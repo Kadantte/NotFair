@@ -11,11 +11,16 @@ import {
 import { listAccessibleCustomersAction } from "@/app/actions";
 import { Loader2, Settings, AlertCircle, CheckCircle2, ChevronDown } from "lucide-react";
 
-export function GoogleAdsAuth() {
+interface GoogleAdsAuthProps {
+    onConnect?: (customerId: string) => void;
+    onDisconnect?: () => void;
+}
+
+export function GoogleAdsAuth({ onConnect, onDisconnect }: GoogleAdsAuthProps) {
     const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [customerName, setCustomerName] = useState<string | null>(null);
-    const [availableCustomers, setAvailableCustomers] = useState<{ id: string, name: string }[]>([]);
+    const [availableCustomers, setAvailableCustomers] = useState<{ id: string, name: string, status: string, error?: string, isTest: boolean }[]>([]);
     const [loading, setLoading] = useState(false);
     const [isClient, setIsClient] = useState(false);
 
@@ -54,7 +59,9 @@ export function GoogleAdsAuth() {
     const fetchCustomers = async (token: string) => {
         setLoading(true);
         try {
+            // @ts-ignore
             const customers = await listAccessibleCustomersAction(token);
+            // @ts-ignore
             setAvailableCustomers(customers);
         } catch (e) {
             console.error(e);
@@ -84,6 +91,7 @@ export function GoogleAdsAuth() {
         localStorage.setItem("google_ads_customer_name", customer.name);
         setCustomerId(id);
         setCustomerName(customer.name);
+        onConnect?.(id);
     };
 
     const handleDisconnect = () => {
@@ -94,6 +102,7 @@ export function GoogleAdsAuth() {
         setCustomerId(null);
         setCustomerName(null);
         setAvailableCustomers([]);
+        onDisconnect?.();
     };
 
     if (!isClient) return null;
@@ -137,7 +146,7 @@ export function GoogleAdsAuth() {
                         </Button>
                     )}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-zinc-950 border-zinc-800 text-zinc-200 min-w-[200px]">
+                <DropdownMenuContent align="end" className="bg-zinc-950 border-zinc-800 text-zinc-200 min-w-[320px]">
                     {loading && <div className="p-2 text-xs text-zinc-500 text-center">Loading accounts...</div>}
 
                     {!loading && availableCustomers.length === 0 && (
@@ -147,13 +156,24 @@ export function GoogleAdsAuth() {
                     {availableCustomers.map(c => (
                         <DropdownMenuItem
                             key={c.id}
-                            onSelect={() => handleSelectCustomer(c)}
-                            className="text-xs focus:bg-zinc-900 focus:text-white cursor-pointer flex flex-col items-start gap-0.5 py-2"
+                            disabled={c.status === "ERROR"}
+                            onSelect={() => c.status !== "ERROR" && handleSelectCustomer(c)}
+                            className={`text-xs flex flex-col items-start gap-1 py-2 ${c.status === "ERROR" ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer focus:bg-zinc-900 focus:text-white'}`}
                         >
-                            <span className="font-medium text-zinc-100">{c.name}</span>
+                            <div className="flex items-center justify-between w-full">
+                                <span className="font-medium text-zinc-100 truncate max-w-[200px]">{c.name}</span>
+                                {c.isTest && <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded border border-amber-500/20">TEST</span>}
+                            </div>
                             <span className="text-[10px] text-zinc-500 font-mono">{c.id.replace('customers/', '')}</span>
+                            {c.error && (
+                                <span className="text-[10px] text-red-400 bg-red-950/20 p-1 rounded border border-red-900/30 mt-1 w-full whitespace-normal leading-tight">
+                                    {c.error}
+                                </span>
+                            )}
                         </DropdownMenuItem>
                     ))}
+
+
 
                     <div className="h-px bg-zinc-800 my-1" />
 
@@ -165,6 +185,8 @@ export function GoogleAdsAuth() {
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+
+
         </div>
     );
 }

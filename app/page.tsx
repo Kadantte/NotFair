@@ -4,23 +4,30 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { GoogleAdsAuth } from '@/components/google-ads-auth';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import { CreateAccountDialog } from '@/components/create-account-dialog';
 
 export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('GOOGLE_ADS_REFRESH_TOKEN');
-    const cid = localStorage.getItem('GOOGLE_ADS_CUSTOMER_ID');
+    const token = localStorage.getItem('google_ads_refresh_token');
+    const cid = localStorage.getItem('google_ads_customer_id');
     if (token && cid) {
       setIsConnected(true);
       setCustomerId(cid);
+      setRefreshToken(token);
     }
   }, []);
 
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white relative overflow-hidden font-sans">
+    <main className="flex min-h-screen flex-col items-center justify-start bg-black text-white relative overflow-hidden font-sans py-8">
       {/* Background gradients */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-black to-black z-0 pointer-events-none" />
 
@@ -45,9 +52,55 @@ export default function Home() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="mt-4"
         >
-          <GoogleAdsAuth />
+          <GoogleAdsAuth
+            onConnect={(cid) => {
+              setIsConnected(true);
+              setCustomerId(cid);
+              setRefreshToken(localStorage.getItem('google_ads_refresh_token'));
+            }}
+            onDisconnect={() => {
+              setIsConnected(false);
+              setCustomerId(null);
+              setRefreshToken(null);
+            }}
+          />
         </motion.div>
+
+
+        {isConnected && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6 flex flex-col items-center gap-4"
+          >
+            <div className="flex gap-4">
+              <Button
+                size="lg"
+                onClick={() => setShowCreateDialog(true)}
+                className="font-semibold bg-white text-black hover:bg-zinc-200 rounded-full px-8"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Account
+              </Button>
+              <Link href="/campaigns">
+                <Button size="lg" className="font-semibold bg-white text-black hover:bg-zinc-200 rounded-full px-8">
+                  View Campaigns <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        )}
       </div>
-    </main>
+
+      {customerId && refreshToken && (
+        <CreateAccountDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          managerId={customerId}
+          refreshToken={refreshToken}
+        />
+      )}
+    </main >
   );
 }
