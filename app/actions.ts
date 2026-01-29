@@ -152,11 +152,11 @@ export async function createSubAccountAction(
 
         // @ts-ignore
         const result = await customer.customers.createCustomerClient({
-            customerId: managerCustomerId,
-            clientCustomer: {
-                descriptiveName: accountName,
-                currencyCode: currencyCode,
-                timeZone: timeZone,
+            customer_id: managerCustomerId,
+            client_customer: {
+                descriptive_name: accountName,
+                currency_code: currencyCode,
+                time_zone: timeZone,
             },
         } as any);
 
