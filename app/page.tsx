@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { GoogleAdsAuth } from '@/components/google-ads-auth';
 
 export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
@@ -17,25 +18,6 @@ export default function Home() {
     }
   }, []);
 
-  const handleConnect = () => {
-    const width = 600;
-    const height = 700;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-
-    window.open(
-      "/api/auth/google/signin",
-      "Google Ads Auth",
-      `width=${width},height=${height},top=${top},left=${left}`
-    );
-  };
-
-  const handleDisconnect = () => {
-    localStorage.removeItem('GOOGLE_ADS_REFRESH_TOKEN');
-    localStorage.removeItem('GOOGLE_ADS_CUSTOMER_ID');
-    setIsConnected(false);
-    setCustomerId(null);
-  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white relative overflow-hidden font-sans">
@@ -63,28 +45,7 @@ export default function Home() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="mt-4"
         >
-          {!isConnected ? (
-            <button
-              onClick={handleConnect}
-              className="group relative inline-flex items-center gap-3 rounded-full bg-white px-8 py-4 text-black transition-all hover:bg-zinc-200 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] ring-offset-black focus:outline-none focus:ring-2 focus:ring-white/20"
-            >
-              <span className="font-semibold text-lg tracking-tight">Connect to Google</span>
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </button>
-          ) : (
-            <div className="flex flex-col items-center gap-6">
-              <div className="flex items-center gap-3 text-emerald-400 bg-emerald-950/30 px-6 py-3 rounded-full border border-emerald-500/20 backdrop-blur-md">
-                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                <span className="font-medium tracking-wide">Ready to Optimize</span>
-              </div>
-              <button
-                onClick={handleDisconnect}
-                className="text-sm text-zinc-600 hover:text-red-400 transition-colors duration-300"
-              >
-                Disconnect Account
-              </button>
-            </div>
-          )}
+          <GoogleAdsAuth />
         </motion.div>
       </div>
     </main>
