@@ -114,65 +114,57 @@ export function GoogleAdsAuth() {
 
     return (
         <div className="flex items-center gap-2 animate-in fade-in duration-500">
-            {customerId ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-green-900/30 rounded-full backdrop-blur-sm group hover:border-green-800/50 transition-colors">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                    <div className="flex flex-col leading-none gap-0.5 text-left">
-                        <span className="text-xs text-zinc-200 font-semibold max-w-[140px] truncate">{customerName || 'Unknown Account'}</span>
-                        <span className="text-[10px] text-zinc-500 font-mono">{customerId}</span>
-                    </div>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                className="ml-1 text-zinc-600 hover:text-red-400 transition-colors outline-none opacity-0 group-hover:opacity-100"
-                                title="Disconnect"
-                            >
-                                <div className="w-3 h-3 rounded-full hover:bg-zinc-800 flex items-center justify-center">×</div>
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-zinc-950 border-zinc-800">
-                            <DropdownMenuItem
-                                onSelect={handleDisconnect}
-                                className="text-red-400 focus:text-red-300 focus:bg-red-900/20 cursor-pointer text-xs font-medium"
-                            >
-                                Confirm Disconnect
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ) : (
-                <DropdownMenu onOpenChange={(open: boolean) => {
-                    if (open && availableCustomers.length === 0 && refreshToken) {
-                        fetchCustomers(refreshToken);
-                    }
-                }}>
-                    <DropdownMenuTrigger asChild>
+            <DropdownMenu onOpenChange={(open: boolean) => {
+                if (open && availableCustomers.length === 0 && refreshToken) {
+                    fetchCustomers(refreshToken);
+                }
+            }}>
+                <DropdownMenuTrigger asChild>
+                    {customerId ? (
+                        <button className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-green-900/30 rounded-full backdrop-blur-sm group hover:border-green-800/50 transition-colors outline-none text-left">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                            <div className="flex flex-col leading-none gap-0.5 text-left">
+                                <span className="text-xs text-zinc-200 font-semibold max-w-[140px] truncate">{customerName || 'Unknown Account'}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">{customerId}</span>
+                            </div>
+                            <ChevronDown className="w-3 h-3 text-zinc-600 ml-1 opacity-50 group-hover:opacity-100" />
+                        </button>
+                    ) : (
                         <Button variant="outline" className="gap-2 text-amber-500 border-amber-900/30 bg-amber-950/10 hover:bg-amber-950/20">
                             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertCircle className="w-3.5 h-3.5" />}
                             Select Account
                             <ChevronDown className="w-3 h-3 opacity-50" />
                         </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-zinc-950 border-zinc-800 text-zinc-200">
-                        {loading && <div className="p-2 text-xs text-zinc-500 text-center">Loading accounts...</div>}
+                    )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-zinc-950 border-zinc-800 text-zinc-200 min-w-[200px]">
+                    {loading && <div className="p-2 text-xs text-zinc-500 text-center">Loading accounts...</div>}
 
-                        {!loading && availableCustomers.length === 0 && (
-                            <div className="p-2 text-xs text-zinc-500 text-center">No accounts found</div>
-                        )}
+                    {!loading && availableCustomers.length === 0 && (
+                        <div className="p-2 text-xs text-zinc-500 text-center">No accounts found</div>
+                    )}
 
-                        {availableCustomers.map(c => (
-                            <DropdownMenuItem
-                                key={c.id}
-                                onSelect={() => handleSelectCustomer(c)}
-                                className="text-xs focus:bg-zinc-900 focus:text-white cursor-pointer flex flex-col items-start gap-0.5 py-2"
-                            >
-                                <span className="font-medium text-zinc-100">{c.name}</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">{c.id.replace('customers/', '')}</span>
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
+                    {availableCustomers.map(c => (
+                        <DropdownMenuItem
+                            key={c.id}
+                            onSelect={() => handleSelectCustomer(c)}
+                            className="text-xs focus:bg-zinc-900 focus:text-white cursor-pointer flex flex-col items-start gap-0.5 py-2"
+                        >
+                            <span className="font-medium text-zinc-100">{c.name}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono">{c.id.replace('customers/', '')}</span>
+                        </DropdownMenuItem>
+                    ))}
+
+                    <div className="h-px bg-zinc-800 my-1" />
+
+                    <DropdownMenuItem
+                        onSelect={handleDisconnect}
+                        className="text-red-400 focus:text-red-300 focus:bg-red-900/20 cursor-pointer text-xs font-medium"
+                    >
+                        Disconnect
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
     );
 }
