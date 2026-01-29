@@ -14,6 +14,7 @@ import { Loader2, Settings, AlertCircle, CheckCircle2, ChevronDown } from "lucid
 export function GoogleAdsAuth() {
     const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [customerId, setCustomerId] = useState<string | null>(null);
+    const [customerName, setCustomerName] = useState<string | null>(null);
     const [availableCustomers, setAvailableCustomers] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(false);
     const [isClient, setIsClient] = useState(false);
@@ -23,6 +24,7 @@ export function GoogleAdsAuth() {
         // Check local storage on mount
         const storedRefresh = localStorage.getItem("google_ads_refresh_token");
         const storedCustomer = localStorage.getItem("google_ads_customer_id");
+        const storedName = localStorage.getItem("google_ads_customer_name");
 
         if (storedRefresh) {
             setRefreshToken(storedRefresh);
@@ -30,6 +32,7 @@ export function GoogleAdsAuth() {
             // User can click menu to fetch if needed or we fetch on mount
         }
         if (storedCustomer) setCustomerId(storedCustomer);
+        if (storedName) setCustomerName(storedName);
 
         // Listen for auth success message from popup
         const handleMessage = (event: MessageEvent) => {
@@ -74,18 +77,22 @@ export function GoogleAdsAuth() {
         );
     };
 
-    const handleSelectCustomer = (cid: string) => {
+    const handleSelectCustomer = (customer: { id: string, name: string }) => {
         // cid is 'customers/123-456-7890'
-        const id = cid.replace("customers/", "");
+        const id = customer.id.replace("customers/", "");
         localStorage.setItem("google_ads_customer_id", id);
+        localStorage.setItem("google_ads_customer_name", customer.name);
         setCustomerId(id);
+        setCustomerName(customer.name);
     };
 
     const handleDisconnect = () => {
         localStorage.removeItem("google_ads_refresh_token");
         localStorage.removeItem("google_ads_customer_id");
+        localStorage.removeItem("google_ads_customer_name");
         setRefreshToken(null);
         setCustomerId(null);
+        setCustomerName(null);
         setAvailableCustomers([]);
     };
 
@@ -108,13 +115,16 @@ export function GoogleAdsAuth() {
     return (
         <div className="flex items-center gap-2 animate-in fade-in duration-500">
             {customerId ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-green-900/30 rounded-full backdrop-blur-sm">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-xs text-green-100 font-mono">{customerId}</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-green-900/30 rounded-full backdrop-blur-sm group hover:border-green-800/50 transition-colors">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    <div className="flex flex-col leading-none gap-0.5 text-left">
+                        <span className="text-xs text-zinc-200 font-semibold max-w-[140px] truncate">{customerName || 'Unknown Account'}</span>
+                        <span className="text-[10px] text-zinc-500 font-mono">{customerId}</span>
+                    </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
-                                className="ml-1 text-zinc-600 hover:text-red-400 transition-colors outline-none"
+                                className="ml-1 text-zinc-600 hover:text-red-400 transition-colors outline-none opacity-0 group-hover:opacity-100"
                                 title="Disconnect"
                             >
                                 <div className="w-3 h-3 rounded-full hover:bg-zinc-800 flex items-center justify-center">×</div>
@@ -153,7 +163,7 @@ export function GoogleAdsAuth() {
                         {availableCustomers.map(c => (
                             <DropdownMenuItem
                                 key={c.id}
-                                onSelect={() => handleSelectCustomer(c.id)}
+                                onSelect={() => handleSelectCustomer(c)}
                                 className="text-xs focus:bg-zinc-900 focus:text-white cursor-pointer flex flex-col items-start gap-0.5 py-2"
                             >
                                 <span className="font-medium text-zinc-100">{c.name}</span>
