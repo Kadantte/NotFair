@@ -109,11 +109,11 @@ export async function listCampaignsAction(refreshToken: string, customerId: stri
 
         return response.map((row: any) => ({
             id: row.campaign.id,
-            name: row.campaign.name,
+            name: row.campaign.name || 'Untitled Campaign',
             status: row.campaign.status,
-            type: row.campaign.advertising_channel_type,
-            impressions: row.metrics.impressions,
-            clicks: row.metrics.clicks,
+            type: row.campaign.advertising_channel_type || 'UNKNOWN',
+            impressions: row.metrics.impressions || 0,
+            clicks: row.metrics.clicks || 0,
             cost: row.metrics.cost_micros ? (row.metrics.cost_micros / 1000000) : 0
         }));
 

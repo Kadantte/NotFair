@@ -125,7 +125,7 @@ export default function CampaignsPage() {
                                             <h3 className="text-lg font-medium text-zinc-100 truncate pr-4 group-hover:text-white transition-colors">
                                                 {campaign.name}
                                             </h3>
-                                            <p className="text-xs text-zinc-500 mt-1 capitalize">{campaign.type.replace(/_/g, ' ').toLowerCase()}</p>
+                                            <p className="text-xs text-zinc-500 mt-1 capitalize">{String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</p>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-8 border-t md:border-t-0 md:border-l border-zinc-800/50 pt-4 md:pt-0 md:pl-8">
@@ -134,21 +134,21 @@ export default function CampaignsPage() {
                                                     <TrendingUp className="w-3.5 h-3.5" />
                                                     Impressions
                                                 </div>
-                                                <p className="text-sm font-semibold text-zinc-200">{campaign.impressions.toLocaleString()}</p>
+                                                <p className="text-sm font-semibold text-zinc-200">{(campaign.impressions || 0).toLocaleString()}</p>
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-1.5 text-zinc-500 text-xs mb-1">
                                                     <MousePointer2 className="w-3.5 h-3.5" />
                                                     Clicks
                                                 </div>
-                                                <p className="text-sm font-semibold text-zinc-200">{campaign.clicks.toLocaleString()}</p>
+                                                <p className="text-sm font-semibold text-zinc-200">{(campaign.clicks || 0).toLocaleString()}</p>
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-1.5 text-zinc-500 text-xs mb-1">
                                                     <DollarSign className="w-3.5 h-3.5" />
                                                     Cost
                                                 </div>
-                                                <p className="text-sm font-semibold text-zinc-200">${campaign.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                <p className="text-sm font-semibold text-zinc-200">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
                                         </div>
                                     </div>
