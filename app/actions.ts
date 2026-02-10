@@ -123,50 +123,6 @@ export async function listCampaignsAction(refreshToken: string, customerId: stri
     }
 }
 
-export async function createSubAccountAction(
-    refreshToken: string,
-    managerCustomerId: string,
-    accountName: string,
-    currencyCode: string,
-    timeZone: string
-) {
-    const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
 
-    if (!clientId || !clientSecret || !developerToken) {
-        throw new Error("Missing Server Google Ads Configuration");
-    }
-
-    try {
-        const client = new GoogleAdsApi({
-            client_id: clientId,
-            client_secret: clientSecret,
-            developer_token: developerToken,
-        });
-
-        const customer = client.Customer({
-            customer_id: managerCustomerId,
-            refresh_token: refreshToken,
-        });
-
-        // @ts-ignore
-        const result = await customer.customers.createCustomerClient({
-            customer_id: managerCustomerId,
-            client_customer: {
-                descriptive_name: accountName,
-                currency_code: currencyCode,
-                time_zone: timeZone,
-            },
-        } as any);
-
-        return { success: true, resourceName: result.resource_name };
-    } catch (error: any) {
-        console.error("Create Account Error:", JSON.stringify(error, null, 2));
-        // Extract meaningful error message if possible
-        const msg = error.details || error.message || "Failed to create account";
-        return { success: false, error: msg };
-    }
-}
 
 

@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { GoogleAdsAuth } from '@/components/google-ads-auth';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { CreateAccountDialog } from '@/components/create-account-dialog';
+
 
 export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
 
   useEffect(() => {
     const token = localStorage.getItem('google_ads_refresh_token');
@@ -75,14 +74,6 @@ export default function Home() {
             className="mt-6 flex flex-col items-center gap-4"
           >
             <div className="flex gap-4">
-              <Button
-                size="lg"
-                onClick={() => setShowCreateDialog(true)}
-                className="font-semibold bg-white text-black hover:bg-zinc-200 rounded-full px-8"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Account
-              </Button>
               <Link href="/campaigns">
                 <Button size="lg" className="font-semibold bg-white text-black hover:bg-zinc-200 rounded-full px-8">
                   View Campaigns <ArrowRight className="w-4 h-4 ml-2" />
@@ -92,15 +83,6 @@ export default function Home() {
           </motion.div>
         )}
       </div>
-
-      {customerId && refreshToken && (
-        <CreateAccountDialog
-          open={showCreateDialog}
-          onOpenChange={setShowCreateDialog}
-          managerId={customerId}
-          refreshToken={refreshToken}
-        />
-      )}
     </main >
   );
 }
