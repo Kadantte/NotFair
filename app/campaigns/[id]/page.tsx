@@ -57,20 +57,71 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const resolvedParams = use(params);
     const campaignId = resolvedParams.id;
 
+    type TimeRange = 'ALL' | '5Y' | '1Y' | '6M' | '3M' | '1M' | '1W' | 'YESTERDAY' | 'TODAY';
+    const [timeRange, setTimeRange] = useState<TimeRange>('ALL');
+
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<CampaignHistory[]>([]);
     const [keywords, setKeywords] = useState<CampaignKeyword[]>([]);
     const [error, setError] = useState<string | null>(null);
 
+    const formatDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const getDateRange = (range: TimeRange) => {
+        const today = new Date();
+        const end = new Date(today);
+        let start = new Date(today);
+
+        switch (range) {
+            case 'ALL':
+                return { startDate: '2000-01-01', endDate: '2030-12-31' };
+            case '5Y':
+                start.setFullYear(today.getFullYear() - 5);
+                break;
+            case '1Y':
+                start.setFullYear(today.getFullYear() - 1);
+                break;
+            case '6M':
+                start.setMonth(today.getMonth() - 6);
+                break;
+            case '3M':
+                start.setMonth(today.getMonth() - 3);
+                break;
+            case '1M':
+                start.setMonth(today.getMonth() - 1);
+                break;
+            case '1W':
+                start.setDate(today.getDate() - 7);
+                break;
+            case 'YESTERDAY':
+                start.setDate(today.getDate() - 1);
+                end.setDate(today.getDate() - 1);
+                break;
+            case 'TODAY':
+                break; // start and end are already today
+        }
+
+        return {
+            startDate: formatDate(start),
+            endDate: formatDate(end)
+        };
+    };
+
     useEffect(() => {
         fetchData();
-    }, [campaignId]);
+    }, [campaignId, timeRange]);
 
     const fetchData = async () => {
         setLoading(true);
         setError(null);
         const token = localStorage.getItem('google_ads_refresh_token');
         const cid = localStorage.getItem('google_ads_customer_id');
+        const { startDate, endDate } = getDateRange(timeRange);
 
         if (!token || !cid) {
             router.push('/');
@@ -79,8 +130,8 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
 
         try {
             const [historyData, keywordsData] = await Promise.all([
-                getCampaignHistoryAction(token, cid, campaignId),
-                getCampaignKeywordsAction(token, cid, campaignId)
+                getCampaignHistoryAction(token, cid, campaignId, startDate, endDate),
+                getCampaignKeywordsAction(token, cid, campaignId, startDate, endDate)
             ]);
             setHistory(historyData);
             setKeywords(keywordsData);
@@ -117,15 +168,35 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
 
             <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
-                <header className="flex items-center gap-4 mb-12">
-                    <Link href="/campaigns">
-                        <Button variant="ghost" size="icon" className="hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full">
-                            <ArrowLeft className="w-5 h-5" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Campaign Details</h1>
-                        <p className="text-zinc-500 text-sm mt-1">Campaign ID: {campaignId}</p>
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                    <div className="flex items-center gap-4">
+                        <Link href="/campaigns">
+                            <Button variant="ghost" size="icon" className="hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full">
+                                <ArrowLeft className="w-5 h-5" />
+                            </Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight">Campaign Details</h1>
+                            <p className="text-zinc-500 text-sm mt-1">Campaign ID: {campaignId}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50">
+                        {(['ALL', '5Y', '1Y', '6M', '3M', '1M', '1W', 'YESTERDAY', 'TODAY'] as const).map((range) => (
+                            <button
+                                key={range}
+                                onClick={() => setTimeRange(range)}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${timeRange === range
+                                        ? 'bg-indigo-500/20 text-indigo-300 shadow-sm border border-indigo-500/20'
+                                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                                    }`}
+                            >
+                                {range === 'ALL' ? 'All Time' :
+                                    range === 'YESTERDAY' ? 'Yesterday' :
+                                        range === 'TODAY' ? 'Today' :
+                                            range}
+                            </button>
+                        ))}
                     </div>
                 </header>
 

@@ -124,10 +124,14 @@ export async function listCampaignsAction(refreshToken: string, customerId: stri
     }
 }
 
-export async function getCampaignHistoryAction(refreshToken: string, customerId: string, campaignId: string) {
+export async function getCampaignHistoryAction(refreshToken: string, customerId: string, campaignId: string, startDate?: string, endDate?: string) {
     const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
     const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+
+    // Default to a wide range if not provided (All Time)
+    const effectiveStartDate = startDate || '2000-01-01';
+    const effectiveEndDate = endDate || '2030-12-31';
 
     if (!clientId || !clientSecret || !developerToken) {
         throw new Error("Missing Server Google Ads Configuration");
@@ -145,7 +149,7 @@ export async function getCampaignHistoryAction(refreshToken: string, customerId:
             refresh_token: refreshToken,
         });
 
-        // Query daily metrics for full history (simulated by using a wide date range)
+        // Query daily metrics for the specified date range
         const response = await customer.query(`
             SELECT 
                 segments.date, 
@@ -156,7 +160,7 @@ export async function getCampaignHistoryAction(refreshToken: string, customerId:
                 metrics.average_cpc
             FROM campaign 
             WHERE campaign.id = ${campaignId}
-              AND segments.date BETWEEN '2000-01-01' AND '2030-12-31'
+              AND segments.date BETWEEN '${effectiveStartDate}' AND '${effectiveEndDate}'
             ORDER BY segments.date ASC
         `);
 
@@ -175,10 +179,14 @@ export async function getCampaignHistoryAction(refreshToken: string, customerId:
     }
 }
 
-export async function getCampaignKeywordsAction(refreshToken: string, customerId: string, campaignId: string) {
+export async function getCampaignKeywordsAction(refreshToken: string, customerId: string, campaignId: string, startDate?: string, endDate?: string) {
     const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
     const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+
+    // Default to a wide range if not provided (All Time)
+    const effectiveStartDate = startDate || '2000-01-01';
+    const effectiveEndDate = endDate || '2030-12-31';
 
     if (!clientId || !clientSecret || !developerToken) {
         throw new Error("Missing Server Google Ads Configuration");
@@ -196,7 +204,7 @@ export async function getCampaignKeywordsAction(refreshToken: string, customerId
             refresh_token: refreshToken,
         });
 
-        // Query keyword performance (all time)
+        // Query keyword performance for the specified date range
         const response = await customer.query(`
             SELECT 
                 ad_group_criterion.criterion_id,
@@ -210,7 +218,7 @@ export async function getCampaignKeywordsAction(refreshToken: string, customerId
                 metrics.average_cpc
             FROM keyword_view 
             WHERE campaign.id = ${campaignId}
-              AND segments.date BETWEEN '2000-01-01' AND '2030-12-31'
+              AND segments.date BETWEEN '${effectiveStartDate}' AND '${effectiveEndDate}'
             ORDER BY metrics.impressions DESC
             LIMIT 50
         `);
