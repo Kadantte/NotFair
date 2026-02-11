@@ -112,7 +112,8 @@ export default function CampaignsPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
                                     key={campaign.id}
-                                    className="group relative bg-zinc-900/40 hover:bg-zinc-900/60 border border-zinc-800/50 hover:border-zinc-700 transition-all duration-300 rounded-xl p-5"
+                                    onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                                    className="group relative bg-zinc-900/40 hover:bg-zinc-900/60 border border-zinc-800/50 hover:border-zinc-700 transition-all duration-300 rounded-xl p-5 cursor-pointer"
                                 >
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                         <div className="flex-1 min-w-0">
