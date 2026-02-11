@@ -14,9 +14,12 @@ import { Loader2, Settings, AlertCircle, CheckCircle2, ChevronDown } from "lucid
 interface GoogleAdsAuthProps {
     onConnect?: (customerId: string) => void;
     onDisconnect?: () => void;
+    className?: string;
+    size?: "default" | "sm" | "lg" | "icon";
+    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 }
 
-export function GoogleAdsAuth({ onConnect, onDisconnect }: GoogleAdsAuthProps) {
+export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm", variant = "outline" }: GoogleAdsAuthProps) {
     const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [customerName, setCustomerName] = useState<string | null>(null);
@@ -110,13 +113,13 @@ export function GoogleAdsAuth({ onConnect, onDisconnect }: GoogleAdsAuthProps) {
     if (!refreshToken) {
         return (
             <Button
-                variant="outline"
+                variant={variant}
                 onClick={handleConnect}
-                className="gap-2 bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 backdrop-blur-sm"
-                size="sm"
+                className={className || "gap-2 bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 backdrop-blur-sm"}
+                size={size}
             >
-                <Settings className="w-3.5 h-3.5" />
-                Connect Ads
+                <Settings className="w-3.5 h-3.5 mr-2" />
+                Connect to Google Ads
             </Button>
         );
     }
