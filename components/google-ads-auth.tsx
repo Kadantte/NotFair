@@ -25,6 +25,7 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
     const [customerName, setCustomerName] = useState<string | null>(null);
     const [availableCustomers, setAvailableCustomers] = useState<{ id: string, name: string, status: string, error?: string, isTest: boolean }[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -66,6 +67,7 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
             const customers = await listAccessibleCustomersAction(token);
             // @ts-ignore
             setAvailableCustomers(customers);
+            setIsDropdownOpen(true);
         } catch (e) {
             console.error(e);
             // Maybe toast error
@@ -126,11 +128,15 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
 
     return (
         <div className="flex items-center gap-2 animate-in fade-in duration-500">
-            <DropdownMenu onOpenChange={(open: boolean) => {
-                if (open && availableCustomers.length === 0 && refreshToken) {
-                    fetchCustomers(refreshToken);
-                }
-            }}>
+            <DropdownMenu
+                open={isDropdownOpen}
+                onOpenChange={(open: boolean) => {
+                    setIsDropdownOpen(open);
+                    if (open && availableCustomers.length === 0 && refreshToken) {
+                        fetchCustomers(refreshToken);
+                    }
+                }}
+            >
                 <DropdownMenuTrigger asChild>
                     {customerId ? (
                         <button className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-green-900/30 rounded-full backdrop-blur-sm group hover:border-green-800/50 transition-colors outline-none text-left">
@@ -143,13 +149,22 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
                         </button>
                     ) : (
                         <Button variant="outline" className="gap-2 text-amber-500 border-amber-900/30 bg-amber-950/10 hover:bg-amber-950/20">
-                            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                            Select Account
-                            <ChevronDown className="w-3 h-3 opacity-50" />
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    Loading...
+                                </>
+                            ) : (
+                                <>
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    Select Account
+                                    <ChevronDown className="w-3 h-3 opacity-50" />
+                                </>
+                            )}
                         </Button>
                     )}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-zinc-950 border-zinc-800 text-zinc-200 min-w-[320px]">
+                <DropdownMenuContent align="center" className="bg-zinc-950 border-zinc-800 text-zinc-200 min-w-[320px]">
                     {loading && <div className="p-2 text-xs text-zinc-500 text-center">Loading accounts...</div>}
 
                     {!loading && availableCustomers.length === 0 && (
