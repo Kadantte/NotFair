@@ -124,11 +124,18 @@ export default function Home() {
                         className="flex flex-col items-center gap-6 w-full"
                     >
                         {isConnected && (
-                            <Link href="/campaigns">
-                                <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]">
-                                    Go to Dashboard <ArrowRight className="w-5 h-5 ml-2" />
-                                </Button>
-                            </Link>
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                                <Link href="/campaigns">
+                                    <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]">
+                                        Go to Dashboard <ArrowRight className="w-5 h-5 ml-2" />
+                                    </Button>
+                                </Link>
+                                <Link href="/chat">
+                                    <Button size="lg" variant="outline" className="h-14 px-10 text-lg font-semibold rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
+                                        Open Copilot
+                                    </Button>
+                                </Link>
+                            </div>
                         )}
 
                         <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${isConnected ? 'scale-90 opacity-80 hover:opacity-100' : 'scale-100'}`}>
