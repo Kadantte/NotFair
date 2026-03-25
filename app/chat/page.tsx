@@ -2,27 +2,24 @@
 
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
+import type { ElementType, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import {
   Bot,
   ChevronDown,
   ChevronRight,
   Loader2,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
   Send,
   Sparkles,
   Square,
-  Trash2,
   User,
 } from "lucide-react";
+import { AppSidebar, type SidebarThread } from "@/components/app-sidebar";
 import { GoogleAdsAuth } from "@/components/google-ads-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
+import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from "@/lib/chat-history";
 
 type StoredAccount = {
   refreshToken: string | null;
@@ -38,7 +35,6 @@ type ChatThread = {
   messages: GoogleAdsAgentUIMessage[];
 };
 
-const CHAT_HISTORY_KEY = "adsagent_chat_history_v1";
 const emptyAccount: StoredAccount = {
   refreshToken: null,
   customerId: null,
@@ -116,15 +112,6 @@ function getThreadTitle(messages: GoogleAdsAgentUIMessage[]): string {
   return text.slice(0, 48);
 }
 
-function formatThreadTime(isoString: string): string {
-  const date = new Date(isoString);
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function applyActiveThreadSnapshot(
   threads: ChatThread[],
   activeThreadId: string,
@@ -140,6 +127,228 @@ function applyActiveThreadSnapshot(
         }
       : thread,
   );
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const pattern =
+    /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+  const matches = text.split(pattern).filter(Boolean);
+
+  return matches.map((part, index) => {
+    const key = `${keyPrefix}-${index}`;
+
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code
+          key={key}
+          className="rounded-md bg-white/8 px-1.5 py-0.5 font-mono text-[0.95em] text-zinc-100"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    if (
+      (part.startsWith("**") && part.endsWith("**")) ||
+      (part.startsWith("__") && part.endsWith("__"))
+    ) {
+      return <strong key={key}>{part.slice(2, -2)}</strong>;
+    }
+
+    if (
+      (part.startsWith("*") && part.endsWith("*")) ||
+      (part.startsWith("_") && part.endsWith("_"))
+    ) {
+      return <em key={key}>{part.slice(1, -1)}</em>;
+    }
+
+    const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
+
+    if (linkMatch) {
+      return (
+        <a
+          key={key}
+          href={linkMatch[2]}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-300 underline underline-offset-4 hover:text-blue-200"
+        >
+          {linkMatch[1]}
+        </a>
+      );
+    }
+
+    return part;
+  });
+}
+
+function renderMarkdown(text: string): ReactNode[] {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const nodes: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    const codeFenceMatch = /^```(\w+)?\s*$/.exec(line);
+    if (codeFenceMatch) {
+      const language = codeFenceMatch[1];
+      index += 1;
+      const codeLines: string[] = [];
+
+      while (index < lines.length && !/^```/.test(lines[index])) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+
+      if (index < lines.length) {
+        index += 1;
+      }
+
+      nodes.push(
+        <pre
+          key={`code-${nodes.length}`}
+          className="overflow-x-auto rounded-2xl border border-zinc-800 bg-black/40 p-4 text-sm leading-6 text-zinc-200"
+        >
+          {language ? (
+            <div className="mb-3 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+              {language}
+            </div>
+          ) : null}
+          <code>{codeLines.join("\n")}</code>
+        </pre>,
+      );
+      continue;
+    }
+
+    const headingMatch = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const className =
+        level === 1
+          ? "text-3xl font-semibold text-white"
+          : level === 2
+            ? "text-2xl font-semibold text-white"
+            : level === 3
+              ? "text-xl font-semibold text-white"
+              : "text-base font-semibold text-zinc-100";
+      const Tag = `h${Math.min(level, 6)}` as ElementType;
+
+      nodes.push(
+        <Tag key={`heading-${nodes.length}`} className={className}>
+          {renderInlineMarkdown(headingMatch[2], `heading-${nodes.length}`)}
+        </Tag>,
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^([-*_]){3,}\s*$/.test(line.trim())) {
+      nodes.push(
+        <hr key={`hr-${nodes.length}`} className="border-zinc-800" />,
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quoteLines: string[] = [];
+
+      while (index < lines.length && /^>\s?/.test(lines[index])) {
+        quoteLines.push(lines[index].replace(/^>\s?/, ""));
+        index += 1;
+      }
+
+      nodes.push(
+        <blockquote
+          key={`quote-${nodes.length}`}
+          className="border-l-2 border-zinc-700 pl-4 text-zinc-300"
+        >
+          {quoteLines.map((quoteLine, quoteIndex) => (
+            <p key={`quote-line-${quoteIndex}`}>
+              {renderInlineMarkdown(quoteLine, `quote-${quoteIndex}`)}
+            </p>
+          ))}
+        </blockquote>,
+      );
+      continue;
+    }
+
+    if (/^[-*+]\s+/.test(line)) {
+      const items: string[] = [];
+
+      while (index < lines.length && /^[-*+]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^[-*+]\s+/, ""));
+        index += 1;
+      }
+
+      nodes.push(
+        <ul
+          key={`ul-${nodes.length}`}
+          className="list-disc space-y-2 pl-6 text-zinc-100"
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`ul-item-${itemIndex}`}>
+              {renderInlineMarkdown(item, `ul-${itemIndex}`)}
+            </li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\d+\.\s+/, ""));
+        index += 1;
+      }
+
+      nodes.push(
+        <ol
+          key={`ol-${nodes.length}`}
+          className="list-decimal space-y-2 pl-6 text-zinc-100"
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`ol-item-${itemIndex}`}>
+              {renderInlineMarkdown(item, `ol-${itemIndex}`)}
+            </li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^```/.test(lines[index]) &&
+      !/^(#{1,6})\s+/.test(lines[index]) &&
+      !/^>\s?/.test(lines[index]) &&
+      !/^[-*+]\s+/.test(lines[index]) &&
+      !/^\d+\.\s+/.test(lines[index]) &&
+      !/^([-*_]){3,}\s*$/.test(lines[index].trim())
+    ) {
+      paragraphLines.push(lines[index]);
+      index += 1;
+    }
+
+    nodes.push(
+      <p key={`p-${nodes.length}`} className="text-[15px] leading-7 text-zinc-100">
+        {renderInlineMarkdown(paragraphLines.join(" "), `p-${nodes.length}`)}
+      </p>,
+    );
+  }
+
+  return nodes;
 }
 
 function ToolBlock({
@@ -217,9 +426,9 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
               return (
                 <div
                   key={`${message.id}-${index}`}
-                  className="whitespace-pre-wrap text-[15px] leading-7 text-zinc-100"
+                  className="space-y-4 text-[15px] leading-7 text-zinc-100"
                 >
-                  {part.text}
+                  {renderMarkdown(part.text)}
                 </div>
               );
             default:
@@ -294,10 +503,16 @@ export default function ChatPage() {
     const frame = window.requestAnimationFrame(() => {
       const storedThreads = loadThreads();
       const initialThreads = storedThreads.length > 0 ? storedThreads : [createThread()];
+      const preferredThreadId = localStorage.getItem(ACTIVE_CHAT_THREAD_KEY);
+      const initialActiveThreadId =
+        preferredThreadId &&
+        initialThreads.some(thread => thread.id === preferredThreadId)
+          ? preferredThreadId
+          : initialThreads[0].id;
 
       setAccount(readStoredAccount());
       setThreads(initialThreads);
-      setActiveThreadId(initialThreads[0].id);
+      setActiveThreadId(initialActiveThreadId);
       setIsHydrated(true);
     });
 
@@ -353,6 +568,7 @@ export default function ChatPage() {
       return nextThreads;
     });
     setActiveThreadId(newThread.id);
+    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, newThread.id);
     setInput("");
   }
 
@@ -366,6 +582,7 @@ export default function ChatPage() {
       applyActiveThreadSnapshot(currentThreads, activeThreadId, messages),
     );
     setActiveThreadId(threadId);
+    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
   }
 
   function handleDeleteThread(threadId: string) {
@@ -380,6 +597,7 @@ export default function ChatPage() {
 
       if (threadId === activeThreadId) {
         setActiveThreadId(fallbackThreads[0].id);
+        localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, fallbackThreads[0].id);
         setInput("");
       }
 
@@ -403,135 +621,21 @@ export default function ChatPage() {
             : "lg:grid-cols-[280px_minmax(0,1fr)]"
         }`}
       >
-        <aside className="border-b border-white/8 bg-[#171717] transition-all duration-300 ease-out lg:border-b-0 lg:border-r lg:border-r-white/8">
-          <div className="flex h-screen flex-col">
-            <div className="shrink-0 p-4">
-              <div
-                className={`group relative flex items-center transition-all duration-300 ease-out ${
-                  isSidebarCollapsed ? "justify-center" : "justify-between gap-2"
-                }`}
-              >
-                <Link
-                  href="/"
-                  className={`inline-flex items-center rounded-xl px-1 py-1 transition ${
-                    isSidebarCollapsed
-                      ? "opacity-100 group-hover:opacity-0"
-                      : "hover:bg-white/5"
-                  }`}
-                >
-                  <Image src="/logo.svg" alt="AdsAgent" width={24} height={24} />
-                </Link>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setIsSidebarCollapsed(current => !current)}
-                  className={`rounded-full text-zinc-400 transition-all duration-300 ease-out hover:bg-white/5 hover:text-white ${
-                    isSidebarCollapsed
-                      ? "pointer-events-none absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-                      : ""
-                  }`}
-                >
-                  {isSidebarCollapsed ? (
-                    <PanelLeftOpen className="h-4 w-4" />
-                  ) : (
-                    <PanelLeftClose className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-
-              <div
-                className={`mt-6 space-y-1 ${
-                  isSidebarCollapsed ? "flex flex-col items-center" : ""
-                }`}
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleCreateThread}
-                  className={`h-12 rounded-2xl px-3 text-white transition-all duration-300 ease-out hover:bg-white/6 hover:text-white ${
-                    isSidebarCollapsed
-                      ? "w-12 justify-center gap-0 self-center px-0"
-                      : "w-full justify-start"
-                  }`}
-                >
-                  <Plus className="h-5 w-5" />
-                  <span
-                    className={`overflow-hidden whitespace-nowrap text-[15px] transition-all duration-300 ease-out ${
-                      isSidebarCollapsed ? "max-w-0 opacity-0" : "ml-4 max-w-32 opacity-100"
-                    }`}
-                  >
-                    New chat
-                  </span>
-                </Button>
-              </div>
-            </div>
-
-            <div
-              className={`min-h-0 flex-1 overflow-y-auto px-3 pb-4 transition-opacity duration-200 ${
-                isSidebarCollapsed ? "hidden" : "block"
-              }`}
-            >
-              {sortedThreads.map(thread => (
-                <div
-                  key={thread.id}
-                  onClick={() => {
-                    if (isSidebarCollapsed) {
-                      handleSelectThread(thread.id);
-                    }
-                  }}
-                  className={`mb-1 rounded-2xl transition ${
-                    thread.id === activeThreadId
-                      ? "bg-white/8"
-                      : "bg-transparent hover:bg-white/[0.05]"
-                  }`}
-                >
-                  <div
-                    className={`flex min-h-12 p-3 transition-all duration-300 ease-out ${
-                      isSidebarCollapsed ? "items-center justify-center" : "items-start gap-2"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleSelectThread(thread.id)}
-                      className={`min-w-0 flex-1 text-left ${
-                        isSidebarCollapsed ? "hidden" : "block"
-                      }`}
-                    >
-                      {!isSidebarCollapsed && (
-                        <>
-                          <div className="truncate text-[14px] font-medium text-zinc-100">
-                            {thread.title}
-                          </div>
-                          <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
-                            <span>{formatThreadTime(thread.updatedAt)}</span>
-                            <span>·</span>
-                            <span>{thread.messages.length} messages</span>
-                          </div>
-                        </>
-                      )}
-                    </button>
-                    {!isSidebarCollapsed && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={event => {
-                          event.stopPropagation();
-                          handleDeleteThread(thread.id);
-                        }}
-                        className="shrink-0 rounded-full text-zinc-500 hover:bg-white/10 hover:text-zinc-200"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
+        <AppSidebar
+          currentPath="/chat"
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapsed={() => setIsSidebarCollapsed(current => !current)}
+          onCreateThread={handleCreateThread}
+          threads={sortedThreads.map<SidebarThread>(thread => ({
+            id: thread.id,
+            title: thread.title,
+            updatedAt: thread.updatedAt,
+            messageCount: thread.messages.length,
+          }))}
+          activeThreadId={activeThreadId}
+          onSelectThread={handleSelectThread}
+          onDeleteThread={handleDeleteThread}
+        />
 
         <section className="flex min-h-0 h-screen flex-col overflow-hidden">
           <header className="shrink-0 border-b border-white/10 bg-black/50 backdrop-blur-xl">

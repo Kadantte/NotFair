@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useCallback, useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, History, Search, Zap, MousePointer2, TrendingUp, DollarSign, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { History, Search, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { AppSidebar, type SidebarThread } from '@/components/app-sidebar';
 import { Button } from '@/components/ui/button';
 import { getCampaignHistoryAction, getCampaignKeywordsAction, generateCampaignSummaryAction } from '@/app/actions';
+import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from '@/lib/chat-history';
 import {
-    LineChart,
-    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -41,8 +40,87 @@ interface CampaignKeyword {
     averageCpc: number;
 }
 
+type TimeRange = 'ALL' | '5Y' | '1Y' | '6M' | '3M' | '1M' | '1W' | 'YESTERDAY' | 'TODAY';
+
+function loadSidebarThreads(): SidebarThread[] {
+    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .filter(thread => thread && typeof thread.id === 'string' && typeof thread.title === 'string')
+            .map(thread => ({
+                id: thread.id,
+                title: thread.title,
+                updatedAt: thread.updatedAt ?? new Date().toISOString(),
+                messageCount: Array.isArray(thread.messages) ? thread.messages.length : 0,
+            }))
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    } catch {
+        return [];
+    }
+}
+
+function formatDate(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getDateRange(range: TimeRange) {
+    const today = new Date();
+    const end = new Date(today);
+    const start = new Date(today);
+
+    switch (range) {
+        case 'ALL':
+            return { startDate: '2000-01-01', endDate: '2030-12-31' };
+        case '5Y':
+            start.setFullYear(today.getFullYear() - 5);
+            break;
+        case '1Y':
+            start.setFullYear(today.getFullYear() - 1);
+            break;
+        case '6M':
+            start.setMonth(today.getMonth() - 6);
+            break;
+        case '3M':
+            start.setMonth(today.getMonth() - 3);
+            break;
+        case '1M':
+            start.setMonth(today.getMonth() - 1);
+            break;
+        case '1W':
+            start.setDate(today.getDate() - 7);
+            break;
+        case 'YESTERDAY':
+            start.setDate(today.getDate() - 1);
+            end.setDate(today.getDate() - 1);
+            break;
+        case 'TODAY':
+            break;
+    }
+
+    return {
+        startDate: formatDate(start),
+        endDate: formatDate(end)
+    };
+}
+
 export default function CampaignDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [sidebarThreads, setSidebarThreads] = useState<SidebarThread[]>([]);
     // Unwrap params using use() hook since it's a promise in Next.js 15+ (if applicable, but safer pattern)
     // Or just await it if it's async component, but this is 'use client'.
     // Actually in Next.js 13+ params is prop, but recent versions made it a promise in some contexts or just object.
@@ -57,7 +135,6 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const resolvedParams = use(params);
     const campaignId = resolvedParams.id;
 
-    type TimeRange = 'ALL' | '5Y' | '1Y' | '6M' | '3M' | '1M' | '1W' | 'YESTERDAY' | 'TODAY';
     const [timeRange, setTimeRange] = useState<TimeRange>('ALL');
 
     const [loading, setLoading] = useState(true);
@@ -68,58 +145,11 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
-    const formatDate = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const getDateRange = (range: TimeRange) => {
-        const today = new Date();
-        const end = new Date(today);
-        let start = new Date(today);
-
-        switch (range) {
-            case 'ALL':
-                return { startDate: '2000-01-01', endDate: '2030-12-31' };
-            case '5Y':
-                start.setFullYear(today.getFullYear() - 5);
-                break;
-            case '1Y':
-                start.setFullYear(today.getFullYear() - 1);
-                break;
-            case '6M':
-                start.setMonth(today.getMonth() - 6);
-                break;
-            case '3M':
-                start.setMonth(today.getMonth() - 3);
-                break;
-            case '1M':
-                start.setMonth(today.getMonth() - 1);
-                break;
-            case '1W':
-                start.setDate(today.getDate() - 7);
-                break;
-            case 'YESTERDAY':
-                start.setDate(today.getDate() - 1);
-                end.setDate(today.getDate() - 1);
-                break;
-            case 'TODAY':
-                break; // start and end are already today
-        }
-
-        return {
-            startDate: formatDate(start),
-            endDate: formatDate(end)
-        };
-    };
-
     useEffect(() => {
-        fetchData();
-    }, [campaignId, timeRange]);
+        setSidebarThreads(loadSidebarThreads());
+    }, []);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
         const token = localStorage.getItem('google_ads_refresh_token');
@@ -144,7 +174,11 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         } finally {
             setLoading(false);
         }
-    };
+    }, [campaignId, router, timeRange]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     const handleGenerateSummary = async () => {
         setSummaryLoading(true);
@@ -160,12 +194,20 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         }
     };
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
+    const CustomTooltip = ({
+        active,
+        payload,
+        label,
+    }: {
+        active?: boolean;
+        payload?: Array<{ color: string; name: string; value: number }>;
+        label?: string;
+    }) => {
         if (active && payload && payload.length) {
             return (
                 <div className="bg-zinc-900 border border-zinc-700 p-3 rounded-lg shadow-xl">
                     <p className="text-zinc-300 mb-2 font-medium">{label}</p>
-                    {payload.map((entry: any, index: number) => (
+                    {payload.map((entry, index: number) => (
                         <div key={index} className="flex items-center gap-2 text-sm text-zinc-400">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                             <span>{entry.name}:</span>
@@ -181,56 +223,65 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     };
 
     return (
-        <main className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30">
+        <main className="h-screen overflow-hidden bg-black text-white font-sans selection:bg-indigo-500/30">
             <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
 
-            <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
-                <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                    <div className="flex items-center gap-4">
-                        <Link href="/campaigns">
-                            <Button variant="ghost" size="icon" className="hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full">
-                                <ArrowLeft className="w-5 h-5" />
-                            </Button>
-                        </Link>
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Campaign Details</h1>
-                            <p className="text-zinc-500 text-sm mt-1">Campaign ID: {campaignId}</p>
+            <div className={`relative z-10 grid h-screen w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${isSidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]'}`}>
+                <AppSidebar
+                    currentPath="/campaigns"
+                    isCollapsed={isSidebarCollapsed}
+                    onToggleCollapsed={() => setIsSidebarCollapsed(current => !current)}
+                    onCreateThread={() => router.push('/chat')}
+                    threads={sidebarThreads}
+                    onSelectThread={(threadId) => {
+                        localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
+                        router.push('/chat');
+                    }}
+                />
+
+                <section className="flex min-h-0 h-screen flex-col overflow-hidden">
+                    <header className="shrink-0 border-b border-white/10 bg-black/50 backdrop-blur-xl">
+                        <div className="flex flex-col gap-6 px-6 py-6 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <h1 className="text-3xl font-bold tracking-tight">Campaign Details</h1>
+                                <p className="mt-1 text-sm text-zinc-500">Campaign ID: {campaignId}</p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50">
+                                {(['ALL', '5Y', '1Y', '6M', '3M', '1M', '1W', 'YESTERDAY', 'TODAY'] as const).map((range) => (
+                                    <button
+                                        key={range}
+                                        onClick={() => setTimeRange(range)}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${timeRange === range
+                                                ? 'bg-indigo-500/20 text-indigo-300 shadow-sm border border-indigo-500/20'
+                                                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                                            }`}
+                                    >
+                                        {range === 'ALL' ? 'All Time' :
+                                            range === 'YESTERDAY' ? 'Yesterday' :
+                                                range === 'TODAY' ? 'Today' :
+                                                    range}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    </header>
 
-                    <div className="flex flex-wrap items-center gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800/50">
-                        {(['ALL', '5Y', '1Y', '6M', '3M', '1M', '1W', 'YESTERDAY', 'TODAY'] as const).map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setTimeRange(range)}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${timeRange === range
-                                        ? 'bg-indigo-500/20 text-indigo-300 shadow-sm border border-indigo-500/20'
-                                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-                                    }`}
-                            >
-                                {range === 'ALL' ? 'All Time' :
-                                    range === 'YESTERDAY' ? 'Yesterday' :
-                                        range === 'TODAY' ? 'Today' :
-                                            range}
-                            </button>
-                        ))}
-                    </div>
-                </header>
+                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+                        {error && (
+                            <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4 mb-8 flex items-center gap-3 text-red-400">
+                                <AlertCircle className="w-5 h-5 shrink-0" />
+                                <p>{error}</p>
+                            </div>
+                        )}
 
-                {error && (
-                    <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4 mb-8 flex items-center gap-3 text-red-400">
-                        <AlertCircle className="w-5 h-5 shrink-0" />
-                        <p>{error}</p>
-                    </div>
-                )}
-
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-zinc-500 animate-pulse">Loading campaign data...</p>
-                    </div>
-                ) : (
-                    <div className="space-y-8">
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                <p className="text-zinc-500 animate-pulse">Loading campaign data...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-8">
                         {/* AI Summary */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -420,8 +471,10 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                 </table>
                             </div>
                         </motion.div>
+                            </div>
+                        )}
                     </div>
-                )}
+                </section>
             </div>
         </main>
     );

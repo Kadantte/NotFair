@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useScroll, useTransform, useMotionTemplate, useMotionValue } from 'framer-motion';
-import { ArrowRight, BarChart3, Zap, ShieldCheck, TrendingUp, MousePointer2, Layers } from 'lucide-react';
+import { ArrowRight, Zap, ShieldCheck, TrendingUp, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { GoogleAdsAuth } from '@/components/google-ads-auth';
@@ -51,22 +51,9 @@ function SpotlightCard({ children, className = "" }: { children: React.ReactNode
 }
 
 export default function Home() {
-    const [isConnected, setIsConnected] = useState(false);
-    const [customerId, setCustomerId] = useState<string | null>(null);
-    const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const { scrollY } = useScroll();
     const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
     const heroScale = useTransform(scrollY, [0, 300], [1, 0.95]);
-
-    useEffect(() => {
-        const token = localStorage.getItem('google_ads_refresh_token');
-        const cid = localStorage.getItem('google_ads_customer_id');
-        if (token && cid) {
-            setIsConnected(true);
-            setCustomerId(cid);
-            setRefreshToken(token);
-        }
-    }, []);
 
     return (
         <>
@@ -123,40 +110,19 @@ export default function Home() {
                         transition={{ delay: 0.2, duration: 0.5 }}
                         className="flex flex-col items-center gap-6 w-full"
                     >
-                        {isConnected && (
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                                <Link href="/campaigns">
-                                    <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]">
-                                        Go to Dashboard <ArrowRight className="w-5 h-5 ml-2" />
-                                    </Button>
-                                </Link>
-                                <Link href="/chat">
-                                    <Button size="lg" variant="outline" className="h-14 px-10 text-lg font-semibold rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
-                                        Open Copilot
-                                    </Button>
-                                </Link>
-                            </div>
-                        )}
+                        <Link href="/chat">
+                            <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]">
+                                Launch AdsAgent <ArrowRight className="w-5 h-5 ml-2" />
+                            </Button>
+                        </Link>
 
-                        <div className={`flex flex-col items-center gap-4 transition-all duration-500 ${isConnected ? 'scale-90 opacity-80 hover:opacity-100' : 'scale-100'}`}>
+                        <div className="flex flex-col items-center gap-4">
                             <GoogleAdsAuth
-                                onConnect={(cid) => {
-                                    setIsConnected(true);
-                                    setCustomerId(cid);
-                                    setRefreshToken(localStorage.getItem('google_ads_refresh_token'));
-                                }}
-                                onDisconnect={() => {
-                                    setIsConnected(false);
-                                    setCustomerId(null);
-                                    setRefreshToken(null);
-                                }}
                                 variant="default"
                                 size="lg"
                                 className="h-14 px-8 font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
                             />
-                            {!isConnected && (
-                                <p className="text-zinc-500 text-sm">No credit card required for connection.</p>
-                            )}
+                            <p className="text-zinc-500 text-sm">No credit card required for connection.</p>
                         </div>
                     </motion.div>
                 </motion.div>
