@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getAppOrigin } from '@/lib/app-url';
 
 export async function GET() {
     const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/google/callback`;
+    const redirectUri = `${getAppOrigin()}/api/auth/google/callback`;
     const scope = 'https://www.googleapis.com/auth/adwords';
 
     if (!clientId) {
