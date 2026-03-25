@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AdsAgent - Put your ads on autopilot",
-  description: "The intelligent agent that optimizes your ad spend, scales your high-performing campaigns, and saves you hours every week.",
+  title: "AdsAgent - Your AI Ads Advisor",
+  description: "An MCP server that connects your Google Ads to Claude, Cursor, or any AI tool. Get intelligent recommendations, execute changes safely, and track impact.",
 };
 
 export default function RootLayout({
