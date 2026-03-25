@@ -67,30 +67,23 @@ export default function Home() {
                     </div>
 
                     <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight drop-shadow-2xl leading-[0.95]">
-                        <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/50">Your AI ads advisor</span>
+                        <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/50">Let your AI agent</span>
                         <br />
-                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-400">on your side</span>
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-400">manage your ads</span>
                     </h1>
 
                     <p className="text-zinc-400 text-lg md:text-xl font-light tracking-wide max-w-2xl mx-auto leading-relaxed">
-                        An MCP server that connects your Google Ads account to Claude, Cursor, or any AI tool.
-                        It tells you what to change, makes the change with your approval, and tracks whether it worked.
+                        Connect your Google Ads account to Claude Coworker, OpenClaw, or any AI agent.
+                        Your agent analyzes your campaigns, recommends what to change, executes with your approval, and proves it worked.
                     </p>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                        <Link href="#connect">
-                            <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]">
-                                Connect Now <ArrowRight className="w-5 h-5 ml-2" />
-                            </Button>
-                        </Link>
-                        <Link href="/chat">
-                            <Button size="lg" variant="outline" className="h-14 px-10 text-lg font-semibold rounded-full border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500">
-                                Try the Demo
-                            </Button>
-                        </Link>
-                    </div>
+                    <Link href="#connect">
+                        <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+                            Get Started <ArrowRight className="w-5 h-5 ml-2" />
+                        </Button>
+                    </Link>
 
-                    <p className="text-zinc-600 text-sm">Free to use. No credit card required.</p>
+                    <p className="text-zinc-600 text-sm">Free to use. Works with any MCP-compatible AI agent.</p>
                 </motion.div>
             </section>
 
@@ -107,17 +100,17 @@ export default function Home() {
                             {
                                 step: "1",
                                 title: "Connect",
-                                description: "Add the AdsAgent MCP server URL to Claude Coworker, Cursor, or any MCP-compatible AI tool. Authorize with your Google Ads account."
+                                description: "Add the AdsAgent server URL to your AI agent \u2014 Claude Coworker, OpenClaw, Cursor, or any MCP-compatible tool. Authorize with your Google Ads account."
                             },
                             {
                                 step: "2",
-                                title: "Get Recommendations",
-                                description: "Ask your AI: \"How are my ads doing?\" AdsAgent analyzes your campaigns, keywords, and search terms, then ranks what to change by estimated dollar impact."
+                                title: "Ask Your Agent",
+                                description: "Tell your agent: \"How are my ads doing?\" or \"What should I change?\" It analyzes your campaigns, keywords, and search terms, then ranks actions by estimated dollar impact."
                             },
                             {
                                 step: "3",
                                 title: "Execute & Track",
-                                description: "Approve the changes right in your AI tool. AdsAgent tracks every change and reports whether it improved your numbers."
+                                description: "Your agent applies changes with your approval \u2014 pause wasteful keywords, add negatives, adjust bids. Every change is tracked with before/after performance data."
                             }
                         ].map((item) => (
                             <div key={item.step} className="relative p-8 rounded-2xl border border-zinc-800 bg-zinc-900/30">
@@ -234,12 +227,7 @@ export default function Home() {
                     </div>
 
                     <div className="text-center mt-8">
-                        <p className="text-zinc-500 text-sm mb-4">Want to try without installing MCP?</p>
-                        <Link href="/chat">
-                            <Button variant="outline" className="rounded-full border-zinc-700 text-zinc-300 hover:text-white">
-                                Try the hosted demo <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                        </Link>
+                        <p className="text-zinc-500 text-sm">Works with Claude Coworker, OpenClaw, Cursor, and any MCP-compatible agent.</p>
                     </div>
                 </div>
             </section>
