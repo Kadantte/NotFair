@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, useMotionTemplate, useMotionValue } from 'framer-motion';
 import { ArrowRight, Zap, ShieldCheck, TrendingUp, Layers } from 'lucide-react';
 import Link from 'next/link';
@@ -51,9 +51,20 @@ function SpotlightCard({ children, className = "" }: { children: React.ReactNode
 }
 
 export default function Home() {
+    const [isConnected, setIsConnected] = useState(false);
     const { scrollY } = useScroll();
     const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
     const heroScale = useTransform(scrollY, [0, 300], [1, 0.95]);
+
+    useEffect(() => {
+        const frame = window.requestAnimationFrame(() => {
+            const token = localStorage.getItem('google_ads_refresh_token');
+            const cid = localStorage.getItem('google_ads_customer_id');
+            setIsConnected(Boolean(token && cid));
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, []);
 
     return (
         <>
@@ -110,14 +121,22 @@ export default function Home() {
                         transition={{ delay: 0.2, duration: 0.5 }}
                         className="flex flex-col items-center gap-6 w-full"
                     >
-                        <Link href="/chat">
-                            <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]">
-                                Launch AdsAgent <ArrowRight className="w-5 h-5 ml-2" />
-                            </Button>
-                        </Link>
+                        {isConnected && (
+                            <Link href="/chat">
+                                <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]">
+                                    Launch AdsAgent <ArrowRight className="w-5 h-5 ml-2" />
+                                </Button>
+                            </Link>
+                        )}
 
                         <div className="flex flex-col items-center gap-4">
                             <GoogleAdsAuth
+                                onConnect={() => {
+                                    setIsConnected(true);
+                                }}
+                                onDisconnect={() => {
+                                    setIsConnected(false);
+                                }}
                                 variant="default"
                                 size="lg"
                                 className="h-14 px-8 font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
