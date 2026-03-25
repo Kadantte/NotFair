@@ -1,4 +1,4 @@
-import { createMcpHandler } from "mcp-handler";
+import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import {
   getAccountInfo,
@@ -16,17 +16,61 @@ import {
   toMicros,
   type AuthContext,
 } from "@/lib/google-ads";
+import { db, schema } from "@/lib/db";
+import { eq, and, gte } from "drizzle-orm";
 
-// Phase 1: env-based auth for founder's account.
-// Phase 2: MCP OAuth 2.1 for multi-user.
-const auth: AuthContext = {
+// ─── Auth: resolve bearer token → Google Ads credentials ─────────
+// Falls back to env vars if no token provided (founder's account).
+
+async function resolveAuth(request: Request): Promise<AuthContext> {
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : null;
+
+  if (bearerToken) {
+    try {
+      const [session] = await db()
+        .select()
+        .from(schema.mcpSessions)
+        .where(
+          and(
+            eq(schema.mcpSessions.accessToken, bearerToken),
+            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+          ),
+        )
+        .limit(1);
+
+      if (session) {
+        return {
+          refreshToken: session.refreshToken,
+          customerId: session.customerId,
+        };
+      }
+    } catch {
+      // DB unavailable — fall through to env vars
+    }
+  }
+
+  // Fallback: env vars (founder's account)
+  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN ?? "";
+  const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID ?? "";
+  if (!refreshToken || !customerId) {
+    throw new Error("No valid authentication. Sign in at /connect to get your MCP token.");
+  }
+  return { refreshToken, customerId };
+}
+
+// Per-request auth — set before MCP handler runs.
+// Safe because Vercel serverless handles one request at a time.
+let currentAuth: AuthContext = {
   refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN ?? "",
   customerId: process.env.GOOGLE_ADS_CUSTOMER_ID ?? "",
 };
 
 // ─── MCP Handler ─────────────────────────────────────────────────────
 
-const handler = createMcpHandler(
+const mcpHandler = createMcpHandler(
   (server) => {
     // ─── READ TOOLS ────────────────────────────────────────────
 
@@ -39,7 +83,7 @@ const handler = createMcpHandler(
         inputSchema: {},
       },
       async () => {
-        const result = await getAccountInfo(auth);
+        const result = await getAccountInfo(currentAuth);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -67,7 +111,7 @@ const handler = createMcpHandler(
         },
       },
       async ({ limit, includeRemoved }) => {
-        const result = await listCampaigns(auth, {
+        const result = await listCampaigns(currentAuth, {
           limit,
           includeRemoved,
         });
@@ -96,7 +140,7 @@ const handler = createMcpHandler(
       },
       async ({ campaignId, days }) => {
         const result = await getCampaignPerformance(
-          auth,
+          currentAuth,
           campaignId,
           days,
         );
@@ -119,7 +163,7 @@ const handler = createMcpHandler(
         },
       },
       async ({ campaignId, days, limit }) => {
-        const result = await getKeywords(auth, campaignId, days, limit);
+        const result = await getKeywords(currentAuth, campaignId, days, limit);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -140,7 +184,7 @@ const handler = createMcpHandler(
       },
       async ({ campaignId, days, limit }) => {
         const result = await getSearchTermReport(
-          auth,
+          currentAuth,
           campaignId,
           days,
           limit,
@@ -169,7 +213,7 @@ const handler = createMcpHandler(
       },
       async ({ campaignId, adGroupId, criterionId }) => {
         const result = await pauseKeyword(
-          auth,
+          currentAuth,
           campaignId,
           adGroupId,
           criterionId,
@@ -192,7 +236,7 @@ const handler = createMcpHandler(
         },
       },
       async ({ adGroupId, criterionId }) => {
-        const result = await enableKeyword(auth, adGroupId, criterionId);
+        const result = await enableKeyword(currentAuth, adGroupId, criterionId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -218,7 +262,7 @@ const handler = createMcpHandler(
       async ({ campaignId, adGroupId, criterionId, newBidDollars }) => {
         const newBidMicros = toMicros(newBidDollars);
         const result = await updateBid(
-          auth,
+          currentAuth,
           campaignId,
           adGroupId,
           criterionId,
@@ -246,7 +290,7 @@ const handler = createMcpHandler(
       },
       async ({ campaignId, keywordText }) => {
         const result = await addNegativeKeyword(
-          auth,
+          currentAuth,
           campaignId,
           keywordText,
         );
@@ -273,7 +317,7 @@ const handler = createMcpHandler(
       async ({ campaignId, newDailyBudgetDollars }) => {
         const newBudgetMicros = toMicros(newDailyBudgetDollars);
         const result = await updateCampaignBudget(
-          auth,
+          currentAuth,
           campaignId,
           newBudgetMicros,
         );
@@ -293,7 +337,7 @@ const handler = createMcpHandler(
         },
       },
       async ({ campaignId }) => {
-        const result = await pauseCampaign(auth, campaignId);
+        const result = await pauseCampaign(currentAuth, campaignId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -310,7 +354,7 @@ const handler = createMcpHandler(
         },
       },
       async ({ campaignId }) => {
-        const result = await enableCampaign(auth, campaignId);
+        const result = await enableCampaign(currentAuth, campaignId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -323,5 +367,16 @@ const handler = createMcpHandler(
     maxDuration: 60,
   },
 );
+
+// Wrapper that resolves per-request auth before the MCP handler runs
+async function handler(request: Request): Promise<Response> {
+  try {
+    currentAuth = await resolveAuth(request);
+  } catch {
+    // resolveAuth throws if no valid auth — let it fall through
+    // to env var defaults (already set in currentAuth initialization)
+  }
+  return mcpHandler(request);
+}
 
 export { handler as GET, handler as POST, handler as DELETE };

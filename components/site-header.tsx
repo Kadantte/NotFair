@@ -19,7 +19,7 @@ export function SiteHeader() {
                         Features
                     </Link>
                     <Link
-                        href="/#connect"
+                        href="/connect"
                         className="text-zinc-300 hover:text-white transition-colors"
                     >
                         Connect
@@ -38,7 +38,7 @@ export function SiteHeader() {
                     </Link>
                 </nav>
                 <div className="ml-auto flex items-center space-x-4">
-                    <Link href="/#connect">
+                    <Link href="/connect">
                         <span className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors">
                             Get Started
                         </span>

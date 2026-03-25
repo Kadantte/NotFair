@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap, ShieldCheck, TrendingUp, DollarSign, Search, PauseCircle, Target, Copy, Check } from 'lucide-react';
+import { ArrowRight, Zap, ShieldCheck, TrendingUp, DollarSign, Search, PauseCircle, Target } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -15,28 +14,7 @@ function GridPattern() {
     );
 }
 
-function CopyButton({ text }: { text: string }) {
-    const [copied, setCopied] = useState(false);
-
-    return (
-        <button
-            onClick={() => {
-                navigator.clipboard.writeText(text);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            }}
-            className="ml-2 p-1.5 rounded-md hover:bg-zinc-700 transition-colors"
-            title="Copy to clipboard"
-        >
-            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-zinc-400" />}
-        </button>
-    );
-}
-
 export default function Home() {
-    const mcpUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/api/mcp`
-        : 'https://your-domain.vercel.app/api/mcp';
 
     return (
         <>
@@ -182,53 +160,19 @@ export default function Home() {
 
             {/* Connect Section */}
             <section id="connect" className="py-24 px-4 bg-black border-t border-zinc-900">
-                <div className="container mx-auto max-w-3xl">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Connect in 30 seconds</h2>
-                        <p className="text-zinc-400 text-lg">Add this MCP server URL to your AI tool:</p>
-                    </div>
+                <div className="container mx-auto max-w-3xl text-center">
+                    <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Connect in 30 seconds</h2>
+                    <p className="text-zinc-400 text-lg mb-8">
+                        Sign in with Google Ads, get your personal MCP config, paste it into your AI agent. Done.
+                    </p>
 
-                    <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 space-y-8">
-                        {/* MCP URL */}
-                        <div>
-                            <label className="text-sm font-medium text-zinc-400 mb-2 block">MCP Server URL</label>
-                            <div className="flex items-center bg-zinc-950 rounded-lg border border-zinc-700 px-4 py-3 font-mono text-sm text-blue-300">
-                                <span className="flex-1 truncate">{mcpUrl}</span>
-                                <CopyButton text={mcpUrl} />
-                            </div>
-                        </div>
+                    <Link href="/connect">
+                        <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+                            Sign in with Google Ads <ArrowRight className="w-5 h-5 ml-2" />
+                        </Button>
+                    </Link>
 
-                        {/* Instructions */}
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-white font-semibold mb-2">Claude Coworker</h3>
-                                <p className="text-zinc-400 text-sm">Settings &rarr; MCP Servers &rarr; Add Server &rarr; paste the URL above</p>
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold mb-2">Cursor</h3>
-                                <p className="text-zinc-400 text-sm">Add to your MCP config:</p>
-                                <pre className="mt-2 bg-zinc-950 rounded-lg p-4 text-xs text-zinc-300 overflow-x-auto border border-zinc-800">
-{`{
-  "adsagent": {
-    "url": "${mcpUrl}"
-  }
-}`}
-                                </pre>
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold mb-2">Other MCP Clients</h3>
-                                <p className="text-zinc-400 text-sm">
-                                    Any client supporting Streamable HTTP can connect directly to the URL above.
-                                    For stdio-only clients, use{' '}
-                                    <code className="text-blue-300 bg-zinc-800 px-1.5 py-0.5 rounded text-xs">npx mcp-remote {mcpUrl}</code>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="text-center mt-8">
-                        <p className="text-zinc-500 text-sm">Works with Claude Coworker, OpenClaw, Cursor, and any MCP-compatible agent.</p>
-                    </div>
+                    <p className="text-zinc-500 text-sm mt-6">Works with Claude Coworker, OpenClaw, Cursor, and any MCP-compatible agent.</p>
                 </div>
             </section>
 
