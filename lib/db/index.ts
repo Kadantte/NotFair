@@ -1,14 +1,15 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 function getDb() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
   if (!url) {
-    throw new Error("Missing DATABASE_URL environment variable");
+    throw new Error("Missing TURSO_DATABASE_URL environment variable");
   }
-  const sql = neon(url);
-  return drizzle(sql, { schema });
+  const client = createClient({ url, authToken });
+  return drizzle(client, { schema });
 }
 
 // Lazy singleton — created on first access

@@ -92,11 +92,13 @@ export async function getImpact(
   if (!change) return null;
   if (!change.campaignId) return { change, impact: null, reason: "No campaign associated" };
 
-  const changeDate = change.createdAt;
+  const changeDate = new Date(change.createdAt);
+  const changeDateStr = changeDate.toISOString().slice(0, 10);
 
   // Get 7-day average BEFORE the change
   const sevenDaysBefore = new Date(changeDate);
   sevenDaysBefore.setDate(sevenDaysBefore.getDate() - 7);
+  const beforeDateStr = sevenDaysBefore.toISOString().slice(0, 10);
 
   const beforeSnapshots = await db()
     .select()
@@ -105,14 +107,15 @@ export async function getImpact(
       and(
         eq(schema.performanceSnapshots.accountId, accountId),
         eq(schema.performanceSnapshots.campaignId, change.campaignId),
-        gte(schema.performanceSnapshots.snapshotDate, sevenDaysBefore.toISOString().slice(0, 10)),
-        lte(schema.performanceSnapshots.snapshotDate, changeDate.toISOString().slice(0, 10)),
+        gte(schema.performanceSnapshots.snapshotDate, beforeDateStr),
+        lte(schema.performanceSnapshots.snapshotDate, changeDateStr),
       ),
     );
 
   // Get 7-day average AFTER the change
   const sevenDaysAfter = new Date(changeDate);
   sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+  const afterDateStr = sevenDaysAfter.toISOString().slice(0, 10);
 
   const afterSnapshots = await db()
     .select()
@@ -121,8 +124,8 @@ export async function getImpact(
       and(
         eq(schema.performanceSnapshots.accountId, accountId),
         eq(schema.performanceSnapshots.campaignId, change.campaignId),
-        gte(schema.performanceSnapshots.snapshotDate, changeDate.toISOString().slice(0, 10)),
-        lte(schema.performanceSnapshots.snapshotDate, sevenDaysAfter.toISOString().slice(0, 10)),
+        gte(schema.performanceSnapshots.snapshotDate, changeDateStr),
+        lte(schema.performanceSnapshots.snapshotDate, afterDateStr),
       ),
     );
 
@@ -196,7 +199,7 @@ export async function setGoals(
     })
     .onConflictDoUpdate({
       target: [schema.goals.accountId, schema.goals.campaignId],
-      set: { ...goals, updatedAt: new Date() },
+      set: { ...goals, updatedAt: new Date().toISOString() },
     })
     .returning();
 

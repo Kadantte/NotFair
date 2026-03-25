@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const sessions = await db()
       .select()
       .from(schema.mcpSessions)
-      .where(gte(schema.mcpSessions.expiresAt, new Date()));
+      .where(gte(schema.mcpSessions.expiresAt, new Date().toISOString()));
 
     let snapshotsCreated = 0;
     let errors = 0;
