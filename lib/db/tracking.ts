@@ -1,0 +1,236 @@
+import { db, schema } from "./index";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
+import type { WriteResult } from "@/lib/google-ads";
+
+// ─── Change Logging ──────────────────────────────────────────────────
+
+export async function logChange(
+  accountId: string,
+  campaignId: string | null,
+  writeResult: WriteResult,
+  reasoning?: string,
+) {
+  try {
+    const [inserted] = await db()
+      .insert(schema.changes)
+      .values({
+        accountId,
+        campaignId,
+        toolName: writeResult.action,
+        entityType: getEntityType(writeResult.action),
+        entityId: writeResult.entityId,
+        beforeValue: writeResult.beforeValue,
+        afterValue: writeResult.afterValue,
+        reasoning: reasoning ?? null,
+      })
+      .returning();
+
+    return inserted;
+  } catch (error) {
+    // CRITICAL: Log error but don't throw — the write operation already succeeded
+    console.error("[tracking] Failed to log change:", error);
+    return null;
+  }
+}
+
+function getEntityType(action: string): string {
+  if (action.includes("keyword") || action.includes("bid")) return "keyword";
+  if (action.includes("campaign") || action.includes("budget")) return "campaign";
+  return "unknown";
+}
+
+// ─── Change History ──────────────────────────────────────────────────
+
+export async function getChanges(
+  accountId: string,
+  options: { limit?: number; campaignId?: string } = {},
+) {
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+
+  const conditions = [eq(schema.changes.accountId, accountId)];
+  if (options.campaignId) {
+    conditions.push(eq(schema.changes.campaignId, options.campaignId));
+  }
+
+  const rows = await db()
+    .select()
+    .from(schema.changes)
+    .where(and(...conditions))
+    .orderBy(desc(schema.changes.createdAt))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    action: row.toolName,
+    entityType: row.entityType,
+    entityId: row.entityId,
+    beforeValue: row.beforeValue,
+    afterValue: row.afterValue,
+    reasoning: row.reasoning,
+    timestamp: row.createdAt,
+  }));
+}
+
+// ─── Impact Attribution ──────────────────────────────────────────────
+
+export async function getImpact(
+  accountId: string,
+  changeId: number,
+) {
+  // Get the change record
+  const [change] = await db()
+    .select()
+    .from(schema.changes)
+    .where(
+      and(
+        eq(schema.changes.id, changeId),
+        eq(schema.changes.accountId, accountId),
+      ),
+    )
+    .limit(1);
+
+  if (!change) return null;
+  if (!change.campaignId) return { change, impact: null, reason: "No campaign associated" };
+
+  const changeDate = change.createdAt;
+
+  // Get 7-day average BEFORE the change
+  const sevenDaysBefore = new Date(changeDate);
+  sevenDaysBefore.setDate(sevenDaysBefore.getDate() - 7);
+
+  const beforeSnapshots = await db()
+    .select()
+    .from(schema.performanceSnapshots)
+    .where(
+      and(
+        eq(schema.performanceSnapshots.accountId, accountId),
+        eq(schema.performanceSnapshots.campaignId, change.campaignId),
+        gte(schema.performanceSnapshots.snapshotDate, sevenDaysBefore.toISOString().slice(0, 10)),
+        lte(schema.performanceSnapshots.snapshotDate, changeDate.toISOString().slice(0, 10)),
+      ),
+    );
+
+  // Get 7-day average AFTER the change
+  const sevenDaysAfter = new Date(changeDate);
+  sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+
+  const afterSnapshots = await db()
+    .select()
+    .from(schema.performanceSnapshots)
+    .where(
+      and(
+        eq(schema.performanceSnapshots.accountId, accountId),
+        eq(schema.performanceSnapshots.campaignId, change.campaignId),
+        gte(schema.performanceSnapshots.snapshotDate, changeDate.toISOString().slice(0, 10)),
+        lte(schema.performanceSnapshots.snapshotDate, sevenDaysAfter.toISOString().slice(0, 10)),
+      ),
+    );
+
+  if (beforeSnapshots.length === 0 || afterSnapshots.length === 0) {
+    return {
+      change,
+      impact: null,
+      reason: "Insufficient snapshot data for comparison (need at least 7 days before and after)",
+    };
+  }
+
+  const avgBefore = average(beforeSnapshots);
+  const avgAfter = average(afterSnapshots);
+
+  return {
+    change: {
+      id: change.id,
+      action: change.toolName,
+      entityId: change.entityId,
+      timestamp: change.createdAt,
+    },
+    impact: {
+      before: avgBefore,
+      after: avgAfter,
+      cpaDelta: avgAfter.cpa !== null && avgBefore.cpa !== null
+        ? avgAfter.cpa - avgBefore.cpa
+        : null,
+      costDelta: avgAfter.dailyCost - avgBefore.dailyCost,
+      conversionsDelta: avgAfter.dailyConversions - avgBefore.dailyConversions,
+      // Attribution language: always estimated, never causal
+      disclaimer: "These changes are correlated with the action taken. Other factors (seasonality, competitor bids, Google's algorithm) may have contributed.",
+    },
+  };
+}
+
+function average(snapshots: typeof schema.performanceSnapshots.$inferSelect[]) {
+  const n = snapshots.length;
+  if (n === 0) return { dailyCost: 0, dailyConversions: 0, cpa: null };
+
+  const totalCost = snapshots.reduce((sum, s) => sum + (s.costMicros ?? 0), 0) / 1_000_000;
+  const totalConversions = snapshots.reduce((sum, s) => sum + (s.conversions ?? 0), 0);
+
+  return {
+    dailyCost: totalCost / n,
+    dailyConversions: totalConversions / n,
+    cpa: totalConversions > 0 ? totalCost / totalConversions : null,
+  };
+}
+
+// ─── Goals ───────────────────────────────────────────────────────────
+
+export async function setGoals(
+  accountId: string,
+  campaignId: string | null,
+  goals: {
+    targetCpa?: number;
+    monthlyCap?: number;
+    maxBidChangePct?: number;
+    maxBudgetChangePct?: number;
+    maxKeywordPausePct?: number;
+  },
+) {
+  const effectiveCampaignId = campaignId ?? "";
+
+  const [result] = await db()
+    .insert(schema.goals)
+    .values({
+      accountId,
+      campaignId: effectiveCampaignId,
+      ...goals,
+    })
+    .onConflictDoUpdate({
+      target: [schema.goals.accountId, schema.goals.campaignId],
+      set: { ...goals, updatedAt: new Date() },
+    })
+    .returning();
+
+  return result;
+}
+
+export async function getGoals(accountId: string, campaignId?: string) {
+  // Get campaign-specific goals first, fall back to account-level
+  if (campaignId) {
+    const campaignGoals = await db()
+      .select()
+      .from(schema.goals)
+      .where(
+        and(
+          eq(schema.goals.accountId, accountId),
+          eq(schema.goals.campaignId, campaignId),
+        ),
+      )
+      .limit(1);
+
+    if (campaignGoals.length > 0) return campaignGoals[0];
+  }
+
+  // Account-level default
+  const accountGoals = await db()
+    .select()
+    .from(schema.goals)
+    .where(
+      and(
+        eq(schema.goals.accountId, accountId),
+        eq(schema.goals.campaignId, ""),
+      ),
+    )
+    .limit(1);
+
+  return accountGoals[0] ?? null;
+}
