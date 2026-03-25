@@ -4,9 +4,9 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, History, Search, Zap, MousePointer2, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
+import { ArrowLeft, History, Search, Zap, MousePointer2, TrendingUp, DollarSign, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCampaignHistoryAction, getCampaignKeywordsAction } from '@/app/actions';
+import { getCampaignHistoryAction, getCampaignKeywordsAction, generateCampaignSummaryAction } from '@/app/actions';
 import {
     LineChart,
     Line,
@@ -64,6 +64,9 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [history, setHistory] = useState<CampaignHistory[]>([]);
     const [keywords, setKeywords] = useState<CampaignKeyword[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [summary, setSummary] = useState<string | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryError, setSummaryError] = useState<string | null>(null);
 
     const formatDate = (date: Date) => {
         const year = date.getFullYear();
@@ -143,6 +146,20 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         }
     };
 
+    const handleGenerateSummary = async () => {
+        setSummaryLoading(true);
+        setSummaryError(null);
+        try {
+            const result = await generateCampaignSummaryAction(history, keywords, campaignId);
+            setSummary(result);
+        } catch (err) {
+            console.error(err);
+            setSummaryError('Failed to generate AI summary. Please try again.');
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
@@ -214,6 +231,59 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                     </div>
                 ) : (
                     <div className="space-y-8">
+                        {/* AI Summary */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-zinc-900/40 border border-zinc-800/50 rounded-xl p-6"
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-indigo-400" />
+                                    <h2 className="text-xl font-semibold text-zinc-200">AI Summary</h2>
+                                </div>
+                                <Button
+                                    onClick={handleGenerateSummary}
+                                    disabled={summaryLoading || history.length === 0}
+                                    className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 disabled:opacity-50"
+                                >
+                                    {summaryLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Analyzing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4 mr-2" />
+                                            {summary ? 'Regenerate' : 'Generate Summary'}
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+
+                            {summaryError && (
+                                <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-3 flex items-center gap-2 text-red-400 text-sm">
+                                    <AlertCircle className="w-4 h-4 shrink-0" />
+                                    <p>{summaryError}</p>
+                                </div>
+                            )}
+
+                            {!summary && !summaryLoading && !summaryError && (
+                                <p className="text-zinc-500 text-sm">
+                                    Click &quot;Generate Summary&quot; to get an AI-powered analysis of your campaign performance, trends, and recommendations.
+                                </p>
+                            )}
+
+                            {summary && (
+                                <div className="prose prose-invert prose-sm max-w-none text-zinc-300 
+                                    prose-headings:text-indigo-300 prose-strong:text-zinc-200 
+                                    prose-ul:text-zinc-400 prose-li:text-zinc-400
+                                    [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm">
+                                    <div dangerouslySetInnerHTML={{ __html: summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
+                                </div>
+                            )}
+                        </motion.div>
+
                         {/* History Chart */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}

@@ -15,7 +15,7 @@ export function SiteHeader() {
                     <Image src="/logo.svg" alt="AdsAgent Logo" width={32} height={32} className="w-8 h-8" />
                     <span className="hidden font-bold sm:inline-block text-xl text-white">AdsAgent</span>
                 </Link>
-                <div className="hidden">
+                <div className="flex items-center">
                     <nav className="flex items-center space-x-6 text-sm font-medium">
                         <Link
                             href="/#features"
@@ -34,6 +34,12 @@ export function SiteHeader() {
                             className="text-zinc-300 hover:text-white transition-colors"
                         >
                             Privacy
+                        </Link>
+                        <Link
+                            href="/tools"
+                            className="text-zinc-300 hover:text-white transition-colors"
+                        >
+                            Tools
                         </Link>
                     </nav>
                 </div>

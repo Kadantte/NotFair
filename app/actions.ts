@@ -1,5 +1,7 @@
 "use server"
 import { GoogleAdsApi, enums } from "google-ads-api";
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 
 export async function listAccessibleCustomersAction(refreshToken: string) {
     const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
@@ -241,6 +243,79 @@ export async function getCampaignKeywordsAction(refreshToken: string, customerId
     }
 }
 
+export async function generateCampaignSummaryAction(
+    history: Array<{
+        date: string;
+        impressions: number;
+        clicks: number;
+        cost: number;
+        ctr: number;
+        averageCpc: number;
+    }>,
+    keywords: Array<{
+        text: string;
+        status: string;
+        qualityScore: number;
+        impressions: number;
+        clicks: number;
+        ctr: number;
+        cost: number;
+        averageCpc: number;
+    }>,
+    campaignId: string
+) {
+    // Build a concise data summary for the prompt
+    const totalImpressions = history.reduce((sum, d) => sum + d.impressions, 0);
+    const totalClicks = history.reduce((sum, d) => sum + d.clicks, 0);
+    const totalCost = history.reduce((sum, d) => sum + d.cost, 0);
+    const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) : 0;
+    const avgCpc = totalClicks > 0 ? (totalCost / totalClicks) : 0;
+    const dateRange = history.length > 0
+        ? `${history[0].date} to ${history[history.length - 1].date}`
+        : 'No data';
 
+    const topKeywords = keywords
+        .slice(0, 10)
+        .map(k => `- "${k.text}": ${k.impressions.toLocaleString()} impressions, ${k.clicks} clicks, CTR ${(k.ctr * 100).toFixed(2)}%, CPC $${k.averageCpc.toFixed(2)}, QS ${k.qualityScore || 'N/A'}`)
+        .join('\n');
 
+    const prompt = `You are a Google Ads performance analyst. Analyze this campaign data and provide a concise, actionable summary.
 
+Campaign ID: ${campaignId}
+Date Range: ${dateRange}
+Days of Data: ${history.length}
+
+Overall Metrics:
+- Total Impressions: ${totalImpressions.toLocaleString()}
+- Total Clicks: ${totalClicks.toLocaleString()}
+- Total Cost: $${totalCost.toFixed(2)}
+- Average CTR: ${(avgCtr * 100).toFixed(2)}%
+- Average CPC: $${avgCpc.toFixed(2)}
+
+Top Keywords:
+${topKeywords || 'No keyword data available'}
+
+Daily Trend (last 7 days):
+${history.slice(-7).map(d => `${d.date}: ${d.impressions} imp, ${d.clicks} clicks, $${d.cost.toFixed(2)} cost`).join('\n')}
+
+Provide a summary with these sections:
+1. **Performance Overview** - Brief overall assessment
+2. **Key Trends** - What's improving or declining
+3. **Top Performers** - Best keywords and why
+4. **Cost Efficiency** - Analysis of spend effectiveness
+5. **Recommendations** - 2-3 specific, actionable next steps
+
+Keep it concise and data-driven. Use specific numbers from the data.`;
+
+    try {
+        const { text } = await generateText({
+            model: google('gemini-2.5-flash'),
+            prompt,
+        });
+
+        return text || 'No summary generated.';
+    } catch (error) {
+        console.error("Generate Campaign Summary Error:", error);
+        throw new Error("Failed to generate AI summary.");
+    }
+}
