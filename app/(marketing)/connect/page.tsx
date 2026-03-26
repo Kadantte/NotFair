@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
 
 const CLIENTS = [
     {
@@ -99,6 +98,10 @@ function ConnectContent() {
         ? client.prompt(mcpUrl, token, customerName || 'My Account')
         : '';
 
+    function beginGoogleSignIn() {
+        window.location.assign('/api/auth/signin');
+    }
+
     function copyPrompt() {
         navigator.clipboard.writeText(prompt);
         setCopied(true);
@@ -169,11 +172,13 @@ function ConnectContent() {
                         <p className="text-zinc-400 text-lg max-w-md">
                             Sign in with your Google Ads account. You'll get a prompt to paste into your AI — that's it.
                         </p>
-                        <Link href="/api/auth/signin">
-                            <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105">
-                                Sign in with Google <ExternalLink className="w-5 h-5 ml-2" />
-                            </Button>
-                        </Link>
+                        <Button
+                            size="lg"
+                            onClick={beginGoogleSignIn}
+                            className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105"
+                        >
+                            Sign in with Google <ExternalLink className="w-5 h-5 ml-2" />
+                        </Button>
                         <p className="text-zinc-600 text-xs">OAuth 2.0 — we never see your password.</p>
                     </div>
                 ) : (

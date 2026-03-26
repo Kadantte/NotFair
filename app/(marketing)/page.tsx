@@ -2,10 +2,13 @@
 
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function Home() {
+    function beginGoogleSignIn() {
+        window.location.assign('/api/auth/signin');
+    }
+
     return (
         <section className="relative flex flex-col items-center justify-center min-h-[90vh] py-20 px-4 overflow-hidden">
             <motion.div
@@ -36,11 +39,13 @@ export default function Home() {
                 </p>
 
                 <div className="flex flex-col items-center gap-4">
-                    <Link href="/api/auth/signin">
-                        <Button size="lg" className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]">
-                            Connect Google Ads <ArrowRight className="w-5 h-5 ml-2" />
-                        </Button>
-                    </Link>
+                    <Button
+                        size="lg"
+                        onClick={beginGoogleSignIn}
+                        className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                    >
+                        Connect Google Ads <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
 
                     <div className="flex items-center gap-6 text-zinc-500 text-sm">
                         <span>3 steps</span>
