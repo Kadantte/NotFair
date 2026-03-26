@@ -17,9 +17,6 @@ importers:
       '@ai-sdk/react':
         specifier: ^3.0.140
         version: 3.0.140(react@19.2.3)(zod@4.3.6)
-      '@libsql/client':
-        specifier: ^0.17.2
-        version: 0.17.2(bufferutil@4.1.0)
       '@modelcontextprotocol/sdk':
         specifier: 1.26.0
         version: 1.26.0(zod@4.3.6)
@@ -52,13 +49,16 @@ importers:
         version: 2.1.1
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@libsql/client@0.17.2(bufferutil@4.1.0))(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@vercel/postgres@0.10.0)
+        version: 0.45.1(@libsql/client@0.17.2(bufferutil@4.1.0))(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@vercel/postgres@0.10.0)(postgres@3.4.8)
       framer-motion:
         specifier: ^12.29.2
         version: 12.29.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       google-ads-api:
         specifier: ^22.0.0
         version: 22.0.0
+      google-ads-mcp:
+        specifier: file:packages/google-ads-mcp
+        version: file:packages/google-ads-mcp(@modelcontextprotocol/sdk@1.26.0(zod@4.3.6))
       googleapis:
         specifier: ^170.1.0
         version: 170.1.0
@@ -71,6 +71,9 @@ importers:
       next:
         specifier: 16.1.6
         version: 16.1.6(@babel/core@7.28.6)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      postgres:
+        specifier: ^3.4.8
+        version: 3.4.8
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2981,6 +2984,13 @@ packages:
   google-ads-api@22.0.0:
     resolution: {integrity: sha512-mOKzMWDbCxr28m6ykyLHXI7EjCWvRdKW3EeJrV1zhPc79WSVo/ShxQJQSiMZFBVD068iUBAkggBipbfstlzsyA==}
 
+  google-ads-mcp@file:packages/google-ads-mcp:
+    resolution: {directory: packages/google-ads-mcp, type: directory}
+    engines: {node: '>=18'}
+    hasBin: true
+    peerDependencies:
+      '@modelcontextprotocol/sdk': ^1.26.0
+
   google-ads-node@19.0.0:
     resolution: {integrity: sha512-fR40PUTHP0X6tJO7KF/BhDPJgiZRzR8ax25DGIghZBXy97ReMiO0gcZeAQJKcM+UGWCRUTyvroj7KbMmIOWGdA==}
 
@@ -3825,6 +3835,10 @@ packages:
 
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
+
+  postgres@3.4.8:
+    resolution: {integrity: sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg==}
+    engines: {node: '>=12'}
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -5207,10 +5221,12 @@ snapshots:
       - bufferutil
       - encoding
       - utf-8-validate
+    optional: true
 
   '@libsql/core@0.17.2':
     dependencies:
       js-base64: 3.7.8
+    optional: true
 
   '@libsql/darwin-arm64@0.5.29':
     optional: true
@@ -5228,6 +5244,7 @@ snapshots:
       - bufferutil
       - encoding
       - utf-8-validate
+    optional: true
 
   '@libsql/isomorphic-ws@0.1.5(bufferutil@4.1.0)':
     dependencies:
@@ -5236,6 +5253,7 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+    optional: true
 
   '@libsql/linux-arm-gnueabihf@0.5.29':
     optional: true
@@ -5294,7 +5312,8 @@ snapshots:
       '@tybys/wasm-util': 0.10.1
     optional: true
 
-  '@neon-rs/load@0.0.4': {}
+  '@neon-rs/load@0.0.4':
+    optional: true
 
   '@neondatabase/serverless@0.9.5':
     dependencies:
@@ -5953,6 +5972,7 @@ snapshots:
   '@types/ws@8.18.1':
     dependencies:
       '@types/node': 20.19.30
+    optional: true
 
   '@typescript-eslint/eslint-plugin@8.54.0(@typescript-eslint/parser@8.54.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
@@ -6479,6 +6499,7 @@ snapshots:
       node-fetch: 2.7.0
     transitivePeerDependencies:
       - encoding
+    optional: true
 
   cross-spawn@7.0.6:
     dependencies:
@@ -6578,7 +6599,8 @@ snapshots:
 
   dequal@2.0.3: {}
 
-  detect-libc@2.0.2: {}
+  detect-libc@2.0.2:
+    optional: true
 
   detect-libc@2.1.2: {}
 
@@ -6595,13 +6617,14 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.21.0
 
-  drizzle-orm@0.45.1(@libsql/client@0.17.2(bufferutil@4.1.0))(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@vercel/postgres@0.10.0):
+  drizzle-orm@0.45.1(@libsql/client@0.17.2(bufferutil@4.1.0))(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@vercel/postgres@0.10.0)(postgres@3.4.8):
     optionalDependencies:
       '@libsql/client': 0.17.2(bufferutil@4.1.0)
       '@neondatabase/serverless': 1.0.2
       '@opentelemetry/api': 1.9.0
       '@types/pg': 8.11.6
       '@vercel/postgres': 0.10.0
+      postgres: 3.4.8
 
   dunder-proto@1.0.1:
     dependencies:
@@ -7322,6 +7345,16 @@ snapshots:
       - encoding
       - supports-color
 
+  google-ads-mcp@file:packages/google-ads-mcp(@modelcontextprotocol/sdk@1.26.0(zod@4.3.6)):
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.26.0(zod@4.3.6)
+      google-ads-api: 22.0.0
+      zod: 4.3.6
+    transitivePeerDependencies:
+      - debug
+      - encoding
+      - supports-color
+
   google-ads-node@19.0.0:
     dependencies:
       google-gax: 5.0.6
@@ -7658,7 +7691,8 @@ snapshots:
 
   jose@6.2.2: {}
 
-  js-base64@3.7.8: {}
+  js-base64@3.7.8:
+    optional: true
 
   js-tokens@10.0.0: {}
 
@@ -7739,6 +7773,7 @@ snapshots:
       '@libsql/linux-x64-gnu': 0.5.29
       '@libsql/linux-x64-musl': 0.5.29
       '@libsql/win32-x64-msvc': 0.5.29
+    optional: true
 
   lightningcss-android-arm64@1.30.2:
     optional: true
@@ -8150,9 +8185,12 @@ snapshots:
   postgres-range@1.1.4:
     optional: true
 
+  postgres@3.4.8: {}
+
   prelude-ls@1.2.1: {}
 
-  promise-limit@2.7.0: {}
+  promise-limit@2.7.0:
+    optional: true
 
   prop-types@15.8.1:
     dependencies:
@@ -8985,6 +9023,7 @@ snapshots:
   ws@8.20.0(bufferutil@4.1.0):
     optionalDependencies:
       bufferutil: 4.1.0
+    optional: true
 
   y18n@5.0.8: {}
 

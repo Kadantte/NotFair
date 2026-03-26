@@ -31,7 +31,6 @@
     "drizzle-orm": "^0.45.1",
     "framer-motion": "^12.29.2",
     "google-ads-api": "^22.0.0",
-    "google-ads-mcp": "file:packages/google-ads-mcp",
     "googleapis": "^170.1.0",
     "lucide-react": "^0.563.0",
     "mcp-handler": "^1.1.0",
