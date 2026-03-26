@@ -1,27 +1,28 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
-  real,
+  doublePrecision,
+  serial,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 // ─── Goals & Guardrails ──────────────────────────────────────────────
 
-export const goals = sqliteTable(
+export const goals = pgTable(
   "goals",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     accountId: text("account_id").notNull(),
     campaignId: text("campaign_id").notNull().default(""),
-    targetCpa: real("target_cpa"),
-    monthlyCap: real("monthly_cap"),
-    maxBidChangePct: real("max_bid_change_pct").default(0.25),
-    maxBudgetChangePct: real("max_budget_change_pct").default(0.50),
-    maxKeywordPausePct: real("max_keyword_pause_pct").default(0.30),
-    createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
-    updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+    targetCpa: doublePrecision("target_cpa"),
+    monthlyCap: doublePrecision("monthly_cap"),
+    maxBidChangePct: doublePrecision("max_bid_change_pct").default(0.25),
+    maxBudgetChangePct: doublePrecision("max_budget_change_pct").default(0.50),
+    maxKeywordPausePct: doublePrecision("max_keyword_pause_pct").default(0.30),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("goals_account_campaign_idx").on(
@@ -33,8 +34,8 @@ export const goals = sqliteTable(
 
 // ─── Change Tracking ─────────────────────────────────────────────────
 
-export const changes = sqliteTable("changes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const changes = pgTable("changes", {
+  id: serial("id").primaryKey(),
   accountId: text("account_id").notNull(),
   campaignId: text("campaign_id"),
   toolName: text("tool_name").notNull(),
@@ -43,24 +44,24 @@ export const changes = sqliteTable("changes", {
   beforeValue: text("before_value").notNull(),
   afterValue: text("after_value").notNull(),
   reasoning: text("reasoning"),
-  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ─── Performance Snapshots ───────────────────────────────────────────
 
-export const performanceSnapshots = sqliteTable(
+export const performanceSnapshots = pgTable(
   "performance_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     accountId: text("account_id").notNull(),
     campaignId: text("campaign_id").notNull(),
     snapshotDate: text("snapshot_date").notNull(),
     impressions: integer("impressions").default(0),
     clicks: integer("clicks").default(0),
     costMicros: integer("cost_micros").default(0),
-    conversions: real("conversions").default(0),
-    cpa: real("cpa"),
-    createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+    conversions: doublePrecision("conversions").default(0),
+    cpa: doublePrecision("cpa"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("snapshot_account_campaign_date_idx").on(
@@ -73,11 +74,11 @@ export const performanceSnapshots = sqliteTable(
 
 // ─── MCP Auth Sessions ───────────────────────────────────────────────
 
-export const mcpSessions = sqliteTable("mcp_sessions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const mcpSessions = pgTable("mcp_sessions", {
+  id: serial("id").primaryKey(),
   accessToken: text("access_token").notNull().unique(),
   refreshToken: text("refresh_token").notNull(),
   customerId: text("customer_id").notNull(),
   expiresAt: text("expires_at").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });

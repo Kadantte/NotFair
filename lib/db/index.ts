@@ -1,15 +1,14 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 import { getEnv } from "@/lib/env";
 
 function getDb() {
-  const url = getEnv("TURSO_DATABASE_URL");
-  const authToken = getEnv("TURSO_AUTH_TOKEN");
+  const url = getEnv("DATABASE_URL");
   if (!url) {
-    throw new Error("Missing TURSO_DATABASE_URL environment variable");
+    throw new Error("Missing DATABASE_URL environment variable");
   }
-  const client = createClient({ url, authToken });
+  const client = postgres(url, { prepare: false });
   return drizzle(client, { schema });
 }
 

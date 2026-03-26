@@ -92,7 +92,7 @@ export async function getImpact(
   if (!change) return null;
   if (!change.campaignId) return { change, impact: null, reason: "No campaign associated" };
 
-  const changeDate = new Date(change.createdAt);
+  const changeDate = change.createdAt;
   const changeDateStr = changeDate.toISOString().slice(0, 10);
 
   // Get 7-day average BEFORE the change
@@ -199,7 +199,7 @@ export async function setGoals(
     })
     .onConflictDoUpdate({
       target: [schema.goals.accountId, schema.goals.campaignId],
-      set: { ...goals, updatedAt: new Date().toISOString() },
+      set: { ...goals, updatedAt: new Date() },
     })
     .returning();
 
