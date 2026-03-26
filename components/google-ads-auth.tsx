@@ -45,13 +45,25 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
 
         // Listen for auth success message from popup
         const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
             if (event.data.type === "GOOGLE_ADS_AUTH_SUCCESS") {
                 const newRefresh = event.data.refreshToken;
                 if (newRefresh) {
                     localStorage.setItem("google_ads_refresh_token", newRefresh);
                     setRefreshToken(newRefresh);
-                    // Auto fetch customers
-                    fetchCustomers(newRefresh);
+
+                    // If the popup already resolved the account, store it directly
+                    if (event.data.customerId && event.data.customerName) {
+                        const id = event.data.customerId.replace("customers/", "");
+                        localStorage.setItem("google_ads_customer_id", id);
+                        localStorage.setItem("google_ads_customer_name", event.data.customerName);
+                        setCustomerId(id);
+                        setCustomerName(event.data.customerName);
+                        onConnect?.(id);
+                    } else {
+                        // No account selected yet — fetch the list
+                        fetchCustomers(newRefresh);
+                    }
                 }
             }
         };
@@ -83,7 +95,7 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         const top = window.screen.height / 2 - height / 2;
 
         window.open(
-            "/api/auth/google/signin",
+            "/api/auth/signin?popup=1",
             "Google Ads Auth",
             `width=${width},height=${height},top=${top},left=${left}`
         );
