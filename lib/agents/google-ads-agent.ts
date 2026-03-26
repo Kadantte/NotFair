@@ -2,13 +2,13 @@ import { InferAgentUIMessage, stepCountIs, ToolLoopAgent, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import {
-  getCampaignKeywords,
+  getKeywords,
   getCampaignPerformance,
-  getCustomerOverview,
+  getAccountInfo,
   listAccessibleCustomers,
   listCampaigns,
   runSafeGaqlReport,
-} from "@/lib/google-ads-chat";
+} from "@/lib/google-ads";
 
 type AgentAuth = {
   refreshToken: string;
@@ -35,7 +35,7 @@ Rules:
       getConnectedAccount: tool({
         description: "Get the currently connected Google Ads customer context.",
         inputSchema: z.object({}),
-        execute: async () => getCustomerOverview(auth),
+        execute: async () => getAccountInfo(auth),
       }),
       listAccessibleCustomers: tool({
         description:
@@ -72,7 +72,7 @@ Rules:
           limit: z.number().int().min(1).max(100).default(20),
         }),
         execute: async ({ campaignId, days, limit }) =>
-          getCampaignKeywords(auth, campaignId, days, limit),
+          getKeywords(auth, campaignId, days, limit),
       }),
       runGaqlReport: tool({
         description:
