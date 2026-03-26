@@ -29,28 +29,134 @@ const CLIENTS = [
 Read the existing file, merge this into mcpServers, and write it back. Then tell me to restart Claude Desktop.`,
     },
     {
-        id: 'chatgpt',
-        name: 'ChatGPT',
-        hint: 'Paste into ChatGPT. It will connect to your ads automatically.',
+        id: 'codex',
+        name: 'Codex',
+        hint: 'Paste into Codex CLI. It will add AdsAgent as an MCP server and start analyzing your ads.',
         prompt: (mcpUrl: string, token: string, accountName: string) =>
-            `I just connected my Google Ads account "${accountName}" to AdsAgent.
+            `Set up this MCP server in Codex so I can manage my ads with AI:
 
-Add this MCP server and then show me how my campaigns are performing:
+1. Run this command to add the server:
 
-Server URL: ${mcpUrl}
-Authorization: Bearer ${token}`,
+codex mcp add adsagent --url ${mcpUrl} -- --header "Authorization: Bearer ${token}"
+
+2. Verify it was added:
+
+codex mcp list
+
+3. Restart Codex or reopen the IDE panel to load the server.
+
+Once connected, show me how my campaigns are performing — top spenders, wasted budget, and quick wins.`,
     },
     {
         id: 'openclaw',
         name: 'OpenClaw',
-        hint: 'Paste into OpenClaw. It will connect to your ads automatically.',
+        hint: 'Paste into OpenClaw. It will use MCPorter to set up AdsAgent as a skill and start optimizing your ads.',
         prompt: (mcpUrl: string, token: string, accountName: string) =>
-            `I just connected my Google Ads account "${accountName}" to AdsAgent.
+            `## Step 1: Add the MCP server
 
-Add this MCP server and then show me how my campaigns are performing:
+Add this MCP server to your config (openclaw.json or equivalent):
 
-Server URL: ${mcpUrl}
-Authorization: Bearer ${token}`,
+"adsagent": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "mcp-remote",
+    "${mcpUrl}",
+    "--transport",
+    "streamable-http",
+    "--header",
+    "Authorization: Bearer ${token}"
+  ]
+}
+
+## Step 2: Use MCPorter to discover and verify the tools
+
+Run these commands to confirm the server is reachable and see all available tools:
+
+npx mcporter list adsagent --schema
+
+This should show 12 tools: getAccountInfo, listCampaigns, getCampaignPerformance, getKeywords, getSearchTermReport, pauseKeyword, enableKeyword, updateBid, addNegativeKeyword, updateCampaignBudget, pauseCampaign, enableCampaign.
+
+## Step 3: Generate a typed client for the skill
+
+npx mcporter emit-ts adsagent --mode client --out ~/.openclaw/skills/adsagent/adsagent-client.ts
+
+## Step 4: Create the AdsAgent skill
+
+Create the file ~/.openclaw/skills/adsagent/SKILL.md with this content:
+
+---
+name: adsagent
+description: Manage Google Ads campaigns — read performance, optimize keywords, adjust bids and budgets, add negatives, pause/enable campaigns.
+version: 1.0.0
+mcp_servers:
+  - adsagent
+triggers:
+  - google ads
+  - campaigns
+  - keywords
+  - ad spend
+  - CPA
+  - ROAS
+  - search terms
+  - negative keywords
+  - bid
+  - budget
+  - pause campaign
+  - ads performance
+---
+
+# AdsAgent — Google Ads Management
+
+You have access to 12 Google Ads tools via the \`adsagent\` MCP server. Use them to help the user monitor and optimize their ad campaigns.
+
+## Available Tools
+
+### Read (safe, no side effects)
+- **getAccountInfo** — Account name, currency, timezone, test status
+- **listCampaigns** — All campaigns with impressions, clicks, cost, conversions. Params: \`limit\` (1-100, default 20), \`includeRemoved\` (bool, default false)
+- **getCampaignPerformance** — Daily metrics over a date range. Params: \`campaignId\`, \`days\` (1-365, default 30)
+- **getKeywords** — Top keywords with quality scores. Params: \`campaignId\`, \`days\`, \`limit\`
+- **getSearchTermReport** — Actual search queries triggering ads. Params: \`campaignId\`, \`days\`, \`limit\`
+
+### Write (mutates the account — always confirm with user first)
+- **pauseKeyword** — Stop a keyword. Params: \`campaignId\`, \`adGroupId\`, \`criterionId\`
+- **enableKeyword** — Re-enable a paused keyword. Params: \`adGroupId\`, \`criterionId\`
+- **updateBid** — Change CPC bid (manual/enhanced CPC only, max 25% change). Params: \`campaignId\`, \`adGroupId\`, \`criterionId\`, \`newBidDollars\`
+- **addNegativeKeyword** — Block irrelevant search terms (phrase match). Params: \`campaignId\`, \`keywordText\`
+- **updateCampaignBudget** — Change daily budget (max 50% change, min $1/day). Params: \`campaignId\`, \`newDailyBudgetDollars\`
+- **pauseCampaign** — Pause all ads in a campaign. Params: \`campaignId\`
+- **enableCampaign** — Re-enable a paused campaign. Params: \`campaignId\`
+
+## Rules
+
+1. **Never make write changes without explicit user confirmation.** Always show what you plan to change, the current value, and the new value before executing.
+2. **Start with reads.** When the user asks about their ads, begin with listCampaigns and getAccountInfo to build context.
+3. **Show numbers clearly.** Format cost as dollars, show CTR as percentages, include date ranges.
+4. **Recommend before acting.** When you spot waste (high-spend zero-conversion keywords, irrelevant search terms), recommend the action and wait for approval.
+5. **Guardrails are server-side.** Bid changes >25% and budget changes >50% will be rejected by the server. Don't try to circumvent this.
+
+## Common Workflows
+
+### "How are my ads doing?"
+1. getAccountInfo → listCampaigns → summarize top spenders, best/worst performers, total spend
+
+### "Find wasted spend"
+1. listCampaigns → pick top-spend campaigns
+2. getKeywords for each → find high-spend, zero-conversion keywords
+3. getSearchTermReport → find irrelevant search terms
+4. Recommend: pause wasteful keywords + add negative keywords
+
+### "Optimize bids"
+1. getKeywords → find keywords with good conversion rates but low impression share
+2. Recommend bid increases (within 25% limit) for high-performers
+3. Recommend bid decreases for underperformers
+
+---
+
+## Step 5: Verify it works
+
+Now use the skill. Call getAccountInfo to verify the connection, then listCampaigns to show me how my campaigns are performing — top spenders, wasted budget, and quick wins I should act on.`,
     },
 ] as const;
 
