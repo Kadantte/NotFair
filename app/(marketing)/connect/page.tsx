@@ -11,7 +11,17 @@ const CLIENTS = [
         name: 'Claude',
         hint: 'Paste into Claude Code. It will add AdsAgent to your Claude Desktop config so Coworker can use it.',
         prompt: (mcpUrl: string, token: string, _accountName: string) =>
-            `Add this MCP server to my claude_desktop_config.json (find it — macOS: ~/Library/Application Support/Claude/, Windows: %APPDATA%/Claude/, Linux: ~/.config/Claude/) under mcpServers:
+            `Add this MCP server to my Claude Desktop config.
+
+Before you start:
+1. Detect my OS and find my Claude Desktop config file:
+   - macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
+   - Windows: %APPDATA%\\Claude\\claude_desktop_config.json
+   - Linux: ~/.config/Claude/claude_desktop_config.json
+2. Check if Node.js is installed (run \`node --version\`). If not, tell me to install it first (https://nodejs.org) and stop — npx won't work without it.
+3. Check if npx is available (run \`npx --version\`). If missing but node exists, run \`npm install -g npx\` or tell me how to fix it.
+
+Once prerequisites are confirmed, add this entry under mcpServers in the config file:
 
 "adsagent": {
   "command": "npx",
@@ -26,14 +36,20 @@ const CLIENTS = [
   ]
 }
 
-Read the existing file, merge this into mcpServers, and write it back. Then tell me to restart Claude Desktop.`,
+Read the existing file first. If the file doesn't exist, create it with \`{"mcpServers": {}}\`. Merge this entry into mcpServers (don't overwrite other servers). Write it back, then tell me to restart Claude Desktop.`,
     },
     {
         id: 'codex',
         name: 'Codex',
         hint: 'Paste into Codex CLI. It will add AdsAgent as an MCP server and start analyzing your ads.',
-        prompt: (mcpUrl: string, token: string, accountName: string) =>
-            `Set up this MCP server in Codex so I can manage my ads with AI:
+        prompt: (mcpUrl: string, token: string, _accountName: string) =>
+            `Set up this MCP server in Codex so I can manage my ads with AI.
+
+Before you start:
+1. Check if the Codex CLI is installed by running \`codex --version\`. If not found, tell me how to install it and stop.
+2. Check if Node.js is available (run \`node --version\`). The MCP bridge requires it.
+
+Once prerequisites are confirmed:
 
 1. Run this command to add the server:
 
@@ -51,10 +67,23 @@ Once connected, show me how my campaigns are performing — top spenders, wasted
         id: 'openclaw',
         name: 'OpenClaw',
         hint: 'Paste into OpenClaw. It will use MCPorter to set up AdsAgent as a skill and start optimizing your ads.',
-        prompt: (mcpUrl: string, token: string, accountName: string) =>
-            `## Step 1: Add the MCP server
+        prompt: (mcpUrl: string, token: string, _accountName: string) =>
+            `## Step 0: Check prerequisites
 
-Add this MCP server to your config (openclaw.json or equivalent):
+Before doing anything, verify:
+1. **Node.js** — run \`node --version\`. If missing, tell me to install it from https://nodejs.org and stop.
+2. **npx** — run \`npx --version\`. If missing, run \`npm install -g npx\`.
+3. **OpenClaw config location** — detect where OpenClaw stores its config on this system:
+   - Check for \`openclaw.json\` in the current directory
+   - Check \`~/.openclaw/config.json\` or \`~/.config/openclaw/config.json\`
+   - If none exist, ask me where my OpenClaw config lives before proceeding.
+4. **OpenClaw skills directory** — detect the skills directory:
+   - Check \`~/.openclaw/skills/\`, \`~/.config/openclaw/skills/\`, or any path referenced in the OpenClaw config.
+   - If not found, ask me before creating one.
+
+## Step 1: Add the MCP server
+
+Add this entry to the OpenClaw config file you found above:
 
 "adsagent": {
   "command": "npx",
@@ -69,6 +98,8 @@ Add this MCP server to your config (openclaw.json or equivalent):
   ]
 }
 
+Read the existing config first and merge — don't overwrite other servers.
+
 ## Step 2: Use MCPorter to discover and verify the tools
 
 Run these commands to confirm the server is reachable and see all available tools:
@@ -79,11 +110,13 @@ This should show 12 tools: getAccountInfo, listCampaigns, getCampaignPerformance
 
 ## Step 3: Generate a typed client for the skill
 
-npx mcporter emit-ts adsagent --mode client --out ~/.openclaw/skills/adsagent/adsagent-client.ts
+Use the skills directory you found in Step 0:
+
+npx mcporter emit-ts adsagent --mode client --out <skills-dir>/adsagent/adsagent-client.ts
 
 ## Step 4: Create the AdsAgent skill
 
-Create the file ~/.openclaw/skills/adsagent/SKILL.md with this content:
+Create the file <skills-dir>/adsagent/SKILL.md with this content:
 
 ---
 name: adsagent
