@@ -2,6 +2,27 @@
 import { GoogleAdsApi, enums } from "google-ads-api";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { createClient as createSupabaseClient } from "@/lib/supabase/server";
+import { db, schema } from "@/lib/db";
+import { eq } from "drizzle-orm";
+
+export async function hasLinkedAdsAccount(): Promise<boolean> {
+    try {
+        const supabase = await createSupabaseClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+
+        const [session] = await db()
+            .select({ id: schema.mcpSessions.id })
+            .from(schema.mcpSessions)
+            .where(eq(schema.mcpSessions.userId, user.id))
+            .limit(1);
+
+        return !!session;
+    } catch {
+        return false;
+    }
+}
 
 export async function listAccessibleCustomersAction(refreshToken: string) {
     const clientId = process.env.GOOGLE_ADS_CLIENT_ID;

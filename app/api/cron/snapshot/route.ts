@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { gte } from "drizzle-orm";
-import { listCampaigns, getCampaignPerformance, toMicros, type AuthContext } from "@/lib/google-ads";
+import { listCampaigns, getCampaignPerformance, toMicros, parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 
 /**
  * Daily performance snapshot cron job.
  *
  * Triggered by Vercel Cron (see vercel.json).
  * For each active MCP session, captures yesterday's campaign metrics
- * and stores them in performance_snapshots for impact attribution.
+ * for ALL connected accounts and stores them in performance_snapshots.
  */
 export async function GET(request: Request) {
   // Verify cron secret to prevent unauthorized access
@@ -28,43 +28,53 @@ export async function GET(request: Request) {
     let errors = 0;
 
     for (const session of sessions) {
-      try {
-        const auth: AuthContext = {
-          refreshToken: session.refreshToken,
-          customerId: session.customerId,
-        };
+      // Parse all connected account IDs
+      let accountIds = parseCustomerIds(session.customerIds).map((a) => a.id);
 
-        const campaigns = await listCampaigns(auth, { limit: 100 });
+      // Ensure at least the primary account is included
+      if (accountIds.length === 0 && session.customerId) {
+        accountIds = [session.customerId];
+      }
 
-        for (const campaign of campaigns) {
-          if (campaign.status === "REMOVED") continue;
+      for (const accountId of accountIds) {
+        try {
+          const auth: AuthContext = {
+            refreshToken: session.refreshToken,
+            customerId: accountId,
+          };
 
-          // Get yesterday's performance
-          const perf = await getCampaignPerformance(auth, campaign.id, 1);
-          const yesterday = perf.daily[0];
-          if (!yesterday) continue;
+          const campaigns = await listCampaigns(auth, { limit: 100 });
 
-          await db()
-            .insert(schema.performanceSnapshots)
-            .values({
-              accountId: session.customerId,
-              campaignId: campaign.id,
-              snapshotDate: yesterday.date,
-              impressions: yesterday.impressions,
-              clicks: yesterday.clicks,
-              costMicros: toMicros(yesterday.cost),
-              conversions: yesterday.conversions,
-              cpa: yesterday.conversions > 0
-                ? yesterday.cost / yesterday.conversions
-                : null,
-            })
-            .onConflictDoNothing(); // Skip if snapshot already exists for this date
+          for (const campaign of campaigns) {
+            if (campaign.status === "REMOVED") continue;
 
-          snapshotsCreated++;
+            // Get yesterday's performance
+            const perf = await getCampaignPerformance(auth, campaign.id, 1);
+            const yesterday = perf.daily[0];
+            if (!yesterday) continue;
+
+            await db()
+              .insert(schema.performanceSnapshots)
+              .values({
+                accountId,
+                campaignId: campaign.id,
+                snapshotDate: yesterday.date,
+                impressions: yesterday.impressions,
+                clicks: yesterday.clicks,
+                costMicros: toMicros(yesterday.cost),
+                conversions: yesterday.conversions,
+                cpa: yesterday.conversions > 0
+                  ? yesterday.cost / yesterday.conversions
+                  : null,
+              })
+              .onConflictDoNothing(); // Skip if snapshot already exists for this date
+
+            snapshotsCreated++;
+          }
+        } catch (error) {
+          console.error(`[cron/snapshot] Error for session ${session.id}, account ${accountId}:`, error);
+          errors++;
         }
-      } catch (error) {
-        console.error(`[cron/snapshot] Error for session ${session.id}:`, error);
-        errors++;
       }
     }
 

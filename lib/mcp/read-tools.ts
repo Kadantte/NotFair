@@ -6,8 +6,9 @@ import {
   getKeywords,
   getSearchTermReport,
   runSafeGaqlReport,
+  authForAccount,
 } from "@/lib/google-ads";
-import { jsonResult } from "./types";
+import { jsonResult, accountIdParam, READ_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 
 /**
@@ -21,13 +22,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     title: "Get Account Info",
     description:
       "Get the connected Google Ads account details including name, currency, timezone, and test account status.",
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
+    inputSchema: {
+      accountId: accountIdParam,
     },
-  }, async () => {
-    const result = await getAccountInfo(currentAuth());
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId }) => {
+    const result = await getAccountInfo(authForAccount(currentAuth(), accountId));
     return jsonResult(result);
   });
 
@@ -38,6 +38,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     description:
       "List all campaigns with lifetime metrics (impressions, clicks, cost, conversions). Use to get an overview of account performance.",
     inputSchema: {
+      accountId: accountIdParam,
       limit: z
         .number()
         .int()
@@ -50,13 +51,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .default(false)
         .describe("Include removed campaigns"),
     },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  }, async ({ limit, includeRemoved }) => {
-    const result = await listCampaigns(currentAuth(), { limit, includeRemoved });
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, limit, includeRemoved }) => {
+    const result = await listCampaigns(authForAccount(currentAuth(), accountId), { limit, includeRemoved });
     return jsonResult(result);
   });
 
@@ -65,6 +62,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     description:
       "Get daily performance metrics and totals for a specific campaign over a date range. Includes impressions, clicks, cost, conversions, CPA, and ROAS.",
     inputSchema: {
+      accountId: accountIdParam,
       campaignId: z.string().describe("Google Ads campaign ID"),
       days: z
         .number()
@@ -74,13 +72,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .default(30)
         .describe("Number of days to look back (1-365)"),
     },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  }, async ({ campaignId, days }) => {
-    const result = await getCampaignPerformance(currentAuth(), campaignId, days);
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, days }) => {
+    const result = await getCampaignPerformance(authForAccount(currentAuth(), accountId), campaignId, days);
     return jsonResult(result);
   });
 
@@ -91,6 +85,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     description:
       "Get top keywords for a campaign with metrics: impressions, clicks, CTR, CPC, quality score, and conversions.",
     inputSchema: {
+      accountId: accountIdParam,
       campaignId: z.string().describe("Google Ads campaign ID"),
       days: z
         .number()
@@ -107,13 +102,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .default(50)
         .describe("Max keywords to return (1-100)"),
     },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  }, async ({ campaignId, days, limit }) => {
-    const result = await getKeywords(currentAuth(), campaignId, days, limit);
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, days, limit }) => {
+    const result = await getKeywords(authForAccount(currentAuth(), accountId), campaignId, days, limit);
     return jsonResult(result);
   });
 
@@ -122,6 +113,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     description:
       "Get actual search queries that triggered your ads, ordered by cost. Use to find irrelevant terms to add as negative keywords.",
     inputSchema: {
+      accountId: accountIdParam,
       campaignId: z.string().describe("Google Ads campaign ID"),
       days: z
         .number()
@@ -138,13 +130,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .default(50)
         .describe("Max search terms to return (1-100)"),
     },
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  }, async ({ campaignId, days, limit }) => {
-    const result = await getSearchTermReport(currentAuth(), campaignId, days, limit);
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, days, limit }) => {
+    const result = await getSearchTermReport(authForAccount(currentAuth(), accountId), campaignId, days, limit);
     return jsonResult(result);
   });
 
@@ -155,6 +143,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     description:
       "Run a custom read-only Google Ads Query Language (GAQL) query. Only SELECT statements are allowed. Returns up to 50 rows.",
     inputSchema: {
+      accountId: accountIdParam,
       query: z
         .string()
         .min(1)
@@ -165,8 +154,8 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       destructiveHint: false,
       openWorldHint: true,
     },
-  }, async ({ query }) => {
-    const result = await runSafeGaqlReport(currentAuth(), query);
+  }, async ({ accountId, query }) => {
+    const result = await runSafeGaqlReport(authForAccount(currentAuth(), accountId), query);
     return jsonResult(result);
   });
 };

@@ -79,6 +79,8 @@ export const mcpSessions = pgTable("mcp_sessions", {
   accessToken: text("access_token").notNull().unique(),
   refreshToken: text("refresh_token").notNull(),
   customerId: text("customer_id").notNull(),
+  customerIds: text("customer_ids").notNull().default("[]"),
+  userId: text("user_id"),
   expiresAt: text("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

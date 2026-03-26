@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { listAccessibleCustomers } from "@/lib/google-ads";
 import { randomBytes } from "crypto";
+import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
 function redirectWithError(message: string) {
   return NextResponse.redirect(
@@ -64,53 +65,108 @@ function popupAccountSelectionResponse(
     body { font-family: system-ui, sans-serif; background: #09090b; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
     .container { max-width: 360px; width: 100%; padding: 24px; text-align: center; }
     h2 { font-size: 20px; margin-bottom: 8px; }
-    p { color: #a1a1aa; font-size: 14px; margin-bottom: 24px; }
-    button { display: block; width: 100%; padding: 14px 16px; margin-bottom: 8px; background: #18181b; border: 1px solid #27272a; border-radius: 12px; color: #fff; text-align: left; cursor: pointer; font-size: 14px; }
-    button:hover { background: #27272a; border-color: #3f3f46; }
+    p { color: #a1a1aa; font-size: 14px; margin-bottom: 16px; }
+    .account { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; margin-bottom: 8px; background: #18181b; border: 1px solid #27272a; border-radius: 12px; color: #fff; text-align: left; cursor: pointer; font-size: 14px; transition: all 0.15s; }
+    .account:hover { background: #27272a; border-color: #3f3f46; }
+    .account.selected { border-color: #22c55e; background: #052e16; }
+    .account input[type="checkbox"] { width: 18px; height: 18px; accent-color: #22c55e; cursor: pointer; flex-shrink: 0; }
+    .account-info { flex: 1; min-width: 0; }
     .name { font-weight: 600; }
     .id { color: #71717a; font-size: 12px; font-family: monospace; margin-top: 4px; }
+    .connect-btn { display: block; width: 100%; padding: 14px; margin-top: 16px; background: #fff; color: #000; border: none; border-radius: 9999px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+    .connect-btn:hover:not(:disabled) { background: #e4e4e7; }
+    .connect-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .count { color: #a1a1aa; font-size: 13px; margin-top: 8px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Pick an account</h2>
-    <p>Which Google Ads account do you want to manage?</p>
+    <h2>Select accounts</h2>
+    <p>Which Google Ads accounts do you want to manage?</p>
     <div id="accounts"></div>
+    <div class="count" id="count"></div>
+    <button class="connect-btn" id="connectBtn" disabled>Connect</button>
   </div>
   <script>
     const accounts = ${accountsJson};
     const refreshToken = ${refreshTokenJson};
     const origin = ${originJson};
+    const selected = new Set();
+
+    function updateUI() {
+      const btn = document.getElementById('connectBtn');
+      const count = document.getElementById('count');
+      btn.disabled = selected.size === 0;
+      btn.textContent = selected.size === 0 ? 'Connect' : 'Connect ' + selected.size + ' account' + (selected.size > 1 ? 's' : '');
+      count.textContent = selected.size > 0 ? selected.size + ' of ' + accounts.length + ' selected' : '';
+      document.querySelectorAll('.account').forEach(el => {
+        const id = el.dataset.id;
+        el.classList.toggle('selected', selected.has(id));
+        el.querySelector('input').checked = selected.has(id);
+      });
+    }
+
     if (!window.opener) { document.querySelector('p').textContent = 'This page must be opened from the app.'; }
     else {
       const container = document.getElementById('accounts');
       accounts.forEach(a => {
-        const btn = document.createElement('button');
+        const div = document.createElement('div');
+        div.className = 'account';
+        div.dataset.id = a.id;
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        const info = document.createElement('div');
+        info.className = 'account-info';
         const nameDiv = document.createElement('div');
         nameDiv.className = 'name';
         nameDiv.textContent = a.name;
         const idDiv = document.createElement('div');
         idDiv.className = 'id';
         idDiv.textContent = a.id;
-        btn.appendChild(nameDiv);
-        btn.appendChild(idDiv);
-        btn.onclick = () => {
-          window.opener.postMessage({
-            type: "GOOGLE_ADS_AUTH_SUCCESS",
-            refreshToken,
-            customerId: a.id,
-            customerName: a.name,
-          }, origin);
-          window.close();
+        info.appendChild(nameDiv);
+        info.appendChild(idDiv);
+        div.appendChild(cb);
+        div.appendChild(info);
+        div.onclick = (e) => {
+          if (e.target === cb) return;
+          cb.checked = !cb.checked;
+          if (cb.checked) selected.add(a.id); else selected.delete(a.id);
+          updateUI();
         };
-        container.appendChild(btn);
+        cb.onchange = () => {
+          if (cb.checked) selected.add(a.id); else selected.delete(a.id);
+          updateUI();
+        };
+        container.appendChild(div);
       });
+
+      document.getElementById('connectBtn').onclick = () => {
+        const selectedAccounts = accounts.filter(a => selected.has(a.id));
+        window.opener.postMessage({
+          type: "GOOGLE_ADS_AUTH_SUCCESS",
+          refreshToken,
+          accounts: selectedAccounts,
+          customerId: selectedAccounts[0].id,
+          customerName: selectedAccounts[0].name,
+        }, origin);
+        window.close();
+      };
     }
   </script>
 </body>
 </html>`,
     { headers: { "Content-Type": "text/html" } },
   );
+}
+
+async function getSupabaseUserId(): Promise<string | null> {
+  try {
+    const supabase = await createSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(request: Request) {
@@ -134,6 +190,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Get Supabase user ID if logged in (for linking MCP session to user)
+    const userId = await getSupabaseUserId();
+
     // Exchange code for tokens
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -194,11 +253,17 @@ export async function GET(request: Request) {
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
+      const customerIds = JSON.stringify([
+        { id: account.id, name: account.name || "" },
+      ]);
+
       try {
         await db().insert(schema.mcpSessions).values({
           accessToken,
           refreshToken: tokenData.refresh_token,
           customerId: account.id,
+          customerIds,
+          userId,
           expiresAt: expiresAt.toISOString(),
         });
       } catch (error) {
@@ -233,6 +298,7 @@ export async function GET(request: Request) {
         accessToken: pendingToken,
         refreshToken: tokenData.refresh_token,
         customerId: "", // pending selection
+        userId,
         expiresAt: expiresAt.toISOString(),
       });
     } catch (error) {

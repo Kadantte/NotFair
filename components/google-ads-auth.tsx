@@ -52,11 +52,23 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
                     localStorage.setItem("google_ads_refresh_token", newRefresh);
                     setRefreshToken(newRefresh);
 
-                    // If the popup already resolved the account, store it directly
-                    if (event.data.customerId && event.data.customerName) {
+                    // If the popup already resolved the account(s), store directly
+                    if (event.data.accounts && Array.isArray(event.data.accounts)) {
+                        // Multi-account selection from popup
+                        const accounts = event.data.accounts;
+                        localStorage.setItem("google_ads_customer_ids", JSON.stringify(accounts));
+                        const primary = accounts[0];
+                        const id = primary.id.replace("customers/", "");
+                        localStorage.setItem("google_ads_customer_id", id);
+                        localStorage.setItem("google_ads_customer_name", primary.name || "Google Ads Account");
+                        setCustomerId(id);
+                        setCustomerName(primary.name || "Google Ads Account");
+                        onConnect?.(id);
+                    } else if (event.data.customerId && event.data.customerName) {
                         const id = event.data.customerId.replace("customers/", "");
                         localStorage.setItem("google_ads_customer_id", id);
                         localStorage.setItem("google_ads_customer_name", event.data.customerName);
+                        localStorage.setItem("google_ads_customer_ids", JSON.stringify([{ id, name: event.data.customerName }]));
                         setCustomerId(id);
                         setCustomerName(event.data.customerName);
                         onConnect?.(id);
@@ -115,6 +127,7 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         localStorage.removeItem("google_ads_refresh_token");
         localStorage.removeItem("google_ads_customer_id");
         localStorage.removeItem("google_ads_customer_name");
+        localStorage.removeItem("google_ads_customer_ids");
         setRefreshToken(null);
         setCustomerId(null);
         setCustomerName(null);

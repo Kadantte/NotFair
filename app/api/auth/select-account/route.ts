@@ -12,11 +12,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { pendingToken, customerId, customerName } = body;
+  const { pendingToken, accounts } = body;
 
-  if (!pendingToken || !customerId) {
+  if (!pendingToken || !Array.isArray(accounts) || accounts.length === 0) {
     return NextResponse.json(
-      { error: "Missing pendingToken or customerId" },
+      { error: "Missing pendingToken or accounts array" },
+      { status: 400 },
+    );
+  }
+
+  // Validate accounts shape
+  const validAccounts = accounts.filter(
+    (a: unknown): a is { id: string; name: string } =>
+      typeof a === "object" && a !== null && typeof (a as any).id === "string",
+  );
+
+  if (validAccounts.length === 0) {
+    return NextResponse.json(
+      { error: "No valid accounts provided" },
       { status: 400 },
     );
   }
@@ -40,25 +53,39 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify the customerId is in the user's accessible accounts
-  const customers = await listAccessibleCustomers(session.refreshToken);
-  const isAccessible = customers.some(
-    (c) => !("error" in c) && c.id === customerId,
+  // Verify all selected account IDs are accessible
+  const accessible = await listAccessibleCustomers(session.refreshToken);
+  const accessibleIds = new Set(
+    accessible.filter((c) => !("error" in c)).map((c) => c.id),
   );
 
-  if (!isAccessible) {
+  const inaccessible = validAccounts.filter((a) => !accessibleIds.has(a.id));
+  if (inaccessible.length > 0) {
     return NextResponse.json(
-      { error: "Account not accessible" },
+      { error: `Account(s) not accessible: ${inaccessible.map((a) => a.id).join(", ")}` },
       { status: 403 },
     );
   }
 
+  // Set first selected as default, store all in customerIds
+  const primaryAccount = validAccounts[0];
+  const customerIds = JSON.stringify(
+    validAccounts.map((a) => ({ id: a.id, name: a.name || "" })),
+  );
+
   await db()
     .update(schema.mcpSessions)
-    .set({ customerId })
+    .set({
+      customerId: primaryAccount.id,
+      customerIds,
+    })
     .where(eq(schema.mcpSessions.accessToken, pendingToken));
 
+  const accountNames = validAccounts
+    .map((a) => a.name || a.id)
+    .join(", ");
+
   return NextResponse.json({
-    redirectUrl: `${getAppOrigin()}/connect?token=${pendingToken}&customer_name=${encodeURIComponent(customerName || "Google Ads Account")}`,
+    redirectUrl: `${getAppOrigin()}/connect?token=${pendingToken}&customer_name=${encodeURIComponent(accountNames)}`,
   });
 }

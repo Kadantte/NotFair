@@ -3,10 +3,48 @@ import { getRequiredEnv } from "@/lib/env";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
+export type ConnectedAccount = {
+  id: string;
+  name: string;
+};
+
+/** Parse a JSON-encoded customer_ids string into ConnectedAccount[]. */
+export function parseCustomerIds(raw: string | null | undefined): ConnectedAccount[] {
+  if (!raw || raw === "[]") return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item: unknown): item is ConnectedAccount =>
+        typeof item === "object" && item !== null && "id" in item,
+    );
+  } catch {
+    return [];
+  }
+}
+
 export type AuthContext = {
   refreshToken: string;
   customerId: string;
+  customerIds?: ConnectedAccount[];
 };
+
+/**
+ * Resolve the target account ID for a tool call.
+ * If accountId is provided and is in the session's connected accounts, use it.
+ * Otherwise fall back to the default customerId.
+ */
+export function resolveAccountId(auth: AuthContext, accountId?: string): string {
+  if (!accountId) return auth.customerId;
+  if (auth.customerIds?.some((a) => a.id === accountId)) return accountId;
+  return auth.customerId;
+}
+
+/** Build an AuthContext targeting a specific account (for per-tool targeting). */
+export function authForAccount(auth: AuthContext, accountId?: string): AuthContext {
+  const targetId = resolveAccountId(auth, accountId);
+  return { ...auth, customerId: targetId };
+}
 
 export type Guardrails = {
   maxBidChangePct: number;      // e.g. 0.25 = 25%

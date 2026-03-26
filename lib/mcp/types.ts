@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
@@ -14,3 +15,23 @@ export type ToolRegistrar = (
 export function jsonResult(value: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
 }
+
+/** Shared optional accountId param for all tools (multi-account targeting). */
+export const accountIdParam = z
+  .string()
+  .optional()
+  .describe("Target a specific connected account ID (defaults to primary account)");
+
+/** Shared annotation presets to avoid repetition across tool registrations. */
+export const READ_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: false,
+} as const;
+
+export const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;

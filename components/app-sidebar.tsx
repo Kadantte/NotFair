@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export type SidebarThread = {
   id: string;
@@ -178,6 +179,10 @@ export function AppSidebar({
             ))}
           </div>
         ) : null}
+
+        <div className={`shrink-0 border-t border-white/8 p-3 ${isCollapsed ? "flex justify-center" : ""}`}>
+          <SignOutButton isCollapsed={isCollapsed} />
+        </div>
       </div>
     </aside>
   );

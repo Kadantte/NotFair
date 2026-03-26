@@ -6,8 +6,9 @@ import { motion } from 'framer-motion';
 import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle } from 'lucide-react';
 import { AppSidebar, type SidebarThread } from '@/components/app-sidebar';
 import { Button } from '@/components/ui/button';
-import { listCampaignsAction } from '@/app/actions';
+import { listCampaignsAction, hasLinkedAdsAccount } from '@/app/actions';
 import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from '@/lib/chat-history';
+import { ConnectAdsPrompt } from '@/components/connect-ads-prompt';
 
 interface Campaign {
     id: string;
@@ -54,6 +55,7 @@ export default function CampaignsPage() {
     const [loading, setLoading] = useState(true);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [hasAdsAccount, setHasAdsAccount] = useState<boolean | null>(null);
 
     const fetchCampaigns = useCallback(async () => {
         setLoading(true);
@@ -62,10 +64,19 @@ export default function CampaignsPage() {
         const cid = localStorage.getItem('google_ads_customer_id');
 
         if (!token || !cid) {
-            router.push('/');
+            // Check if user has a server-linked MCP session
+            const linked = await hasLinkedAdsAccount();
+            setHasAdsAccount(linked);
+            if (!linked) {
+                setLoading(false);
+                return;
+            }
+            // Has server session but no local tokens — still show empty for now
+            setLoading(false);
             return;
         }
 
+        setHasAdsAccount(true);
         try {
             const data = await listCampaignsAction(token, cid);
             setCampaigns(data);
@@ -75,7 +86,7 @@ export default function CampaignsPage() {
         } finally {
             setLoading(false);
         }
-    }, [router]);
+    }, []);
 
     useEffect(() => {
         fetchCampaigns();
@@ -129,6 +140,10 @@ export default function CampaignsPage() {
                     </header>
 
                     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+                        {hasAdsAccount === false && (
+                            <ConnectAdsPrompt />
+                        )}
+
                         {error && (
                             <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4 mb-8 flex items-center gap-3 text-red-400">
                                 <AlertCircle className="w-5 h-5 shrink-0" />

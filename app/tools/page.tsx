@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SignOutButton } from '@/components/sign-out-button';
 
 export default function ToolsPage() {
     return (
@@ -21,6 +22,7 @@ export default function ToolsPage() {
                             <h1 className="text-3xl font-bold tracking-tight">Tools</h1>
                         </div>
                     </div>
+                    <SignOutButton />
                 </header>
             </div>
         </main>
