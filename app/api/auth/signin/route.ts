@@ -3,7 +3,7 @@ import { getAppOrigin } from "@/lib/app-url";
 
 export async function GET() {
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const redirectUri = `${getAppOrigin()}/api/auth/mcp/callback`;
+  const redirectUri = `${getAppOrigin()}/api/auth/google/callback`;
   const scope = "https://www.googleapis.com/auth/adwords";
 
   if (!clientId) {
