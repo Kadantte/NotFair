@@ -1,4 +1,4 @@
-import { createMcpHandler, withMcpAuth } from "mcp-handler";
+import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import {
   getAccountInfo,
@@ -42,6 +42,9 @@ async function resolveAuth(request: Request): Promise<AuthContext> {
         .limit(1);
 
       if (session) {
+        if (!session.customerId) {
+          throw new Error("Account selection pending. Complete setup at /connect.");
+        }
         return {
           refreshToken: session.refreshToken,
           customerId: session.customerId,
@@ -61,12 +64,15 @@ async function resolveAuth(request: Request): Promise<AuthContext> {
   return { refreshToken, customerId };
 }
 
-// Per-request auth — set before MCP handler runs.
-// Safe because Vercel serverless handles one request at a time.
-let currentAuth: AuthContext = {
-  refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN ?? "",
-  customerId: process.env.GOOGLE_ADS_CUSTOMER_ID ?? "",
-};
+// Per-request auth — stored in AsyncLocalStorage for concurrency safety.
+import { AsyncLocalStorage } from "node:async_hooks";
+const authStore = new AsyncLocalStorage<AuthContext>();
+
+function currentAuth(): AuthContext {
+  const auth = authStore.getStore();
+  if (!auth) throw new Error("No auth context — request not authenticated.");
+  return auth;
+}
 
 // ─── MCP Handler ─────────────────────────────────────────────────────
 
@@ -83,7 +89,7 @@ const mcpHandler = createMcpHandler(
         inputSchema: {},
       },
       async () => {
-        const result = await getAccountInfo(currentAuth);
+        const result = await getAccountInfo(currentAuth());
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -111,7 +117,7 @@ const mcpHandler = createMcpHandler(
         },
       },
       async ({ limit, includeRemoved }) => {
-        const result = await listCampaigns(currentAuth, {
+        const result = await listCampaigns(currentAuth(), {
           limit,
           includeRemoved,
         });
@@ -140,7 +146,7 @@ const mcpHandler = createMcpHandler(
       },
       async ({ campaignId, days }) => {
         const result = await getCampaignPerformance(
-          currentAuth,
+          currentAuth(),
           campaignId,
           days,
         );
@@ -163,7 +169,7 @@ const mcpHandler = createMcpHandler(
         },
       },
       async ({ campaignId, days, limit }) => {
-        const result = await getKeywords(currentAuth, campaignId, days, limit);
+        const result = await getKeywords(currentAuth(), campaignId, days, limit);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -184,7 +190,7 @@ const mcpHandler = createMcpHandler(
       },
       async ({ campaignId, days, limit }) => {
         const result = await getSearchTermReport(
-          currentAuth,
+          currentAuth(),
           campaignId,
           days,
           limit,
@@ -213,7 +219,7 @@ const mcpHandler = createMcpHandler(
       },
       async ({ campaignId, adGroupId, criterionId }) => {
         const result = await pauseKeyword(
-          currentAuth,
+          currentAuth(),
           campaignId,
           adGroupId,
           criterionId,
@@ -236,7 +242,7 @@ const mcpHandler = createMcpHandler(
         },
       },
       async ({ adGroupId, criterionId }) => {
-        const result = await enableKeyword(currentAuth, adGroupId, criterionId);
+        const result = await enableKeyword(currentAuth(), adGroupId, criterionId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -262,7 +268,7 @@ const mcpHandler = createMcpHandler(
       async ({ campaignId, adGroupId, criterionId, newBidDollars }) => {
         const newBidMicros = toMicros(newBidDollars);
         const result = await updateBid(
-          currentAuth,
+          currentAuth(),
           campaignId,
           adGroupId,
           criterionId,
@@ -290,7 +296,7 @@ const mcpHandler = createMcpHandler(
       },
       async ({ campaignId, keywordText }) => {
         const result = await addNegativeKeyword(
-          currentAuth,
+          currentAuth(),
           campaignId,
           keywordText,
         );
@@ -317,7 +323,7 @@ const mcpHandler = createMcpHandler(
       async ({ campaignId, newDailyBudgetDollars }) => {
         const newBudgetMicros = toMicros(newDailyBudgetDollars);
         const result = await updateCampaignBudget(
-          currentAuth,
+          currentAuth(),
           campaignId,
           newBudgetMicros,
         );
@@ -337,7 +343,7 @@ const mcpHandler = createMcpHandler(
         },
       },
       async ({ campaignId }) => {
-        const result = await pauseCampaign(currentAuth, campaignId);
+        const result = await pauseCampaign(currentAuth(), campaignId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -354,7 +360,7 @@ const mcpHandler = createMcpHandler(
         },
       },
       async ({ campaignId }) => {
-        const result = await enableCampaign(currentAuth, campaignId);
+        const result = await enableCampaign(currentAuth(), campaignId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
@@ -370,13 +376,16 @@ const mcpHandler = createMcpHandler(
 
 // Wrapper that resolves per-request auth before the MCP handler runs
 async function handler(request: Request): Promise<Response> {
+  let auth: AuthContext;
   try {
-    currentAuth = await resolveAuth(request);
-  } catch {
-    // resolveAuth throws if no valid auth — let it fall through
-    // to env var defaults (already set in currentAuth initialization)
+    auth = await resolveAuth(request);
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: (e as Error).message || "Authentication required" }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
   }
-  return mcpHandler(request);
+  return authStore.run(auth, () => mcpHandler(request));
 }
 
 export { handler as GET, handler as POST, handler as DELETE };

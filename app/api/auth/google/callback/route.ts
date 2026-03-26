@@ -48,6 +48,13 @@ export async function GET(request: Request) {
       (c) => !("error" in c) && !c.isManager,
     );
 
+    // No usable accounts — error
+    if (usableAccounts.length === 0) {
+      return NextResponse.redirect(
+        `${getAppOrigin()}/connect?error=${encodeURIComponent("No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.")}`,
+      );
+    }
+
     // If only one account, skip selection
     if (usableAccounts.length === 1) {
       const account = usableAccounts[0];

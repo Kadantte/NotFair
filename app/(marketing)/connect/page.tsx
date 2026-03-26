@@ -81,9 +81,14 @@ function ConnectContent() {
     const [selecting, setSelecting] = useState(false);
     const [activeClient, setActiveClient] = useState<string>('claude');
 
-    const accounts: { id: string; name: string }[] = accountsParam
-        ? JSON.parse(decodeURIComponent(accountsParam))
-        : [];
+    let accounts: { id: string; name: string }[] = [];
+    if (accountsParam) {
+        try {
+            accounts = JSON.parse(accountsParam);
+        } catch {
+            // malformed accounts param — fall through to empty
+        }
+    }
 
     useEffect(() => {
         setMcpUrl(`${window.location.origin}/api/mcp`);
@@ -128,7 +133,7 @@ function ConnectContent() {
                 {error && (
                     <div className="mb-8 p-4 rounded-xl border border-red-900/50 bg-red-950/30 flex items-start gap-3">
                         <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-red-300 text-sm">{decodeURIComponent(error)}</p>
+                        <p className="text-red-300 text-sm">{error}</p>
                     </div>
                 )}
 
