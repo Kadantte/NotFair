@@ -1,5 +1,7 @@
+import { getEnv } from "@/lib/env";
+
 export function getAppOrigin(): string {
-  const envOrigin = process.env.NEXT_PUBLIC_APP_URL;
+  const envOrigin = getEnv("NEXT_PUBLIC_APP_URL");
 
   if (envOrigin) {
     return envOrigin.replace(/\/$/, "");

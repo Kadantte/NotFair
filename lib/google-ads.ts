@@ -1,4 +1,5 @@
 import { GoogleAdsApi } from "google-ads-api";
+import { getRequiredEnv } from "@/lib/env";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -39,9 +40,7 @@ const STATUS = {
 // ─── Client Factory ──────────────────────────────────────────────────
 
 function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  return value;
+  return getRequiredEnv(name);
 }
 
 function normalizeCustomerId(customerId: string): string {

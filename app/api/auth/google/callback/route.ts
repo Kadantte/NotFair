@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import { listAccessibleCustomers } from "@/lib/google-ads";
 import { randomBytes } from "crypto";
+
+function redirectWithError(message: string) {
+  return NextResponse.redirect(
+    `${getAppOrigin()}/connect?error=${encodeURIComponent(message)}`,
+  );
+}
+
+function describeError(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Unknown error";
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,15 +25,18 @@ export async function GET(request: Request) {
   const error = searchParams.get("error");
 
   if (error || !code) {
-    const origin = getAppOrigin();
-    return NextResponse.redirect(
-      `${origin}/connect?error=${encodeURIComponent(error || "Missing authorization code")}`,
-    );
+    return redirectWithError(error || "Missing authorization code");
   }
 
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID!;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET!;
+  const clientId = getEnv("GOOGLE_ADS_CLIENT_ID");
+  const clientSecret = getEnv("GOOGLE_ADS_CLIENT_SECRET");
   const redirectUri = `${getAppOrigin()}/api/auth/google/callback`;
+
+  if (!clientId || !clientSecret) {
+    return redirectWithError(
+      "Server misconfiguration: missing Google OAuth credentials",
+    );
+  }
 
   try {
     // Exchange code for tokens
@@ -36,22 +54,33 @@ export async function GET(request: Request) {
 
     const tokenData = await tokenResponse.json();
 
-    if (tokenData.error || !tokenData.refresh_token) {
-      return NextResponse.redirect(
-        `${getAppOrigin()}/connect?error=${encodeURIComponent(tokenData.error_description || "Failed to get refresh token")}`,
+    if (!tokenResponse.ok || tokenData.error || !tokenData.refresh_token) {
+      return redirectWithError(
+        tokenData.error_description ||
+          tokenData.error ||
+          "Failed to get refresh token",
       );
     }
 
-    // Get accessible Google Ads accounts
-    const customers = await listAccessibleCustomers(tokenData.refresh_token);
+    let customers;
+    try {
+      // Get accessible Google Ads accounts
+      customers = await listAccessibleCustomers(tokenData.refresh_token);
+    } catch (error) {
+      console.error("[auth] Failed to load Google Ads accounts:", error);
+      return redirectWithError(
+        `Failed to load Google Ads accounts: ${describeError(error)}`,
+      );
+    }
+
     const usableAccounts = customers.filter(
       (c) => !("error" in c) && !c.isManager,
     );
 
     // No usable accounts — error
     if (usableAccounts.length === 0) {
-      return NextResponse.redirect(
-        `${getAppOrigin()}/connect?error=${encodeURIComponent("No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.")}`,
+      return redirectWithError(
+        "No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.",
       );
     }
 
@@ -62,12 +91,19 @@ export async function GET(request: Request) {
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-      await db().insert(schema.mcpSessions).values({
-        accessToken,
-        refreshToken: tokenData.refresh_token,
-        customerId: account.id,
-        expiresAt: expiresAt.toISOString(),
-      });
+      try {
+        await db().insert(schema.mcpSessions).values({
+          accessToken,
+          refreshToken: tokenData.refresh_token,
+          customerId: account.id,
+          expiresAt: expiresAt.toISOString(),
+        });
+      } catch (error) {
+        console.error("[auth] Failed to create MCP session:", error);
+        return redirectWithError(
+          `Failed to create session: ${describeError(error)}`,
+        );
+      }
 
       return NextResponse.redirect(
         `${getAppOrigin()}/connect?token=${accessToken}&customer_name=${encodeURIComponent(account.name || "Google Ads Account")}`,
@@ -79,12 +115,19 @@ export async function GET(request: Request) {
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-    await db().insert(schema.mcpSessions).values({
-      accessToken: pendingToken,
-      refreshToken: tokenData.refresh_token,
-      customerId: "", // pending selection
-      expiresAt: expiresAt.toISOString(),
-    });
+    try {
+      await db().insert(schema.mcpSessions).values({
+        accessToken: pendingToken,
+        refreshToken: tokenData.refresh_token,
+        customerId: "", // pending selection
+        expiresAt: expiresAt.toISOString(),
+      });
+    } catch (error) {
+      console.error("[auth] Failed to create pending MCP session:", error);
+      return redirectWithError(
+        `Failed to create session: ${describeError(error)}`,
+      );
+    }
 
     const accountsParam = encodeURIComponent(
       JSON.stringify(
@@ -96,9 +139,7 @@ export async function GET(request: Request) {
       `${getAppOrigin()}/connect?pending=${pendingToken}&accounts=${accountsParam}`,
     );
   } catch (e) {
-    console.error("[auth] Error:", e);
-    return NextResponse.redirect(
-      `${getAppOrigin()}/connect?error=${encodeURIComponent("Authentication failed")}`,
-    );
+    console.error("[auth] Unexpected callback error:", e);
+    return redirectWithError(`Authentication failed: ${describeError(e)}`);
   }
 }
