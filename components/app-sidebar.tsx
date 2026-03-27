@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   LayoutDashboard,
+  Activity,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -20,7 +21,7 @@ export type SidebarThread = {
 };
 
 type AppSidebarProps = {
-  currentPath: "/chat" | "/campaigns";
+  currentPath: "/chat" | "/campaigns" | "/operations";
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   onCreateThread?: () => void;
@@ -126,6 +127,25 @@ export function AppSidebar({
                   }`}
                 >
                   Campaigns
+                </span>
+              </Button>
+            </Link>
+
+            <Link href="/operations">
+              <Button
+                type="button"
+                variant="ghost"
+                className={`h-12 rounded-2xl px-3 text-white transition-all duration-300 ease-out hover:bg-white/6 hover:text-white ${
+                  currentPath === "/operations" ? "bg-white/8" : ""
+                } ${isCollapsed ? "w-12 justify-center gap-0 px-0" : "w-full justify-start"}`}
+              >
+                <Activity className="h-5 w-5" />
+                <span
+                  className={`overflow-hidden whitespace-nowrap text-[15px] transition-all duration-300 ease-out ${
+                    isCollapsed ? "max-w-0 opacity-0" : "ml-4 max-w-32 opacity-100"
+                  }`}
+                >
+                  Operations
                 </span>
               </Button>
             </Link>

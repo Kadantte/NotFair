@@ -67,6 +67,7 @@ export async function getChanges(
     beforeValue: row.beforeValue,
     afterValue: row.afterValue,
     reasoning: row.reasoning,
+    rolledBack: row.rolledBack === 1,
     timestamp: row.createdAt,
   }));
 }

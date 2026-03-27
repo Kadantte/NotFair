@@ -1,8 +1,40 @@
 "use server"
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient } from "@/lib/google-ads";
+import { getClient, parseCustomerIds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
+import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
+import { executeUndoForChange } from "@/lib/mcp/write-tools";
+
+export async function getChangesAction(options: { limit?: number; campaignId?: string } = {}) {
+    const { customerId } = await getSessionAuth();
+    return getChanges(customerId, options);
+}
+
+export async function undoChangeAction(changeId: number) {
+    const { refreshToken, customerId, customerIds } = await getSessionAuth();
+
+    const check = await getUndoableChange(customerId, changeId);
+    if ("error" in check) {
+        throw new Error(check.error);
+    }
+
+    const auth = {
+        refreshToken,
+        customerId,
+        customerIds: parseCustomerIds(customerIds),
+    };
+
+    const undoResult = await executeUndoForChange(auth, check.change);
+    if (!undoResult.success) {
+        throw new Error(undoResult.error ?? "Undo failed");
+    }
+
+    await markRolledBack(changeId);
+    await logChange(customerId, check.change.campaignId, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
+
+    return { success: true, changeId };
+}
 
 export async function listCampaignsAction() {
     try {

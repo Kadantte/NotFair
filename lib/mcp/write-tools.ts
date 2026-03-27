@@ -341,3 +341,30 @@ async function findAndUpdateBid(auth: AuthContext, criterionId: string, previous
     maxKeywordPausePct: 1.0,
   });
 }
+
+/** Execute the reverse operation for a change record. Used by both MCP undoChange and the dashboard undo action. */
+export async function executeUndoForChange(
+  auth: AuthContext,
+  change: { toolName: string; entityId: string; campaignId: string | null; beforeValue: string },
+): Promise<WriteResult> {
+  switch (change.toolName) {
+    case "pause_keyword":
+      return findAndEnableKeyword(auth, change.entityId);
+    case "enable_keyword":
+      return findAndPauseKeyword(auth, change.entityId);
+    case "update_bid":
+      return findAndUpdateBid(auth, change.entityId, Number(change.beforeValue));
+    case "update_budget":
+      return updateCampaignBudget(auth, change.entityId, Number(change.beforeValue), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
+    case "add_negative_keyword":
+      return removeNegativeKeyword(auth, change.campaignId ?? "", change.entityId);
+    case "remove_negative_keyword":
+      return addNegativeKeyword(auth, change.campaignId ?? "", change.entityId);
+    case "pause_campaign":
+      return enableCampaign(auth, change.entityId);
+    case "enable_campaign":
+      return pauseCampaign(auth, change.entityId);
+    default:
+      return { success: false, action: change.toolName, entityId: change.entityId, beforeValue: change.beforeValue, afterValue: change.beforeValue, error: `Don't know how to undo "${change.toolName}"` };
+  }
+}
