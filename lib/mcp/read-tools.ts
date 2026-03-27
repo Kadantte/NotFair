@@ -7,6 +7,13 @@ import {
   getSearchTermReport,
   runSafeGaqlReport,
   getTrackingTemplate,
+  listAdGroups,
+  listAds,
+  getImpressionShare,
+  getConversionActions,
+  getAccountSettings,
+  getCampaignSettings,
+  getRecommendations,
   authForAccount,
   resolveAccountId,
 } from "@/lib/google-ads";
@@ -202,6 +209,161 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await getTrackingTemplate(authForAccount(auth, accountId), level, entityId);
     void logRead(targetId, auth.userId, "get_tracking_template");
+    return jsonResult(result);
+  });
+
+  // ─── Ad Groups & Ads ────────────────────────────────────────────
+
+  server.registerTool("listAdGroups", {
+    title: "List Ad Groups",
+    description:
+      "List all ad groups in a campaign with performance metrics (impressions, clicks, cost, conversions). Use to understand campaign structure before creating or editing ads.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(50)
+        .describe("Max ad groups to return (1-100)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, limit }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await listAdGroups(authForAccount(auth, accountId), campaignId, limit);
+    void logRead(targetId, auth.userId, "list_ad_groups", campaignId);
+    return jsonResult(result);
+  });
+
+  server.registerTool("listAds", {
+    title: "List Ads",
+    description:
+      "List all ads in a campaign (optionally filtered to one ad group). Returns RSA headlines, descriptions, final URLs, status, and performance metrics. Use to audit ad copy, find broken URLs, or identify ads to pause/edit.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID"),
+      adGroupId: z
+        .string()
+        .optional()
+        .describe("Filter to a specific ad group (optional)"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(50)
+        .describe("Max ads to return (1-100)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, limit }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await listAds(authForAccount(auth, accountId), campaignId, adGroupId, limit);
+    void logRead(targetId, auth.userId, "list_ads", campaignId);
+    return jsonResult(result);
+  });
+
+  // ─── Competitive Intelligence ────────────────────────────────────
+
+  server.registerTool("getImpressionShare", {
+    title: "Get Impression Share",
+    description:
+      "Get impression share metrics for a campaign: search IS, absolute top IS, top IS, budget-lost IS, and rank-lost IS. Use to understand competitive position and diagnose whether lost impressions are due to budget or Quality Score.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID"),
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .default(30)
+        .describe("Number of days to look back (1-90)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, days }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getImpressionShare(authForAccount(auth, accountId), campaignId, days);
+    void logRead(targetId, auth.userId, "get_impression_share", campaignId);
+    return jsonResult(result);
+  });
+
+  // ─── Conversion Tracking ─────────────────────────────────────────
+
+  server.registerTool("getConversionActions", {
+    title: "Get Conversion Actions",
+    description:
+      "List all conversion actions in the account with their type, status, counting method, and value settings. Use to understand what conversions are tracked and their IDs before importing offline conversions or setting up campaigns.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getConversionActions(authForAccount(auth, accountId));
+    void logRead(targetId, auth.userId, "get_conversion_actions");
+    return jsonResult(result);
+  });
+
+  // ─── Account & Campaign Settings ────────────────────────────────
+
+  server.registerTool("getAccountSettings", {
+    title: "Get Account Settings",
+    description:
+      "Get account-level settings including auto-tagging status, tracking URL template, and conversion tracking IDs. Use to diagnose UTM tracking issues or verify auto-tagging is enabled.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getAccountSettings(authForAccount(auth, accountId));
+    void logRead(targetId, auth.userId, "get_account_settings");
+    return jsonResult(result);
+  });
+
+  server.registerTool("getCampaignSettings", {
+    title: "Get Campaign Settings",
+    description:
+      "Get detailed campaign settings including bidding strategy, network targeting (Search Partners, Display), location targeting, and ad schedule. Use to audit campaign configuration or plan optimizations.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getCampaignSettings(authForAccount(auth, accountId), campaignId);
+    void logRead(targetId, auth.userId, "get_campaign_settings", campaignId);
+    return jsonResult(result);
+  });
+
+  // ─── Recommendations ─────────────────────────────────────────────
+
+  server.registerTool("getRecommendations", {
+    title: "Get Recommendations",
+    description:
+      "Get Google Ads optimization recommendations with estimated impact (impressions, clicks, conversions). Optionally filter to a specific campaign. Use to find optimization opportunities suggested by Google.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z
+        .string()
+        .optional()
+        .describe("Filter to a specific campaign (optional)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getRecommendations(authForAccount(auth, accountId), campaignId);
+    void logRead(targetId, auth.userId, "get_recommendations", campaignId);
     return jsonResult(result);
   });
 

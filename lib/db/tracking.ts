@@ -23,6 +23,12 @@ export const TOOL_CODE = {
   add_keyword: 11,
   remove_keyword: 12,
   set_tracking_template: 13,
+  create_ad_group: 14,
+  create_ad: 15,
+  pause_ad: 16,
+  enable_ad: 17,
+  update_ad_final_url: 18,
+  update_ad_assets: 19,
   // Reads (20+)
   get_account_info: 20,
   list_campaigns: 21,
@@ -33,6 +39,13 @@ export const TOOL_CODE = {
   get_changes: 26,
   list_accessible_customers: 27,
   get_tracking_template: 28,
+  list_ad_groups: 29,
+  list_ads: 30,
+  get_impression_share: 31,
+  get_conversion_actions: 32,
+  get_account_settings: 33,
+  get_campaign_settings: 34,
+  get_recommendations: 35,
 } as const;
 
 type ToolCode = (typeof TOOL_CODE)[keyof typeof TOOL_CODE];
@@ -298,6 +311,11 @@ const REVERSIBLE_ACTIONS: Record<number, number> = {
   [TOOL_CODE.create_campaign]: TOOL_CODE.remove_campaign,
   [TOOL_CODE.add_keyword]: TOOL_CODE.remove_keyword,
   [TOOL_CODE.set_tracking_template]: TOOL_CODE.set_tracking_template,
+  [TOOL_CODE.pause_ad]: TOOL_CODE.enable_ad,
+  [TOOL_CODE.enable_ad]: TOOL_CODE.pause_ad,
+  [TOOL_CODE.update_ad_final_url]: TOOL_CODE.update_ad_final_url,
+  [TOOL_CODE.update_ad_assets]: TOOL_CODE.update_ad_assets,
+  [TOOL_CODE.create_ad]: TOOL_CODE.pause_ad,
 };
 
 export async function getUndoableChange(accountId: string, changeId: number) {

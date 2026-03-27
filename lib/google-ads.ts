@@ -85,6 +85,10 @@ const STATUS = {
   PAUSED: 3,
 } as const;
 
+const AD_GROUP_TYPE = {
+  SEARCH_STANDARD: 2,
+} as const;
+
 // ─── Client Factory ──────────────────────────────────────────────────
 
 function requiredEnv(name: string): string {
@@ -162,12 +166,32 @@ export function toMicros(dollars: number): number {
   return Math.round(dollars * 1_000_000);
 }
 
-function safeCampaignId(campaignId: string): number {
-  const id = Number(campaignId);
+function safeEntityId(value: string, label = "campaign"): number {
+  const id = Number(value);
   if (!Number.isFinite(id) || id <= 0) {
-    throw new Error(`Invalid campaign ID: ${campaignId}`);
+    throw new Error(`Invalid ${label} ID: ${value}`);
   }
   return id;
+}
+
+function isValidFinalUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Returns null if valid, or an error message string. */
+function validateRsaAssets(headlines: string[], descriptions: string[]): string | null {
+  if (headlines.length < 3 || headlines.length > 15) return "RSA requires 3-15 headlines";
+  if (descriptions.length < 2 || descriptions.length > 4) return "RSA requires 2-4 descriptions";
+  const longHeadline = headlines.find((h) => h.length > 30);
+  if (longHeadline) return `Headline exceeds 30 chars: "${longHeadline}"`;
+  const longDesc = descriptions.find((d) => d.length > 90);
+  if (longDesc) return `Description exceeds 90 chars: "${longDesc}"`;
+  return null;
 }
 
 // ─── Read Functions ──────────────────────────────────────────────────
@@ -269,7 +293,7 @@ export async function getCampaignPerformance(
   days: number,
 ) {
   const customer = getCustomer(auth);
-  const id = safeCampaignId(campaignId);
+  const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
   const { start, end } = getDateRange(boundedDays);
 
@@ -330,7 +354,7 @@ export async function getKeywords(
   limit = 50,
 ) {
   const customer = getCustomer(auth);
-  const id = safeCampaignId(campaignId);
+  const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
   const { start, end } = getDateRange(boundedDays);
@@ -377,7 +401,7 @@ export async function getSearchTermReport(
   limit = 50,
 ) {
   const customer = getCustomer(auth);
-  const id = safeCampaignId(campaignId);
+  const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
   const { start, end } = getDateRange(boundedDays);
@@ -424,7 +448,7 @@ export async function pauseKeyword(
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  const cid = safeCampaignId(campaignId);
+  const cid = safeEntityId(campaignId);
 
   // Check blast radius: count active keywords in campaign
   const countResult = await customer.query(`
@@ -526,7 +550,7 @@ export async function updateBid(
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  const cid = safeCampaignId(campaignId);
+  const cid = safeEntityId(campaignId);
 
   // Check bidding strategy — manual bid overrides only work on MANUAL_CPC / ENHANCED_CPC
   const campaignResult = await customer.query(`
@@ -621,7 +645,7 @@ export async function addNegativeKeyword(
   keywordText: string,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  safeCampaignId(campaignId);
+  safeEntityId(campaignId);
 
   const text = keywordText.trim();
   if (!text) {
@@ -680,7 +704,7 @@ export async function updateCampaignBudget(
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  const cid = safeCampaignId(campaignId);
+  const cid = safeEntityId(campaignId);
 
   // Get current budget
   const result = await customer.query(`
@@ -775,7 +799,7 @@ export async function pauseCampaign(
   campaignId: string,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  safeCampaignId(campaignId);
+  safeEntityId(campaignId);
 
   try {
     await customer.mutateResources([
@@ -813,7 +837,7 @@ export async function enableCampaign(
   campaignId: string,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  safeCampaignId(campaignId);
+  safeEntityId(campaignId);
 
   try {
     await customer.mutateResources([
@@ -962,7 +986,7 @@ export async function removeNegativeKeyword(
   keywordText: string,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  const cid = safeCampaignId(campaignId);
+  const cid = safeEntityId(campaignId);
 
   try {
     // Find the negative keyword criterion by text.
@@ -1056,19 +1080,9 @@ export async function createSearchCampaign(
   const cid = normalizeCustomerId(auth.customerId);
 
   // ── Validation ──
-  if (params.headlines.length < 3 || params.headlines.length > 15) {
-    return { success: false, campaignName: params.campaignName, error: "Responsive Search Ads require 3-15 headlines" };
-  }
-  if (params.descriptions.length < 2 || params.descriptions.length > 4) {
-    return { success: false, campaignName: params.campaignName, error: "Responsive Search Ads require 2-4 descriptions" };
-  }
-  const longHeadline = params.headlines.find((h) => h.length > 30);
-  if (longHeadline) {
-    return { success: false, campaignName: params.campaignName, error: `Headline exceeds 30 chars: "${longHeadline}"` };
-  }
-  const longDesc = params.descriptions.find((d) => d.length > 90);
-  if (longDesc) {
-    return { success: false, campaignName: params.campaignName, error: `Description exceeds 90 chars: "${longDesc}"` };
+  const rsaError = validateRsaAssets(params.headlines, params.descriptions);
+  if (rsaError) {
+    return { success: false, campaignName: params.campaignName, error: rsaError };
   }
   if (params.dailyBudgetDollars < 1) {
     return { success: false, campaignName: params.campaignName, error: "Daily budget must be at least $1" };
@@ -1236,7 +1250,7 @@ export async function removeCampaign(
   campaignId: string,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  safeCampaignId(campaignId);
+  safeEntityId(campaignId);
 
   try {
     await customer.mutateResources([
@@ -1311,7 +1325,7 @@ export async function getTrackingTemplate(
     }
     case "campaign": {
       if (!entityId) throw new Error("entityId (campaignId) is required for campaign level");
-      const id = safeCampaignId(entityId);
+      const id = safeEntityId(entityId);
       const result = await customer.query(`
         SELECT campaign.tracking_url_template
         FROM campaign
@@ -1418,7 +1432,7 @@ export async function setTrackingTemplate(
         break;
       case "campaign": {
         if (!entityId) throw new Error("entityId (campaignId) is required");
-        const campaignIdNum = safeCampaignId(entityId);
+        const campaignIdNum = safeEntityId(entityId);
         await customer.mutateResources([
           {
             entity: "campaign" as any,
@@ -1482,6 +1496,764 @@ export async function setTrackingTemplate(
       afterValue: trackingTemplate,
       error: extractErrorMessage(error),
     };
+  }
+}
+
+// ─── Ad Group Management ─────────────────────────────────────────────
+
+export async function listAdGroups(
+  auth: AuthContext,
+  campaignId: string,
+  limit = 50,
+) {
+  const customer = getCustomer(auth);
+  const id = safeEntityId(campaignId);
+  const bounded = Math.min(Math.max(limit, 1), 100);
+
+  const result = await customer.query(`
+    SELECT
+      ad_group.id,
+      ad_group.name,
+      ad_group.status,
+      ad_group.type,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions
+    FROM ad_group
+    WHERE campaign.id = ${id}
+      AND ad_group.status != 'REMOVED'
+    ORDER BY metrics.impressions DESC
+    LIMIT ${bounded}
+  `);
+
+  return (result as any[]).map((row) => ({
+    id: String(row.ad_group.id),
+    name: row.ad_group.name ?? "Untitled ad group",
+    status: row.ad_group.status ?? "UNKNOWN",
+    type: row.ad_group.type ?? "UNKNOWN",
+    impressions: row.metrics?.impressions ?? 0,
+    clicks: row.metrics?.clicks ?? 0,
+    cost: micros(row.metrics?.cost_micros),
+    conversions: row.metrics?.conversions ?? 0,
+  }));
+}
+
+export async function createAdGroup(
+  auth: AuthContext,
+  campaignId: string,
+  adGroupName: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const campaignIdNum = safeEntityId(campaignId);
+
+  if (!adGroupName.trim()) {
+    return { success: false, action: "create_ad_group", entityId: "", beforeValue: "", afterValue: "", error: "Ad group name cannot be empty" };
+  }
+
+  try {
+    const response = await customer.mutateResources([
+      {
+        entity: "ad_group" as any,
+        operation: "create",
+        resource: {
+          name: adGroupName.trim(),
+          campaign: `customers/${cid}/campaigns/${campaignIdNum}`,
+          status: STATUS.ENABLED,
+          type: AD_GROUP_TYPE.SEARCH_STANDARD,
+        },
+      },
+    ]);
+
+    const responses = (response as any)?.mutate_operation_responses ?? [];
+    const resourceName = responses[0]?.ad_group_result?.resource_name as string | undefined;
+    const adGroupId = resourceName?.split("/").pop() ?? "";
+
+    if (!adGroupId) {
+      return { success: false, action: "create_ad_group", entityId: "", beforeValue: "", afterValue: adGroupName, error: "Ad group created but ID could not be extracted from response" };
+    }
+
+    return {
+      success: true,
+      action: "create_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: adGroupName,
+      campaignId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "create_ad_group",
+      entityId: "",
+      beforeValue: "",
+      afterValue: adGroupName,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+// ─── Ad Management ───────────────────────────────────────────────────
+
+export async function listAds(
+  auth: AuthContext,
+  campaignId: string,
+  adGroupId?: string,
+  limit = 50,
+) {
+  const customer = getCustomer(auth);
+  const id = safeEntityId(campaignId);
+  const bounded = Math.min(Math.max(limit, 1), 100);
+
+  const adGroupIdNum = adGroupId ? safeEntityId(adGroupId, "ad group") : null;
+  const adGroupFilter = adGroupIdNum ? `AND ad_group.id = ${adGroupIdNum}` : "";
+
+  const result = await customer.query(`
+    SELECT
+      ad_group_ad.ad.id,
+      ad_group_ad.ad.name,
+      ad_group_ad.status,
+      ad_group_ad.ad.type,
+      ad_group_ad.ad.final_urls,
+      ad_group_ad.ad.responsive_search_ad.headlines,
+      ad_group_ad.ad.responsive_search_ad.descriptions,
+      ad_group.id,
+      ad_group.name,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions
+    FROM ad_group_ad
+    WHERE campaign.id = ${id}
+      AND ad_group_ad.status != 'REMOVED'
+      ${adGroupFilter}
+    ORDER BY metrics.impressions DESC
+    LIMIT ${bounded}
+  `);
+
+  return (result as any[]).map((row) => {
+    const ad = row.ad_group_ad?.ad ?? {};
+    const rsa = ad.responsive_search_ad ?? {};
+    return {
+      adId: String(ad.id ?? ""),
+      adName: ad.name ?? null,
+      status: row.ad_group_ad?.status ?? "UNKNOWN",
+      type: ad.type ?? "UNKNOWN",
+      adGroupId: String(row.ad_group?.id ?? ""),
+      adGroupName: row.ad_group?.name ?? "",
+      finalUrls: ad.final_urls ?? [],
+      headlines: (rsa.headlines ?? []).map((h: any) => h.text ?? ""),
+      descriptions: (rsa.descriptions ?? []).map((d: any) => d.text ?? ""),
+      impressions: row.metrics?.impressions ?? 0,
+      clicks: row.metrics?.clicks ?? 0,
+      cost: micros(row.metrics?.cost_micros),
+      conversions: row.metrics?.conversions ?? 0,
+    };
+  });
+}
+
+export type CreateAdParams = {
+  headlines: string[];
+  descriptions: string[];
+  finalUrl: string;
+};
+
+export async function createAd(
+  auth: AuthContext,
+  adGroupId: string,
+  params: CreateAdParams,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  const rsaError = validateRsaAssets(params.headlines, params.descriptions);
+  if (rsaError) {
+    return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: rsaError };
+  }
+  let adGroupIdNum: number;
+  try {
+    adGroupIdNum = safeEntityId(adGroupId, "ad group");
+  } catch (e) {
+    return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: (e as Error).message };
+  }
+  if (!isValidFinalUrl(params.finalUrl)) {
+    return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: "Final URL must start with http:// or https://" };
+  }
+
+  try {
+    const response = await customer.mutateResources([
+      {
+        entity: "ad_group_ad" as any,
+        operation: "create",
+        resource: {
+          ad_group: `customers/${cid}/adGroups/${adGroupIdNum}`,
+          status: STATUS.ENABLED,
+          ad: {
+            final_urls: [params.finalUrl],
+            responsive_search_ad: {
+              headlines: params.headlines.map((text) => ({ text })),
+              descriptions: params.descriptions.map((text) => ({ text })),
+            },
+          },
+        },
+      },
+    ]);
+
+    const responses = (response as any)?.mutate_operation_responses ?? [];
+    const resourceName = responses[0]?.ad_group_ad_result?.resource_name as string | undefined;
+    // resource_name format: customers/{cid}/adGroupAds/{adGroupId}~{adId}
+    const adId = resourceName?.split("~").pop() ?? "";
+
+    if (!adId) {
+      return { success: false, action: "create_ad", entityId: "", beforeValue: adGroupId, afterValue: params.finalUrl, error: "Ad created but ID could not be extracted from response" };
+    }
+
+    return {
+      success: true,
+      action: "create_ad",
+      entityId: adId,
+      beforeValue: adGroupId,
+      afterValue: params.finalUrl,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "create_ad",
+      entityId: "",
+      beforeValue: adGroupId,
+      afterValue: params.finalUrl,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+async function setAdStatus(
+  auth: AuthContext,
+  adGroupId: string,
+  adId: string,
+  pause: boolean,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const action = pause ? "pause_ad" : "enable_ad";
+  const targetStatus = pause ? STATUS.PAUSED : STATUS.ENABLED;
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "ad_group_ad" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}/adGroupAds/${adGroupId}~${adId}`,
+          status: targetStatus,
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action,
+      entityId: adId,
+      beforeValue: adGroupId, // stored for undo (needs adGroupId + adId)
+      afterValue: pause ? "PAUSED" : "ENABLED",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action,
+      entityId: adId,
+      beforeValue: adGroupId,
+      afterValue: pause ? "ENABLED" : "PAUSED",
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+export async function pauseAd(auth: AuthContext, adGroupId: string, adId: string): Promise<WriteResult> {
+  return setAdStatus(auth, adGroupId, adId, true);
+}
+
+export async function enableAd(auth: AuthContext, adGroupId: string, adId: string): Promise<WriteResult> {
+  return setAdStatus(auth, adGroupId, adId, false);
+}
+
+export async function updateAdFinalUrl(
+  auth: AuthContext,
+  adGroupId: string,
+  adId: string,
+  finalUrl: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const entityId = `${adGroupId}~${adId}`;
+
+  if (!isValidFinalUrl(finalUrl)) {
+    return { success: false, action: "update_ad_final_url", entityId, beforeValue: "", afterValue: finalUrl, error: "Final URL must start with http:// or https://" };
+  }
+
+  let adIdNum: number;
+  let adGroupIdNum: number;
+  try {
+    adIdNum = safeEntityId(adId, "ad");
+    adGroupIdNum = safeEntityId(adGroupId, "ad group");
+  } catch (e) {
+    return { success: false, action: "update_ad_final_url", entityId, beforeValue: "", afterValue: finalUrl, error: (e as Error).message };
+  }
+
+  // Fetch current URL for undo record, scoped to the correct ad group.
+  // Abort if fetch fails — proceeding with empty beforeValue would cause undo to set URL to "".
+  let beforeValue: string;
+  try {
+    const current = await customer.query(`
+      SELECT ad_group_ad.ad.final_urls
+      FROM ad_group_ad
+      WHERE ad_group_ad.ad.id = ${adIdNum}
+        AND ad_group.id = ${adGroupIdNum}
+      LIMIT 1
+    `);
+    beforeValue = (current as any[])[0]?.ad_group_ad?.ad?.final_urls?.[0] ?? "";
+  } catch (fetchError) {
+    return {
+      success: false,
+      action: "update_ad_final_url",
+      entityId,
+      beforeValue: "",
+      afterValue: finalUrl,
+      error: `Could not read current final URL before writing (undo would be unsafe): ${extractErrorMessage(fetchError)}`,
+    };
+  }
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "ad" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}/ads/${adId}`,
+          final_urls: [finalUrl],
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "update_ad_final_url",
+      entityId,
+      beforeValue,
+      afterValue: finalUrl,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "update_ad_final_url",
+      entityId,
+      beforeValue,
+      afterValue: finalUrl,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+export type UpdateAdAssetsParams = {
+  headlines: string[];
+  descriptions: string[];
+};
+
+export async function updateAdAssets(
+  auth: AuthContext,
+  adGroupId: string,
+  adId: string,
+  params: UpdateAdAssetsParams,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const entityId = `${adGroupId}~${adId}`;
+
+  const rsaError = validateRsaAssets(params.headlines, params.descriptions);
+  if (rsaError) {
+    return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: rsaError };
+  }
+
+  let adIdNum: number;
+  let adGroupIdNum: number;
+  try {
+    adIdNum = safeEntityId(adId, "ad");
+    adGroupIdNum = safeEntityId(adGroupId, "ad group");
+  } catch (e) {
+    return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: (e as Error).message };
+  }
+
+  // Fetch current assets for undo record, scoped to the correct ad group.
+  // Abort if fetch fails — proceeding with empty beforeValue would cause undo to restore empty assets.
+  let beforeValue: string;
+  try {
+    const current = await customer.query(`
+      SELECT
+        ad_group_ad.ad.responsive_search_ad.headlines,
+        ad_group_ad.ad.responsive_search_ad.descriptions
+      FROM ad_group_ad
+      WHERE ad_group_ad.ad.id = ${adIdNum}
+        AND ad_group.id = ${adGroupIdNum}
+      LIMIT 1
+    `);
+    const row = (current as any[])[0]?.ad_group_ad?.ad?.responsive_search_ad ?? {};
+    beforeValue = JSON.stringify({
+      h: (row.headlines ?? []).map((x: any) => x.text ?? ""),
+      d: (row.descriptions ?? []).map((x: any) => x.text ?? ""),
+    });
+  } catch (fetchError) {
+    return {
+      success: false,
+      action: "update_ad_assets",
+      entityId,
+      beforeValue: "",
+      afterValue: "",
+      error: `Could not read current ad assets before writing (undo would be unsafe): ${extractErrorMessage(fetchError)}`,
+    };
+  }
+
+  const afterValue = JSON.stringify({
+    h: params.headlines,
+    d: params.descriptions,
+  });
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "ad" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}/ads/${adId}`,
+          responsive_search_ad: {
+            headlines: params.headlines.map((text) => ({ text })),
+            descriptions: params.descriptions.map((text) => ({ text })),
+          },
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "update_ad_assets",
+      entityId,
+      beforeValue,
+      afterValue,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "update_ad_assets",
+      entityId,
+      beforeValue,
+      afterValue,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+// ─── Bulk Operations ─────────────────────────────────────────────────
+
+export type BulkBidUpdate = {
+  campaignId: string;
+  adGroupId: string;
+  criterionId: string;
+  newBidDollars: number;
+};
+
+export async function bulkUpdateBids(
+  auth: AuthContext,
+  updates: BulkBidUpdate[],
+  guardrails = DEFAULT_GUARDRAILS,
+): Promise<Array<WriteResult & { input: BulkBidUpdate }>> {
+  const CHUNK_SIZE = 5;
+  const results: Array<WriteResult & { input: BulkBidUpdate }> = [];
+  for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+    const chunk = updates.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map(async (u) => {
+        const result = await updateBid(auth, u.campaignId, u.adGroupId, u.criterionId, toMicros(u.newBidDollars), guardrails);
+        return { ...result, input: u };
+      }),
+    );
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
+// ─── Analytics & Settings ────────────────────────────────────────────
+
+export async function getImpressionShare(
+  auth: AuthContext,
+  campaignId: string,
+  days: number,
+) {
+  const customer = getCustomer(auth);
+  const id = safeEntityId(campaignId);
+  const boundedDays = Math.min(Math.max(days, 1), 90);
+  const { start, end } = getDateRange(boundedDays);
+
+  // Query without date segmentation to get Google's correctly weighted aggregate IS values
+  const result = await customer.query(`
+    SELECT
+      campaign.id,
+      campaign.name,
+      metrics.search_impression_share,
+      metrics.search_budget_lost_impression_share,
+      metrics.search_rank_lost_impression_share,
+      metrics.search_absolute_top_impression_share,
+      metrics.search_top_impression_share,
+      metrics.search_exact_match_impression_share,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros
+    FROM campaign
+    WHERE campaign.id = ${id}
+      AND segments.date BETWEEN '${start}' AND '${end}'
+    LIMIT 1
+  `);
+
+  const row = (result as any[])[0];
+  if (!row) {
+    return { campaignId, days: boundedDays, impressionShare: null, message: "No data for this date range" };
+  }
+
+  const m = row.metrics ?? {};
+  return {
+    campaignId,
+    campaignName: row.campaign?.name ?? "",
+    dateRange: { start, end, days: boundedDays },
+    impressionShare: m.search_impression_share ?? null,
+    absoluteTopImpressionShare: m.search_absolute_top_impression_share ?? null,
+    topImpressionShare: m.search_top_impression_share ?? null,
+    exactMatchImpressionShare: m.search_exact_match_impression_share ?? null,
+    budgetLostImpressionShare: m.search_budget_lost_impression_share ?? null,
+    rankLostImpressionShare: m.search_rank_lost_impression_share ?? null,
+    totalImpressions: m.impressions ?? 0,
+    totalClicks: m.clicks ?? 0,
+    totalCost: micros(m.cost_micros),
+  };
+}
+
+export async function getConversionActions(auth: AuthContext) {
+  const customer = getCustomer(auth);
+
+  const result = await customer.query(`
+    SELECT
+      conversion_action.id,
+      conversion_action.name,
+      conversion_action.type,
+      conversion_action.status,
+      conversion_action.category,
+      conversion_action.include_in_conversions_metric,
+      conversion_action.counting_type,
+      conversion_action.value_settings.default_value,
+      conversion_action.value_settings.always_use_default_value
+    FROM conversion_action
+    WHERE conversion_action.status != 'REMOVED'
+    ORDER BY conversion_action.name ASC
+  `);
+
+  return (result as any[]).map((row) => {
+    const ca = row.conversion_action ?? {};
+    return {
+      id: String(ca.id ?? ""),
+      name: ca.name ?? "Untitled",
+      type: ca.type ?? "UNKNOWN",
+      status: ca.status ?? "UNKNOWN",
+      category: ca.category ?? "UNKNOWN",
+      includeInConversions: ca.include_in_conversions_metric ?? true,
+      countingType: ca.counting_type ?? "UNKNOWN",
+      defaultValue: ca.value_settings?.default_value ?? null,
+      alwaysUseDefaultValue: ca.value_settings?.always_use_default_value ?? false,
+    };
+  });
+}
+
+export async function getAccountSettings(auth: AuthContext) {
+  const customer = getCustomer(auth);
+
+  const result = await customer.query(`
+    SELECT
+      customer.id,
+      customer.descriptive_name,
+      customer.auto_tagging_enabled,
+      customer.tracking_url_template,
+      customer.conversion_tracking_setting.conversion_tracking_id,
+      customer.conversion_tracking_setting.cross_account_conversion_tracking_id
+    FROM customer
+    LIMIT 1
+  `);
+
+  const row = (result as any[])[0]?.customer ?? {};
+  return {
+    id: String(row.id ?? normalizeCustomerId(auth.customerId)),
+    name: row.descriptive_name ?? "Untitled account",
+    autoTaggingEnabled: row.auto_tagging_enabled ?? false,
+    trackingUrlTemplate: row.tracking_url_template ?? null,
+    conversionTrackingId: row.conversion_tracking_setting?.conversion_tracking_id
+      ? String(row.conversion_tracking_setting.conversion_tracking_id)
+      : null,
+    crossAccountConversionTrackingId: row.conversion_tracking_setting?.cross_account_conversion_tracking_id
+      ? String(row.conversion_tracking_setting.cross_account_conversion_tracking_id)
+      : null,
+  };
+}
+
+export async function getCampaignSettings(
+  auth: AuthContext,
+  campaignId: string,
+) {
+  const customer = getCustomer(auth);
+  const id = safeEntityId(campaignId);
+
+  const [campaignResult, locationResult, scheduleResult] = await Promise.all([
+    customer.query(`
+      SELECT
+        campaign.id,
+        campaign.name,
+        campaign.status,
+        campaign.start_date,
+        campaign.end_date,
+        campaign.bidding_strategy_type,
+        campaign.target_cpa.target_cpa_micros,
+        campaign.target_roas.target_roas,
+        campaign.maximize_conversions.target_cpa_micros,
+        campaign.network_settings.target_google_search,
+        campaign.network_settings.target_search_network,
+        campaign.network_settings.target_content_network,
+        campaign.geo_target_type_setting.positive_geo_target_type,
+        campaign.geo_target_type_setting.negative_geo_target_type
+      FROM campaign
+      WHERE campaign.id = ${id}
+      LIMIT 1
+    `),
+    customer.query(`
+      SELECT
+        campaign_criterion.criterion_id,
+        campaign_criterion.negative,
+        campaign_criterion.location.geo_target_constant
+      FROM campaign_criterion
+      WHERE campaign.id = ${id}
+        AND campaign_criterion.type = 'LOCATION'
+      LIMIT 50
+    `),
+    customer.query(`
+      SELECT
+        campaign_criterion.ad_schedule.day_of_week,
+        campaign_criterion.ad_schedule.start_hour,
+        campaign_criterion.ad_schedule.start_minute,
+        campaign_criterion.ad_schedule.end_hour,
+        campaign_criterion.ad_schedule.end_minute,
+        campaign_criterion.bid_modifier
+      FROM campaign_criterion
+      WHERE campaign.id = ${id}
+        AND campaign_criterion.type = 'AD_SCHEDULE'
+      ORDER BY campaign_criterion.ad_schedule.day_of_week ASC
+    `),
+  ]);
+
+  const c = (campaignResult as any[])[0]?.campaign ?? {};
+  const ns = c.network_settings ?? {};
+
+  const locations = (locationResult as any[]).map((row) => {
+    const cc = row.campaign_criterion ?? {};
+    const geoConst = cc.location?.geo_target_constant ?? "";
+    const geoId = geoConst ? geoConst.replace("geoTargetConstants/", "") : null;
+    return {
+      criterionId: String(cc.criterion_id ?? ""),
+      negative: cc.negative ?? false,
+      geoTargetConstantId: geoId,
+    };
+  });
+
+  const adSchedule = (scheduleResult as any[]).map((row) => {
+    const cc = row.campaign_criterion ?? {};
+    const sched = cc.ad_schedule ?? {};
+    return {
+      dayOfWeek: sched.day_of_week ?? "UNKNOWN",
+      startHour: sched.start_hour ?? 0,
+      startMinute: sched.start_minute ?? "ZERO",
+      endHour: sched.end_hour ?? 0,
+      endMinute: sched.end_minute ?? "ZERO",
+      bidModifier: cc.bid_modifier ?? 1.0,
+    };
+  });
+
+  return {
+    id: String(c.id ?? campaignId),
+    name: c.name ?? "",
+    status: c.status ?? "UNKNOWN",
+    startDate: c.start_date ?? null,
+    endDate: c.end_date ?? null,
+    biddingStrategy: c.bidding_strategy_type ?? "UNKNOWN",
+    targetCpaMicros: c.target_cpa?.target_cpa_micros ?? c.maximize_conversions?.target_cpa_micros ?? null,
+    targetRoas: c.target_roas?.target_roas ?? null,
+    networks: {
+      googleSearch: ns.target_google_search ?? false,
+      searchPartners: ns.target_search_network ?? false,
+      displayNetwork: ns.target_content_network ?? false,
+    },
+    locationTargeting: locations,
+    adSchedule: adSchedule.length > 0 ? adSchedule : null,
+  };
+}
+
+export async function getRecommendations(
+  auth: AuthContext,
+  campaignId?: string,
+) {
+  const customer = getCustomer(auth);
+  const campaignFilter = campaignId
+    ? `AND campaign.id = ${safeEntityId(campaignId)}`
+    : "";
+
+  try {
+    const result = await customer.query(`
+      SELECT
+        recommendation.resource_name,
+        recommendation.type,
+        recommendation.dismissed,
+        recommendation.campaign,
+        recommendation.impact.base_metrics.impressions,
+        recommendation.impact.base_metrics.clicks,
+        recommendation.impact.base_metrics.cost_micros,
+        recommendation.impact.base_metrics.conversions,
+        recommendation.impact.potential_metrics.impressions,
+        recommendation.impact.potential_metrics.clicks,
+        recommendation.impact.potential_metrics.conversions
+      FROM recommendation
+      WHERE recommendation.dismissed = FALSE
+        ${campaignFilter}
+      LIMIT 25
+    `);
+
+    const recommendations = (result as any[]).map((row) => {
+      const rec = row.recommendation ?? {};
+      const base = rec.impact?.base_metrics ?? {};
+      const potential = rec.impact?.potential_metrics ?? {};
+      // resource_name format: customers/{cid}/campaigns/{id} — extract last segment
+      const campId = rec.campaign ? (rec.campaign.match(/\/campaigns\/(\d+)$/)?.[1] ?? null) : null;
+      return {
+        type: rec.type ?? "UNKNOWN",
+        campaignId: campId ?? null,
+        baseMetrics: {
+          impressions: base.impressions ?? 0,
+          clicks: base.clicks ?? 0,
+          cost: micros(base.cost_micros),
+          conversions: base.conversions ?? 0,
+        },
+        potentialMetrics: {
+          impressions: potential.impressions ?? 0,
+          clicks: potential.clicks ?? 0,
+          conversions: potential.conversions ?? 0,
+        },
+      };
+    });
+    return { recommendations };
+  } catch (error) {
+    // Recommendations API may not be available for all accounts
+    return { recommendations: [], error: extractErrorMessage(error) };
   }
 }
 

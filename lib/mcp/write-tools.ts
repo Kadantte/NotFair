@@ -18,6 +18,13 @@ import {
   toMicros,
   authForAccount,
   resolveAccountId,
+  createAdGroup,
+  createAd,
+  pauseAd,
+  enableAd,
+  updateAdFinalUrl,
+  updateAdAssets,
+  bulkUpdateBids,
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
@@ -356,6 +363,182 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
+  // ─── Ad Group Management ────────────────────────────────────────
+
+  server.registerTool("createAdGroup", {
+    title: "Create Ad Group",
+    description:
+      "Create a new ad group within an existing campaign. Use listAdGroups to see existing structure. The ad group starts enabled. Use createAd to add a Responsive Search Ad to the new group.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID to add the ad group to"),
+      adGroupName: z.string().min(1).describe("Name for the new ad group"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupName }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await createAdGroup(authForAccount(auth, accountId), campaignId, adGroupName);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  // ─── Ad Management ──────────────────────────────────────────────
+
+  server.registerTool("createAd", {
+    title: "Create Responsive Search Ad",
+    description:
+      "Create a new Responsive Search Ad (RSA) in an existing ad group. Requires 3-15 headlines (max 30 chars each) and 2-4 descriptions (max 90 chars each). Use listAdGroups to find the adGroupId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (used for logging/undo tracking)"),
+      adGroupId: z.string().describe("Ad group ID to add the ad to"),
+      headlines: z
+        .array(z.string().min(1).max(30))
+        .min(3)
+        .max(15)
+        .describe("RSA headlines (3-15, max 30 chars each)"),
+      descriptions: z
+        .array(z.string().min(1).max(90))
+        .min(2)
+        .max(4)
+        .describe("RSA descriptions (2-4, max 90 chars each)"),
+      finalUrl: z.string().url().describe("Landing page URL for the ad"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await createAd(authForAccount(auth, accountId), adGroupId, { headlines, descriptions, finalUrl });
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  server.registerTool("pauseAd", {
+    title: "Pause Ad",
+    description:
+      "Pause an active ad to stop it from serving. Use for A/B testing or when an ad has poor performance. Use listAds to find adGroupId and adId. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging)"),
+      adGroupId: z.string().describe("Ad group ID"),
+      adId: z.string().describe("Ad ID to pause"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, adId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await pauseAd(authForAccount(auth, accountId), adGroupId, adId);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  server.registerTool("enableAd", {
+    title: "Enable Ad",
+    description:
+      "Re-enable a paused ad so it can serve again. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging)"),
+      adGroupId: z.string().describe("Ad group ID"),
+      adId: z.string().describe("Ad ID to enable"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, adId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await enableAd(authForAccount(auth, accountId), adGroupId, adId);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  server.registerTool("updateAdFinalUrl", {
+    title: "Update Ad Final URL",
+    description:
+      "Update the landing page URL for a specific ad. Use listAds to find adGroupId and adId and see current URLs. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging)"),
+      adGroupId: z.string().describe("Ad group ID"),
+      adId: z.string().describe("Ad ID to update"),
+      finalUrl: z.string().url().describe("New landing page URL"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await updateAdFinalUrl(authForAccount(auth, accountId), adGroupId, adId, finalUrl);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  server.registerTool("updateAdAssets", {
+    title: "Update Ad Headlines & Descriptions",
+    description:
+      "Replace the headlines and descriptions for a Responsive Search Ad. You must provide the COMPLETE list — this replaces all existing assets. Headlines: 3-15, max 30 chars each. Descriptions: 2-4, max 90 chars each. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging)"),
+      adGroupId: z.string().describe("Ad group ID"),
+      adId: z.string().describe("Ad ID to update"),
+      headlines: z
+        .array(z.string().min(1).max(30))
+        .min(3)
+        .max(15)
+        .describe("Complete replacement headlines (3-15, max 30 chars each)"),
+      descriptions: z
+        .array(z.string().min(1).max(90))
+        .min(2)
+        .max(4)
+        .describe("Complete replacement descriptions (2-4, max 90 chars each)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await updateAdAssets(authForAccount(auth, accountId), adGroupId, adId, { headlines, descriptions });
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  // ─── Bulk Operations ────────────────────────────────────────────
+
+  server.registerTool("bulkUpdateBids", {
+    title: "Bulk Update Keyword Bids",
+    description:
+      "Update multiple keyword bids in a single call. Each bid is subject to the same 25% guardrail as updateBid. Returns per-keyword results with individual changeIds for undo. Use getKeywords to find criterionIds.",
+    inputSchema: {
+      accountId: accountIdParam,
+      updates: z
+        .array(
+          z.object({
+            campaignId: z.string().describe("Campaign ID"),
+            adGroupId: z.string().describe("Ad group ID"),
+            criterionId: z.string().describe("Keyword criterion ID"),
+            newBidDollars: z.number().positive().describe("New bid in dollars"),
+          }),
+        )
+        .min(1)
+        .max(50)
+        .describe("Array of bid updates (max 50)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, updates }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const results = await bulkUpdateBids(authForAccount(auth, accountId), updates);
+
+    // Log each successful bid change individually so they can each be undone
+    const logged = await Promise.all(
+      results.map(({ input, ...result }) =>
+        logAndReturn(targetId, auth.userId, input.campaignId, result)
+          .then((r) => ({ ...r, input })),
+      ),
+    );
+
+    const succeeded = logged.filter((r) => r.success).length;
+    const failed = logged.filter((r) => !r.success).length;
+
+    return jsonResult({
+      summary: { total: results.length, succeeded, failed },
+      results: logged,
+    });
+  });
+
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
@@ -495,6 +678,45 @@ export async function executeUndoForChange(
     case "set_tracking_template": {
       const { level, entityId: actualId } = decodeTrackingEntityId(entityId);
       return setTrackingTemplate(auth, level, beforeValue, actualId);
+    }
+    case "create_ad_group":
+      // Ad group removal is complex and potentially destructive — not supported
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo ad group creation (would require removing all ads and keywords inside it)" };
+    case "create_ad":
+      // entityId = adId, beforeValue = adGroupId
+      return pauseAd(auth, beforeValue, entityId);
+    case "pause_ad":
+      // entityId = adId, beforeValue = adGroupId
+      return enableAd(auth, beforeValue, entityId);
+    case "enable_ad":
+      // entityId = adId, beforeValue = adGroupId
+      return pauseAd(auth, beforeValue, entityId);
+    case "update_ad_final_url": {
+      // entityId = adGroupId~adId, beforeValue = old URL
+      const [adGroupIdPart, adIdPart] = entityId.split("~");
+      if (!adGroupIdPart || !adIdPart) {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: malformed entity ID" };
+      }
+      if (!beforeValue) {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous URL was not recorded" };
+      }
+      return updateAdFinalUrl(auth, adGroupIdPart, adIdPart, beforeValue);
+    }
+    case "update_ad_assets": {
+      // entityId = adGroupId~adId, beforeValue = JSON {h: [], d: []}
+      const [adGroupIdPart, adIdPart] = entityId.split("~");
+      if (!adGroupIdPart || !adIdPart) {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: malformed entity ID" };
+      }
+      if (!beforeValue) {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous assets were not recorded" };
+      }
+      try {
+        const prev = JSON.parse(beforeValue) as { h: string[]; d: string[] };
+        return updateAdAssets(auth, adGroupIdPart, adIdPart, { headlines: prev.h, descriptions: prev.d });
+      } catch {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: could not parse previous asset state" };
+      }
     }
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
