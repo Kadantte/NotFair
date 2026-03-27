@@ -876,14 +876,28 @@ export async function addKeyword(
       },
     ]);
 
-    // Extract the new criterion ID from the response resource name
-    const resourceName = (response as any)?.results?.[0]?.resource_name as string | undefined;
+    // Extract the new criterion ID from the batch mutate response
+    // mutateResources uses GoogleAdsService.mutate → mutate_operation_responses[0].ad_group_criterion_result.resource_name
+    const responses = (response as any)?.mutate_operation_responses ?? [];
+    const resourceName = responses[0]?.ad_group_criterion_result?.resource_name as string | undefined;
     const criterionId = resourceName?.split("~").pop() ?? "";
+
+    if (!criterionId) {
+      // Without criterionId we cannot support undo — fail rather than store an unparseable fallback
+      return {
+        success: false,
+        action: "add_keyword",
+        entityId: "",
+        beforeValue: "",
+        afterValue: text,
+        error: "Keyword was created but criterion ID could not be extracted from response — undo unavailable. Verify the keyword exists in Google Ads.",
+      };
+    }
 
     return {
       success: true,
       action: "add_keyword",
-      entityId: criterionId || `${adGroupId}:${text}`,
+      entityId: criterionId,
       beforeValue: adGroupId, // stored for undo (removeKeyword needs adGroupId + criterionId)
       afterValue: `${text} (${matchType})`,
     };

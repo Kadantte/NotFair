@@ -34,6 +34,7 @@ export default function CampaignsPage() {
     const fetchCampaigns = useCallback(async () => {
         setLoading(true);
         setError(null);
+        setNavigatingTo(null);
         try {
             const data = await listCampaignsAction();
             setCampaigns(data);
