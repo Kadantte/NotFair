@@ -8,6 +8,8 @@ import {
   updateCampaignBudget,
   pauseCampaign,
   enableCampaign,
+  removeCampaign,
+  createSearchCampaign,
   getCustomer,
   toMicros,
   authForAccount,
@@ -180,6 +182,85 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(await logAndReturn(targetId, campaignId, result));
   });
 
+  // ─── Create Campaign ────────────────────────────────────────────
+
+  server.registerTool("createCampaign", {
+    title: "Create Search Campaign",
+    description:
+      "Create a complete Google Search campaign with budget, ad group, keywords, and a Responsive Search Ad. The campaign starts PAUSED — use enableCampaign to go live after reviewing. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignName: z.string().min(1).describe("Name for the new campaign"),
+      dailyBudgetDollars: z
+        .number()
+        .positive()
+        .min(1)
+        .describe("Daily budget in dollars (minimum $1)"),
+      keywords: z
+        .array(z.string().min(1))
+        .min(1)
+        .describe("Keywords to target (at least 1)"),
+      headlines: z
+        .array(z.string().min(1).max(30))
+        .min(3)
+        .max(15)
+        .describe("RSA headlines (3-15, max 30 chars each)"),
+      descriptions: z
+        .array(z.string().min(1).max(90))
+        .min(2)
+        .max(4)
+        .describe("RSA descriptions (2-4, max 90 chars each)"),
+      finalUrl: z
+        .string()
+        .url()
+        .describe("Landing page URL for the ads"),
+      biddingStrategy: z
+        .enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CLICKS", "MANUAL_CPC"])
+        .default("MAXIMIZE_CONVERSIONS")
+        .describe("Bidding strategy (defaults to Maximize Conversions)"),
+      keywordMatchType: z
+        .enum(["BROAD", "PHRASE", "EXACT"])
+        .default("BROAD")
+        .describe("Match type for all keywords (defaults to Broad)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await createSearchCampaign(authForAccount(auth, accountId), {
+      campaignName,
+      dailyBudgetDollars,
+      keywords,
+      headlines,
+      descriptions,
+      finalUrl,
+      biddingStrategy,
+      keywordMatchType,
+    });
+
+    // Adapt to WriteResult for change logging
+    const writeResult: WriteResult = {
+      success: result.success,
+      action: "create_campaign",
+      entityId: result.campaignId ?? "",
+      beforeValue: "",
+      afterValue: result.campaignName,
+      error: result.error,
+    };
+
+    const logged = await logAndReturn(targetId, result.campaignId ?? null, writeResult);
+
+    // Return full details for the LLM
+    return jsonResult({
+      ...result,
+      changeId: logged.changeId,
+      status: result.success ? "PAUSED" : undefined,
+      nextSteps: result.success
+        ? "Campaign created as PAUSED. Review settings in Google Ads, then use enableCampaign to start running ads."
+        : undefined,
+    });
+  });
+
   // ─── Campaign Status ────────────────────────────────────────────
 
   server.registerTool("pauseCampaign", {
@@ -246,43 +327,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     }
 
     const { change } = check;
-    let undoResult: WriteResult;
-
     const targetAuth = authForAccount(auth, accountId);
 
-    switch (change.toolName) {
-      case "pause_keyword":
-        undoResult = await findAndEnableKeyword(targetAuth, change.entityId);
-        break;
-      case "enable_keyword":
-        undoResult = await findAndPauseKeyword(targetAuth, change.entityId);
-        break;
-      case "update_bid":
-        undoResult = await findAndUpdateBid(targetAuth, change.entityId, Number(change.beforeValue));
-        break;
-      case "update_budget":
-        // Bypass guardrails for undo — restore to exact previous value
-        undoResult = await updateCampaignBudget(targetAuth, change.entityId, Number(change.beforeValue), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
-        break;
-      case "add_negative_keyword":
-        undoResult = await removeNegativeKeyword(targetAuth, change.campaignId ?? "", change.entityId);
-        break;
-      case "remove_negative_keyword":
-        undoResult = await addNegativeKeyword(targetAuth, change.campaignId ?? "", change.entityId);
-        break;
-      case "pause_campaign":
-        undoResult = await enableCampaign(targetAuth, change.entityId);
-        break;
-      case "enable_campaign":
-        undoResult = await pauseCampaign(targetAuth, change.entityId);
-        break;
-      default:
-        return jsonResult({ success: false, error: `Don't know how to undo "${change.toolName}"` });
-    }
+    const undoResult = await executeUndoForChange(targetAuth, change);
 
     if (undoResult.success) {
       await markRolledBack(changeId);
-      // Log the undo itself as a new change entry for audit trail
       await logChange(targetId, change.campaignId, undoResult, `Undo of change #${changeId} (${change.toolName})`);
     }
 
@@ -345,26 +395,39 @@ async function findAndUpdateBid(auth: AuthContext, criterionId: string, previous
 /** Execute the reverse operation for a change record. Used by both MCP undoChange and the dashboard undo action. */
 export async function executeUndoForChange(
   auth: AuthContext,
-  change: { toolName: string; entityId: string; campaignId: string | null; beforeValue: string },
+  change: { toolName: string; entityId: string | null; campaignId: string | null; beforeValue: string | null },
 ): Promise<WriteResult> {
+  const entityId = change.entityId ?? "";
+  const beforeValue = change.beforeValue ?? "";
+  if (!entityId) {
+    return { success: false, action: change.toolName, entityId: "", beforeValue, afterValue: beforeValue, error: "Cannot undo: missing entity ID" };
+  }
   switch (change.toolName) {
     case "pause_keyword":
-      return findAndEnableKeyword(auth, change.entityId);
+      return findAndEnableKeyword(auth, entityId);
     case "enable_keyword":
-      return findAndPauseKeyword(auth, change.entityId);
-    case "update_bid":
-      return findAndUpdateBid(auth, change.entityId, Number(change.beforeValue));
-    case "update_budget":
-      return updateCampaignBudget(auth, change.entityId, Number(change.beforeValue), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
+      return findAndPauseKeyword(auth, entityId);
+    case "update_bid": {
+      const bidMicros = Number(beforeValue);
+      if (!bidMicros || bidMicros <= 0) return { success: false, action: "update_bid", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: invalid previous bid value" };
+      return findAndUpdateBid(auth, entityId, bidMicros);
+    }
+    case "update_budget": {
+      const budgetMicros = Number(beforeValue);
+      if (!budgetMicros || budgetMicros <= 0) return { success: false, action: "update_budget", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: invalid previous budget value" };
+      return updateCampaignBudget(auth, entityId, budgetMicros, { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
+    }
     case "add_negative_keyword":
-      return removeNegativeKeyword(auth, change.campaignId ?? "", change.entityId);
+      return removeNegativeKeyword(auth, change.campaignId ?? "", entityId);
     case "remove_negative_keyword":
-      return addNegativeKeyword(auth, change.campaignId ?? "", change.entityId);
+      return addNegativeKeyword(auth, change.campaignId ?? "", entityId);
     case "pause_campaign":
-      return enableCampaign(auth, change.entityId);
+      return enableCampaign(auth, entityId);
     case "enable_campaign":
-      return pauseCampaign(auth, change.entityId);
+      return pauseCampaign(auth, entityId);
+    case "create_campaign":
+      return removeCampaign(auth, entityId);
     default:
-      return { success: false, action: change.toolName, entityId: change.entityId, beforeValue: change.beforeValue, afterValue: change.beforeValue, error: `Don't know how to undo "${change.toolName}"` };
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }
 }

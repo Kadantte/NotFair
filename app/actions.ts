@@ -31,7 +31,7 @@ export async function undoChangeAction(changeId: number) {
     }
 
     await markRolledBack(changeId);
-    await logChange(customerId, check.change.campaignId, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
+    await logChange(customerId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
 
     return { success: true, changeId };
 }

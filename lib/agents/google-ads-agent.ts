@@ -206,32 +206,33 @@ Rules:
           if ("error" in check) return { success: false, error: check.error };
 
           const { change } = check;
+          const eid = change.entityId ?? "";
+          const bv = change.beforeValue ?? "";
           let undoResult;
 
           switch (change.toolName) {
             case "update_budget":
-              undoResult = await updateCampaignBudget(auth, change.entityId, Number(change.beforeValue), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
+              undoResult = await updateCampaignBudget(auth, eid, Number(bv), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
               break;
             case "add_negative_keyword":
-              undoResult = await removeNegativeKeyword(auth, change.campaignId ?? "", change.entityId);
+              undoResult = await removeNegativeKeyword(auth, change.campaignId ?? "", eid);
               break;
             case "remove_negative_keyword":
-              undoResult = await addNegativeKeyword(auth, change.campaignId ?? "", change.entityId);
+              undoResult = await addNegativeKeyword(auth, change.campaignId ?? "", eid);
               break;
             case "pause_campaign":
-              undoResult = await enableCampaign(auth, change.entityId);
+              undoResult = await enableCampaign(auth, eid);
               break;
             case "enable_campaign":
-              undoResult = await pauseCampaign(auth, change.entityId);
+              undoResult = await pauseCampaign(auth, eid);
               break;
             default:
-              // Keyword-level undo requires ad group context lookup only available via MCP
               return { success: false, error: `Cannot undo "${change.toolName}" from chat. Use the MCP undoChange tool for keyword operations.` };
           }
 
           if (undoResult.success) {
             await markRolledBack(changeId);
-            await logChange(auth.customerId, change.campaignId, undoResult, `Undo of change #${changeId}`);
+            await logChange(auth.customerId, change.campaignId ?? null, undoResult, `Undo of change #${changeId}`);
           }
 
           return { ...undoResult, undoneChangeId: changeId, originalAction: change.toolName };

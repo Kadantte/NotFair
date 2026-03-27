@@ -1,10 +1,12 @@
 import {
   pgTable,
   text,
+  smallint,
   integer,
   doublePrecision,
   serial,
   uniqueIndex,
+  index,
   timestamp,
 } from "drizzle-orm/pg-core";
 
@@ -32,21 +34,29 @@ export const goals = pgTable(
   ],
 );
 
-// ─── Change Tracking ─────────────────────────────────────────────────
+// ─── Operations (unified read + write tracking) ─────────────────────
 
-export const changes = pgTable("changes", {
+export const operations = pgTable("operations", {
   id: serial("id").primaryKey(),
   accountId: text("account_id").notNull(),
+  userId: text("user_id"),
   campaignId: text("campaign_id"),
-  toolName: text("tool_name").notNull(),
-  entityType: text("entity_type").notNull(),
-  entityId: text("entity_id").notNull(),
-  beforeValue: text("before_value").notNull(),
-  afterValue: text("after_value").notNull(),
+  /** 0=read, 1=write — see OP_TYPE in tracking.ts */
+  opType: smallint("op_type").notNull(),
+  /** Compact tool code — see TOOL_CODE in tracking.ts */
+  toolCode: smallint("tool_code").notNull(),
+  /** Compact entity type — see ENTITY_CODE in tracking.ts */
+  entityCode: smallint("entity_code"),
+  entityId: text("entity_id"),
+  beforeValue: text("before_value"),
+  afterValue: text("after_value"),
   reasoning: text("reasoning"),
-  rolledBack: integer("rolled_back").default(0).notNull(),
+  rolledBack: smallint("rolled_back").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("ops_account_created_idx").on(table.accountId, table.createdAt),
+  index("ops_user_created_idx").on(table.userId, table.createdAt),
+]);
 
 // ─── Performance Snapshots ───────────────────────────────────────────
 

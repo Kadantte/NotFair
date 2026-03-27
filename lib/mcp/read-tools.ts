@@ -9,7 +9,7 @@ import {
   authForAccount,
   resolveAccountId,
 } from "@/lib/google-ads";
-import { getChanges } from "@/lib/db/tracking";
+import { getChanges, logRead } from "@/lib/db/tracking";
 import { jsonResult, accountIdParam, READ_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 
@@ -29,7 +29,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId }) => {
-    const result = await getAccountInfo(authForAccount(currentAuth(), accountId));
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getAccountInfo(authForAccount(auth, accountId));
+    void logRead(targetId, "get_account_info");
     return jsonResult(result);
   });
 
@@ -55,7 +58,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, limit, includeRemoved }) => {
-    const result = await listCampaigns(authForAccount(currentAuth(), accountId), { limit, includeRemoved });
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await listCampaigns(authForAccount(auth, accountId), { limit, includeRemoved });
+    void logRead(targetId, "list_campaigns");
     return jsonResult(result);
   });
 
@@ -76,7 +82,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days }) => {
-    const result = await getCampaignPerformance(authForAccount(currentAuth(), accountId), campaignId, days);
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getCampaignPerformance(authForAccount(auth, accountId), campaignId, days);
+    void logRead(targetId, "get_campaign_performance", campaignId);
     return jsonResult(result);
   });
 
@@ -106,7 +115,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days, limit }) => {
-    const result = await getKeywords(authForAccount(currentAuth(), accountId), campaignId, days, limit);
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getKeywords(authForAccount(auth, accountId), campaignId, days, limit);
+    void logRead(targetId, "get_keywords", campaignId);
     return jsonResult(result);
   });
 
@@ -134,7 +146,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days, limit }) => {
-    const result = await getSearchTermReport(authForAccount(currentAuth(), accountId), campaignId, days, limit);
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getSearchTermReport(authForAccount(auth, accountId), campaignId, days, limit);
+    void logRead(targetId, "get_search_term_report", campaignId);
     return jsonResult(result);
   });
 
@@ -157,7 +172,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       openWorldHint: true,
     },
   }, async ({ accountId, query }) => {
-    const result = await runSafeGaqlReport(authForAccount(currentAuth(), accountId), query);
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await runSafeGaqlReport(authForAccount(auth, accountId), query);
+    void logRead(targetId, "run_gaql_query");
     return jsonResult(result);
   });
 
@@ -186,6 +204,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await getChanges(targetId, { limit, campaignId });
+    void logRead(targetId, "get_changes");
     return jsonResult(result);
   });
 };
