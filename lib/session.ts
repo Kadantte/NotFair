@@ -33,6 +33,7 @@ async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | nu
       customerId: schema.mcpSessions.customerId,
       customerIds: schema.mcpSessions.customerIds,
       userId: schema.mcpSessions.userId,
+      googleEmail: schema.mcpSessions.googleEmail,
     })
     .from(schema.mcpSessions)
     .where(

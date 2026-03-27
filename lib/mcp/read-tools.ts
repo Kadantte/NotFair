@@ -6,6 +6,7 @@ import {
   getKeywords,
   getSearchTermReport,
   runSafeGaqlReport,
+  getTrackingTemplate,
   authForAccount,
   resolveAccountId,
 } from "@/lib/google-ads";
@@ -176,6 +177,31 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await runSafeGaqlReport(authForAccount(auth, accountId), query);
     void logRead(targetId, auth.userId, "run_gaql_query");
+    return jsonResult(result);
+  });
+
+  // ─── Tracking Templates ──────────────────────────────────────────
+
+  server.registerTool("getTrackingTemplate", {
+    title: "Get Tracking Template",
+    description:
+      "Get the current tracking template (URL suffix used for click tracking) at the account, campaign, ad group, or ad level. Returns null if no template is set at that level.",
+    inputSchema: {
+      accountId: accountIdParam,
+      level: z
+        .enum(["account", "campaign", "ad_group", "ad"])
+        .describe("The level at which to read the tracking template"),
+      entityId: z
+        .string()
+        .optional()
+        .describe("Required for campaign (campaignId), ad_group (adGroupId), and ad (adId) levels. Not needed for account level."),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, level, entityId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getTrackingTemplate(authForAccount(auth, accountId), level, entityId);
+    void logRead(targetId, auth.userId, "get_tracking_template");
     return jsonResult(result);
   });
 

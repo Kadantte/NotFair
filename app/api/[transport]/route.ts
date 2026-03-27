@@ -56,7 +56,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
           customerIds: customerIds.length > 0
             ? customerIds
             : [{ id: session.customerId, name: "" }],
-          userId: session.userId,
+          userId: session.userId ?? session.googleEmail ?? null,
           sessionToken: bearerToken,
         };
       }

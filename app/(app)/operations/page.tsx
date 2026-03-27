@@ -54,7 +54,7 @@ function entityTypeBadge(type: string) {
 }
 
 const UNDO_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const REVERSIBLE = new Set(['pause_keyword', 'enable_keyword', 'update_bid', 'update_budget', 'add_negative_keyword', 'remove_negative_keyword', 'pause_campaign', 'enable_campaign', 'create_campaign', 'add_keyword']);
+const REVERSIBLE = new Set(['pause_keyword', 'enable_keyword', 'update_bid', 'update_budget', 'add_negative_keyword', 'remove_negative_keyword', 'pause_campaign', 'enable_campaign', 'create_campaign', 'add_keyword', 'set_tracking_template']);
 
 export default function OperationsPage() {
     const [changes, setChanges] = useState<Change[]>([]);

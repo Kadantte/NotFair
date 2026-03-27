@@ -12,6 +12,8 @@ import {
   enableCampaign,
   removeCampaign,
   createSearchCampaign,
+  setTrackingTemplate,
+  decodeTrackingEntityId,
   getCustomer,
   toMicros,
   authForAccount,
@@ -325,6 +327,35 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
+  // ─── Tracking Templates ─────────────────────────────────────────
+
+  server.registerTool("setTrackingTemplate", {
+    title: "Set Tracking Template",
+    description:
+      "Set or clear the tracking template (click-tracking URL suffix) at the account, campaign, ad group, or ad level. Templates use ValueTrack parameters like {lpurl} for the landing page URL. Pass an empty string to remove the template. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      level: z
+        .enum(["account", "campaign", "ad_group", "ad"])
+        .describe("The level at which to set the tracking template"),
+      entityId: z
+        .string()
+        .optional()
+        .describe("Required for campaign (campaignId), ad_group (adGroupId), and ad (adId) levels. Not needed for account level."),
+      trackingTemplate: z
+        .string()
+        .describe("The tracking template URL (e.g. '{lpurl}?utm_source=google&utm_medium=cpc'). Pass an empty string to remove the template."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, level, entityId, trackingTemplate }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
+    // campaignId: direct for campaign level; resolved from prefetch for ad_group/ad; null for account
+    const campaignId = level === "campaign" ? (entityId ?? null) : (result.campaignId ?? null);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
@@ -461,6 +492,10 @@ export async function executeUndoForChange(
       return pauseCampaign(auth, entityId);
     case "create_campaign":
       return removeCampaign(auth, entityId);
+    case "set_tracking_template": {
+      const { level, entityId: actualId } = decodeTrackingEntityId(entityId);
+      return setTrackingTemplate(auth, level, beforeValue, actualId);
+    }
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }

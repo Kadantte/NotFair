@@ -73,6 +73,8 @@ export type WriteResult = {
   beforeValue: string;
   afterValue: string;
   error?: string;
+  /** Owning campaign ID — set by operations that resolve it as a side-effect (e.g. ad_group/ad tracking template updates). */
+  campaignId?: string | null;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -1262,6 +1264,222 @@ export async function removeCampaign(
       entityId: campaignId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+// ─── Tracking Templates ──────────────────────────────────────────────
+
+export type TrackingTemplateLevel = "account" | "campaign" | "ad_group" | "ad";
+
+/** Format: "account" | "campaign:{id}" | "ad_group:{id}" | "ad:{id}" */
+export function encodeTrackingEntityId(level: TrackingTemplateLevel, entityId?: string): string {
+  if (level === "account") return "account";
+  return `${level}:${entityId}`;
+}
+
+export function decodeTrackingEntityId(encoded: string): { level: TrackingTemplateLevel; entityId?: string } {
+  if (encoded === "account") return { level: "account" };
+  const idx = encoded.indexOf(":");
+  if (idx === -1) throw new Error(`Cannot undo: unrecognized tracking entity ID format "${encoded}"`);
+  const level = encoded.slice(0, idx) as TrackingTemplateLevel;
+  const entityId = encoded.slice(idx + 1);
+  if (!["campaign", "ad_group", "ad"].includes(level)) {
+    throw new Error(`Cannot undo: unknown tracking level "${level}" in entity ID "${encoded}"`);
+  }
+  return { level, entityId };
+}
+
+export async function getTrackingTemplate(
+  auth: AuthContext,
+  level: TrackingTemplateLevel,
+  entityId?: string,
+): Promise<{ level: string; entityId: string; trackingTemplate: string | null; campaignId?: string | null }> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  switch (level) {
+    case "account": {
+      const result = await customer.query(`
+        SELECT customer.tracking_url_template
+        FROM customer
+        LIMIT 1
+      `);
+      const row = (result as any[])[0]?.customer;
+      return { level, entityId: cid, trackingTemplate: row?.tracking_url_template ?? null };
+    }
+    case "campaign": {
+      if (!entityId) throw new Error("entityId (campaignId) is required for campaign level");
+      const id = safeCampaignId(entityId);
+      const result = await customer.query(`
+        SELECT campaign.tracking_url_template
+        FROM campaign
+        WHERE campaign.id = ${id}
+        LIMIT 1
+      `);
+      const row = (result as any[])[0]?.campaign;
+      return { level, entityId, trackingTemplate: row?.tracking_url_template ?? null };
+    }
+    case "ad_group": {
+      if (!entityId) throw new Error("entityId (adGroupId) is required for ad_group level");
+      const id = Number(entityId);
+      if (!Number.isFinite(id) || id <= 0) throw new Error(`Invalid adGroupId: ${entityId}`);
+      // Single query fetches template + owning campaign in one round-trip
+      const result = await customer.query(`
+        SELECT ad_group.tracking_url_template, campaign.id
+        FROM ad_group
+        WHERE ad_group.id = ${id}
+        LIMIT 1
+      `);
+      const row = (result as any[])[0];
+      return {
+        level,
+        entityId,
+        trackingTemplate: row?.ad_group?.tracking_url_template ?? null,
+        campaignId: row?.campaign?.id ? String(row.campaign.id) : null,
+      };
+    }
+    case "ad": {
+      if (!entityId) throw new Error("entityId (adId) is required for ad level");
+      const id = Number(entityId);
+      if (!Number.isFinite(id) || id <= 0) throw new Error(`Invalid adId: ${entityId}`);
+      // Single query fetches template + owning campaign in one round-trip
+      const result = await customer.query(`
+        SELECT ad_group_ad.ad.tracking_url_template, campaign.id
+        FROM ad_group_ad
+        WHERE ad_group_ad.ad.id = ${id}
+        LIMIT 1
+      `);
+      const row = (result as any[])[0];
+      return {
+        level,
+        entityId,
+        trackingTemplate: row?.ad_group_ad?.ad?.tracking_url_template ?? null,
+        campaignId: row?.campaign?.id ? String(row.campaign.id) : null,
+      };
+    }
+  }
+}
+
+export async function setTrackingTemplate(
+  auth: AuthContext,
+  level: TrackingTemplateLevel,
+  trackingTemplate: string,
+  entityId?: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const encoded = encodeTrackingEntityId(level, entityId);
+
+  if (trackingTemplate !== "" && !trackingTemplate.includes("{lpurl}")) {
+    return {
+      success: false,
+      action: "set_tracking_template",
+      entityId: encoded,
+      beforeValue: "",
+      afterValue: trackingTemplate,
+      error: 'Tracking template must contain {lpurl} (e.g. "{lpurl}?utm_source=google&utm_medium=cpc"). Pass an empty string to clear the template.',
+    };
+  }
+
+  // Fetch current state before writing — required for accurate undo record.
+  // Also resolves the owning campaignId for ad_group/ad levels in the same query.
+  // If the fetch fails, abort: a write with a wrong beforeValue cannot be safely undone.
+  let prefetch: Awaited<ReturnType<typeof getTrackingTemplate>>;
+  try {
+    prefetch = await getTrackingTemplate(auth, level, entityId);
+  } catch (fetchError) {
+    return {
+      success: false,
+      action: "set_tracking_template",
+      entityId: encoded,
+      beforeValue: "",
+      afterValue: trackingTemplate,
+      error: `Could not read current tracking template before writing (undo would be unsafe): ${extractErrorMessage(fetchError)}`,
+    };
+  }
+
+  const beforeValue = prefetch.trackingTemplate ?? "";
+
+  try {
+    switch (level) {
+      case "account":
+        await customer.mutateResources([
+          {
+            entity: "customer" as any,
+            operation: "update",
+            resource: {
+              resource_name: `customers/${cid}`,
+              tracking_url_template: trackingTemplate,
+            },
+          },
+        ]);
+        break;
+      case "campaign": {
+        if (!entityId) throw new Error("entityId (campaignId) is required");
+        const campaignIdNum = safeCampaignId(entityId);
+        await customer.mutateResources([
+          {
+            entity: "campaign" as any,
+            operation: "update",
+            resource: {
+              resource_name: `customers/${cid}/campaigns/${campaignIdNum}`,
+              tracking_url_template: trackingTemplate,
+            },
+          },
+        ]);
+        break;
+      }
+      case "ad_group": {
+        if (!entityId) throw new Error("entityId (adGroupId) is required");
+        const agId = Number(entityId);
+        if (!Number.isFinite(agId) || agId <= 0) throw new Error(`Invalid adGroupId: ${entityId}`);
+        await customer.mutateResources([
+          {
+            entity: "ad_group" as any,
+            operation: "update",
+            resource: {
+              resource_name: `customers/${cid}/adGroups/${agId}`,
+              tracking_url_template: trackingTemplate,
+            },
+          },
+        ]);
+        break;
+      }
+      case "ad": {
+        if (!entityId) throw new Error("entityId (adId) is required");
+        const adId = Number(entityId);
+        if (!Number.isFinite(adId) || adId <= 0) throw new Error(`Invalid adId: ${entityId}`);
+        await customer.mutateResources([
+          {
+            entity: "ad" as any,
+            operation: "update",
+            resource: {
+              resource_name: `customers/${cid}/ads/${adId}`,
+              tracking_url_template: trackingTemplate,
+            },
+          },
+        ]);
+        break;
+      }
+    }
+
+    return {
+      success: true,
+      action: "set_tracking_template",
+      entityId: encoded,
+      beforeValue,
+      afterValue: trackingTemplate,
+      campaignId: prefetch.campaignId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "set_tracking_template",
+      entityId: encoded,
+      beforeValue,
+      afterValue: trackingTemplate,
       error: extractErrorMessage(error),
     };
   }

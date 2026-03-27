@@ -22,6 +22,7 @@ export const TOOL_CODE = {
   remove_campaign: 10,
   add_keyword: 11,
   remove_keyword: 12,
+  set_tracking_template: 13,
   // Reads (20+)
   get_account_info: 20,
   list_campaigns: 21,
@@ -31,6 +32,7 @@ export const TOOL_CODE = {
   run_gaql_query: 25,
   get_changes: 26,
   list_accessible_customers: 27,
+  get_tracking_template: 28,
 } as const;
 
 type ToolCode = (typeof TOOL_CODE)[keyof typeof TOOL_CODE];
@@ -295,6 +297,7 @@ const REVERSIBLE_ACTIONS: Record<number, number> = {
   [TOOL_CODE.remove_negative_keyword]: TOOL_CODE.add_negative_keyword,
   [TOOL_CODE.create_campaign]: TOOL_CODE.remove_campaign,
   [TOOL_CODE.add_keyword]: TOOL_CODE.remove_keyword,
+  [TOOL_CODE.set_tracking_template]: TOOL_CODE.set_tracking_template,
 };
 
 export async function getUndoableChange(accountId: string, changeId: number) {
