@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:backfill-operation-user-ids": "npx tsx scripts/backfill-operation-user-ids.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.29",

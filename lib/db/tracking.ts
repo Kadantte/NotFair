@@ -63,6 +63,7 @@ function getEntityCode(action: string): number {
 
 export async function logChange(
   accountId: string,
+  userId: string | null | undefined,
   campaignId: string | null,
   writeResult: WriteResult,
   reasoning?: string,
@@ -78,6 +79,7 @@ export async function logChange(
       .insert(schema.operations)
       .values({
         accountId,
+        userId: userId ?? null,
         campaignId,
         opType: OP_TYPE.WRITE,
         toolCode: code,
@@ -101,6 +103,7 @@ export async function logChange(
 
 export async function logRead(
   accountId: string,
+  userId: string | null | undefined,
   toolName: string,
   campaignId?: string | null,
 ) {
@@ -112,6 +115,7 @@ export async function logRead(
       .insert(schema.operations)
       .values({
         accountId,
+        userId: userId ?? null,
         campaignId: campaignId ?? null,
         opType: OP_TYPE.READ,
         toolCode: code,

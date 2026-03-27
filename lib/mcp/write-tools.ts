@@ -26,13 +26,14 @@ import type { ToolRegistrar } from "./types";
  */
 async function logAndReturn(
   accountId: string,
+  userId: string | null | undefined,
   campaignId: string | null,
   result: WriteResult,
   reasoning?: string,
 ) {
   if (!result.success) return { ...result, changeId: null };
 
-  const change = await logChange(accountId, campaignId, result, reasoning);
+  const change = await logChange(accountId, userId, campaignId, result, reasoning);
   return { ...result, changeId: change?.id ?? null };
 }
 
@@ -59,7 +60,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await pauseKeyword(authForAccount(auth, accountId), campaignId, adGroupId, criterionId);
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   server.registerTool("enableKeyword", {
@@ -76,7 +77,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await enableKeyword(authForAccount(auth, accountId), adGroupId, criterionId);
-    return jsonResult(await logAndReturn(targetId, null, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, null, result));
   });
 
   // ─── Bid Management ─────────────────────────────────────────────
@@ -106,7 +107,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       criterionId,
       toMicros(newBidDollars),
     );
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   // ─── Negative Keywords ──────────────────────────────────────────
@@ -128,7 +129,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await addNegativeKeyword(authForAccount(auth, accountId), campaignId, keywordText);
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   server.registerTool("removeNegativeKeyword", {
@@ -153,7 +154,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keywordText);
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   // ─── Budget Management ──────────────────────────────────────────
@@ -179,7 +180,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId,
       toMicros(newDailyBudgetDollars),
     );
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   // ─── Create Campaign ────────────────────────────────────────────
@@ -248,7 +249,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       error: result.error,
     };
 
-    const logged = await logAndReturn(targetId, result.campaignId ?? null, writeResult);
+    const logged = await logAndReturn(targetId, auth.userId, result.campaignId ?? null, writeResult);
 
     // Return full details for the LLM
     return jsonResult({
@@ -281,7 +282,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await pauseCampaign(authForAccount(auth, accountId), campaignId);
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   server.registerTool("enableCampaign", {
@@ -297,7 +298,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await enableCampaign(authForAccount(auth, accountId), campaignId);
-    return jsonResult(await logAndReturn(targetId, campaignId, result));
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   // ─── Undo ───────────────────────────────────────────────────────
@@ -333,7 +334,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     if (undoResult.success) {
       await markRolledBack(changeId);
-      await logChange(targetId, change.campaignId, undoResult, `Undo of change #${changeId} (${change.toolName})`);
+      await logChange(targetId, auth.userId, change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${change.toolName})`);
     }
 
     return jsonResult({

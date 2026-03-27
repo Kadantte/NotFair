@@ -18,6 +18,7 @@ type SessionRow = {
   refreshToken: string;
   customerId: string;
   customerIds: string;
+  userId: string | null;
 };
 
 async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | null> {
@@ -31,6 +32,7 @@ async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | nu
       refreshToken: schema.mcpSessions.refreshToken,
       customerId: schema.mcpSessions.customerId,
       customerIds: schema.mcpSessions.customerIds,
+      userId: schema.mcpSessions.userId,
     })
     .from(schema.mcpSessions)
     .where(

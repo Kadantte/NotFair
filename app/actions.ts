@@ -25,7 +25,7 @@ export async function getChangesAction(options: { limit?: number; campaignId?: s
 
 export async function undoChangeAction(changeId: number) {
     return requireAuth(async () => {
-        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
 
         const check = await getUndoableChange(customerId, changeId);
         if ("error" in check) {
@@ -44,7 +44,7 @@ export async function undoChangeAction(changeId: number) {
         }
 
         await markRolledBack(changeId);
-        await logChange(customerId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
+        await logChange(customerId, userId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
 
         return { success: true, changeId };
     });

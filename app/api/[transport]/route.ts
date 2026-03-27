@@ -5,7 +5,6 @@ import { AsyncLocalStorage } from "node:async_hooks";
 if (!process.env.GCLOUD_PROJECT) {
   process.env.GCLOUD_PROJECT = "ads-agent-mcp";
 }
-import { z } from "zod";
 import { createMcpHandler } from "mcp-handler";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
@@ -57,6 +56,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
           customerIds: customerIds.length > 0
             ? customerIds
             : [{ id: session.customerId, name: "" }],
+          userId: session.userId,
           sessionToken: bearerToken,
         };
       }

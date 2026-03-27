@@ -32,7 +32,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await getAccountInfo(authForAccount(auth, accountId));
-    void logRead(targetId, "get_account_info");
+    void logRead(targetId, auth.userId, "get_account_info");
     return jsonResult(result);
   });
 
@@ -61,7 +61,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await listCampaigns(authForAccount(auth, accountId), { limit, includeRemoved });
-    void logRead(targetId, "list_campaigns");
+    void logRead(targetId, auth.userId, "list_campaigns");
     return jsonResult(result);
   });
 
@@ -85,7 +85,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await getCampaignPerformance(authForAccount(auth, accountId), campaignId, days);
-    void logRead(targetId, "get_campaign_performance", campaignId);
+    void logRead(targetId, auth.userId, "get_campaign_performance", campaignId);
     return jsonResult(result);
   });
 
@@ -118,7 +118,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await getKeywords(authForAccount(auth, accountId), campaignId, days, limit);
-    void logRead(targetId, "get_keywords", campaignId);
+    void logRead(targetId, auth.userId, "get_keywords", campaignId);
     return jsonResult(result);
   });
 
@@ -149,7 +149,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await getSearchTermReport(authForAccount(auth, accountId), campaignId, days, limit);
-    void logRead(targetId, "get_search_term_report", campaignId);
+    void logRead(targetId, auth.userId, "get_search_term_report", campaignId);
     return jsonResult(result);
   });
 
@@ -175,7 +175,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await runSafeGaqlReport(authForAccount(auth, accountId), query);
-    void logRead(targetId, "run_gaql_query");
+    void logRead(targetId, auth.userId, "run_gaql_query");
     return jsonResult(result);
   });
 
@@ -204,7 +204,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await getChanges(targetId, { limit, campaignId });
-    void logRead(targetId, "get_changes");
+    void logRead(targetId, auth.userId, "get_changes");
     return jsonResult(result);
   });
 };

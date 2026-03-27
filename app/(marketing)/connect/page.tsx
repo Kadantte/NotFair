@@ -219,7 +219,7 @@ export default function ConnectPage() {
     return (
         <Suspense fallback={
             <div className="pt-24 pb-16 px-4 flex items-center justify-center min-h-[50vh]">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-blue-400" />
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
             </div>
         }>
             <ConnectContent />
@@ -248,7 +248,7 @@ function ConnectContent() {
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
 
-    const actionBtnClass = "flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-sm transition-all";
+    const actionBtnClass = "flex items-center gap-2 px-4 py-2 rounded-lg bg-[#24231F] border border-[#3D3C36] hover:border-[#9B9689]/40 text-[#9B9689] hover:text-[#E8E4DD] text-sm transition-all";
 
     let accounts: { id: string; name: string }[] = [];
     if (accountsParam) {
@@ -338,21 +338,21 @@ function ConnectContent() {
             <div className="container mx-auto max-w-2xl">
 
                 {error && (
-                    <div className="mb-8 p-4 rounded-xl border border-red-900/50 bg-red-950/30 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-red-300 text-sm">{error}</p>
+                    <div className="mb-8 p-4 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-[#C45D4A] flex-shrink-0 mt-0.5" />
+                        <p className="text-[#C45D4A] text-sm">{error}</p>
                     </div>
                 )}
 
                 {pendingToken && accounts.length > 0 ? (
                     /* Account selection — multi-select */
                     <div className="flex flex-col items-center text-center space-y-6">
-                        <div className="flex items-center gap-2 text-green-400">
+                        <div className="flex items-center gap-2 text-[#4CAF6E]">
                             <CheckCircle2 className="w-5 h-5" />
                             <span className="text-sm font-medium">Google connected</span>
                         </div>
-                        <h1 className="text-3xl md:text-5xl font-bold text-white">Select accounts</h1>
-                        <p className="text-zinc-400 text-lg max-w-md">
+                        <h1 className="text-3xl md:text-5xl font-bold text-[#E8E4DD]">Select accounts</h1>
+                        <p className="text-[#9B9689] text-lg max-w-md">
                             Which Google Ads accounts do you want to manage?
                         </p>
                         <div className="w-full space-y-3 max-w-md">
@@ -363,27 +363,27 @@ function ConnectContent() {
                                         key={account.id}
                                         onClick={() => toggleAccount(account.id)}
                                         disabled={selecting}
-                                        className={`w-full p-4 rounded-xl border transition-all text-left disabled:opacity-50 flex items-center gap-3 ${
+                                        className={`w-full p-4 rounded-lg border transition-all text-left disabled:opacity-50 flex items-center gap-3 ${
                                             isSelected
-                                                ? 'border-green-700 bg-green-950/30'
-                                                : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600 hover:bg-zinc-800/80'
+                                                ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
+                                                : 'border-[#3D3C36] bg-[#24231F] hover:border-[#9B9689]/40 hover:bg-[#2E2D28]'
                                         }`}
                                     >
                                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                            isSelected ? 'bg-green-500 border-green-500' : 'border-zinc-600'
+                                            isSelected ? 'bg-[#4CAF6E] border-[#4CAF6E]' : 'border-[#9B9689]/40'
                                         }`}>
-                                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                                            {isSelected && <Check className="w-3 h-3 text-[#1A1917]" />}
                                         </div>
                                         <div>
-                                            <p className="text-white font-medium">{account.name}</p>
-                                            <p className="text-zinc-500 text-sm mt-0.5">{account.id}</p>
+                                            <p className="text-[#E8E4DD] font-medium">{account.name}</p>
+                                            <p className="text-[#9B9689] text-sm mt-0.5">{account.id}</p>
                                         </div>
                                     </button>
                                 );
                             })}
                         </div>
                         {selectedAccounts.size > 0 && (
-                            <p className="text-zinc-500 text-sm">
+                            <p className="text-[#9B9689] text-sm">
                                 {selectedAccounts.size} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected
                             </p>
                         )}
@@ -391,7 +391,7 @@ function ConnectContent() {
                             size="lg"
                             onClick={submitSelectedAccounts}
                             disabled={selectedAccounts.size === 0 || selecting}
-                            className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                            className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
                         >
                             {selecting ? 'Connecting...' : `Connect ${selectedAccounts.size || ''} account${selectedAccounts.size !== 1 ? 's' : ''}`}
                         </Button>
@@ -399,67 +399,67 @@ function ConnectContent() {
                 ) : !token ? (
                     /* Step 1: Connect Google Ads */
                     <div className="flex flex-col items-center text-center space-y-6">
-                        <h1 className="text-3xl md:text-5xl font-bold text-white">Connect Google Ads</h1>
-                        <p className="text-zinc-400 text-lg max-w-md">
+                        <h1 className="text-3xl md:text-5xl font-bold text-[#E8E4DD]">Connect Google Ads</h1>
+                        <p className="text-[#9B9689] text-lg max-w-md">
                             Sign in with your Google Ads account. You'll get a prompt to paste into your AI — that's it.
                         </p>
                         <Button
                             size="lg"
                             onClick={beginGoogleSignIn}
-                            className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105"
+                            className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105"
                         >
                             Sign in with Google <ExternalLink className="w-5 h-5 ml-2" />
                         </Button>
-                        <p className="text-zinc-600 text-xs">OAuth 2.0 — we never see your password.</p>
+                        <p className="text-[#9B9689]/60 text-xs">OAuth 2.0 — we never see your password.</p>
                     </div>
                 ) : (
                     /* Step 3: Copy prompt */
                     <div className="flex flex-col items-center text-center space-y-8">
-                        <div className="flex items-center gap-2 text-green-400">
+                        <div className="flex items-center gap-2 text-[#4CAF6E]">
                             <CheckCircle2 className="w-5 h-5" />
                             <span className="text-sm font-medium">Connected to {customerName || 'Google Ads'}</span>
                         </div>
 
-                        <h1 className="text-3xl md:text-5xl font-bold text-white">Paste this into your AI</h1>
+                        <h1 className="text-3xl md:text-5xl font-bold text-[#E8E4DD]">Paste this into your AI</h1>
 
                         {/* Client tabs */}
-                        <div className="flex items-center gap-1 p-1 rounded-full bg-zinc-900 border border-zinc-800">
+                        <div className="flex items-center gap-1 p-1 rounded-full bg-[#24231F] border border-[#3D3C36]">
                             {CLIENTS.map((c) => (
                                 <button
                                     key={c.id}
                                     onClick={() => { setActiveClient(c.id); setCopied(false); }}
                                     className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
                                         activeClient === c.id
-                                            ? 'bg-white text-black'
-                                            : 'text-zinc-400 hover:text-white'
+                                            ? 'bg-[#4CAF6E] text-[#1A1917]'
+                                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
                                     }`}
                                 >
                                     {c.name}
                                 </button>
                             ))}
                         </div>
-                        <p className="text-zinc-400 text-sm max-w-md">
+                        <p className="text-[#9B9689] text-sm max-w-md">
                             {client.hint}
                         </p>
 
                         <div className="w-full text-left">
-                            <div className="relative bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-                                <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed pr-16">
+                            <div className="relative bg-[#24231F] rounded-lg border border-[#3D3C36] p-6">
+                                <pre className="text-sm text-[#E8E4DD]/80 whitespace-pre-wrap font-mono leading-relaxed pr-16 max-h-[400px] overflow-y-auto">
                                     {prompt}
                                 </pre>
                                 <button
                                     onClick={copyPrompt}
-                                    className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors text-sm"
+                                    className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#2E2D28] hover:bg-[#3D3C36] transition-colors text-sm"
                                 >
                                     {copied ? (
                                         <>
-                                            <Check className="w-4 h-4 text-green-400" />
-                                            <span className="text-green-400">Copied</span>
+                                            <Check className="w-4 h-4 text-[#4CAF6E]" />
+                                            <span className="text-[#4CAF6E]">Copied</span>
                                         </>
                                     ) : (
                                         <>
-                                            <Copy className="w-4 h-4 text-zinc-400" />
-                                            <span className="text-zinc-400">Copy</span>
+                                            <Copy className="w-4 h-4 text-[#9B9689]" />
+                                            <span className="text-[#9B9689]">Copy</span>
                                         </>
                                     )}
                                 </button>
@@ -469,17 +469,17 @@ function ConnectContent() {
                         <Button
                             size="lg"
                             onClick={copyPrompt}
-                            className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105"
+                            className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105"
                         >
                             {copied ? 'Copied!' : 'Copy Prompt'} {copied ? <Check className="w-5 h-5 ml-2" /> : <Copy className="w-5 h-5 ml-2" />}
                         </Button>
 
-                        <p className="text-zinc-600 text-xs max-w-sm">
+                        <p className="text-[#9B9689]/60 text-xs max-w-sm">
                             This prompt contains your personal access token. Don't share it publicly.
                         </p>
 
                         {/* Actions */}
-                        <div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-zinc-800 w-full max-w-md">
+                        <div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-[#3D3C36] w-full max-w-md">
                             <Link
                                 href="/campaigns"
                                 className={actionBtnClass}

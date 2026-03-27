@@ -34,6 +34,7 @@ export type AuthContext = {
   refreshToken: string;
   customerId: string;
   customerIds?: ConnectedAccount[];
+  userId?: string | null;
 };
 
 /**
@@ -108,6 +109,32 @@ export function getCustomer(auth: AuthContext) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Extract a meaningful error message from Google Ads API errors.
+ * The google-ads-api library throws GoogleAdsFailure objects (not Error instances)
+ * with an `errors` array containing detailed failure info.
+ */
+function extractErrorMessage(error: unknown): string {
+  // Standard Error
+  if (error instanceof Error) return error.message;
+
+  // GoogleAdsFailure — has an `errors` array with `message` and `error_code` fields
+  if (error && typeof error === "object" && "errors" in error) {
+    const failures = (error as { errors: Array<{ message?: string; error_code?: Record<string, unknown> }> }).errors;
+    if (Array.isArray(failures) && failures.length > 0) {
+      const messages = failures.map((f) => {
+        const code = f.error_code ? Object.entries(f.error_code).map(([k, v]) => `${k}=${v}`).join(", ") : "";
+        return f.message ? `${f.message}${code ? ` (${code})` : ""}` : code;
+      }).filter(Boolean);
+      if (messages.length > 0) return messages.join("; ");
+    }
+  }
+
+  // Fallback: try to stringify
+  if (typeof error === "string") return error;
+  try { return JSON.stringify(error); } catch { return "Unknown error"; }
+}
 
 function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -184,7 +211,7 @@ export async function listAccessibleCustomers(refreshToken: string) {
           timeZone: null,
           isTestAccount: false,
           isManager: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: extractErrorMessage(error),
         };
       }
     }),
@@ -442,7 +469,7 @@ export async function pauseKeyword(
       entityId: criterionId,
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -480,7 +507,7 @@ export async function enableKeyword(
       entityId: criterionId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -578,7 +605,7 @@ export async function updateBid(
       entityId: criterionId,
       beforeValue: String(currentBidMicros),
       afterValue: String(newBidMicros),
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -627,7 +654,7 @@ export async function addNegativeKeyword(
       afterValue: text,
     };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
+    const msg = extractErrorMessage(error);
     return {
       success: false,
       action: "add_negative_keyword",
@@ -733,7 +760,7 @@ export async function updateCampaignBudget(
       entityId: campaignId,
       beforeValue: String(currentBudgetMicros),
       afterValue: String(newDailyBudgetMicros),
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -771,7 +798,7 @@ export async function pauseCampaign(
       entityId: campaignId,
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -809,7 +836,7 @@ export async function enableCampaign(
       entityId: campaignId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -872,7 +899,7 @@ export async function removeNegativeKeyword(
       entityId: keywordText,
       beforeValue: keywordText,
       afterValue: "",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -1081,7 +1108,7 @@ export async function createSearchCampaign(
     return {
       success: false,
       campaignName: params.campaignName,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }
@@ -1123,7 +1150,7 @@ export async function removeCampaign(
       entityId: campaignId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: extractErrorMessage(error),
     };
   }
 }

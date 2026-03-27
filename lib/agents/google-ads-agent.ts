@@ -24,6 +24,7 @@ import type { WriteResult } from "@/lib/google-ads";
 type AgentAuth = {
   refreshToken: string;
   customerId: string;
+  userId?: string | null;
 };
 
 /** Execute a write operation and log the change. Returns the result with changeId attached. */
@@ -34,7 +35,7 @@ async function execAndLog(
 ) {
   const result = await fn();
   if (!result.success) return result;
-  const change = await logChange(auth.customerId, campaignId, result);
+  const change = await logChange(auth.customerId, auth.userId, campaignId, result);
   return { ...result, changeId: change?.id ?? null };
 }
 
@@ -232,7 +233,7 @@ Rules:
 
           if (undoResult.success) {
             await markRolledBack(changeId);
-            await logChange(auth.customerId, change.campaignId ?? null, undoResult, `Undo of change #${changeId}`);
+            await logChange(auth.customerId, auth.userId, change.campaignId ?? null, undoResult, `Undo of change #${changeId}`);
           }
 
           return { ...undoResult, undoneChangeId: changeId, originalAction: change.toolName };
