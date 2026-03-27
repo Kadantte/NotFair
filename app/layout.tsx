@@ -26,9 +26,9 @@ export default function RootLayout({
   const isDevelopment = process.env.NODE_ENV === "development";
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
         {isDevelopment ? <Agentation /> : null}
         {children}
