@@ -46,7 +46,13 @@ async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | nu
 
   if (!row || !row.customerId) return null;
 
-  return { token, row };
+  return {
+    token,
+    row: {
+      ...row,
+      userId: row.userId ?? row.googleEmail ?? null,
+    },
+  };
 }
 
 export async function getSession(): Promise<Session> {
