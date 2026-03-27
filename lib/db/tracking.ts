@@ -1,5 +1,5 @@
 import { db, schema } from "./index";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gt, gte, lte, desc } from "drizzle-orm";
 import type { WriteResult } from "@/lib/google-ads";
 
 // ─── Change Logging ──────────────────────────────────────────────────
@@ -173,6 +173,82 @@ function average(snapshots: typeof schema.performanceSnapshots.$inferSelect[]) {
     dailyConversions: totalConversions / n,
     cpa: totalConversions > 0 ? totalCost / totalConversions : null,
   };
+}
+
+// ─── Undo ────────────────────────────────────────────────────────────
+
+const UNDO_WINDOW_DAYS = 7;
+
+/** Actions that map to a reverse Google Ads mutation. */
+const REVERSIBLE_ACTIONS: Record<string, string> = {
+  pause_keyword: "enable_keyword",
+  enable_keyword: "pause_keyword",
+  pause_campaign: "enable_campaign",
+  enable_campaign: "pause_campaign",
+  update_bid: "update_bid",
+  update_budget: "update_budget",
+  add_negative_keyword: "remove_negative_keyword",
+  remove_negative_keyword: "add_negative_keyword",
+};
+
+export async function getUndoableChange(accountId: string, changeId: number) {
+  const [change] = await db()
+    .select()
+    .from(schema.changes)
+    .where(
+      and(
+        eq(schema.changes.id, changeId),
+        eq(schema.changes.accountId, accountId),
+      ),
+    )
+    .limit(1);
+
+  if (!change) return { error: "Change not found" };
+  if (change.rolledBack) return { error: "Change was already undone" };
+
+  // Check undo window
+  const ageMs = Date.now() - change.createdAt.getTime();
+  const ageDays = ageMs / (1000 * 60 * 60 * 24);
+  if (ageDays > UNDO_WINDOW_DAYS) {
+    return { error: `Change is ${Math.floor(ageDays)} days old. Undo window is ${UNDO_WINDOW_DAYS} days.` };
+  }
+
+  // Check reversibility
+  if (!REVERSIBLE_ACTIONS[change.toolName]) {
+    return { error: `Action "${change.toolName}" is not reversible` };
+  }
+
+  // Check if entity was modified after this change (stale undo guard)
+  const staleConditions = [
+    gt(schema.changes.id, changeId),
+    eq(schema.changes.accountId, accountId),
+    eq(schema.changes.entityType, change.entityType),
+    eq(schema.changes.entityId, change.entityId),
+    eq(schema.changes.rolledBack, 0),
+  ];
+  if (change.campaignId) {
+    staleConditions.push(eq(schema.changes.campaignId, change.campaignId));
+  }
+  const [laterChange] = await db()
+    .select({ id: schema.changes.id, createdAt: schema.changes.createdAt })
+    .from(schema.changes)
+    .where(and(...staleConditions))
+    .limit(1);
+
+  if (laterChange) {
+    return {
+      error: `Entity was modified after this change (change #${laterChange.id} on ${laterChange.createdAt.toISOString()}). Undo would overwrite a more recent change. Undo the later change first, or apply the desired state directly.`,
+    };
+  }
+
+  return { change };
+}
+
+export async function markRolledBack(changeId: number) {
+  await db()
+    .update(schema.changes)
+    .set({ rolledBack: 1 })
+    .where(eq(schema.changes.id, changeId));
 }
 
 // ─── Goals ───────────────────────────────────────────────────────────

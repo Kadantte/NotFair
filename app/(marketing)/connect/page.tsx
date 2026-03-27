@@ -108,7 +108,7 @@ Run these commands to confirm the server is reachable and see all available tool
 
 npx mcporter list adsagent --schema
 
-This should show 12 tools: getAccountInfo, listCampaigns, getCampaignPerformance, getKeywords, getSearchTermReport, pauseKeyword, enableKeyword, updateBid, addNegativeKeyword, updateCampaignBudget, pauseCampaign, enableCampaign.
+This should show 17 tools: getAccountInfo, listCampaigns, getCampaignPerformance, getKeywords, getSearchTermReport, runGaqlQuery, getChanges, listConnectedAccounts, pauseKeyword, enableKeyword, updateBid, addNegativeKeyword, removeNegativeKeyword, updateCampaignBudget, pauseCampaign, enableCampaign, undoChange.
 
 ## Step 3: Generate a typed client for the skill
 
@@ -122,8 +122,8 @@ Create the file <skills-dir>/adsagent/SKILL.md with this content:
 
 ---
 name: adsagent
-description: Manage Google Ads campaigns — read performance, optimize keywords, adjust bids and budgets, add negatives, pause/enable campaigns.
-version: 1.0.0
+description: Manage Google Ads campaigns — read performance, optimize keywords, adjust bids and budgets, add negatives, pause/enable campaigns, and undo changes.
+version: 1.1.0
 mcp_servers:
   - adsagent
 triggers:
@@ -143,7 +143,7 @@ triggers:
 
 # AdsAgent — Google Ads Management
 
-You have access to 12 Google Ads tools via the \`adsagent\` MCP server. Use them to help the user monitor and optimize their ad campaigns.
+You have access to 17 Google Ads tools via the \`adsagent\` MCP server. Use them to help the user monitor and optimize their ad campaigns.
 
 ## Available Tools
 
@@ -153,15 +153,21 @@ You have access to 12 Google Ads tools via the \`adsagent\` MCP server. Use them
 - **getCampaignPerformance** — Daily metrics over a date range. Params: \`campaignId\`, \`days\` (1-365, default 30)
 - **getKeywords** — Top keywords with quality scores. Params: \`campaignId\`, \`days\`, \`limit\`
 - **getSearchTermReport** — Actual search queries triggering ads. Params: \`campaignId\`, \`days\`, \`limit\`
+- **runGaqlQuery** — Run a custom read-only GAQL SELECT query (max 50 rows). Params: \`query\`
+- **getChanges** — Get recent changes made via AdsAgent with changeIds for undo. Params: \`campaignId\` (optional), \`limit\` (1-100, default 20)
+- **listConnectedAccounts** — List all Google Ads accounts connected to this session
 
 ### Write (mutates the account — always confirm with user first)
+All write tools return a \`changeId\` on success. Use this with \`undoChange\` to reverse the operation within 7 days.
 - **pauseKeyword** — Stop a keyword. Params: \`campaignId\`, \`adGroupId\`, \`criterionId\`
 - **enableKeyword** — Re-enable a paused keyword. Params: \`adGroupId\`, \`criterionId\`
 - **updateBid** — Change CPC bid (manual/enhanced CPC only, max 25% change). Params: \`campaignId\`, \`adGroupId\`, \`criterionId\`, \`newBidDollars\`
 - **addNegativeKeyword** — Block irrelevant search terms (phrase match). Params: \`campaignId\`, \`keywordText\`
+- **removeNegativeKeyword** — Remove a negative keyword so those terms can trigger ads again. Params: \`campaignId\`, \`keywordText\`
 - **updateCampaignBudget** — Change daily budget (max 50% change, min $1/day). Params: \`campaignId\`, \`newDailyBudgetDollars\`
 - **pauseCampaign** — Pause all ads in a campaign. Params: \`campaignId\`
 - **enableCampaign** — Re-enable a paused campaign. Params: \`campaignId\`
+- **undoChange** — Reverse a previous write by changeId. Works within 7 days if entity hasn't been modified since. Params: \`changeId\`
 
 ## Rules
 
@@ -170,6 +176,7 @@ You have access to 12 Google Ads tools via the \`adsagent\` MCP server. Use them
 3. **Show numbers clearly.** Format cost as dollars, show CTR as percentages, include date ranges.
 4. **Recommend before acting.** When you spot waste (high-spend zero-conversion keywords, irrelevant search terms), recommend the action and wait for approval.
 5. **Guardrails are server-side.** Bid changes >25% and budget changes >50% will be rejected by the server. Don't try to circumvent this.
+6. **After every write, note the changeId.** Tell the user they can undo the change within 7 days. Use getChanges to review recent operations.
 
 ## Common Workflows
 

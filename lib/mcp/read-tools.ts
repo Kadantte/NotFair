@@ -7,7 +7,9 @@ import {
   getSearchTermReport,
   runSafeGaqlReport,
   authForAccount,
+  resolveAccountId,
 } from "@/lib/google-ads";
+import { getChanges } from "@/lib/db/tracking";
 import { jsonResult, accountIdParam, READ_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 
@@ -156,6 +158,34 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
   }, async ({ accountId, query }) => {
     const result = await runSafeGaqlReport(authForAccount(currentAuth(), accountId), query);
+    return jsonResult(result);
+  });
+
+  // ─── Change History ───────────────────────────────────────────
+
+  server.registerTool("getChanges", {
+    title: "Get Change History",
+    description:
+      "Get recent changes made to the account via AdsAgent (bid updates, keyword pauses, budget changes, etc). Each change has a changeId that can be used with undoChange to reverse it.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z
+        .string()
+        .optional()
+        .describe("Filter changes to a specific campaign"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(20)
+        .describe("Max changes to return (1-100)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, limit }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getChanges(targetId, { limit, campaignId });
     return jsonResult(result);
   });
 };

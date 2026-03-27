@@ -100,7 +100,7 @@ export function getClient() {
   });
 }
 
-function getCustomer(auth: AuthContext) {
+export function getCustomer(auth: AuthContext) {
   return getClient().Customer({
     customer_id: normalizeCustomerId(auth.customerId),
     refresh_token: auth.refreshToken,
@@ -809,6 +809,69 @@ export async function enableCampaign(
       entityId: campaignId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+// ─── Remove Negative Keyword (for undo) ─────────────────────────────
+
+export async function removeNegativeKeyword(
+  auth: AuthContext,
+  campaignId: string,
+  keywordText: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = safeCampaignId(campaignId);
+
+  try {
+    // Find the negative keyword criterion by text.
+    // Query all negatives for the campaign and filter in code to avoid GAQL string interpolation.
+    const result = await customer.query(`
+      SELECT campaign_criterion.resource_name, campaign_criterion.keyword.text
+      FROM campaign_criterion
+      WHERE campaign.id = ${cid}
+        AND campaign_criterion.negative = TRUE
+        AND campaign_criterion.type = 'KEYWORD'
+    `);
+
+    const match = (result as any[]).find(
+      (row) => row.campaign_criterion?.keyword?.text === keywordText,
+    );
+    const resourceName = match?.campaign_criterion?.resource_name;
+    if (!resourceName) {
+      return {
+        success: false,
+        action: "remove_negative_keyword",
+        entityId: keywordText,
+        beforeValue: keywordText,
+        afterValue: "",
+        error: `Negative keyword "${keywordText}" not found in campaign ${campaignId}`,
+      };
+    }
+
+    await customer.mutateResources([
+      {
+        entity: "campaign_criterion" as any,
+        operation: "remove",
+        resource: { resource_name: resourceName },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "remove_negative_keyword",
+      entityId: keywordText,
+      beforeValue: keywordText,
+      afterValue: "",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "remove_negative_keyword",
+      entityId: keywordText,
+      beforeValue: keywordText,
+      afterValue: "",
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }

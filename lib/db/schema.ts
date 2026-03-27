@@ -44,6 +44,7 @@ export const changes = pgTable("changes", {
   beforeValue: text("before_value").notNull(),
   afterValue: text("after_value").notNull(),
   reasoning: text("reasoning"),
+  rolledBack: integer("rolled_back").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
