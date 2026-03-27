@@ -55,6 +55,7 @@ export const operations = pgTable("operations", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("ops_account_created_idx").on(table.accountId, table.createdAt),
+  index("ops_account_type_idx").on(table.accountId, table.opType, table.createdAt),
   index("ops_user_created_idx").on(table.userId, table.createdAt),
 ]);
 
@@ -92,6 +93,7 @@ export const mcpSessions = pgTable("mcp_sessions", {
   customerId: text("customer_id").notNull(),
   customerIds: text("customer_ids").notNull().default("[]"),
   userId: text("user_id"),
+  googleEmail: text("google_email"),
   expiresAt: text("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

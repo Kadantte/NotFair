@@ -10,9 +10,9 @@ import {
   ChevronRight,
   Loader2,
   Send,
-  Sparkles,
   Square,
   User,
+  Wrench,
 } from "lucide-react";
 import { AppSidebar, type SidebarThread } from "@/components/app-sidebar";
 import { GoogleAdsAuth } from "@/components/google-ads-auth";
@@ -141,7 +141,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       return (
         <code
           key={key}
-          className="rounded-md bg-white/8 px-1.5 py-0.5 font-mono text-[0.95em] text-zinc-100"
+          className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-[0.95em] text-[#E8E4DD]"
         >
           {part.slice(1, -1)}
         </code>
@@ -171,7 +171,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
           href={linkMatch[2]}
           target="_blank"
           rel="noreferrer"
-          className="text-blue-300 underline underline-offset-4 hover:text-blue-200"
+          className="text-[#4CAF6E] underline underline-offset-4 hover:text-[#3D9A5C]"
         >
           {linkMatch[1]}
         </a>
@@ -213,10 +213,10 @@ function renderMarkdown(text: string): ReactNode[] {
       nodes.push(
         <pre
           key={`code-${nodes.length}`}
-          className="overflow-x-auto rounded-2xl border border-zinc-800 bg-black/40 p-4 text-sm leading-6 text-zinc-200"
+          className="overflow-x-auto rounded border border-[#3D3C36] bg-[#24231F] p-4 text-sm leading-6 text-[#E8E4DD]"
         >
           {language ? (
-            <div className="mb-3 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+            <div className="mb-3 text-[11px] uppercase tracking-[0.16em] text-[#9B9689]">
               {language}
             </div>
           ) : null}
@@ -231,12 +231,12 @@ function renderMarkdown(text: string): ReactNode[] {
       const level = headingMatch[1].length;
       const className =
         level === 1
-          ? "text-3xl font-semibold text-white"
+          ? "text-3xl font-semibold text-[#E8E4DD]"
           : level === 2
-            ? "text-2xl font-semibold text-white"
+            ? "text-2xl font-semibold text-[#E8E4DD]"
             : level === 3
-              ? "text-xl font-semibold text-white"
-              : "text-base font-semibold text-zinc-100";
+              ? "text-xl font-semibold text-[#E8E4DD]"
+              : "text-base font-semibold text-[#E8E4DD]";
       const Tag = `h${Math.min(level, 6)}` as ElementType;
 
       nodes.push(
@@ -250,7 +250,7 @@ function renderMarkdown(text: string): ReactNode[] {
 
     if (/^([-*_]){3,}\s*$/.test(line.trim())) {
       nodes.push(
-        <hr key={`hr-${nodes.length}`} className="border-zinc-800" />,
+        <hr key={`hr-${nodes.length}`} className="border-[#3D3C36]" />,
       );
       index += 1;
       continue;
@@ -267,7 +267,7 @@ function renderMarkdown(text: string): ReactNode[] {
       nodes.push(
         <blockquote
           key={`quote-${nodes.length}`}
-          className="border-l-2 border-zinc-700 pl-4 text-zinc-300"
+          className="border-l-2 border-[#3D3C36] pl-4 text-[#E8E4DD]"
         >
           {quoteLines.map((quoteLine, quoteIndex) => (
             <p key={`quote-line-${quoteIndex}`}>
@@ -290,7 +290,7 @@ function renderMarkdown(text: string): ReactNode[] {
       nodes.push(
         <ul
           key={`ul-${nodes.length}`}
-          className="list-disc space-y-2 pl-6 text-zinc-100"
+          className="list-disc space-y-2 pl-6 text-[#E8E4DD]"
         >
           {items.map((item, itemIndex) => (
             <li key={`ul-item-${itemIndex}`}>
@@ -313,7 +313,7 @@ function renderMarkdown(text: string): ReactNode[] {
       nodes.push(
         <ol
           key={`ol-${nodes.length}`}
-          className="list-decimal space-y-2 pl-6 text-zinc-100"
+          className="list-decimal space-y-2 pl-6 text-[#E8E4DD]"
         >
           {items.map((item, itemIndex) => (
             <li key={`ol-item-${itemIndex}`}>
@@ -342,7 +342,7 @@ function renderMarkdown(text: string): ReactNode[] {
     }
 
     nodes.push(
-      <p key={`p-${nodes.length}`} className="text-[15px] leading-7 text-zinc-100">
+      <p key={`p-${nodes.length}`} className="text-[15px] leading-7 text-[#E8E4DD]">
         {renderInlineMarkdown(paragraphLines.join(" "), `p-${nodes.length}`)}
       </p>,
     );
@@ -368,34 +368,34 @@ function ToolBlock({
     return (
       <button
         type="button"
-        className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-left text-sm text-zinc-400"
+        className="flex w-full items-center gap-3 rounded border border-[#3D3C36] bg-[#24231F] px-4 py-3 text-left text-sm text-[#9B9689]"
       >
-        <Sparkles className="h-3.5 w-3.5 text-blue-400" />
-        <span className="font-medium text-zinc-200">{title}</span>
-        <span className="text-zinc-500">Running...</span>
+        <Wrench className="h-3.5 w-3.5 text-[#4CAF6E]" />
+        <span className="font-medium text-[#E8E4DD]">{title}</span>
+        <span className="text-[#9B9689]">Running...</span>
       </button>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70">
+    <div className="rounded border border-[#3D3C36] bg-[#24231F]">
       <button
         type="button"
         onClick={() => setIsOpen(current => !current)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left"
       >
         {isOpen ? (
-          <ChevronDown className="h-4 w-4 text-zinc-500" />
+          <ChevronDown className="h-4 w-4 text-[#9B9689]" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-zinc-500" />
+          <ChevronRight className="h-4 w-4 text-[#9B9689]" />
         )}
-        <Sparkles className="h-3.5 w-3.5 text-blue-400" />
-        <span className="text-sm font-medium text-zinc-100">{title}</span>
+        <Wrench className="h-3.5 w-3.5 text-[#4CAF6E]" />
+        <span className="text-sm font-medium text-[#E8E4DD]">{title}</span>
       </button>
 
       {isOpen && (
-        <div className="border-t border-zinc-800 px-4 py-4">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-zinc-300">
+        <div className="border-t border-[#3D3C36] px-4 py-4">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-[#E8E4DD]">
             {JSON.stringify("output" in part ? part.output : null, null, 2)}
           </pre>
         </div>
@@ -412,7 +412,7 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
           isUser
-            ? "border-zinc-700 bg-zinc-800 text-zinc-200"
+            ? "border-[#3D3C36] bg-[#2E2D28] text-[#E8E4DD]"
             : "border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]"
         }`}
       >
@@ -426,7 +426,7 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
               return (
                 <div
                   key={`${message.id}-${index}`}
-                  className="space-y-4 text-[15px] leading-7 text-zinc-100"
+                  className="space-y-4 text-[15px] leading-7 text-[#E8E4DD]"
                 >
                   {renderMarkdown(part.text)}
                 </div>
@@ -607,7 +607,7 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-[#1A1917] text-white">
+    <main className="h-screen overflow-hidden bg-[#1A1917] text-[#E8E4DD]">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.08]" />
       </div>
@@ -636,14 +636,14 @@ export default function ChatPage() {
         />
 
         <section className="flex min-h-0 h-screen flex-col overflow-hidden">
-          <header className="shrink-0 border-b border-white/10 bg-black/50 backdrop-blur-xl">
+          <header className="shrink-0 border-b border-[#3D3C36] bg-[#1A1917]/90 backdrop-blur-xl">
             <div className="flex w-full items-center justify-between gap-4 px-6 py-3">
               <div>
-                <div className="text-sm font-medium text-white">
+                <div className="text-sm font-medium text-[#E8E4DD]">
                   {displayThreads.find(thread => thread.id === activeThreadId)?.title ??
                     "New chat"}
                 </div>
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-[#9B9689]">
                   {isReady
                     ? account.customerName ?? account.customerId
                     : "Connect Google Ads to begin"}
@@ -659,7 +659,7 @@ export default function ChatPage() {
                 }}
                 variant="outline"
                 size="sm"
-                className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10"
+                className="rounded-full border-[#3D3C36] bg-[#2E2D28] text-[#E8E4DD] hover:bg-[#3D3C36]"
               />
             </div>
           </header>
@@ -671,10 +671,10 @@ export default function ChatPage() {
                   <span className="mr-2 h-2 w-2 rounded-full bg-[#4CAF6E] shadow-[0_0_10px_rgba(76,175,110,0.5)]" />
                   ADSAGENT COPILOT
                 </div>
-                <h1 className="text-3xl font-semibold tracking-tight text-white md:text-5xl">
+                <h1 className="text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
                   How can I help with your Google Ads account?
                 </h1>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-400">
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[#9B9689]">
                   Ask for audits, campaign summaries, keyword analysis, or GAQL
                   reports.
                 </p>
@@ -685,7 +685,7 @@ export default function ChatPage() {
                       key={prompt}
                       type="button"
                       onClick={() => setInput(prompt)}
-                      className="rounded-3xl border border-zinc-800 bg-zinc-900/50 px-4 py-4 text-left text-sm leading-6 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900/80"
+                      className="rounded border border-[#3D3C36] bg-[#24231F] px-4 py-4 text-left text-sm leading-6 text-[#E8E4DD] transition hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
                     >
                       {prompt}
                     </button>
@@ -701,10 +701,10 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="shrink-0 border-t border-white/10 bg-black/70 px-4 py-4 backdrop-blur-xl">
+          <div className="shrink-0 border-t border-[#3D3C36] bg-[#1A1917]/95 px-4 py-4 backdrop-blur-xl">
             <div className="w-full px-2">
               {error && (
-                <div className="mb-3 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="mb-3 rounded border border-[#C45D4A]/20 bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
                   {error.message}
                 </div>
               )}
@@ -720,7 +720,7 @@ export default function ChatPage() {
                   sendMessage({ text: input });
                   setInput("");
                 }}
-                className="rounded-[28px] border border-zinc-800 bg-zinc-900/80 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+                className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
               >
                 <div className="flex items-end gap-3">
                   <Input
@@ -732,7 +732,7 @@ export default function ChatPage() {
                         : "Connect Google Ads first..."
                     }
                     disabled={!isReady || isSending}
-                    className="h-12 border-0 bg-transparent px-2 text-[15px] text-white shadow-none placeholder:text-zinc-500 focus-visible:ring-0"
+                    className="h-12 border-0 bg-transparent px-2 text-[15px] text-[#E8E4DD] shadow-none placeholder:text-[#9B9689] focus-visible:ring-0"
                   />
 
                   {isSending ? (
@@ -740,7 +740,7 @@ export default function ChatPage() {
                       type="button"
                       variant="ghost"
                       onClick={() => stop()}
-                      className="h-10 w-10 rounded-full text-zinc-300 hover:bg-white/5"
+                      className="h-10 w-10 rounded-full text-[#E8E4DD] hover:bg-[#2E2D28]"
                     >
                       <Square className="h-4 w-4 fill-current" />
                     </Button>
@@ -748,7 +748,7 @@ export default function ChatPage() {
                     <Button
                       type="submit"
                       disabled={!isReady || !input.trim()}
-                      className="h-10 w-10 rounded-full bg-white text-black hover:bg-zinc-200"
+                      className="h-10 w-10 rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]"
                     >
                       {isSending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

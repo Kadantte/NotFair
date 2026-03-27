@@ -7,14 +7,12 @@ import { SignOutButton } from '@/components/sign-out-button';
 
 export default function ToolsPage() {
     return (
-        <main className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30">
-            <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
-
-            <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl">
+        <main className="min-h-screen bg-[#1A1917] text-[#E8E4DD] font-sans selection:bg-[#4CAF6E]/30">
+            <div className="container mx-auto px-4 py-8 max-w-5xl">
                 <header className="flex items-center justify-between mb-12">
                     <div className="flex items-center gap-4">
                         <Link href="/">
-                            <Button variant="ghost" size="icon" className="hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full">
+                            <Button variant="ghost" size="icon" className="hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] rounded-md">
                                 <ArrowLeft className="w-5 h-5" />
                             </Button>
                         </Link>

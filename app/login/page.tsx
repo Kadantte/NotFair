@@ -8,11 +8,11 @@ import { Loader2, Mail } from "lucide-react";
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-black text-white selection:bg-indigo-500/30 font-sans">
+    <div className="flex min-h-screen flex-col bg-[#1A1917] text-[#E8E4DD] selection:bg-[#4CAF6E]/30 font-sans">
       <main className="flex-1 flex items-center justify-center px-4">
         <Suspense
           fallback={
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-blue-400" />
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
           }
         >
           <LoginForm />
@@ -76,20 +76,20 @@ function LoginForm() {
   return (
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">Sign in to AdsAgent</h1>
-        <p className="text-zinc-400 text-sm">
+        <h1 className="text-3xl font-bold text-[#E8E4DD]">Sign in to AdsAgent</h1>
+        <p className="text-[#9B9689] text-sm">
           Manage your Google Ads with AI
         </p>
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg border border-red-900/50 bg-red-950/30 text-red-300 text-sm text-center">
+        <div className="p-3 rounded border border-[#C45D4A]/40 bg-[#C45D4A]/10 text-[#C45D4A] text-sm text-center">
           {error}
         </div>
       )}
 
       {message && (
-        <div className="p-3 rounded-lg border border-green-900/50 bg-green-950/30 text-green-300 text-sm text-center">
+        <div className="p-3 rounded border border-[#5DBE82]/40 bg-[#5DBE82]/10 text-[#5DBE82] text-sm text-center">
           {message}
         </div>
       )}
@@ -97,7 +97,7 @@ function LoginForm() {
       <Button
         onClick={signInWithGoogle}
         disabled={googleLoading}
-        className="w-full h-12 bg-white text-black hover:bg-zinc-200 font-semibold rounded-xl transition-all"
+        className="w-full h-12 bg-[#E8E4DD] text-[#1A1917] hover:bg-[#E8E4DD]/90 font-semibold rounded-md transition-colors"
       >
         {googleLoading ? (
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -127,9 +127,9 @@ function LoginForm() {
       </Button>
 
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-zinc-800" />
-        <span className="text-zinc-500 text-xs uppercase">or</span>
-        <div className="flex-1 h-px bg-zinc-800" />
+        <div className="flex-1 h-px bg-[#3D3C36]" />
+        <span className="text-[#9B9689] text-xs uppercase">or</span>
+        <div className="flex-1 h-px bg-[#3D3C36]" />
       </div>
 
       <form onSubmit={signInWithEmail} className="space-y-3">
@@ -139,12 +139,12 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           required
-          className="w-full h-12 px-4 rounded-xl bg-zinc-900 border border-zinc-800 text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+          className="w-full h-12 px-4 rounded-md bg-[#24231F] border border-[#3D3C36] text-[#E8E4DD] placeholder:text-[#9B9689] focus:outline-none focus:border-[#4CAF6E] transition-colors"
         />
         <Button
           type="submit"
           disabled={loading || !email.trim()}
-          className="w-full h-12 bg-zinc-900 border border-zinc-800 text-white hover:bg-zinc-800 font-semibold rounded-xl transition-all"
+          className="w-full h-12 bg-[#24231F] border border-[#3D3C36] text-[#E8E4DD] hover:bg-[#2E2D28] font-semibold rounded-md transition-colors"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -157,7 +157,7 @@ function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-zinc-600 text-xs text-center">
+      <p className="text-[#9B9689] text-xs text-center">
         We'll send a sign-in link to your email. No password needed.
       </p>
     </div>

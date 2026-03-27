@@ -217,6 +217,20 @@ export async function GET(request: Request) {
       return errorResponse(msg, isPopup);
     }
 
+    // Fetch Google email from userinfo endpoint
+    let googleEmail: string | null = null;
+    try {
+      const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      if (userinfoRes.ok) {
+        const userinfo = await userinfoRes.json();
+        googleEmail = userinfo.email ?? null;
+      }
+    } catch (e) {
+      console.warn("[auth] Failed to fetch Google email:", e);
+    }
+
     let customers;
     try {
       // Get accessible Google Ads accounts
@@ -247,6 +261,7 @@ export async function GET(request: Request) {
           refreshToken: tokenData.refresh_token,
           customerId: account.id,
           customerName: account.name || "Google Ads Account",
+          ...(googleEmail ? { googleEmail } : {}),
         });
       }
 
@@ -265,6 +280,7 @@ export async function GET(request: Request) {
           customerId: account.id,
           customerIds,
           userId,
+          googleEmail,
           expiresAt: expiresAt.toISOString(),
         });
       } catch (error) {
@@ -302,6 +318,7 @@ export async function GET(request: Request) {
         refreshToken: tokenData.refresh_token,
         customerId: "", // pending selection
         userId,
+        googleEmail,
         expiresAt: expiresAt.toISOString(),
       });
     } catch (error) {

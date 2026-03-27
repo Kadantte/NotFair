@@ -53,7 +53,7 @@ function NavItem({
             <Button
                 type="button"
                 variant="ghost"
-                className={`h-10 rounded-xl px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+                className={`h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
                     active
                         ? 'bg-[#4CAF6E]/12 text-[#4CAF6E] hover:bg-[#4CAF6E]/16 hover:text-[#4CAF6E]'
                         : 'text-[#9B9689]'
@@ -93,9 +93,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex h-full bg-[#1A1917]">
-            {/* Subtle green glow at top */}
-            <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_40%_at_50%_-10%,rgba(76,175,110,0.06),transparent)] z-0" />
-
             <aside
                 className={`relative z-10 flex h-full shrink-0 flex-col border-r border-[#3D3C36] bg-[#24231F] transition-[width] duration-300 ease-out ${
                     collapsed ? 'w-[60px]' : 'w-[240px]'
@@ -131,7 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         type="button"
                         variant="ghost"
                         onClick={() => router.push('/chat')}
-                        className={`h-9 rounded-xl px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+                        className={`h-9 rounded-lg px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
                             collapsed ? 'w-10 justify-center gap-0 px-0 mx-auto' : 'w-full justify-start'
                         }`}
                     >
@@ -166,7 +163,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, thread.id);
                                     router.push('/chat');
                                 }}
-                                className="w-full rounded-xl px-3 py-2 text-left transition hover:bg-[#E8E4DD]/5"
+                                className="w-full rounded-lg px-3 py-2 text-left transition hover:bg-[#E8E4DD]/5"
                             >
                                 <div className="truncate text-[13px] font-medium text-[#E8E4DD]/80">
                                     {thread.title}

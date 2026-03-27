@@ -24,7 +24,7 @@ export function SignOutButton({ isCollapsed = false }: { isCollapsed?: boolean }
       variant="ghost"
       onClick={handleSignOut}
       title="Sign out"
-      className={`h-12 rounded-2xl px-3 text-zinc-400 transition-all duration-300 ease-out hover:bg-white/6 hover:text-white ${
+      className={`h-12 rounded-lg px-3 text-[#9B9689] transition-all duration-300 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
         isCollapsed
           ? "w-12 justify-center gap-0 px-0"
           : "w-full justify-start"

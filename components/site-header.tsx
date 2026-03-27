@@ -3,23 +3,23 @@ import Image from "next/image"
 
 export function SiteHeader({ connected = false }: { connected?: boolean }) {
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/50 backdrop-blur-xl">
-            <div className="container flex h-16 items-center mx-auto px-4 md:px-6">
+        <header className="sticky top-0 z-50 w-full border-b border-[#3D3C36] bg-[#1A1917]/90 backdrop-blur-sm">
+            <div className="container flex h-14 items-center mx-auto px-4 md:px-6">
                 <Link href="/" className="mr-6 flex items-center space-x-2">
-                    <Image src="/logo.svg" alt="AdsAgent Logo" width={32} height={32} className="w-8 h-8" />
-                    <span className="hidden font-bold sm:inline-block text-xl text-white">AdsAgent</span>
+                    <Image src="/logo.svg" alt="AdsAgent Logo" width={28} height={28} className="w-7 h-7" />
+                    <span className="hidden font-bold sm:inline-block text-base text-[#E8E4DD]">AdsAgent</span>
                 </Link>
                 <nav className="flex items-center space-x-6 text-sm font-medium">
                     <Link
                         href="/connect"
-                        className="text-zinc-300 hover:text-white transition-colors"
+                        className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
                     >
                         Connect
                     </Link>
                     {connected && (
                         <Link
                             href="/campaigns"
-                            className="text-zinc-300 hover:text-white transition-colors"
+                            className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
                         >
                             Dashboard
                         </Link>

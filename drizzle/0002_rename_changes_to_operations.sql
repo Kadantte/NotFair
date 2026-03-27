@@ -52,4 +52,5 @@ ALTER TABLE "operations" ALTER COLUMN "rolled_back" TYPE smallint;
 
 -- Step 10: Add indexes for billing and querying
 CREATE INDEX IF NOT EXISTS "ops_account_created_idx" ON "operations" ("account_id", "created_at");
+CREATE INDEX IF NOT EXISTS "ops_account_type_idx" ON "operations" ("account_id", "op_type", "created_at");
 CREATE INDEX IF NOT EXISTS "ops_user_created_idx" ON "operations" ("user_id", "created_at");

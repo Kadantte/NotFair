@@ -7,7 +7,7 @@ export async function GET(request: Request) {
 
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
   const redirectUri = `${getAppOrigin()}/api/auth/google/callback`;
-  const scope = "https://www.googleapis.com/auth/adwords";
+  const scope = "openid email https://www.googleapis.com/auth/adwords";
 
   if (!clientId) {
     return NextResponse.json(

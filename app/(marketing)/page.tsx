@@ -1,12 +1,24 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/components/session-provider';
 
+const CYCLING_WORDS = ['Claude', 'ChatGPT', 'OpenClaw', 'AI agent'];
+const CYCLE_INTERVAL_MS = 2000;
+
 export default function Home() {
     const session = useSession();
+    const [wordIndex, setWordIndex] = useState(0);
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setWordIndex(i => (i + 1) % CYCLING_WORDS.length);
+        }, CYCLE_INTERVAL_MS);
+        return () => clearInterval(id);
+    }, []);
 
     function handleCTA() {
         if (session.connected) {
@@ -17,7 +29,7 @@ export default function Home() {
     }
 
     return (
-        <section className="relative flex flex-col items-center justify-center min-h-[90vh] py-20 px-4 overflow-hidden">
+        <section className="relative flex flex-col items-center justify-center min-h-[90vh] pt-10 pb-20 px-4 overflow-hidden">
 
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -25,13 +37,26 @@ export default function Home() {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="z-10 flex flex-col items-center max-w-3xl mx-auto text-center space-y-8"
             >
-                <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight drop-shadow-2xl leading-[0.95]">
-                    <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/50">Let your AI agent</span>
-                    <br />
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-400">manage your ads</span>
+                <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight drop-shadow-2xl leading-[1.0]">
+                    <span className="block text-[#E8E4DD]">Let your</span>
+                    <span className="block h-[1.05em] overflow-hidden">
+                        <AnimatePresence mode="wait">
+                            <motion.span
+                                key={wordIndex}
+                                initial={{ opacity: 0, y: '100%' }}
+                                animate={{ opacity: 1, y: '0%' }}
+                                exit={{ opacity: 0, y: '-100%' }}
+                                transition={{ duration: 0.25, ease: 'easeOut' }}
+                                className="block text-[#4CAF6E]"
+                            >
+                                {CYCLING_WORDS[wordIndex]}
+                            </motion.span>
+                        </AnimatePresence>
+                    </span>
+                    <span className="block text-[#E8E4DD]">manage your ads</span>
                 </h1>
 
-                <p className="text-zinc-400 text-lg md:text-xl font-light tracking-wide max-w-xl mx-auto leading-relaxed">
+                <p className="text-[#9B9689] text-lg md:text-xl font-light tracking-wide max-w-xl mx-auto leading-relaxed">
                     Connect your Google Ads. Paste a prompt into Claude Coworker. Start optimizing.
                 </p>
 
@@ -39,16 +64,16 @@ export default function Home() {
                     <Button
                         size="lg"
                         onClick={handleCTA}
-                        className="h-14 px-10 text-lg font-semibold bg-white text-black hover:bg-zinc-200 rounded-full transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                        className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105"
                     >
                         {session.connected ? 'Go to Dashboard' : 'Connect Google Ads'} <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
 
-                    <div className="flex items-center gap-6 text-zinc-500 text-sm">
+                    <div className="flex items-center gap-6 text-[#9B9689] text-sm">
                         <span>3 steps</span>
-                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                        <span className="w-1 h-1 rounded-full bg-[#3D3C36]" />
                         <span>30 seconds</span>
-                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                        <span className="w-1 h-1 rounded-full bg-[#3D3C36]" />
                         <span>Free</span>
                     </div>
                 </div>
@@ -61,8 +86,8 @@ export default function Home() {
                         { step: "3", text: "Ask about your campaigns" },
                     ].map((item) => (
                         <div key={item.step} className="flex items-start gap-3 text-left">
-                            <span className="text-2xl font-bold text-zinc-700">{item.step}</span>
-                            <p className="text-zinc-400 text-sm leading-relaxed pt-1">{item.text}</p>
+                            <span className="text-2xl font-bold text-[#3D3C36]">{item.step}</span>
+                            <p className="text-[#9B9689] text-sm leading-relaxed pt-1">{item.text}</p>
                         </div>
                     ))}
                 </div>
