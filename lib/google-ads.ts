@@ -116,6 +116,9 @@ export function getCustomer(auth: AuthContext) {
  * with an `errors` array containing detailed failure info.
  */
 function extractErrorMessage(error: unknown): string {
+  // Always log the raw error for server-side debugging
+  console.error("[google-ads] API error:", error);
+
   // Standard Error
   if (error instanceof Error) return error.message;
 
@@ -977,7 +980,7 @@ export async function createSearchCampaign(
       biddingFields.maximize_conversions = {};
       break;
     case "MAXIMIZE_CLICKS":
-      biddingFields.maximize_clicks = {};
+      biddingFields.target_spend = {};
       break;
     case "MANUAL_CPC":
       biddingFields.manual_cpc = { enhanced_cpc_enabled: false };
@@ -1020,6 +1023,7 @@ export async function createSearchCampaign(
           target_google_search: true,
           target_search_network: false,
         },
+        contains_eu_political_advertising: 3, // DOES_NOT_CONTAIN
         ...biddingFields,
       },
     },

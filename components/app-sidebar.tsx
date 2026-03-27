@@ -51,33 +51,30 @@ export function AppSidebar({
   onDeleteThread,
 }: AppSidebarProps) {
   return (
-    <aside className="border-b border-white/8 bg-[#171717] transition-all duration-300 ease-out lg:border-b-0 lg:border-r lg:border-r-white/8">
+    <aside className="border-b border-[#3D3C36] bg-[#24231F] transition-all duration-300 ease-out lg:border-b-0 lg:border-r lg:border-r-[#3D3C36]">
       <div className="flex h-full flex-col">
-        <div className="shrink-0 p-4">
+        <div className="shrink-0">
           <div
-            className={`group relative flex items-center transition-all duration-300 ease-out ${
-              isCollapsed ? "justify-center" : "justify-between gap-2"
+            className={`flex h-14 shrink-0 items-center px-3 ${
+              isCollapsed ? "justify-center" : "justify-between"
             }`}
           >
-            <Link
-              href="/"
-              className={`inline-flex items-center rounded-xl px-1 py-1 transition ${
-                isCollapsed ? "opacity-100 group-hover:opacity-0" : "hover:bg-white/5"
-              }`}
-            >
-              <Image src="/logo.svg" alt="AdsAgent" width={24} height={24} />
-            </Link>
+            {!isCollapsed && (
+              <Link
+                href="/"
+                className="inline-flex items-center rounded-lg px-1 py-1 transition hover:bg-[#E8E4DD]/5"
+              >
+                <Image src="/logo.svg" alt="AdsAgent" width={24} height={24} />
+                <span className="ml-2.5 text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
+              </Link>
+            )}
 
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               onClick={onToggleCollapsed}
-              className={`rounded-full text-zinc-400 transition-all duration-300 ease-out hover:bg-white/5 hover:text-white ${
-                isCollapsed
-                  ? "pointer-events-none absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-                  : ""
-              }`}
+              className="rounded-lg text-[#9B9689] transition-all duration-300 ease-out hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
             >
               {isCollapsed ? (
                 <PanelLeftOpen className="h-4 w-4" />
@@ -88,23 +85,23 @@ export function AppSidebar({
           </div>
 
           <div
-            className={`mt-6 space-y-1 ${isCollapsed ? "flex flex-col items-center" : ""}`}
+            className={`px-2 space-y-0.5 ${isCollapsed ? "flex flex-col items-center" : ""}`}
           >
             {onCreateThread ? (
               <Button
                 type="button"
                 variant="ghost"
                 onClick={onCreateThread}
-                className={`h-12 rounded-2xl px-3 text-white transition-all duration-300 ease-out hover:bg-white/6 hover:text-white ${
+                className={`h-10 rounded-lg px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
                   isCollapsed
-                    ? "w-12 justify-center gap-0 self-center px-0"
+                    ? "w-10 justify-center gap-0 self-center px-0"
                     : "w-full justify-start"
                 }`}
               >
-                <Plus className="h-5 w-5" />
+                <Plus className="h-[18px] w-[18px] shrink-0" />
                 <span
-                  className={`overflow-hidden whitespace-nowrap text-[15px] transition-all duration-300 ease-out ${
-                    isCollapsed ? "max-w-0 opacity-0" : "ml-4 max-w-32 opacity-100"
+                  className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
+                    isCollapsed ? "max-w-0 opacity-0" : "ml-3 max-w-32 opacity-100"
                   }`}
                 >
                   New chat
@@ -116,14 +113,16 @@ export function AppSidebar({
               <Button
                 type="button"
                 variant="ghost"
-                className={`h-12 rounded-2xl px-3 text-white transition-all duration-300 ease-out hover:bg-white/6 hover:text-white ${
-                  currentPath === "/campaigns" ? "bg-white/8" : ""
-                } ${isCollapsed ? "w-12 justify-center gap-0 px-0" : "w-full justify-start"}`}
+                className={`h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+                  currentPath === "/campaigns"
+                    ? "bg-[#4CAF6E]/12 text-[#4CAF6E] hover:bg-[#4CAF6E]/16 hover:text-[#4CAF6E]"
+                    : "text-[#9B9689]"
+                } ${isCollapsed ? "w-10 justify-center gap-0 px-0" : "w-full justify-start"}`}
               >
-                <LayoutDashboard className="h-5 w-5" />
+                <LayoutDashboard className="h-[18px] w-[18px] shrink-0" />
                 <span
-                  className={`overflow-hidden whitespace-nowrap text-[15px] transition-all duration-300 ease-out ${
-                    isCollapsed ? "max-w-0 opacity-0" : "ml-4 max-w-32 opacity-100"
+                  className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
+                    isCollapsed ? "max-w-0 opacity-0" : "ml-3 max-w-32 opacity-100"
                   }`}
                 >
                   Campaigns
@@ -135,14 +134,16 @@ export function AppSidebar({
               <Button
                 type="button"
                 variant="ghost"
-                className={`h-12 rounded-2xl px-3 text-white transition-all duration-300 ease-out hover:bg-white/6 hover:text-white ${
-                  currentPath === "/operations" ? "bg-white/8" : ""
-                } ${isCollapsed ? "w-12 justify-center gap-0 px-0" : "w-full justify-start"}`}
+                className={`h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+                  currentPath === "/operations"
+                    ? "bg-[#4CAF6E]/12 text-[#4CAF6E] hover:bg-[#4CAF6E]/16 hover:text-[#4CAF6E]"
+                    : "text-[#9B9689]"
+                } ${isCollapsed ? "w-10 justify-center gap-0 px-0" : "w-full justify-start"}`}
               >
-                <Activity className="h-5 w-5" />
+                <Activity className="h-[18px] w-[18px] shrink-0" />
                 <span
-                  className={`overflow-hidden whitespace-nowrap text-[15px] transition-all duration-300 ease-out ${
-                    isCollapsed ? "max-w-0 opacity-0" : "ml-4 max-w-32 opacity-100"
+                  className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
+                    isCollapsed ? "max-w-0 opacity-0" : "ml-3 max-w-32 opacity-100"
                   }`}
                 >
                   Operations
@@ -154,27 +155,28 @@ export function AppSidebar({
 
         {threads.length > 0 ? (
           <div
-            className={`min-h-0 flex-1 overflow-y-auto px-3 pb-4 transition-opacity duration-200 ${
+            className={`min-h-0 flex-1 overflow-y-auto px-2 pb-4 transition-opacity duration-200 ${
               isCollapsed ? "hidden" : "block"
             }`}
           >
+            <div className="mx-1 mb-2 border-t border-[#3D3C36]" />
             {threads.map(thread => (
               <div
                 key={thread.id}
-                className={`mb-1 rounded-2xl transition ${
-                  thread.id === activeThreadId ? "bg-white/8" : "bg-transparent hover:bg-white/[0.05]"
+                className={`mb-0.5 rounded-lg transition ${
+                  thread.id === activeThreadId ? "bg-[#E8E4DD]/5" : "bg-transparent hover:bg-[#E8E4DD]/5"
                 }`}
               >
-                <div className="flex min-h-12 items-start gap-2 p-3 transition-all duration-300 ease-out">
+                <div className="flex items-start gap-2 px-3 py-2 transition-all duration-200 ease-out">
                   <button
                     type="button"
                     onClick={() => onSelectThread?.(thread.id)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <div className="truncate text-[14px] font-medium text-zinc-100">
+                    <div className="truncate text-[13px] font-medium text-[#E8E4DD]/80">
                       {thread.title}
                     </div>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[#9B9689]">
                       <span>{formatThreadTime(thread.updatedAt)}</span>
                       <span>·</span>
                       <span>{thread.messageCount} messages</span>
@@ -189,7 +191,7 @@ export function AppSidebar({
                         event.stopPropagation();
                         onDeleteThread(thread.id);
                       }}
-                      className="shrink-0 rounded-full text-zinc-500 hover:bg-white/10 hover:text-zinc-200"
+                      className="shrink-0 rounded-lg text-[#9B9689] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -200,7 +202,7 @@ export function AppSidebar({
           </div>
         ) : null}
 
-        <div className={`shrink-0 border-t border-white/8 p-3 ${isCollapsed ? "flex justify-center" : ""}`}>
+        <div className={`shrink-0 border-t border-[#3D3C36] p-3 ${isCollapsed ? "flex justify-center" : ""}`}>
           <SignOutButton isCollapsed={isCollapsed} />
         </div>
       </div>

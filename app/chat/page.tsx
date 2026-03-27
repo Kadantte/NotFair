@@ -141,7 +141,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
       return (
         <code
           key={key}
-          className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-[0.95em] text-[#E8E4DD]"
+          className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-[0.95em] text-[#E8E4DD]"
         >
           {part.slice(1, -1)}
         </code>
@@ -510,10 +510,27 @@ export default function ChatPage() {
           ? preferredThreadId
           : initialThreads[0].id;
 
-      setAccount(readStoredAccount());
+      const localAccount = readStoredAccount();
+      setAccount(localAccount);
       setThreads(initialThreads);
       setActiveThreadId(initialActiveThreadId);
       setIsHydrated(true);
+
+      // If no local auth, check server session (cookie-based)
+      if (!localAccount.refreshToken || !localAccount.customerId) {
+        fetch("/api/auth/session")
+          .then(r => r.json())
+          .then(session => {
+            if (session.connected) {
+              setAccount({
+                refreshToken: "__server_session__",
+                customerId: "__server_session__",
+                customerName: session.customerName ?? "Google Ads Account",
+              });
+            }
+          })
+          .catch(() => {});
+      }
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -615,8 +632,8 @@ export default function ChatPage() {
       <div
         className={`relative grid h-screen w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${
           isSidebarCollapsed
-            ? "lg:grid-cols-[72px_minmax(0,1fr)]"
-            : "lg:grid-cols-[280px_minmax(0,1fr)]"
+            ? "lg:grid-cols-[60px_minmax(0,1fr)]"
+            : "lg:grid-cols-[240px_minmax(0,1fr)]"
         }`}
       >
         <AppSidebar
@@ -693,7 +710,7 @@ export default function ChatPage() {
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-white/5">
+              <div className="divide-y divide-[#3D3C36]/50">
                 {messages.map(message => (
                   <Message key={message.id} message={message} />
                 ))}

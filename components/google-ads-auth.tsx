@@ -8,7 +8,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Settings, AlertCircle, CheckCircle2, ChevronDown } from "lucide-react";
+import { Loader2, Settings, CheckCircle2, ChevronDown } from "lucide-react";
 
 interface GoogleAdsAuthProps {
     onConnect?: (customerId: string) => void;
@@ -18,29 +18,47 @@ interface GoogleAdsAuthProps {
     variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 }
 
+type AuthState =
+    | { status: "loading" }
+    | { status: "disconnected" }
+    | { status: "connected"; customerId: string; customerName: string; source: "local" | "server" };
+
 export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm", variant = "outline" }: GoogleAdsAuthProps) {
-    const [refreshToken, setRefreshToken] = useState<string | null>(null);
-    const [customerId, setCustomerId] = useState<string | null>(null);
-    const [customerName, setCustomerName] = useState<string | null>(null);
-    const [availableCustomers, setAvailableCustomers] = useState<{ id: string, name: string, status: string, error?: string, isTest: boolean }[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [auth, setAuth] = useState<AuthState>({ status: "loading" });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
-        setIsClient(true);
-        // Check local storage on mount
+        // 1. Check localStorage first
         const storedRefresh = localStorage.getItem("google_ads_refresh_token");
         const storedCustomer = localStorage.getItem("google_ads_customer_id");
         const storedName = localStorage.getItem("google_ads_customer_name");
 
-        if (storedRefresh) {
-            setRefreshToken(storedRefresh);
-            // If we have token but don't know customers yet, we could fetch, but simple is better.
-            // User can click menu to fetch if needed or we fetch on mount
+        if (storedRefresh && storedCustomer) {
+            setAuth({
+                status: "connected",
+                customerId: storedCustomer,
+                customerName: storedName ?? "Google Ads Account",
+                source: "local",
+            });
+            return;
         }
-        if (storedCustomer) setCustomerId(storedCustomer);
-        if (storedName) setCustomerName(storedName);
+
+        // 2. Fall back to server session
+        fetch("/api/auth/session")
+            .then(r => r.json())
+            .then(session => {
+                if (session.connected) {
+                    setAuth({
+                        status: "connected",
+                        customerId: "",
+                        customerName: session.customerName ?? "Google Ads Account",
+                        source: "server",
+                    });
+                } else {
+                    setAuth({ status: "disconnected" });
+                }
+            })
+            .catch(() => setAuth({ status: "disconnected" }));
 
         // Listen for auth success message from popup
         const handleMessage = (event: MessageEvent) => {
@@ -49,31 +67,23 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
                 const newRefresh = event.data.refreshToken;
                 if (newRefresh) {
                     localStorage.setItem("google_ads_refresh_token", newRefresh);
-                    setRefreshToken(newRefresh);
 
-                    // If the popup already resolved the account(s), store directly
                     if (event.data.accounts && Array.isArray(event.data.accounts)) {
-                        // Multi-account selection from popup
                         const accounts = event.data.accounts;
                         localStorage.setItem("google_ads_customer_ids", JSON.stringify(accounts));
                         const primary = accounts[0];
                         const id = primary.id.replace("customers/", "");
                         localStorage.setItem("google_ads_customer_id", id);
                         localStorage.setItem("google_ads_customer_name", primary.name || "Google Ads Account");
-                        setCustomerId(id);
-                        setCustomerName(primary.name || "Google Ads Account");
+                        setAuth({ status: "connected", customerId: id, customerName: primary.name || "Google Ads Account", source: "local" });
                         onConnect?.(id);
                     } else if (event.data.customerId && event.data.customerName) {
                         const id = event.data.customerId.replace("customers/", "");
                         localStorage.setItem("google_ads_customer_id", id);
                         localStorage.setItem("google_ads_customer_name", event.data.customerName);
                         localStorage.setItem("google_ads_customer_ids", JSON.stringify([{ id, name: event.data.customerName }]));
-                        setCustomerId(id);
-                        setCustomerName(event.data.customerName);
+                        setAuth({ status: "connected", customerId: id, customerName: event.data.customerName, source: "local" });
                         onConnect?.(id);
-                    } else {
-                        // No account selected yet — fetch the list
-                        fetchCustomers(newRefresh);
                     }
                 }
             }
@@ -82,11 +92,6 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
     }, []);
-
-    const fetchCustomers = async (_token: string) => {
-        // Account selection is now handled server-side during OAuth callback
-        setLoading(false);
-    };
 
     const handleConnect = () => {
         const width = 600;
@@ -101,36 +106,23 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         );
     };
 
-    const handleSelectCustomer = (customer: { id: string, name: string }) => {
-        // cid is 'customers/123-456-7890'
-        const id = customer.id.replace("customers/", "");
-        localStorage.setItem("google_ads_customer_id", id);
-        localStorage.setItem("google_ads_customer_name", customer.name);
-        setCustomerId(id);
-        setCustomerName(customer.name);
-        onConnect?.(id);
-    };
-
     const handleDisconnect = () => {
         localStorage.removeItem("google_ads_refresh_token");
         localStorage.removeItem("google_ads_customer_id");
         localStorage.removeItem("google_ads_customer_name");
         localStorage.removeItem("google_ads_customer_ids");
-        setRefreshToken(null);
-        setCustomerId(null);
-        setCustomerName(null);
-        setAvailableCustomers([]);
+        setAuth({ status: "disconnected" });
         onDisconnect?.();
     };
 
-    if (!isClient) return null;
+    if (auth.status === "loading") return null;
 
-    if (!refreshToken) {
+    if (auth.status === "disconnected") {
         return (
             <Button
                 variant={variant}
                 onClick={handleConnect}
-                className={className || "gap-2 bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 backdrop-blur-sm"}
+                className={className || "gap-2 bg-[#24231F] border-[#3D3C36] text-[#9B9689] hover:text-[#E8E4DD] hover:bg-[#2E2D28] backdrop-blur-sm"}
                 size={size}
             >
                 <Settings className="w-3.5 h-3.5 mr-2" />
@@ -140,84 +132,29 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
     }
 
     return (
-        <div className="flex items-center gap-2 animate-in fade-in duration-500">
-            <DropdownMenu
-                open={isDropdownOpen}
-                onOpenChange={(open: boolean) => {
-                    setIsDropdownOpen(open);
-                    if (open && availableCustomers.length === 0 && refreshToken) {
-                        fetchCustomers(refreshToken);
-                    }
-                }}
-            >
+        <div className="flex items-center gap-2">
+            <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
-                    {customerId ? (
-                        <button className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-green-900/30 rounded-full backdrop-blur-sm group hover:border-green-800/50 transition-colors outline-none text-left">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                            <div className="flex flex-col leading-none gap-0.5 text-left">
-                                <span className="text-xs text-zinc-200 font-semibold max-w-[140px] truncate">{customerName || 'Unknown Account'}</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">{customerId}</span>
-                            </div>
-                            <ChevronDown className="w-3 h-3 text-zinc-600 ml-1 opacity-50 group-hover:opacity-100" />
-                        </button>
-                    ) : (
-                        <Button variant="outline" className="gap-2 text-amber-500 border-amber-900/30 bg-amber-950/10 hover:bg-amber-950/20">
-                            {loading ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    Loading...
-                                </>
-                            ) : (
-                                <>
-                                    <AlertCircle className="w-3.5 h-3.5" />
-                                    Select Account
-                                    <ChevronDown className="w-3 h-3 opacity-50" />
-                                </>
+                    <button className="flex items-center gap-2 px-3 py-1.5 bg-[#24231F] border border-[#4CAF6E]/30 rounded-lg backdrop-blur-sm group hover:border-[#4CAF6E]/50 transition-colors outline-none text-left">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#4CAF6E] shrink-0" />
+                        <div className="flex flex-col leading-none gap-0.5 text-left">
+                            <span className="text-xs text-[#E8E4DD] font-semibold max-w-[140px] truncate">{auth.customerName}</span>
+                            {auth.customerId && (
+                                <span className="text-[10px] text-[#9B9689] font-mono">{auth.customerId}</span>
                             )}
-                        </Button>
-                    )}
+                        </div>
+                        <ChevronDown className="w-3 h-3 text-[#9B9689] ml-1 opacity-50 group-hover:opacity-100" />
+                    </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="bg-zinc-950 border-zinc-800 text-zinc-200 min-w-[320px]">
-                    {loading && <div className="p-2 text-xs text-zinc-500 text-center">Loading accounts...</div>}
-
-                    {!loading && availableCustomers.length === 0 && (
-                        <div className="p-2 text-xs text-zinc-500 text-center">No accounts found</div>
-                    )}
-
-                    {availableCustomers.map(c => (
-                        <DropdownMenuItem
-                            key={c.id}
-                            disabled={c.status === "ERROR"}
-                            onSelect={() => c.status !== "ERROR" && handleSelectCustomer(c)}
-                            className={`text-xs flex flex-col items-start gap-1 py-2 ${c.status === "ERROR" ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer focus:bg-zinc-900 focus:text-white'}`}
-                        >
-                            <div className="flex items-center justify-between w-full">
-                                <span className="font-medium text-zinc-100 truncate max-w-[200px]">{c.name}</span>
-                                {c.isTest && <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded border border-amber-500/20">TEST</span>}
-                            </div>
-                            <span className="text-[10px] text-zinc-500 font-mono">{c.id.replace('customers/', '')}</span>
-                            {c.error && (
-                                <span className="text-[10px] text-red-400 bg-red-950/20 p-1 rounded border border-red-900/30 mt-1 w-full whitespace-normal leading-tight">
-                                    {c.error}
-                                </span>
-                            )}
-                        </DropdownMenuItem>
-                    ))}
-
-
-
-                    <div className="h-px bg-zinc-800 my-1" />
-
+                <DropdownMenuContent align="center" className="bg-[#24231F] border-[#3D3C36] text-[#E8E4DD] min-w-[200px]">
                     <DropdownMenuItem
                         onSelect={handleDisconnect}
-                        className="text-red-400 focus:text-red-300 focus:bg-red-900/20 cursor-pointer text-xs font-medium"
+                        className="text-[#C45D4A] focus:text-[#C45D4A] focus:bg-[#C45D4A]/10 cursor-pointer text-xs font-medium"
                     >
                         Disconnect
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-
-
         </div>
     );
 }

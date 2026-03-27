@@ -99,24 +99,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 }`}
             >
                 {/* Header */}
-                <div className="flex h-14 shrink-0 items-center justify-between px-3">
-                    <Link
-                        href="/"
-                        className={`flex items-center gap-2.5 rounded-lg px-1 py-1 transition hover:bg-[#E8E4DD]/5 ${
-                            collapsed ? 'opacity-0 pointer-events-none' : ''
-                        }`}
-                    >
-                        <Image src="/logo.svg" alt="AdsAgent" width={22} height={22} />
-                        <span className="text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
-                    </Link>
+                <div className={`flex h-14 shrink-0 items-center px-3 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+                    {!collapsed && (
+                        <Link
+                            href="/"
+                            className="flex items-center gap-2.5 rounded-lg px-1 py-1 transition hover:bg-[#E8E4DD]/5"
+                        >
+                            <Image src="/logo.svg" alt="AdsAgent" width={22} height={22} />
+                            <span className="text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
+                        </Link>
+                    )}
                     <Button
                         type="button"
                         variant="ghost"
                         size="icon-sm"
                         onClick={toggleCollapsed}
-                        className={`rounded-lg text-[#9B9689] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] ${
-                            collapsed ? 'mx-auto' : ''
-                        }`}
+                        className="rounded-lg text-[#9B9689] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
                     >
                         {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
                     </Button>
