@@ -1,12 +1,14 @@
 # Toprank
 
-**Your search data + Claude's brain. That's it.**
+**SEO that reads your data, tells you what's wrong, and fixes it.**
 
-Most SEO tools show you dashboards. Toprank feeds your real Google Search Console and Google Ads data directly into Claude, the most capable AI model available, and gets you answers. Not charts. Answers.
+Toprank gives Claude direct access to your Google Search Console and Google Ads data. Run it inside your website repo and it doesn't just analyze — it rewrites your meta tags, fixes your headings, adds structured data, and ships the changes.
 
-"Why did my traffic drop?" "Where am I wasting ad spend?" "What should I write next?" One command. Real data. Actionable plan.
+> *"Why did my traffic drop last month?"*
+> *"What keywords am I almost ranking for?"*
+> *"Fix my title tags for pages losing clicks."*
 
-Open source. Works inside Claude Code, Codex, and any agent that reads SKILL.md. No SaaS fees, no seat licenses, no dashboards to stare at.
+Free, open-source skill for Claude Code and Codex. Install in 30 seconds.
 
 ---
 
