@@ -99,17 +99,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID containing the ad group"),
       adGroupId: z.string().describe("Ad group ID to add the keyword to"),
-      keywordText: z.string().min(1).describe("Keyword text to add"),
+      keyword: z.string().min(1).describe("Keyword text to add"),
       matchType: z
         .enum(["BROAD", "PHRASE", "EXACT"])
         .default("BROAD")
         .describe("Keyword match type (defaults to Broad)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, keywordText, matchType }) => {
+  }, async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await addKeyword(authForAccount(auth, accountId), adGroupId, keywordText, matchType);
+    const result = await addKeyword(authForAccount(auth, accountId), adGroupId, keyword, matchType);
     return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
@@ -152,16 +152,16 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID"),
-      keywordText: z
+      keyword: z
         .string()
         .min(1)
         .describe("Keyword text to add as negative (phrase match)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, keywordText }) => {
+  }, async ({ accountId, campaignId, keyword }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await addNegativeKeyword(authForAccount(auth, accountId), campaignId, keywordText);
+    const result = await addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword);
     return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
@@ -172,7 +172,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID"),
-      keywordText: z
+      keyword: z
         .string()
         .min(1)
         .describe("The exact negative keyword text to remove"),
@@ -183,10 +183,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       idempotentHint: true,
       openWorldHint: false,
     },
-  }, async ({ accountId, campaignId, keywordText }) => {
+  }, async ({ accountId, campaignId, keyword }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keywordText);
+    const result = await removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword);
     return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
