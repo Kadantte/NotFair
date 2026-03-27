@@ -1,4 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+
+// Fix for Node 20+ IPv6 metadata lookup timeout in google-auth-library which causes:
+// MetadataLookupWarning: received unexpected error = All promises were rejected code = UNKNOWN
+if (!process.env.GCLOUD_PROJECT) {
+  process.env.GCLOUD_PROJECT = "ads-agent-mcp";
+}
 import { z } from "zod";
 import { createMcpHandler } from "mcp-handler";
 import { db, schema } from "@/lib/db";

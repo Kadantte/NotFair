@@ -11,19 +11,32 @@ const CLIENTS = [
     {
         id: 'claude',
         name: 'Claude',
-        hint: 'Paste into Claude Code. It will add AdsAgent to your Claude Desktop config so Coworker can use it.',
+        hint: 'Paste into Claude Code. It will set up AdsAgent for both Claude Code and Claude Desktop.',
         prompt: (mcpUrl: string, token: string, _accountName: string) =>
-            `Add this MCP server to my Claude Desktop config.
+            `Set up the AdsAgent MCP server for both Claude Code and Claude Desktop.
 
 Before you start:
-1. Detect my OS and find my Claude Desktop config file:
-   - macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-   - Windows: %APPDATA%\\Claude\\claude_desktop_config.json
-   - Linux: ~/.config/Claude/claude_desktop_config.json
-2. Check if Node.js is installed (run \`node --version\`). If not, tell me to install it first (https://nodejs.org) and stop — npx won't work without it.
-3. Check if npx is available (run \`npx --version\`). If missing but node exists, run \`npm install -g npx\` or tell me how to fix it.
+1. Check if Node.js is installed (run \`node --version\`). If not, tell me to install it first (https://nodejs.org) and stop — npx won't work without it.
+2. Check if npx is available (run \`npx --version\`). If missing but node exists, run \`npm install -g npx\`.
 
-Once prerequisites are confirmed, add this entry under mcpServers in the config file:
+## Part 1: Claude Code
+
+Run this command to add the MCP server to Claude Code:
+
+claude mcp add adsagent -s user -- npx -y mcp-remote ${mcpUrl} --transport streamable-http --header "Authorization: Bearer ${token}"
+
+Verify it was added:
+
+claude mcp list
+
+## Part 2: Claude Desktop
+
+Detect my OS and find my Claude Desktop config file:
+- macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
+- Windows: %APPDATA%\\Claude\\claude_desktop_config.json
+- Linux: ~/.config/Claude/claude_desktop_config.json
+
+Add this entry under mcpServers in the config file:
 
 "adsagent": {
   "command": "npx",

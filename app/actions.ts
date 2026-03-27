@@ -1,4 +1,5 @@
 "use server"
+import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getClient, parseCustomerIds } from "@/lib/google-ads";
@@ -6,37 +7,51 @@ import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 
+function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+    return fn().catch((err) => {
+        if (err instanceof Error && err.message === "Not authenticated") {
+            redirect("/connect");
+        }
+        throw err;
+    });
+}
+
 export async function getChangesAction(options: { limit?: number; campaignId?: string } = {}) {
-    const { customerId } = await getSessionAuth();
-    return getChanges(customerId, options);
+    return requireAuth(async () => {
+        const { customerId } = await getSessionAuth();
+        return getChanges(customerId, options);
+    });
 }
 
 export async function undoChangeAction(changeId: number) {
-    const { refreshToken, customerId, customerIds } = await getSessionAuth();
+    return requireAuth(async () => {
+        const { refreshToken, customerId, customerIds } = await getSessionAuth();
 
-    const check = await getUndoableChange(customerId, changeId);
-    if ("error" in check) {
-        throw new Error(check.error);
-    }
+        const check = await getUndoableChange(customerId, changeId);
+        if ("error" in check) {
+            throw new Error(check.error);
+        }
 
-    const auth = {
-        refreshToken,
-        customerId,
-        customerIds: parseCustomerIds(customerIds),
-    };
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
 
-    const undoResult = await executeUndoForChange(auth, check.change);
-    if (!undoResult.success) {
-        throw new Error(undoResult.error ?? "Undo failed");
-    }
+        const undoResult = await executeUndoForChange(auth, check.change);
+        if (!undoResult.success) {
+            throw new Error(undoResult.error ?? "Undo failed");
+        }
 
-    await markRolledBack(changeId);
-    await logChange(customerId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
+        await markRolledBack(changeId);
+        await logChange(customerId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
 
-    return { success: true, changeId };
+        return { success: true, changeId };
+    });
 }
 
 export async function listCampaignsAction() {
+    return requireAuth(async () => {
     try {
         const { refreshToken, customerId } = await getSessionAuth();
         const customer = getClient().Customer({
@@ -71,12 +86,14 @@ export async function listCampaignsAction() {
         console.error("List Campaigns Error:", error);
         throw new Error("Failed to list campaigns.");
     }
+    });
 }
 
 export async function getCampaignHistoryAction(campaignId: string, startDate?: string, endDate?: string) {
     const effectiveStartDate = startDate || '2000-01-01';
     const effectiveEndDate = endDate || '2030-12-31';
 
+    return requireAuth(async () => {
     try {
         const { refreshToken, customerId } = await getSessionAuth();
         const customer = getClient().Customer({
@@ -110,12 +127,14 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
         console.error("Get Campaign History Error:", error);
         throw new Error("Failed to fetch campaign history.");
     }
+    });
 }
 
 export async function getCampaignKeywordsAction(campaignId: string, startDate?: string, endDate?: string) {
     const effectiveStartDate = startDate || '2000-01-01';
     const effectiveEndDate = endDate || '2030-12-31';
 
+    return requireAuth(async () => {
     try {
         const { refreshToken, customerId } = await getSessionAuth();
         const customer = getClient().Customer({
@@ -156,6 +175,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
         console.error("Get Campaign Keywords Error:", error);
         throw new Error("Failed to fetch campaign keywords.");
     }
+    });
 }
 
 export async function generateCampaignSummaryAction(

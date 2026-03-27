@@ -9,22 +9,22 @@ export function SiteHeader({ connected = false }: { connected?: boolean }) {
                     <Image src="/logo.svg" alt="AdsAgent Logo" width={28} height={28} className="w-7 h-7" />
                     <span className="hidden font-bold sm:inline-block text-base text-[#E8E4DD]">AdsAgent</span>
                 </Link>
-                <nav className="flex items-center space-x-6 text-sm font-medium">
-                    <Link
-                        href="/connect"
-                        className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
-                    >
-                        Connect
-                    </Link>
-                    {connected && (
+                {connected && (
+                    <nav className="flex items-center space-x-6 text-sm font-medium">
+                        <Link
+                            href="/connect"
+                            className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
+                        >
+                            Connect
+                        </Link>
                         <Link
                             href="/campaigns"
                             className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
                         >
                             Dashboard
                         </Link>
-                    )}
-                </nav>
+                    </nav>
+                )}
             </div>
         </header>
     )
