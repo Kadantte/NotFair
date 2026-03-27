@@ -67,8 +67,8 @@ function DeltaBadge({ before, after }: { before: string; after: string }) {
 
 function entityTypeBadge(type: string) {
     const map: Record<string, string> = {
-        keyword: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-        campaign: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+        keyword: 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20',
+        campaign: 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20',
         unknown: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
     };
     return map[type] ?? map.unknown;
