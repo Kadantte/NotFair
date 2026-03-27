@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
 import { eq, gte, and } from "drizzle-orm";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
+import { deriveCustomerName } from "@/lib/google-ads";
 
 export type Session = {
   connected: true;
@@ -13,16 +14,21 @@ export type Session = {
   connected: false;
 };
 
-export async function getSession(): Promise<Session> {
+type SessionRow = {
+  refreshToken: string;
+  customerId: string;
+  customerIds: string;
+};
+
+async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAMES.token)?.value;
 
-  if (!token) {
-    return { connected: false };
-  }
+  if (!token) return null;
 
-  const [session] = await db()
+  const [row] = await db()
     .select({
+      refreshToken: schema.mcpSessions.refreshToken,
       customerId: schema.mcpSessions.customerId,
       customerIds: schema.mcpSessions.customerIds,
     })
@@ -35,20 +41,24 @@ export async function getSession(): Promise<Session> {
     )
     .limit(1);
 
-  if (!session || !session.customerId) {
-    return { connected: false };
-  }
+  if (!row || !row.customerId) return null;
 
-  // Derive customer name from customerIds JSON stored in DB
-  let customerName = "Google Ads Account";
-  try {
-    const accounts: { id: string; name: string }[] = JSON.parse(session.customerIds || "[]");
-    if (accounts.length > 0) {
-      customerName = accounts.map((a) => a.name || a.id).join(", ");
-    }
-  } catch {
-    // fall through with default name
-  }
+  return { token, row };
+}
 
-  return { connected: true, token, customerName };
+export async function getSession(): Promise<Session> {
+  const result = await loadSessionRow();
+  if (!result) return { connected: false };
+
+  return {
+    connected: true,
+    token: result.token,
+    customerName: deriveCustomerName(result.row.customerIds),
+  };
+}
+
+export async function getSessionAuth(): Promise<SessionRow> {
+  const result = await loadSessionRow();
+  if (!result) throw new Error("Not authenticated");
+  return result.row;
 }

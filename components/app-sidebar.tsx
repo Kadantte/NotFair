@@ -51,7 +51,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <aside className="border-b border-white/8 bg-[#171717] transition-all duration-300 ease-out lg:border-b-0 lg:border-r lg:border-r-white/8">
-      <div className="flex h-screen flex-col">
+      <div className="flex h-full flex-col">
         <div className="shrink-0 p-4">
           <div
             className={`group relative flex items-center transition-all duration-300 ease-out ${

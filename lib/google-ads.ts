@@ -23,6 +23,13 @@ export function parseCustomerIds(raw: string | null | undefined): ConnectedAccou
   }
 }
 
+/** Derive a display name from a JSON-encoded customer_ids string. */
+export function deriveCustomerName(raw: string | null | undefined): string {
+  const accounts = parseCustomerIds(raw);
+  if (accounts.length === 0) return "Google Ads Account";
+  return accounts.map((a) => a.name || a.id).join(", ");
+}
+
 export type AuthContext = {
   refreshToken: string;
   customerId: string;
@@ -85,7 +92,7 @@ function normalizeCustomerId(customerId: string): string {
   return customerId.replace(/-/g, "").trim();
 }
 
-function getClient() {
+export function getClient() {
   return new GoogleAdsApi({
     client_id: requiredEnv("GOOGLE_ADS_CLIENT_ID"),
     client_secret: requiredEnv("GOOGLE_ADS_CLIENT_SECRET"),

@@ -6,9 +6,8 @@ import { motion } from 'framer-motion';
 import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle } from 'lucide-react';
 import { AppSidebar, type SidebarThread } from '@/components/app-sidebar';
 import { Button } from '@/components/ui/button';
-import { listCampaignsAction, hasLinkedAdsAccount } from '@/app/actions';
+import { listCampaignsAction } from '@/app/actions';
 import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from '@/lib/chat-history';
-import { ConnectAdsPrompt } from '@/components/connect-ads-prompt';
 
 interface Campaign {
     id: string;
@@ -55,30 +54,12 @@ export default function CampaignsPage() {
     const [loading, setLoading] = useState(true);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [hasAdsAccount, setHasAdsAccount] = useState<boolean | null>(null);
 
     const fetchCampaigns = useCallback(async () => {
         setLoading(true);
         setError(null);
-        const token = localStorage.getItem('google_ads_refresh_token');
-        const cid = localStorage.getItem('google_ads_customer_id');
-
-        if (!token || !cid) {
-            // Check if user has a server-linked MCP session
-            const linked = await hasLinkedAdsAccount();
-            setHasAdsAccount(linked);
-            if (!linked) {
-                setLoading(false);
-                return;
-            }
-            // Has server session but no local tokens — still show empty for now
-            setLoading(false);
-            return;
-        }
-
-        setHasAdsAccount(true);
         try {
-            const data = await listCampaignsAction(token, cid);
+            const data = await listCampaignsAction();
             setCampaigns(data);
         } catch (err) {
             console.error(err);
@@ -104,10 +85,10 @@ export default function CampaignsPage() {
     };
 
     return (
-        <main className="h-screen overflow-hidden bg-black text-white font-sans selection:bg-indigo-500/30">
-            <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
+        <main className="h-full overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
 
-            <div className={`relative z-10 grid h-screen w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${isSidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]'}`}>
+            <div className={`relative z-10 grid h-full w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${isSidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]'}`}>
                 <AppSidebar
                     currentPath="/campaigns"
                     isCollapsed={isSidebarCollapsed}
@@ -120,7 +101,7 @@ export default function CampaignsPage() {
                     }}
                 />
 
-                <section className="flex min-h-0 h-screen flex-col overflow-hidden">
+                <section className="flex min-h-0 h-full flex-col overflow-hidden">
                     <header className="shrink-0 border-b border-white/10 bg-black/50 backdrop-blur-xl">
                         <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
                             <div>
@@ -140,10 +121,6 @@ export default function CampaignsPage() {
                     </header>
 
                     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
-                        {hasAdsAccount === false && (
-                            <ConnectAdsPrompt />
-                        )}
-
                         {error && (
                             <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4 mb-8 flex items-center gap-3 text-red-400">
                                 <AlertCircle className="w-5 h-5 shrink-0" />

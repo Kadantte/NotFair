@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, LayoutDashboard, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/components/session-provider';
 
@@ -212,19 +213,22 @@ function ConnectContent() {
     const session = useSession();
     const urlToken = searchParams.get('token');
     const urlCustomerName = searchParams.get('customer_name');
-    const error = searchParams.get('error');
+    const urlError = searchParams.get('error');
     const pendingToken = searchParams.get('pending');
     const accountsParam = searchParams.get('accounts');
 
     const [mcpUrl, setMcpUrl] = useState('');
+    const [error, setError] = useState<string | null>(urlError);
     const [copied, setCopied] = useState(false);
     const [selecting, setSelecting] = useState(false);
+    const [rotating, setRotating] = useState(false);
     const [activeClient, setActiveClient] = useState<string>('claude');
     const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
 
-    // Prefer URL params (fresh from OAuth redirect), fall back to server session
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
+
+    const actionBtnClass = "flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-sm transition-all";
 
     let accounts: { id: string; name: string }[] = [];
     if (accountsParam) {
@@ -288,6 +292,24 @@ function ConnectContent() {
             }
         } catch {
             setSelecting(false);
+        }
+    }
+
+    async function rotateToken() {
+        setRotating(true);
+        try {
+            const res = await fetch('/api/auth/rotate-token', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                setError(data.error || 'Failed to rotate token');
+                return;
+            }
+            setCopied(false);
+            router.refresh();
+        } catch {
+            setError('Failed to rotate token');
+        } finally {
+            setRotating(false);
         }
     }
 
@@ -435,6 +457,32 @@ function ConnectContent() {
                         <p className="text-zinc-600 text-xs max-w-sm">
                             This prompt contains your personal access token. Don't share it publicly.
                         </p>
+
+                        {/* Actions */}
+                        <div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-zinc-800 w-full max-w-md">
+                            <Link
+                                href="/campaigns"
+                                className={actionBtnClass}
+                            >
+                                <LayoutDashboard className="w-4 h-4" />
+                                Dashboard
+                            </Link>
+                            <button
+                                onClick={beginGoogleSignIn}
+                                className={actionBtnClass}
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Account
+                            </button>
+                            <button
+                                onClick={rotateToken}
+                                disabled={rotating}
+                                className={`${actionBtnClass} disabled:opacity-50`}
+                            >
+                                <RotateCw className={`w-4 h-4 ${rotating ? 'animate-spin' : ''}`} />
+                                {rotating ? 'Rotating...' : 'Rotate Token'}
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

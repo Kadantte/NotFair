@@ -152,19 +152,12 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
-        const token = localStorage.getItem('google_ads_refresh_token');
-        const cid = localStorage.getItem('google_ads_customer_id');
         const { startDate, endDate } = getDateRange(timeRange);
-
-        if (!token || !cid) {
-            router.push('/');
-            return;
-        }
 
         try {
             const [historyData, keywordsData] = await Promise.all([
-                getCampaignHistoryAction(token, cid, campaignId, startDate, endDate),
-                getCampaignKeywordsAction(token, cid, campaignId, startDate, endDate)
+                getCampaignHistoryAction(campaignId, startDate, endDate),
+                getCampaignKeywordsAction(campaignId, startDate, endDate)
             ]);
             setHistory(historyData);
             setKeywords(keywordsData);
@@ -174,7 +167,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         } finally {
             setLoading(false);
         }
-    }, [campaignId, router, timeRange]);
+    }, [campaignId, timeRange]);
 
     useEffect(() => {
         fetchData();
@@ -223,10 +216,10 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     };
 
     return (
-        <main className="h-screen overflow-hidden bg-black text-white font-sans selection:bg-indigo-500/30">
-            <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
+        <main className="h-full overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
 
-            <div className={`relative z-10 grid h-screen w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${isSidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]'}`}>
+            <div className={`relative z-10 grid h-full w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${isSidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]'}`}>
                 <AppSidebar
                     currentPath="/campaigns"
                     isCollapsed={isSidebarCollapsed}
@@ -239,7 +232,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                     }}
                 />
 
-                <section className="flex min-h-0 h-screen flex-col overflow-hidden">
+                <section className="flex min-h-0 h-full flex-col overflow-hidden">
                     <header className="shrink-0 border-b border-white/10 bg-black/50 backdrop-blur-xl">
                         <div className="flex flex-col gap-6 px-6 py-6 md:flex-row md:items-center md:justify-between">
                             <div>

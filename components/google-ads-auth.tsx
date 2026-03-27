@@ -8,7 +8,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { listAccessibleCustomersAction } from "@/app/actions";
 import { Loader2, Settings, AlertCircle, CheckCircle2, ChevronDown } from "lucide-react";
 
 interface GoogleAdsAuthProps {
@@ -84,20 +83,9 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         return () => window.removeEventListener("message", handleMessage);
     }, []);
 
-    const fetchCustomers = async (token: string) => {
-        setLoading(true);
-        try {
-            // @ts-ignore
-            const customers = await listAccessibleCustomersAction(token);
-            // @ts-ignore
-            setAvailableCustomers(customers);
-            setIsDropdownOpen(true);
-        } catch (e) {
-            console.error(e);
-            // Maybe toast error
-        } finally {
-            setLoading(false);
-        }
+    const fetchCustomers = async (_token: string) => {
+        // Account selection is now handled server-side during OAuth callback
+        setLoading(false);
     };
 
     const handleConnect = () => {
