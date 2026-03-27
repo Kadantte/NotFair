@@ -216,8 +216,8 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     };
 
     return (
-        <main className="h-full overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black z-0 pointer-events-none" />
+        <main className="h-full overflow-hidden bg-[#1A1917]">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#4CAF6E]/8 via-[#1A1917] to-[#1A1917] z-0 pointer-events-none" />
 
             <div className={`relative z-10 grid h-full w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${isSidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]'}`}>
                 <AppSidebar
