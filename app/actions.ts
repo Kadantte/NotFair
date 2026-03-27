@@ -16,7 +16,7 @@ function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     });
 }
 
-export async function getChangesAction(options: { limit?: number; campaignId?: string } = {}) {
+export async function getChangesAction(options: { limit?: number; offset?: number; campaignId?: string } = {}) {
     return requireAuth(async () => {
         const { customerId } = await getSessionAuth();
         return getChanges(customerId, options);

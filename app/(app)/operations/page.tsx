@@ -17,6 +17,8 @@ type Change = {
     timestamp: Date;
 };
 
+const PAGE_SIZE = 25;
+
 function formatAction(action: string): string {
     return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -52,21 +54,26 @@ function entityTypeBadge(type: string) {
 }
 
 const UNDO_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const REVERSIBLE = new Set(['pause_keyword', 'enable_keyword', 'update_bid', 'update_budget', 'add_negative_keyword', 'remove_negative_keyword', 'pause_campaign', 'enable_campaign', 'create_campaign']);
+const REVERSIBLE = new Set(['pause_keyword', 'enable_keyword', 'update_bid', 'update_budget', 'add_negative_keyword', 'remove_negative_keyword', 'pause_campaign', 'enable_campaign', 'create_campaign', 'add_keyword']);
 
 export default function OperationsPage() {
     const [changes, setChanges] = useState<Change[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [undoing, setUndoing] = useState<number | null>(null);
     const [undoError, setUndoError] = useState<{ id: number; message: string } | null>(null);
 
-    const fetchChanges = useCallback(async () => {
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    const fetchChanges = useCallback(async (p: number) => {
         setLoading(true);
         setError(null);
         try {
-            const data = await getChangesAction({ limit: 100 });
-            setChanges(data as Change[]);
+            const data = await getChangesAction({ limit: PAGE_SIZE, offset: p * PAGE_SIZE });
+            setChanges(data.items as Change[]);
+            setTotal(data.total);
         } catch (err) {
             console.error(err);
             setError('Failed to load operations. Please try again.');
@@ -75,14 +82,14 @@ export default function OperationsPage() {
         }
     }, []);
 
-    useEffect(() => { fetchChanges(); }, [fetchChanges]);
+    useEffect(() => { fetchChanges(page); }, [fetchChanges, page]);
 
     async function handleUndo(changeId: number) {
         setUndoing(changeId);
         setUndoError(null);
         try {
             await undoChangeAction(changeId);
-            await fetchChanges();
+            await fetchChanges(page);
         } catch (err) {
             setUndoError({ id: changeId, message: err instanceof Error ? err.message : 'Undo failed' });
         } finally {
@@ -103,7 +110,7 @@ export default function OperationsPage() {
                         <p className="mt-0.5 text-sm text-[#9B9689]">Every change made by the MCP agent — with one-click revert</p>
                     </div>
                     <Button
-                        onClick={fetchChanges}
+                        onClick={() => fetchChanges(page)}
                         disabled={loading}
                         variant="outline"
                         className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-2"
@@ -213,10 +220,36 @@ export default function OperationsPage() {
                     </div>
                 )}
 
-                {changes.length > 0 && (
-                    <p className="mt-6 text-xs text-[#9B9689]/40">
-                        Revert available within 7 days. Reverted changes are logged as new entries for the full audit trail.
-                    </p>
+                {total > 0 && (
+                    <div className="mt-6 flex items-center justify-between">
+                        <p className="text-xs text-[#9B9689]/40">
+                            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total} operations.
+                            Revert available within 7 days.
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={page === 0 || loading}
+                                onClick={() => setPage(p => p - 1)}
+                                className="h-7 px-3 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] text-xs disabled:opacity-30"
+                            >
+                                Previous
+                            </Button>
+                            <span className="text-xs text-[#9B9689] tabular-nums font-mono">
+                                {page + 1} / {totalPages}
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={page >= totalPages - 1 || loading}
+                                onClick={() => setPage(p => p + 1)}
+                                className="h-7 px-3 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] text-xs disabled:opacity-30"
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
                 )}
             </div>
         </section>

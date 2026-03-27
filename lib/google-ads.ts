@@ -846,6 +846,100 @@ export async function enableCampaign(
 
 // ─── Remove Negative Keyword (for undo) ─────────────────────────────
 
+export async function addKeyword(
+  auth: AuthContext,
+  adGroupId: string,
+  keywordText: string,
+  matchType: "BROAD" | "PHRASE" | "EXACT" = "BROAD",
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  const text = keywordText.trim();
+  if (!text) {
+    return { success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: "", error: "Keyword text cannot be empty" };
+  }
+
+  try {
+    const response = await customer.mutateResources([
+      {
+        entity: "ad_group_criterion" as any,
+        operation: "create",
+        resource: {
+          ad_group: `customers/${cid}/adGroups/${adGroupId}`,
+          status: STATUS.ENABLED,
+          keyword: {
+            text,
+            match_type: MATCH_TYPE[matchType],
+          },
+        },
+      },
+    ]);
+
+    // Extract the new criterion ID from the response resource name
+    const resourceName = (response as any)?.results?.[0]?.resource_name as string | undefined;
+    const criterionId = resourceName?.split("~").pop() ?? "";
+
+    return {
+      success: true,
+      action: "add_keyword",
+      entityId: criterionId || `${adGroupId}:${text}`,
+      beforeValue: adGroupId, // stored for undo (removeKeyword needs adGroupId + criterionId)
+      afterValue: `${text} (${matchType})`,
+    };
+  } catch (error) {
+    const msg = extractErrorMessage(error);
+    return {
+      success: false,
+      action: "add_keyword",
+      entityId: "",
+      beforeValue: "",
+      afterValue: text,
+      error: msg.includes("ALREADY_EXISTS")
+        ? `Keyword "${text}" already exists in this ad group`
+        : msg,
+    };
+  }
+}
+
+export async function removeKeyword(
+  auth: AuthContext,
+  adGroupId: string,
+  criterionId: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "ad_group_criterion" as any,
+        operation: "remove",
+        resource: {
+          resource_name: `customers/${cid}/adGroupCriteria/${adGroupId}~${criterionId}`,
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "remove_keyword",
+      entityId: criterionId,
+      beforeValue: criterionId,
+      afterValue: "",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "remove_keyword",
+      entityId: criterionId,
+      beforeValue: criterionId,
+      afterValue: criterionId,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
 export async function removeNegativeKeyword(
   auth: AuthContext,
   campaignId: string,

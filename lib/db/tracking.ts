@@ -1,5 +1,5 @@
 import { db, schema } from "./index";
-import { eq, and, gt, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gt, gte, lte, desc, sql } from "drizzle-orm";
 import type { WriteResult } from "@/lib/google-ads";
 
 // ─── Compact Code Maps ──────────────────────────────────────────────
@@ -20,6 +20,8 @@ export const TOOL_CODE = {
   undo: 8,
   create_campaign: 9,
   remove_campaign: 10,
+  add_keyword: 11,
+  remove_keyword: 12,
   // Reads (20+)
   get_account_info: 20,
   list_campaigns: 21,
@@ -130,9 +132,10 @@ export async function logRead(
 
 export async function getChanges(
   accountId: string,
-  options: { limit?: number; campaignId?: string } = {},
+  options: { limit?: number; offset?: number; campaignId?: string } = {},
 ) {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+  const offset = Math.max(options.offset ?? 0, 0);
 
   const conditions = [
     eq(schema.operations.accountId, accountId),
@@ -142,24 +145,34 @@ export async function getChanges(
     conditions.push(eq(schema.operations.campaignId, options.campaignId));
   }
 
-  const rows = await db()
-    .select()
-    .from(schema.operations)
-    .where(and(...conditions))
-    .orderBy(desc(schema.operations.createdAt))
-    .limit(limit);
+  const [rows, countResult] = await Promise.all([
+    db()
+      .select()
+      .from(schema.operations)
+      .where(and(...conditions))
+      .orderBy(desc(schema.operations.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db()
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.operations)
+      .where(and(...conditions)),
+  ]);
 
-  return rows.map((row) => ({
-    id: row.id,
-    action: CODE_TO_TOOL[row.toolCode] ?? `unknown_${row.toolCode}`,
-    entityType: CODE_TO_ENTITY[row.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
-    entityId: row.entityId ?? "",
-    beforeValue: row.beforeValue ?? "",
-    afterValue: row.afterValue ?? "",
-    reasoning: row.reasoning,
-    rolledBack: row.rolledBack === 1,
-    timestamp: row.createdAt,
-  }));
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      action: CODE_TO_TOOL[row.toolCode] ?? `unknown_${row.toolCode}`,
+      entityType: CODE_TO_ENTITY[row.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
+      entityId: row.entityId ?? "",
+      beforeValue: row.beforeValue ?? "",
+      afterValue: row.afterValue ?? "",
+      reasoning: row.reasoning,
+      rolledBack: row.rolledBack === 1,
+      timestamp: row.createdAt,
+    })),
+    total: Number(countResult[0]?.count ?? 0),
+  };
 }
 
 // ─── Impact Attribution ─────────────────────────────────────────────
@@ -281,6 +294,7 @@ const REVERSIBLE_ACTIONS: Record<number, number> = {
   [TOOL_CODE.add_negative_keyword]: TOOL_CODE.remove_negative_keyword,
   [TOOL_CODE.remove_negative_keyword]: TOOL_CODE.add_negative_keyword,
   [TOOL_CODE.create_campaign]: TOOL_CODE.remove_campaign,
+  [TOOL_CODE.add_keyword]: TOOL_CODE.remove_keyword,
 };
 
 export async function getUndoableChange(accountId: string, changeId: number) {

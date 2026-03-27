@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { listCampaignsAction } from '@/app/actions';
 
@@ -29,6 +29,7 @@ export default function CampaignsPage() {
     const [loading, setLoading] = useState(true);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
     const fetchCampaigns = useCallback(async () => {
         setLoading(true);
@@ -90,55 +91,76 @@ export default function CampaignsPage() {
                                 <p className="text-[#9B9689] max-w-sm mx-auto mt-2 text-sm">Create your first campaign in Google Ads to see it here.</p>
                             </div>
                         ) : (
-                            campaigns.map((campaign, index) => (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.04 }}
-                                    key={campaign.id}
-                                    onClick={() => router.push(`/campaigns/${campaign.id}`)}
-                                    className="group relative bg-[#24231F] hover:bg-[#2E2D28] border border-[#3D3C36] hover:border-[#4CAF6E]/20 transition-all duration-200 rounded-xl p-5 cursor-pointer"
-                                >
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2.5 mb-2">
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-wide uppercase ${statusColors[campaign.status as keyof typeof statusColors] || statusColors.UNKNOWN}`}>
-                                                    {campaign.status}
-                                                </span>
-                                                <span className="text-xs text-[#9B9689] font-mono">ID: {campaign.id}</span>
+                            campaigns.map((campaign, index) => {
+                                const isNavigating = navigatingTo === campaign.id;
+                                return (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.04 }}
+                                        key={campaign.id}
+                                        onClick={() => {
+                                            if (navigatingTo) return;
+                                            setNavigatingTo(campaign.id);
+                                            router.push(`/campaigns/${campaign.id}`);
+                                        }}
+                                        className={`group relative bg-[#24231F] border border-[#3D3C36] transition-all duration-150 rounded-xl p-5 cursor-pointer select-none
+                                            ${isNavigating
+                                                ? 'border-[#4CAF6E]/30 bg-[#2E2D28] scale-[0.995]'
+                                                : navigatingTo
+                                                    ? 'opacity-50 cursor-default'
+                                                    : 'hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 active:scale-[0.995]'
+                                            }`}
+                                    >
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2.5 mb-2">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-wide uppercase ${statusColors[campaign.status as keyof typeof statusColors] || statusColors.UNKNOWN}`}>
+                                                        {campaign.status}
+                                                    </span>
+                                                    <span className="text-xs text-[#9B9689] font-mono">ID: {campaign.id}</span>
+                                                </div>
+                                                <h3 className="text-[15px] font-medium text-[#E8E4DD] truncate pr-4 group-hover:text-white transition-colors">
+                                                    {campaign.name}
+                                                </h3>
+                                                <p className="text-xs text-[#9B9689] mt-1 capitalize">{String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</p>
                                             </div>
-                                            <h3 className="text-[15px] font-medium text-[#E8E4DD] truncate pr-4 group-hover:text-white transition-colors">
-                                                {campaign.name}
-                                            </h3>
-                                            <p className="text-xs text-[#9B9689] mt-1 capitalize">{String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</p>
-                                        </div>
 
-                                        <div className="grid grid-cols-3 gap-8 border-t md:border-t-0 md:border-l border-[#3D3C36] pt-4 md:pt-0 md:pl-8">
-                                            <div>
-                                                <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
-                                                    <TrendingUp className="w-3 h-3" />
-                                                    Impressions
+                                            <div className="flex items-center gap-6">
+                                                <div className="grid grid-cols-3 gap-8 border-t md:border-t-0 md:border-l border-[#3D3C36] pt-4 md:pt-0 md:pl-8">
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                            <TrendingUp className="w-3 h-3" />
+                                                            Impressions
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.impressions || 0).toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                            <MousePointer2 className="w-3 h-3" />
+                                                            Clicks
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.clicks || 0).toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                            <DollarSign className="w-3 h-3" />
+                                                            Cost
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.impressions || 0).toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
-                                                    <MousePointer2 className="w-3 h-3" />
-                                                    Clicks
+                                                <div className="hidden md:flex items-center text-[#9B9689]">
+                                                    {isNavigating
+                                                        ? <Loader2 className="w-4 h-4 animate-spin text-[#4CAF6E]" />
+                                                        : <ChevronRight className="w-4 h-4 group-hover:text-[#E8E4DD] transition-colors" />
+                                                    }
                                                 </div>
-                                                <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.clicks || 0).toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
-                                                    <DollarSign className="w-3 h-3" />
-                                                    Cost
-                                                </div>
-                                                <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            ))
+                                    </motion.div>
+                                );
+                            })
                         )}
                     </div>
                 )}

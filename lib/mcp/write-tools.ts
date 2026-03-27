@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   pauseKeyword,
   enableKeyword,
+  addKeyword,
+  removeKeyword,
   updateBid,
   addNegativeKeyword,
   removeNegativeKeyword,
@@ -78,6 +80,28 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await enableKeyword(authForAccount(auth, accountId), adGroupId, criterionId);
     return jsonResult(await logAndReturn(targetId, auth.userId, null, result));
+  });
+
+  server.registerTool("addKeyword", {
+    title: "Add Keyword",
+    description:
+      "Add a new keyword to an existing ad group. The keyword starts enabled. Use getKeywords to find the adGroupId. Returns a changeId that can be used with undoChange.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID containing the ad group"),
+      adGroupId: z.string().describe("Ad group ID to add the keyword to"),
+      keywordText: z.string().min(1).describe("Keyword text to add"),
+      matchType: z
+        .enum(["BROAD", "PHRASE", "EXACT"])
+        .default("BROAD")
+        .describe("Keyword match type (defaults to Broad)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, keywordText, matchType }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await addKeyword(authForAccount(auth, accountId), adGroupId, keywordText, matchType);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   // ─── Bid Management ─────────────────────────────────────────────
@@ -417,6 +441,15 @@ export async function executeUndoForChange(
       const budgetMicros = Number(beforeValue);
       if (!budgetMicros || budgetMicros <= 0) return { success: false, action: "update_budget", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: invalid previous budget value" };
       return updateCampaignBudget(auth, entityId, budgetMicros, { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
+    }
+    case "add_keyword": {
+      // beforeValue holds the adGroupId saved at creation time
+      if (!beforeValue) return { success: false, action: "remove_keyword", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: missing adGroupId" };
+      return removeKeyword(auth, beforeValue, entityId);
+    }
+    case "remove_keyword": {
+      // Not generally undoable — we'd need keyword text + match type
+      return { success: false, action: "add_keyword", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo keyword removal (keyword text not stored)" };
     }
     case "add_negative_keyword":
       return removeNegativeKeyword(auth, change.campaignId ?? "", entityId);
