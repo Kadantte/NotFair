@@ -130,7 +130,7 @@ export default function CampaignsPage() {
 
                         {loading && campaigns.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 gap-4">
-                                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                                <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
                                 <p className="text-zinc-500 animate-pulse">Loading campaigns...</p>
                             </div>
                         ) : (
