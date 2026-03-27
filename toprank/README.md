@@ -8,7 +8,7 @@ Toprank is a collection of AI agent skills that give you the leverage of a searc
 
 ## Skills
 
-### [`seo-analysis`](skills/seo-analysis/) — SEO Audit & Search Console Analysis
+### [`seo-analysis`](seo-analysis/) — SEO Audit & Search Console Analysis
 
 A full SEO audit in one command. Connects to Google Search Console, auto-detects your site, and produces a prioritized action plan.
 
@@ -26,25 +26,19 @@ A full SEO audit in one command. Connects to Google Search Console, auto-detects
 
 ---
 
-## Installation
+## Install — 30 seconds
 
-**Install a single skill:**
-```bash
-cp -r skills/seo-analysis ~/.claude/skills/
-```
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Python 3.8+, `gcloud` CLI (`brew install google-cloud-sdk`)
 
-**Install all skills:**
-```bash
-cp -r skills/* ~/.claude/skills/
-```
+### Step 1: Install on your machine
 
-Restart Claude Code and the skills are available immediately.
+Open Claude Code and paste this. Claude does the rest.
 
-## Requirements
+> Install toprank: run **`git clone --single-branch --depth 1 https://github.com/nowork-studio/ads-agent.git /tmp/ads-agent && cp -Rf /tmp/ads-agent/toprank ~/.claude/skills/toprank && cd ~/.claude/skills/toprank && ./setup && rm -rf /tmp/ads-agent`** then add a "toprank" section to CLAUDE.md that lists the available skills: /seo-analysis.
 
-- [Claude Code](https://claude.ai/code) CLI
-- Python 3.8+
-- `gcloud` CLI for Google Search Console skills — `brew install google-cloud-sdk`
+### Step 2: Add to your repo so teammates get it (optional)
+
+> Add toprank to this project: run **`cp -Rf ~/.claude/skills/toprank .claude/skills/toprank && cd .claude/skills/toprank && ./setup`** then add a "toprank" section to this project's CLAUDE.md that lists the available skills: /seo-analysis.
 
 ---
 
@@ -55,11 +49,13 @@ Each skill is a `SKILL.md` file that Claude Code loads as an instruction set. Cl
 Skills live in `~/.claude/skills/` and are discovered automatically. No configuration needed.
 
 ```
-skills/
-└── seo-analysis/
-    ├── SKILL.md          ← workflow instructions Claude follows
-    ├── scripts/          ← Python scripts for API calls and data processing
-    └── references/       ← guides and docs loaded as needed
+toprank/
+├── setup                 ← run this to register skills
+├── seo-analysis/
+│   ├── SKILL.md          ← workflow instructions Claude follows
+│   ├── scripts/          ← Python scripts for API calls and data processing
+│   └── references/       ← guides and docs loaded as needed
+└── (future skills go here)
 ```
 
 ---
