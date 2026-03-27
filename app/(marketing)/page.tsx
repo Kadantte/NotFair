@@ -18,16 +18,6 @@ export default function Home() {
 
     return (
         <section className="relative flex flex-col items-center justify-center min-h-[90vh] py-20 px-4 overflow-hidden">
-            <motion.div
-                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/20 rounded-full blur-[128px] pointer-events-none"
-            />
-            <motion.div
-                animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
-                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                className="absolute bottom-1/4 -right-20 w-96 h-96 bg-emerald-600/20 rounded-full blur-[128px] pointer-events-none"
-            />
 
             <motion.div
                 initial={{ opacity: 0, y: 20 }}

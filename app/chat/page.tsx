@@ -413,7 +413,7 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
           isUser
             ? "border-zinc-700 bg-zinc-800 text-zinc-200"
-            : "border-blue-500/30 bg-blue-500/10 text-blue-300"
+            : "border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]"
         }`}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -607,11 +607,9 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-black text-white">
+    <main className="h-screen overflow-hidden bg-[#1A1917] text-white">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.08]" />
-        <div className="absolute left-[-8rem] top-20 h-80 w-80 rounded-full bg-blue-600/20 blur-[120px]" />
-        <div className="absolute bottom-16 right-[-8rem] h-80 w-80 rounded-full bg-emerald-600/20 blur-[120px]" />
       </div>
 
       <div
@@ -669,8 +667,8 @@ export default function ChatPage() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {messages.length === 0 ? (
               <div className="flex min-h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
-                <div className="mb-6 inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-sm text-blue-300 shadow-[0_0_20px_rgba(59,130,246,0.16)]">
-                  <span className="mr-2 h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                <div className="mb-6 inline-flex items-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-1.5 text-sm text-[#4CAF6E] shadow-[0_0_20px_rgba(76,175,110,0.16)]">
+                  <span className="mr-2 h-2 w-2 rounded-full bg-[#4CAF6E] shadow-[0_0_10px_rgba(76,175,110,0.5)]" />
                   ADSAGENT COPILOT
                 </div>
                 <h1 className="text-3xl font-semibold tracking-tight text-white md:text-5xl">
