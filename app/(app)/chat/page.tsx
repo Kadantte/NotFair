@@ -14,12 +14,12 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import { AppSidebar, type SidebarThread } from "@/components/app-sidebar";
 import { GoogleAdsAuth } from "@/components/google-ads-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from "@/lib/chat-history";
+import { dispatchThreadEvent, onThreadEvent } from "@/lib/thread-events";
 
 type StoredAccount = {
   refreshToken: string | null;
@@ -58,7 +58,6 @@ function readStoredAccount(): StoredAccount {
 
 function createThread(): ChatThread {
   const now = new Date().toISOString();
-
   return {
     id: crypto.randomUUID(),
     title: "New chat",
@@ -70,23 +69,16 @@ function createThread(): ChatThread {
 
 function loadThreads(): ChatThread[] {
   const raw = localStorage.getItem(CHAT_HISTORY_KEY);
-
-  if (!raw) {
-    return [];
-  }
-
+  if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(thread =>
-      thread &&
-      typeof thread.id === "string" &&
-      typeof thread.title === "string" &&
-      Array.isArray(thread.messages),
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (thread: unknown): thread is ChatThread =>
+        !!thread &&
+        typeof (thread as ChatThread).id === "string" &&
+        typeof (thread as ChatThread).title === "string" &&
+        Array.isArray((thread as ChatThread).messages),
     );
   } catch {
     return [];
@@ -104,11 +96,7 @@ function getMessageText(message: GoogleAdsAgentUIMessage): string {
 function getThreadTitle(messages: GoogleAdsAgentUIMessage[]): string {
   const firstUserMessage = messages.find(message => message.role === "user");
   const text = firstUserMessage ? getMessageText(firstUserMessage) : "";
-
-  if (!text) {
-    return "New chat";
-  }
-
+  if (!text) return "New chat";
   return text.slice(0, 48);
 }
 
@@ -128,6 +116,8 @@ function applyActiveThreadSnapshot(
       : thread,
   );
 }
+
+// ── Markdown rendering ──────────────────────────────────────────────
 
 function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
   const pattern =
@@ -163,7 +153,6 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
     }
 
     const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
-
     if (linkMatch) {
       return (
         <a
@@ -200,15 +189,11 @@ function renderMarkdown(text: string): ReactNode[] {
       const language = codeFenceMatch[1];
       index += 1;
       const codeLines: string[] = [];
-
       while (index < lines.length && !/^```/.test(lines[index])) {
         codeLines.push(lines[index]);
         index += 1;
       }
-
-      if (index < lines.length) {
-        index += 1;
-      }
+      if (index < lines.length) index += 1;
 
       nodes.push(
         <pre
@@ -238,7 +223,6 @@ function renderMarkdown(text: string): ReactNode[] {
               ? "text-xl font-semibold text-[#E8E4DD]"
               : "text-base font-semibold text-[#E8E4DD]";
       const Tag = `h${Math.min(level, 6)}` as ElementType;
-
       nodes.push(
         <Tag key={`heading-${nodes.length}`} className={className}>
           {renderInlineMarkdown(headingMatch[2], `heading-${nodes.length}`)}
@@ -249,21 +233,17 @@ function renderMarkdown(text: string): ReactNode[] {
     }
 
     if (/^([-*_]){3,}\s*$/.test(line.trim())) {
-      nodes.push(
-        <hr key={`hr-${nodes.length}`} className="border-[#3D3C36]" />,
-      );
+      nodes.push(<hr key={`hr-${nodes.length}`} className="border-[#3D3C36]" />);
       index += 1;
       continue;
     }
 
     if (/^>\s?/.test(line)) {
       const quoteLines: string[] = [];
-
       while (index < lines.length && /^>\s?/.test(lines[index])) {
         quoteLines.push(lines[index].replace(/^>\s?/, ""));
         index += 1;
       }
-
       nodes.push(
         <blockquote
           key={`quote-${nodes.length}`}
@@ -281,17 +261,12 @@ function renderMarkdown(text: string): ReactNode[] {
 
     if (/^[-*+]\s+/.test(line)) {
       const items: string[] = [];
-
       while (index < lines.length && /^[-*+]\s+/.test(lines[index])) {
         items.push(lines[index].replace(/^[-*+]\s+/, ""));
         index += 1;
       }
-
       nodes.push(
-        <ul
-          key={`ul-${nodes.length}`}
-          className="list-disc space-y-2 pl-6 text-[#E8E4DD]"
-        >
+        <ul key={`ul-${nodes.length}`} className="list-disc space-y-2 pl-6 text-[#E8E4DD]">
           {items.map((item, itemIndex) => (
             <li key={`ul-item-${itemIndex}`}>
               {renderInlineMarkdown(item, `ul-${itemIndex}`)}
@@ -304,17 +279,12 @@ function renderMarkdown(text: string): ReactNode[] {
 
     if (/^\d+\.\s+/.test(line)) {
       const items: string[] = [];
-
       while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
         items.push(lines[index].replace(/^\d+\.\s+/, ""));
         index += 1;
       }
-
       nodes.push(
-        <ol
-          key={`ol-${nodes.length}`}
-          className="list-decimal space-y-2 pl-6 text-[#E8E4DD]"
-        >
+        <ol key={`ol-${nodes.length}`} className="list-decimal space-y-2 pl-6 text-[#E8E4DD]">
           {items.map((item, itemIndex) => (
             <li key={`ol-item-${itemIndex}`}>
               {renderInlineMarkdown(item, `ol-${itemIndex}`)}
@@ -326,7 +296,6 @@ function renderMarkdown(text: string): ReactNode[] {
     }
 
     const paragraphLines: string[] = [];
-
     while (
       index < lines.length &&
       lines[index].trim() &&
@@ -351,6 +320,8 @@ function renderMarkdown(text: string): ReactNode[] {
   return nodes;
 }
 
+// ── Chat UI components ──────────────────────────────────────────────
+
 function ToolBlock({
   part,
 }: {
@@ -358,9 +329,7 @@ function ToolBlock({
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!part.type.startsWith("tool-")) {
-    return null;
-  }
+  if (!part.type.startsWith("tool-")) return null;
 
   const title = part.type.replace("tool-", "");
 
@@ -392,7 +361,6 @@ function ToolBlock({
         <Wrench className="h-3.5 w-3.5 text-[#4CAF6E]" />
         <span className="text-sm font-medium text-[#E8E4DD]">{title}</span>
       </button>
-
       {isOpen && (
         <div className="border-t border-[#3D3C36] px-4 py-4">
           <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-[#E8E4DD]">
@@ -418,7 +386,6 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
-
       <div className="min-w-0 flex-1 space-y-3 pt-0.5">
         {message.parts.map((part, index) => {
           switch (part.type) {
@@ -432,17 +399,16 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
                 </div>
               );
             default:
-              if (!part.type.startsWith("tool-")) {
-                return null;
-              }
-
+              if (!part.type.startsWith("tool-")) return null;
               return (
                 <ToolBlock
                   key={`${message.id}-${index}`}
-                  part={part as Extract<
-                    GoogleAdsAgentUIMessage["parts"][number],
-                    { type: string }
-                  >}
+                  part={
+                    part as Extract<
+                      GoogleAdsAgentUIMessage["parts"][number],
+                      { type: string }
+                    >
+                  }
                 />
               );
           }
@@ -452,13 +418,14 @@ function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
   );
 }
 
+// ── Main chat page ──────────────────────────────────────────────────
+
 export default function ChatPage() {
   const [input, setInput] = useState("");
   const [account, setAccount] = useState<StoredAccount>(emptyAccount);
   const [isHydrated, setIsHydrated] = useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string>("");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const transport = useMemo(
     () =>
@@ -468,7 +435,6 @@ export default function ChatPage() {
           headers: (() => {
             const currentAccount =
               typeof window === "undefined" ? emptyAccount : readStoredAccount();
-
             return {
               "X-Google-Ads-Refresh-Token": currentAccount.refreshToken ?? "",
               "X-Google-Ads-Customer-Id": currentAccount.customerId ?? "",
@@ -480,13 +446,9 @@ export default function ChatPage() {
             trigger,
             messages,
             refreshToken:
-              typeof window === "undefined"
-                ? null
-                : readStoredAccount().refreshToken,
+              typeof window === "undefined" ? null : readStoredAccount().refreshToken,
             customerId:
-              typeof window === "undefined"
-                ? null
-                : readStoredAccount().customerId,
+              typeof window === "undefined" ? null : readStoredAccount().customerId,
           },
         }),
       }),
@@ -499,14 +461,21 @@ export default function ChatPage() {
       transport,
     });
 
+  // Helper: notify layout sidebar that threads changed
+  function syncToSidebar(nextThreads: ChatThread[], nextActiveId: string) {
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(nextThreads));
+    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, nextActiveId);
+    dispatchThreadEvent("refresh");
+  }
+
+  // ── Hydration ──
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       const storedThreads = loadThreads();
       const initialThreads = storedThreads.length > 0 ? storedThreads : [createThread()];
       const preferredThreadId = localStorage.getItem(ACTIVE_CHAT_THREAD_KEY);
       const initialActiveThreadId =
-        preferredThreadId &&
-        initialThreads.some(thread => thread.id === preferredThreadId)
+        preferredThreadId && initialThreads.some(thread => thread.id === preferredThreadId)
           ? preferredThreadId
           : initialThreads[0].id;
 
@@ -516,7 +485,11 @@ export default function ChatPage() {
       setActiveThreadId(initialActiveThreadId);
       setIsHydrated(true);
 
-      // If no local auth, check server session (cookie-based)
+      // Sync to sidebar
+      localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, initialActiveThreadId);
+      dispatchThreadEvent("refresh");
+
+      // If no local auth, check server session
       if (!localAccount.refreshToken || !localAccount.customerId) {
         fetch("/api/auth/session")
           .then(r => r.json())
@@ -532,35 +505,79 @@ export default function ChatPage() {
           .catch(() => {});
       }
     });
-
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
+  // ── Listen for sidebar events ──
   useEffect(() => {
-    if (!isHydrated || !activeThreadId) {
-      return;
-    }
+    const unsubs = [
+      onThreadEvent("select", (threadId) => {
+        if (!threadId || threadId === activeThreadId) return;
+        stop();
+        setThreads(currentThreads =>
+          applyActiveThreadSnapshot(currentThreads, activeThreadId, messages),
+        );
+        setActiveThreadId(threadId);
+        localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
+        dispatchThreadEvent("refresh");
+      }),
+      onThreadEvent("create", () => {
+        stop();
+        const newThread = createThread();
+        setThreads(currentThreads => {
+          const syncedThreads = activeThreadId
+            ? applyActiveThreadSnapshot(currentThreads, activeThreadId, messages)
+            : currentThreads;
+          const nextThreads = [newThread, ...syncedThreads];
+          syncToSidebar(nextThreads, newThread.id);
+          return nextThreads;
+        });
+        setActiveThreadId(newThread.id);
+        setInput("");
+      }),
+      onThreadEvent("delete", (threadId) => {
+        if (!threadId) return;
+        stop();
+        setThreads(currentThreads => {
+          const syncedThreads = activeThreadId
+            ? applyActiveThreadSnapshot(currentThreads, activeThreadId, messages)
+            : currentThreads;
+          const nextThreads = syncedThreads.filter(thread => thread.id !== threadId);
+          const fallbackThreads = nextThreads.length > 0 ? nextThreads : [createThread()];
+          if (threadId === activeThreadId) {
+            setActiveThreadId(fallbackThreads[0].id);
+            setInput("");
+            syncToSidebar(fallbackThreads, fallbackThreads[0].id);
+          } else {
+            syncToSidebar(fallbackThreads, activeThreadId);
+          }
+          return fallbackThreads;
+        });
+      }),
+    ];
+    return () => unsubs.forEach(u => u());
+  }, [activeThreadId, messages, stop]);
 
+  // ── Load messages when active thread changes ──
+  useEffect(() => {
+    if (!isHydrated || !activeThreadId) return;
     const activeThread = threads.find(thread => thread.id === activeThreadId);
-
     const frame = window.requestAnimationFrame(() => {
       setMessages(activeThread?.messages ?? []);
       setInput("");
     });
-
     return () => window.cancelAnimationFrame(frame);
   }, [activeThreadId, isHydrated, setMessages, threads]);
 
+  // ── Persist thread data on message changes ──
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-
+    if (!isHydrated) return;
     const nextThreads = activeThreadId
       ? applyActiveThreadSnapshot(threads, activeThreadId, messages)
       : threads;
-
     localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(nextThreads));
+    // Notify sidebar so thread titles update in real-time
+    dispatchThreadEvent("refresh");
   }, [activeThreadId, isHydrated, messages, threads]);
 
   const isReady = isHydrated && Boolean(account.refreshToken && account.customerId);
@@ -568,219 +585,113 @@ export default function ChatPage() {
   const displayThreads = activeThreadId
     ? applyActiveThreadSnapshot(threads, activeThreadId, messages)
     : threads;
-  const sortedThreads = [...displayThreads].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  );
-
-  function handleCreateThread() {
-    stop();
-    const newThread = createThread();
-
-    setThreads(currentThreads => {
-      const syncedThreads = activeThreadId
-        ? applyActiveThreadSnapshot(currentThreads, activeThreadId, messages)
-        : currentThreads;
-      const nextThreads = [newThread, ...syncedThreads];
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(nextThreads));
-      return nextThreads;
-    });
-    setActiveThreadId(newThread.id);
-    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, newThread.id);
-    setInput("");
-  }
-
-  function handleSelectThread(threadId: string) {
-    if (threadId === activeThreadId) {
-      return;
-    }
-
-    stop();
-    setThreads(currentThreads =>
-      applyActiveThreadSnapshot(currentThreads, activeThreadId, messages),
-    );
-    setActiveThreadId(threadId);
-    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
-  }
-
-  function handleDeleteThread(threadId: string) {
-    stop();
-
-    setThreads(currentThreads => {
-      const syncedThreads = activeThreadId
-        ? applyActiveThreadSnapshot(currentThreads, activeThreadId, messages)
-        : currentThreads;
-      const nextThreads = syncedThreads.filter(thread => thread.id !== threadId);
-      const fallbackThreads = nextThreads.length > 0 ? nextThreads : [createThread()];
-
-      if (threadId === activeThreadId) {
-        setActiveThreadId(fallbackThreads[0].id);
-        localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, fallbackThreads[0].id);
-        setInput("");
-      }
-
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(fallbackThreads));
-      return fallbackThreads;
-    });
-  }
 
   return (
-    <main className="h-screen overflow-hidden bg-[#1A1917] text-[#E8E4DD]">
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.08]" />
+    <section className="flex h-full flex-col overflow-hidden">
+      <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
+        <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">
+              {displayThreads.find(thread => thread.id === activeThreadId)?.title ??
+                "New chat"}
+            </h1>
+            <p className="mt-0.5 text-sm text-[#9B9689]">
+              {isReady
+                ? account.customerName ?? account.customerId
+                : "Connect Google Ads to begin"}
+            </p>
+          </div>
+          <GoogleAdsAuth
+            onConnect={() => setAccount(readStoredAccount())}
+            onDisconnect={() => setAccount(emptyAccount)}
+            variant="outline"
+            size="sm"
+            className="rounded-lg border-[#3D3C36] bg-[#2E2D28] text-[#E8E4DD] hover:bg-[#3D3C36]"
+          />
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="flex min-h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="mb-6 inline-flex items-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-1.5 text-sm text-[#4CAF6E] shadow-[0_0_20px_rgba(76,175,110,0.16)]">
+              <span className="mr-2 h-2 w-2 rounded-full bg-[#4CAF6E] shadow-[0_0_10px_rgba(76,175,110,0.5)]" />
+              ADSAGENT COPILOT
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
+              How can I help with your Google Ads account?
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[#9B9689]">
+              Ask for audits, campaign summaries, keyword analysis, or GAQL reports.
+            </p>
+            <div className="mt-8 grid w-full max-w-4xl gap-3 sm:grid-cols-2">
+              {starterPrompts.map(prompt => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => setInput(prompt)}
+                  className="rounded border border-[#3D3C36] bg-[#24231F] px-4 py-4 text-left text-sm leading-6 text-[#E8E4DD] transition hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#3D3C36]/50">
+            {messages.map(message => (
+              <Message key={message.id} message={message} />
+            ))}
+          </div>
+        )}
       </div>
 
-      <div
-        className={`relative grid h-screen w-full overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${
-          isSidebarCollapsed
-            ? "lg:grid-cols-[60px_minmax(0,1fr)]"
-            : "lg:grid-cols-[240px_minmax(0,1fr)]"
-        }`}
-      >
-        <AppSidebar
-          currentPath="/chat"
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapsed={() => setIsSidebarCollapsed(current => !current)}
-          onCreateThread={handleCreateThread}
-          threads={sortedThreads.map<SidebarThread>(thread => ({
-            id: thread.id,
-            title: thread.title,
-            updatedAt: thread.updatedAt,
-            messageCount: thread.messages.length,
-          }))}
-          activeThreadId={activeThreadId}
-          onSelectThread={handleSelectThread}
-          onDeleteThread={handleDeleteThread}
-        />
-
-        <section className="flex min-h-0 h-screen flex-col overflow-hidden">
-          <header className="shrink-0 border-b border-[#3D3C36] bg-[#1A1917]/90 backdrop-blur-xl">
-            <div className="flex w-full items-center justify-between gap-4 px-6 py-3">
-              <div>
-                <div className="text-sm font-medium text-[#E8E4DD]">
-                  {displayThreads.find(thread => thread.id === activeThreadId)?.title ??
-                    "New chat"}
-                </div>
-                <div className="text-xs text-[#9B9689]">
-                  {isReady
-                    ? account.customerName ?? account.customerId
-                    : "Connect Google Ads to begin"}
-                </div>
-              </div>
-
-              <GoogleAdsAuth
-                onConnect={() => {
-                  setAccount(readStoredAccount());
-                }}
-                onDisconnect={() => {
-                  setAccount(emptyAccount);
-                }}
-                variant="outline"
-                size="sm"
-                className="rounded-full border-[#3D3C36] bg-[#2E2D28] text-[#E8E4DD] hover:bg-[#3D3C36]"
+      <div className="shrink-0 border-t border-[#3D3C36] bg-[#1A1917]/95 px-4 py-4 backdrop-blur-xl">
+        <div className="w-full px-2">
+          {error && (
+            <div className="mb-3 rounded border border-[#C45D4A]/20 bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
+              {error.message}
+            </div>
+          )}
+          <form
+            onSubmit={event => {
+              event.preventDefault();
+              if (!input.trim() || !isReady || isSending) return;
+              sendMessage({ text: input });
+              setInput("");
+            }}
+            className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+          >
+            <div className="flex items-end gap-3">
+              <Input
+                value={input}
+                onChange={event => setInput(event.currentTarget.value)}
+                placeholder={isReady ? "Message AdsAgent" : "Connect Google Ads first..."}
+                disabled={!isReady || isSending}
+                className="h-12 border-0 bg-transparent px-2 text-[15px] text-[#E8E4DD] shadow-none placeholder:text-[#9B9689] focus-visible:ring-0"
               />
-            </div>
-          </header>
-
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {messages.length === 0 ? (
-              <div className="flex min-h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
-                <div className="mb-6 inline-flex items-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-1.5 text-sm text-[#4CAF6E] shadow-[0_0_20px_rgba(76,175,110,0.16)]">
-                  <span className="mr-2 h-2 w-2 rounded-full bg-[#4CAF6E] shadow-[0_0_10px_rgba(76,175,110,0.5)]" />
-                  ADSAGENT COPILOT
-                </div>
-                <h1 className="text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
-                  How can I help with your Google Ads account?
-                </h1>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-[#9B9689]">
-                  Ask for audits, campaign summaries, keyword analysis, or GAQL
-                  reports.
-                </p>
-
-                <div className="mt-8 grid w-full max-w-4xl gap-3 sm:grid-cols-2">
-                  {starterPrompts.map(prompt => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => setInput(prompt)}
-                      className="rounded border border-[#3D3C36] bg-[#24231F] px-4 py-4 text-left text-sm leading-6 text-[#E8E4DD] transition hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="divide-y divide-[#3D3C36]/50">
-                {messages.map(message => (
-                  <Message key={message.id} message={message} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="shrink-0 border-t border-[#3D3C36] bg-[#1A1917]/95 px-4 py-4 backdrop-blur-xl">
-            <div className="w-full px-2">
-              {error && (
-                <div className="mb-3 rounded border border-[#C45D4A]/20 bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
-                  {error.message}
-                </div>
+              {isSending ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => stop()}
+                  className="h-10 w-10 rounded-full text-[#E8E4DD] hover:bg-[#2E2D28]"
+                >
+                  <Square className="h-4 w-4 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={!isReady || !input.trim()}
+                  className="h-10 w-10 rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
               )}
-
-              <form
-                onSubmit={event => {
-                  event.preventDefault();
-
-                  if (!input.trim() || !isReady || isSending) {
-                    return;
-                  }
-
-                  sendMessage({ text: input });
-                  setInput("");
-                }}
-                className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
-              >
-                <div className="flex items-end gap-3">
-                  <Input
-                    value={input}
-                    onChange={event => setInput(event.currentTarget.value)}
-                    placeholder={
-                      isReady
-                        ? "Message AdsAgent"
-                        : "Connect Google Ads first..."
-                    }
-                    disabled={!isReady || isSending}
-                    className="h-12 border-0 bg-transparent px-2 text-[15px] text-[#E8E4DD] shadow-none placeholder:text-[#9B9689] focus-visible:ring-0"
-                  />
-
-                  {isSending ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => stop()}
-                      className="h-10 w-10 rounded-full text-[#E8E4DD] hover:bg-[#2E2D28]"
-                    >
-                      <Square className="h-4 w-4 fill-current" />
-                    </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      disabled={!isReady || !input.trim()}
-                      className="h-10 w-10 rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]"
-                    >
-                      {isSending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </form>
-
             </div>
-          </div>
-        </section>
+          </form>
+        </div>
       </div>
-    </main>
+    </section>
   );
 }

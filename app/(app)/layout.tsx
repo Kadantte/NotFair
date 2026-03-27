@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -8,6 +8,7 @@ import { LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2 
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
 import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from '@/lib/chat-history';
+import { dispatchThreadEvent, onThreadEvent } from '@/lib/thread-events';
 
 type Thread = { id: string; title: string; updatedAt: string; messageCount: number };
 
@@ -77,18 +78,64 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const [collapsed, setCollapsed] = useState(false);
     const [threads, setThreads] = useState<Thread[]>([]);
+    const [activeThreadId, setActiveThreadId] = useState<string>('');
+    const isOnChat = pathname === '/chat';
+
+    const refreshThreads = useCallback(() => {
+        setThreads(loadThreads());
+        setActiveThreadId(localStorage.getItem(ACTIVE_CHAT_THREAD_KEY) ?? '');
+    }, []);
 
     useEffect(() => {
         const stored = localStorage.getItem(COLLAPSED_KEY);
         if (stored !== null) setCollapsed(stored === 'true');
-        setThreads(loadThreads());
-    }, []);
+        refreshThreads();
+    }, [refreshThreads]);
+
+    // Listen for thread refresh events from the chat page
+    useEffect(() => {
+        return onThreadEvent('refresh', refreshThreads);
+    }, [refreshThreads]);
 
     function toggleCollapsed() {
         setCollapsed(c => {
             localStorage.setItem(COLLAPSED_KEY, String(!c));
             return !c;
         });
+    }
+
+    function handleNewChat() {
+        if (isOnChat) {
+            dispatchThreadEvent('create');
+        } else {
+            router.push('/chat');
+        }
+    }
+
+    function handleSelectThread(threadId: string) {
+        if (isOnChat) {
+            dispatchThreadEvent('select', threadId);
+        } else {
+            localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
+            router.push('/chat');
+        }
+    }
+
+    function handleDeleteThread(threadId: string) {
+        if (isOnChat) {
+            dispatchThreadEvent('delete', threadId);
+        } else {
+            // Delete directly from localStorage when not on chat
+            try {
+                const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    const filtered = Array.isArray(parsed) ? parsed.filter((t: { id: string }) => t.id !== threadId) : [];
+                    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(filtered));
+                    refreshThreads();
+                }
+            } catch { /* ignore */ }
+        }
     }
 
     return (
@@ -125,7 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => router.push('/chat')}
+                        onClick={handleNewChat}
                         className={`h-9 rounded-lg px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
                             collapsed ? 'w-10 justify-center gap-0 px-0 mx-auto' : 'w-full justify-start'
                         }`}
@@ -154,22 +201,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {!collapsed && threads.length > 0 && (
                     <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
                         {threads.map(thread => (
-                            <button
+                            <div
                                 key={thread.id}
-                                type="button"
-                                onClick={() => {
-                                    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, thread.id);
-                                    router.push('/chat');
-                                }}
-                                className="w-full rounded-lg px-3 py-2 text-left transition hover:bg-[#E8E4DD]/5"
+                                className={`mb-0.5 rounded-lg transition ${
+                                    isOnChat && thread.id === activeThreadId
+                                        ? 'bg-[#E8E4DD]/5'
+                                        : 'hover:bg-[#E8E4DD]/5'
+                                }`}
                             >
-                                <div className="truncate text-[13px] font-medium text-[#E8E4DD]/80">
-                                    {thread.title}
+                                <div className="flex items-start gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectThread(thread.id)}
+                                        className="min-w-0 flex-1 rounded-lg px-3 py-2 text-left"
+                                    >
+                                        <div className="truncate text-[13px] font-medium text-[#E8E4DD]/80">
+                                            {thread.title}
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] text-[#9B9689]">
+                                            {formatDate(thread.updatedAt)} · {thread.messageCount}m
+                                        </div>
+                                    </button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        onClick={() => handleDeleteThread(thread.id)}
+                                        className="mt-1.5 mr-1 shrink-0 rounded-lg text-[#9B9689] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] [div:hover>&]:opacity-100"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
                                 </div>
-                                <div className="mt-0.5 text-[11px] text-[#9B9689]">
-                                    {formatDate(thread.updatedAt)} · {thread.messageCount}m
-                                </div>
-                            </button>
+                            </div>
                         ))}
                     </div>
                 )}
