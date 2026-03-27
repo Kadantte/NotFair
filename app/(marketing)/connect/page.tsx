@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSession } from '@/components/session-provider';
 
 const CLIENTS = [
     {
@@ -208,8 +209,9 @@ export default function ConnectPage() {
 function ConnectContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const token = searchParams.get('token');
-    const customerName = searchParams.get('customer_name');
+    const session = useSession();
+    const urlToken = searchParams.get('token');
+    const urlCustomerName = searchParams.get('customer_name');
     const error = searchParams.get('error');
     const pendingToken = searchParams.get('pending');
     const accountsParam = searchParams.get('accounts');
@@ -219,6 +221,10 @@ function ConnectContent() {
     const [selecting, setSelecting] = useState(false);
     const [activeClient, setActiveClient] = useState<string>('claude');
     const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+
+    // Prefer URL params (fresh from OAuth redirect), fall back to server session
+    const token = urlToken || (session.connected ? session.token : null);
+    const customerName = urlCustomerName || (session.connected ? session.customerName : null);
 
     let accounts: { id: string; name: string }[] = [];
     if (accountsParam) {
@@ -231,7 +237,12 @@ function ConnectContent() {
 
     useEffect(() => {
         setMcpUrl(`${window.location.origin}/api/mcp`);
-    }, []);
+
+        // Strip sensitive token from URL after OAuth redirect lands
+        if (urlToken) {
+            window.history.replaceState({}, '', '/connect');
+        }
+    }, [urlToken]);
 
     const client = CLIENTS.find((c) => c.id === activeClient)!;
     const prompt = token && mcpUrl

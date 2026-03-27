@@ -3,6 +3,7 @@ import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { listAccessibleCustomers } from "@/lib/google-ads";
+import { setSessionCookies } from "@/lib/auth-cookies";
 
 export async function POST(request: Request) {
   let body;
@@ -85,7 +86,9 @@ export async function POST(request: Request) {
     .map((a) => a.name || a.id)
     .join(", ");
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}/connect?token=${pendingToken}&customer_name=${encodeURIComponent(accountNames)}`,
   });
+  setSessionCookies(response, pendingToken, accountNames);
+  return response;
 }

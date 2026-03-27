@@ -5,6 +5,7 @@ import { getEnv } from "@/lib/env";
 import { listAccessibleCustomers } from "@/lib/google-ads";
 import { randomBytes } from "crypto";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
+import { setSessionCookies } from "@/lib/auth-cookies";
 
 function redirectWithError(message: string) {
   return NextResponse.redirect(
@@ -273,9 +274,11 @@ export async function GET(request: Request) {
         );
       }
 
-      return NextResponse.redirect(
+      const redirectResponse = NextResponse.redirect(
         `${getAppOrigin()}/connect?token=${accessToken}&customer_name=${encodeURIComponent(account.name || "Google Ads Account")}`,
       );
+      setSessionCookies(redirectResponse, accessToken, account.name || "Google Ads Account");
+      return redirectResponse;
     }
 
     // Multiple accounts — show account selection
