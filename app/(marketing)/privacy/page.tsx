@@ -1,6 +1,18 @@
-export const metadata = {
-    title: "Privacy Policy - AdsAgent",
-};
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+    title: "Privacy Policy",
+    description:
+        "Read how AdsAgent handles Google OAuth data, Google Ads account data, retention, deletion, and security for the AI Google Ads agent product.",
+    path: "/privacy",
+    keywords: [
+        "AdsAgent privacy policy",
+        "Google Ads OAuth privacy",
+        "Google Ads data handling",
+        "AI Google Ads privacy",
+    ],
+    category: "legal",
+});
 
 export default function PrivacyPage() {
     return (

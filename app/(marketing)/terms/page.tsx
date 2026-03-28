@@ -1,6 +1,17 @@
-export const metadata = {
-    title: "Terms of Service - AdsAgent",
-};
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata = buildMetadata({
+    title: "Terms of Service",
+    description:
+        "Review the AdsAgent terms covering use of the AI Google Ads agent, Google Ads integrations, service limitations, and account responsibilities.",
+    path: "/terms",
+    keywords: [
+        "AdsAgent terms of service",
+        "Google Ads agent terms",
+        "Google Ads MCP terms",
+    ],
+    category: "legal",
+});
 
 export default function TermsPage() {
     return (
@@ -10,7 +21,7 @@ export default function TermsPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">1. Introduction</h2>
                 <p>
-                    Welcome to AdsAgent ("Service"). By accessing or using our Service, you agree to comply with and be bound by these Terms of Service. If you do not agree, you must not use the Service.
+                    Welcome to AdsAgent (&quot;Service&quot;). By accessing or using our Service, you agree to comply with and be bound by these Terms of Service. If you do not agree, you must not use the Service.
                 </p>
             </section>
 
@@ -58,7 +69,7 @@ export default function TermsPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">7. Disclaimer of Warranties</h2>
                 <p>
-                    THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS. ADSAGENT MAKES NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, AS TO THE OPERATION OF THE SERVICE OR THE INFORMATION, CONTENT, MATERIALS, OR PRODUCTS INCLUDED ON THE SERVICE.
+                    THE SERVICE IS PROVIDED ON AN &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; BASIS. ADSAGENT MAKES NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, AS TO THE OPERATION OF THE SERVICE OR THE INFORMATION, CONTENT, MATERIALS, OR PRODUCTS INCLUDED ON THE SERVICE.
                 </p>
             </section>
 
@@ -72,7 +83,7 @@ export default function TermsPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">9. Changes to Terms</h2>
                 <p>
-                    We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material we will try to provide at least 30 days' notice prior to any new terms taking effect.
+                    We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material we will try to provide at least 30 days&apos; notice prior to any new terms taking effect.
                 </p>
             </section>
 

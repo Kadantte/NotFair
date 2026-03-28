@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Agentation } from 'agentation';
+import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +15,47 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AdsAgent - Your AI Ads Advisor",
-  description: "An MCP server that connects your Google Ads to Claude, Cursor, or any AI tool. Get intelligent recommendations, execute changes safely, and track impact.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} | AI Google Ads Agent & MCP Server`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} | AI Google Ads Agent & MCP Server`,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: "/logo.svg",
+        alt: `${SITE_NAME} logo`,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} | AI Google Ads Agent & MCP Server`,
+    description: SITE_DESCRIPTION,
+    images: ["/logo.svg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  category: "marketing",
 };
 
 export default function RootLayout({
