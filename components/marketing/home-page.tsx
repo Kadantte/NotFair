@@ -1,33 +1,33 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Link2, Sparkles, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useSession } from '@/components/session-provider';
-import { startGoogleConnect } from '@/lib/google-oauth';
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Link2, Sparkles, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useSession } from "@/components/session-provider";
+import { startGoogleConnect } from "@/lib/google-oauth";
 
-const CYCLING_WORDS = ['Claude', 'ChatGPT', 'OpenClaw', 'AI agent'];
+const CYCLING_WORDS = ["Claude", "ChatGPT", "OpenClaw", "AI agent"];
 const CYCLE_INTERVAL_MS = 2000;
 
 const intentCards = [
   {
-    title: 'AI Google Ads agent',
+    title: "AI Google Ads agent",
     description:
-      'Use AdsAgent when you want an AI agent to inspect campaigns, surface waste, and recommend changes before you act.',
+      "Use AdsAgent when you want an AI agent to inspect campaigns, surface waste, and recommend changes before you act.",
     icon: Sparkles,
   },
   {
-    title: 'Google Ads MCP server',
+    title: "Google Ads MCP server",
     description:
-      'Connect Google Ads to Claude, OpenClaw, or other MCP-compatible workflows without building your own integration layer.',
+      "Connect Google Ads to Claude, OpenClaw, or other MCP-compatible workflows without building your own integration layer.",
     icon: Link2,
   },
   {
-    title: 'Safer optimization workflow',
+    title: "Safer optimization workflow",
     description:
-      'Track what changed, compare before and after, and keep a tighter audit trail around campaign updates.',
+      "Track what changed, compare before and after, and keep a tighter audit trail around campaign updates.",
     icon: ShieldCheck,
   },
 ];
@@ -70,10 +70,10 @@ export function HomePage() {
               <AnimatePresence mode="wait">
                 <motion.span
                   key={wordIndex}
-                  initial={{ opacity: 0, y: '100%' }}
-                  animate={{ opacity: 1, y: '0%' }}
-                  exit={{ opacity: 0, y: '-100%' }}
-                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  initial={{ opacity: 0, y: "100%" }}
+                  animate={{ opacity: 1, y: "0%" }}
+                  exit={{ opacity: 0, y: "-100%" }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="block text-[#4CAF6E]"
                 >
                   {CYCLING_WORDS[wordIndex]}
@@ -101,7 +101,7 @@ export function HomePage() {
               onClick={handleCTA}
               className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
             >
-              {session.connected ? 'Go to Connect' : 'Connect Google Ads'}{' '}
+              {session.connected ? "Go to Connect" : "Connect Google Ads"}{" "}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
 
@@ -115,13 +115,14 @@ export function HomePage() {
 
             <p className="max-w-md text-center text-sm leading-relaxed text-[#9B9689]">
               By connecting Google Ads, you agree to our{' '}
+              {" "}
               <Link
                 href="/privacy"
                 className="font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
               >
                 Privacy Policy
-              </Link>{' '}
-              and{' '}
+              </Link>{" "}
+              and{" "}
               <Link
                 href="/terms"
                 className="font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
@@ -134,12 +135,12 @@ export function HomePage() {
 
           <div className="mt-16 grid w-full max-w-2xl grid-cols-1 gap-6 md:grid-cols-3">
             {[
-              { step: '1', text: 'Connect your Google Ads account' },
+              { step: "1", text: "Connect your Google Ads account" },
               {
-                step: '2',
-                text: 'Paste the setup prompt into Claude, OpenClaw, or your MCP client',
+                step: "2",
+                text: "Paste the setup prompt into Claude, OpenClaw, or your MCP client",
               },
-              { step: '3', text: 'Ask about your campaigns and approve changes' },
+              { step: "3", text: "Ask about your campaigns and approve changes" },
             ].map((item) => (
               <div key={item.step} className="flex items-start gap-3 text-left">
                 <span className="text-2xl font-bold text-[#3D3C36]">{item.step}</span>
@@ -205,6 +206,31 @@ export function HomePage() {
             >
               Explore impact tracking
             </Link>
+          </div>
+
+          <div className="mt-6 text-sm leading-relaxed text-[#9B9689]">
+            Popular guides:{" "}
+            <Link
+              href="/ai-google-ads-agent"
+              className="underline underline-offset-4 transition-colors hover:text-[#E8E4DD]"
+            >
+              AI Google Ads agent
+            </Link>
+            ,{" "}
+            <Link
+              href="/google-ads-mcp"
+              className="underline underline-offset-4 transition-colors hover:text-[#E8E4DD]"
+            >
+              Google Ads MCP
+            </Link>
+            , and{" "}
+            <Link
+              href="/connect-google-ads-to-claude"
+              className="underline underline-offset-4 transition-colors hover:text-[#E8E4DD]"
+            >
+              connect Google Ads to Claude
+            </Link>
+            .
           </div>
         </div>
       </section>
