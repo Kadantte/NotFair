@@ -1,5 +1,8 @@
 import { HomePage } from "@/components/marketing/home-page";
-import { buildHomepageJsonLd, buildMetadata } from "@/lib/seo";
+import { FaqSection } from "@/components/marketing/faq-section";
+import { LandingLinksSection } from "@/components/marketing/landing-links-section";
+import { allLandingPages, homepageFaq } from "@/lib/marketing-pages";
+import { buildFaqJsonLd, buildHomepageJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "AI Google Ads Agent & Google Ads MCP Server",
@@ -17,7 +20,12 @@ export const metadata = buildMetadata({
 });
 
 export default function Home() {
-  const jsonLd = buildHomepageJsonLd();
+  const jsonLd = [buildHomepageJsonLd(), buildFaqJsonLd(homepageFaq)].flat();
+  const homepageLinks = allLandingPages.map((page) => ({
+    href: `/${page.slug}`,
+    title: page.title,
+    description: page.description,
+  }));
 
   return (
     <>
@@ -26,6 +34,16 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <HomePage />
+      <LandingLinksSection
+        title="Explore common AdsAgent search intents"
+        intro="These pages answer the most common high-intent questions teams have before they connect Google Ads to an AI workflow."
+        links={homepageLinks}
+      />
+      <FaqSection
+        title="Homepage FAQ"
+        intro="Concise answers to the questions most buyers ask when they are evaluating AdsAgent."
+        items={homepageFaq}
+      />
     </>
   );
 }

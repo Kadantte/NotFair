@@ -1,7 +1,14 @@
 import type { MetadataRoute } from "next";
+import { allLandingPages } from "@/lib/marketing-pages";
 import { SITE_URL } from "@/lib/seo";
 
-const publicMarketingRoutes = ["/", "/impact", "/privacy", "/terms"];
+const publicMarketingRoutes = [
+  "/",
+  "/impact",
+  "/privacy",
+  "/terms",
+  ...allLandingPages.map((page) => `/${page.slug}`),
+];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

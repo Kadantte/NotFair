@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const SITE_NAME = "AdsAgent";
 export const SITE_URL = "https://adsagent.ai";
-export const DEFAULT_OG_IMAGE = "/logo.svg";
+export const DEFAULT_OG_IMAGE = "/opengraph-image";
 export const SITE_DESCRIPTION =
   "AdsAgent is an AI Google Ads agent and Google Ads MCP server that lets you connect Google Ads to Claude, ChatGPT-style MCP workflows, and OpenClaw.";
 export const SITE_KEYWORDS = [
@@ -112,4 +112,24 @@ export function buildHomepageJsonLd() {
       url: SITE_URL,
     },
   ];
+}
+
+export type FaqItem = {
+  question: string;
+  answer: string;
+};
+
+export function buildFaqJsonLd(items: FaqItem[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  };
 }
