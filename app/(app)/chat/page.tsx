@@ -8,7 +8,6 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
-  Loader2,
   Send,
   Square,
   User,
@@ -20,9 +19,10 @@ import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from "@/lib/chat-history";
 import { dispatchThreadEvent, onThreadEvent } from "@/lib/thread-events";
+import type { Session } from "@/lib/session";
 
 type StoredAccount = {
-  refreshToken: string | null;
+  connected: boolean;
   customerId: string | null;
   customerName: string | null;
 };
@@ -36,7 +36,7 @@ type ChatThread = {
 };
 
 const emptyAccount: StoredAccount = {
-  refreshToken: null,
+  connected: false,
   customerId: null,
   customerName: null,
 };
@@ -48,12 +48,12 @@ const starterPrompts = [
   "Write a GAQL report to show campaign CTR, CPC, and conversions, then explain it.",
 ];
 
-function readStoredAccount(): StoredAccount {
-  return {
-    refreshToken: localStorage.getItem("google_ads_refresh_token"),
-    customerId: localStorage.getItem("google_ads_customer_id"),
-    customerName: localStorage.getItem("google_ads_customer_name"),
-  };
+async function readServerSession(): Promise<Session> {
+  const response = await fetch("/api/auth/session", {
+    credentials: "include",
+  });
+
+  return response.json();
 }
 
 function createThread(): ChatThread {
@@ -432,23 +432,11 @@ export default function ChatPage() {
       new DefaultChatTransport({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
-          headers: (() => {
-            const currentAccount =
-              typeof window === "undefined" ? emptyAccount : readStoredAccount();
-            return {
-              "X-Google-Ads-Refresh-Token": currentAccount.refreshToken ?? "",
-              "X-Google-Ads-Customer-Id": currentAccount.customerId ?? "",
-            };
-          })(),
           body: {
             id,
             messageId,
             trigger,
             messages,
-            refreshToken:
-              typeof window === "undefined" ? null : readStoredAccount().refreshToken,
-            customerId:
-              typeof window === "undefined" ? null : readStoredAccount().customerId,
           },
         }),
       }),
@@ -479,8 +467,7 @@ export default function ChatPage() {
           ? preferredThreadId
           : initialThreads[0].id;
 
-      const localAccount = readStoredAccount();
-      setAccount(localAccount);
+      setAccount(emptyAccount);
       setThreads(initialThreads);
       setActiveThreadId(initialActiveThreadId);
       setIsHydrated(true);
@@ -489,21 +476,17 @@ export default function ChatPage() {
       localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, initialActiveThreadId);
       dispatchThreadEvent("refresh");
 
-      // If no local auth, check server session
-      if (!localAccount.refreshToken || !localAccount.customerId) {
-        fetch("/api/auth/session")
-          .then(r => r.json())
-          .then(session => {
-            if (session.connected) {
-              setAccount({
-                refreshToken: "__server_session__",
-                customerId: "__server_session__",
-                customerName: session.customerName ?? "Google Ads Account",
-              });
-            }
-          })
-          .catch(() => {});
-      }
+      readServerSession()
+        .then(session => {
+          if (session.connected) {
+            setAccount({
+              connected: true,
+              customerId: session.customerId,
+              customerName: session.customerName ?? "Google Ads Account",
+            });
+          }
+        })
+        .catch(() => {});
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -580,7 +563,7 @@ export default function ChatPage() {
     dispatchThreadEvent("refresh");
   }, [activeThreadId, isHydrated, messages, threads]);
 
-  const isReady = isHydrated && Boolean(account.refreshToken && account.customerId);
+  const isReady = isHydrated && account.connected;
   const isSending = status === "submitted" || status === "streaming";
   const displayThreads = activeThreadId
     ? applyActiveThreadSnapshot(threads, activeThreadId, messages)
@@ -602,7 +585,18 @@ export default function ChatPage() {
             </p>
           </div>
           <GoogleAdsAuth
-            onConnect={() => setAccount(readStoredAccount())}
+            onConnect={() =>
+              readServerSession()
+                .then(session => {
+                  if (!session.connected) return;
+                  setAccount({
+                    connected: true,
+                    customerId: session.customerId,
+                    customerName: session.customerName ?? "Google Ads Account",
+                  });
+                })
+                .catch(() => {})
+            }
             onDisconnect={() => setAccount(emptyAccount)}
             variant="outline"
             size="sm"

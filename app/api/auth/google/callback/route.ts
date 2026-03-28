@@ -36,7 +36,7 @@ function popupPostMessage(json: string) {
   );
 }
 
-function popupResponse(data: Record<string, string>) {
+function popupResponse(data: Record<string, unknown>) {
   return popupPostMessage(safeJsonForScript({ type: "GOOGLE_ADS_AUTH_SUCCESS", ...data }));
 }
 
@@ -51,11 +51,11 @@ function errorResponse(message: string, isPopup: boolean) {
 
 function popupAccountSelectionResponse(
   accounts: { id: string; name: string }[],
-  refreshToken: string,
+  pendingToken: string,
   origin: string,
 ) {
   const accountsJson = safeJsonForScript(accounts);
-  const refreshTokenJson = safeJsonForScript(refreshToken);
+  const pendingTokenJson = safeJsonForScript(pendingToken);
   const originJson = safeJsonForScript(origin);
   return new NextResponse(
     `<!DOCTYPE html>
@@ -90,7 +90,7 @@ function popupAccountSelectionResponse(
   </div>
   <script>
     const accounts = ${accountsJson};
-    const refreshToken = ${refreshTokenJson};
+    const pendingToken = ${pendingTokenJson};
     const origin = ${originJson};
     const selected = new Set();
 
@@ -145,7 +145,7 @@ function popupAccountSelectionResponse(
         const selectedAccounts = accounts.filter(a => selected.has(a.id));
         window.opener.postMessage({
           type: "GOOGLE_ADS_AUTH_SUCCESS",
-          refreshToken,
+          pendingToken,
           accounts: selectedAccounts,
           customerId: selectedAccounts[0].id,
           customerName: selectedAccounts[0].name,
@@ -255,16 +255,6 @@ export async function GET(request: Request) {
     // If only one account, skip selection
     if (usableAccounts.length === 1) {
       const account = usableAccounts[0];
-
-      if (isPopup) {
-        return popupResponse({
-          refreshToken: tokenData.refresh_token,
-          customerId: account.id,
-          customerName: account.name || "Google Ads Account",
-          ...(googleEmail ? { googleEmail } : {}),
-        });
-      }
-
       const accessToken = randomBytes(32).toString("hex");
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -290,6 +280,16 @@ export async function GET(request: Request) {
         );
       }
 
+      if (isPopup) {
+        const response = popupResponse({
+          customerId: account.id,
+          customerName: account.name || "Google Ads Account",
+          ...(googleEmail ? { googleEmail } : {}),
+        });
+        setSessionCookies(response, accessToken, account.name || "Google Ads Account");
+        return response;
+      }
+
       const redirectResponse = NextResponse.redirect(
         `${getAppOrigin()}/connect?token=${accessToken}&customer_name=${encodeURIComponent(account.name || "Google Ads Account")}`,
       );
@@ -299,15 +299,6 @@ export async function GET(request: Request) {
 
     // Multiple accounts — show account selection
     const accountsList = usableAccounts.map((a) => ({ id: a.id, name: a.name }));
-
-    if (isPopup) {
-      return popupAccountSelectionResponse(
-        accountsList,
-        tokenData.refresh_token,
-        getAppOrigin(),
-      );
-    }
-
     const pendingToken = randomBytes(32).toString("hex");
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -325,6 +316,14 @@ export async function GET(request: Request) {
       console.error("[auth] Failed to create pending MCP session:", error);
       return redirectWithError(
         `Failed to create session: ${describeError(error)}`,
+      );
+    }
+
+    if (isPopup) {
+      return popupAccountSelectionResponse(
+        accountsList,
+        pendingToken,
+        getAppOrigin(),
       );
     }
 

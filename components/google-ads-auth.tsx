@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -8,7 +8,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Settings, CheckCircle2, ChevronDown } from "lucide-react";
+import { Settings, CheckCircle2, ChevronDown } from "lucide-react";
+import type { Session } from "@/lib/session";
 
 interface GoogleAdsAuthProps {
     onConnect?: (customerId: string) => void;
@@ -21,77 +22,89 @@ interface GoogleAdsAuthProps {
 type AuthState =
     | { status: "loading" }
     | { status: "disconnected" }
-    | { status: "connected"; customerId: string; customerName: string; source: "local" | "server" };
+    | { status: "connected"; customerId: string; customerName: string };
+
+type PopupSuccessMessage = {
+    type: "GOOGLE_ADS_AUTH_SUCCESS";
+    customerId?: string;
+    customerName?: string;
+    pendingToken?: string;
+    accounts?: { id: string; name: string }[];
+};
+
+async function readServerSession(): Promise<Session> {
+    const response = await fetch("/api/auth/session", {
+        credentials: "include",
+    });
+
+    return response.json();
+}
 
 export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm", variant = "outline" }: GoogleAdsAuthProps) {
     const [auth, setAuth] = useState<AuthState>({ status: "loading" });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     useEffect(() => {
-        // 1. Check localStorage first
-        const storedRefresh = localStorage.getItem("google_ads_refresh_token");
-        const storedCustomer = localStorage.getItem("google_ads_customer_id");
-        const storedName = localStorage.getItem("google_ads_customer_name");
+        async function refreshSession() {
+            try {
+                const session = await readServerSession();
+                if (!session.connected) {
+                    setAuth({ status: "disconnected" });
+                    return;
+                }
 
-        if (storedRefresh && storedCustomer) {
-            setAuth({
-                status: "connected",
-                customerId: storedCustomer,
-                customerName: storedName ?? "Google Ads Account",
-                source: "local",
-            });
-            return;
+                setAuth({
+                    status: "connected",
+                    customerId: session.customerId,
+                    customerName: session.customerName ?? "Google Ads Account",
+                });
+            } catch {
+                setAuth({ status: "disconnected" });
+            }
         }
 
-        // 2. Fall back to server session
-        fetch("/api/auth/session")
-            .then(r => r.json())
-            .then(session => {
-                if (session.connected) {
-                    setAuth({
-                        status: "connected",
-                        customerId: "",
-                        customerName: session.customerName ?? "Google Ads Account",
-                        source: "server",
-                    });
-                } else {
-                    setAuth({ status: "disconnected" });
-                }
-            })
-            .catch(() => setAuth({ status: "disconnected" }));
-
-        // Listen for auth success message from popup
-        const handleMessage = (event: MessageEvent) => {
+        async function handlePopupSuccess(event: MessageEvent<PopupSuccessMessage>) {
             if (event.origin !== window.location.origin) return;
-            if (event.data.type === "GOOGLE_ADS_AUTH_SUCCESS") {
-                const newRefresh = event.data.refreshToken;
-                if (newRefresh) {
-                    localStorage.setItem("google_ads_refresh_token", newRefresh);
+            if (event.data.type !== "GOOGLE_ADS_AUTH_SUCCESS") return;
 
-                    if (event.data.accounts && Array.isArray(event.data.accounts)) {
-                        const accounts = event.data.accounts;
-                        localStorage.setItem("google_ads_customer_ids", JSON.stringify(accounts));
-                        const primary = accounts[0];
-                        const id = primary.id.replace("customers/", "");
-                        localStorage.setItem("google_ads_customer_id", id);
-                        localStorage.setItem("google_ads_customer_name", primary.name || "Google Ads Account");
-                        setAuth({ status: "connected", customerId: id, customerName: primary.name || "Google Ads Account", source: "local" });
-                        onConnect?.(id);
-                    } else if (event.data.customerId && event.data.customerName) {
-                        const id = event.data.customerId.replace("customers/", "");
-                        localStorage.setItem("google_ads_customer_id", id);
-                        localStorage.setItem("google_ads_customer_name", event.data.customerName);
-                        localStorage.setItem("google_ads_customer_ids", JSON.stringify([{ id, name: event.data.customerName }]));
-                        setAuth({ status: "connected", customerId: id, customerName: event.data.customerName, source: "local" });
-                        onConnect?.(id);
+            try {
+                if (event.data.pendingToken && Array.isArray(event.data.accounts)) {
+                    const response = await fetch("/api/auth/select-account", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            pendingToken: event.data.pendingToken,
+                            accounts: event.data.accounts,
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Failed to finalize Google Ads account selection");
                     }
                 }
-            }
-        };
 
-        window.addEventListener("message", handleMessage);
-        return () => window.removeEventListener("message", handleMessage);
-    }, []);
+                const session = await readServerSession();
+                if (!session.connected) {
+                    setAuth({ status: "disconnected" });
+                    return;
+                }
+
+                setAuth({
+                    status: "connected",
+                    customerId: session.customerId,
+                    customerName: session.customerName ?? "Google Ads Account",
+                });
+                onConnect?.(session.customerId);
+            } catch {
+                setAuth({ status: "disconnected" });
+            }
+        }
+
+        refreshSession();
+        window.addEventListener("message", handlePopupSuccess);
+        return () => window.removeEventListener("message", handlePopupSuccess);
+    }, [onConnect]);
 
     const handleConnect = () => {
         const width = 600;
@@ -106,11 +119,11 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         );
     };
 
-    const handleDisconnect = () => {
-        localStorage.removeItem("google_ads_refresh_token");
-        localStorage.removeItem("google_ads_customer_id");
-        localStorage.removeItem("google_ads_customer_name");
-        localStorage.removeItem("google_ads_customer_ids");
+    const handleDisconnect = async () => {
+        await fetch("/api/auth/signout", {
+            method: "POST",
+            credentials: "include",
+        }).catch(() => {});
         setAuth({ status: "disconnected" });
         onDisconnect?.();
     };

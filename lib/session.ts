@@ -9,6 +9,7 @@ import { deriveCustomerName } from "@/lib/google-ads";
 export type Session = {
   connected: true;
   token: string;
+  customerId: string;
   customerName: string;
 } | {
   connected: false;
@@ -62,6 +63,7 @@ export async function getSession(): Promise<Session> {
   return {
     connected: true,
     token: result.token,
+    customerId: result.row.customerId,
     customerName: deriveCustomerName(result.row.customerIds),
   };
 }

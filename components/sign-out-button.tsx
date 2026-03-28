@@ -1,21 +1,27 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
 export function SignOutButton({ isCollapsed = false }: { isCollapsed?: boolean }) {
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await fetch("/api/auth/signout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {
       // Sign-out failed — still redirect to clear client state
     }
-    router.push("/login");
+    router.push("/");
     router.refresh();
   }
 
@@ -23,6 +29,7 @@ export function SignOutButton({ isCollapsed = false }: { isCollapsed?: boolean }
     <Button
       variant="ghost"
       onClick={handleSignOut}
+      disabled={isSigningOut}
       title="Sign out"
       className={`h-12 rounded-lg px-3 text-[#9B9689] transition-all duration-300 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
         isCollapsed
