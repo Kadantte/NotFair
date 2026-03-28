@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail } from "lucide-react";
+import { startGoogleConnect } from "@/lib/google-oauth";
 
 export default function LoginPage() {
   return (
@@ -36,15 +37,14 @@ function LoginForm() {
   async function signInWithGoogle() {
     setGoogleLoading(true);
     setError("");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
-    if (error) {
-      setError(error.message);
+    try {
+      await startGoogleConnect(next);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Authentication failed. Please try again.",
+      );
       setGoogleLoading(false);
     }
   }

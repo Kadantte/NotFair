@@ -51,7 +51,7 @@ async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | nu
     token,
     row: {
       ...row,
-      userId: row.userId ?? row.googleEmail ?? null,
+      userId: row.userId ?? null,
     },
   };
 }

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/components/session-provider';
+import { startGoogleConnect } from '@/lib/google-oauth';
 
 const CYCLING_WORDS = ['Claude', 'ChatGPT', 'OpenClaw', 'AI agent'];
 const CYCLE_INTERVAL_MS = 2000;
@@ -20,11 +21,15 @@ export default function Home() {
         return () => clearInterval(id);
     }, []);
 
-    function handleCTA() {
+    async function handleCTA() {
         if (session.connected) {
             window.location.assign('/connect');
         } else {
-            window.location.assign('/api/auth/signin');
+            try {
+                await startGoogleConnect('/connect');
+            } catch {
+                window.location.assign('/login?error=auth_failed');
+            }
         }
     }
 

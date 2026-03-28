@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Settings, CheckCircle2, ChevronDown } from "lucide-react";
 import type { Session } from "@/lib/session";
+import { startGoogleConnectPopup } from "@/lib/google-oauth";
 
 interface GoogleAdsAuthProps {
     onConnect?: (customerId: string) => void;
@@ -106,17 +107,12 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
         return () => window.removeEventListener("message", handlePopupSuccess);
     }, [onConnect]);
 
-    const handleConnect = () => {
-        const width = 600;
-        const height = 700;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-
-        window.open(
-            "/api/auth/signin?popup=1",
-            "Google Ads Auth",
-            `width=${width},height=${height},top=${top},left=${left}`
-        );
+    const handleConnect = async () => {
+        try {
+            await startGoogleConnectPopup(window.location.pathname);
+        } catch {
+            setAuth({ status: "disconnected" });
+        }
     };
 
     const handleDisconnect = async () => {

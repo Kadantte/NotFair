@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
+import { startGoogleConnect } from '@/lib/google-oauth';
 
 const CLIENTS = [
     {
@@ -303,8 +304,13 @@ function ConnectContent() {
     const client = CLIENTS.find(c => c.id === activeClient)!;
     const prompt = token && mcpUrl ? client.prompt(mcpUrl, token) : '';
 
-    function beginGoogleSignIn() {
-        window.location.assign('/api/auth/signin');
+    async function beginGoogleSignIn() {
+        setError(null);
+        try {
+            await startGoogleConnect('/connect');
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
+        }
     }
 
     function openAgenticAi() {

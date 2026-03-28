@@ -50,16 +50,16 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
           throw new Error("Account selection pending. Complete setup at /connect.");
         }
         const customerIds = parseCustomerIds(session.customerIds);
-        return {
-          refreshToken: session.refreshToken,
-          customerId: session.customerId,
-          customerIds: customerIds.length > 0
-            ? customerIds
-            : [{ id: session.customerId, name: "" }],
-          userId: session.userId ?? session.googleEmail ?? null,
-          sessionToken: bearerToken,
-        };
-      }
+          return {
+            refreshToken: session.refreshToken,
+            customerId: session.customerId,
+            customerIds: customerIds.length > 0
+              ? customerIds
+              : [{ id: session.customerId, name: "" }],
+            userId: session.userId ?? null,
+            sessionToken: bearerToken,
+          };
+        }
     } catch (e) {
       if (e instanceof Error && e.message.includes("Account selection pending")) {
         throw e;
