@@ -1,39 +1,43 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
-import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from '@/lib/chat-history';
-import { dispatchThreadEvent, onThreadEvent } from '@/lib/thread-events';
-
-type Thread = { id: string; title: string; updatedAt: string; messageCount: number };
+import { dispatchThreadEvent } from '@/lib/thread-events';
+import { getChatSidebarServerSnapshot, getChatSidebarSnapshot, setStoredActiveThreadId, subscribeChatSidebar } from '@/lib/chat-thread-store';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
-function loadThreads(): Thread[] {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) ?? '[]');
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-            .filter((t: unknown): t is Thread => !!t && typeof (t as Thread).id === 'string')
-            .map(t => ({
-                id: t.id,
-                title: t.title,
-                updatedAt: t.updatedAt ?? new Date().toISOString(),
-                messageCount: t.messageCount ?? 0,
-            }))
-            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    } catch {
-        return [];
-    }
-}
-
 function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getCollapsedSnapshot() {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(COLLAPSED_KEY) === 'true';
+}
+
+function subscribeCollapsed(callback: () => void) {
+    const handleStorage = (event: StorageEvent) => {
+        if (!event.key || event.key === COLLAPSED_KEY) callback();
+    };
+    const handleSidebar = () => callback();
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('adsagent:sidebar-collapsed', handleSidebar);
+
+    return () => {
+        window.removeEventListener('storage', handleStorage);
+        window.removeEventListener('adsagent:sidebar-collapsed', handleSidebar);
+    };
+}
+
+function subscribeHydration() {
+    return () => {};
 }
 
 function NavItem({
@@ -76,32 +80,18 @@ function NavItem({
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const [collapsed, setCollapsed] = useState(false);
-    const [threads, setThreads] = useState<Thread[]>([]);
-    const [activeThreadId, setActiveThreadId] = useState<string>('');
+    const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
+    const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false);
+    const { threads, activeThreadId } = useSyncExternalStore(
+        subscribeChatSidebar,
+        getChatSidebarSnapshot,
+        getChatSidebarServerSnapshot,
+    );
     const isOnChat = pathname === '/chat';
 
-    const refreshThreads = useCallback(() => {
-        setThreads(loadThreads());
-        setActiveThreadId(localStorage.getItem(ACTIVE_CHAT_THREAD_KEY) ?? '');
-    }, []);
-
-    useEffect(() => {
-        const stored = localStorage.getItem(COLLAPSED_KEY);
-        if (stored !== null) setCollapsed(stored === 'true');
-        refreshThreads();
-    }, [refreshThreads]);
-
-    // Listen for thread refresh events from the chat page
-    useEffect(() => {
-        return onThreadEvent('refresh', refreshThreads);
-    }, [refreshThreads]);
-
     function toggleCollapsed() {
-        setCollapsed(c => {
-            localStorage.setItem(COLLAPSED_KEY, String(!c));
-            return !c;
-        });
+        localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
+        window.dispatchEvent(new Event('adsagent:sidebar-collapsed'));
     }
 
     function handleNewChat() {
@@ -116,25 +106,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (isOnChat) {
             dispatchThreadEvent('select', threadId);
         } else {
-            localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
+            setStoredActiveThreadId(threadId);
             router.push('/chat');
-        }
-    }
-
-    function handleDeleteThread(threadId: string) {
-        if (isOnChat) {
-            dispatchThreadEvent('delete', threadId);
-        } else {
-            // Delete directly from localStorage when not on chat
-            try {
-                const raw = localStorage.getItem(CHAT_HISTORY_KEY);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    const filtered = Array.isArray(parsed) ? parsed.filter((t: { id: string }) => t.id !== threadId) : [];
-                    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(filtered));
-                    refreshThreads();
-                }
-            } catch { /* ignore */ }
         }
     }
 
@@ -167,39 +140,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </Button>
                 </div>
 
-                {/* New chat */}
-                <div className="shrink-0 px-2 pb-1">
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={handleNewChat}
-                        className={`h-9 rounded-lg px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
-                            collapsed ? 'w-10 justify-center gap-0 px-0 mx-auto' : 'w-full justify-start'
-                        }`}
-                    >
-                        <Plus className="h-4 w-4 shrink-0" />
-                        <span
-                            className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-200 ease-out ${
-                                collapsed ? 'max-w-0 opacity-0' : 'ml-2.5 max-w-32 opacity-100'
-                            }`}
-                        >
-                            New chat
-                        </span>
-                    </Button>
-                </div>
-
                 {/* Nav items */}
                 <nav className="shrink-0 px-2 pb-2 space-y-0.5">
-                    <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={collapsed} />
+                    <NavItem href="/connect" icon={PlugZap} label="Connect" active={pathname === '/connect'} collapsed={collapsed} />
                     <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={collapsed} />
+                    <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={collapsed} />
+                    <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} collapsed={collapsed} />
                 </nav>
 
-                {/* Divider */}
-                <div className="mx-3 shrink-0 border-t border-[#3D3C36]" />
+                {isOnChat && (
+                    <>
+                        {/* New chat */}
+                        <div className="shrink-0 px-2 pb-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={handleNewChat}
+                                className={`h-9 rounded-lg px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+                                    collapsed ? 'mx-auto w-10 justify-center gap-0 px-0' : 'w-full justify-start'
+                                }`}
+                            >
+                                <Plus className="h-4 w-4 shrink-0" />
+                                <span
+                                    className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-200 ease-out ${
+                                        collapsed ? 'max-w-0 opacity-0' : 'ml-2.5 max-w-32 opacity-100'
+                                    }`}
+                                >
+                                    New chat
+                                </span>
+                            </Button>
+                        </div>
 
-                {/* Thread list */}
-                {!collapsed && threads.length > 0 && (
-                    <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                        {/* Divider */}
+                        <div className="mx-3 shrink-0 border-t border-[#3D3C36]" />
+
+                        {/* Thread list */}
+                        {hydrated && !collapsed && threads.length > 0 && (
+                            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
                         {threads.map(thread => (
                             <div
                                 key={thread.id}
@@ -226,7 +203,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         type="button"
                                         variant="ghost"
                                         size="icon-sm"
-                                        onClick={() => handleDeleteThread(thread.id)}
+                                        onClick={() => dispatchThreadEvent('delete', thread.id)}
                                         className="mt-1.5 mr-1 shrink-0 rounded-lg text-[#9B9689] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] [div:hover>&]:opacity-100"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
@@ -234,9 +211,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 </div>
                             </div>
                         ))}
-                    </div>
+                            </div>
+                        )}
+                    </>
                 )}
                 {collapsed && <div className="flex-1" />}
+                {!collapsed && (!isOnChat || threads.length === 0) && <div className="flex-1" />}
 
                 {/* Footer */}
                 <div className="shrink-0 border-t border-[#3D3C36] p-2">

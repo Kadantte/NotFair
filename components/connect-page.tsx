@@ -2,17 +2,16 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, LayoutDashboard, Plus, RotateCw } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useSession } from '@/components/session-provider';
+import type { Session } from '@/lib/session';
 
 const CLIENTS = [
     {
         id: 'claude',
         name: 'Claude',
         hint: 'Paste into Claude Code. It will set up AdsAgent for both Claude Code and Claude Desktop.',
-        prompt: (mcpUrl: string, token: string, _accountName: string) =>
+        prompt: (mcpUrl: string, token: string) =>
             `Set up the AdsAgent MCP server for both Claude Code and Claude Desktop.
 
 Before you start:
@@ -57,7 +56,7 @@ Read the existing file first. If the file doesn't exist, create it with \`{"mcpS
         id: 'codex',
         name: 'Codex',
         hint: 'Paste into Codex CLI. It will add AdsAgent as an MCP server and start analyzing your ads.',
-        prompt: (mcpUrl: string, token: string, _accountName: string) =>
+        prompt: (mcpUrl: string, token: string) =>
             `Set up this MCP server in Codex so I can manage my ads with AI.
 
 Before you start:
@@ -82,7 +81,7 @@ Once connected, show me how my campaigns are performing — top spenders, wasted
         id: 'openclaw',
         name: 'OpenClaw',
         hint: 'Paste into OpenClaw. It will use MCPorter to set up AdsAgent as a skill and start optimizing your ads.',
-        prompt: (mcpUrl: string, token: string, _accountName: string) =>
+        prompt: (mcpUrl: string, token: string) =>
             `## Step 0: Check prerequisites
 
 Before doing anything, verify:
@@ -215,13 +214,27 @@ Now use the skill. Call getAccountInfo to verify the connection, then listCampai
     },
 ] as const;
 
-export default function ConnectPage() {
+const emptySession: Session = { connected: false };
+
+async function readServerSession(): Promise<Session> {
+    const response = await fetch('/api/auth/session', {
+        credentials: 'include',
+        cache: 'no-store',
+    });
+
+    if (!response.ok) return emptySession;
+    return response.json();
+}
+
+export function ConnectPage() {
     return (
-        <Suspense fallback={
-            <div className="pt-24 pb-16 px-4 flex items-center justify-center min-h-[50vh]">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
-            </div>
-        }>
+        <Suspense
+            fallback={
+                <div className="flex min-h-[50vh] items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
+                </div>
+            }
+        >
             <ConnectContent />
         </Suspense>
     );
@@ -230,13 +243,13 @@ export default function ConnectPage() {
 function ConnectContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const session = useSession();
     const urlToken = searchParams.get('token');
     const urlCustomerName = searchParams.get('customer_name');
     const urlError = searchParams.get('error');
     const pendingToken = searchParams.get('pending');
     const accountsParam = searchParams.get('accounts');
 
+    const [session, setSession] = useState<Session>(emptySession);
     const [mcpUrl, setMcpUrl] = useState('');
     const [error, setError] = useState<string | null>(urlError);
     const [copied, setCopied] = useState(false);
@@ -247,31 +260,39 @@ function ConnectContent() {
 
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
-
-    const actionBtnClass = "flex items-center gap-2 px-4 py-2 rounded-lg bg-[#24231F] border border-[#3D3C36] hover:border-[#9B9689]/40 text-[#9B9689] hover:text-[#E8E4DD] text-sm transition-all";
+    const actionBtnClass = 'flex items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-2 text-sm text-[#9B9689] transition-all hover:border-[#9B9689]/40 hover:text-[#E8E4DD]';
 
     let accounts: { id: string; name: string }[] = [];
     if (accountsParam) {
         try {
             accounts = JSON.parse(accountsParam);
         } catch {
-            // malformed accounts param — fall through to empty
+            accounts = [];
         }
     }
 
     useEffect(() => {
         setMcpUrl(`${window.location.origin}/api/mcp`);
 
-        // Strip sensitive token from URL after OAuth redirect lands
         if (urlToken) {
             window.history.replaceState({}, '', '/connect');
+            return;
         }
+
+        let cancelled = false;
+        readServerSession().then(nextSession => {
+            if (!cancelled) setSession(nextSession);
+        }).catch(() => {
+            if (!cancelled) setSession(emptySession);
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [urlToken]);
 
-    const client = CLIENTS.find((c) => c.id === activeClient)!;
-    const prompt = token && mcpUrl
-        ? client.prompt(mcpUrl, token, customerName || 'My Account')
-        : '';
+    const client = CLIENTS.find(c => c.id === activeClient)!;
+    const prompt = token && mcpUrl ? client.prompt(mcpUrl, token) : '';
 
     function beginGoogleSignIn() {
         window.location.assign('/api/auth/signin');
@@ -310,7 +331,7 @@ function ConnectContent() {
             } else if (data.error) {
                 router.push(`/connect?error=${encodeURIComponent(data.error)}`);
             }
-        } catch {
+        } finally {
             setSelecting(false);
         }
     }
@@ -325,6 +346,8 @@ function ConnectContent() {
                 return;
             }
             setCopied(false);
+            const nextSession = await readServerSession();
+            setSession(nextSession);
             router.refresh();
         } catch {
             setError('Failed to rotate token');
@@ -334,178 +357,174 @@ function ConnectContent() {
     }
 
     return (
-        <div className="pt-24 pb-16 px-4">
-            <div className="container mx-auto max-w-2xl">
-
-                {error && (
-                    <div className="mb-8 p-4 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-[#C45D4A] flex-shrink-0 mt-0.5" />
-                        <p className="text-[#C45D4A] text-sm">{error}</p>
+        <section className="flex h-full min-h-0 flex-col overflow-hidden">
+            <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
+                <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
+                        <p className="mt-0.5 text-sm text-[#9B9689]">Connect Google Ads and generate the MCP setup prompt for your AI client.</p>
                     </div>
-                )}
+                </div>
+            </header>
 
-                {pendingToken && accounts.length > 0 ? (
-                    /* Account selection — multi-select */
-                    <div className="flex flex-col items-center text-center space-y-6">
-                        <div className="flex items-center gap-2 text-[#4CAF6E]">
-                            <CheckCircle2 className="w-5 h-5" />
-                            <span className="text-sm font-medium">Google connected</span>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+                <div className="mx-auto max-w-2xl">
+                    {error && (
+                        <div className="mb-8 flex items-start gap-3 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-4">
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#C45D4A]" />
+                            <p className="text-sm text-[#C45D4A]">{error}</p>
                         </div>
-                        <h1 className="text-3xl md:text-5xl font-bold text-[#E8E4DD]">Select accounts</h1>
-                        <p className="text-[#9B9689] text-lg max-w-md">
-                            Which Google Ads accounts do you want to manage?
-                        </p>
-                        <div className="w-full space-y-3 max-w-md">
-                            {accounts.map((account) => {
-                                const isSelected = selectedAccounts.has(account.id);
-                                return (
+                    )}
+
+                    {pendingToken && accounts.length > 0 ? (
+                        <div className="flex flex-col items-center space-y-6 text-center">
+                            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                                <CheckCircle2 className="h-5 w-5" />
+                                <span className="text-sm font-medium">Google connected</span>
+                            </div>
+                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Select accounts</h2>
+                            <p className="max-w-md text-lg text-[#9B9689]">
+                                Which Google Ads accounts do you want to manage?
+                            </p>
+                            <div className="w-full max-w-md space-y-3">
+                                {accounts.map(account => {
+                                    const isSelected = selectedAccounts.has(account.id);
+                                    return (
+                                        <button
+                                            key={account.id}
+                                            onClick={() => toggleAccount(account.id)}
+                                            disabled={selecting}
+                                            className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${
+                                                isSelected
+                                                    ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
+                                                    : 'border-[#3D3C36] bg-[#24231F] hover:border-[#9B9689]/40 hover:bg-[#2E2D28]'
+                                            }`}
+                                        >
+                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                                                isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#9B9689]/40'
+                                            }`}>
+                                                {isSelected && <Check className="h-3 w-3 text-[#1A1917]" />}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-[#E8E4DD]">{account.name}</p>
+                                                <p className="mt-0.5 text-sm text-[#9B9689]">{account.id}</p>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {selectedAccounts.size > 0 && (
+                                <p className="text-sm text-[#9B9689]">
+                                    {selectedAccounts.size} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected
+                                </p>
+                            )}
+                            <Button
+                                size="lg"
+                                onClick={submitSelectedAccounts}
+                                disabled={selectedAccounts.size === 0 || selecting}
+                                className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C] disabled:opacity-50 disabled:hover:scale-100"
+                            >
+                                {selecting ? 'Connecting...' : `Connect ${selectedAccounts.size || ''} account${selectedAccounts.size !== 1 ? 's' : ''}`}
+                            </Button>
+                        </div>
+                    ) : !token ? (
+                        <div className="flex flex-col items-center space-y-6 pt-12 text-center">
+                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect Google Ads</h2>
+                            <p className="max-w-md text-lg text-[#9B9689]">
+                                Sign in with your Google Ads account. You&apos;ll get a prompt to paste into your AI.
+                            </p>
+                            <Button
+                                size="lg"
+                                onClick={beginGoogleSignIn}
+                                className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
+                            >
+                                Sign in with Google <ExternalLink className="ml-2 h-5 w-5" />
+                            </Button>
+                            <p className="text-xs text-[#9B9689]/60">OAuth 2.0 — we never see your password.</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center space-y-8 text-center">
+                            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                                <CheckCircle2 className="h-5 w-5" />
+                                <span className="text-sm font-medium">Connected to {customerName || 'Google Ads'}</span>
+                            </div>
+
+                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Paste this into your AI</h2>
+
+                            <div className="flex items-center gap-1 rounded-full border border-[#3D3C36] bg-[#24231F] p-1">
+                                {CLIENTS.map(c => (
                                     <button
-                                        key={account.id}
-                                        onClick={() => toggleAccount(account.id)}
-                                        disabled={selecting}
-                                        className={`w-full p-4 rounded-lg border transition-all text-left disabled:opacity-50 flex items-center gap-3 ${
-                                            isSelected
-                                                ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
-                                                : 'border-[#3D3C36] bg-[#24231F] hover:border-[#9B9689]/40 hover:bg-[#2E2D28]'
+                                        key={c.id}
+                                        onClick={() => {
+                                            setActiveClient(c.id);
+                                            setCopied(false);
+                                        }}
+                                        className={`rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                                            activeClient === c.id
+                                                ? 'bg-[#4CAF6E] text-[#1A1917]'
+                                                : 'text-[#9B9689] hover:text-[#E8E4DD]'
                                         }`}
                                     >
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                            isSelected ? 'bg-[#4CAF6E] border-[#4CAF6E]' : 'border-[#9B9689]/40'
-                                        }`}>
-                                            {isSelected && <Check className="w-3 h-3 text-[#1A1917]" />}
-                                        </div>
-                                        <div>
-                                            <p className="text-[#E8E4DD] font-medium">{account.name}</p>
-                                            <p className="text-[#9B9689] text-sm mt-0.5">{account.id}</p>
-                                        </div>
+                                        {c.name}
                                     </button>
-                                );
-                            })}
-                        </div>
-                        {selectedAccounts.size > 0 && (
-                            <p className="text-[#9B9689] text-sm">
-                                {selectedAccounts.size} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected
+                                ))}
+                            </div>
+                            <p className="max-w-md text-sm text-[#9B9689]">{client.hint}</p>
+
+                            <div className="w-full text-left">
+                                <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
+                                    <pre className="max-h-[400px] overflow-y-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-relaxed text-[#E8E4DD]/80">
+                                        {prompt}
+                                    </pre>
+                                    <button
+                                        onClick={copyPrompt}
+                                        className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#2E2D28] px-3 py-1.5 text-sm transition-colors hover:bg-[#3D3C36]"
+                                    >
+                                        {copied ? (
+                                            <>
+                                                <Check className="h-4 w-4 text-[#4CAF6E]" />
+                                                <span className="text-[#4CAF6E]">Copied</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="h-4 w-4 text-[#9B9689]" />
+                                                <span className="text-[#9B9689]">Copy</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <Button
+                                size="lg"
+                                onClick={copyPrompt}
+                                className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
+                            >
+                                {copied ? 'Copied!' : 'Copy Prompt'} {copied ? <Check className="ml-2 h-5 w-5" /> : <Copy className="ml-2 h-5 w-5" />}
+                            </Button>
+
+                            <p className="max-w-sm text-xs text-[#9B9689]/60">
+                                This prompt contains your personal access token. Don&apos;t share it publicly.
                             </p>
-                        )}
-                        <Button
-                            size="lg"
-                            onClick={submitSelectedAccounts}
-                            disabled={selectedAccounts.size === 0 || selecting}
-                            className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-                        >
-                            {selecting ? 'Connecting...' : `Connect ${selectedAccounts.size || ''} account${selectedAccounts.size !== 1 ? 's' : ''}`}
-                        </Button>
-                    </div>
-                ) : !token ? (
-                    /* Step 1: Connect Google Ads */
-                    <div className="flex flex-col items-center text-center space-y-6">
-                        <h1 className="text-3xl md:text-5xl font-bold text-[#E8E4DD]">Connect Google Ads</h1>
-                        <p className="text-[#9B9689] text-lg max-w-md">
-                            Sign in with your Google Ads account. You'll get a prompt to paste into your AI — that's it.
-                        </p>
-                        <Button
-                            size="lg"
-                            onClick={beginGoogleSignIn}
-                            className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105"
-                        >
-                            Sign in with Google <ExternalLink className="w-5 h-5 ml-2" />
-                        </Button>
-                        <p className="text-[#9B9689]/60 text-xs">OAuth 2.0 — we never see your password.</p>
-                    </div>
-                ) : (
-                    /* Step 3: Copy prompt */
-                    <div className="flex flex-col items-center text-center space-y-8">
-                        <div className="flex items-center gap-2 text-[#4CAF6E]">
-                            <CheckCircle2 className="w-5 h-5" />
-                            <span className="text-sm font-medium">Connected to {customerName || 'Google Ads'}</span>
-                        </div>
 
-                        <h1 className="text-3xl md:text-5xl font-bold text-[#E8E4DD]">Paste this into your AI</h1>
-
-                        {/* Client tabs */}
-                        <div className="flex items-center gap-1 p-1 rounded-full bg-[#24231F] border border-[#3D3C36]">
-                            {CLIENTS.map((c) => (
-                                <button
-                                    key={c.id}
-                                    onClick={() => { setActiveClient(c.id); setCopied(false); }}
-                                    className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                                        activeClient === c.id
-                                            ? 'bg-[#4CAF6E] text-[#1A1917]'
-                                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                                    }`}
-                                >
-                                    {c.name}
+                            <div className="flex w-full max-w-md flex-wrap items-center justify-center gap-3 border-t border-[#3D3C36] pt-4">
+                                <button onClick={beginGoogleSignIn} className={actionBtnClass}>
+                                    <Plus className="h-4 w-4" />
+                                    Add Account
                                 </button>
-                            ))}
-                        </div>
-                        <p className="text-[#9B9689] text-sm max-w-md">
-                            {client.hint}
-                        </p>
-
-                        <div className="w-full text-left">
-                            <div className="relative bg-[#24231F] rounded-lg border border-[#3D3C36] p-6">
-                                <pre className="text-sm text-[#E8E4DD]/80 whitespace-pre-wrap font-mono leading-relaxed pr-16 max-h-[400px] overflow-y-auto">
-                                    {prompt}
-                                </pre>
                                 <button
-                                    onClick={copyPrompt}
-                                    className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#2E2D28] hover:bg-[#3D3C36] transition-colors text-sm"
+                                    onClick={rotateToken}
+                                    disabled={rotating}
+                                    className={`${actionBtnClass} disabled:opacity-50`}
                                 >
-                                    {copied ? (
-                                        <>
-                                            <Check className="w-4 h-4 text-[#4CAF6E]" />
-                                            <span className="text-[#4CAF6E]">Copied</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Copy className="w-4 h-4 text-[#9B9689]" />
-                                            <span className="text-[#9B9689]">Copy</span>
-                                        </>
-                                    )}
+                                    <RotateCw className={`h-4 w-4 ${rotating ? 'animate-spin' : ''}`} />
+                                    {rotating ? 'Rotating...' : 'Rotate Token'}
                                 </button>
                             </div>
                         </div>
-
-                        <Button
-                            size="lg"
-                            onClick={copyPrompt}
-                            className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105"
-                        >
-                            {copied ? 'Copied!' : 'Copy Prompt'} {copied ? <Check className="w-5 h-5 ml-2" /> : <Copy className="w-5 h-5 ml-2" />}
-                        </Button>
-
-                        <p className="text-[#9B9689]/60 text-xs max-w-sm">
-                            This prompt contains your personal access token. Don't share it publicly.
-                        </p>
-
-                        {/* Actions */}
-                        <div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-[#3D3C36] w-full max-w-md">
-                            <Link
-                                href="/campaigns"
-                                className={actionBtnClass}
-                            >
-                                <LayoutDashboard className="w-4 h-4" />
-                                Dashboard
-                            </Link>
-                            <button
-                                onClick={beginGoogleSignIn}
-                                className={actionBtnClass}
-                            >
-                                <Plus className="w-4 h-4" />
-                                Add Account
-                            </button>
-                            <button
-                                onClick={rotateToken}
-                                disabled={rotating}
-                                className={`${actionBtnClass} disabled:opacity-50`}
-                            >
-                                <RotateCw className={`w-4 h-4 ${rotating ? 'animate-spin' : ''}`} />
-                                {rotating ? 'Rotating...' : 'Rotate Token'}
-                            </button>
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
-        </div>
+        </section>
     );
 }

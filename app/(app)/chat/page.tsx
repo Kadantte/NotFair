@@ -17,8 +17,14 @@ import { GoogleAdsAuth } from "@/components/google-ads-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
-import { ACTIVE_CHAT_THREAD_KEY, CHAT_HISTORY_KEY } from "@/lib/chat-history";
-import { dispatchThreadEvent, onThreadEvent } from "@/lib/thread-events";
+import { onThreadEvent } from "@/lib/thread-events";
+import {
+  getStoredActiveThreadId,
+  getStoredChatThreads,
+  persistChatThreads,
+  setStoredActiveThreadId,
+  type StoredChatThread,
+} from "@/lib/chat-thread-store";
 import type { Session } from "@/lib/session";
 
 type StoredAccount = {
@@ -27,13 +33,7 @@ type StoredAccount = {
   customerName: string | null;
 };
 
-type ChatThread = {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  messages: GoogleAdsAgentUIMessage[];
-};
+type ChatThread = StoredChatThread<GoogleAdsAgentUIMessage>;
 
 const emptyAccount: StoredAccount = {
   connected: false,
@@ -68,21 +68,7 @@ function createThread(): ChatThread {
 }
 
 function loadThreads(): ChatThread[] {
-  const raw = localStorage.getItem(CHAT_HISTORY_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (thread: unknown): thread is ChatThread =>
-        !!thread &&
-        typeof (thread as ChatThread).id === "string" &&
-        typeof (thread as ChatThread).title === "string" &&
-        Array.isArray((thread as ChatThread).messages),
-    );
-  } catch {
-    return [];
-  }
+  return getStoredChatThreads<GoogleAdsAgentUIMessage>();
 }
 
 function getMessageText(message: GoogleAdsAgentUIMessage): string {
@@ -451,9 +437,7 @@ export default function ChatPage() {
 
   // Helper: notify layout sidebar that threads changed
   function syncToSidebar(nextThreads: ChatThread[], nextActiveId: string) {
-    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(nextThreads));
-    localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, nextActiveId);
-    dispatchThreadEvent("refresh");
+    persistChatThreads(nextThreads, nextActiveId);
   }
 
   // ── Hydration ──
@@ -461,7 +445,7 @@ export default function ChatPage() {
     const frame = window.requestAnimationFrame(() => {
       const storedThreads = loadThreads();
       const initialThreads = storedThreads.length > 0 ? storedThreads : [createThread()];
-      const preferredThreadId = localStorage.getItem(ACTIVE_CHAT_THREAD_KEY);
+      const preferredThreadId = getStoredActiveThreadId();
       const initialActiveThreadId =
         preferredThreadId && initialThreads.some(thread => thread.id === preferredThreadId)
           ? preferredThreadId
@@ -473,8 +457,7 @@ export default function ChatPage() {
       setIsHydrated(true);
 
       // Sync to sidebar
-      localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, initialActiveThreadId);
-      dispatchThreadEvent("refresh");
+      syncToSidebar(initialThreads, initialActiveThreadId);
 
       readServerSession()
         .then(session => {
@@ -501,8 +484,7 @@ export default function ChatPage() {
           applyActiveThreadSnapshot(currentThreads, activeThreadId, messages),
         );
         setActiveThreadId(threadId);
-        localStorage.setItem(ACTIVE_CHAT_THREAD_KEY, threadId);
-        dispatchThreadEvent("refresh");
+        setStoredActiveThreadId(threadId);
       }),
       onThreadEvent("create", () => {
         stop();
@@ -511,9 +493,7 @@ export default function ChatPage() {
           const syncedThreads = activeThreadId
             ? applyActiveThreadSnapshot(currentThreads, activeThreadId, messages)
             : currentThreads;
-          const nextThreads = [newThread, ...syncedThreads];
-          syncToSidebar(nextThreads, newThread.id);
-          return nextThreads;
+          return [newThread, ...syncedThreads];
         });
         setActiveThreadId(newThread.id);
         setInput("");
@@ -530,9 +510,6 @@ export default function ChatPage() {
           if (threadId === activeThreadId) {
             setActiveThreadId(fallbackThreads[0].id);
             setInput("");
-            syncToSidebar(fallbackThreads, fallbackThreads[0].id);
-          } else {
-            syncToSidebar(fallbackThreads, activeThreadId);
           }
           return fallbackThreads;
         });
@@ -558,9 +535,7 @@ export default function ChatPage() {
     const nextThreads = activeThreadId
       ? applyActiveThreadSnapshot(threads, activeThreadId, messages)
       : threads;
-    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(nextThreads));
-    // Notify sidebar so thread titles update in real-time
-    dispatchThreadEvent("refresh");
+    persistChatThreads(nextThreads, activeThreadId);
   }, [activeThreadId, isHydrated, messages, threads]);
 
   const isReady = isHydrated && account.connected;
