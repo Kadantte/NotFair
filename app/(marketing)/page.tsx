@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -81,6 +82,17 @@ export default function Home() {
                         <span className="w-1 h-1 rounded-full bg-[#3D3C36]" />
                         <span>Free</span>
                     </div>
+
+                    <p className="max-w-md text-center text-sm leading-relaxed text-[#9B9689]">
+                        By connecting Google Ads, you agree to our{' '}
+                        <Link href="/privacy" className="font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]">
+                            Privacy Policy
+                        </Link>{' '}
+                        and{' '}
+                        <Link href="/terms" className="font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]">
+                            Terms of Service
+                        </Link>.
+                    </p>
                 </div>
 
                 {/* How it works - inline */}
