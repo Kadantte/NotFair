@@ -307,6 +307,10 @@ function ConnectContent() {
         window.location.assign('/api/auth/signin');
     }
 
+    function openAgenticAi() {
+        window.location.assign('/chat');
+    }
+
     function copyPrompt() {
         navigator.clipboard.writeText(prompt);
         setCopied(true);
@@ -373,6 +377,22 @@ function ConnectContent() {
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
                         <p className="mt-0.5 text-sm text-[#9B9689]">Connect Google Ads and generate the MCP setup prompt for your AI client.</p>
                     </div>
+                    {token ? (
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                            <button onClick={beginGoogleSignIn} className={actionBtnClass}>
+                                <Plus className="h-4 w-4" />
+                                Add Account
+                            </button>
+                            <button
+                                onClick={rotateToken}
+                                disabled={rotating}
+                                className={`${actionBtnClass} disabled:opacity-50`}
+                            >
+                                <RotateCw className={`h-4 w-4 ${rotating ? 'animate-spin' : ''}`} />
+                                {rotating ? 'Rotating...' : 'Rotate Token'}
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             </header>
 
@@ -482,53 +502,52 @@ function ConnectContent() {
 
                             <div className="w-full text-left">
                                 <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
-                                    <pre className="max-h-[400px] overflow-y-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-relaxed text-[#E8E4DD]/80">
+                                    <pre className="max-h-[280px] overflow-y-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-relaxed text-[#E8E4DD]/80">
                                         {prompt}
                                     </pre>
                                     <button
                                         onClick={copyPrompt}
-                                        className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#2E2D28] px-3 py-1.5 text-sm transition-colors hover:bg-[#3D3C36]"
+                                        className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#4CAF6E] px-3 py-1.5 text-sm font-medium text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
                                     >
                                         {copied ? (
                                             <>
-                                                <Check className="h-4 w-4 text-[#4CAF6E]" />
-                                                <span className="text-[#4CAF6E]">Copied</span>
+                                                <Check className="h-4 w-4 text-[#1A1917]" />
+                                                <span className="text-[#1A1917]">Copied</span>
                                             </>
                                         ) : (
                                             <>
-                                                <Copy className="h-4 w-4 text-[#9B9689]" />
-                                                <span className="text-[#9B9689]">Copy</span>
+                                                <Copy className="h-4 w-4 text-[#1A1917]" />
+                                                <span className="text-[#1A1917]">Copy</span>
                                             </>
                                         )}
                                     </button>
+                                    <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
+                                        This prompt contains your personal access token. Don&apos;t share it publicly.
+                                    </p>
                                 </div>
                             </div>
 
-                            <Button
-                                size="lg"
-                                onClick={copyPrompt}
-                                className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
-                            >
-                                {copied ? 'Copied!' : 'Copy Prompt'} {copied ? <Check className="ml-2 h-5 w-5" /> : <Copy className="ml-2 h-5 w-5" />}
-                            </Button>
+                            <div className="flex w-full items-center gap-4">
+                                <div className="h-px flex-1 bg-[#3D3C36]" />
+                                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#9B9689]">or</span>
+                                <div className="h-px flex-1 bg-[#3D3C36]" />
+                            </div>
 
-                            <p className="max-w-sm text-xs text-[#9B9689]/60">
-                                This prompt contains your personal access token. Don&apos;t share it publicly.
-                            </p>
-
-                            <div className="flex w-full max-w-md flex-wrap items-center justify-center gap-3 border-t border-[#3D3C36] pt-4">
-                                <button onClick={beginGoogleSignIn} className={actionBtnClass}>
-                                    <Plus className="h-4 w-4" />
-                                    Add Account
-                                </button>
-                                <button
-                                    onClick={rotateToken}
-                                    disabled={rotating}
-                                    className={`${actionBtnClass} disabled:opacity-50`}
-                                >
-                                    <RotateCw className={`h-4 w-4 ${rotating ? 'animate-spin' : ''}`} />
-                                    {rotating ? 'Rotating...' : 'Rotate Token'}
-                                </button>
+                            <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium text-[#E8E4DD]">Don&apos;t want to set up MCP yourself?</p>
+                                        <p className="text-sm text-[#9B9689]">
+                                            Try our agentic AI instead. AdsAgent Chat is already wired up and ready to use out of the box.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        onClick={openAgenticAi}
+                                        className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
+                                    >
+                                        Open AdsAgent Chat
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     )}

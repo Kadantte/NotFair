@@ -22,7 +22,7 @@ export default function Home() {
 
     function handleCTA() {
         if (session.connected) {
-            window.location.assign('/campaigns');
+            window.location.assign('/connect');
         } else {
             window.location.assign('/api/auth/signin');
         }
@@ -66,7 +66,7 @@ export default function Home() {
                         onClick={handleCTA}
                         className="h-14 px-10 text-lg font-semibold bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] rounded-full transition-all hover:scale-105"
                     >
-                        {session.connected ? 'Go to Dashboard' : 'Connect Google Ads'} <ArrowRight className="w-5 h-5 ml-2" />
+                        {session.connected ? 'Go to Connect' : 'Connect Google Ads'} <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
 
                     <div className="flex items-center gap-6 text-[#9B9689] text-sm">
