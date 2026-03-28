@@ -306,7 +306,7 @@ function ConnectContent() {
             });
             const data = await res.json();
             if (data.redirectUrl) {
-                router.push(data.redirectUrl.replace(window.location.origin, ''));
+                window.location.assign(data.redirectUrl);
             } else if (data.error) {
                 router.push(`/connect?error=${encodeURIComponent(data.error)}`);
             }

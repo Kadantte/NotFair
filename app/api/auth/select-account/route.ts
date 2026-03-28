@@ -25,7 +25,10 @@ export async function POST(request: Request) {
   // Validate accounts shape
   const validAccounts = accounts.filter(
     (a: unknown): a is { id: string; name: string } =>
-      typeof a === "object" && a !== null && typeof (a as any).id === "string",
+      typeof a === "object" &&
+      a !== null &&
+      "id" in a &&
+      typeof a.id === "string",
   );
 
   if (validAccounts.length === 0) {
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
     .join(", ");
 
   const response = NextResponse.json({
-    redirectUrl: `${getAppOrigin()}/connect?token=${pendingToken}&customer_name=${encodeURIComponent(accountNames)}`,
+    redirectUrl: `${getAppOrigin()}/connect`,
   });
   setSessionCookies(response, pendingToken, accountNames);
   return response;

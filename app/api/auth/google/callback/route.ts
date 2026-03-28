@@ -291,7 +291,7 @@ export async function GET(request: Request) {
       }
 
       const redirectResponse = NextResponse.redirect(
-        `${getAppOrigin()}/connect?token=${accessToken}&customer_name=${encodeURIComponent(account.name || "Google Ads Account")}`,
+        `${getAppOrigin()}/connect`,
       );
       setSessionCookies(redirectResponse, accessToken, account.name || "Google Ads Account");
       return redirectResponse;
