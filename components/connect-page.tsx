@@ -61,21 +61,30 @@ Read the existing file first. If the file doesn't exist, create it with \`{"mcpS
 
 Before you start:
 1. Check if the Codex CLI is installed by running \`codex --version\`. If not found, tell me how to install it and stop.
-2. Check if Node.js is available (run \`node --version\`). The MCP bridge requires it.
+2. Check if Node.js is available by running \`node --version\`. If it is not found, tell me how to install it and stop.
 
 Once prerequisites are confirmed:
 
-1. Run this command to add the server:
+1. Set an environment variable for the bearer token:
 
-codex mcp add adsagent --url ${mcpUrl} -- --header "Authorization: Bearer ${token}"
+export ADSAGENT_MCP_BEARER_TOKEN="${token}"
 
-2. Verify it was added:
+If needed, also add that export to my shell profile so it persists across restarts.
+
+2. Add the MCP server in Codex using the bearer token env var:
+
+codex mcp add adsagent --url ${mcpUrl} --bearer-token-env-var ADSAGENT_MCP_BEARER_TOKEN
+
+3. Verify it was added:
 
 codex mcp list
 
-3. Restart Codex or reopen the IDE panel to load the server.
+4. Restart Codex or reopen the IDE panel so the new MCP server is loaded with the environment variable.
 
-Once connected, show me how my campaigns are performing — top spenders, wasted budget, and quick wins.`,
+Once connected, show me how my campaigns are performing:
+- top spenders
+- wasted budget
+- quick wins`,
     },
     {
         id: 'openclaw',
