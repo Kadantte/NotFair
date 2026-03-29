@@ -68,7 +68,7 @@ export default function PrivacyPage() {
                     We retain connection data for active AdsAgent sessions so the service can continue to access your connected Google Ads accounts without requiring you to re-authorize on every visit. Our current session retention period is up to one year unless the session expires earlier or we delete it in response to support or compliance needs.
                 </p>
                 <p>
-                    If you want us to delete your stored Google connection data, contact us at <a href="mailto:support@adsagent.ai" className="text-blue-400 hover:underline">support@adsagent.ai</a>. You can also revoke AdsAgent&apos;s access at any time from your Google account permissions settings.
+                    If you want us to delete your stored Google connection data, contact us at <a href="mailto:support@adsagent.org" className="text-blue-400 hover:underline">support@adsagent.org</a>. You can also revoke AdsAgent&apos;s access at any time from your Google account permissions settings.
                 </p>
             </section>
 
@@ -111,7 +111,7 @@ export default function PrivacyPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">9. Contact Us</h2>
                 <p>
-                    If you have any questions about this Privacy Policy, please contact us at: <a href="mailto:support@adsagent.ai" className="text-blue-400 hover:underline">support@adsagent.ai</a>
+                    If you have any questions about this Privacy Policy, please contact us at: <a href="mailto:support@adsagent.org" className="text-blue-400 hover:underline">support@adsagent.org</a>
                 </p>
             </section>
         </div>
