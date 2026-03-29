@@ -90,7 +90,7 @@ Once connected, show me how my campaigns are performing:
     {
         id: 'openclaw',
         name: 'OpenClaw',
-        hint: 'Paste into OpenClaw. It will use MCPorter to set up AdsAgent as a skill and start optimizing your ads.',
+        hint: 'Paste into OpenClaw. It will configure the MCP server correctly, create an MCPorter config, generate the client, and install the AdsAgent skill.',
         prompt: (mcpUrl: string, token: string) =>
             `## Step 0: Check prerequisites
 
@@ -98,16 +98,20 @@ Before doing anything, verify:
 1. **Node.js** — run \`node --version\`. If missing, tell me to install it from https://nodejs.org and stop.
 2. **npx** — run \`npx --version\`. If missing, run \`npm install -g npx\`.
 3. **OpenClaw config location** — detect where OpenClaw stores its config on this system:
-   - Check for \`openclaw.json\` in the current directory
-   - Check \`~/.openclaw/config.json\` or \`~/.config/openclaw/config.json\`
+   - Check \`~/.openclaw/openclaw.json\`
+   - Check \`~/.config/openclaw/openclaw.json\`
    - If none exist, ask me where my OpenClaw config lives before proceeding.
 4. **OpenClaw skills directory** — detect the skills directory:
    - Check \`~/.openclaw/skills/\`, \`~/.config/openclaw/skills/\`, or any path referenced in the OpenClaw config.
    - If not found, ask me before creating one.
+5. **MCPorter config location** — detect whether MCPorter already has a config:
+   - Check \`./config/mcporter.json\` in the current working directory
+   - Check \`~/.mcporter/mcporter.json\`
+   - If neither exists, create \`./config/mcporter.json\` in the current working directory.
 
-## Step 1: Add the MCP server
+## Step 1: Add the MCP server to OpenClaw
 
-Add this entry to the OpenClaw config file you found above:
+Read the existing OpenClaw config first and merge this server definition under \`mcp.servers.adsagent\` — do not overwrite other servers:
 
 "adsagent": {
   "command": "npx",
@@ -122,30 +126,61 @@ Add this entry to the OpenClaw config file you found above:
   ]
 }
 
-Read the existing config first and merge — don't overwrite other servers.
+Important: OpenClaw's config schema is not MCPorter's schema. OpenClaw stores MCP servers under \`mcp.servers\`.
 
-## Step 2: Use MCPorter to discover and verify the tools
+## Step 2: Add the same MCP server to MCPorter config
 
-Run these commands to confirm the server is reachable and see all available tools:
+MCPorter does not automatically read OpenClaw's \`openclaw.json\`. To let \`mcporter\` commands work, ensure there is an MCPorter config file with this shape:
+
+{
+  "mcpServers": {
+    "adsagent": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "${mcpUrl}",
+        "--transport",
+        "streamable-http",
+        "--header",
+        "Authorization: Bearer ${token}"
+      ]
+    }
+  }
+}
+
+If \`./config/mcporter.json\` exists, merge into \`mcpServers\`. Otherwise create it.
+
+## Step 3: Verify the MCP server with MCPorter
+
+Run:
 
 npx mcporter list adsagent --schema
 
-This should show 17 tools: getAccountInfo, listCampaigns, getCampaignPerformance, getKeywords, getSearchTermReport, runGaqlQuery, getChanges, listConnectedAccounts, pauseKeyword, enableKeyword, updateBid, addNegativeKeyword, removeNegativeKeyword, updateCampaignBudget, pauseCampaign, enableCampaign, undoChange.
+If verification fails, also test the endpoint directly with curl using the required Accept header for streamable HTTP MCP:
 
-## Step 3: Generate a typed client for the skill
+curl -i -sS -X POST '${mcpUrl}' \\
+  -H 'Authorization: Bearer ${token}' \\
+  -H 'Content-Type: application/json' \\
+  -H 'Accept: application/json, text/event-stream' \\
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
+
+A \`200 OK\` means the token and endpoint are working. A \`406\` usually means the Accept header was wrong, not that auth failed.
+
+## Step 4: Generate a typed client for the skill
 
 Use the skills directory you found in Step 0:
 
 npx mcporter emit-ts adsagent --mode client --out <skills-dir>/adsagent/adsagent-client.ts
 
-## Step 4: Create the AdsAgent skill
+## Step 5: Create the AdsAgent skill
 
 Create the file <skills-dir>/adsagent/SKILL.md with this content:
 
 ---
 name: adsagent
-description: Manage Google Ads campaigns — read performance, optimize keywords, adjust bids and budgets, add negatives, pause/enable campaigns, and undo changes.
-version: 1.1.0
+description: Manage Google Ads campaigns — read performance, optimize keywords, adjust bids and budgets, add negatives, pause/enable campaigns, manage ads/ad groups, tracking templates, and undo changes.
+version: 1.2.0
 mcp_servers:
   - adsagent
 triggers:
@@ -165,62 +200,81 @@ triggers:
 
 # AdsAgent — Google Ads Management
 
-You have access to 17 Google Ads tools via the \`adsagent\` MCP server. Use them to help the user monitor and optimize their ad campaigns.
+You have access to Google Ads tools via the \`adsagent\` MCP server. Use them to help the user monitor and optimize ad campaigns.
 
 ## Available Tools
 
 ### Read (safe, no side effects)
 - **getAccountInfo** — Account name, currency, timezone, test status
-- **listCampaigns** — All campaigns with impressions, clicks, cost, conversions. Params: \`limit\` (1-100, default 20), \`includeRemoved\` (bool, default false)
-- **getCampaignPerformance** — Daily metrics over a date range. Params: \`campaignId\`, \`days\` (1-365, default 30)
-- **getKeywords** — Top keywords with quality scores. Params: \`campaignId\`, \`days\`, \`limit\`
-- **getSearchTermReport** — Actual search queries triggering ads. Params: \`campaignId\`, \`days\`, \`limit\`
-- **runGaqlQuery** — Run a custom read-only GAQL SELECT query (max 50 rows). Params: \`query\`
-- **getChanges** — Get recent changes made via AdsAgent with changeIds for undo. Params: \`campaignId\` (optional), \`limit\` (1-100, default 20)
-- **listConnectedAccounts** — List all Google Ads accounts connected to this session
+- **listCampaigns** — All campaigns with impressions, clicks, cost, conversions
+- **getCampaignPerformance** — Daily metrics over a date range
+- **getKeywords** — Top keywords with quality scores
+- **getSearchTermReport** — Actual search queries triggering ads
+- **runGaqlQuery** — Run a custom read-only GAQL SELECT query (max 50 rows)
+- **getChanges** — Recent AdsAgent changes with \`changeId\`s for undo
+- **listConnectedAccounts** — All connected Google Ads accounts
+- **getTrackingTemplate** — Current tracking template at account/campaign/ad-group/ad level
+- **listAdGroups** — Ad groups in a campaign with metrics
+- **listAds** — Ads in a campaign/ad group with copy, URLs, status, metrics
+- **getImpressionShare** — Search/top/abs-top IS and budget/rank-lost IS
+- **getConversionActions** — Conversion actions and settings
+- **getAccountSettings** — Auto-tagging, tracking template, conversion tracking IDs
+- **getCampaignSettings** — Bidding, network, locations, schedule
+- **getRecommendations** — Google optimization recommendations
 
 ### Write (mutates the account — always confirm with user first)
 All write tools return a \`changeId\` on success. Use this with \`undoChange\` to reverse the operation within 7 days.
-- **pauseKeyword** — Stop a keyword. Params: \`campaignId\`, \`adGroupId\`, \`criterionId\`
-- **enableKeyword** — Re-enable a paused keyword. Params: \`adGroupId\`, \`criterionId\`
-- **updateBid** — Change CPC bid (manual/enhanced CPC only, max 25% change). Params: \`campaignId\`, \`adGroupId\`, \`criterionId\`, \`newBidDollars\`
-- **addNegativeKeyword** — Block irrelevant search terms (phrase match). Params: \`campaignId\`, \`keywordText\`
-- **removeNegativeKeyword** — Remove a negative keyword so those terms can trigger ads again. Params: \`campaignId\`, \`keywordText\`
-- **updateCampaignBudget** — Change daily budget (max 50% change, min $1/day). Params: \`campaignId\`, \`newDailyBudgetDollars\`
-- **pauseCampaign** — Pause all ads in a campaign. Params: \`campaignId\`
-- **enableCampaign** — Re-enable a paused campaign. Params: \`campaignId\`
-- **undoChange** — Reverse a previous write by changeId. Works within 7 days if entity hasn't been modified since. Params: \`changeId\`
+- **pauseKeyword** — Stop a keyword
+- **enableKeyword** — Re-enable a paused keyword
+- **addKeyword** — Add a new keyword to an ad group
+- **updateBid** — Change CPC bid (manual/enhanced CPC only, max 25% change)
+- **bulkUpdateBids** — Update multiple CPC bids in one call
+- **addNegativeKeyword** — Block irrelevant search terms (phrase match)
+- **removeNegativeKeyword** — Remove a negative keyword
+- **updateCampaignBudget** — Change daily budget (max 50% change)
+- **createCampaign** — Create a full paused search campaign
+- **pauseCampaign** — Pause all ads in a campaign
+- **enableCampaign** — Re-enable a paused campaign
+- **setTrackingTemplate** — Set/clear tracking template
+- **createAdGroup** — Create a new ad group
+- **createAd** — Create a new Responsive Search Ad
+- **pauseAd** — Pause an ad
+- **enableAd** — Re-enable an ad
+- **updateAdFinalUrl** — Change an ad’s landing page URL
+- **updateAdAssets** — Replace an RSA’s headlines/descriptions
+- **undoChange** — Reverse a previous write by \`changeId\`
 
 ## Rules
 
 1. **Never make write changes without explicit user confirmation.** Always show what you plan to change, the current value, and the new value before executing.
-2. **Start with reads.** When the user asks about their ads, begin with listCampaigns and getAccountInfo to build context.
+2. **Start with reads.** When the user asks about ads, begin with \`getAccountInfo\` and \`listCampaigns\` to build context.
 3. **Show numbers clearly.** Format cost as dollars, show CTR as percentages, include date ranges.
 4. **Recommend before acting.** When you spot waste (high-spend zero-conversion keywords, irrelevant search terms), recommend the action and wait for approval.
-5. **Guardrails are server-side.** Bid changes >25% and budget changes >50% will be rejected by the server. Don't try to circumvent this.
-6. **After every write, note the changeId.** Tell the user they can undo the change within 7 days. Use getChanges to review recent operations.
+5. **Guardrails are server-side.** Bid changes >25% and budget changes >50% will be rejected by the server. Don’t try to circumvent this.
+6. **After every write, note the \`changeId\`.** Tell the user they can undo the change within 7 days. Use \`getChanges\` to review recent operations.
 
 ## Common Workflows
 
 ### "How are my ads doing?"
-1. getAccountInfo → listCampaigns → summarize top spenders, best/worst performers, total spend
+1. \`getAccountInfo\` → \`listCampaigns\` → summarize top spenders, best/worst performers, total spend
 
 ### "Find wasted spend"
-1. listCampaigns → pick top-spend campaigns
-2. getKeywords for each → find high-spend, zero-conversion keywords
-3. getSearchTermReport → find irrelevant search terms
+1. \`listCampaigns\` → pick top-spend campaigns
+2. \`getKeywords\` for each → find high-spend, zero-conversion keywords
+3. \`getSearchTermReport\` → find irrelevant search terms
 4. Recommend: pause wasteful keywords + add negative keywords
 
 ### "Optimize bids"
-1. getKeywords → find keywords with good conversion rates but low impression share
-2. Recommend bid increases (within 25% limit) for high-performers
-3. Recommend bid decreases for underperformers
+1. \`getKeywords\` → find keywords with good conversion rates but low impression share
+2. \`getImpressionShare\` / \`getCampaignSettings\` as needed for context
+3. Recommend bid increases (within 25% limit) for high-performers
+4. Recommend bid decreases for underperformers
 
----
+## Step 6: Verify it works
 
-## Step 5: Verify it works
+Now use the skill. Call \`getAccountInfo\` to verify the connection, then \`listCampaigns\` to show me how my campaigns are performing — top spenders, wasted budget, and quick wins I should act on.
 
-Now use the skill. Call getAccountInfo to verify the connection, then listCampaigns to show me how my campaigns are performing — top spenders, wasted budget, and quick wins I should act on.`,
+When summarizing verification, do not claim a fixed number of tools unless you just checked the current schema output.`,
     },
 ] as const;
 
