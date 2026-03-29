@@ -13,21 +13,18 @@ const CYCLE_INTERVAL_MS = 2000;
 
 const intentCards = [
   {
-    title: "AI Google Ads agent",
-    description:
-      "Use AdsAgent when you want an AI agent to inspect campaigns, surface waste, and recommend changes before you act.",
-    icon: Sparkles,
-  },
-  {
     title: "Google Ads MCP server",
-    description:
-      "Connect Google Ads to Claude, OpenClaw, or other MCP-compatible workflows without building your own integration layer.",
+    description: "Give your AI agent the capability to manage your Google Ads.",
     icon: Link2,
   },
   {
+    title: "AI Google Ads agent",
+    description: "Chat with an AI agent that audits campaigns, spots waste, and improves ads.",
+    icon: Sparkles,
+  },
+  {
     title: "Safer optimization workflow",
-    description:
-      "Track what changed, compare before and after, and keep a tighter audit trail around campaign updates.",
+    description: "Track every AI-made change, measure impact, and optimize on a platform you can trust.",
     icon: ShieldCheck,
   },
 ];
@@ -83,15 +80,9 @@ export function HomePage() {
             <span className="block text-[#E8E4DD]">manage your ads</span>
           </h1>
 
-          <div className="max-w-2xl space-y-4">
+          <div className="max-w-2xl space-y-3">
             <p className="mx-auto max-w-xl text-lg font-light leading-relaxed tracking-wide text-[#9B9689] md:text-xl">
-              AdsAgent is an AI Google Ads agent and Google Ads MCP server. Connect
-              your account, then let Claude, ChatGPT-style MCP workflows, or
-              OpenClaw inspect campaigns, surface waste, and guide approved changes.
-            </p>
-            <p className="mx-auto max-w-xl text-sm leading-relaxed text-[#9B9689]">
-              Connect Google Ads once. Paste the setup prompt into your preferred AI
-              client. Start optimizing with context instead of screenshots and CSVs.
+              Connect Google Ads to your AI via MCP and let it analyze, optimize, and improve your campaigns.
             </p>
           </div>
 
@@ -135,12 +126,9 @@ export function HomePage() {
 
           <div className="mt-16 grid w-full max-w-2xl grid-cols-1 gap-6 md:grid-cols-3">
             {[
-              { step: "1", text: "Connect your Google Ads account" },
-              {
-                step: "2",
-                text: "Paste the setup prompt into Claude, OpenClaw, or your MCP client",
-              },
-              { step: "3", text: "Ask about your campaigns and approve changes" },
+              { step: "1", text: "Connect Google Ads" },
+              { step: "2", text: "Paste the setup prompt" },
+              { step: "3", text: "Review and approve changes" },
             ].map((item) => (
               <div key={item.step} className="flex items-start gap-3 text-left">
                 <span className="text-2xl font-bold text-[#3D3C36]">{item.step}</span>
@@ -160,14 +148,8 @@ export function HomePage() {
               What AdsAgent helps with
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Connect Google Ads to AI without turning the workflow into a custom
-              engineering project
+              Google Ads access for AI agents
             </h2>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#9B9689]">
-              AdsAgent is built for teams searching for an AI Google Ads agent, a
-              Google Ads MCP server, or a simple way to connect Google Ads to
-              Claude or OpenClaw while keeping changes reviewable.
-            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -188,49 +170,6 @@ export function HomePage() {
                 </div>
               );
             })}
-          </div>
-
-          <div className="mt-8 flex flex-col gap-3 rounded-3xl border border-[#3D3C36] bg-[#201F1B] p-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                Need proof that changes stay traceable?
-              </h3>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#9B9689]">
-                Visit the impact page to see how AdsAgent logs campaign changes and
-                before/after context for attribution.
-              </p>
-            </div>
-            <Link
-              href="/impact"
-              className="inline-flex items-center text-sm font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
-            >
-              Explore impact tracking
-            </Link>
-          </div>
-
-          <div className="mt-6 text-sm leading-relaxed text-[#9B9689]">
-            Popular guides:{" "}
-            <Link
-              href="/ai-google-ads-agent"
-              className="underline underline-offset-4 transition-colors hover:text-[#E8E4DD]"
-            >
-              AI Google Ads agent
-            </Link>
-            ,{" "}
-            <Link
-              href="/google-ads-mcp"
-              className="underline underline-offset-4 transition-colors hover:text-[#E8E4DD]"
-            >
-              Google Ads MCP
-            </Link>
-            , and{" "}
-            <Link
-              href="/connect-google-ads-to-claude"
-              className="underline underline-offset-4 transition-colors hover:text-[#E8E4DD]"
-            >
-              connect Google Ads to Claude
-            </Link>
-            .
           </div>
         </div>
       </section>
