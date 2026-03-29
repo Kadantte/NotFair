@@ -44,12 +44,6 @@ export function SiteFooter() {
                         </h3>
                         <div className="mt-4 grid gap-3">
                             <Link
-                                href="/impact"
-                                className="text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
-                            >
-                                Impact Tracker
-                            </Link>
-                            <Link
                                 href="/privacy"
                                 className="text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
                             >
