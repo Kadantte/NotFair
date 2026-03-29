@@ -236,7 +236,11 @@ async function readServerSession(): Promise<Session> {
     return response.json();
 }
 
-export function ConnectPage() {
+type ConnectPageProps = {
+    initialSession?: Session;
+};
+
+export function ConnectPage({ initialSession = emptySession }: ConnectPageProps) {
     return (
         <Suspense
             fallback={
@@ -245,12 +249,12 @@ export function ConnectPage() {
                 </div>
             }
         >
-            <ConnectContent />
+            <ConnectContent initialSession={initialSession} />
         </Suspense>
     );
 }
 
-function ConnectContent() {
+function ConnectContent({ initialSession }: { initialSession: Session }) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const urlToken = searchParams.get('token');
@@ -259,7 +263,7 @@ function ConnectContent() {
     const pendingToken = searchParams.get('pending');
     const accountsParam = searchParams.get('accounts');
 
-    const [session, setSession] = useState<Session>(emptySession);
+    const [session, setSession] = useState<Session>(initialSession);
     const [mcpUrl, setMcpUrl] = useState('');
     const [error, setError] = useState<string | null>(urlError);
     const [copied, setCopied] = useState(false);
