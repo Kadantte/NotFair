@@ -22,15 +22,15 @@ type CampaignHistoryRow = {
 
 type CampaignKeywordRow = {
     ad_group_criterion: {
-        criterion_id: string;
+        criterion_id?: number | string | null;
         status?: string | null;
-        keyword: {
-            text: string;
-        };
+        keyword?: {
+            text?: string | null;
+        } | null;
         quality_info?: {
             quality_score?: number | null;
         } | null;
-    };
+    } | null;
     metrics: {
         impressions?: number | null;
         clicks?: number | null;
@@ -247,11 +247,11 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
             LIMIT 50
         `);
 
-        return (response as CampaignKeywordRow[]).map((row) => ({
-            id: row.ad_group_criterion.criterion_id,
-            text: row.ad_group_criterion.keyword.text,
-            status: row.ad_group_criterion.status,
-            qualityScore: row.ad_group_criterion.quality_info?.quality_score || 0,
+        return (response as unknown as CampaignKeywordRow[]).map((row) => ({
+            id: String(row.ad_group_criterion?.criterion_id ?? ""),
+            text: row.ad_group_criterion?.keyword?.text ?? "",
+            status: row.ad_group_criterion?.status ?? "UNKNOWN",
+            qualityScore: row.ad_group_criterion?.quality_info?.quality_score || 0,
             impressions: row.metrics.impressions || 0,
             clicks: row.metrics.clicks || 0,
             ctr: row.metrics.ctr || 0,
