@@ -2,10 +2,58 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, removeCampaign, listCampaigns } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
+
+type CampaignHistoryRow = {
+    segments: {
+        date: string;
+    };
+    metrics: {
+        impressions?: number | null;
+        clicks?: number | null;
+        cost_micros?: number | null;
+        ctr?: number | null;
+        average_cpc?: number | null;
+    };
+};
+
+type CampaignKeywordRow = {
+    ad_group_criterion: {
+        criterion_id: string;
+        status?: string | null;
+        keyword: {
+            text: string;
+        };
+        quality_info?: {
+            quality_score?: number | null;
+        } | null;
+    };
+    metrics: {
+        impressions?: number | null;
+        clicks?: number | null;
+        ctr?: number | null;
+        cost_micros?: number | null;
+        average_cpc?: number | null;
+    };
+};
+
+function normalizeCampaignStatus(status: string | number | null | undefined): string {
+    const value = String(status ?? "UNKNOWN").toUpperCase();
+
+    switch (value) {
+        case "2":
+            return "ENABLED";
+        case "3":
+            return "PAUSED";
+        case "4":
+            return "REMOVED";
+        default:
+            return value;
+    }
+}
 
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     return fn().catch((err) => {
@@ -53,38 +101,77 @@ export async function undoChangeAction(changeId: number) {
 export async function listCampaignsAction() {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId } = await getSessionAuth();
-        const customer = getClient().Customer({
-            customer_id: customerId,
-            refresh_token: refreshToken,
-        });
+        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
 
-        const response = await customer.query(`
-            SELECT
-                campaign.id,
-                campaign.name,
-                campaign.status,
-                campaign.advertising_channel_type,
-                metrics.impressions,
-                metrics.clicks,
-                metrics.cost_micros
-            FROM campaign
-            WHERE campaign.status != 'REMOVED'
-            ORDER BY campaign.name ASC
-        `);
+        const response = await listCampaigns(auth, { limit: 100 });
 
-        return response.map((row: any) => ({
-            id: row.campaign.id,
-            name: row.campaign.name || 'Untitled Campaign',
-            status: row.campaign.status,
-            type: row.campaign.advertising_channel_type || 'UNKNOWN',
-            impressions: row.metrics.impressions || 0,
-            clicks: row.metrics.clicks || 0,
-            cost: row.metrics.cost_micros ? (row.metrics.cost_micros / 1000000) : 0
+        const campaigns = response.map((campaign) => ({
+            id: campaign.id,
+            name: campaign.name || 'Untitled Campaign',
+            status: normalizeCampaignStatus(campaign.status),
+            type: campaign.channelType || 'UNKNOWN',
+            impressions: campaign.impressions || 0,
+            clicks: campaign.clicks || 0,
+            cost: campaign.cost || 0
         }));
+
+        return campaigns;
     } catch (error) {
         console.error("List Campaigns Error:", error);
         throw new Error("Failed to list campaigns.");
+    }
+    });
+}
+
+export async function pauseCampaignAction(campaignId: string) {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+
+        const result = await pauseCampaign(auth, campaignId);
+        if (!result.success) {
+            throw new Error(result.error ?? "Failed to pause campaign.");
+        }
+
+        await logChange(customerId, userId, campaignId, result, "Paused from campaigns page");
+        return { success: true, campaignId };
+    } catch (error) {
+        console.error("Pause Campaign Error:", error);
+        throw new Error("Failed to pause campaign.");
+    }
+    });
+}
+
+export async function removeCampaignAction(campaignId: string) {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+
+        const result = await removeCampaign(auth, campaignId);
+        if (!result.success) {
+            throw new Error(result.error ?? "Failed to delete campaign.");
+        }
+
+        await logChange(customerId, userId, campaignId, result, "Deleted from campaigns page");
+        return { success: true, campaignId };
+    } catch (error) {
+        console.error("Remove Campaign Error:", error);
+        throw new Error("Failed to delete campaign.");
     }
     });
 }
@@ -115,7 +202,7 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
             ORDER BY segments.date ASC
         `);
 
-        return response.map((row: any) => ({
+        return (response as CampaignHistoryRow[]).map((row) => ({
             date: row.segments.date,
             impressions: row.metrics.impressions || 0,
             clicks: row.metrics.clicks || 0,
@@ -160,7 +247,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
             LIMIT 50
         `);
 
-        return response.map((row: any) => ({
+        return (response as CampaignKeywordRow[]).map((row) => ({
             id: row.ad_group_criterion.criterion_id,
             text: row.ad_group_criterion.keyword.text,
             status: row.ad_group_criterion.status,

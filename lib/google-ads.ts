@@ -1242,25 +1242,22 @@ export async function createSearchCampaign(
 }
 
 /**
- * Remove a campaign by setting its status to REMOVED.
- * Used for undoing campaign creation.
+ * Remove a campaign using the Google Ads remove mutation.
+ * Used for undoing campaign creation and explicit campaign deletion.
  */
 export async function removeCampaign(
   auth: AuthContext,
   campaignId: string,
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
-  safeEntityId(campaignId);
+  const normalizedCampaignId = safeEntityId(campaignId);
 
   try {
     await customer.mutateResources([
       {
         entity: "campaign" as any,
-        operation: "update",
-        resource: {
-          resource_name: `customers/${normalizeCustomerId(auth.customerId)}/campaigns/${campaignId}`,
-          status: 4, // REMOVED
-        },
+        operation: "remove",
+        resource: `customers/${normalizeCustomerId(auth.customerId)}/campaigns/${normalizedCampaignId}` as any,
       },
     ]);
 

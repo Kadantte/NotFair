@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { listCampaignsAction } from '@/app/actions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { listCampaignsAction, pauseCampaignAction, removeCampaignAction } from '@/app/actions';
 
 interface Campaign {
     id: string;
@@ -24,12 +25,16 @@ const statusColors = {
     UNKNOWN: 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20',
 };
 
+type CampaignStatusFilter = 'ALL' | 'ENABLED' | 'PAUSED';
+
 export default function CampaignsPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>('ALL');
+    const [actingOnCampaignId, setActingOnCampaignId] = useState<string | null>(null);
 
     const fetchCampaigns = useCallback(async () => {
         setLoading(true);
@@ -49,6 +54,43 @@ export default function CampaignsPage() {
     useEffect(() => {
         fetchCampaigns();
     }, [fetchCampaigns]);
+
+    const filteredCampaigns = campaigns.filter((campaign) => {
+        if (statusFilter === 'ALL') return true;
+        return campaign.status === statusFilter;
+    });
+
+    const handlePauseCampaign = async (campaignId: string) => {
+        setActingOnCampaignId(campaignId);
+        setError(null);
+        try {
+            await pauseCampaignAction(campaignId);
+            await fetchCampaigns();
+        } catch (err) {
+            console.error(err);
+            setError('Failed to pause campaign. Please try again.');
+        } finally {
+            setActingOnCampaignId(null);
+        }
+    };
+
+    const handleRemoveCampaign = async (campaignId: string) => {
+        if (!window.confirm('Delete this paused campaign? This will remove it from Google Ads.')) {
+            return;
+        }
+
+        setActingOnCampaignId(campaignId);
+        setError(null);
+        try {
+            await removeCampaignAction(campaignId);
+            await fetchCampaigns();
+        } catch (err) {
+            console.error(err);
+            setError('Failed to delete campaign. Please try again.');
+        } finally {
+            setActingOnCampaignId(null);
+        }
+    };
 
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
@@ -78,6 +120,25 @@ export default function CampaignsPage() {
                     </div>
                 )}
 
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-[#9B9689]">
+                        Showing <span className="text-[#E8E4DD]">{filteredCampaigns.length}</span> of <span className="text-[#E8E4DD]">{campaigns.length}</span> campaigns
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-[#9B9689]">Status</span>
+                        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as CampaignStatusFilter)}>
+                            <SelectTrigger className="w-[180px] border-[#3D3C36] bg-[#24231F] text-[#E8E4DD] hover:bg-[#2E2D28] focus:ring-[#4CAF6E]/20">
+                                <SelectValue placeholder="All statuses" />
+                            </SelectTrigger>
+                            <SelectContent className="border-[#3D3C36] bg-[#24231F] text-[#E8E4DD]">
+                                <SelectItem value="ALL">All statuses</SelectItem>
+                                <SelectItem value="ENABLED">Enabled</SelectItem>
+                                <SelectItem value="PAUSED">Paused</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
                 {loading && campaigns.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
@@ -85,15 +146,22 @@ export default function CampaignsPage() {
                     </div>
                 ) : (
                     <div className="grid gap-3">
-                        {campaigns.length === 0 && !error ? (
+                        {filteredCampaigns.length === 0 && !error ? (
                             <div className="text-center py-20 bg-[#24231F]/60 border border-[#3D3C36] rounded-xl">
                                 <BarChart3 className="w-10 h-10 text-[#9B9689]/30 mx-auto mb-4" />
-                                <h3 className="text-base font-medium text-[#E8E4DD]/60">No campaigns found</h3>
-                                <p className="text-[#9B9689] max-w-sm mx-auto mt-2 text-sm">Create your first campaign in Google Ads to see it here.</p>
+                                <h3 className="text-base font-medium text-[#E8E4DD]/60">
+                                    {campaigns.length === 0 ? 'No campaigns found' : `No ${statusFilter.toLowerCase()} campaigns found`}
+                                </h3>
+                                <p className="text-[#9B9689] max-w-sm mx-auto mt-2 text-sm">
+                                    {campaigns.length === 0
+                                        ? 'Create your first campaign in Google Ads to see it here.'
+                                        : 'Try a different status filter to see more campaigns.'}
+                                </p>
                             </div>
                         ) : (
-                            campaigns.map((campaign, index) => {
+                            filteredCampaigns.map((campaign, index) => {
                                 const isNavigating = navigatingTo === campaign.id;
+                                const isActing = actingOnCampaignId === campaign.id;
                                 return (
                                     <motion.div
                                         initial={{ opacity: 0, y: 8 }}
@@ -101,14 +169,14 @@ export default function CampaignsPage() {
                                         transition={{ delay: index * 0.04 }}
                                         key={campaign.id}
                                         onClick={() => {
-                                            if (navigatingTo) return;
+                                            if (navigatingTo || actingOnCampaignId) return;
                                             setNavigatingTo(campaign.id);
                                             router.push(`/campaigns/${campaign.id}`);
                                         }}
                                         className={`group relative bg-[#24231F] border border-[#3D3C36] transition-all duration-150 rounded-xl p-5 cursor-pointer select-none
                                             ${isNavigating
                                                 ? 'border-[#4CAF6E]/30 bg-[#2E2D28] scale-[0.995]'
-                                                : navigatingTo
+                                                : (navigatingTo || actingOnCampaignId)
                                                     ? 'opacity-50 cursor-default'
                                                     : 'hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 active:scale-[0.995]'
                                             }`}
@@ -151,8 +219,42 @@ export default function CampaignsPage() {
                                                         <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                                     </div>
                                                 </div>
+                                                <div className="flex items-center gap-2">
+                                                    {campaign.status === 'ENABLED' && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={Boolean(navigatingTo || actingOnCampaignId)}
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                void handlePauseCampaign(campaign.id);
+                                                            }}
+                                                            className="border-[#D4882A]/30 bg-[#D4882A]/10 text-[#D9B26B] hover:bg-[#D4882A]/20 hover:text-[#F1D4A0]"
+                                                        >
+                                                            {isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
+                                                            Pause
+                                                        </Button>
+                                                    )}
+                                                    {campaign.status === 'PAUSED' && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={Boolean(navigatingTo || actingOnCampaignId)}
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                void handleRemoveCampaign(campaign.id);
+                                                            }}
+                                                            className="border-[#C45D4A]/30 bg-[#C45D4A]/10 text-[#E28A79] hover:bg-[#C45D4A]/20 hover:text-[#F3B2A5]"
+                                                        >
+                                                            {isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                                            Delete
+                                                        </Button>
+                                                    )}
+                                                </div>
                                                 <div className="hidden md:flex items-center text-[#9B9689]">
-                                                    {isNavigating
+                                                    {isNavigating || isActing
                                                         ? <Loader2 className="w-4 h-4 animate-spin text-[#4CAF6E]" />
                                                         : <ChevronRight className="w-4 h-4 group-hover:text-[#E8E4DD] transition-colors" />
                                                     }
