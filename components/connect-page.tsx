@@ -335,7 +335,17 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const accounts = useMemo(() => {
         if (!accountsParam) return [] as { id: string; name: string }[];
         try {
-            return JSON.parse(accountsParam);
+            const parsed = JSON.parse(accountsParam);
+            if (!Array.isArray(parsed)) return [] as { id: string; name: string }[];
+            return parsed.filter(
+                (account: unknown): account is { id: string; name: string } =>
+                    typeof account === 'object' &&
+                    account !== null &&
+                    'id' in account &&
+                    typeof account.id === 'string' &&
+                    'name' in account &&
+                    typeof account.name === 'string',
+            );
         } catch {
             return [] as { id: string; name: string }[];
         }
