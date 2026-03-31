@@ -287,41 +287,33 @@ export async function listCampaigns(
   }));
 }
 
-export async function getCampaignPerformance(
-  auth: AuthContext,
-  campaignId: string,
-  days: number,
-) {
-  const customer = getCustomer(auth);
-  const id = safeEntityId(campaignId);
-  const boundedDays = Math.min(Math.max(days, 1), 365);
-  const { start, end } = getDateRange(boundedDays);
+type PerfTotals = {
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  conversionValue: number;
+};
 
-  const result = await customer.query(`
-    SELECT
-      campaign.id, campaign.name,
-      segments.date,
-      metrics.impressions, metrics.clicks, metrics.cost_micros,
-      metrics.conversions, metrics.conversions_value,
-      metrics.ctr, metrics.average_cpc
-    FROM campaign
-    WHERE campaign.id = ${id}
-      AND segments.date BETWEEN '${start}' AND '${end}'
-    ORDER BY segments.date ASC
-  `);
+type PerfTotalsWithRatios = PerfTotals & {
+  ctr: number;
+  averageCpc: number;
+  cpa: number | null;
+  roas: number | null;
+};
 
-  const rows = (result as any[]).map((row) => ({
-    date: row.segments.date,
-    impressions: row.metrics.impressions ?? 0,
-    clicks: row.metrics.clicks ?? 0,
-    cost: micros(row.metrics.cost_micros),
-    conversions: row.metrics.conversions ?? 0,
-    conversionValue: row.metrics.conversions_value ?? 0,
-    ctr: row.metrics.ctr ?? 0,
-    averageCpc: micros(row.metrics.average_cpc),
-  }));
+function computeRatios(t: PerfTotals): PerfTotalsWithRatios {
+  return {
+    ...t,
+    ctr: t.impressions > 0 ? t.clicks / t.impressions : 0,
+    averageCpc: t.clicks > 0 ? t.cost / t.clicks : 0,
+    cpa: t.conversions > 0 ? t.cost / t.conversions : null,
+    roas: t.cost > 0 ? t.conversionValue / t.cost : null,
+  };
+}
 
-  const totals = rows.reduce(
+function sumTotals(rows: PerfTotals[]): PerfTotals {
+  return rows.reduce(
     (acc, row) => ({
       impressions: acc.impressions + row.impressions,
       clicks: acc.clicks + row.clicks,
@@ -331,19 +323,137 @@ export async function getCampaignPerformance(
     }),
     { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversionValue: 0 },
   );
+}
+
+function pctChange(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? null : 0;
+  return (current - previous) / previous;
+}
+
+async function queryPerformanceRows(
+  customer: any,
+  campaignId: number,
+  start: string,
+  end: string,
+) {
+  const result = await customer.query(`
+    SELECT
+      campaign.id, campaign.name,
+      segments.date,
+      metrics.impressions, metrics.clicks, metrics.cost_micros,
+      metrics.conversions, metrics.conversions_value,
+      metrics.ctr, metrics.average_cpc
+    FROM campaign
+    WHERE campaign.id = ${campaignId}
+      AND segments.date BETWEEN '${start}' AND '${end}'
+    ORDER BY segments.date ASC
+  `);
 
   return {
-    campaignId,
     campaignName: (result as any[])[0]?.campaign?.name ?? "Unknown",
-    dateRange: { start, end, days: boundedDays },
-    totals: {
-      ...totals,
-      ctr: totals.impressions > 0 ? totals.clicks / totals.impressions : 0,
-      averageCpc: totals.clicks > 0 ? totals.cost / totals.clicks : 0,
-      cpa: totals.conversions > 0 ? totals.cost / totals.conversions : null,
-      roas: totals.cost > 0 ? totals.conversionValue / totals.cost : null,
-    },
+    rows: (result as any[]).map((row: any) => ({
+      date: row.segments.date,
+      impressions: row.metrics.impressions ?? 0,
+      clicks: row.metrics.clicks ?? 0,
+      cost: micros(row.metrics.cost_micros),
+      conversions: row.metrics.conversions ?? 0,
+      conversionValue: row.metrics.conversions_value ?? 0,
+      ctr: row.metrics.ctr ?? 0,
+      averageCpc: micros(row.metrics.average_cpc),
+    })),
+  };
+}
+
+export type CampaignPerformanceOptions = {
+  /** Number of days to look back (alternative to startDate/endDate). Default 30. */
+  days?: number;
+  /** Explicit start date (YYYY-MM-DD). Overrides days when both startDate and endDate are set. */
+  startDate?: string;
+  /** Explicit end date (YYYY-MM-DD). Overrides days when both startDate and endDate are set. */
+  endDate?: string;
+  /** Include a comparison with the previous period of equal length. */
+  comparePreviousPeriod?: boolean;
+};
+
+export async function getCampaignPerformance(
+  auth: AuthContext,
+  campaignId: string,
+  daysOrOptions: number | CampaignPerformanceOptions = 30,
+) {
+  const customer = getCustomer(auth);
+  const id = safeEntityId(campaignId);
+
+  const opts: CampaignPerformanceOptions =
+    typeof daysOrOptions === "number" ? { days: daysOrOptions } : daysOrOptions;
+
+  let start: string;
+  let end: string;
+  let periodDays: number;
+
+  if (opts.startDate || opts.endDate) {
+    if (!opts.startDate || !opts.endDate) {
+      throw new Error("Both startDate and endDate are required when specifying a date range");
+    }
+    start = opts.startDate;
+    end = opts.endDate;
+    periodDays = Math.round(
+      (new Date(end).getTime() - new Date(start).getTime()) / 86_400_000,
+    ) + 1;
+    if (periodDays < 1) {
+      throw new Error("startDate must be before or equal to endDate");
+    }
+    if (periodDays > 365) {
+      throw new Error("Date range cannot exceed 365 days");
+    }
+  } else {
+    periodDays = Math.min(Math.max(opts.days ?? 30, 1), 365);
+    ({ start, end } = getDateRange(periodDays));
+  }
+
+  const { campaignName, rows } = await queryPerformanceRows(customer, id, start, end);
+  const totals = computeRatios(sumTotals(rows));
+
+  const base = {
+    campaignId,
+    campaignName,
+    dateRange: { start, end, days: periodDays },
+    totals,
     daily: rows,
+  };
+
+  if (!opts.comparePreviousPeriod) return base;
+
+  // Compute previous period of equal length ending the day before `start`
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - periodDays + 1);
+
+  const prev = await queryPerformanceRows(
+    customer, id, formatDate(prevStart), formatDate(prevEnd),
+  );
+  const prevTotals = computeRatios(sumTotals(prev.rows));
+
+  return {
+    ...base,
+    comparison: {
+      dateRange: {
+        start: formatDate(prevStart),
+        end: formatDate(prevEnd),
+        days: periodDays,
+      },
+      totals: prevTotals,
+      daily: prev.rows,
+      changes: {
+        impressions: pctChange(totals.impressions, prevTotals.impressions),
+        clicks: pctChange(totals.clicks, prevTotals.clicks),
+        cost: pctChange(totals.cost, prevTotals.cost),
+        conversions: pctChange(totals.conversions, prevTotals.conversions),
+        conversionValue: pctChange(totals.conversionValue, prevTotals.conversionValue),
+        ctr: pctChange(totals.ctr, prevTotals.ctr),
+        averageCpc: pctChange(totals.averageCpc, prevTotals.averageCpc),
+      },
+    },
   };
 }
 
@@ -1039,6 +1149,35 @@ export async function removeNegativeKeyword(
       error: extractErrorMessage(error),
     };
   }
+}
+
+export async function getNegativeKeywords(
+  auth: AuthContext,
+  campaignId: string,
+  limit = 100,
+) {
+  const customer = getCustomer(auth);
+  const id = safeEntityId(campaignId);
+  const boundedLimit = Math.min(Math.max(limit, 1), 500);
+
+  const result = await customer.query(`
+    SELECT
+      campaign_criterion.criterion_id,
+      campaign_criterion.keyword.text,
+      campaign_criterion.keyword.match_type,
+      campaign_criterion.negative
+    FROM campaign_criterion
+    WHERE campaign.id = ${id}
+      AND campaign_criterion.type = 'KEYWORD'
+      AND campaign_criterion.negative = TRUE
+    LIMIT ${boundedLimit}
+  `);
+
+  return (result as any[]).map((row: any) => ({
+    criterionId: String(row.campaign_criterion?.criterion_id ?? ""),
+    text: row.campaign_criterion?.keyword?.text ?? "",
+    matchType: row.campaign_criterion?.keyword?.match_type ?? "UNKNOWN",
+  }));
 }
 
 // ─── Create Campaign ─────────────────────────────────────────────────
@@ -1852,10 +1991,39 @@ export async function updateAdFinalUrl(
   }
 }
 
+export type AdAsset = { text: string; pin?: number };
+
 export type UpdateAdAssetsParams = {
-  headlines: string[];
-  descriptions: string[];
+  headlines: AdAsset[];
+  descriptions: AdAsset[];
 };
+
+/** Convert raw API pinned_field value (number or string) to user-facing pin number (1-3). */
+function pinnedFieldToPin(raw: unknown): number | undefined {
+  if (!raw) return undefined;
+  const s = String(raw);
+  if (s === "HEADLINE_1" || s === "2") return 1;
+  if (s === "HEADLINE_2" || s === "3") return 2;
+  if (s === "HEADLINE_3" || s === "4") return 3;
+  if (s === "DESCRIPTION_1" || s === "5") return 1;
+  if (s === "DESCRIPTION_2" || s === "6") return 2;
+  return undefined;
+}
+
+/** Convert user-facing pin number to Google Ads API pinned_field string for headlines. */
+function headlinePinnedField(pin: number | undefined): string | undefined {
+  if (pin === 1) return "HEADLINE_1";
+  if (pin === 2) return "HEADLINE_2";
+  if (pin === 3) return "HEADLINE_3";
+  return undefined;
+}
+
+/** Convert user-facing pin number to Google Ads API pinned_field string for descriptions. */
+function descriptionPinnedField(pin: number | undefined): string | undefined {
+  if (pin === 1) return "DESCRIPTION_1";
+  if (pin === 2) return "DESCRIPTION_2";
+  return undefined;
+}
 
 export async function updateAdAssets(
   auth: AuthContext,
@@ -1867,9 +2035,24 @@ export async function updateAdAssets(
   const cid = normalizeCustomerId(auth.customerId);
   const entityId = `${adGroupId}~${adId}`;
 
-  const rsaError = validateRsaAssets(params.headlines, params.descriptions);
+  const rsaError = validateRsaAssets(
+    params.headlines.map((h) => h.text),
+    params.descriptions.map((d) => d.text),
+  );
   if (rsaError) {
     return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: rsaError };
+  }
+
+  // Validate pin values
+  for (const h of params.headlines) {
+    if (h.pin !== undefined && (h.pin < 1 || h.pin > 3 || !Number.isInteger(h.pin))) {
+      return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: `Invalid headline pin ${h.pin}: must be 1, 2, or 3` };
+    }
+  }
+  for (const d of params.descriptions) {
+    if (d.pin !== undefined && (d.pin < 1 || d.pin > 2 || !Number.isInteger(d.pin))) {
+      return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: `Invalid description pin ${d.pin}: must be 1 or 2` };
+    }
   }
 
   let adIdNum: number;
@@ -1896,8 +2079,18 @@ export async function updateAdAssets(
     `);
     const row = (current as any[])[0]?.ad_group_ad?.ad?.responsive_search_ad ?? {};
     beforeValue = JSON.stringify({
-      h: (row.headlines ?? []).map((x: any) => x.text ?? ""),
-      d: (row.descriptions ?? []).map((x: any) => x.text ?? ""),
+      h: (row.headlines ?? []).map((x: any) => {
+        const asset: AdAsset = { text: x.text ?? "" };
+        const pin = pinnedFieldToPin(x.pinned_field);
+        if (pin !== undefined) asset.pin = pin;
+        return asset;
+      }),
+      d: (row.descriptions ?? []).map((x: any) => {
+        const asset: AdAsset = { text: x.text ?? "" };
+        const pin = pinnedFieldToPin(x.pinned_field);
+        if (pin !== undefined) asset.pin = pin;
+        return asset;
+      }),
     });
   } catch (fetchError) {
     return {
@@ -1923,8 +2116,18 @@ export async function updateAdAssets(
         resource: {
           resource_name: `customers/${cid}/ads/${adId}`,
           responsive_search_ad: {
-            headlines: params.headlines.map((text) => ({ text })),
-            descriptions: params.descriptions.map((text) => ({ text })),
+            headlines: params.headlines.map((h) => {
+              const asset: Record<string, unknown> = { text: h.text };
+              const pf = headlinePinnedField(h.pin);
+              if (pf) asset.pinned_field = pf;
+              return asset;
+            }),
+            descriptions: params.descriptions.map((d) => {
+              const asset: Record<string, unknown> = { text: d.text };
+              const pf = descriptionPinnedField(d.pin);
+              if (pf) asset.pinned_field = pf;
+              return asset;
+            }),
           },
         },
       },
@@ -1976,6 +2179,264 @@ export async function bulkUpdateBids(
     results.push(...chunkResults);
   }
   return results;
+}
+
+// ─── Bulk Keyword Operations ────────────────────────────────────────────
+
+export type BulkPauseKeywordInput = {
+  campaignId: string;
+  adGroupId: string;
+  criterionId: string;
+};
+
+export async function bulkPauseKeywords(
+  auth: AuthContext,
+  keywords: BulkPauseKeywordInput[],
+  guardrails = DEFAULT_GUARDRAILS,
+): Promise<Array<WriteResult & { input: BulkPauseKeywordInput }>> {
+  // Run pauses sequentially — pauseKeyword checks active keyword count before
+  // pausing, and parallel execution defeats this guardrail (all observe the
+  // same count and all proceed).
+  const results: Array<WriteResult & { input: BulkPauseKeywordInput }> = [];
+  for (const k of keywords) {
+    const result = await pauseKeyword(auth, k.campaignId, k.adGroupId, k.criterionId, guardrails);
+    results.push({ ...result, input: k });
+  }
+  return results;
+}
+
+export type BulkAddKeywordInput = {
+  keyword: string;
+  matchType?: "BROAD" | "PHRASE" | "EXACT";
+};
+
+export async function bulkAddKeywords(
+  auth: AuthContext,
+  adGroupId: string,
+  keywords: BulkAddKeywordInput[],
+): Promise<Array<WriteResult & { input: BulkAddKeywordInput }>> {
+  const CHUNK_SIZE = 5;
+  const results: Array<WriteResult & { input: BulkAddKeywordInput }> = [];
+  for (let i = 0; i < keywords.length; i += CHUNK_SIZE) {
+    const chunk = keywords.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map(async (k) => {
+        const result = await addKeyword(auth, adGroupId, k.keyword, k.matchType ?? "BROAD");
+        return { ...result, input: k };
+      }),
+    );
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
+// ─── Move Keywords ──────────────────────────────────────────────────────
+
+export type MoveKeywordsResult = {
+  success: boolean;
+  added: Array<WriteResult & { criterionId: string }>;
+  paused: Array<WriteResult & { criterionId: string }>;
+  error?: string;
+};
+
+export async function moveKeywords(
+  auth: AuthContext,
+  campaignId: string,
+  fromAdGroupId: string,
+  toAdGroupId: string,
+  criterionIds: string[],
+  matchType: "BROAD" | "PHRASE" | "EXACT" = "PHRASE",
+): Promise<MoveKeywordsResult> {
+  const customer = getCustomer(auth);
+  const cid = safeEntityId(campaignId);
+
+  // Step 1: Look up keyword text for each criterionId from the source ad group
+  const result = await customer.query(`
+    SELECT
+      ad_group_criterion.criterion_id,
+      ad_group_criterion.keyword.text,
+      ad_group_criterion.keyword.match_type
+    FROM keyword_view
+    WHERE campaign.id = ${cid}
+      AND ad_group.id = ${safeEntityId(fromAdGroupId)}
+      AND ad_group_criterion.criterion_id IN (${criterionIds.map((id) => safeEntityId(id)).join(",")})
+  `);
+
+  const keywordMap = new Map<string, { text: string }>();
+  for (const row of result as any[]) {
+    const critId = String(row.ad_group_criterion?.criterion_id ?? "");
+    const text = row.ad_group_criterion?.keyword?.text ?? "";
+    if (critId && text) keywordMap.set(critId, { text });
+  }
+
+  // Validate all keywords were found
+  const missing = criterionIds.filter((id) => !keywordMap.has(id));
+  if (missing.length > 0) {
+    return {
+      success: false,
+      added: [],
+      paused: [],
+      error: `Could not find keywords for criterion IDs: ${missing.join(", ")}`,
+    };
+  }
+
+  // Step 2: Add keywords to the destination ad group
+  const added: Array<WriteResult & { criterionId: string }> = [];
+  const CHUNK_SIZE = 5;
+  for (let i = 0; i < criterionIds.length; i += CHUNK_SIZE) {
+    const chunk = criterionIds.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map(async (critId) => {
+        const kw = keywordMap.get(critId)!;
+        const addResult = await addKeyword(auth, toAdGroupId, kw.text, matchType);
+        return { ...addResult, criterionId: critId };
+      }),
+    );
+    added.push(...chunkResults);
+  }
+
+  // If any adds failed, roll back successful adds and abort
+  const addFailures = added.filter((r) => !r.success);
+  if (addFailures.length > 0) {
+    // Best-effort cleanup: remove successfully-added keywords from destination
+    const successfulAdds = added.filter((r) => r.success && r.entityId);
+    for (const add of successfulAdds) {
+      try {
+        await removeKeyword(auth, toAdGroupId, add.entityId);
+      } catch {
+        // Cleanup failure is logged but doesn't change the error result
+      }
+    }
+    return {
+      success: false,
+      added,
+      paused: [],
+      error: `${addFailures.length} keyword(s) failed to add to destination — rolled back ${successfulAdds.length} successful add(s), originals left untouched`,
+    };
+  }
+
+  // Step 3: Pause keywords in the source ad group (sequential to respect guardrails)
+  const paused: Array<WriteResult & { criterionId: string }> = [];
+  for (const critId of criterionIds) {
+    const pauseResult = await pauseKeyword(auth, campaignId, fromAdGroupId, critId);
+    paused.push({ ...pauseResult, criterionId: critId });
+  }
+
+  const pauseFailures = paused.filter((r) => !r.success);
+  return {
+    success: pauseFailures.length === 0,
+    added,
+    paused,
+    error: pauseFailures.length > 0
+      ? `Keywords added successfully but ${pauseFailures.length} failed to pause in source — may be duplicated`
+      : undefined,
+  };
+}
+
+// ─── Rename Campaign / Ad Group ─────────────────────────────────────────
+
+export async function renameCampaign(
+  auth: AuthContext,
+  campaignId: string,
+  newName: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const id = safeEntityId(campaignId);
+
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    return { success: false, action: "rename_campaign", entityId: campaignId, beforeValue: "", afterValue: "", error: "Campaign name cannot be empty" };
+  }
+
+  try {
+    // Fetch current name for undo
+    const rows = await customer.query(`
+      SELECT campaign.name FROM campaign WHERE campaign.id = ${id} LIMIT 1
+    `);
+    const oldName = (rows as any[])[0]?.campaign?.name ?? "";
+
+    await customer.mutateResources([
+      {
+        entity: "campaign" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}/campaigns/${campaignId}`,
+          name: trimmed,
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "rename_campaign",
+      entityId: campaignId,
+      beforeValue: oldName,
+      afterValue: trimmed,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "rename_campaign",
+      entityId: campaignId,
+      beforeValue: "",
+      afterValue: trimmed,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+export async function renameAdGroup(
+  auth: AuthContext,
+  campaignId: string,
+  adGroupId: string,
+  newName: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  safeEntityId(campaignId);
+
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    return { success: false, action: "rename_ad_group", entityId: adGroupId, beforeValue: "", afterValue: "", error: "Ad group name cannot be empty" };
+  }
+
+  try {
+    // Fetch current name for undo
+    const rows = await customer.query(`
+      SELECT ad_group.name FROM ad_group WHERE ad_group.id = ${safeEntityId(adGroupId)} LIMIT 1
+    `);
+    const oldName = (rows as any[])[0]?.ad_group?.name ?? "";
+
+    await customer.mutateResources([
+      {
+        entity: "ad_group" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}/adGroups/${adGroupId}`,
+          name: trimmed,
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "rename_ad_group",
+      entityId: adGroupId,
+      beforeValue: oldName,
+      afterValue: trimmed,
+      campaignId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "rename_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: trimmed,
+      error: extractErrorMessage(error),
+    };
+  }
 }
 
 // ─── Analytics & Settings ────────────────────────────────────────────

@@ -14,6 +14,7 @@ import {
   getAccountSettings,
   getCampaignSettings,
   getRecommendations,
+  getNegativeKeywords,
   authForAccount,
   resolveAccountId,
 } from "@/lib/google-ads";
@@ -76,7 +77,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   server.registerTool("getCampaignPerformance", {
     title: "Get Campaign Performance",
     description:
-      "Get daily performance metrics and totals for a specific campaign over a date range. Includes impressions, clicks, cost, conversions, CPA, and ROAS.",
+      "Get daily performance metrics and totals for a specific campaign. Supports flexible date ranges and period-over-period comparison. Use startDate/endDate for exact ranges (e.g., 'since we made changes on March 27'), or days for relative lookback. Enable comparePreviousPeriod to see % changes vs the prior period of equal length.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Google Ads campaign ID"),
@@ -86,13 +87,32 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .min(1)
         .max(365)
         .default(30)
-        .describe("Number of days to look back (1-365)"),
+        .describe("Number of days to look back (1-365). Ignored when both startDate and endDate are provided."),
+      startDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
+        .optional()
+        .describe("Start date in YYYY-MM-DD format. Use with endDate for exact date ranges."),
+      endDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
+        .optional()
+        .describe("End date in YYYY-MM-DD format. Use with startDate for exact date ranges."),
+      comparePreviousPeriod: z
+        .boolean()
+        .default(false)
+        .describe("Compare with previous period of equal length. Returns % changes for all metrics."),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, days }) => {
+  }, async ({ accountId, campaignId, days, startDate, endDate, comparePreviousPeriod }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await getCampaignPerformance(authForAccount(auth, accountId), campaignId, days);
+    const result = await getCampaignPerformance(authForAccount(auth, accountId), campaignId, {
+      days,
+      startDate,
+      endDate,
+      comparePreviousPeriod,
+    });
     void logRead(targetId, auth.userId, "get_campaign_performance", campaignId);
     return jsonResult(result);
   });
@@ -127,6 +147,30 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await getKeywords(authForAccount(auth, accountId), campaignId, days, limit);
     void logRead(targetId, auth.userId, "get_keywords", campaignId);
+    return jsonResult(result);
+  });
+
+  server.registerTool("getNegativeKeywords", {
+    title: "Get Negative Keywords",
+    description:
+      "List all negative keywords for a campaign. Use before adding negatives to avoid duplicates, or to audit existing exclusions.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Google Ads campaign ID"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(500)
+        .default(100)
+        .describe("Max negative keywords to return (1-500)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, campaignId, limit }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await getNegativeKeywords(authForAccount(auth, accountId), campaignId, limit);
+    void logRead(targetId, auth.userId, "get_negative_keywords", campaignId);
     return jsonResult(result);
   });
 

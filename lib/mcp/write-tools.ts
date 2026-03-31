@@ -25,6 +25,11 @@ import {
   updateAdFinalUrl,
   updateAdAssets,
   bulkUpdateBids,
+  bulkPauseKeywords,
+  bulkAddKeywords,
+  moveKeywords,
+  renameCampaign,
+  renameAdGroup,
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
@@ -470,22 +475,32 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   server.registerTool("updateAdAssets", {
     title: "Update Ad Headlines & Descriptions",
     description:
-      "Replace the headlines and descriptions for a Responsive Search Ad. You must provide the COMPLETE list — this replaces all existing assets. Headlines: 3-15, max 30 chars each. Descriptions: 2-4, max 90 chars each. Returns a changeId for undo support.",
+      "Replace the headlines and descriptions for a Responsive Search Ad. You must provide the COMPLETE list — this replaces all existing assets. Headlines: 3-15, max 30 chars each. Descriptions: 2-4, max 90 chars each. Optionally pin assets to fixed positions: headlines pin 1-3, descriptions pin 1-2. Returns a changeId for undo support.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
       adGroupId: z.string().describe("Ad group ID"),
       adId: z.string().describe("Ad ID to update"),
       headlines: z
-        .array(z.string().min(1).max(30))
+        .array(
+          z.object({
+            text: z.string().min(1).max(30).describe("Headline text (max 30 chars)"),
+            pin: z.number().int().min(1).max(3).optional().describe("Pin to position 1, 2, or 3 (optional)"),
+          }),
+        )
         .min(3)
         .max(15)
-        .describe("Complete replacement headlines (3-15, max 30 chars each)"),
+        .describe("Complete replacement headlines (3-15). Each can optionally be pinned to position 1, 2, or 3."),
       descriptions: z
-        .array(z.string().min(1).max(90))
+        .array(
+          z.object({
+            text: z.string().min(1).max(90).describe("Description text (max 90 chars)"),
+            pin: z.number().int().min(1).max(2).optional().describe("Pin to position 1 or 2 (optional)"),
+          }),
+        )
         .min(2)
         .max(4)
-        .describe("Complete replacement descriptions (2-4, max 90 chars each)"),
+        .describe("Complete replacement descriptions (2-4). Each can optionally be pinned to position 1 or 2."),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
@@ -537,6 +552,182 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
+  });
+
+  // ─── Bulk Keyword Operations ─────────────────────────────────────
+
+  server.registerTool("bulkPauseKeywords", {
+    title: "Bulk Pause Keywords",
+    description:
+      "Pause multiple keywords in a single call. Each keyword is paused individually — partial success is possible. Returns per-keyword results with individual changeIds for undo. Use getKeywords to find criterionIds.",
+    inputSchema: {
+      accountId: accountIdParam,
+      keywords: z
+        .array(
+          z.object({
+            campaignId: z.string().describe("Campaign ID"),
+            adGroupId: z.string().describe("Ad group ID"),
+            criterionId: z.string().describe("Keyword criterion ID to pause"),
+          }),
+        )
+        .min(1)
+        .max(100)
+        .describe("Array of keywords to pause (max 100)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, keywords }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const results = await bulkPauseKeywords(authForAccount(auth, accountId), keywords);
+
+    const logged = await Promise.all(
+      results.map(({ input, ...result }) =>
+        logAndReturn(targetId, auth.userId, input.campaignId, result)
+          .then((r) => ({ ...r, input })),
+      ),
+    );
+
+    const succeeded = logged.filter((r) => r.success).length;
+    const failed = logged.filter((r) => !r.success).length;
+
+    return jsonResult({
+      summary: { total: results.length, succeeded, failed },
+      results: logged,
+    });
+  });
+
+  server.registerTool("bulkAddKeywords", {
+    title: "Bulk Add Keywords",
+    description:
+      "Add multiple keywords to an ad group in a single call. Each keyword is added individually — partial success is possible. Returns per-keyword results with individual changeIds for undo.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging)"),
+      adGroupId: z.string().describe("Ad group ID to add keywords to"),
+      keywords: z
+        .array(
+          z.object({
+            keyword: z.string().min(1).describe("Keyword text"),
+            matchType: z
+              .enum(["BROAD", "PHRASE", "EXACT"])
+              .default("BROAD")
+              .describe("Match type (defaults to Broad)"),
+          }),
+        )
+        .min(1)
+        .max(100)
+        .describe("Array of keywords to add (max 100)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, keywords }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const results = await bulkAddKeywords(authForAccount(auth, accountId), adGroupId, keywords);
+
+    const logged = await Promise.all(
+      results.map(({ input, ...result }) =>
+        logAndReturn(targetId, auth.userId, campaignId, result)
+          .then((r) => ({ ...r, input })),
+      ),
+    );
+
+    const succeeded = logged.filter((r) => r.success).length;
+    const failed = logged.filter((r) => !r.success).length;
+
+    return jsonResult({
+      summary: { total: results.length, succeeded, failed },
+      results: logged,
+    });
+  });
+
+  // ─── Move Keywords ─────────────────────────────────────────────────
+
+  server.registerTool("moveKeywords", {
+    title: "Move Keywords Between Ad Groups",
+    description:
+      "Move keywords from one ad group to another within the same campaign. Adds to destination first, then pauses in source only if all adds succeed. If any add fails, successful adds are rolled back and no keywords are paused. Returns changeIds for both adds and pauses (full undo support). Use getKeywords to find criterionIds.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID containing both ad groups"),
+      fromAdGroupId: z.string().describe("Source ad group ID"),
+      toAdGroupId: z.string().describe("Destination ad group ID"),
+      criterionIds: z
+        .array(z.string())
+        .min(1)
+        .max(100)
+        .describe("Keyword criterion IDs to move"),
+      matchType: z
+        .enum(["BROAD", "PHRASE", "EXACT"])
+        .default("PHRASE")
+        .describe("Match type applied to all keywords in the destination ad group — does not inherit from source (defaults to Phrase)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await moveKeywords(authForAccount(auth, accountId), campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
+
+    // Log all individual add and pause results
+    const addChangeIds = await Promise.all(
+      result.added.filter((r) => r.success).map((r) =>
+        logAndReturn(targetId, auth.userId, campaignId, r),
+      ),
+    );
+    const pauseChangeIds = await Promise.all(
+      result.paused.filter((r) => r.success).map((r) =>
+        logAndReturn(targetId, auth.userId, campaignId, r),
+      ),
+    );
+
+    return jsonResult({
+      success: result.success,
+      summary: {
+        added: { total: result.added.length, succeeded: result.added.filter((r) => r.success).length },
+        paused: { total: result.paused.length, succeeded: result.paused.filter((r) => r.success).length },
+      },
+      changeIds: {
+        adds: addChangeIds.map((r) => r.changeId).filter(Boolean),
+        pauses: pauseChangeIds.map((r) => r.changeId).filter(Boolean),
+      },
+      error: result.error,
+    });
+  });
+
+  // ─── Rename Campaign / Ad Group ────────────────────────────────────
+
+  server.registerTool("renameCampaign", {
+    title: "Rename Campaign",
+    description:
+      "Change the name of a campaign. Use after restructuring to keep names accurate. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID to rename"),
+      newName: z.string().min(1).describe("New campaign name"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, newName }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await renameCampaign(authForAccount(auth, accountId), campaignId, newName);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+  });
+
+  server.registerTool("renameAdGroup", {
+    title: "Rename Ad Group",
+    description:
+      "Change the name of an ad group. Use after restructuring to keep names accurate. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID containing the ad group"),
+      adGroupId: z.string().describe("Ad group ID to rename"),
+      newName: z.string().min(1).describe("New ad group name"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, adGroupId, newName }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await renameAdGroup(authForAccount(auth, accountId), campaignId, adGroupId, newName);
+    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
   // ─── Undo ───────────────────────────────────────────────────────
@@ -703,7 +894,7 @@ export async function executeUndoForChange(
       return updateAdFinalUrl(auth, adGroupIdPart, adIdPart, beforeValue);
     }
     case "update_ad_assets": {
-      // entityId = adGroupId~adId, beforeValue = JSON {h: [], d: []}
+      // entityId = adGroupId~adId, beforeValue = JSON {h: AdAsset[], d: AdAsset[]} (or legacy {h: string[], d: string[]})
       const [adGroupIdPart, adIdPart] = entityId.split("~");
       if (!adGroupIdPart || !adIdPart) {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: malformed entity ID" };
@@ -712,12 +903,25 @@ export async function executeUndoForChange(
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous assets were not recorded" };
       }
       try {
-        const prev = JSON.parse(beforeValue) as { h: string[]; d: string[] };
-        return updateAdAssets(auth, adGroupIdPart, adIdPart, { headlines: prev.h, descriptions: prev.d });
+        const prev = JSON.parse(beforeValue) as { h: (string | { text: string; pin?: number })[]; d: (string | { text: string; pin?: number })[] };
+        const toAsset = (x: string | { text: string; pin?: number }) =>
+          typeof x === "string" ? { text: x } : x;
+        return updateAdAssets(auth, adGroupIdPart, adIdPart, {
+          headlines: prev.h.map(toAsset),
+          descriptions: prev.d.map(toAsset),
+        });
       } catch {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: could not parse previous asset state" };
       }
     }
+    case "rename_campaign":
+      // entityId = campaignId, beforeValue = old name
+      if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
+      return renameCampaign(auth, entityId, beforeValue);
+    case "rename_ad_group":
+      // entityId = adGroupId, beforeValue = old name, campaignId from change record
+      if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
+      return renameAdGroup(auth, change.campaignId ?? "", entityId, beforeValue);
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }
