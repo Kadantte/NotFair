@@ -1,7 +1,5 @@
-import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
-import { db, schema } from "@/lib/db";
 import { listAccessibleCustomers, parseCustomerIds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 
@@ -33,20 +31,6 @@ export async function GET() {
       );
     }
 
-    const pendingToken = randomBytes(32).toString("hex");
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-    await db().insert(schema.mcpSessions).values({
-      accessToken: pendingToken,
-      refreshToken: session.refreshToken,
-      customerId: "",
-      customerIds: session.customerIds,
-      userId: session.userId,
-      googleEmail: session.googleEmail,
-      expiresAt: expiresAt.toISOString(),
-    });
-
     const accountsParam = encodeURIComponent(
       JSON.stringify(
         usableAccounts.map((account) => ({ id: account.id, name: account.name })),
@@ -57,7 +41,7 @@ export async function GET() {
     );
 
     return NextResponse.redirect(
-      `${getAppOrigin()}/connect?pending=${pendingToken}&accounts=${accountsParam}&selected=${selectedParam}`,
+      `${getAppOrigin()}/connect?mode=update&accounts=${accountsParam}&selected=${selectedParam}`,
     );
   } catch (error) {
     return redirectWithError(

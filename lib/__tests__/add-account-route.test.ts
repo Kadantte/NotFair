@@ -3,11 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockGetSessionAuth,
   mockListAccessibleCustomers,
-  mockInsertValues,
 } = vi.hoisted(() => ({
   mockGetSessionAuth: vi.fn(),
   mockListAccessibleCustomers: vi.fn(),
-  mockInsertValues: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({
@@ -33,11 +31,7 @@ vi.mock("@/lib/google-ads", () => ({
 }));
 
 vi.mock("@/lib/db", () => ({
-  db: () => ({
-    insert: vi.fn(() => ({
-      values: (...args: unknown[]) => mockInsertValues(...args),
-    })),
-  }),
+  db: () => ({}),
   schema: {
     mcpSessions: {},
   },
@@ -65,7 +59,6 @@ describe("Add account route — GET", () => {
       { id: "0987654321", name: "New Account", isManager: false },
     ]);
 
-    mockInsertValues.mockResolvedValue(undefined);
   });
 
   it("reuses the current refresh token and redirects straight to account selection", async () => {
@@ -73,19 +66,11 @@ describe("Add account route — GET", () => {
 
     expect(mockGetSessionAuth).toHaveBeenCalled();
     expect(mockListAccessibleCustomers).toHaveBeenCalledWith("refresh-token");
-    expect(mockInsertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        refreshToken: "refresh-token",
-        customerId: "",
-        userId: "user-123",
-        googleEmail: "user@example.com",
-      }),
-    );
 
     expect(response.status).toBe(307);
 
     const location = response.headers.get("location") ?? "";
-    expect(location).toContain("/connect?pending=");
+    expect(location).toContain("/connect?mode=update");
     expect(location).toContain("accounts=");
     expect(location).toContain("selected=");
     expect(decodeURIComponent(location)).toContain('"1234567890"');

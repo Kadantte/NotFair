@@ -121,9 +121,13 @@ export function getCustomer(auth: AuthContext) {
  * The google-ads-api library throws GoogleAdsFailure objects (not Error instances)
  * with an `errors` array containing detailed failure info.
  */
-function extractErrorMessage(error: unknown): string {
-  // Always log the raw error for server-side debugging
-  console.error("[google-ads] API error:", error);
+function extractErrorMessage(
+  error: unknown,
+  options: { log?: boolean } = {},
+): string {
+  if (options.log !== false) {
+    console.error("[google-ads] API error:", error);
+  }
 
   // Standard Error
   if (error instanceof Error) return error.message;
@@ -240,7 +244,7 @@ export async function listAccessibleCustomers(refreshToken: string) {
           timeZone: null,
           isTestAccount: false,
           isManager: false,
-          error: extractErrorMessage(error),
+          error: extractErrorMessage(error, { log: false }),
         };
       }
     }),

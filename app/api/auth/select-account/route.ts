@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
-import { listAccessibleCustomers } from "@/lib/google-ads";
-import { setSessionCookies } from "@/lib/auth-cookies";
+import { eq, and, gte, ne } from "drizzle-orm";
+import { listAccessibleCustomers, deriveCustomerName } from "@/lib/google-ads";
+import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
 
 export async function POST(request: Request) {
   let body;
@@ -15,9 +16,9 @@ export async function POST(request: Request) {
 
   const { pendingToken, accounts } = body;
 
-  if (!pendingToken || !Array.isArray(accounts) || accounts.length === 0) {
+  if (!Array.isArray(accounts) || accounts.length === 0) {
     return NextResponse.json(
-      { error: "Missing pendingToken or accounts array" },
+      { error: "Missing accounts array" },
       { status: 400 },
     );
   }
@@ -38,21 +39,44 @@ export async function POST(request: Request) {
     );
   }
 
-  // Only update sessions that are actually pending (empty customerId)
-  const [session] = await db()
-    .select()
-    .from(schema.mcpSessions)
-    .where(
-      and(
+  const cookieStore = await cookies();
+  const currentToken = cookieStore.get(COOKIE_NAMES.token)?.value ?? null;
+
+  const sessionWhere = pendingToken
+    ? and(
         eq(schema.mcpSessions.accessToken, pendingToken),
         eq(schema.mcpSessions.customerId, ""),
-      ),
-    )
+        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+      )
+    : currentToken
+      ? and(
+          eq(schema.mcpSessions.accessToken, currentToken),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        )
+      : null;
+
+  if (!sessionWhere) {
+    return NextResponse.json(
+      { error: "No active session found" },
+      { status: 401 },
+    );
+  }
+
+  const [session] = await db()
+    .select({
+      id: schema.mcpSessions.id,
+      accessToken: schema.mcpSessions.accessToken,
+      refreshToken: schema.mcpSessions.refreshToken,
+      customerId: schema.mcpSessions.customerId,
+      userId: schema.mcpSessions.userId,
+    })
+    .from(schema.mcpSessions)
+    .where(sessionWhere)
     .limit(1);
 
   if (!session) {
     return NextResponse.json(
-      { error: "Pending session not found" },
+      { error: pendingToken ? "Pending session not found" : "Session not found" },
       { status: 404 },
     );
   }
@@ -71,8 +95,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Set first selected as default, store all in customerIds
-  const primaryAccount = validAccounts[0];
+  // Keep the current primary account if it remains selected; otherwise use the first selected account.
+  const primaryAccount =
+    validAccounts.find((account) => account.id === session.customerId) ??
+    validAccounts[0];
   const customerIds = JSON.stringify(
     validAccounts.map((a) => ({ id: a.id, name: a.name || "" })),
   );
@@ -83,15 +109,24 @@ export async function POST(request: Request) {
       customerId: primaryAccount.id,
       customerIds,
     })
-    .where(eq(schema.mcpSessions.accessToken, pendingToken));
+    .where(eq(schema.mcpSessions.id, session.id));
 
-  const accountNames = validAccounts
-    .map((a) => a.name || a.id)
-    .join(", ");
+  if (session.userId) {
+    await db()
+      .delete(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.userId, session.userId),
+          ne(schema.mcpSessions.id, session.id),
+        ),
+      );
+  }
+
+  const accountNames = deriveCustomerName(customerIds);
 
   const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}/connect`,
   });
-  setSessionCookies(response, pendingToken, accountNames);
+  setSessionCookies(response, session.accessToken, accountNames);
   return response;
 }

@@ -315,6 +315,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const urlCustomerName = searchParams.get('customer_name');
     const urlError = searchParams.get('error');
     const pendingToken = searchParams.get('pending');
+    const selectionMode = searchParams.get('mode');
     const accountsParam = searchParams.get('accounts');
     const selectedParam = searchParams.get('selected');
 
@@ -325,7 +326,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
     const [activeClient, setActiveClient] = useState<string>('claude');
-    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+    const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
@@ -372,16 +373,16 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     }, [urlToken]);
 
     useEffect(() => {
-        if (!pendingToken || accounts.length === 0) {
-            setSelectedAccounts(new Set());
+        if ((!pendingToken && selectionMode !== 'update') || accounts.length === 0) {
+            setSelectedAccounts([]);
             return;
         }
 
         const accessiblePreselected = preselectedAccountIds.filter(id =>
             accounts.some(account => account.id === id),
         );
-        setSelectedAccounts(new Set(accessiblePreselected));
-    }, [pendingToken, accounts, preselectedAccountIds]);
+        setSelectedAccounts(accessiblePreselected);
+    }, [pendingToken, selectionMode, accounts, preselectedAccountIds]);
 
     const client = CLIENTS.find(c => c.id === activeClient)!;
     const prompt = token && mcpUrl ? client.prompt(mcpUrl, token) : '';
@@ -412,16 +413,16 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
 
     function toggleAccount(accountId: string) {
         setSelectedAccounts(prev => {
-            const next = new Set(prev);
-            if (next.has(accountId)) next.delete(accountId);
-            else next.add(accountId);
-            return next;
+            if (prev.includes(accountId)) {
+                return prev.filter(id => id !== accountId);
+            }
+            return [...prev, accountId];
         });
     }
 
     async function submitSelectedAccounts() {
         setSelecting(true);
-        const selected = accounts.filter(a => selectedAccounts.has(a.id));
+        const selected = accounts.filter(account => selectedAccounts.includes(account.id));
         try {
             const res = await fetch('/api/auth/select-account', {
                 method: 'POST',
@@ -498,7 +499,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                         </div>
                     )}
 
-                    {pendingToken && accounts.length > 0 ? (
+                    {(pendingToken || selectionMode === 'update') && accounts.length > 0 ? (
                         <div className="flex flex-col items-center space-y-6 text-center">
                             <div className="flex items-center gap-2 text-[#4CAF6E]">
                                 <CheckCircle2 className="h-5 w-5" />
@@ -510,7 +511,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                             </p>
                             <div className="w-full max-w-md space-y-3">
                                 {accounts.map(account => {
-                                    const isSelected = selectedAccounts.has(account.id);
+                                    const isSelected = selectedAccounts.includes(account.id);
                                     return (
                                         <button
                                             key={account.id}
@@ -535,18 +536,18 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                     );
                                 })}
                             </div>
-                            {selectedAccounts.size > 0 && (
+                            {selectedAccounts.length > 0 && (
                                 <p className="text-sm text-[#9B9689]">
-                                    {selectedAccounts.size} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected
+                                    {selectedAccounts.length} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected.
                                 </p>
                             )}
                             <Button
                                 size="lg"
                                 onClick={submitSelectedAccounts}
-                                disabled={selectedAccounts.size === 0 || selecting}
+                                disabled={selectedAccounts.length === 0 || selecting}
                                 className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C] disabled:opacity-50 disabled:hover:scale-100"
                             >
-                                {selecting ? 'Connecting...' : `Connect ${selectedAccounts.size || ''} account${selectedAccounts.size !== 1 ? 's' : ''}`}
+                                {selecting ? 'Connecting...' : `Connect ${selectedAccounts.length || ''} account${selectedAccounts.length !== 1 ? 's' : ''}`}
                             </Button>
                         </div>
                     ) : !token ? (
