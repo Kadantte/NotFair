@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -316,6 +316,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const urlError = searchParams.get('error');
     const pendingToken = searchParams.get('pending');
     const accountsParam = searchParams.get('accounts');
+    const selectedParam = searchParams.get('selected');
 
     const [session, setSession] = useState<Session>(initialSession);
     const [mcpUrl, setMcpUrl] = useState('');
@@ -330,14 +331,25 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
     const actionBtnClass = 'flex items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-2 text-sm text-[#9B9689] transition-all hover:border-[#9B9689]/40 hover:text-[#E8E4DD]';
 
-    let accounts: { id: string; name: string }[] = [];
-    if (accountsParam) {
+    const accounts = useMemo(() => {
+        if (!accountsParam) return [] as { id: string; name: string }[];
         try {
-            accounts = JSON.parse(accountsParam);
+            return JSON.parse(accountsParam);
         } catch {
-            accounts = [];
+            return [] as { id: string; name: string }[];
         }
-    }
+    }, [accountsParam]);
+
+    const preselectedAccountIds = useMemo(() => {
+        if (!selectedParam) return [] as string[];
+        try {
+            const parsed = JSON.parse(selectedParam);
+            if (!Array.isArray(parsed)) return [] as string[];
+            return parsed.filter((value): value is string => typeof value === 'string');
+        } catch {
+            return [] as string[];
+        }
+    }, [selectedParam]);
 
     useEffect(() => {
         setMcpUrl(`${window.location.origin}/api/mcp`);
@@ -359,6 +371,18 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
         };
     }, [urlToken]);
 
+    useEffect(() => {
+        if (!pendingToken || accounts.length === 0) {
+            setSelectedAccounts(new Set());
+            return;
+        }
+
+        const accessiblePreselected = preselectedAccountIds.filter(id =>
+            accounts.some(account => account.id === id),
+        );
+        setSelectedAccounts(new Set(accessiblePreselected));
+    }, [pendingToken, accounts, preselectedAccountIds]);
+
     const client = CLIENTS.find(c => c.id === activeClient)!;
     const prompt = token && mcpUrl ? client.prompt(mcpUrl, token) : '';
 
@@ -369,6 +393,11 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
         }
+    }
+
+    function beginAddAccount() {
+        setError(null);
+        window.location.assign('/api/auth/add-account');
     }
 
     function openAgenticAi() {
@@ -443,7 +472,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                     </div>
                     {token ? (
                         <div className="flex flex-wrap items-center justify-end gap-3">
-                            <button onClick={beginGoogleSignIn} className={actionBtnClass}>
+                            <button onClick={beginAddAccount} className={actionBtnClass}>
                                 <Plus className="h-4 w-4" />
                                 Add Account
                             </button>

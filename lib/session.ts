@@ -20,6 +20,7 @@ type SessionRow = {
   customerId: string;
   customerIds: string;
   userId: string | null;
+  googleEmail: string | null;
 };
 
 async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | null> {
