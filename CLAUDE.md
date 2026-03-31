@@ -1,3 +1,6 @@
+## Supabase
+Use `mcp__supabase__*` tools for all database queries in this project (configured in `.mcp.json`, project ref `uzoexgcrwodqxzixenfm`). Never use `mcp__claude_ai_Supabase__*` — that connects to a different project.
+
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.
