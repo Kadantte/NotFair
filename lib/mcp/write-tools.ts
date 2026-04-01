@@ -62,14 +62,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Keyword Management ─────────────────────────────────────────
 
   server.registerTool("pauseKeyword", {
-    title: "Pause Keyword",
-    description:
-      "Pause an active keyword to stop it from triggering ads. Use when a keyword is wasting spend with poor or no conversions. Returns a changeId that can be used with undoChange.",
+    description: "Pause an active keyword. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      adGroupId: z.string().describe("Ad group ID containing the keyword"),
-      criterionId: z.string().describe("Keyword criterion ID to pause"),
+      campaignId: z.string(),
+      adGroupId: z.string(),
+      criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, criterionId }) => {
@@ -80,13 +78,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("enableKeyword", {
-    title: "Enable Keyword",
-    description:
-      "Re-enable a previously paused keyword so it can trigger ads again. Returns a changeId that can be used with undoChange.",
+    description: "Re-enable a paused keyword. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      adGroupId: z.string().describe("Ad group ID"),
-      criterionId: z.string().describe("Keyword criterion ID to enable"),
+      adGroupId: z.string(),
+      criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, adGroupId, criterionId }) => {
@@ -97,18 +93,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("addKeyword", {
-    title: "Add Keyword",
-    description:
-      "Add a new keyword to an existing ad group. The keyword starts enabled. Use getKeywords to find the adGroupId. Returns a changeId that can be used with undoChange.",
+    description: "Add a keyword to an ad group (starts enabled). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID containing the ad group"),
-      adGroupId: z.string().describe("Ad group ID to add the keyword to"),
-      keyword: z.string().min(1).describe("Keyword text to add"),
-      matchType: z
-        .enum(["BROAD", "PHRASE", "EXACT"])
-        .default("BROAD")
-        .describe("Keyword match type (defaults to Broad)"),
+      campaignId: z.string(),
+      adGroupId: z.string(),
+      keyword: z.string().min(1),
+      matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("BROAD"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
@@ -121,18 +112,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Bid Management ─────────────────────────────────────────────
 
   server.registerTool("updateBid", {
-    title: "Update Keyword Bid",
-    description:
-      "Change the CPC bid for a keyword. Only works with MANUAL_CPC or ENHANCED_CPC bidding strategies. Bid change is limited to 25% per adjustment. Returns a changeId that can be used with undoChange.",
+    description: "Update a keyword's CPC bid. Only works with MANUAL_CPC or ENHANCED_CPC bidding. Capped at 25% change per adjustment. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      adGroupId: z.string().describe("Ad group ID"),
-      criterionId: z.string().describe("Keyword criterion ID"),
-      newBidDollars: z
-        .number()
-        .positive()
-        .describe("New bid amount in dollars (e.g. 1.50)"),
+      campaignId: z.string(),
+      adGroupId: z.string(),
+      criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
+      newBidDollars: z.number().positive().describe("New bid in dollars (e.g. 1.50)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
@@ -151,16 +137,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Negative Keywords ──────────────────────────────────────────
 
   server.registerTool("addNegativeKeyword", {
-    title: "Add Negative Keyword",
-    description:
-      "Add a negative keyword (phrase match) to a campaign to block irrelevant search terms from triggering your ads. Returns a changeId that can be used with undoChange.",
+    description: "Add a phrase-match negative keyword to a campaign. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      keyword: z
-        .string()
-        .min(1)
-        .describe("Keyword text to add as negative (phrase match)"),
+      campaignId: z.string(),
+      keyword: z.string().min(1).describe("Keyword text to block (added as phrase match)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, keyword }) => {
@@ -171,16 +152,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("removeNegativeKeyword", {
-    title: "Remove Negative Keyword",
-    description:
-      "Remove a negative keyword from a campaign so those search terms can trigger your ads again. Returns a changeId that can be used with undoChange.",
+    description: "Remove a negative keyword from a campaign. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      keyword: z
-        .string()
-        .min(1)
-        .describe("The exact negative keyword text to remove"),
+      campaignId: z.string(),
+      keyword: z.string().min(1).describe("Exact negative keyword text to remove"),
     },
     annotations: {
       readOnlyHint: false,
@@ -198,16 +174,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Budget Management ──────────────────────────────────────────
 
   server.registerTool("updateCampaignBudget", {
-    title: "Update Campaign Budget",
-    description:
-      "Change the daily budget for a campaign. Budget change is limited to 50% per adjustment with a minimum of $1/day. Returns a changeId that can be used with undoChange.",
+    description: "Update a campaign's daily budget. Capped at 50% change per adjustment, minimum $1/day. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      newDailyBudgetDollars: z
-        .number()
-        .positive()
-        .describe("New daily budget in dollars (e.g. 25.00)"),
+      campaignId: z.string(),
+      newDailyBudgetDollars: z.number().positive().describe("New daily budget in dollars (e.g. 25.00)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, newDailyBudgetDollars }) => {
@@ -224,21 +195,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Create Campaign ────────────────────────────────────────────
 
   server.registerTool("createCampaign", {
-    title: "Create Search Campaign",
-    description:
-      "Create a complete Google Search campaign with budget, ad group, keywords, and a Responsive Search Ad. The campaign starts PAUSED — use enableCampaign to go live after reviewing. Returns a changeId for undo support.",
+    description: "Create a Search campaign with budget, ad group, keywords, and a Responsive Search Ad. Starts PAUSED — use enableCampaign to go live. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignName: z.string().min(1).describe("Name for the new campaign"),
-      dailyBudgetDollars: z
-        .number()
-        .positive()
-        .min(1)
-        .describe("Daily budget in dollars (minimum $1)"),
-      keywords: z
-        .array(z.string().min(1))
-        .min(1)
-        .describe("Keywords to target (at least 1)"),
+      campaignName: z.string().min(1),
+      dailyBudgetDollars: z.number().positive().min(1).describe("Daily budget in dollars"),
+      keywords: z.array(z.string().min(1)).min(1),
       headlines: z
         .array(z.string().min(1).max(30))
         .min(3)
@@ -249,18 +211,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .min(2)
         .max(4)
         .describe("RSA descriptions (2-4, max 90 chars each)"),
-      finalUrl: z
-        .string()
-        .url()
-        .describe("Landing page URL for the ads"),
+      finalUrl: z.string().url(),
       biddingStrategy: z
         .enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CLICKS", "MANUAL_CPC"])
-        .default("MAXIMIZE_CONVERSIONS")
-        .describe("Bidding strategy (defaults to Maximize Conversions)"),
+        .default("MAXIMIZE_CONVERSIONS"),
       keywordMatchType: z
         .enum(["BROAD", "PHRASE", "EXACT"])
-        .default("BROAD")
-        .describe("Match type for all keywords (defaults to Broad)"),
+        .default("BROAD"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
@@ -303,12 +260,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaign Status ────────────────────────────────────────────
 
   server.registerTool("pauseCampaign", {
-    title: "Pause Campaign",
-    description:
-      "Pause an active campaign to stop all ads in the campaign from running. Returns a changeId that can be used with undoChange.",
+    description: "Pause a campaign, stopping all its ads. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID to pause"),
+      campaignId: z.string(),
     },
     annotations: {
       readOnlyHint: false,
@@ -324,12 +279,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("enableCampaign", {
-    title: "Enable Campaign",
-    description:
-      "Re-enable a paused campaign to resume all ads. Returns a changeId that can be used with undoChange.",
+    description: "Re-enable a paused campaign. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID to enable"),
+      campaignId: z.string(),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId }) => {
@@ -342,21 +295,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Tracking Templates ─────────────────────────────────────────
 
   server.registerTool("setTrackingTemplate", {
-    title: "Set Tracking Template",
-    description:
-      "Set or clear the tracking template (click-tracking URL suffix) at the account, campaign, ad group, or ad level. Templates use ValueTrack parameters like {lpurl} for the landing page URL. Pass an empty string to remove the template. Returns a changeId for undo support.",
+    description: "Set or clear the click-tracking URL suffix at the account, campaign, ad group, or ad level. Uses ValueTrack parameters. Pass empty string to clear. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      level: z
-        .enum(["account", "campaign", "ad_group", "ad"])
-        .describe("The level at which to set the tracking template"),
+      level: z.enum(["account", "campaign", "ad_group", "ad"]),
       entityId: z
         .string()
         .optional()
-        .describe("Required for campaign (campaignId), ad_group (adGroupId), and ad (adId) levels. Not needed for account level."),
+        .describe("Required for campaign, ad_group, and ad levels; omit for account level"),
       trackingTemplate: z
         .string()
-        .describe("The tracking template URL (e.g. '{lpurl}?utm_source=google&utm_medium=cpc'). Pass an empty string to remove the template."),
+        .describe("Tracking URL template (e.g. '{lpurl}?utm_source=google&utm_medium=cpc'). Empty string to remove."),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, level, entityId, trackingTemplate }) => {
@@ -371,13 +320,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Ad Group Management ────────────────────────────────────────
 
   server.registerTool("createAdGroup", {
-    title: "Create Ad Group",
-    description:
-      "Create a new ad group within an existing campaign. Use listAdGroups to see existing structure. The ad group starts enabled. Use createAd to add a Responsive Search Ad to the new group.",
+    description: "Create an ad group in a campaign (starts enabled). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID to add the ad group to"),
-      adGroupName: z.string().min(1).describe("Name for the new ad group"),
+      campaignId: z.string(),
+      adGroupName: z.string().min(1),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupName }) => {
@@ -390,24 +337,22 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Ad Management ──────────────────────────────────────────────
 
   server.registerTool("createAd", {
-    title: "Create Responsive Search Ad",
-    description:
-      "Create a new Responsive Search Ad (RSA) in an existing ad group. Requires 3-15 headlines (max 30 chars each) and 2-4 descriptions (max 90 chars each). Use listAdGroups to find the adGroupId.",
+    description: "Create a Responsive Search Ad (RSA) in an ad group. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID (used for logging/undo tracking)"),
-      adGroupId: z.string().describe("Ad group ID to add the ad to"),
+      campaignId: z.string().describe("Campaign ID (for logging/undo tracking)"),
+      adGroupId: z.string(),
       headlines: z
         .array(z.string().min(1).max(30))
         .min(3)
         .max(15)
-        .describe("RSA headlines (3-15, max 30 chars each)"),
+        .describe("3-15 headlines, max 30 chars each"),
       descriptions: z
         .array(z.string().min(1).max(90))
         .min(2)
         .max(4)
-        .describe("RSA descriptions (2-4, max 90 chars each)"),
-      finalUrl: z.string().url().describe("Landing page URL for the ad"),
+        .describe("2-4 descriptions, max 90 chars each"),
+      finalUrl: z.string().url(),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
@@ -418,14 +363,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("pauseAd", {
-    title: "Pause Ad",
-    description:
-      "Pause an active ad to stop it from serving. Use for A/B testing or when an ad has poor performance. Use listAds to find adGroupId and adId. Returns a changeId for undo support.",
+    description: "Pause an active ad. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
-      adGroupId: z.string().describe("Ad group ID"),
-      adId: z.string().describe("Ad ID to pause"),
+      adGroupId: z.string(),
+      adId: z.string(),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, adId }) => {
@@ -436,14 +379,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("enableAd", {
-    title: "Enable Ad",
-    description:
-      "Re-enable a paused ad so it can serve again. Returns a changeId for undo support.",
+    description: "Re-enable a paused ad. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
-      adGroupId: z.string().describe("Ad group ID"),
-      adId: z.string().describe("Ad ID to enable"),
+      adGroupId: z.string(),
+      adId: z.string(),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, adId }) => {
@@ -454,15 +395,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("updateAdFinalUrl", {
-    title: "Update Ad Final URL",
-    description:
-      "Update the landing page URL for a specific ad. Use listAds to find adGroupId and adId and see current URLs. Returns a changeId for undo support.",
+    description: "Update the landing page URL for an ad. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
-      adGroupId: z.string().describe("Ad group ID"),
-      adId: z.string().describe("Ad ID to update"),
-      finalUrl: z.string().url().describe("New landing page URL"),
+      adGroupId: z.string(),
+      adId: z.string(),
+      finalUrl: z.string().url(),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
@@ -473,34 +412,32 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("updateAdAssets", {
-    title: "Update Ad Headlines & Descriptions",
-    description:
-      "Replace the headlines and descriptions for a Responsive Search Ad. You must provide the COMPLETE list — this replaces all existing assets. Headlines: 3-15, max 30 chars each. Descriptions: 2-4, max 90 chars each. Optionally pin assets to fixed positions: headlines pin 1-3, descriptions pin 1-2. Returns a changeId for undo support.",
+    description: "Replace all headlines and descriptions for a Responsive Search Ad. COMPLETE replacement — provide every asset, not just changed ones. Optionally pin assets to fixed positions. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
-      adGroupId: z.string().describe("Ad group ID"),
-      adId: z.string().describe("Ad ID to update"),
+      adGroupId: z.string(),
+      adId: z.string(),
       headlines: z
         .array(
           z.object({
-            text: z.string().min(1).max(30).describe("Headline text (max 30 chars)"),
-            pin: z.number().int().min(1).max(3).optional().describe("Pin to position 1, 2, or 3 (optional)"),
+            text: z.string().min(1).max(30),
+            pin: z.number().int().min(1).max(3).optional().describe("Pin to position 1, 2, or 3"),
           }),
         )
         .min(3)
         .max(15)
-        .describe("Complete replacement headlines (3-15). Each can optionally be pinned to position 1, 2, or 3."),
+        .describe("Complete replacement headlines (3-15, max 30 chars each)"),
       descriptions: z
         .array(
           z.object({
-            text: z.string().min(1).max(90).describe("Description text (max 90 chars)"),
-            pin: z.number().int().min(1).max(2).optional().describe("Pin to position 1 or 2 (optional)"),
+            text: z.string().min(1).max(90),
+            pin: z.number().int().min(1).max(2).optional().describe("Pin to position 1 or 2"),
           }),
         )
         .min(2)
         .max(4)
-        .describe("Complete replacement descriptions (2-4). Each can optionally be pinned to position 1 or 2."),
+        .describe("Complete replacement descriptions (2-4, max 90 chars each)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
@@ -513,23 +450,20 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Bulk Operations ────────────────────────────────────────────
 
   server.registerTool("bulkUpdateBids", {
-    title: "Bulk Update Keyword Bids",
-    description:
-      "Update multiple keyword bids in a single call. Each bid is subject to the same 25% guardrail as updateBid. Returns per-keyword results with individual changeIds for undo. Use getKeywords to find criterionIds.",
+    description: "Update up to 50 keyword bids in one call. Each bid capped at 25% change. Returns per-keyword results with individual changeIds.",
     inputSchema: {
       accountId: accountIdParam,
       updates: z
         .array(
           z.object({
-            campaignId: z.string().describe("Campaign ID"),
-            adGroupId: z.string().describe("Ad group ID"),
-            criterionId: z.string().describe("Keyword criterion ID"),
+            campaignId: z.string(),
+            adGroupId: z.string(),
+            criterionId: z.string(),
             newBidDollars: z.number().positive().describe("New bid in dollars"),
           }),
         )
         .min(1)
-        .max(50)
-        .describe("Array of bid updates (max 50)"),
+        .max(50),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, updates }) => {
@@ -557,22 +491,19 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Bulk Keyword Operations ─────────────────────────────────────
 
   server.registerTool("bulkPauseKeywords", {
-    title: "Bulk Pause Keywords",
-    description:
-      "Pause multiple keywords in a single call. Each keyword is paused individually — partial success is possible. Returns per-keyword results with individual changeIds for undo. Use getKeywords to find criterionIds.",
+    description: "Pause up to 100 keywords in one call. Partial success is possible. Returns per-keyword results with individual changeIds.",
     inputSchema: {
       accountId: accountIdParam,
       keywords: z
         .array(
           z.object({
-            campaignId: z.string().describe("Campaign ID"),
-            adGroupId: z.string().describe("Ad group ID"),
-            criterionId: z.string().describe("Keyword criterion ID to pause"),
+            campaignId: z.string(),
+            adGroupId: z.string(),
+            criterionId: z.string(),
           }),
         )
         .min(1)
-        .max(100)
-        .describe("Array of keywords to pause (max 100)"),
+        .max(100),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, keywords }) => {
@@ -597,26 +528,20 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("bulkAddKeywords", {
-    title: "Bulk Add Keywords",
-    description:
-      "Add multiple keywords to an ad group in a single call. Each keyword is added individually — partial success is possible. Returns per-keyword results with individual changeIds for undo.",
+    description: "Add up to 100 keywords to an ad group in one call. Partial success is possible. Returns per-keyword results with individual changeIds.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
-      adGroupId: z.string().describe("Ad group ID to add keywords to"),
+      adGroupId: z.string(),
       keywords: z
         .array(
           z.object({
-            keyword: z.string().min(1).describe("Keyword text"),
-            matchType: z
-              .enum(["BROAD", "PHRASE", "EXACT"])
-              .default("BROAD")
-              .describe("Match type (defaults to Broad)"),
+            keyword: z.string().min(1),
+            matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("BROAD"),
           }),
         )
         .min(1)
-        .max(100)
-        .describe("Array of keywords to add (max 100)"),
+        .max(100),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, keywords }) => {
@@ -643,23 +568,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Move Keywords ─────────────────────────────────────────────────
 
   server.registerTool("moveKeywords", {
-    title: "Move Keywords Between Ad Groups",
-    description:
-      "Move keywords from one ad group to another within the same campaign. Adds to destination first, then pauses in source only if all adds succeed. If any add fails, successful adds are rolled back and no keywords are paused. Returns changeIds for both adds and pauses (full undo support). Use getKeywords to find criterionIds.",
+    description: "Move keywords between ad groups in the same campaign. Adds to destination first, then pauses in source only if all adds succeed — rolls back on partial failure. Returns changeIds for both adds and pauses.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID containing both ad groups"),
-      fromAdGroupId: z.string().describe("Source ad group ID"),
-      toAdGroupId: z.string().describe("Destination ad group ID"),
-      criterionIds: z
-        .array(z.string())
-        .min(1)
-        .max(100)
-        .describe("Keyword criterion IDs to move"),
+      campaignId: z.string(),
+      fromAdGroupId: z.string(),
+      toAdGroupId: z.string(),
+      criterionIds: z.array(z.string()).min(1).max(100).describe("Keyword criterion IDs (from getKeywords)"),
       matchType: z
         .enum(["BROAD", "PHRASE", "EXACT"])
         .default("PHRASE")
-        .describe("Match type applied to all keywords in the destination ad group — does not inherit from source (defaults to Phrase)"),
+        .describe("Match type in destination — does not inherit from source"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
@@ -696,13 +615,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Rename Campaign / Ad Group ────────────────────────────────────
 
   server.registerTool("renameCampaign", {
-    title: "Rename Campaign",
-    description:
-      "Change the name of a campaign. Use after restructuring to keep names accurate. Returns a changeId for undo support.",
+    description: "Rename a campaign. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID to rename"),
-      newName: z.string().min(1).describe("New campaign name"),
+      campaignId: z.string(),
+      newName: z.string().min(1),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, newName }) => {
@@ -713,14 +630,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("renameAdGroup", {
-    title: "Rename Ad Group",
-    description:
-      "Change the name of an ad group. Use after restructuring to keep names accurate. Returns a changeId for undo support.",
+    description: "Rename an ad group. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID containing the ad group"),
-      adGroupId: z.string().describe("Ad group ID to rename"),
-      newName: z.string().min(1).describe("New ad group name"),
+      campaignId: z.string(),
+      adGroupId: z.string(),
+      newName: z.string().min(1),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, newName }) => {
@@ -733,12 +648,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
-    title: "Undo Change",
-    description:
-      "Undo a previous write operation by its changeId. Restores the entity to its state before the change was made. Only works within 7 days and if the entity hasn't been modified since. Use getChanges to find changeIds.",
+    description: "Undo a previous write operation by changeId. Only works within 7 days and if the entity hasn't been modified since.",
     inputSchema: {
       accountId: accountIdParam,
-      changeId: z.number().int().positive().describe("The changeId returned by the original write operation"),
+      changeId: z.number().int().positive().describe("changeId returned by the original write operation"),
     },
     annotations: {
       readOnlyHint: false,

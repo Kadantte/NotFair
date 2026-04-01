@@ -30,9 +30,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Account ────────────────────────────────────────────────────
 
   server.registerTool("getAccountInfo", {
-    title: "Get Account Info",
-    description:
-      "Get the connected Google Ads account details including name, currency, timezone, and test account status.",
+    description: "Get connected Google Ads account details: name, currency, timezone, and test account status.",
     inputSchema: {
       accountId: accountIdParam,
     },
@@ -48,22 +46,11 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaigns ──────────────────────────────────────────────────
 
   server.registerTool("listCampaigns", {
-    title: "List Campaigns",
-    description:
-      "List all campaigns with lifetime metrics (impressions, clicks, cost, conversions). Use to get an overview of account performance.",
+    description: "List all campaigns with lifetime metrics (impressions, clicks, cost, conversions).",
     inputSchema: {
       accountId: accountIdParam,
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(20)
-        .describe("Max campaigns to return (1-100)"),
-      includeRemoved: z
-        .boolean()
-        .default(false)
-        .describe("Include removed campaigns"),
+      limit: z.number().int().min(1).max(100).default(20),
+      includeRemoved: z.boolean().default(false),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, limit, includeRemoved }) => {
@@ -75,33 +62,29 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("getCampaignPerformance", {
-    title: "Get Campaign Performance",
     description:
-      "Get daily performance metrics and totals for a specific campaign. Supports flexible date ranges and period-over-period comparison. Use startDate/endDate for exact ranges (e.g., 'since we made changes on March 27'), or days for relative lookback. Enable comparePreviousPeriod to see % changes vs the prior period of equal length.",
+      "Daily performance metrics for a campaign. Use startDate+endDate for exact date ranges or days for relative lookback; set comparePreviousPeriod to see % changes vs the prior period of equal length.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Google Ads campaign ID"),
+      campaignId: z.string(),
       days: z
         .number()
         .int()
         .min(1)
         .max(365)
         .default(30)
-        .describe("Number of days to look back (1-365). Ignored when both startDate and endDate are provided."),
+        .describe("Lookback days; ignored when startDate+endDate are provided"),
       startDate: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
         .optional()
-        .describe("Start date in YYYY-MM-DD format. Use with endDate for exact date ranges."),
+        .describe("YYYY-MM-DD; use with endDate for exact date ranges"),
       endDate: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
         .optional()
-        .describe("End date in YYYY-MM-DD format. Use with startDate for exact date ranges."),
-      comparePreviousPeriod: z
-        .boolean()
-        .default(false)
-        .describe("Compare with previous period of equal length. Returns % changes for all metrics."),
+        .describe("YYYY-MM-DD; use with startDate for exact date ranges"),
+      comparePreviousPeriod: z.boolean().default(false),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days, startDate, endDate, comparePreviousPeriod }) => {
@@ -120,26 +103,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Keywords & Search Terms ────────────────────────────────────
 
   server.registerTool("getKeywords", {
-    title: "Get Keywords",
-    description:
-      "Get top keywords for a campaign with metrics: impressions, clicks, CTR, CPC, quality score, and conversions.",
+    description: "Top keywords for a campaign with metrics: impressions, clicks, CTR, CPC, quality score, and conversions.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Google Ads campaign ID"),
-      days: z
-        .number()
-        .int()
-        .min(1)
-        .max(365)
-        .default(30)
-        .describe("Number of days to look back (1-365)"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(50)
-        .describe("Max keywords to return (1-100)"),
+      campaignId: z.string(),
+      days: z.number().int().min(1).max(365).default(30),
+      limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days, limit }) => {
@@ -151,19 +120,11 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("getNegativeKeywords", {
-    title: "Get Negative Keywords",
-    description:
-      "List all negative keywords for a campaign. Use before adding negatives to avoid duplicates, or to audit existing exclusions.",
+    description: "List negative keywords for a campaign. Check before adding new negatives to avoid duplicates.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Google Ads campaign ID"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(500)
-        .default(100)
-        .describe("Max negative keywords to return (1-500)"),
+      campaignId: z.string(),
+      limit: z.number().int().min(1).max(500).default(100),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, limit }) => {
@@ -175,26 +136,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("getSearchTermReport", {
-    title: "Get Search Terms",
-    description:
-      "Get actual search queries that triggered your ads, ordered by cost. Use to find irrelevant terms to add as negative keywords.",
+    description: "Actual search queries that triggered ads, ordered by cost. Use to find irrelevant terms to add as negative keywords.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Google Ads campaign ID"),
-      days: z
-        .number()
-        .int()
-        .min(1)
-        .max(365)
-        .default(30)
-        .describe("Number of days to look back (1-365)"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(50)
-        .describe("Max search terms to return (1-100)"),
+      campaignId: z.string(),
+      days: z.number().int().min(1).max(365).default(30),
+      limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days, limit }) => {
@@ -208,15 +155,13 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Custom Query ───────────────────────────────────────────────
 
   server.registerTool("runGaqlQuery", {
-    title: "Run GAQL Query",
-    description:
-      "Run a custom read-only Google Ads Query Language (GAQL) query. Only SELECT statements are allowed. Returns up to 50 rows.",
+    description: "Run a read-only GAQL SELECT query. Returns up to 50 rows.",
     inputSchema: {
       accountId: accountIdParam,
       query: z
         .string()
         .min(1)
-        .describe("A read-only GAQL SELECT query (e.g. 'SELECT campaign.id, campaign.name FROM campaign')"),
+        .describe("GAQL SELECT query (e.g. 'SELECT campaign.id, campaign.name FROM campaign')"),
     },
     annotations: {
       readOnlyHint: true,
@@ -234,18 +179,14 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Tracking Templates ──────────────────────────────────────────
 
   server.registerTool("getTrackingTemplate", {
-    title: "Get Tracking Template",
-    description:
-      "Get the current tracking template (URL suffix used for click tracking) at the account, campaign, ad group, or ad level. Returns null if no template is set at that level.",
+    description: "Get the tracking template (click-tracking URL suffix) at the account, campaign, ad group, or ad level. Returns null if not set at that level.",
     inputSchema: {
       accountId: accountIdParam,
-      level: z
-        .enum(["account", "campaign", "ad_group", "ad"])
-        .describe("The level at which to read the tracking template"),
+      level: z.enum(["account", "campaign", "ad_group", "ad"]),
       entityId: z
         .string()
         .optional()
-        .describe("Required for campaign (campaignId), ad_group (adGroupId), and ad (adId) levels. Not needed for account level."),
+        .describe("Required for campaign, ad_group, and ad levels; omit for account level"),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, level, entityId }) => {
@@ -259,19 +200,11 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Ad Groups & Ads ────────────────────────────────────────────
 
   server.registerTool("listAdGroups", {
-    title: "List Ad Groups",
-    description:
-      "List all ad groups in a campaign with performance metrics (impressions, clicks, cost, conversions). Use to understand campaign structure before creating or editing ads.",
+    description: "List ad groups in a campaign with performance metrics (impressions, clicks, cost, conversions).",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(50)
-        .describe("Max ad groups to return (1-100)"),
+      campaignId: z.string(),
+      limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, limit }) => {
@@ -283,23 +216,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("listAds", {
-    title: "List Ads",
-    description:
-      "List all ads in a campaign (optionally filtered to one ad group). Returns RSA headlines, descriptions, final URLs, status, and performance metrics. Use to audit ad copy, find broken URLs, or identify ads to pause/edit.",
+    description: "List ads in a campaign with RSA headlines, descriptions, final URLs, status, and performance metrics. Optionally filter to one ad group.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      adGroupId: z
-        .string()
-        .optional()
-        .describe("Filter to a specific ad group (optional)"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(50)
-        .describe("Max ads to return (1-100)"),
+      campaignId: z.string(),
+      adGroupId: z.string().optional(),
+      limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, adGroupId, limit }) => {
@@ -313,19 +235,11 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Competitive Intelligence ────────────────────────────────────
 
   server.registerTool("getImpressionShare", {
-    title: "Get Impression Share",
-    description:
-      "Get impression share metrics for a campaign: search IS, absolute top IS, top IS, budget-lost IS, and rank-lost IS. Use to understand competitive position and diagnose whether lost impressions are due to budget or Quality Score.",
+    description: "Impression share metrics for a campaign: search IS, absolute top IS, top IS, budget-lost IS, and rank-lost IS.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
-      days: z
-        .number()
-        .int()
-        .min(1)
-        .max(90)
-        .default(30)
-        .describe("Number of days to look back (1-90)"),
+      campaignId: z.string(),
+      days: z.number().int().min(1).max(90).default(30),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, days }) => {
@@ -339,9 +253,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Conversion Tracking ─────────────────────────────────────────
 
   server.registerTool("getConversionActions", {
-    title: "Get Conversion Actions",
-    description:
-      "List all conversion actions in the account with their type, status, counting method, and value settings. Use to understand what conversions are tracked and their IDs before importing offline conversions or setting up campaigns.",
+    description: "List conversion actions with type, status, counting method, and value settings.",
     inputSchema: {
       accountId: accountIdParam,
     },
@@ -357,9 +269,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Account & Campaign Settings ────────────────────────────────
 
   server.registerTool("getAccountSettings", {
-    title: "Get Account Settings",
-    description:
-      "Get account-level settings including auto-tagging status, tracking URL template, and conversion tracking IDs. Use to diagnose UTM tracking issues or verify auto-tagging is enabled.",
+    description: "Account-level settings: auto-tagging status, tracking URL template, and conversion tracking IDs.",
     inputSchema: {
       accountId: accountIdParam,
     },
@@ -373,12 +283,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("getCampaignSettings", {
-    title: "Get Campaign Settings",
-    description:
-      "Get detailed campaign settings including bidding strategy, network targeting (Search Partners, Display), location targeting, and ad schedule. Use to audit campaign configuration or plan optimizations.",
+    description: "Campaign configuration: bidding strategy, network targeting (Search Partners, Display), location targeting, and ad schedule.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z.string().describe("Campaign ID"),
+      campaignId: z.string(),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId }) => {
@@ -392,15 +300,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Recommendations ─────────────────────────────────────────────
 
   server.registerTool("getRecommendations", {
-    title: "Get Recommendations",
-    description:
-      "Get Google Ads optimization recommendations with estimated impact (impressions, clicks, conversions). Optionally filter to a specific campaign. Use to find optimization opportunities suggested by Google.",
+    description: "Google Ads optimization recommendations with estimated impact (impressions, clicks, conversions). Optionally filter to a specific campaign.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z
-        .string()
-        .optional()
-        .describe("Filter to a specific campaign (optional)"),
+      campaignId: z.string().optional(),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId }) => {
@@ -414,22 +317,11 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Change History ───────────────────────────────────────────
 
   server.registerTool("getChanges", {
-    title: "Get Change History",
-    description:
-      "Get recent changes made to the account via AdsAgent (bid updates, keyword pauses, budget changes, etc). Each change has a changeId that can be used with undoChange to reverse it.",
+    description: "Recent changes made to the account via AdsAgent. Each change has a changeId usable with undoChange.",
     inputSchema: {
       accountId: accountIdParam,
-      campaignId: z
-        .string()
-        .optional()
-        .describe("Filter changes to a specific campaign"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(20)
-        .describe("Max changes to return (1-100)"),
+      campaignId: z.string().optional(),
+      limit: z.number().int().min(1).max(100).default(20),
     },
     annotations: READ_ANNOTATIONS,
   }, async ({ accountId, campaignId, limit }) => {

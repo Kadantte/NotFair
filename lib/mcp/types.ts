@@ -20,7 +20,7 @@ export function jsonResult(value: unknown): CallToolResult {
 export const accountIdParam = z
   .string()
   .optional()
-  .describe("Target a specific connected account ID (defaults to primary account)");
+  .describe("Account ID (omit for primary)");
 
 /** Shared annotation presets to avoid repetition across tool registrations. */
 export const READ_ANNOTATIONS = {
