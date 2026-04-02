@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 
-const PROTECTED_PATHS = ["/campaigns", "/operations", "/tools", "/chat"];
+const PROTECTED_PATHS = ["/dashboard", "/campaigns", "/operations", "/tools", "/chat"];
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;

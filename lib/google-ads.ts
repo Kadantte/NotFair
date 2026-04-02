@@ -540,6 +540,7 @@ export async function getKeywords(
 
   const result = await customer.query(`
     SELECT
+      ad_group.id,
       ad_group.name,
       ad_group_criterion.criterion_id,
       ad_group_criterion.keyword.text,
@@ -559,6 +560,7 @@ export async function getKeywords(
     dateRange: { start, end, days: boundedDays },
     keywords: (result as any[]).map((row) => ({
       criterionId: String(row.ad_group_criterion.criterion_id),
+      adGroupId: String(row.ad_group?.id ?? ""),
       adGroupName: row.ad_group?.name ?? "Unknown",
       text: row.ad_group_criterion.keyword?.text ?? "",
       status: row.ad_group_criterion.status ?? "UNKNOWN",

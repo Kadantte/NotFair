@@ -162,7 +162,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     }
 
     function openAgenticAi() {
-        window.location.assign('/chat');
+        window.location.assign('/dashboard');
     }
 
     function copyPrompt() {
@@ -452,7 +452,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                         onClick={openAgenticAi}
                                         className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
                                     >
-                                        Open AdsAgent Chat
+                                        Open Dashboard
                                     </Button>
                                 </div>
                             </div>
