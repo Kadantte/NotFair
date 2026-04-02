@@ -8,7 +8,7 @@ import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 
 function buildSetupPrompt(token: string): string {
-    return `git clone --depth 1 https://github.com/nowork-studio/toprank.git ~/.claude/skills/toprank 2>/dev/null; ~/.claude/skills/toprank/setup --skill google-ads && mkdir -p ~/.adsagent && echo '{"apiKey":"${token}"}' > ~/.adsagent/config.json`;
+    return `git clone --depth 1 https://github.com/nowork-studio/toprank.git ~/.claude/skills/toprank 2>/dev/null; ~/.claude/skills/toprank/setup --skill google-ads --api-key ${token}`;
 }
 
 const emptySession: Session = { connected: false };
