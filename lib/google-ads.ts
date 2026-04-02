@@ -322,12 +322,17 @@ export async function listCampaigns(
 ) {
   const customer = getCachedCustomer(auth);
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
-  const dateFilter = options.days != null
-    ? `WHERE segments.date BETWEEN '${getDateRange(options.days).start}' AND '${getDateRange(options.days).end}'`
-    : "WHERE 1=1";
-  const statusFilter = options.includeRemoved
-    ? ""
-    : "AND campaign.status != 'REMOVED'";
+  const conditions: string[] = [];
+  if (options.days != null) {
+    const { start, end } = getDateRange(options.days);
+    conditions.push(`segments.date BETWEEN '${start}' AND '${end}'`);
+  }
+  if (!options.includeRemoved) {
+    conditions.push("campaign.status != 'REMOVED'");
+  }
+  const whereClause = conditions.length > 0
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
 
   const result = await customer.query(`
     SELECT
@@ -341,8 +346,7 @@ export async function listCampaigns(
       metrics.cost_micros,
       metrics.conversions
     FROM campaign
-    ${dateFilter}
-      ${statusFilter}
+    ${whereClause}
     ORDER BY metrics.impressions DESC
     LIMIT ${limit}
   `);
