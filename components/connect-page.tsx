@@ -7,276 +7,9 @@ import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 
-const CLIENTS = [
-    {
-        id: 'claude',
-        name: 'Claude',
-        hint: 'Paste into Claude Code. It will set up AdsAgent for both Claude Code and Claude Desktop.',
-        prompt: (mcpUrl: string, token: string) =>
-            `Set up the AdsAgent MCP server for both Claude Code and Claude Desktop.
-
-Before you start:
-1. Check if Node.js is installed (run \`node --version\`). If not, tell me to install it first (https://nodejs.org) and stop — npx won't work without it.
-2. Check if npx is available (run \`npx --version\`). If missing but node exists, run \`npm install -g npx\`.
-
-## Part 1: Claude Code
-
-Run this command to add the MCP server to Claude Code:
-
-claude mcp add adsagent -s user -- npx -y mcp-remote ${mcpUrl} --transport streamable-http --header "Authorization: Bearer ${token}"
-
-Verify it was added:
-
-claude mcp list
-
-## Part 2: Claude Desktop
-
-Detect my OS and find my Claude Desktop config file:
-- macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-- Windows: %APPDATA%\\Claude\\claude_desktop_config.json
-- Linux: ~/.config/Claude/claude_desktop_config.json
-
-Add this entry under mcpServers in the config file:
-
-"adsagent": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "mcp-remote",
-    "${mcpUrl}",
-    "--transport",
-    "streamable-http",
-    "--header",
-    "Authorization: Bearer ${token}"
-  ]
+function buildSetupPrompt(token: string): string {
+    return `git clone --depth 1 https://github.com/nowork-studio/toprank.git ~/.claude/skills/toprank 2>/dev/null; ~/.claude/skills/toprank/setup --skill google-ads && mkdir -p ~/.adsagent && echo '{"apiKey":"${token}"}' > ~/.adsagent/config.json`;
 }
-
-Read the existing file first. If the file doesn't exist, create it with \`{"mcpServers": {}}\`. Merge this entry into mcpServers (don't overwrite other servers). Write it back, then tell me to restart Claude Desktop.`,
-    },
-    {
-        id: 'codex',
-        name: 'Codex',
-        hint: 'Paste into Codex CLI. It will add AdsAgent as an MCP server and start analyzing your ads.',
-        prompt: (mcpUrl: string, token: string) =>
-            `Set up this MCP server in Codex so I can manage my ads with AI.
-
-Before you start:
-1. Check if the Codex CLI is installed by running \`codex --version\`. If not found, tell me how to install it and stop.
-2. Check if Node.js is available by running \`node --version\`. If it is not found, tell me how to install it and stop.
-
-Once prerequisites are confirmed:
-
-1. Set an environment variable for the bearer token:
-
-export ADSAGENT_MCP_BEARER_TOKEN="${token}"
-
-If needed, also add that export to my shell profile so it persists across restarts.
-
-2. Add the MCP server in Codex using the bearer token env var:
-
-codex mcp add adsagent --url ${mcpUrl} --bearer-token-env-var ADSAGENT_MCP_BEARER_TOKEN
-
-3. Verify it was added:
-
-codex mcp list
-
-4. Restart Codex or reopen the IDE panel so the new MCP server is loaded with the environment variable.
-
-Once connected, show me how my campaigns are performing:
-- top spenders
-- wasted budget
-- quick wins`,
-    },
-    {
-        id: 'openclaw',
-        name: 'OpenClaw',
-        hint: 'Paste into OpenClaw. It will configure the MCP server correctly, create an MCPorter config, generate the client, and install the AdsAgent skill.',
-        prompt: (mcpUrl: string, token: string) =>
-            `## Step 0: Check prerequisites
-
-Before doing anything, verify:
-1. **Node.js** — run \`node --version\`. If missing, tell me to install it from https://nodejs.org and stop.
-2. **npx** — run \`npx --version\`. If missing, run \`npm install -g npx\`.
-3. **OpenClaw config location** — detect where OpenClaw stores its config on this system:
-   - Check \`~/.openclaw/openclaw.json\`
-   - Check \`~/.config/openclaw/openclaw.json\`
-   - If none exist, ask me where my OpenClaw config lives before proceeding.
-4. **OpenClaw skills directory** — detect the skills directory:
-   - Check \`~/.openclaw/skills/\`, \`~/.config/openclaw/skills/\`, or any path referenced in the OpenClaw config.
-   - If not found, ask me before creating one.
-5. **MCPorter config location** — detect whether MCPorter already has a config:
-   - Check \`./config/mcporter.json\` in the current working directory
-   - Check \`~/.mcporter/mcporter.json\`
-   - If neither exists, create \`./config/mcporter.json\` in the current working directory.
-
-## Step 1: Add the MCP server to OpenClaw
-
-Read the existing OpenClaw config first and merge this server definition under \`mcp.servers.adsagent\` — do not overwrite other servers:
-
-"adsagent": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "mcp-remote",
-    "${mcpUrl}",
-    "--transport",
-    "streamable-http",
-    "--header",
-    "Authorization: Bearer ${token}"
-  ]
-}
-
-Important: OpenClaw's config schema is not MCPorter's schema. OpenClaw stores MCP servers under \`mcp.servers\`.
-
-## Step 2: Add the same MCP server to MCPorter config
-
-MCPorter does not automatically read OpenClaw's \`openclaw.json\`. To let \`mcporter\` commands work, ensure there is an MCPorter config file with this shape:
-
-{
-  "mcpServers": {
-    "adsagent": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "${mcpUrl}",
-        "--transport",
-        "streamable-http",
-        "--header",
-        "Authorization: Bearer ${token}"
-      ]
-    }
-  }
-}
-
-If \`./config/mcporter.json\` exists, merge into \`mcpServers\`. Otherwise create it.
-
-## Step 3: Verify the MCP server with MCPorter
-
-Run:
-
-npx mcporter list adsagent --schema
-
-If verification fails, also test the endpoint directly with curl using the required Accept header for streamable HTTP MCP:
-
-curl -i -sS -X POST '${mcpUrl}' \\
-  -H 'Authorization: Bearer ${token}' \\
-  -H 'Content-Type: application/json' \\
-  -H 'Accept: application/json, text/event-stream' \\
-  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
-
-A \`200 OK\` means the token and endpoint are working. A \`406\` usually means the Accept header was wrong, not that auth failed.
-
-## Step 4: Generate a typed client for the skill
-
-Use the skills directory you found in Step 0:
-
-npx mcporter emit-ts adsagent --mode client --out <skills-dir>/adsagent/adsagent-client.ts
-
-## Step 5: Create the AdsAgent skill
-
-Create the file <skills-dir>/adsagent/SKILL.md with this content:
-
----
-name: adsagent
-description: Manage Google Ads campaigns — read performance, optimize keywords, adjust bids and budgets, add negatives, pause/enable campaigns, manage ads/ad groups, tracking templates, and undo changes.
-version: 1.2.0
-mcp_servers:
-  - adsagent
-triggers:
-  - google ads
-  - campaigns
-  - keywords
-  - ad spend
-  - CPA
-  - ROAS
-  - search terms
-  - negative keywords
-  - bid
-  - budget
-  - pause campaign
-  - ads performance
----
-
-# AdsAgent — Google Ads Management
-
-You have access to Google Ads tools via the \`adsagent\` MCP server. Use them to help the user monitor and optimize ad campaigns.
-
-## Available Tools
-
-### Read (safe, no side effects)
-- **getAccountInfo** — Account name, currency, timezone, test status
-- **listCampaigns** — All campaigns with impressions, clicks, cost, conversions
-- **getCampaignPerformance** — Daily metrics over a date range
-- **getKeywords** — Top keywords with quality scores
-- **getSearchTermReport** — Actual search queries triggering ads
-- **runGaqlQuery** — Run a custom read-only GAQL SELECT query (max 50 rows)
-- **getChanges** — Recent AdsAgent changes with \`changeId\`s for undo
-- **listConnectedAccounts** — All connected Google Ads accounts
-- **getTrackingTemplate** — Current tracking template at account/campaign/ad-group/ad level
-- **listAdGroups** — Ad groups in a campaign with metrics
-- **listAds** — Ads in a campaign/ad group with copy, URLs, status, metrics
-- **getImpressionShare** — Search/top/abs-top IS and budget/rank-lost IS
-- **getConversionActions** — Conversion actions and settings
-- **getAccountSettings** — Auto-tagging, tracking template, conversion tracking IDs
-- **getCampaignSettings** — Bidding, network, locations, schedule
-- **getRecommendations** — Google optimization recommendations
-
-### Write (mutates the account — always confirm with user first)
-All write tools return a \`changeId\` on success. Use this with \`undoChange\` to reverse the operation within 7 days.
-- **pauseKeyword** — Stop a keyword
-- **enableKeyword** — Re-enable a paused keyword
-- **addKeyword** — Add a new keyword to an ad group
-- **updateBid** — Change CPC bid (manual/enhanced CPC only, max 25% change)
-- **bulkUpdateBids** — Update multiple CPC bids in one call
-- **addNegativeKeyword** — Block irrelevant search terms (phrase match)
-- **removeNegativeKeyword** — Remove a negative keyword
-- **updateCampaignBudget** — Change daily budget (max 50% change)
-- **createCampaign** — Create a full paused search campaign
-- **pauseCampaign** — Pause all ads in a campaign
-- **enableCampaign** — Re-enable a paused campaign
-- **setTrackingTemplate** — Set/clear tracking template
-- **createAdGroup** — Create a new ad group
-- **createAd** — Create a new Responsive Search Ad
-- **pauseAd** — Pause an ad
-- **enableAd** — Re-enable an ad
-- **updateAdFinalUrl** — Change an ad’s landing page URL
-- **updateAdAssets** — Replace an RSA’s headlines/descriptions
-- **undoChange** — Reverse a previous write by \`changeId\`
-
-## Rules
-
-1. **Never make write changes without explicit user confirmation.** Always show what you plan to change, the current value, and the new value before executing.
-2. **Start with reads.** When the user asks about ads, begin with \`getAccountInfo\` and \`listCampaigns\` to build context.
-3. **Show numbers clearly.** Format cost as dollars, show CTR as percentages, include date ranges.
-4. **Recommend before acting.** When you spot waste (high-spend zero-conversion keywords, irrelevant search terms), recommend the action and wait for approval.
-5. **Guardrails are server-side.** Bid changes >25% and budget changes >50% will be rejected by the server. Don’t try to circumvent this.
-6. **After every write, note the \`changeId\`.** Tell the user they can undo the change within 7 days. Use \`getChanges\` to review recent operations.
-
-## Common Workflows
-
-### "How are my ads doing?"
-1. \`getAccountInfo\` → \`listCampaigns\` → summarize top spenders, best/worst performers, total spend
-
-### "Find wasted spend"
-1. \`listCampaigns\` → pick top-spend campaigns
-2. \`getKeywords\` for each → find high-spend, zero-conversion keywords
-3. \`getSearchTermReport\` → find irrelevant search terms
-4. Recommend: pause wasteful keywords + add negative keywords
-
-### "Optimize bids"
-1. \`getKeywords\` → find keywords with good conversion rates but low impression share
-2. \`getImpressionShare\` / \`getCampaignSettings\` as needed for context
-3. Recommend bid increases (within 25% limit) for high-performers
-4. Recommend bid decreases for underperformers
-
-## Step 6: Verify it works
-
-Now use the skill. Call \`getAccountInfo\` to verify the connection, then \`listCampaigns\` to show me how my campaigns are performing — top spenders, wasted budget, and quick wins I should act on.
-
-When summarizing verification, do not claim a fixed number of tools unless you just checked the current schema output.`,
-    },
-] as const;
 
 const emptySession: Session = { connected: false };
 
@@ -320,12 +53,10 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const selectedParam = searchParams.get('selected');
 
     const [session, setSession] = useState<Session>(initialSession);
-    const [mcpUrl, setMcpUrl] = useState('');
     const [error, setError] = useState<string | null>(urlError);
     const [copied, setCopied] = useState(false);
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
-    const [activeClient, setActiveClient] = useState<string>('claude');
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
     const token = urlToken || (session.connected ? session.token : null);
@@ -363,8 +94,6 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     }, [selectedParam]);
 
     useEffect(() => {
-        setMcpUrl(`${window.location.origin}/api/mcp`);
-
         if (urlToken) {
             window.history.replaceState({}, '', '/connect');
             return;
@@ -394,8 +123,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
         setSelectedAccounts(accessiblePreselected);
     }, [pendingToken, selectionMode, accounts, preselectedAccountIds]);
 
-    const client = CLIENTS.find(c => c.id === activeClient)!;
-    const prompt = token && mcpUrl ? client.prompt(mcpUrl, token) : '';
+    const prompt = token ? buildSetupPrompt(token) : '';
 
     async function beginGoogleSignIn() {
         setError(null);
@@ -582,27 +310,11 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                 <span className="text-sm font-medium">Connected to {customerName || 'Google Ads'}</span>
                             </div>
 
-                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Paste this into your AI</h2>
+                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your AI client</h2>
 
-                            <div className="flex items-center gap-1 rounded-full border border-[#3D3C36] bg-[#24231F] p-1">
-                                {CLIENTS.map(c => (
-                                    <button
-                                        key={c.id}
-                                        onClick={() => {
-                                            setActiveClient(c.id);
-                                            setCopied(false);
-                                        }}
-                                        className={`rounded-full px-5 py-2 text-sm font-medium transition-all ${
-                                            activeClient === c.id
-                                                ? 'bg-[#4CAF6E] text-[#1A1917]'
-                                                : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                                        }`}
-                                    >
-                                        {c.name}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="max-w-md text-sm text-[#9B9689]">{client.hint}</p>
+                            <p className="max-w-md text-sm text-[#9B9689]">
+                                Run this in your terminal. Works with Claude Code, Claude Desktop, and any AI client that supports skills.
+                            </p>
 
                             <div className="w-full text-left">
                                 <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
@@ -626,7 +338,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                         )}
                                     </button>
                                     <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
-                                        This prompt contains your personal access token. Don&apos;t share it publicly.
+                                        This contains your personal access token. Don&apos;t share it publicly.
                                     </p>
                                 </div>
                             </div>
