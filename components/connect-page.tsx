@@ -29,7 +29,7 @@ function buildCoworkPrompt(token: string): string {
     return `Find the claude_desktop_config.json file on my local machine (check ~/Library/Application Support/Claude/ on macOS or %APPDATA%/Claude/ on Windows). Read it, merge the following MCP server into the mcpServers object, and write the file back.\n\n${config}`;
 }
 
-type SetupTab = 'claude-code' | 'claude-cowork';
+type SetupTab = 'cli' | 'claude-cowork';
 
 const emptySession: Session = { connected: false };
 
@@ -61,6 +61,37 @@ export function ConnectPage({ initialSession = emptySession }: ConnectPageProps)
     );
 }
 
+function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: boolean; onCopy: () => void }) {
+    return (
+        <div className="w-full text-left">
+            <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
+                <pre className="max-h-[280px] overflow-y-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-relaxed text-[#E8E4DD]/80">
+                    {content}
+                </pre>
+                <button
+                    onClick={onCopy}
+                    className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#4CAF6E] px-3 py-1.5 text-sm font-medium text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
+                >
+                    {copied ? (
+                        <>
+                            <Check className="h-4 w-4 text-[#1A1917]" />
+                            <span className="text-[#1A1917]">Copied</span>
+                        </>
+                    ) : (
+                        <>
+                            <Copy className="h-4 w-4 text-[#1A1917]" />
+                            <span className="text-[#1A1917]">Copy</span>
+                        </>
+                    )}
+                </button>
+                <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
+                    This contains your personal access token. Don&apos;t share it publicly.
+                </p>
+            </div>
+        </div>
+    );
+}
+
 function ConnectContent({ initialSession }: { initialSession: Session }) {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -78,7 +109,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-    const [setupTab, setSetupTab] = useState<SetupTab>('claude-code');
+    const [setupTab, setSetupTab] = useState<SetupTab>('cli');
 
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
@@ -163,12 +194,6 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
 
     function openAgenticAi() {
         window.location.assign('/dashboard');
-    }
-
-    function copyPrompt() {
-        navigator.clipboard.writeText(prompt);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
     }
 
     function toggleAccount(accountId: string) {
@@ -336,63 +361,42 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
 
                             {/* Tab switcher */}
                             <div className="inline-flex rounded-lg border border-[#3D3C36] bg-[#24231F] p-1">
-                                <button
-                                    onClick={() => setSetupTab('claude-code')}
-                                    className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                                        setupTab === 'claude-code'
-                                            ? 'bg-[#3D3C36] text-[#E8E4DD]'
-                                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                                    }`}
-                                >
-                                    Claude Code
-                                </button>
-                                <button
-                                    onClick={() => setSetupTab('claude-cowork')}
-                                    className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                                        setupTab === 'claude-cowork'
-                                            ? 'bg-[#3D3C36] text-[#E8E4DD]'
-                                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                                    }`}
-                                >
-                                    Claude Cowork
-                                </button>
+                                {([
+                                    ['cli', 'Claude Code / Codex / OpenClaw'],
+                                    ['claude-cowork', 'Claude Cowork'],
+                                ] as const).map(([id, label]) => (
+                                    <button
+                                        key={id}
+                                        onClick={() => setSetupTab(id)}
+                                        className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                                            setupTab === id
+                                                ? 'bg-[#3D3C36] text-[#E8E4DD]'
+                                                : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
 
-                            {setupTab === 'claude-code' ? (
+                            {setupTab === 'cli' ? (
                                 <>
                                     <p className="max-w-md text-sm text-[#9B9689]">
-                                        Run this in your terminal. Works with Claude Code, Claude Desktop, and any AI client that supports skills.
+                                        Run this in your terminal. It auto-detects and configures all installed agents.
                                     </p>
 
-                                    <div className="w-full text-left">
-                                        <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
-                                            <pre className="max-h-[280px] overflow-y-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-relaxed text-[#E8E4DD]/80">
-                                                {prompt}
-                                            </pre>
-                                            <button
-                                                onClick={copyPrompt}
-                                                className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#4CAF6E] px-3 py-1.5 text-sm font-medium text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
-                                            >
-                                                {copied ? (
-                                                    <>
-                                                        <Check className="h-4 w-4 text-[#1A1917]" />
-                                                        <span className="text-[#1A1917]">Copied</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy className="h-4 w-4 text-[#1A1917]" />
-                                                        <span className="text-[#1A1917]">Copy</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                            <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
-                                                This contains your personal access token. Don&apos;t share it publicly.
-                                            </p>
-                                        </div>
-                                    </div>
+                                    <SetupCodeBlock
+                                        content={prompt}
+                                        copied={copied}
+                                        onCopy={() => {
+                                            navigator.clipboard.writeText(prompt);
+                                            setCopied(true);
+                                            setTimeout(() => setCopied(false), 2000);
+                                        }}
+                                    />
 
                                     <p className="max-w-md text-sm text-[#9B9689]">
-                                        Then type <code className="rounded bg-[#3D3C36] px-1.5 py-0.5 font-mono text-[#E8E4DD]">/google-ads</code> in Claude Code to continue.
+                                        Works with Claude Code, Codex, and OpenClaw. The installer detects which agents you have and sets up the skill for each one.
                                     </p>
                                 </>
                             ) : (
@@ -401,36 +405,15 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                         Paste this into Claude Cowork. It will install the MCP server for you.
                                     </p>
 
-                                    <div className="w-full text-left">
-                                        <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
-                                            <pre className="max-h-[280px] overflow-y-auto whitespace-pre-wrap pr-16 font-mono text-sm leading-relaxed text-[#E8E4DD]/80">
-                                                {coworkPrompt}
-                                            </pre>
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(coworkPrompt);
-                                                    setCopied(true);
-                                                    setTimeout(() => setCopied(false), 2000);
-                                                }}
-                                                className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#4CAF6E] px-3 py-1.5 text-sm font-medium text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
-                                            >
-                                                {copied ? (
-                                                    <>
-                                                        <Check className="h-4 w-4 text-[#1A1917]" />
-                                                        <span className="text-[#1A1917]">Copied</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy className="h-4 w-4 text-[#1A1917]" />
-                                                        <span className="text-[#1A1917]">Copy</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                            <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
-                                                This contains your personal access token. Don&apos;t share it publicly.
-                                            </p>
-                                        </div>
-                                    </div>
+                                    <SetupCodeBlock
+                                        content={coworkPrompt}
+                                        copied={copied}
+                                        onCopy={() => {
+                                            navigator.clipboard.writeText(coworkPrompt);
+                                            setCopied(true);
+                                            setTimeout(() => setCopied(false), 2000);
+                                        }}
+                                    />
                                 </>
                             )}
 

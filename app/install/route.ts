@@ -17,7 +17,7 @@ else
   git clone --depth 1 https://github.com/nowork-studio/toprank.git "$SKILL_DIR" 2>/dev/null
 fi
 
-# Run setup
+# Run setup — auto-detect all available hosts
 "$SKILL_DIR/setup" --skill google-ads --api-key "$API_KEY"
 `;
 }
