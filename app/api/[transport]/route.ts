@@ -112,13 +112,34 @@ const mcpHandler = createMcpHandler(
   },
 );
 
+// ─── Schema-only methods (no auth needed) ───────────────────────────
+
+const SCHEMA_METHODS = new Set(["initialize", "tools/list", "notifications/initialized"]);
+
+async function isSchemaRequest(request: Request): Promise<{ schemaOnly: boolean; cloned: Request }> {
+  if (request.method !== "POST") return { schemaOnly: false, cloned: request };
+  const cloned = request.clone();
+  try {
+    const body = await request.json();
+    const method = body?.method;
+    return { schemaOnly: typeof method === "string" && SCHEMA_METHODS.has(method), cloned };
+  } catch {
+    return { schemaOnly: false, cloned };
+  }
+}
+
 // ─── Request handler ─────────────────────────────────────────────────
 
 async function handler(request: Request): Promise<Response> {
-  let auth: AuthContextWithSession;
+  let auth: AuthContextWithSession | null = null;
   try {
     auth = await resolveAuth(request);
   } catch (e) {
+    // Allow schema introspection without auth
+    const { schemaOnly, cloned } = await isSchemaRequest(request);
+    if (schemaOnly) {
+      return mcpHandler(cloned);
+    }
     return new Response(
       JSON.stringify({ error: (e as Error).message || "Authentication required" }),
       { status: 401, headers: { "Content-Type": "application/json" } },
