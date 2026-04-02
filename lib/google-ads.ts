@@ -99,18 +99,83 @@ function normalizeCustomerId(customerId: string): string {
   return customerId.replace(/-/g, "").trim();
 }
 
+/** Singleton client — reuse across calls to avoid re-instantiation. */
+let _clientInstance: GoogleAdsApi | null = null;
+
 export function getClient() {
-  return new GoogleAdsApi({
-    client_id: requiredEnv("GOOGLE_ADS_CLIENT_ID"),
-    client_secret: requiredEnv("GOOGLE_ADS_CLIENT_SECRET"),
-    developer_token: requiredEnv("GOOGLE_ADS_DEVELOPER_TOKEN"),
-  });
+  if (!_clientInstance) {
+    _clientInstance = new GoogleAdsApi({
+      client_id: requiredEnv("GOOGLE_ADS_CLIENT_ID"),
+      client_secret: requiredEnv("GOOGLE_ADS_CLIENT_SECRET"),
+      developer_token: requiredEnv("GOOGLE_ADS_DEVELOPER_TOKEN"),
+    });
+  }
+  return _clientInstance;
 }
 
 export function getCustomer(auth: AuthContext) {
   return getClient().Customer({
     customer_id: normalizeCustomerId(auth.customerId),
     refresh_token: auth.refreshToken,
+  });
+}
+
+// ─── Query Cache ────────────────────────────────────────────────────
+//
+// In-memory TTL cache for read queries. Keyed by customerId + GAQL.
+// Mutations invalidate all entries for the affected customerId.
+
+const CACHE_TTL_MS = 45_000; // 45 seconds
+
+type CacheEntry = {
+  data: any;
+  expiresAt: number;
+};
+
+const queryCache = new Map<string, CacheEntry>();
+
+function cacheKey(customerId: string, query: string): string {
+  return `${normalizeCustomerId(customerId)}::${query.replace(/\s+/g, " ").trim()}`;
+}
+
+/** Invalidate all cached queries for a customer (call after mutations). */
+export function invalidateCache(customerId: string) {
+  const prefix = `${normalizeCustomerId(customerId)}::`;
+  for (const key of queryCache.keys()) {
+    if (key.startsWith(prefix)) queryCache.delete(key);
+  }
+}
+
+/** Clear the entire cache (used by Refresh buttons). */
+export function clearCache() {
+  queryCache.clear();
+}
+
+/**
+ * Get a customer client with cached queries.
+ * customer.query() results are cached with a TTL. Use for read-only functions.
+ */
+function getCachedCustomer(auth: AuthContext) {
+  const raw = getCustomer(auth);
+  const customerId = auth.customerId;
+
+  return new Proxy(raw, {
+    get(target, prop) {
+      if (prop === "query") {
+        return async (query: string) => {
+          const key = cacheKey(customerId, query);
+          const now = Date.now();
+          const cached = queryCache.get(key);
+          if (cached && cached.expiresAt > now) {
+            return cached.data;
+          }
+          const result = await target.query(query);
+          queryCache.set(key, { data: result, expiresAt: now + CACHE_TTL_MS });
+          return result;
+        };
+      }
+      return (target as any)[prop];
+    },
   });
 }
 
@@ -201,7 +266,7 @@ function validateRsaAssets(headlines: string[], descriptions: string[]): string 
 // ─── Read Functions ──────────────────────────────────────────────────
 
 export async function getAccountInfo(auth: AuthContext) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const result = await customer.query(`
     SELECT
       customer.id,
@@ -255,7 +320,7 @@ export async function listCampaigns(
   auth: AuthContext,
   options: { limit?: number; includeRemoved?: boolean } = {},
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
   const where = options.includeRemoved
     ? ""
@@ -384,7 +449,7 @@ export async function getCampaignPerformance(
   campaignId: string,
   daysOrOptions: number | CampaignPerformanceOptions = 30,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
 
   const opts: CampaignPerformanceOptions =
@@ -467,7 +532,7 @@ export async function getKeywords(
   days = 30,
   limit = 50,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
@@ -514,7 +579,7 @@ export async function getSearchTermReport(
   days = 30,
   limit = 50,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
@@ -666,14 +731,18 @@ export async function updateBid(
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
-  // Check bidding strategy — manual bid overrides only work on MANUAL_CPC / ENHANCED_CPC
-  const campaignResult = await customer.query(`
-    SELECT campaign.bidding_strategy_type
-    FROM campaign
+  // Single query: fetch bidding strategy + current bid together
+  const preCheckResult = await customer.query(`
+    SELECT
+      campaign.bidding_strategy_type,
+      ad_group_criterion.cpc_bid_micros
+    FROM keyword_view
     WHERE campaign.id = ${cid}
+      AND ad_group_criterion.criterion_id = ${Number(criterionId)}
     LIMIT 1
   `);
-  const strategy = (campaignResult as any[])[0]?.campaign?.bidding_strategy_type;
+  const row = (preCheckResult as any[])[0];
+  const strategy = row?.campaign?.bidding_strategy_type;
   const manualStrategies = ["MANUAL_CPC", "ENHANCED_CPC"];
   if (strategy && !manualStrategies.includes(strategy)) {
     return {
@@ -686,16 +755,7 @@ export async function updateBid(
     };
   }
 
-  // Get current bid to enforce guardrail
-  const currentResult = await customer.query(`
-    SELECT ad_group_criterion.cpc_bid_micros
-    FROM keyword_view
-    WHERE campaign.id = ${cid}
-      AND ad_group_criterion.criterion_id = ${Number(criterionId)}
-    LIMIT 1
-  `);
-  const currentBidMicros =
-    (currentResult as any[])[0]?.ad_group_criterion?.cpc_bid_micros ?? 0;
+  const currentBidMicros = row?.ad_group_criterion?.cpc_bid_micros ?? 0;
 
   if (currentBidMicros > 0) {
     const changePct = Math.abs(newBidMicros - currentBidMicros) / currentBidMicros;
@@ -820,14 +880,17 @@ export async function updateCampaignBudget(
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
-  // Get current budget
+  // Single query: fetch budget resource name + current amount together
   const result = await customer.query(`
-    SELECT campaign.campaign_budget
+    SELECT
+      campaign.campaign_budget,
+      campaign_budget.amount_micros
     FROM campaign
     WHERE campaign.id = ${cid}
     LIMIT 1
   `);
-  const budgetResourceName = (result as any[])[0]?.campaign?.campaign_budget;
+  const row = (result as any[])[0];
+  const budgetResourceName = row?.campaign?.campaign_budget;
 
   if (!budgetResourceName) {
     return {
@@ -840,15 +903,7 @@ export async function updateCampaignBudget(
     };
   }
 
-  // Get current budget amount
-  const budgetResult = await customer.query(`
-    SELECT campaign_budget.amount_micros
-    FROM campaign_budget
-    WHERE campaign_budget.resource_name = '${budgetResourceName}'
-    LIMIT 1
-  `);
-  const currentBudgetMicros =
-    (budgetResult as any[])[0]?.campaign_budget?.amount_micros ?? 0;
+  const currentBudgetMicros = row?.campaign_budget?.amount_micros ?? 0;
 
   // Enforce guardrail
   if (currentBudgetMicros > 0) {
@@ -1160,7 +1215,7 @@ export async function getNegativeKeywords(
   campaignId: string,
   limit = 100,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedLimit = Math.min(Math.max(limit, 1), 500);
 
@@ -1450,7 +1505,7 @@ export async function getTrackingTemplate(
   level: TrackingTemplateLevel,
   entityId?: string,
 ): Promise<{ level: string; entityId: string; trackingTemplate: string | null; campaignId?: string | null }> {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
 
   switch (level) {
@@ -1646,7 +1701,7 @@ export async function listAdGroups(
   campaignId: string,
   limit = 50,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const bounded = Math.min(Math.max(limit, 1), 100);
 
@@ -1742,7 +1797,7 @@ export async function listAds(
   adGroupId?: string,
   limit = 50,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const bounded = Math.min(Math.max(limit, 1), 100);
 
@@ -2170,18 +2225,98 @@ export async function bulkUpdateBids(
   updates: BulkBidUpdate[],
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<Array<WriteResult & { input: BulkBidUpdate }>> {
-  const CHUNK_SIZE = 5;
-  const results: Array<WriteResult & { input: BulkBidUpdate }> = [];
-  for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
-    const chunk = updates.slice(i, i + CHUNK_SIZE);
-    const chunkResults = await Promise.all(
-      chunk.map(async (u) => {
-        const result = await updateBid(auth, u.campaignId, u.adGroupId, u.criterionId, toMicros(u.newBidDollars), guardrails);
-        return { ...result, input: u };
-      }),
-    );
-    results.push(...chunkResults);
+  if (updates.length === 0) return [];
+
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  // Group by campaign to batch-fetch bidding strategy + current bids
+  const byCampaign = new Map<string, BulkBidUpdate[]>();
+  for (const u of updates) {
+    const arr = byCampaign.get(u.campaignId) ?? [];
+    arr.push(u);
+    byCampaign.set(u.campaignId, arr);
   }
+
+  // 1 query per campaign: fetch strategy + all keyword bids at once
+  const preCheckData = new Map<string, { strategy: string; bidMicros: number }>();
+  for (const [campaignId, group] of byCampaign) {
+    const campId = safeEntityId(campaignId);
+    const criterionIds = group.map((u) => Number(u.criterionId)).join(",");
+    const rows = await customer.query(`
+      SELECT
+        campaign.bidding_strategy_type,
+        ad_group_criterion.criterion_id,
+        ad_group_criterion.cpc_bid_micros
+      FROM keyword_view
+      WHERE campaign.id = ${campId}
+        AND ad_group_criterion.criterion_id IN (${criterionIds})
+    `);
+    for (const row of rows as any[]) {
+      const critId = String(row.ad_group_criterion?.criterion_id ?? "");
+      preCheckData.set(`${campaignId}:${critId}`, {
+        strategy: row.campaign?.bidding_strategy_type ?? "UNKNOWN",
+        bidMicros: row.ad_group_criterion?.cpc_bid_micros ?? 0,
+      });
+    }
+  }
+
+  // Validate all updates and build mutations
+  const results: Array<WriteResult & { input: BulkBidUpdate }> = [];
+  const validMutations: Array<{ update: BulkBidUpdate; newBidMicros: number; currentBidMicros: number }> = [];
+  const manualStrategies = ["MANUAL_CPC", "ENHANCED_CPC"];
+
+  for (const u of updates) {
+    const newBidMicros = toMicros(u.newBidDollars);
+    const data = preCheckData.get(`${u.campaignId}:${u.criterionId}`);
+
+    if (!data) {
+      results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: "N/A", afterValue: String(newBidMicros), error: "Keyword not found", input: u });
+      continue;
+    }
+    if (data.strategy && !manualStrategies.includes(data.strategy)) {
+      results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: "N/A", afterValue: String(newBidMicros), error: `Bid changes not supported for ${data.strategy} strategy`, input: u });
+      continue;
+    }
+    if (newBidMicros <= 0) {
+      results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: String(data.bidMicros), afterValue: String(newBidMicros), error: "Bid must be greater than zero", input: u });
+      continue;
+    }
+    if (data.bidMicros > 0) {
+      const changePct = Math.abs(newBidMicros - data.bidMicros) / data.bidMicros;
+      if (changePct > guardrails.maxBidChangePct) {
+        results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: String(data.bidMicros), afterValue: String(newBidMicros), error: `Bid change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBidChangePct * 100).toFixed(0)}%`, input: u });
+        continue;
+      }
+    }
+    validMutations.push({ update: u, newBidMicros, currentBidMicros: data.bidMicros });
+  }
+
+  // Single batch mutate for all valid updates
+  if (validMutations.length > 0) {
+    try {
+      await customer.mutateResources(
+        validMutations.map(({ update, newBidMicros }) => ({
+          entity: "ad_group_criterion" as any,
+          operation: "update" as const,
+          resource: {
+            resource_name: `customers/${cid}/adGroupCriteria/${update.adGroupId}~${update.criterionId}`,
+            cpc_bid_micros: newBidMicros,
+          },
+        })),
+      );
+      for (const { update, newBidMicros, currentBidMicros } of validMutations) {
+        results.push({ success: true, action: "update_bid", entityId: update.criterionId, beforeValue: String(currentBidMicros), afterValue: String(newBidMicros), input: update });
+      }
+    } catch (error) {
+      // If batch fails, report all as failed
+      const msg = extractErrorMessage(error);
+      for (const { update, newBidMicros, currentBidMicros } of validMutations) {
+        results.push({ success: false, action: "update_bid", entityId: update.criterionId, beforeValue: String(currentBidMicros), afterValue: String(newBidMicros), error: msg, input: update });
+      }
+    }
+  }
+
   return results;
 }
 
@@ -2196,16 +2331,74 @@ export type BulkPauseKeywordInput = {
 export async function bulkPauseKeywords(
   auth: AuthContext,
   keywords: BulkPauseKeywordInput[],
-  guardrails = DEFAULT_GUARDRAILS,
+  _guardrails = DEFAULT_GUARDRAILS,
 ): Promise<Array<WriteResult & { input: BulkPauseKeywordInput }>> {
-  // Run pauses sequentially — pauseKeyword checks active keyword count before
-  // pausing, and parallel execution defeats this guardrail (all observe the
-  // same count and all proceed).
-  const results: Array<WriteResult & { input: BulkPauseKeywordInput }> = [];
+  if (keywords.length === 0) return [];
+
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  // Group by campaign to batch-check active keyword counts
+  const byCampaign = new Map<string, BulkPauseKeywordInput[]>();
   for (const k of keywords) {
-    const result = await pauseKeyword(auth, k.campaignId, k.adGroupId, k.criterionId, guardrails);
-    results.push({ ...result, input: k });
+    const arr = byCampaign.get(k.campaignId) ?? [];
+    arr.push(k);
+    byCampaign.set(k.campaignId, arr);
   }
+
+  // 1 query per campaign: count active keywords
+  const activeCountByCampaign = new Map<string, number>();
+  for (const campaignId of byCampaign.keys()) {
+    const campId = safeEntityId(campaignId);
+    const countResult = await customer.query(`
+      SELECT ad_group_criterion.criterion_id
+      FROM keyword_view
+      WHERE campaign.id = ${campId}
+        AND ad_group_criterion.status = 'ENABLED'
+    `);
+    activeCountByCampaign.set(campaignId, (countResult as any[]).length);
+  }
+
+  // Validate: ensure we don't pause all active keywords in any campaign
+  const results: Array<WriteResult & { input: BulkPauseKeywordInput }> = [];
+  const validKeywords: BulkPauseKeywordInput[] = [];
+
+  for (const [campaignId, group] of byCampaign) {
+    const activeCount = activeCountByCampaign.get(campaignId) ?? 0;
+    if (group.length >= activeCount) {
+      // Would pause all keywords — reject the whole group
+      for (const k of group) {
+        results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: `Cannot pause ${group.length} of ${activeCount} active keywords — would leave campaign with none`, input: k });
+      }
+    } else {
+      validKeywords.push(...group);
+    }
+  }
+
+  // Single batch mutate for all valid pauses
+  if (validKeywords.length > 0) {
+    try {
+      await customer.mutateResources(
+        validKeywords.map((k) => ({
+          entity: "ad_group_criterion" as any,
+          operation: "update" as const,
+          resource: {
+            resource_name: `customers/${cid}/adGroupCriteria/${k.adGroupId}~${k.criterionId}`,
+            status: STATUS.PAUSED,
+          },
+        })),
+      );
+      for (const k of validKeywords) {
+        results.push({ success: true, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "PAUSED", input: k });
+      }
+    } catch (error) {
+      const msg = extractErrorMessage(error);
+      for (const k of validKeywords) {
+        results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: msg, input: k });
+      }
+    }
+  }
+
   return results;
 }
 
@@ -2219,18 +2412,65 @@ export async function bulkAddKeywords(
   adGroupId: string,
   keywords: BulkAddKeywordInput[],
 ): Promise<Array<WriteResult & { input: BulkAddKeywordInput }>> {
-  const CHUNK_SIZE = 5;
+  if (keywords.length === 0) return [];
+
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  // Validate inputs
+  const valid: Array<{ input: BulkAddKeywordInput; text: string; matchType: "BROAD" | "PHRASE" | "EXACT" }> = [];
   const results: Array<WriteResult & { input: BulkAddKeywordInput }> = [];
-  for (let i = 0; i < keywords.length; i += CHUNK_SIZE) {
-    const chunk = keywords.slice(i, i + CHUNK_SIZE);
-    const chunkResults = await Promise.all(
-      chunk.map(async (k) => {
-        const result = await addKeyword(auth, adGroupId, k.keyword, k.matchType ?? "BROAD");
-        return { ...result, input: k };
-      }),
-    );
-    results.push(...chunkResults);
+
+  for (const k of keywords) {
+    const text = k.keyword.trim();
+    if (!text) {
+      results.push({ success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: "", error: "Keyword text cannot be empty", input: k });
+    } else {
+      valid.push({ input: k, text, matchType: k.matchType ?? "BROAD" });
+    }
   }
+
+  if (valid.length === 0) return results;
+
+  // Single batch mutate for all valid keywords
+  try {
+    const response = await customer.mutateResources(
+      valid.map(({ text, matchType }) => ({
+        entity: "ad_group_criterion" as any,
+        operation: "create" as const,
+        resource: {
+          ad_group: `customers/${cid}/adGroups/${adGroupId}`,
+          status: STATUS.ENABLED,
+          keyword: {
+            text,
+            match_type: MATCH_TYPE[matchType],
+          },
+        },
+      })),
+    );
+
+    const responses = (response as any)?.mutate_operation_responses ?? [];
+    for (let i = 0; i < valid.length; i++) {
+      const { input, text, matchType } = valid[i];
+      const resourceName = responses[i]?.ad_group_criterion_result?.resource_name as string | undefined;
+      const criterionId = resourceName?.split("~").pop() ?? "";
+      if (criterionId) {
+        results.push({ success: true, action: "add_keyword", entityId: criterionId, beforeValue: adGroupId, afterValue: `${text} (${matchType})`, input });
+      } else {
+        results.push({ success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text, error: "Keyword created but criterion ID could not be extracted", input });
+      }
+    }
+  } catch (error) {
+    const msg = extractErrorMessage(error);
+    for (const { input, text } of valid) {
+      results.push({
+        success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text,
+        error: msg.includes("ALREADY_EXISTS") ? `Keyword "${text}" already exists in this ad group` : msg,
+        input,
+      });
+    }
+  }
+
   return results;
 }
 
@@ -2450,7 +2690,7 @@ export async function getImpressionShare(
   campaignId: string,
   days: number,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 90);
   const { start, end } = getDateRange(boundedDays);
@@ -2498,7 +2738,7 @@ export async function getImpressionShare(
 }
 
 export async function getConversionActions(auth: AuthContext) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
 
   const result = await customer.query(`
     SELECT
@@ -2533,7 +2773,7 @@ export async function getConversionActions(auth: AuthContext) {
 }
 
 export async function getAccountSettings(auth: AuthContext) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
 
   const result = await customer.query(`
     SELECT
@@ -2566,10 +2806,11 @@ export async function getCampaignSettings(
   auth: AuthContext,
   campaignId: string,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
 
-  const [campaignResult, locationResult, scheduleResult] = await Promise.all([
+  // 2 queries instead of 3: campaign settings + combined location/schedule criteria
+  const [campaignResult, criteriaResult] = await Promise.all([
     customer.query(`
       SELECT
         campaign.id,
@@ -2592,16 +2833,10 @@ export async function getCampaignSettings(
     `),
     customer.query(`
       SELECT
+        campaign_criterion.type,
         campaign_criterion.criterion_id,
         campaign_criterion.negative,
-        campaign_criterion.location.geo_target_constant
-      FROM campaign_criterion
-      WHERE campaign.id = ${id}
-        AND campaign_criterion.type = 'LOCATION'
-      LIMIT 50
-    `),
-    customer.query(`
-      SELECT
+        campaign_criterion.location.geo_target_constant,
         campaign_criterion.ad_schedule.day_of_week,
         campaign_criterion.ad_schedule.start_hour,
         campaign_criterion.ad_schedule.start_minute,
@@ -2610,15 +2845,19 @@ export async function getCampaignSettings(
         campaign_criterion.bid_modifier
       FROM campaign_criterion
       WHERE campaign.id = ${id}
-        AND campaign_criterion.type = 'AD_SCHEDULE'
-      ORDER BY campaign_criterion.ad_schedule.day_of_week ASC
+        AND campaign_criterion.type IN ('LOCATION', 'AD_SCHEDULE')
+      LIMIT 100
     `),
   ]);
 
   const c = (campaignResult as any[])[0]?.campaign ?? {};
   const ns = c.network_settings ?? {};
 
-  const locations = (locationResult as any[]).map((row) => {
+  // Split combined criteria by type
+  const locationRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "LOCATION");
+  const scheduleRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "AD_SCHEDULE");
+
+  const locations = locationRows.map((row) => {
     const cc = row.campaign_criterion ?? {};
     const geoConst = cc.location?.geo_target_constant ?? "";
     const geoId = geoConst ? geoConst.replace("geoTargetConstants/", "") : null;
@@ -2629,18 +2868,20 @@ export async function getCampaignSettings(
     };
   });
 
-  const adSchedule = (scheduleResult as any[]).map((row) => {
-    const cc = row.campaign_criterion ?? {};
-    const sched = cc.ad_schedule ?? {};
-    return {
-      dayOfWeek: sched.day_of_week ?? "UNKNOWN",
-      startHour: sched.start_hour ?? 0,
-      startMinute: sched.start_minute ?? "ZERO",
-      endHour: sched.end_hour ?? 0,
-      endMinute: sched.end_minute ?? "ZERO",
-      bidModifier: cc.bid_modifier ?? 1.0,
-    };
-  });
+  const adSchedule = scheduleRows
+    .sort((a, b) => (a.campaign_criterion?.ad_schedule?.day_of_week ?? 0) - (b.campaign_criterion?.ad_schedule?.day_of_week ?? 0))
+    .map((row) => {
+      const cc = row.campaign_criterion ?? {};
+      const sched = cc.ad_schedule ?? {};
+      return {
+        dayOfWeek: sched.day_of_week ?? "UNKNOWN",
+        startHour: sched.start_hour ?? 0,
+        startMinute: sched.start_minute ?? "ZERO",
+        endHour: sched.end_hour ?? 0,
+        endMinute: sched.end_minute ?? "ZERO",
+        bidModifier: cc.bid_modifier ?? 1.0,
+      };
+    });
 
   return {
     id: String(c.id ?? campaignId),
@@ -2665,7 +2906,7 @@ export async function getRecommendations(
   auth: AuthContext,
   campaignId?: string,
 ) {
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const campaignFilter = campaignId
     ? `AND campaign.id = ${safeEntityId(campaignId)}`
     : "";
@@ -2737,7 +2978,7 @@ export async function runSafeGaqlReport(auth: AuthContext, rawQuery: string) {
     throw new Error("The query contains forbidden keywords.");
   }
 
-  const customer = getCustomer(auth);
+  const customer = getCachedCustomer(auth);
   const rows = await customer.query(query);
   return { rowCount: rows.length, rows: rows.slice(0, 50) };
 }

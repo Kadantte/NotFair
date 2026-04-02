@@ -18,6 +18,7 @@ import {
   toMicros,
   authForAccount,
   resolveAccountId,
+  invalidateCache,
   createAdGroup,
   createAd,
   pauseAd,
@@ -48,6 +49,9 @@ async function logAndReturn(
   reasoning?: string,
 ) {
   if (!result.success) return { ...result, changeId: null };
+
+  // Invalidate read cache for this account after successful mutation
+  invalidateCache(accountId);
 
   const change = await logChange(accountId, userId, campaignId, result, reasoning);
   return { ...result, changeId: change?.id ?? null };
