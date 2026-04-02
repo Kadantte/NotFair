@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,44 +27,60 @@ const statusColors = {
 
 type CampaignStatusFilter = 'ALL' | 'ENABLED' | 'PAUSED';
 
+// Module-level cache so data survives client-side navigations
+let cachedCampaigns: Campaign[] | null = null;
+
 export default function CampaignsPage() {
-    const router = useRouter();
-    const [loading, setLoading] = useState(true);
-    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [loading, setLoading] = useState(!cachedCampaigns);
+    const [campaigns, setCampaigns] = useState<Campaign[]>(cachedCampaigns ?? []);
     const [error, setError] = useState<string | null>(null);
-    const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>('ALL');
     const [actingOnCampaignId, setActingOnCampaignId] = useState<string | null>(null);
+    const isRefreshing = useRef(false);
 
-    const fetchCampaigns = useCallback(async () => {
-        setLoading(true);
+    const fetchCampaigns = useCallback(async (background = false) => {
+        if (!background) setLoading(true);
+        isRefreshing.current = true;
         setError(null);
-        setNavigatingTo(null);
         try {
             const data = await listCampaignsAction();
             setCampaigns(data);
+            cachedCampaigns = data;
         } catch (err) {
             console.error(err);
-            setError('Failed to fetch campaigns. Please try again.');
+            if (!background) setError('Failed to fetch campaigns. Please try again.');
         } finally {
             setLoading(false);
+            isRefreshing.current = false;
         }
     }, []);
 
     useEffect(() => {
-        fetchCampaigns();
+        // If we have cached data, show it immediately and refresh in background
+        fetchCampaigns(!!cachedCampaigns);
     }, [fetchCampaigns]);
 
-    const filteredCampaigns = campaigns.filter((campaign) => {
-        if (statusFilter === 'ALL') return true;
-        return campaign.status === statusFilter;
-    });
+    const filteredCampaigns = campaigns
+        .filter((campaign) => {
+            if (statusFilter === 'ALL') return true;
+            return campaign.status === statusFilter;
+        })
+        .sort((a, b) => {
+            // ENABLED first, then PAUSED, then others
+            const statusOrder: Record<string, number> = { ENABLED: 0, PAUSED: 1 };
+            const aOrder = statusOrder[a.status] ?? 2;
+            const bOrder = statusOrder[b.status] ?? 2;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            // Within same status, keep impressions DESC (original API order)
+            return (b.impressions || 0) - (a.impressions || 0);
+        });
 
     const handlePauseCampaign = async (campaignId: string) => {
         setActingOnCampaignId(campaignId);
         setError(null);
         try {
             await pauseCampaignAction(campaignId);
+            cachedCampaigns = null;
             await fetchCampaigns();
         } catch (err) {
             console.error(err);
@@ -83,6 +99,7 @@ export default function CampaignsPage() {
         setError(null);
         try {
             await removeCampaignAction(campaignId);
+            cachedCampaigns = null;
             await fetchCampaigns();
         } catch (err) {
             console.error(err);
@@ -101,7 +118,7 @@ export default function CampaignsPage() {
                         <p className="mt-0.5 text-sm text-[#9B9689]">Manage and track your Google Ads performance</p>
                     </div>
                     <Button
-                        onClick={fetchCampaigns}
+                        onClick={() => { cachedCampaigns = null; fetchCampaigns(); }}
                         disabled={loading}
                         variant="outline"
                         className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-2"
@@ -160,7 +177,6 @@ export default function CampaignsPage() {
                             </div>
                         ) : (
                             filteredCampaigns.map((campaign, index) => {
-                                const isNavigating = navigatingTo === campaign.id;
                                 const isActing = actingOnCampaignId === campaign.id;
                                 return (
                                     <motion.div
@@ -168,17 +184,14 @@ export default function CampaignsPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.04 }}
                                         key={campaign.id}
-                                        onClick={() => {
-                                            if (navigatingTo || actingOnCampaignId) return;
-                                            setNavigatingTo(campaign.id);
-                                            router.push(`/campaigns/${campaign.id}`);
-                                        }}
-                                        className={`group relative bg-[#24231F] border border-[#3D3C36] transition-all duration-150 rounded-xl p-5 cursor-pointer select-none
-                                            ${isNavigating
-                                                ? 'border-[#4CAF6E]/30 bg-[#2E2D28] scale-[0.995]'
-                                                : (navigatingTo || actingOnCampaignId)
-                                                    ? 'opacity-50 cursor-default'
-                                                    : 'hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 active:scale-[0.995]'
+                                    >
+                                    <Link
+                                        href={`/campaigns/${campaign.id}`}
+                                        prefetch
+                                        className={`group relative block bg-[#24231F] border border-[#3D3C36] transition-all duration-150 rounded-xl p-5 select-none
+                                            ${actingOnCampaignId
+                                                ? 'opacity-50 pointer-events-none'
+                                                : 'hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 active:scale-[0.995]'
                                             }`}
                                     >
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -225,8 +238,9 @@ export default function CampaignsPage() {
                                                             type="button"
                                                             size="sm"
                                                             variant="outline"
-                                                            disabled={Boolean(navigatingTo || actingOnCampaignId)}
+                                                            disabled={Boolean(actingOnCampaignId)}
                                                             onClick={(event) => {
+                                                                event.preventDefault();
                                                                 event.stopPropagation();
                                                                 void handlePauseCampaign(campaign.id);
                                                             }}
@@ -241,8 +255,9 @@ export default function CampaignsPage() {
                                                             type="button"
                                                             size="sm"
                                                             variant="outline"
-                                                            disabled={Boolean(navigatingTo || actingOnCampaignId)}
+                                                            disabled={Boolean(actingOnCampaignId)}
                                                             onClick={(event) => {
+                                                                event.preventDefault();
                                                                 event.stopPropagation();
                                                                 void handleRemoveCampaign(campaign.id);
                                                             }}
@@ -254,13 +269,14 @@ export default function CampaignsPage() {
                                                     )}
                                                 </div>
                                                 <div className="hidden md:flex items-center text-[#9B9689]">
-                                                    {isNavigating || isActing
+                                                    {isActing
                                                         ? <Loader2 className="w-4 h-4 animate-spin text-[#4CAF6E]" />
                                                         : <ChevronRight className="w-4 h-4 group-hover:text-[#E8E4DD] transition-colors" />
                                                     }
                                                 </div>
                                             </div>
                                         </div>
+                                    </Link>
                                     </motion.div>
                                 );
                             })

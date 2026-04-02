@@ -1,10 +1,26 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { clearSessionCookies, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
+
+/**
+ * Delete all Supabase `sb-*` cookies from the response.
+ * Supabase SSR sets large JWT session cookies we don't need — our own
+ * `adsagent_token` cookie handles session management.  Leaving the sb-*
+ * cookies around pushes total header size past the 8 KB limit, causing
+ * HTTP 431 errors.
+ */
+function clearSupabaseCookies(response: NextResponse, requestCookies: { name: string }[]) {
+  for (const { name } of requestCookies) {
+    if (name.startsWith("sb-")) {
+      response.cookies.set(name, "", { maxAge: 0, path: "/" });
+    }
+  }
+}
 
 type AuthState = {
   next?: string;
@@ -436,6 +452,12 @@ export async function GET(request: Request) {
 
   const user = authData.user ?? authData.session?.user ?? null;
 
+  // Capture request cookies so we can identify sb-* cookies to clear
+  const cookieStore = await cookies();
+  const requestCookies = cookieStore.getAll();
+
+  let response: NextResponse;
+
   try {
     const reusedResponse = await reuseExistingSession({
       origin,
@@ -445,11 +467,7 @@ export async function GET(request: Request) {
       next,
     });
 
-    if (reusedResponse) {
-      return reusedResponse;
-    }
-
-    return await createOrRedirectGoogleAdsSession({
+    response = reusedResponse ?? await createOrRedirectGoogleAdsSession({
       origin,
       userId: user?.id ?? null,
       googleEmail: user?.email ?? null,
@@ -459,8 +477,14 @@ export async function GET(request: Request) {
     });
   } catch (sessionError) {
     console.error("[auth/callback] Failed to create Google Ads session:", sessionError);
-    return popup
+    response = popup
       ? popupErrorResponse(origin, describeError(sessionError))
       : redirectWithError(origin, describeError(sessionError));
   }
+
+  // Supabase SSR sets large JWT cookies we don't use — clear them to
+  // avoid HTTP 431 (Request Header Fields Too Large) on subsequent requests.
+  clearSupabaseCookies(response, requestCookies);
+
+  return response;
 }

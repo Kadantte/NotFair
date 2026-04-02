@@ -98,10 +98,31 @@ export async function undoChangeAction(changeId: number) {
     });
 }
 
+const campaignsCache = new Map<string, { data: ReturnType<typeof mapCampaigns>; ts: number }>();
+const CAMPAIGNS_CACHE_TTL = 60_000; // 60 seconds
+
+function mapCampaigns(response: Awaited<ReturnType<typeof listCampaigns>>) {
+    return response.map((campaign) => ({
+        id: campaign.id,
+        name: campaign.name || 'Untitled Campaign',
+        status: normalizeCampaignStatus(campaign.status),
+        type: campaign.channelType || 'UNKNOWN',
+        impressions: campaign.impressions || 0,
+        clicks: campaign.clicks || 0,
+        cost: campaign.cost || 0
+    }));
+}
+
 export async function listCampaignsAction() {
     return requireAuth(async () => {
     try {
         const { refreshToken, customerId, customerIds } = await getSessionAuth();
+
+        const cached = campaignsCache.get(customerId);
+        if (cached && Date.now() - cached.ts < CAMPAIGNS_CACHE_TTL) {
+            return cached.data;
+        }
+
         const auth = {
             refreshToken,
             customerId,
@@ -109,16 +130,9 @@ export async function listCampaignsAction() {
         };
 
         const response = await listCampaigns(auth, { limit: 100 });
+        const campaigns = mapCampaigns(response);
 
-        const campaigns = response.map((campaign) => ({
-            id: campaign.id,
-            name: campaign.name || 'Untitled Campaign',
-            status: normalizeCampaignStatus(campaign.status),
-            type: campaign.channelType || 'UNKNOWN',
-            impressions: campaign.impressions || 0,
-            clicks: campaign.clicks || 0,
-            cost: campaign.cost || 0
-        }));
+        campaignsCache.set(customerId, { data: campaigns, ts: Date.now() });
 
         return campaigns;
     } catch (error) {
@@ -126,6 +140,10 @@ export async function listCampaignsAction() {
         throw new Error("Failed to list campaigns.");
     }
     });
+}
+
+export async function invalidateCampaignsCache() {
+    campaignsCache.clear();
 }
 
 export async function pauseCampaignAction(campaignId: string) {
@@ -143,6 +161,7 @@ export async function pauseCampaignAction(campaignId: string) {
             throw new Error(result.error ?? "Failed to pause campaign.");
         }
 
+        campaignsCache.delete(customerId);
         await logChange(customerId, userId, campaignId, result, "Paused from campaigns page");
         return { success: true, campaignId };
     } catch (error) {
@@ -167,6 +186,7 @@ export async function removeCampaignAction(campaignId: string) {
             throw new Error(result.error ?? "Failed to delete campaign.");
         }
 
+        campaignsCache.delete(customerId);
         await logChange(customerId, userId, campaignId, result, "Deleted from campaigns page");
         return { success: true, campaignId };
     } catch (error) {
