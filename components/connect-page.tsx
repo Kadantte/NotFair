@@ -343,6 +343,10 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                 </div>
                             </div>
 
+                            <p className="max-w-md text-sm text-[#9B9689]">
+                                Then type <code className="rounded bg-[#3D3C36] px-1.5 py-0.5 font-mono text-[#E8E4DD]">/google-ads</code> in Claude Code to continue.
+                            </p>
+
                             <div className="flex w-full items-center gap-4">
                                 <div className="h-px flex-1 bg-[#3D3C36]" />
                                 <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#9B9689]">or</span>
