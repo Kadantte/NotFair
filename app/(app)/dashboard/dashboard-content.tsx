@@ -5,11 +5,18 @@ import { MetricCard } from "./components/metric-card";
 import { IssuesSection } from "./components/issues-section";
 import { OpportunitiesSection } from "./components/opportunities-section";
 import { RecentChanges } from "./components/recent-changes";
-import { AIBriefing } from "./components/ai-briefing";
-import type { DashboardData } from "./actions";
+import { Loader2 } from "lucide-react";
+import type { DashboardOverview, DashboardDetails } from "./actions";
 
-export function DashboardContent({ data }: { data: DashboardData }) {
-  if (data.isEmpty) {
+export function DashboardContent({
+  overview,
+  details,
+}: {
+  overview: DashboardOverview;
+  details: DashboardDetails | null;
+})
+ {
+  if (overview.isEmpty) {
     return (
       <div className="flex h-full items-center justify-center bg-[#1A1917]">
         <div className="text-center max-w-sm">
@@ -28,79 +35,89 @@ export function DashboardContent({ data }: { data: DashboardData }) {
     );
   }
 
-  const { healthScore, issues, opportunities, recentChanges, metrics, impressionShareData, sparklineData } = data;
+  const { healthScore, metrics, sparklineData } = overview;
+
+  // Use refined data from details phase when available
+  const finalHealthScore = details?.refinedHealthScore ?? healthScore;
+  const finalMetrics = metrics
+    ? {
+        ...metrics,
+        avgImpressionShare: details?.refinedMetrics?.avgImpressionShare ?? metrics.avgImpressionShare,
+        wastedSpend: details?.refinedMetrics?.wastedSpend ?? metrics.wastedSpend,
+      }
+    : null;
+
+  const issues = details?.issues ?? [];
+  const opportunities = details?.opportunities ?? [];
+  const recentChanges = details?.recentChanges ?? { items: [], total: 0 };
+  const impressionShareData = details?.impressionShareData ?? [];
 
   return (
     <div className="h-full overflow-y-auto bg-[#1A1917]">
       <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
-        {/* Health Score + Key Metrics (renders instantly, visual anchor) */}
+        {/* Health Score + Key Metrics (renders instantly) */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
-          <HealthScore data={healthScore} />
+          <HealthScore data={finalHealthScore} preliminary={!details} />
 
-          {metrics && (
+          {finalMetrics && (
             <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <MetricCard
-                label="Total Spend"
-                value={metrics.totalCost}
+                label="Spend (30d)"
+                value={finalMetrics.totalCost}
                 format="currency"
                 sparklineData={sparklineData?.cost}
               />
               <MetricCard
                 label="Clicks"
-                value={metrics.totalClicks}
+                value={finalMetrics.totalClicks}
                 format="number"
                 sparklineData={sparklineData?.clicks}
               />
               <MetricCard
                 label="CPA"
-                value={metrics.cpa}
+                value={finalMetrics.cpa}
                 format="currency"
                 sparklineData={sparklineData?.cpa}
-                sparklineColor={metrics.cpa && metrics.cpa > 50 ? "#C45D4A" : "#4CAF6E"}
+                sparklineColor={finalMetrics.cpa && finalMetrics.cpa > 50 ? "#C45D4A" : "#4CAF6E"}
               />
               <MetricCard
                 label="Impression Share"
-                value={metrics.avgImpressionShare}
+                value={finalMetrics.avgImpressionShare}
                 format="percent"
               />
             </div>
           )}
         </div>
 
-        {/* AI Briefing (loads async, appears after health score) */}
-        {metrics && (
-          <AIBriefing
-            metrics={metrics}
-            issueCount={issues.length}
-            opportunityCount={opportunities.length}
-            topIssue={issues[0]?.title ?? null}
-            topOpportunity={opportunities[0]?.title ?? null}
-            recentChangeCount={recentChanges.total}
-          />
-        )}
-
         {/* Waste alert */}
-        {metrics && metrics.wastedSpend > 0 && (
+        {finalMetrics && finalMetrics.wastedSpend > 0 && (
           <div className="rounded-md border border-[#C45D4A]/30 bg-[#C45D4A]/5 p-4">
             <div className="flex items-center gap-2">
               <span className="font-mono text-[16px] font-bold text-[#C45D4A]">
-                ${(metrics.wastedSpend / 30).toFixed(0)}/day
+                ${(finalMetrics.wastedSpend / 30).toFixed(0)}/day
               </span>
               <span className="text-[13px] text-[#E8E4DD]/70">
                 spent on search terms with zero conversions
               </span>
             </div>
             <div className="mt-1 font-mono text-[11px] text-[#9B9689]">
-              ${metrics.wastedSpend.toFixed(0)} total over last 30 days
+              ${finalMetrics.wastedSpend.toFixed(0)} total over last 30 days
             </div>
           </div>
         )}
 
-        {/* Issues + Opportunities side by side on desktop */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <IssuesSection issues={issues} />
-          <OpportunitiesSection opportunities={opportunities} />
-        </div>
+        {/* Issues + Opportunities (loaded in phase 2) */}
+        {details ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <IssuesSection issues={issues} />
+            <OpportunitiesSection opportunities={opportunities} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <LoadingSection label="Issues" />
+            <LoadingSection label="Opportunities" />
+          </div>
+        )}
 
         {/* Impression Share detail */}
         {impressionShareData.length > 0 && (
@@ -122,7 +139,19 @@ export function DashboardContent({ data }: { data: DashboardData }) {
         )}
 
         {/* Recent Changes */}
-        <RecentChanges changes={recentChanges.items} />
+        {details && <RecentChanges changes={recentChanges.items} />}
+      </div>
+    </div>
+  );
+}
+
+function LoadingSection({ label }: { label: string }) {
+  return (
+    <div className="rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
+      <div className="text-[14px] font-medium text-[#E8E4DD]">{label}</div>
+      <div className="mt-3 flex items-center gap-2">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#9B9689]" />
+        <span className="text-[13px] text-[#9B9689]">Analyzing...</span>
       </div>
     </div>
   );

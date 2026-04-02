@@ -8,7 +8,7 @@ const COLOR_MAP = {
   red: "#C45D4A",
 } as const;
 
-export function HealthScore({ data }: { data: HealthResult | null }) {
+export function HealthScore({ data, preliminary }: { data: HealthResult | null; preliminary?: boolean }) {
   if (!data) {
     return (
       <div className="flex items-center justify-center rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
@@ -60,7 +60,14 @@ export function HealthScore({ data }: { data: HealthResult | null }) {
 
       {/* Component breakdown */}
       <div className="flex-1 space-y-1.5">
-        <div className="mb-2 text-[14px] font-medium text-[#E8E4DD]">Account Health</div>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[14px] font-medium text-[#E8E4DD]">Account Health</span>
+          {preliminary && (
+            <span className="rounded-sm bg-[#3D3C36] px-1.5 py-0.5 text-[10px] text-[#9B9689]">
+              updating...
+            </span>
+          )}
+        </div>
         <ComponentBar label="CPA Efficiency" value={data.components.cpaEfficiency} />
         <ComponentBar label="Quality Scores" value={data.components.qualityScores} />
         <ComponentBar label="Impression Share" value={data.components.impressionShare} />

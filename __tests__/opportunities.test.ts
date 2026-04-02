@@ -79,34 +79,18 @@ describe("detectOpportunities", () => {
   });
 
   describe("recommendations", () => {
-    it("includes recommendations with positive impact", () => {
+    it("includes recommendations as opportunities", () => {
       const opps = detectOpportunities({
         impressionShare: [],
         recommendations: [{
           type: "KEYWORD",
           campaignId: "1",
-          baseMetrics: { impressions: 100, clicks: 10, cost: 50, conversions: 1 },
-          potentialMetrics: { impressions: 200, clicks: 20, conversions: 3 },
         }],
       });
 
       expect(opps).toHaveLength(1);
       expect(opps[0].type).toBe("recommendation");
-      expect(opps[0].estimatedImpact).toContain("+100 impressions");
-    });
-
-    it("filters out recommendations with no improvement", () => {
-      const opps = detectOpportunities({
-        impressionShare: [],
-        recommendations: [{
-          type: "KEYWORD",
-          campaignId: "1",
-          baseMetrics: { impressions: 100, clicks: 10, cost: 50, conversions: 1 },
-          potentialMetrics: { impressions: 100, clicks: 10, conversions: 1 },
-        }],
-      });
-
-      expect(opps).toHaveLength(0);
+      expect(opps[0].estimatedImpact).toBe("Review recommended");
     });
 
     it("formats recommendation type nicely", () => {
@@ -115,8 +99,6 @@ describe("detectOpportunities", () => {
         recommendations: [{
           type: "SITELINK_EXTENSION",
           campaignId: "1",
-          baseMetrics: { impressions: 100, clicks: 10, cost: 50, conversions: 1 },
-          potentialMetrics: { impressions: 200, clicks: 20, conversions: 2 },
         }],
       });
 

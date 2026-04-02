@@ -2,6 +2,22 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.1] - 2026-04-02
+
+### Changed
+- Dashboard now loads in two phases: health score and metrics appear instantly, issues and opportunities load progressively in the background
+- Non-converting search terms now show per-term intelligence explaining WHY each term isn't converting (CTR analysis, intent classification, landing page diagnosis)
+- Issue descriptions are now campaign-level insights based on aggregate term patterns instead of generic text
+- "Total Spend" metric renamed to "Spend (30d)" with explicit 30-day date filter on listCampaigns API
+- Client-side cache keyed by account ID to prevent cross-account data leaks on account switch
+
+### Removed
+- AI Briefing component (Gemini LLM call that added latency without useful insight)
+
+### Fixed
+- Google Ads API v22 compatibility: removed deprecated `recommendation.impact.base_metrics/potential_metrics` fields
+- Numeric enum returned by Google Ads API for `recommendation.type` now properly converted to string
+
 ## [0.2.0] - 2026-04-01
 
 ### Added

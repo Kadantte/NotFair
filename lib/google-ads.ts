@@ -318,13 +318,16 @@ export async function listAccessibleCustomers(refreshToken: string) {
 
 export async function listCampaigns(
   auth: AuthContext,
-  options: { limit?: number; includeRemoved?: boolean } = {},
+  options: { limit?: number; includeRemoved?: boolean; days?: number } = {},
 ) {
   const customer = getCachedCustomer(auth);
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
-  const where = options.includeRemoved
+  const dateFilter = options.days != null
+    ? `WHERE segments.date BETWEEN '${getDateRange(options.days).start}' AND '${getDateRange(options.days).end}'`
+    : "WHERE 1=1";
+  const statusFilter = options.includeRemoved
     ? ""
-    : "WHERE campaign.status != 'REMOVED'";
+    : "AND campaign.status != 'REMOVED'";
 
   const result = await customer.query(`
     SELECT
@@ -338,7 +341,8 @@ export async function listCampaigns(
       metrics.cost_micros,
       metrics.conversions
     FROM campaign
-    ${where}
+    ${dateFilter}
+      ${statusFilter}
     ORDER BY metrics.impressions DESC
     LIMIT ${limit}
   `);
@@ -2919,14 +2923,7 @@ export async function getRecommendations(
         recommendation.resource_name,
         recommendation.type,
         recommendation.dismissed,
-        recommendation.campaign,
-        recommendation.impact.base_metrics.impressions,
-        recommendation.impact.base_metrics.clicks,
-        recommendation.impact.base_metrics.cost_micros,
-        recommendation.impact.base_metrics.conversions,
-        recommendation.impact.potential_metrics.impressions,
-        recommendation.impact.potential_metrics.clicks,
-        recommendation.impact.potential_metrics.conversions
+        recommendation.campaign
       FROM recommendation
       WHERE recommendation.dismissed = FALSE
         ${campaignFilter}
@@ -2935,24 +2932,11 @@ export async function getRecommendations(
 
     const recommendations = (result as any[]).map((row) => {
       const rec = row.recommendation ?? {};
-      const base = rec.impact?.base_metrics ?? {};
-      const potential = rec.impact?.potential_metrics ?? {};
       // resource_name format: customers/{cid}/campaigns/{id} — extract last segment
       const campId = rec.campaign ? (rec.campaign.match(/\/campaigns\/(\d+)$/)?.[1] ?? null) : null;
       return {
-        type: rec.type ?? "UNKNOWN",
+        type: String(rec.type ?? "UNKNOWN"),
         campaignId: campId ?? null,
-        baseMetrics: {
-          impressions: base.impressions ?? 0,
-          clicks: base.clicks ?? 0,
-          cost: micros(base.cost_micros),
-          conversions: base.conversions ?? 0,
-        },
-        potentialMetrics: {
-          impressions: potential.impressions ?? 0,
-          clicks: potential.clicks ?? 0,
-          conversions: potential.conversions ?? 0,
-        },
       };
     });
     return { recommendations };

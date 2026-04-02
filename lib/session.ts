@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
 import { eq, gte, and } from "drizzle-orm";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
-import { deriveCustomerName } from "@/lib/google-ads";
+import { deriveCustomerName, parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 
 export type Session = {
   connected: true;
@@ -73,4 +73,16 @@ export async function getSessionAuth(): Promise<SessionRow> {
   const result = await loadSessionRow();
   if (!result) throw new Error("Not authenticated");
   return result.row;
+}
+
+export async function getAuthContext(): Promise<{ auth: AuthContext; session: SessionRow }> {
+  const session = await getSessionAuth();
+  return {
+    auth: {
+      refreshToken: session.refreshToken,
+      customerId: session.customerId,
+      customerIds: parseCustomerIds(session.customerIds),
+    },
+    session,
+  };
 }

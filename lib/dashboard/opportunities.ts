@@ -43,8 +43,6 @@ export type ImpressionShareData = {
 export type RecommendationData = {
   type: string;
   campaignId: string | null;
-  baseMetrics: { impressions: number; clicks: number; cost: number; conversions: number };
-  potentialMetrics: { impressions: number; clicks: number; conversions: number };
 };
 
 export function detectOpportunities(data: {
@@ -91,25 +89,12 @@ export function detectOpportunities(data: {
 
   // 2. Google recommendations (filtered and reframed)
   for (const rec of data.recommendations) {
-    const impressionGain =
-      rec.potentialMetrics.impressions - rec.baseMetrics.impressions;
-    const clickGain = rec.potentialMetrics.clicks - rec.baseMetrics.clicks;
-    const conversionGain =
-      rec.potentialMetrics.conversions - rec.baseMetrics.conversions;
-
-    if (impressionGain <= 0 && clickGain <= 0 && conversionGain <= 0) continue;
-
-    const impactParts: string[] = [];
-    if (impressionGain > 0) impactParts.push(`+${impressionGain.toLocaleString()} impressions`);
-    if (clickGain > 0) impactParts.push(`+${clickGain.toLocaleString()} clicks`);
-    if (conversionGain > 0) impactParts.push(`+${conversionGain.toFixed(1)} conversions`);
-
     opps.push({
       id: `rec-${rec.type}-${rec.campaignId ?? "all"}`,
       type: "recommendation",
       title: formatRecommendationType(rec.type),
       description: `Google suggests this could improve performance. Review carefully — Google's incentives may not align with yours.`,
-      estimatedImpact: impactParts.join(", "),
+      estimatedImpact: "Review recommended",
       action: rec.campaignId
         ? {
             type: "view_recommendation",
@@ -123,8 +108,8 @@ export function detectOpportunities(data: {
   return opps;
 }
 
-function formatRecommendationType(type: string): string {
-  return type
+function formatRecommendationType(type: string | number): string {
+  return String(type)
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());

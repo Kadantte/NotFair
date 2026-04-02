@@ -1,8 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
 import {
   listCampaigns,
   getKeywords,
@@ -13,10 +11,8 @@ import {
   pauseKeyword,
   updateCampaignBudget,
   toMicros,
-  parseCustomerIds,
-  type AuthContext,
 } from "@/lib/google-ads";
-import { getSessionAuth } from "@/lib/session";
+import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { getChanges, getImpact, logChange } from "@/lib/db/tracking";
@@ -33,21 +29,20 @@ function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   });
 }
 
-// ─── Dashboard Data Fetcher ─────────────────────────────────��─────────
+// ─── Dashboard Data Fetcher (two-phase for perceived performance) ───
 
-export type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
+export type DashboardOverview = Awaited<ReturnType<typeof getDashboardOverview>>;
+export type DashboardDetails = Awaited<ReturnType<typeof getDashboardDetails>>;
 
-export async function getDashboardData() {
+/**
+ * Phase 1: Fast overview — campaigns + metrics + health score + sparklines.
+ * Single API call (listCampaigns) + local DB queries.
+ */
+export async function getDashboardOverview() {
   return requireAuth(async () => {
-    const session = await getSessionAuth();
-    const auth: AuthContext = {
-      refreshToken: session.refreshToken,
-      customerId: session.customerId,
-      customerIds: parseCustomerIds(session.customerIds),
-    };
+    const { auth, session } = await getAuthContext();
 
-    // Fetch campaigns first (needed to fan out per-campaign queries)
-    const campaigns = await listCampaigns(auth, { limit: 50 });
+    const campaigns = await listCampaigns(auth, { limit: 50, days: 30 });
     const enabledCampaigns = campaigns.filter(
       (c) => c.status === "ENABLED" || c.status === 2,
     );
@@ -55,16 +50,78 @@ export async function getDashboardData() {
     if (enabledCampaigns.length === 0) {
       return {
         isEmpty: true as const,
+        accountId: session.customerId,
         healthScore: null,
-        issues: [],
-        opportunities: [],
-        recentChanges: { items: [], total: 0 },
         metrics: null,
-        impressionShareData: [],
+        sparklineData: null,
       };
     }
 
-    // Parallel fetch per-campaign data (limit to top 5 campaigns by impressions)
+    const totalCost = campaigns.reduce((s, c) => s + c.cost, 0);
+    const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+    const totalImpressions = campaigns.reduce((s, c) => s + c.impressions, 0);
+    const totalConversions = campaigns.reduce((s, c) => s + c.conversions, 0);
+
+    const healthInput: HealthInput = {
+      campaigns: campaigns.map((c) => ({
+        impressions: c.impressions,
+        clicks: c.clicks,
+        cost: c.cost,
+        conversions: c.conversions,
+      })),
+      keywords: [],
+      searchImpressionShare: null,
+      wastedSpend: 0,
+      totalSearchTermSpend: 0,
+      positiveChanges: 0,
+      totalChanges: 0,
+    };
+    const healthScore = computeHealthScore(healthInput);
+
+    const sparklineData = await fetchSparklineData(session.customerId);
+
+    return {
+      isEmpty: false as const,
+      accountId: session.customerId,
+      healthScore,
+      metrics: {
+        totalCost,
+        totalClicks,
+        totalImpressions,
+        totalConversions,
+        avgImpressionShare: null as number | null,
+        wastedSpend: 0,
+        cpa: totalConversions > 0 ? totalCost / totalConversions : null,
+      },
+      sparklineData,
+    };
+  });
+}
+
+/**
+ * Phase 2: Detailed analysis — issues, opportunities, impression share, recent changes.
+ * Multiple per-campaign API calls. Loaded after overview is visible.
+ */
+export async function getDashboardDetails() {
+  return requireAuth(async () => {
+    const { auth, session } = await getAuthContext();
+
+    const campaigns = await listCampaigns(auth, { limit: 50, days: 30 });
+    const enabledCampaigns = campaigns.filter(
+      (c) => c.status === "ENABLED" || c.status === 2,
+    );
+
+    if (enabledCampaigns.length === 0) {
+      return {
+        issues: [],
+        opportunities: [],
+        recentChanges: { items: [], total: 0 },
+        impressionShareData: [] as ImpressionShareData[],
+        refinedHealthScore: null as ReturnType<typeof computeHealthScore> | null,
+        refinedMetrics: null as { avgImpressionShare: number | null; wastedSpend: number } | null,
+      };
+    }
+
     const topCampaigns = enabledCampaigns
       .sort((a, b) => b.impressions - a.impressions)
       .slice(0, 5);
@@ -76,7 +133,6 @@ export async function getDashboardData() {
       recommendationsResult,
       recentChanges,
     ] = await Promise.all([
-      // Search terms for each top campaign
       Promise.all(
         topCampaigns.map(async (c) => {
           try {
@@ -87,7 +143,6 @@ export async function getDashboardData() {
           }
         }),
       ),
-      // Keywords for each top campaign
       Promise.all(
         topCampaigns.map(async (c) => {
           try {
@@ -98,7 +153,6 @@ export async function getDashboardData() {
           }
         }),
       ),
-      // Impression share for each top campaign
       Promise.all(
         topCampaigns.map(async (c) => {
           try {
@@ -125,29 +179,17 @@ export async function getDashboardData() {
           }
         }),
       ),
-      // Recommendations (account-wide)
       getRecommendations(auth).catch(() => ({ recommendations: [] })),
-      // Recent changes
       getChanges(session.customerId, { limit: 10 }),
     ]);
 
-    // Compute aggregated metrics for health score
-    const totalCost = campaigns.reduce((s, c) => s + c.cost, 0);
-    const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
-    const totalImpressions = campaigns.reduce((s, c) => s + c.impressions, 0);
-    const totalConversions = campaigns.reduce((s, c) => s + c.conversions, 0);
-
-    // Flatten all keywords for health score
     const allKeywords = keywordResults.flatMap((r) => r.keywords);
-
-    // Compute wasted spend
     const allSearchTerms = searchTermResults.flatMap((r) => r.terms);
     const wastedSpend = allSearchTerms
       .filter((t) => t.conversions === 0)
       .reduce((s, t) => s + t.cost, 0);
     const totalSearchTermSpend = allSearchTerms.reduce((s, t) => s + t.cost, 0);
 
-    // Aggregate impression share (weighted by impressions)
     const totalIS = impressionShareResults.reduce((s, r) => {
       if (r.impressionShare === null) return s;
       return s + r.impressionShare * r.totalImpressions;
@@ -158,7 +200,6 @@ export async function getDashboardData() {
     }, 0);
     const avgImpressionShare = totalISImpressions > 0 ? totalIS / totalISImpressions : null;
 
-    // Compute positive changes from impact data (parallel)
     const impactResults = await Promise.all(
       recentChanges.items
         .filter((c) => !c.rolledBack)
@@ -168,8 +209,7 @@ export async function getDashboardData() {
       (r) => r?.impact?.cpaDelta !== null && r?.impact?.cpaDelta !== undefined && r.impact.cpaDelta < 0,
     ).length;
 
-    // Health score
-    const healthInput: HealthInput = {
+    const refinedHealthInput: HealthInput = {
       campaigns: campaigns.map((c) => ({
         impressions: c.impressions,
         clicks: c.clicks,
@@ -186,10 +226,8 @@ export async function getDashboardData() {
       positiveChanges,
       totalChanges: recentChanges.total,
     };
+    const refinedHealthScore = computeHealthScore(refinedHealthInput);
 
-    const healthScore = computeHealthScore(healthInput);
-
-    // Compute week-over-week CPA from performance snapshots
     const campaignPerf = await computeWoWPerformance(session.customerId, enabledCampaigns);
     const issues = detectIssues({
       searchTermsByCampaign: searchTermResults,
@@ -198,32 +236,18 @@ export async function getDashboardData() {
       days: 30,
     });
 
-    // Detect opportunities
     const opportunities = detectOpportunities({
       impressionShare: impressionShareResults,
       recommendations: (recommendationsResult.recommendations ?? []) as RecommendationData[],
     });
 
-    // Fetch 7-day daily snapshots for sparklines
-    const sparklineData = await fetchSparklineData(session.customerId);
-
     return {
-      isEmpty: false as const,
-      healthScore,
       issues,
       opportunities,
       recentChanges,
-      metrics: {
-        totalCost,
-        totalClicks,
-        totalImpressions,
-        totalConversions,
-        avgImpressionShare,
-        wastedSpend,
-        cpa: totalConversions > 0 ? totalCost / totalConversions : null,
-      },
       impressionShareData: impressionShareResults,
-      sparklineData,
+      refinedHealthScore,
+      refinedMetrics: { avgImpressionShare, wastedSpend },
     };
   });
 }
@@ -247,7 +271,6 @@ async function fetchSparklineData(accountId: string) {
         ),
       );
 
-    // Group by date, sum across campaigns
     const byDate = new Map<string, { cost: number; clicks: number; impressions: number; conversions: number }>();
     for (const s of snapshots) {
       const existing = byDate.get(s.snapshotDate) ?? { cost: 0, clicks: 0, impressions: 0, conversions: 0 };
@@ -258,7 +281,6 @@ async function fetchSparklineData(accountId: string) {
       byDate.set(s.snapshotDate, existing);
     }
 
-    // Sort by date
     const sorted = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
     return {
@@ -339,16 +361,10 @@ async function computeWoWPerformance(
 
 export async function addNegativesAction(campaignId: string, terms: string[]) {
   return requireAuth(async () => {
-    const session = await getSessionAuth();
-    const auth: AuthContext = {
-      refreshToken: session.refreshToken,
-      customerId: session.customerId,
-      customerIds: parseCustomerIds(session.customerIds),
-    };
+    const { auth, session } = await getAuthContext();
 
     const results: Array<{ term: string; success: boolean; error?: string }> = [];
 
-    // Execute sequentially to avoid rate limits
     for (const term of terms) {
       const result = await addNegativeKeyword(auth, campaignId, term);
       if (result.success) {
@@ -368,12 +384,7 @@ export async function pauseKeywordAction(
   criterionId: string,
 ) {
   return requireAuth(async () => {
-    const session = await getSessionAuth();
-    const auth: AuthContext = {
-      refreshToken: session.refreshToken,
-      customerId: session.customerId,
-      customerIds: parseCustomerIds(session.customerIds),
-    };
+    const { auth, session } = await getAuthContext();
 
     const result = await pauseKeyword(auth, campaignId, adGroupId, criterionId);
     if (result.success) {
@@ -385,12 +396,7 @@ export async function pauseKeywordAction(
 
 export async function adjustBudgetAction(campaignId: string, newBudgetDollars: number) {
   return requireAuth(async () => {
-    const session = await getSessionAuth();
-    const auth: AuthContext = {
-      refreshToken: session.refreshToken,
-      customerId: session.customerId,
-      customerIds: parseCustomerIds(session.customerIds),
-    };
+    const { auth, session } = await getAuthContext();
 
     const result = await updateCampaignBudget(auth, campaignId, toMicros(newBudgetDollars));
     if (result.success) {
@@ -398,45 +404,4 @@ export async function adjustBudgetAction(campaignId: string, newBudgetDollars: n
     }
     return result;
   });
-}
-
-export async function generateBriefingAction(data: {
-  totalCost: number;
-  totalClicks: number;
-  totalImpressions: number;
-  totalConversions: number;
-  issueCount: number;
-  opportunityCount: number;
-  topIssue: string | null;
-  topOpportunity: string | null;
-  recentChangeCount: number;
-}) {
-  // Auth gate: ensure user is authenticated before spending LLM tokens
-  await getSessionAuth();
-
-  const prompt = `You are AdsAgent, an AI Google Ads analyst for a small business owner. Generate a 2-3 sentence briefing about their ads performance. Be direct, specific with numbers, and actionable. Do not use jargon.
-
-Account metrics (last 30 days):
-- Total spend: $${data.totalCost.toFixed(2)}
-- Impressions: ${data.totalImpressions.toLocaleString()}
-- Clicks: ${data.totalClicks.toLocaleString()}
-- Conversions: ${data.totalConversions}
-- CPA: ${data.totalConversions > 0 ? `$${(data.totalCost / data.totalConversions).toFixed(2)}` : "No conversions"}
-- Issues found: ${data.issueCount}
-- Opportunities found: ${data.opportunityCount}
-- Recent changes: ${data.recentChangeCount}
-${data.topIssue ? `- Top issue: ${data.topIssue}` : ""}
-${data.topOpportunity ? `- Top opportunity: ${data.topOpportunity}` : ""}
-
-Write a brief, personalized summary. Start with overall status (good/needs attention/urgent). Mention the most important issue or opportunity. Be honest — if things are bad, say so.`;
-
-  try {
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
-      prompt,
-    });
-    return text || null;
-  } catch {
-    return null;
-  }
 }

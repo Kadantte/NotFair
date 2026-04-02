@@ -24,6 +24,13 @@ describe("detectIssues", () => {
       expect(issues[0].action.type).toBe("add_negatives");
       if (issues[0].action.type === "add_negatives") {
         expect(issues[0].action.terms).toContain("free pet food");
+        expect(issues[0].action.termDetails).toHaveLength(1);
+        expect(issues[0].action.termDetails[0].searchTerm).toBe("free pet food");
+        expect(issues[0].action.termDetails[0].cost).toBe(60);
+        expect(issues[0].action.termDetails[0].clicks).toBe(30);
+        expect(issues[0].action.termDetails[0].impressions).toBe(500);
+        expect(issues[0].action.termDetails[0].insight).toContain("Low purchase intent");
+        expect(issues[0].action.termDetails[0].suggestBlock).toBe(true);
       }
     });
 
@@ -34,6 +41,23 @@ describe("detectIssues", () => {
           campaignName: "Pet Hotel",
           terms: [
             { searchTerm: "cheap stuff", campaignName: "Pet Hotel", cost: 10, conversions: 0, clicks: 5, impressions: 100 },
+          ],
+        }],
+        keywordsByCampaign: [],
+        campaignPerf: [],
+        days: 30,
+      });
+
+      expect(issues).toHaveLength(0);
+    });
+
+    it("ignores terms with fewer than 5 clicks (not enough data)", () => {
+      const issues = detectIssues({
+        searchTermsByCampaign: [{
+          campaignId: "1",
+          campaignName: "Pet Hotel",
+          terms: [
+            { searchTerm: "new term", campaignName: "Pet Hotel", cost: 60, conversions: 0, clicks: 3, impressions: 200 },
           ],
         }],
         keywordsByCampaign: [],
@@ -92,6 +116,9 @@ describe("detectIssues", () => {
       expect(issues).toHaveLength(1);
       if (issues[0].action.type === "add_negatives") {
         expect(issues[0].action.terms).toHaveLength(10);
+        expect(issues[0].action.termDetails).toHaveLength(10);
+        // Top terms should be sorted by cost descending
+        expect(issues[0].action.termDetails[0].cost).toBeGreaterThanOrEqual(issues[0].action.termDetails[9].cost);
       }
     });
 
@@ -242,6 +269,92 @@ describe("detectIssues", () => {
       });
 
       expect(issues).toHaveLength(0);
+    });
+  });
+
+  describe("per-term insights", () => {
+    it("flags low purchase intent terms", () => {
+      const issues = detectIssues({
+        searchTermsByCampaign: [{
+          campaignId: "1",
+          campaignName: "Test",
+          terms: [
+            { searchTerm: "free dog boarding", campaignName: "Test", cost: 60, conversions: 0, clicks: 10, impressions: 200 },
+          ],
+        }],
+        keywordsByCampaign: [],
+        campaignPerf: [],
+        days: 30,
+      });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].action.type).toBe("add_negatives");
+      if (issues[0].action.type === "add_negatives") {
+        expect(issues[0].action.termDetails[0].insight).toContain("Low purchase intent");
+      }
+    });
+
+    it("identifies landing page issues for high-CTR local terms", () => {
+      const issues = detectIssues({
+        searchTermsByCampaign: [{
+          campaignId: "1",
+          campaignName: "Test",
+          terms: [
+            { searchTerm: "dog boarding near me", campaignName: "Test", cost: 60, conversions: 0, clicks: 16, impressions: 300 },
+          ],
+        }],
+        keywordsByCampaign: [],
+        campaignPerf: [],
+        days: 30,
+      });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].action.type).toBe("add_negatives");
+      if (issues[0].action.type === "add_negatives") {
+        expect(issues[0].action.termDetails[0].insight).toContain("landing page");
+        expect(issues[0].action.termDetails[0].insight).toContain("CTR");
+        expect(issues[0].action.termDetails[0].suggestBlock).toBe(false);
+      }
+    });
+
+    it("flags low CTR as relevance issue", () => {
+      const issues = detectIssues({
+        searchTermsByCampaign: [{
+          campaignId: "1",
+          campaignName: "Test",
+          terms: [
+            { searchTerm: "things to do with pets", campaignName: "Test", cost: 60, conversions: 0, clicks: 6, impressions: 2000 },
+          ],
+        }],
+        keywordsByCampaign: [],
+        campaignPerf: [],
+        days: 30,
+      });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].action.type).toBe("add_negatives");
+      if (issues[0].action.type === "add_negatives") {
+        expect(issues[0].action.termDetails[0].insight).toContain("Low CTR");
+      }
+    });
+
+    it("generates campaign-level insight about landing page when most terms have high CTR", () => {
+      const issues = detectIssues({
+        searchTermsByCampaign: [{
+          campaignId: "1",
+          campaignName: "Test",
+          terms: [
+            { searchTerm: "dog boarding seattle", campaignName: "Test", cost: 60, conversions: 0, clicks: 15, impressions: 300 },
+            { searchTerm: "pet boarding near me", campaignName: "Test", cost: 40, conversions: 0, clicks: 12, impressions: 250 },
+            { searchTerm: "dog kennel seattle", campaignName: "Test", cost: 30, conversions: 0, clicks: 10, impressions: 200 },
+          ],
+        }],
+        keywordsByCampaign: [],
+        campaignPerf: [],
+        days: 30,
+      });
+
+      expect(issues[0].description).toContain("landing page");
     });
   });
 
