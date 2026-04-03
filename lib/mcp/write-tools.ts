@@ -31,8 +31,9 @@ import {
   moveKeywords,
   renameCampaign,
   renameAdGroup,
+  updateCampaignSettings,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
 import { jsonResult, accountIdParam, WRITE_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
@@ -649,6 +650,60 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
   });
 
+  // ─── Campaign Settings ──────────────────────────────────────────
+
+  server.registerTool("updateCampaignSettings", {
+    description: "Update campaign network targeting and/or location targeting. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Returns a changeId per mutation.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      networks: z
+        .object({
+          googleSearch: z.boolean().optional().describe("Target Google Search"),
+          searchPartners: z.boolean().optional().describe("Target Search Partner sites"),
+          displayNetwork: z.boolean().optional().describe("Target Google Display Network"),
+        })
+        .optional()
+        .describe("Network targeting toggles — only specified fields are changed"),
+      locationTargeting: z
+        .object({
+          add: z.array(z.string()).optional().describe("Geo target constant IDs to add (e.g. '2840' for US)"),
+          remove: z.array(z.string()).optional().describe("Geo target constant IDs to remove"),
+        })
+        .optional()
+        .describe("Positive location targeting — where ads should show"),
+      negativeLocationTargeting: z
+        .object({
+          add: z.array(z.string()).optional().describe("Geo target constant IDs to exclude"),
+          remove: z.array(z.string()).optional().describe("Geo target constant IDs to stop excluding"),
+        })
+        .optional()
+        .describe("Negative location targeting — where ads should NOT show"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+
+    const params: UpdateCampaignSettingsParams = {};
+    if (networks) params.networks = networks;
+    if (locationTargeting) params.locationTargeting = locationTargeting;
+    if (negativeLocationTargeting) params.negativeLocationTargeting = negativeLocationTargeting;
+
+    const result = await updateCampaignSettings(authForAccount(auth, accountId), campaignId, params);
+
+    // Log each sub-result individually for granular undo
+    const logged = await Promise.all(
+      result.results.map((r) => logAndReturn(targetId, auth.userId, campaignId, r)),
+    );
+
+    return jsonResult({
+      success: result.success,
+      error: result.error,
+      results: logged,
+    });
+  });
+
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
@@ -830,6 +885,36 @@ export async function executeUndoForChange(
       } catch {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: could not parse previous asset state" };
       }
+    }
+    case "update_campaign_networks": {
+      // entityId = campaignId, beforeValue = JSON {googleSearch, searchPartners, displayNetwork}
+      if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous network settings not recorded" };
+      try {
+        const prev = JSON.parse(beforeValue) as { googleSearch: boolean; searchPartners: boolean; displayNetwork: boolean };
+        const result = await updateCampaignSettings(auth, entityId, { networks: prev });
+        // Return the inner result directly
+        return result.results[0] ?? { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "No result from network settings update" };
+      } catch {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous network settings" };
+      }
+    }
+    case "add_campaign_location": {
+      // entityId = campaignId, afterValue = JSON array of {geo, negative}
+      const afterVal = change.beforeValue ? "" : (beforeValue || ""); // for undo, we use the afterValue of the original
+      if (!entityId) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: missing campaign ID" };
+      // The original afterValue contains the locations that were added — we need to remove them
+      // But in undo, beforeValue="" and afterValue=JSON of added locations from the original change
+      // Actually for undo of add_campaign_location, the change record has:
+      //   beforeValue="" (nothing was there), afterValue=JSON[{geo,negative}]
+      // So change.beforeValue="" and the afterValue (stored in operations table) has the locations
+      // The undo function receives beforeValue from the operations row
+      // We need to read afterValue — but executeUndoForChange only gets beforeValue
+      // For this action, we can't undo without the afterValue. Return not-undoable.
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location additions cannot be automatically undone. Use updateCampaignSettings to remove the locations manually." };
+    }
+    case "remove_campaign_location": {
+      // Same limitation — we'd need the exact geo targets + negative flag to re-add
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location removals cannot be automatically undone. Use updateCampaignSettings to re-add the locations manually." };
     }
     case "rename_campaign":
       // entityId = campaignId, beforeValue = old name

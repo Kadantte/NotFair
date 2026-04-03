@@ -2950,6 +2950,243 @@ export async function getRecommendations(
   }
 }
 
+// ─── Update Campaign Settings ───────────────────────────────────────
+
+export interface UpdateCampaignSettingsParams {
+  networks?: {
+    googleSearch?: boolean;
+    searchPartners?: boolean;
+    displayNetwork?: boolean;
+  };
+  locationTargeting?: {
+    add?: string[];    // geo target constant resource names or IDs
+    remove?: string[]; // geo target constant resource names or IDs
+  };
+  negativeLocationTargeting?: {
+    add?: string[];
+    remove?: string[];
+  };
+}
+
+interface CampaignSettingsResult {
+  success: boolean;
+  results: WriteResult[];
+  error?: string;
+}
+
+/** Normalize a geo target input to a full resource name. Accepts "2840", "geoTargetConstants/2840", etc. */
+function toGeoTargetConstant(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.startsWith("geoTargetConstants/")) return trimmed;
+  return `geoTargetConstants/${trimmed}`;
+}
+
+export async function updateCampaignSettings(
+  auth: AuthContext,
+  campaignId: string,
+  params: UpdateCampaignSettingsParams,
+): Promise<CampaignSettingsResult> {
+  const customer = getCustomer(auth);
+  const cid = safeEntityId(campaignId);
+  const customerId = normalizeCustomerId(auth.customerId);
+  const campaignResourceName = `customers/${customerId}/campaigns/${cid}`;
+  const results: WriteResult[] = [];
+
+  // 1. Update network settings
+  if (params.networks) {
+    // Fetch current settings to record beforeValue
+    const current = await customer.query(`
+      SELECT
+        campaign.network_settings.target_google_search,
+        campaign.network_settings.target_search_network,
+        campaign.network_settings.target_content_network
+      FROM campaign
+      WHERE campaign.id = ${cid}
+      LIMIT 1
+    `);
+    const ns = (current as any[])[0]?.campaign?.network_settings ?? {};
+    const before = {
+      googleSearch: ns.target_google_search ?? false,
+      searchPartners: ns.target_search_network ?? false,
+      displayNetwork: ns.target_content_network ?? false,
+    };
+
+    const after = {
+      googleSearch: params.networks.googleSearch ?? before.googleSearch,
+      searchPartners: params.networks.searchPartners ?? before.searchPartners,
+      displayNetwork: params.networks.displayNetwork ?? before.displayNetwork,
+    };
+
+    try {
+      await customer.mutateResources([
+        {
+          entity: "campaign" as any,
+          operation: "update",
+          resource: {
+            resource_name: campaignResourceName,
+            network_settings: {
+              target_google_search: after.googleSearch,
+              target_search_network: after.searchPartners,
+              target_content_network: after.displayNetwork,
+            },
+          },
+        },
+      ]);
+
+      results.push({
+        success: true,
+        action: "update_campaign_networks",
+        entityId: campaignId,
+        beforeValue: JSON.stringify(before),
+        afterValue: JSON.stringify(after),
+      });
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "update_campaign_networks",
+        entityId: campaignId,
+        beforeValue: JSON.stringify(before),
+        afterValue: JSON.stringify(after),
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  // 2. Add location targeting criteria
+  const locAdds = [
+    ...(params.locationTargeting?.add ?? []).map((g) => ({ geo: g, negative: false })),
+    ...(params.negativeLocationTargeting?.add ?? []).map((g) => ({ geo: g, negative: true })),
+  ];
+
+  if (locAdds.length > 0) {
+    try {
+      const operations = locAdds.map(({ geo, negative }) => ({
+        entity: "campaign_criterion" as any,
+        operation: "create" as const,
+        resource: {
+          campaign: campaignResourceName,
+          negative,
+          location: {
+            geo_target_constant: toGeoTargetConstant(geo),
+          },
+        },
+      }));
+
+      await customer.mutateResources(operations as any);
+
+      results.push({
+        success: true,
+        action: "add_campaign_location",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: JSON.stringify(locAdds.map((l) => ({
+          geo: toGeoTargetConstant(l.geo),
+          negative: l.negative,
+        }))),
+      });
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "add_campaign_location",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: JSON.stringify(locAdds.map((l) => l.geo)),
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  // 3. Remove location targeting criteria
+  const locRemoves = [
+    ...(params.locationTargeting?.remove ?? []),
+    ...(params.negativeLocationTargeting?.remove ?? []),
+  ];
+
+  if (locRemoves.length > 0) {
+    // Look up criterion resource names for the given geo target constants
+    const criteriaResult = await customer.query(`
+      SELECT
+        campaign_criterion.resource_name,
+        campaign_criterion.location.geo_target_constant,
+        campaign_criterion.negative
+      FROM campaign_criterion
+      WHERE campaign.id = ${cid}
+        AND campaign_criterion.type = 'LOCATION'
+      LIMIT 200
+    `);
+
+    const removeSet = new Set(locRemoves.map((g) => toGeoTargetConstant(g)));
+    const toRemove = (criteriaResult as any[])
+      .filter((r) => {
+        const geoConst = r.campaign_criterion?.location?.geo_target_constant;
+        return geoConst && removeSet.has(geoConst);
+      })
+      .map((r) => ({
+        resourceName: r.campaign_criterion.resource_name as string,
+        geo: r.campaign_criterion.location.geo_target_constant as string,
+        negative: r.campaign_criterion.negative as boolean,
+      }));
+
+    if (toRemove.length > 0) {
+      try {
+        const operations = toRemove.map(({ resourceName }) => ({
+          entity: "campaign_criterion" as any,
+          operation: "remove" as const,
+          resource: { resource_name: resourceName },
+        }));
+
+        await customer.mutateResources(operations as any);
+
+        results.push({
+          success: true,
+          action: "remove_campaign_location",
+          entityId: campaignId,
+          beforeValue: JSON.stringify(toRemove.map((t) => ({
+            geo: t.geo,
+            negative: t.negative,
+          }))),
+          afterValue: "",
+        });
+      } catch (error) {
+        results.push({
+          success: false,
+          action: "remove_campaign_location",
+          entityId: campaignId,
+          beforeValue: JSON.stringify(toRemove.map((t) => t.geo)),
+          afterValue: "",
+          error: extractErrorMessage(error),
+        });
+      }
+    } else {
+      const notFound = locRemoves.filter((g) => {
+        const full = toGeoTargetConstant(g);
+        return !(criteriaResult as any[]).some(
+          (r) => r.campaign_criterion?.location?.geo_target_constant === full,
+        );
+      });
+      if (notFound.length > 0) {
+        results.push({
+          success: false,
+          action: "remove_campaign_location",
+          entityId: campaignId,
+          beforeValue: "",
+          afterValue: "",
+          error: `Location criteria not found for: ${notFound.join(", ")}`,
+        });
+      }
+    }
+  }
+
+  if (results.length === 0) {
+    return { success: false, results: [], error: "No settings to update — provide at least one of: networks, locationTargeting, negativeLocationTargeting" };
+  }
+
+  return {
+    success: results.every((r) => r.success),
+    results,
+  };
+}
+
 // ─── Safe GAQL Query ─────────────────────────────────────────────────
 
 export async function runSafeGaqlReport(auth: AuthContext, rawQuery: string) {

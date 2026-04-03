@@ -29,6 +29,12 @@ export const TOOL_CODE = {
   enable_ad: 17,
   update_ad_final_url: 18,
   update_ad_assets: 19,
+  // Campaign settings (compound — separate actions for networks vs location)
+  update_campaign_networks: 36,
+  add_campaign_location: 37,
+  remove_campaign_location: 38,
+  rename_campaign: 39,
+  rename_ad_group: 40,
   // Reads (20+)
   get_account_info: 20,
   list_campaigns: 21,
@@ -316,6 +322,9 @@ const REVERSIBLE_ACTIONS: Record<number, number> = {
   [TOOL_CODE.update_ad_final_url]: TOOL_CODE.update_ad_final_url,
   [TOOL_CODE.update_ad_assets]: TOOL_CODE.update_ad_assets,
   [TOOL_CODE.create_ad]: TOOL_CODE.pause_ad,
+  [TOOL_CODE.update_campaign_networks]: TOOL_CODE.update_campaign_networks,
+  [TOOL_CODE.rename_campaign]: TOOL_CODE.rename_campaign,
+  [TOOL_CODE.rename_ad_group]: TOOL_CODE.rename_ad_group,
 };
 
 export async function getUndoableChange(accountId: string, changeId: number) {
