@@ -29,7 +29,7 @@ type AgentAuth = {
 
 export function createGoogleAdsAgent(auth: AgentAuth) {
   return new ToolLoopAgent({
-    model: openai("gpt-5.4"),
+    model: openai("gpt-5-mini"),
     stopWhen: stepCountIs(8),
     instructions: `You are AdsAgent, a Google Ads copilot in a chat interface.
 
