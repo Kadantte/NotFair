@@ -8,7 +8,7 @@ import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 
 function buildSetupPrompt(token: string): string {
-    return `curl -fsSL ${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token} | bash`;
+    return `Run this command to install the AdsAgent Google Ads skill:\n\ncurl -fsSL ${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token} | bash\n\nOnce installed, use the google-ads skill to show me my campaigns and their performance.`;
 }
 
 function buildCoworkPrompt(token: string): string {
@@ -29,7 +29,13 @@ function buildCoworkPrompt(token: string): string {
     return `Find the claude_desktop_config.json file on my local machine (check ~/Library/Application Support/Claude/ on macOS or %APPDATA%/Claude/ on Windows). Read it, merge the following MCP server into the mcpServers object, and write the file back.\n\n${config}`;
 }
 
-type SetupTab = 'cli' | 'claude-cowork';
+const UNINSTALL_COMMAND = `# Remove skill files from all clients
+rm -rf ~/.claude/skills/toprank ~/.claude/skills/google-ads
+rm -rf ~/.codex/skills/toprank-*
+rm -rf ~/.openclaw/workspace/skills/google-ads
+rm -rf ~/.adsagent ~/.toprank`;
+
+type SetupTab = 'claude-code' | 'codex' | 'openclaw' | 'claude-cowork' | 'uninstall';
 
 const emptySession: Session = { connected: false };
 
@@ -109,7 +115,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-    const [setupTab, setSetupTab] = useState<SetupTab>('cli');
+    const [setupTab, setSetupTab] = useState<SetupTab>('claude-code');
 
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
@@ -360,10 +366,13 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your AI client</h2>
 
                             {/* Tab switcher */}
-                            <div className="inline-flex rounded-lg border border-[#3D3C36] bg-[#24231F] p-1">
+                            <div className="inline-flex flex-wrap justify-center rounded-lg border border-[#3D3C36] bg-[#24231F] p-1">
                                 {([
-                                    ['cli', 'Claude Code / Codex / OpenClaw'],
+                                    ['claude-code', 'Claude Code'],
+                                    ['codex', 'Codex'],
+                                    ['openclaw', 'OpenClaw'],
                                     ['claude-cowork', 'Claude Cowork'],
+                                    ...(process.env.NODE_ENV === 'development' ? [['uninstall', 'Uninstall'] as const] : []),
                                 ] as const).map(([id, label]) => (
                                     <button
                                         key={id}
@@ -379,27 +388,23 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                 ))}
                             </div>
 
-                            {setupTab === 'cli' ? (
+                            {setupTab === 'uninstall' ? (
                                 <>
                                     <p className="max-w-md text-sm text-[#9B9689]">
-                                        Run this in your terminal. It auto-detects and configures all installed agents.
+                                        Run this in your terminal to remove AdsAgent from all clients.
                                     </p>
 
                                     <SetupCodeBlock
-                                        content={prompt}
+                                        content={UNINSTALL_COMMAND}
                                         copied={copied}
                                         onCopy={() => {
-                                            navigator.clipboard.writeText(prompt);
+                                            navigator.clipboard.writeText(UNINSTALL_COMMAND);
                                             setCopied(true);
                                             setTimeout(() => setCopied(false), 2000);
                                         }}
                                     />
-
-                                    <p className="max-w-md text-sm text-[#9B9689]">
-                                        Works with Claude Code, Codex, and OpenClaw. The installer detects which agents you have and sets up the skill for each one.
-                                    </p>
                                 </>
-                            ) : (
+                            ) : setupTab === 'claude-cowork' ? (
                                 <>
                                     <p className="max-w-md text-sm text-[#9B9689]">
                                         Paste this into Claude Cowork. It will install the MCP server for you.
@@ -410,6 +415,22 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                         copied={copied}
                                         onCopy={() => {
                                             navigator.clipboard.writeText(coworkPrompt);
+                                            setCopied(true);
+                                            setTimeout(() => setCopied(false), 2000);
+                                        }}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <p className="max-w-md text-sm text-[#9B9689]">
+                                        Paste this into {setupTab === 'claude-code' ? 'Claude Code' : setupTab === 'codex' ? 'Codex' : 'OpenClaw'}. It will install the Google Ads skill and start managing your campaigns right away.
+                                    </p>
+
+                                    <SetupCodeBlock
+                                        content={prompt}
+                                        copied={copied}
+                                        onCopy={() => {
+                                            navigator.clipboard.writeText(prompt);
                                             setCopied(true);
                                             setTimeout(() => setCopied(false), 2000);
                                         }}
