@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Agentation } from 'agentation';
+
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const geistSans = Geist({
@@ -63,14 +63,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const isDevelopment = process.env.NODE_ENV === "development";
-
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
-        {isDevelopment ? <Agentation /> : null}
         {children}
       </body>
     </html>
