@@ -1134,9 +1134,7 @@ export async function removeKeyword(
       {
         entity: "ad_group_criterion" as any,
         operation: "remove",
-        resource: {
-          resource_name: `customers/${cid}/adGroupCriteria/${adGroupId}~${criterionId}`,
-        },
+        resource: `customers/${cid}/adGroupCriteria/${adGroupId}~${criterionId}` as any,
       },
     ]);
 
@@ -1198,9 +1196,7 @@ export async function removeNegativeKeyword(
       {
         entity: "campaign_criterion" as any,
         operation: "remove",
-        resource: {
-          resource_name: `customers/${customerId}/campaignCriteria/${cid}~${criterionId}`,
-        },
+        resource: `customers/${customerId}/campaignCriteria/${cid}~${criterionId}` as any,
       },
     ]);
 
@@ -3172,7 +3168,7 @@ export async function updateCampaignSettings(
         const operations = toRemove.map(({ resourceName }) => ({
           entity: "campaign_criterion" as any,
           operation: "remove" as const,
-          resource: { resource_name: resourceName },
+          resource: resourceName as any,
         }));
 
         await customer.mutateResources(operations as any);
