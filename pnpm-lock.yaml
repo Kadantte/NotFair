@@ -41,9 +41,6 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.100.1
         version: 2.100.1(bufferutil@4.1.0)
-      agentation:
-        specifier: ^2.2.0
-        version: 2.2.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       ai:
         specifier: ^6.0.85
         version: 6.0.85(zod@4.3.6)
@@ -2078,17 +2075,6 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
-
-  agentation@2.2.0:
-    resolution: {integrity: sha512-DIkXtC/XpOdAK/X1qYZMYocSjfU7EKe5bYG5DyxEr2wIuSxEVi2edSQsIWbB+k/S3yvAnnCfpuTkHh8LOvYxgQ==}
-    peerDependencies:
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
-    peerDependenciesMeta:
-      react:
-        optional: true
-      react-dom:
-        optional: true
 
   ai@6.0.138:
     resolution: {integrity: sha512-49OfPe0f5uxJ6jUdA5BBXjIinP6+ZdYfAtpF2aEH64GA5wPcxH2rf/TBUQQ0bbamBz/D+TLMV18xilZqOC+zaA==}
@@ -6288,11 +6274,6 @@ snapshots:
       - supports-color
 
   agent-base@7.1.4: {}
-
-  agentation@2.2.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
-    optionalDependencies:
-      react: 19.2.3
-      react-dom: 19.2.3(react@19.2.3)
 
   ai@6.0.138(zod@4.3.6):
     dependencies:
