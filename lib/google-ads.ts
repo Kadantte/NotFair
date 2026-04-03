@@ -2994,30 +2994,30 @@ export async function updateCampaignSettings(
 
   // 1. Update network settings
   if (params.networks) {
-    // Fetch current settings to record beforeValue
-    const current = await customer.query(`
-      SELECT
-        campaign.network_settings.target_google_search,
-        campaign.network_settings.target_search_network,
-        campaign.network_settings.target_content_network
-      FROM campaign
-      WHERE campaign.id = ${cid}
-      LIMIT 1
-    `);
-    const ns = (current as any[])[0]?.campaign?.network_settings ?? {};
-    const before = {
-      googleSearch: ns.target_google_search ?? false,
-      searchPartners: ns.target_search_network ?? false,
-      displayNetwork: ns.target_content_network ?? false,
-    };
-
-    const after = {
-      googleSearch: params.networks.googleSearch ?? before.googleSearch,
-      searchPartners: params.networks.searchPartners ?? before.searchPartners,
-      displayNetwork: params.networks.displayNetwork ?? before.displayNetwork,
-    };
-
     try {
+      // Fetch current settings to record beforeValue
+      const current = await customer.query(`
+        SELECT
+          campaign.network_settings.target_google_search,
+          campaign.network_settings.target_search_network,
+          campaign.network_settings.target_content_network
+        FROM campaign
+        WHERE campaign.id = ${cid}
+        LIMIT 1
+      `);
+      const ns = (current as any[])[0]?.campaign?.network_settings ?? {};
+      const before = {
+        googleSearch: ns.target_google_search ?? false,
+        searchPartners: ns.target_search_network ?? false,
+        displayNetwork: ns.target_content_network ?? false,
+      };
+
+      const after = {
+        googleSearch: params.networks.googleSearch ?? before.googleSearch,
+        searchPartners: params.networks.searchPartners ?? before.searchPartners,
+        displayNetwork: params.networks.displayNetwork ?? before.displayNetwork,
+      };
+
       await customer.mutateResources([
         {
           entity: "campaign" as any,
@@ -3045,8 +3045,8 @@ export async function updateCampaignSettings(
         success: false,
         action: "update_campaign_networks",
         entityId: campaignId,
-        beforeValue: JSON.stringify(before),
-        afterValue: JSON.stringify(after),
+        beforeValue: "",
+        afterValue: "",
         error: extractErrorMessage(error),
       });
     }
@@ -3097,38 +3097,42 @@ export async function updateCampaignSettings(
   }
 
   // 3. Remove location targeting criteria
-  const locRemoves = [
-    ...(params.locationTargeting?.remove ?? []),
-    ...(params.negativeLocationTargeting?.remove ?? []),
-  ];
+  // Separate positive and negative removals to avoid conflating them
+  const positiveRemoves = (params.locationTargeting?.remove ?? []).map((g) => ({ geo: g, negative: false }));
+  const negativeRemoves = (params.negativeLocationTargeting?.remove ?? []).map((g) => ({ geo: g, negative: true }));
+  const locRemoves = [...positiveRemoves, ...negativeRemoves];
 
   if (locRemoves.length > 0) {
-    // Look up criterion resource names for the given geo target constants
-    const criteriaResult = await customer.query(`
-      SELECT
-        campaign_criterion.resource_name,
-        campaign_criterion.location.geo_target_constant,
-        campaign_criterion.negative
-      FROM campaign_criterion
-      WHERE campaign.id = ${cid}
-        AND campaign_criterion.type = 'LOCATION'
-      LIMIT 200
-    `);
+    try {
+      // Look up criterion resource names for the given geo target constants
+      const criteriaResult = await customer.query(`
+        SELECT
+          campaign_criterion.resource_name,
+          campaign_criterion.location.geo_target_constant,
+          campaign_criterion.negative
+        FROM campaign_criterion
+        WHERE campaign.id = ${cid}
+          AND campaign_criterion.type = 'LOCATION'
+        LIMIT 200
+      `);
 
-    const removeSet = new Set(locRemoves.map((g) => toGeoTargetConstant(g)));
-    const toRemove = (criteriaResult as any[])
-      .filter((r) => {
-        const geoConst = r.campaign_criterion?.location?.geo_target_constant;
-        return geoConst && removeSet.has(geoConst);
-      })
-      .map((r) => ({
-        resourceName: r.campaign_criterion.resource_name as string,
-        geo: r.campaign_criterion.location.geo_target_constant as string,
-        negative: r.campaign_criterion.negative as boolean,
-      }));
+      // Match by BOTH geo target constant AND negative flag to avoid removing the wrong criterion
+      const toRemove = locRemoves
+        .map(({ geo, negative }) => {
+          const full = toGeoTargetConstant(geo);
+          const match = (criteriaResult as any[]).find((r) => {
+            const cc = r.campaign_criterion ?? {};
+            return cc.location?.geo_target_constant === full && cc.negative === negative;
+          });
+          return match ? {
+            resourceName: match.campaign_criterion.resource_name as string,
+            geo: full,
+            negative,
+          } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
 
-    if (toRemove.length > 0) {
-      try {
+      if (toRemove.length > 0) {
         const operations = toRemove.map(({ resourceName }) => ({
           entity: "campaign_criterion" as any,
           operation: "remove" as const,
@@ -3147,22 +3151,12 @@ export async function updateCampaignSettings(
           }))),
           afterValue: "",
         });
-      } catch (error) {
-        results.push({
-          success: false,
-          action: "remove_campaign_location",
-          entityId: campaignId,
-          beforeValue: JSON.stringify(toRemove.map((t) => t.geo)),
-          afterValue: "",
-          error: extractErrorMessage(error),
-        });
       }
-    } else {
-      const notFound = locRemoves.filter((g) => {
-        const full = toGeoTargetConstant(g);
-        return !(criteriaResult as any[]).some(
-          (r) => r.campaign_criterion?.location?.geo_target_constant === full,
-        );
+
+      // Report any not-found criteria
+      const notFound = locRemoves.filter(({ geo, negative }) => {
+        const full = toGeoTargetConstant(geo);
+        return !toRemove.some((t) => t.geo === full && t.negative === negative);
       });
       if (notFound.length > 0) {
         results.push({
@@ -3171,9 +3165,18 @@ export async function updateCampaignSettings(
           entityId: campaignId,
           beforeValue: "",
           afterValue: "",
-          error: `Location criteria not found for: ${notFound.join(", ")}`,
+          error: `Location criteria not found for: ${notFound.map((n) => `${n.geo}${n.negative ? " (negative)" : ""}`).join(", ")}`,
         });
       }
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "remove_campaign_location",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: "",
+        error: extractErrorMessage(error),
+      });
     }
   }
 

@@ -8,7 +8,7 @@ export const OP_TYPE = { READ: 0, WRITE: 1 } as const;
 
 /** Tool name → compact code. Add new tools at the end to preserve existing data. */
 export const TOOL_CODE = {
-  // Writes (0–19)
+  // Writes
   pause_keyword: 0,
   enable_keyword: 1,
   update_bid: 2,

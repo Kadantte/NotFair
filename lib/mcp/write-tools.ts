@@ -898,24 +898,10 @@ export async function executeUndoForChange(
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous network settings" };
       }
     }
-    case "add_campaign_location": {
-      // entityId = campaignId, afterValue = JSON array of {geo, negative}
-      const afterVal = change.beforeValue ? "" : (beforeValue || ""); // for undo, we use the afterValue of the original
-      if (!entityId) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: missing campaign ID" };
-      // The original afterValue contains the locations that were added — we need to remove them
-      // But in undo, beforeValue="" and afterValue=JSON of added locations from the original change
-      // Actually for undo of add_campaign_location, the change record has:
-      //   beforeValue="" (nothing was there), afterValue=JSON[{geo,negative}]
-      // So change.beforeValue="" and the afterValue (stored in operations table) has the locations
-      // The undo function receives beforeValue from the operations row
-      // We need to read afterValue — but executeUndoForChange only gets beforeValue
-      // For this action, we can't undo without the afterValue. Return not-undoable.
-      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location additions cannot be automatically undone. Use updateCampaignSettings to remove the locations manually." };
-    }
-    case "remove_campaign_location": {
-      // Same limitation — we'd need the exact geo targets + negative flag to re-add
-      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location removals cannot be automatically undone. Use updateCampaignSettings to re-add the locations manually." };
-    }
+    case "add_campaign_location":
+    case "remove_campaign_location":
+      // Location criterion changes can't be auto-undone: executeUndoForChange only receives beforeValue, but we need afterValue to know which criteria were added/removed.
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location changes cannot be automatically undone. Use updateCampaignSettings to adjust locations manually." };
     case "rename_campaign":
       // entityId = campaignId, beforeValue = old name
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
