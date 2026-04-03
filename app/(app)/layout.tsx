@@ -156,7 +156,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {/* Nav items */}
                 <nav className="shrink-0 px-2 pb-2 space-y-0.5">
-                    <NavItem href="/dashboard" icon={Home} label="Dashboard" active={pathname === '/dashboard'} collapsed={collapsed} />
                     <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={collapsed} />
                     <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={collapsed} />
                     <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} collapsed={collapsed} />
