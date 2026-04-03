@@ -216,18 +216,19 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("listAds", {
-    description: "List ads in a campaign with RSA headlines, descriptions, final URLs, status, and performance metrics. Optionally filter to one ad group.",
+    description: "List ads in a campaign with RSA headlines, descriptions, final URLs, status, and performance metrics for a given date range. Optionally filter to one ad group.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
       adGroupId: z.string().optional(),
+      days: z.number().int().min(1).max(365).default(30),
       limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, limit }) => {
+  }, async ({ accountId, campaignId, adGroupId, days, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await listAds(authForAccount(auth, accountId), campaignId, adGroupId, limit);
+    const result = await listAds(authForAccount(auth, accountId), campaignId, adGroupId, days, limit);
     void logRead(targetId, auth.userId, "list_ads", campaignId);
     return jsonResult(result);
   });

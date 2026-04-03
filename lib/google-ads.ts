@@ -1805,11 +1805,14 @@ export async function listAds(
   auth: AuthContext,
   campaignId: string,
   adGroupId?: string,
+  days = 30,
   limit = 50,
 ) {
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
+  const boundedDays = Math.min(Math.max(days, 1), 365);
   const bounded = Math.min(Math.max(limit, 1), 100);
+  const { start, end } = getDateRange(boundedDays);
 
   const adGroupIdNum = adGroupId ? safeEntityId(adGroupId, "ad group") : null;
   const adGroupFilter = adGroupIdNum ? `AND ad_group.id = ${adGroupIdNum}` : "";
@@ -1832,30 +1835,35 @@ export async function listAds(
     FROM ad_group_ad
     WHERE campaign.id = ${id}
       AND ad_group_ad.status != 'REMOVED'
+      AND segments.date BETWEEN '${start}' AND '${end}'
       ${adGroupFilter}
     ORDER BY metrics.impressions DESC
     LIMIT ${bounded}
   `);
 
-  return (result as any[]).map((row) => {
-    const ad = row.ad_group_ad?.ad ?? {};
-    const rsa = ad.responsive_search_ad ?? {};
-    return {
-      adId: String(ad.id ?? ""),
-      adName: ad.name ?? null,
-      status: row.ad_group_ad?.status ?? "UNKNOWN",
-      type: ad.type ?? "UNKNOWN",
-      adGroupId: String(row.ad_group?.id ?? ""),
-      adGroupName: row.ad_group?.name ?? "",
-      finalUrls: ad.final_urls ?? [],
-      headlines: (rsa.headlines ?? []).map((h: any) => h.text ?? ""),
-      descriptions: (rsa.descriptions ?? []).map((d: any) => d.text ?? ""),
-      impressions: row.metrics?.impressions ?? 0,
-      clicks: row.metrics?.clicks ?? 0,
-      cost: micros(row.metrics?.cost_micros),
-      conversions: row.metrics?.conversions ?? 0,
-    };
-  });
+  return {
+    campaignId,
+    dateRange: { start, end, days: boundedDays },
+    ads: (result as any[]).map((row) => {
+      const ad = row.ad_group_ad?.ad ?? {};
+      const rsa = ad.responsive_search_ad ?? {};
+      return {
+        adId: String(ad.id ?? ""),
+        adName: ad.name ?? null,
+        status: row.ad_group_ad?.status ?? "UNKNOWN",
+        type: ad.type ?? "UNKNOWN",
+        adGroupId: String(row.ad_group?.id ?? ""),
+        adGroupName: row.ad_group?.name ?? "",
+        finalUrls: ad.final_urls ?? [],
+        headlines: (rsa.headlines ?? []).map((h: any) => h.text ?? ""),
+        descriptions: (rsa.descriptions ?? []).map((d: any) => d.text ?? ""),
+        impressions: row.metrics?.impressions ?? 0,
+        clicks: row.metrics?.clicks ?? 0,
+        cost: micros(row.metrics?.cost_micros),
+        conversions: row.metrics?.conversions ?? 0,
+      };
+    }),
+  };
 }
 
 export type CreateAdParams = {
@@ -2847,6 +2855,12 @@ export async function getCampaignSettings(
         campaign_criterion.criterion_id,
         campaign_criterion.negative,
         campaign_criterion.location.geo_target_constant,
+        campaign_criterion.proximity.address.city_name,
+        campaign_criterion.proximity.address.postal_code,
+        campaign_criterion.proximity.radius,
+        campaign_criterion.proximity.radius_units,
+        campaign_criterion.proximity.geo_point.latitude_in_micro_degrees,
+        campaign_criterion.proximity.geo_point.longitude_in_micro_degrees,
         campaign_criterion.ad_schedule.day_of_week,
         campaign_criterion.ad_schedule.start_hour,
         campaign_criterion.ad_schedule.start_minute,
@@ -2855,7 +2869,7 @@ export async function getCampaignSettings(
         campaign_criterion.bid_modifier
       FROM campaign_criterion
       WHERE campaign.id = ${id}
-        AND campaign_criterion.type IN ('LOCATION', 'AD_SCHEDULE')
+        AND campaign_criterion.type IN ('LOCATION', 'PROXIMITY', 'AD_SCHEDULE')
       LIMIT 100
     `),
   ]);
@@ -2865,6 +2879,7 @@ export async function getCampaignSettings(
 
   // Split combined criteria by type
   const locationRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "LOCATION");
+  const proximityRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "PROXIMITY");
   const scheduleRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "AD_SCHEDULE");
 
   const locations = locationRows.map((row) => {
@@ -2875,6 +2890,23 @@ export async function getCampaignSettings(
       criterionId: String(cc.criterion_id ?? ""),
       negative: cc.negative ?? false,
       geoTargetConstantId: geoId,
+    };
+  });
+
+  const proximityTargets = proximityRows.map((row) => {
+    const cc = row.campaign_criterion ?? {};
+    const prox = cc.proximity ?? {};
+    const addr = prox.address ?? {};
+    const geo = prox.geo_point ?? {};
+    return {
+      criterionId: String(cc.criterion_id ?? ""),
+      negative: cc.negative ?? false,
+      cityName: addr.city_name ?? null,
+      postalCode: addr.postal_code ?? null,
+      radius: prox.radius ?? null,
+      radiusUnits: prox.radius_units ?? null,
+      latitudeMicroDegrees: geo.latitude_in_micro_degrees ?? null,
+      longitudeMicroDegrees: geo.longitude_in_micro_degrees ?? null,
     };
   });
 
@@ -2908,6 +2940,7 @@ export async function getCampaignSettings(
       displayNetwork: ns.target_content_network ?? false,
     },
     locationTargeting: locations,
+    proximityTargeting: proximityTargets.length > 0 ? proximityTargets : null,
     adSchedule: adSchedule.length > 0 ? adSchedule : null,
   };
 }

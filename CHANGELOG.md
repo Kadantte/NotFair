@@ -2,6 +2,12 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.2] - 2026-04-03
+
+### Fixed
+- `getCampaignSettings` now returns radius/proximity targeting (previously only fetched named locations, silently dropping PROXIMITY criteria)
+- `listAds` metrics are now scoped to a configurable date range (default 30 days) instead of returning misleading lifetime totals
+
 ## [0.2.1] - 2026-04-02
 
 ### Changed
