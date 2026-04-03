@@ -13,7 +13,6 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import { GoogleAdsAuth } from "@/components/google-ads-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
@@ -547,36 +546,13 @@ export default function ChatPage() {
   return (
     <section className="flex h-full flex-col overflow-hidden">
       <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-        <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
+        <div className="flex w-full items-center gap-4 px-6 py-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">
               {displayThreads.find(thread => thread.id === activeThreadId)?.title ??
                 "New chat"}
             </h1>
-            <p className="mt-0.5 text-sm text-[#9B9689]">
-              {isReady
-                ? account.customerName ?? account.customerId
-                : "Connect Google Ads to begin"}
-            </p>
           </div>
-          <GoogleAdsAuth
-            onConnect={() =>
-              readServerSession()
-                .then(session => {
-                  if (!session.connected) return;
-                  setAccount({
-                    connected: true,
-                    customerId: session.customerId,
-                    customerName: session.customerName ?? "Google Ads Account",
-                  });
-                })
-                .catch(() => {})
-            }
-            onDisconnect={() => setAccount(emptyAccount)}
-            variant="outline"
-            size="sm"
-            className="rounded-lg border-[#3D3C36] bg-[#2E2D28] text-[#E8E4DD] hover:bg-[#3D3C36]"
-          />
         </div>
       </header>
 
