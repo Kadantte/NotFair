@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { clearSessionCookies, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers } from "@/lib/google-ads";
@@ -36,39 +36,23 @@ function getSafeNext(next: string | null | undefined) {
 }
 
 /**
- * Verify the OAuth state nonce against the DB, consume it, and return the
- * original payload. Returns null if the nonce is missing, expired, or unknown.
+ * Decode the OAuth state param and verify its nonce matches the cookie.
+ * Returns null if the state is missing, malformed, or the nonce doesn't match.
  */
-async function verifyAndConsumeState(nonce: string | null): Promise<AuthState | null> {
-  if (!nonce) return null;
-
-  // Delete expired states opportunistically (non-blocking cleanup)
-  db().delete(schema.oauthStates)
-    .where(lt(schema.oauthStates.expiresAt, new Date()))
-    .catch(() => {});
-
-  // Atomically consume the nonce: delete + return in one query
-  const [row] = await db()
-    .delete(schema.oauthStates)
-    .where(
-      and(
-        eq(schema.oauthStates.nonce, nonce),
-        gte(schema.oauthStates.expiresAt, new Date()),
-      ),
-    )
-    .returning({ payload: schema.oauthStates.payload });
-
-  if (!row) return null;
+function verifyState(stateParam: string | null, cookieNonce: string | undefined): AuthState | null {
+  if (!stateParam || !cookieNonce) return null;
 
   try {
-    const parsed = JSON.parse(row.payload);
-    if (!parsed || typeof parsed !== "object") return {};
+    const parsed = JSON.parse(Buffer.from(stateParam, "base64url").toString("utf8"));
+    if (!parsed || typeof parsed !== "object") return null;
+    if (parsed.nonce !== cookieNonce) return null;
+
     return {
       next: typeof parsed.next === "string" ? parsed.next : undefined,
       popup: typeof parsed.popup === "boolean" ? parsed.popup : undefined,
     };
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -404,8 +388,10 @@ export async function GET(request: Request) {
   const explicitNext = searchParams.get("next");
   const stateParam = searchParams.get("state");
 
-  // Verify the OAuth state nonce to prevent CSRF
-  const state = await verifyAndConsumeState(stateParam);
+  // Verify the OAuth state nonce matches the cookie to prevent CSRF
+  const cookieStore = await cookies();
+  const cookieNonce = cookieStore.get("oauth_nonce")?.value;
+  const state = verifyState(stateParam, cookieNonce);
   if (!state) {
     return NextResponse.redirect(`${origin}/login?error=auth_failed`);
   }
@@ -474,8 +460,7 @@ export async function GET(request: Request) {
 
   const user = authData.user ?? authData.session?.user ?? null;
 
-  // Capture request cookies so we can identify sb-* cookies to clear
-  const cookieStore = await cookies();
+  // Reuse cookieStore from nonce check above to identify sb-* cookies to clear
   const requestCookies = cookieStore.getAll();
 
   let response: NextResponse;
@@ -503,6 +488,9 @@ export async function GET(request: Request) {
       ? popupErrorResponse(origin, describeError(sessionError))
       : redirectWithError(origin, describeError(sessionError));
   }
+
+  // Clear the one-time OAuth nonce cookie
+  response.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
 
   // Supabase SSR sets large JWT cookies we don't use — clear them to
   // avoid HTTP 431 (Request Header Fields Too Large) on subsequent requests.
