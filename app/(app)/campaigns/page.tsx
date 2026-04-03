@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Trash2 } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Play, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { listCampaignsAction, pauseCampaignAction, removeCampaignAction } from '@/app/actions';
+import { listCampaignsAction, pauseCampaignAction, enableCampaignAction, removeCampaignAction } from '@/app/actions';
 
 interface Campaign {
     id: string;
@@ -38,12 +38,12 @@ export default function CampaignsPage() {
     const [actingOnCampaignId, setActingOnCampaignId] = useState<string | null>(null);
     const isRefreshing = useRef(false);
 
-    const fetchCampaigns = useCallback(async (background = false) => {
+    const fetchCampaigns = useCallback(async (background = false, skipCache = false) => {
         if (!background) setLoading(true);
         isRefreshing.current = true;
         setError(null);
         try {
-            const data = await listCampaignsAction();
+            const data = await listCampaignsAction(skipCache ? { skipCache: true } : undefined);
             setCampaigns(data);
             cachedCampaigns = data;
         } catch (err) {
@@ -75,16 +75,37 @@ export default function CampaignsPage() {
             return (b.impressions || 0) - (a.impressions || 0);
         });
 
+    function applyOptimistic(campaignId: string, patch: Partial<Campaign> | null) {
+        const updated = patch
+            ? campaigns.map(c => c.id === campaignId ? { ...c, ...patch } : c)
+            : campaigns.filter(c => c.id !== campaignId);
+        setCampaigns(updated);
+        cachedCampaigns = updated;
+    }
+
     const handlePauseCampaign = async (campaignId: string) => {
         setActingOnCampaignId(campaignId);
         setError(null);
         try {
-            await pauseCampaignAction(campaignId);
-            cachedCampaigns = null;
-            await fetchCampaigns();
+            const { afterValue } = await pauseCampaignAction(campaignId);
+            applyOptimistic(campaignId, { status: afterValue ?? 'PAUSED' });
         } catch (err) {
             console.error(err);
             setError('Failed to pause campaign. Please try again.');
+        } finally {
+            setActingOnCampaignId(null);
+        }
+    };
+
+    const handleEnableCampaign = async (campaignId: string) => {
+        setActingOnCampaignId(campaignId);
+        setError(null);
+        try {
+            const { afterValue } = await enableCampaignAction(campaignId);
+            applyOptimistic(campaignId, { status: afterValue ?? 'ENABLED' });
+        } catch (err) {
+            console.error(err);
+            setError('Failed to enable campaign. Please try again.');
         } finally {
             setActingOnCampaignId(null);
         }
@@ -99,8 +120,7 @@ export default function CampaignsPage() {
         setError(null);
         try {
             await removeCampaignAction(campaignId);
-            cachedCampaigns = null;
-            await fetchCampaigns();
+            applyOptimistic(campaignId, null);
         } catch (err) {
             console.error(err);
             setError('Failed to delete campaign. Please try again.');
@@ -118,7 +138,7 @@ export default function CampaignsPage() {
                         <p className="mt-0.5 text-sm text-[#9B9689]">Manage and track your Google Ads performance</p>
                     </div>
                     <Button
-                        onClick={() => { cachedCampaigns = null; fetchCampaigns(); }}
+                        onClick={() => { cachedCampaigns = null; fetchCampaigns(false, true); }}
                         disabled={loading}
                         variant="outline"
                         className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-2"
@@ -248,6 +268,23 @@ export default function CampaignsPage() {
                                                         >
                                                             {isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
                                                             Pause
+                                                        </Button>
+                                                    )}
+                                                    {campaign.status === 'PAUSED' && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={Boolean(actingOnCampaignId)}
+                                                            onClick={(event) => {
+                                                                event.preventDefault();
+                                                                event.stopPropagation();
+                                                                void handleEnableCampaign(campaign.id);
+                                                            }}
+                                                            className="border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E] hover:bg-[#4CAF6E]/20 hover:text-[#6FD992]"
+                                                        >
+                                                            {isActing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                                                            Enable
                                                         </Button>
                                                     )}
                                                     {campaign.status === 'PAUSED' && (

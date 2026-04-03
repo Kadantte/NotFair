@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, removeCampaign, listCampaigns } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -113,14 +113,18 @@ function mapCampaigns(response: Awaited<ReturnType<typeof listCampaigns>>) {
     }));
 }
 
-export async function listCampaignsAction() {
+export async function listCampaignsAction(options?: { skipCache?: boolean }) {
     return requireAuth(async () => {
     try {
         const { refreshToken, customerId, customerIds } = await getSessionAuth();
 
-        const cached = campaignsCache.get(customerId);
-        if (cached && Date.now() - cached.ts < CAMPAIGNS_CACHE_TTL) {
-            return cached.data;
+        if (!options?.skipCache) {
+            const cached = campaignsCache.get(customerId);
+            if (cached && Date.now() - cached.ts < CAMPAIGNS_CACHE_TTL) {
+                return cached.data;
+            }
+        } else {
+            campaignsCache.delete(customerId);
         }
 
         const auth = {
@@ -163,10 +167,35 @@ export async function pauseCampaignAction(campaignId: string) {
 
         campaignsCache.delete(customerId);
         await logChange(customerId, userId, campaignId, result, "Paused from campaigns page");
-        return { success: true, campaignId };
+        return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Pause Campaign Error:", error);
         throw new Error("Failed to pause campaign.");
+    }
+    });
+}
+
+export async function enableCampaignAction(campaignId: string) {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+
+        const result = await enableCampaign(auth, campaignId);
+        if (!result.success) {
+            throw new Error(result.error ?? "Failed to enable campaign.");
+        }
+
+        campaignsCache.delete(customerId);
+        await logChange(customerId, userId, campaignId, result, "Enabled from campaigns page");
+        return { success: true, campaignId, afterValue: result.afterValue ?? null };
+    } catch (error) {
+        console.error("Enable Campaign Error:", error);
+        throw new Error("Failed to enable campaign.");
     }
     });
 }
