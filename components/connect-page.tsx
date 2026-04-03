@@ -8,7 +8,7 @@ import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 
 function buildSetupPrompt(token: string): string {
-    return `Run this command to install the AdsAgent Google Ads skill:\n\ncurl -fsSL ${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token} | bash\n\nOnce installed, use the google-ads skill to show me my campaigns and their performance.`;
+    return `curl -fsSL ${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token} | bash`;
 }
 
 function buildCoworkPrompt(token: string): string {
@@ -199,7 +199,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     }
 
     function openAgenticAi() {
-        window.location.assign('/dashboard');
+        window.location.assign('/chat');
     }
 
     function toggleAccount(accountId: string) {
@@ -264,6 +264,10 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                     </div>
                     {token ? (
                         <div className="flex flex-wrap items-center justify-end gap-3">
+                            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span className="text-sm font-medium">{customerName || 'Google Ads'}</span>
+                            </div>
                             <button onClick={beginAddAccount} className={actionBtnClass}>
                                 <Plus className="h-4 w-4" />
                                 Add Account
@@ -358,11 +362,6 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center space-y-8 text-center">
-                            <div className="flex items-center gap-2 text-[#4CAF6E]">
-                                <CheckCircle2 className="h-5 w-5" />
-                                <span className="text-sm font-medium">Connected to {customerName || 'Google Ads'}</span>
-                            </div>
-
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your AI client</h2>
 
                             {/* Tab switcher */}
@@ -421,21 +420,48 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                     />
                                 </>
                             ) : (
-                                <>
-                                    <p className="max-w-md text-sm text-[#9B9689]">
-                                        Paste this into {setupTab === 'claude-code' ? 'Claude Code' : setupTab === 'codex' ? 'Codex' : 'OpenClaw'}. It will install the Google Ads skill and start managing your campaigns right away.
-                                    </p>
+                                <div className="w-full space-y-6 text-left">
+                                    {/* Step 1 */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E] text-sm font-semibold text-[#1A1917]">1</span>
+                                            <p className="text-sm font-medium text-[#E8E4DD]">Run install command in your terminal</p>
+                                        </div>
+                                        <div className="ml-10">
+                                            <SetupCodeBlock
+                                                content={prompt}
+                                                copied={copied}
+                                                onCopy={() => {
+                                                    navigator.clipboard.writeText(prompt);
+                                                    setCopied(true);
+                                                    setTimeout(() => setCopied(false), 2000);
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
 
-                                    <SetupCodeBlock
-                                        content={prompt}
-                                        copied={copied}
-                                        onCopy={() => {
-                                            navigator.clipboard.writeText(prompt);
-                                            setCopied(true);
-                                            setTimeout(() => setCopied(false), 2000);
-                                        }}
-                                    />
-                                </>
+                                    {/* Step 2 */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E] text-sm font-semibold text-[#1A1917]">2</span>
+                                            <p className="text-sm font-medium text-[#E8E4DD]">
+                                                {setupTab === 'claude-code' ? (
+                                                    <>
+                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/google-ads</code> inside Claude Code to start managing your Google Ads with your AI.
+                                                    </>
+                                                ) : setupTab === 'codex' ? (
+                                                    <>
+                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">$toprank-google-ads</code> inside Codex to start managing your Google Ads with your AI.
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        Start a new session with <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/new</code> and ask OpenClaw <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">use the google-ads skill to show my campaigns and their performance.</code>
+                                                    </>
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
 
                             <div className="flex w-full items-center gap-4">
@@ -456,7 +482,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                         onClick={openAgenticAi}
                                         className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
                                     >
-                                        Open Dashboard
+                                        Open Chat
                                     </Button>
                                 </div>
                             </div>
