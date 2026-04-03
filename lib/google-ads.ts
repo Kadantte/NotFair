@@ -1171,7 +1171,7 @@ export async function removeNegativeKeyword(
     // Find the negative keyword criterion by text.
     // Query all negatives for the campaign and filter in code to avoid GAQL string interpolation.
     const result = await customer.query(`
-      SELECT campaign_criterion.resource_name, campaign_criterion.keyword.text
+      SELECT campaign_criterion.criterion_id, campaign_criterion.keyword.text
       FROM campaign_criterion
       WHERE campaign.id = ${cid}
         AND campaign_criterion.negative = TRUE
@@ -1181,8 +1181,8 @@ export async function removeNegativeKeyword(
     const match = (result as any[]).find(
       (row) => row.campaign_criterion?.keyword?.text === keywordText,
     );
-    const resourceName = match?.campaign_criterion?.resource_name;
-    if (!resourceName) {
+    const criterionId = match?.campaign_criterion?.criterion_id;
+    if (!criterionId) {
       return {
         success: false,
         action: "remove_negative_keyword",
@@ -1193,11 +1193,14 @@ export async function removeNegativeKeyword(
       };
     }
 
+    const customerId = normalizeCustomerId(auth.customerId);
     await customer.mutateResources([
       {
         entity: "campaign_criterion" as any,
         operation: "remove",
-        resource: { resource_name: resourceName },
+        resource: {
+          resource_name: `customers/${customerId}/campaignCriteria/${cid}~${criterionId}`,
+        },
       },
     ]);
 
