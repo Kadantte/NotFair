@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
+import { AccountSwitcher } from '@/components/account-switcher';
 import { dispatchThreadEvent } from '@/lib/thread-events';
 import { getChatSidebarServerSnapshot, getChatSidebarSnapshot, setStoredActiveThreadId, subscribeChatSidebar } from '@/lib/chat-thread-store';
 
@@ -140,13 +141,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </Button>
                 </div>
 
+                {/* Account switcher */}
+                <AccountSwitcher collapsed={collapsed} />
+
                 {/* Nav items */}
                 <nav className="shrink-0 px-2 pb-2 space-y-0.5">
                     <NavItem href="/dashboard" icon={Home} label="Dashboard" active={pathname === '/dashboard'} collapsed={collapsed} />
                     <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={collapsed} />
                     <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={collapsed} />
                     <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} collapsed={collapsed} />
-                    <NavItem href="/connect" icon={PlugZap} label="Connect" active={pathname === '/connect'} collapsed={collapsed} />
                 </nav>
 
                 {isOnChat && (
@@ -220,7 +223,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {!collapsed && (!isOnChat || threads.length === 0) && <div className="flex-1" />}
 
                 {/* Footer */}
-                <div className="shrink-0 border-t border-[#3D3C36] p-2">
+                <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
+                    <NavItem href="/connect" icon={PlugZap} label="Connect" active={pathname === '/connect'} collapsed={collapsed} />
                     <SignOutButton isCollapsed={collapsed} />
                 </div>
             </aside>

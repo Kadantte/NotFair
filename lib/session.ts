@@ -4,13 +4,14 @@ import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
 import { eq, gte, and } from "drizzle-orm";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
-import { deriveCustomerName, parseCustomerIds, type AuthContext } from "@/lib/google-ads";
+import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 
 export type Session = {
   connected: true;
   token: string;
   customerId: string;
   customerName: string;
+  customerIds: { id: string; name: string }[];
 } | {
   connected: false;
 };
@@ -66,6 +67,7 @@ export async function getSession(): Promise<Session> {
     token: result.token,
     customerId: result.row.customerId,
     customerName: deriveCustomerName(result.row.customerIds),
+    customerIds: parseCustomerIds(result.row.customerIds),
   };
 }
 
