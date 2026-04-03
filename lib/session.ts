@@ -12,6 +12,7 @@ export type Session = {
   customerId: string;
   customerName: string;
   customerIds: { id: string; name: string }[];
+  googleEmail: string | null;
 } | {
   connected: false;
 };
@@ -68,6 +69,7 @@ export async function getSession(): Promise<Session> {
     customerId: result.row.customerId,
     customerName: deriveCustomerName(result.row.customerIds),
     customerIds: parseCustomerIds(result.row.customerIds),
+    googleEmail: result.row.googleEmail,
   };
 }
 

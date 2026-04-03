@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.3] - 2026-04-03
+
+### Added
+- Dev dashboard (`/dev`) with API usage by day and operations by account, visible only to admin emails
+
 ## [0.2.2] - 2026-04-03
 
 ### Fixed

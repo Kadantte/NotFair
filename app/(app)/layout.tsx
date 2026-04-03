@@ -1,15 +1,17 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { dispatchThreadEvent } from '@/lib/thread-events';
 import { getChatSidebarServerSnapshot, getChatSidebarSnapshot, setStoredActiveThreadId, subscribeChatSidebar } from '@/lib/chat-thread-store';
+
+import { DEV_EMAILS } from '@/lib/dev-access';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -89,6 +91,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         getChatSidebarServerSnapshot,
     );
     const isOnChat = pathname === '/chat';
+    const [isDev, setIsDev] = useState(false);
+
+    useEffect(() => {
+        fetch('/api/auth/session', { credentials: 'include' })
+            .then(r => r.json())
+            .then(s => { if (s.connected && s.googleEmail && DEV_EMAILS.includes(s.googleEmail)) setIsDev(true); })
+            .catch(() => {});
+    }, []);
 
     function toggleCollapsed() {
         localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
@@ -150,6 +160,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={collapsed} />
                     <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={collapsed} />
                     <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} collapsed={collapsed} />
+                    {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={collapsed} />}
                 </nav>
 
                 {isOnChat && (
