@@ -19,25 +19,13 @@ import {
   toMicros,
 } from "@/lib/google-ads";
 import { logChange, getChanges, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
-import type { WriteResult } from "@/lib/google-ads";
+import { execWrite, execRead } from "@/lib/tools/execute";
 
 type AgentAuth = {
   refreshToken: string;
   customerId: string;
   userId?: string | null;
 };
-
-/** Execute a write operation and log the change. Returns the result with changeId attached. */
-async function execAndLog(
-  auth: AgentAuth,
-  campaignId: string | null,
-  fn: () => Promise<WriteResult>,
-) {
-  const result = await fn();
-  if (!result.success) return result;
-  const change = await logChange(auth.customerId, auth.userId, campaignId, result);
-  return { ...result, changeId: change?.id ?? null };
-}
 
 export function createGoogleAdsAgent(auth: AgentAuth) {
   return new ToolLoopAgent({
@@ -61,13 +49,13 @@ Rules:
       getConnectedAccount: tool({
         description: "Get the currently connected Google Ads customer context.",
         inputSchema: z.object({}),
-        execute: async () => getAccountInfo(auth),
+        execute: async () => execRead(auth, auth.customerId, "get_account_info", () => getAccountInfo(auth)),
       }),
       listAccessibleCustomers: tool({
         description:
           "List all Google Ads customers accessible with the connected refresh token.",
         inputSchema: z.object({}),
-        execute: async () => listAccessibleCustomers(auth.refreshToken),
+        execute: async () => execRead(auth, auth.customerId, "list_accessible_customers", () => listAccessibleCustomers(auth.refreshToken)),
       }),
       listCampaigns: tool({
         description:
@@ -77,7 +65,7 @@ Rules:
           includeRemoved: z.boolean().default(false),
         }),
         execute: async ({ limit, includeRemoved }) =>
-          listCampaigns(auth, { limit, includeRemoved }),
+          execRead(auth, auth.customerId, "list_campaigns", () => listCampaigns(auth, { limit, includeRemoved })),
       }),
       getCampaignPerformance: tool({
         description:
@@ -87,7 +75,7 @@ Rules:
           days: z.number().int().min(1).max(365).default(30),
         }),
         execute: async ({ campaignId, days }) =>
-          getCampaignPerformance(auth, campaignId, days),
+          execRead(auth, auth.customerId, "get_campaign_performance", () => getCampaignPerformance(auth, campaignId, days), campaignId),
       }),
       getCampaignKeywords: tool({
         description:
@@ -98,7 +86,7 @@ Rules:
           limit: z.number().int().min(1).max(100).default(20),
         }),
         execute: async ({ campaignId, days, limit }) =>
-          getKeywords(auth, campaignId, days, limit),
+          execRead(auth, auth.customerId, "get_keywords", () => getKeywords(auth, campaignId, days, limit), campaignId),
       }),
       runGaqlReport: tool({
         description:
@@ -109,7 +97,7 @@ Rules:
             .min(10)
             .describe("A GAQL SELECT query. Mutating statements are not allowed."),
         }),
-        execute: async ({ query }) => runSafeGaqlReport(auth, query),
+        execute: async ({ query }) => execRead(auth, auth.customerId, "run_gaql_query", () => runSafeGaqlReport(auth, query)),
       }),
 
       // ─── Write Tools ─────────────────────────────────────────
@@ -121,7 +109,7 @@ Rules:
           criterionId: z.string(),
         }),
         execute: ({ campaignId, adGroupId, criterionId }) =>
-          execAndLog(auth, campaignId, () => pauseKeyword(auth, campaignId, adGroupId, criterionId)),
+          execWrite(auth, auth.customerId, campaignId, () => pauseKeyword(auth, campaignId, adGroupId, criterionId)),
       }),
       enableKeyword: tool({
         description: "Re-enable a paused keyword. Returns a changeId for undo.",
@@ -130,7 +118,7 @@ Rules:
           criterionId: z.string(),
         }),
         execute: ({ adGroupId, criterionId }) =>
-          execAndLog(auth, null, () => enableKeyword(auth, adGroupId, criterionId)),
+          execWrite(auth, auth.customerId, null, () => enableKeyword(auth, adGroupId, criterionId)),
       }),
       updateBid: tool({
         description: "Change the CPC bid for a keyword (max 25% change per adjustment). Returns a changeId for undo.",
@@ -141,7 +129,7 @@ Rules:
           newBidDollars: z.number().positive().describe("New bid in dollars (e.g. 1.50)"),
         }),
         execute: ({ campaignId, adGroupId, criterionId, newBidDollars }) =>
-          execAndLog(auth, campaignId, () => updateBid(auth, campaignId, adGroupId, criterionId, toMicros(newBidDollars))),
+          execWrite(auth, auth.customerId, campaignId, () => updateBid(auth, campaignId, adGroupId, criterionId, toMicros(newBidDollars))),
       }),
       addNegativeKeyword: tool({
         description: "Add a negative keyword (phrase match) to block irrelevant search terms. Returns a changeId for undo.",
@@ -150,7 +138,7 @@ Rules:
           keywordText: z.string().min(1),
         }),
         execute: ({ campaignId, keywordText }) =>
-          execAndLog(auth, campaignId, () => addNegativeKeyword(auth, campaignId, keywordText)),
+          execWrite(auth, auth.customerId, campaignId, () => addNegativeKeyword(auth, campaignId, keywordText)),
       }),
       removeNegativeKeyword: tool({
         description: "Remove a negative keyword from a campaign. Returns a changeId for undo.",
@@ -159,7 +147,7 @@ Rules:
           keywordText: z.string().min(1),
         }),
         execute: ({ campaignId, keywordText }) =>
-          execAndLog(auth, campaignId, () => removeNegativeKeyword(auth, campaignId, keywordText)),
+          execWrite(auth, auth.customerId, campaignId, () => removeNegativeKeyword(auth, campaignId, keywordText)),
       }),
       updateCampaignBudget: tool({
         description: "Change the daily budget for a campaign (max 50% change, min $1/day). Returns a changeId for undo.",
@@ -168,7 +156,7 @@ Rules:
           newDailyBudgetDollars: z.number().positive().describe("New daily budget in dollars"),
         }),
         execute: ({ campaignId, newDailyBudgetDollars }) =>
-          execAndLog(auth, campaignId, () => updateCampaignBudget(auth, campaignId, toMicros(newDailyBudgetDollars))),
+          execWrite(auth, auth.customerId, campaignId, () => updateCampaignBudget(auth, campaignId, toMicros(newDailyBudgetDollars))),
       }),
       pauseCampaign: tool({
         description: "Pause an active campaign to stop all its ads. Returns a changeId for undo.",
@@ -176,7 +164,7 @@ Rules:
           campaignId: z.string(),
         }),
         execute: ({ campaignId }) =>
-          execAndLog(auth, campaignId, () => pauseCampaign(auth, campaignId)),
+          execWrite(auth, auth.customerId, campaignId, () => pauseCampaign(auth, campaignId)),
       }),
       enableCampaign: tool({
         description: "Re-enable a paused campaign to resume all its ads. Returns a changeId for undo.",
@@ -184,7 +172,7 @@ Rules:
           campaignId: z.string(),
         }),
         execute: ({ campaignId }) =>
-          execAndLog(auth, campaignId, () => enableCampaign(auth, campaignId)),
+          execWrite(auth, auth.customerId, campaignId, () => enableCampaign(auth, campaignId)),
       }),
 
       // ─── Change History & Undo ────────────────────────────────
@@ -195,7 +183,7 @@ Rules:
           limit: z.number().int().min(1).max(100).default(20),
         }),
         execute: async ({ campaignId, limit }) =>
-          getChanges(auth.customerId, { limit, campaignId }),
+          execRead(auth, auth.customerId, "get_changes", () => getChanges(auth.customerId, { limit, campaignId })),
       }),
       undoChange: tool({
         description: "Undo a previous write by changeId. Works within 7 days if entity hasn't been modified since.",
@@ -207,25 +195,23 @@ Rules:
           if ("error" in check) return { success: false, error: check.error };
 
           const { change } = check;
-          const eid = change.entityId ?? "";
-          const bv = change.beforeValue ?? "";
           let undoResult;
 
           switch (change.toolName) {
             case "update_budget":
-              undoResult = await updateCampaignBudget(auth, eid, Number(bv), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
+              undoResult = await updateCampaignBudget(auth, change.entityId ?? "", Number(change.beforeValue ?? 0), { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
               break;
             case "add_negative_keyword":
-              undoResult = await removeNegativeKeyword(auth, change.campaignId ?? "", eid);
+              undoResult = await removeNegativeKeyword(auth, change.campaignId ?? "", change.entityId ?? "");
               break;
             case "remove_negative_keyword":
-              undoResult = await addNegativeKeyword(auth, change.campaignId ?? "", eid);
+              undoResult = await addNegativeKeyword(auth, change.campaignId ?? "", change.entityId ?? "");
               break;
             case "pause_campaign":
-              undoResult = await enableCampaign(auth, eid);
+              undoResult = await enableCampaign(auth, change.entityId ?? "");
               break;
             case "enable_campaign":
-              undoResult = await pauseCampaign(auth, eid);
+              undoResult = await pauseCampaign(auth, change.entityId ?? "");
               break;
             default:
               return { success: false, error: `Cannot undo "${change.toolName}" from chat. Use the MCP undoChange tool for keyword operations.` };

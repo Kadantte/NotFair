@@ -18,7 +18,6 @@ import {
   toMicros,
   authForAccount,
   resolveAccountId,
-  invalidateCache,
   createAdGroup,
   createAd,
   pauseAd,
@@ -35,28 +34,9 @@ import {
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext, UpdateCampaignSettingsParams } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
+import { execWrite } from "@/lib/tools/execute";
 import { jsonResult, accountIdParam, WRITE_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
-
-/**
- * Log a write result and return the response with changeId attached.
- * Never throws — if logging fails, the write result is returned without a changeId.
- */
-async function logAndReturn(
-  accountId: string,
-  userId: string | null | undefined,
-  campaignId: string | null,
-  result: WriteResult,
-  reasoning?: string,
-) {
-  if (!result.success) return { ...result, changeId: null };
-
-  // Invalidate read cache for this account after successful mutation
-  invalidateCache(accountId);
-
-  const change = await logChange(accountId, userId, campaignId, result, reasoning);
-  return { ...result, changeId: change?.id ?? null };
-}
 
 /**
  * Write tools that mutate Google Ads account state.
@@ -78,8 +58,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, criterionId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await pauseKeyword(authForAccount(auth, accountId), campaignId, adGroupId, criterionId);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => pauseKeyword(authForAccount(auth, accountId), campaignId, adGroupId, criterionId));
+    return jsonResult(result);
   });
 
   server.registerTool("enableKeyword", {
@@ -93,8 +73,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, adGroupId, criterionId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await enableKeyword(authForAccount(auth, accountId), adGroupId, criterionId);
-    return jsonResult(await logAndReturn(targetId, auth.userId, null, result));
+    const result = await execWrite(auth, targetId, null, () => enableKeyword(authForAccount(auth, accountId), adGroupId, criterionId));
+    return jsonResult(result);
   });
 
   server.registerTool("addKeyword", {
@@ -110,8 +90,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await addKeyword(authForAccount(auth, accountId), adGroupId, keyword, matchType);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => addKeyword(authForAccount(auth, accountId), adGroupId, keyword, matchType));
+    return jsonResult(result);
   });
 
   // ─── Bid Management ─────────────────────────────────────────────
@@ -129,14 +109,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await updateBid(
-      authForAccount(auth, accountId),
-      campaignId,
-      adGroupId,
-      criterionId,
-      toMicros(newBidDollars),
+    const result = await execWrite(auth, targetId, campaignId, () =>
+      updateBid(authForAccount(auth, accountId), campaignId, adGroupId, criterionId, toMicros(newBidDollars)),
     );
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    return jsonResult(result);
   });
 
   // ─── Negative Keywords ──────────────────────────────────────────
@@ -152,8 +128,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, keyword }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword));
+    return jsonResult(result);
   });
 
   server.registerTool("removeNegativeKeyword", {
@@ -172,8 +148,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, keyword }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword));
+    return jsonResult(result);
   });
 
   // ─── Budget Management ──────────────────────────────────────────
@@ -189,12 +165,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, newDailyBudgetDollars }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await updateCampaignBudget(
-      authForAccount(auth, accountId),
-      campaignId,
-      toMicros(newDailyBudgetDollars),
+    const result = await execWrite(auth, targetId, campaignId, () =>
+      updateCampaignBudget(authForAccount(auth, accountId), campaignId, toMicros(newDailyBudgetDollars)),
     );
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    return jsonResult(result);
   });
 
   // ─── Create Campaign ────────────────────────────────────────────
@@ -228,7 +202,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await createSearchCampaign(authForAccount(auth, accountId), {
+
+    const createResult = await createSearchCampaign(authForAccount(auth, accountId), {
       campaignName,
       dailyBudgetDollars,
       keywords,
@@ -239,24 +214,22 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       keywordMatchType,
     });
 
-    // Adapt to WriteResult for change logging
     const writeResult: WriteResult = {
-      success: result.success,
+      success: createResult.success,
       action: "create_campaign",
-      entityId: result.campaignId ?? "",
+      entityId: createResult.campaignId ?? "",
       beforeValue: "",
-      afterValue: result.campaignName,
-      error: result.error,
+      afterValue: createResult.campaignName,
+      error: createResult.error,
     };
 
-    const logged = await logAndReturn(targetId, auth.userId, result.campaignId ?? null, writeResult);
+    const logged = await execWrite(auth, targetId, createResult.campaignId ?? null, async () => writeResult);
 
-    // Return full details for the LLM
     return jsonResult({
-      ...result,
+      ...createResult,
       changeId: logged.changeId,
-      status: result.success ? "PAUSED" : undefined,
-      nextSteps: result.success
+      status: createResult.success ? "PAUSED" : undefined,
+      nextSteps: createResult.success
         ? "Campaign created as PAUSED. Review settings in Google Ads, then use enableCampaign to start running ads."
         : undefined,
     });
@@ -279,8 +252,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await pauseCampaign(authForAccount(auth, accountId), campaignId);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => pauseCampaign(authForAccount(auth, accountId), campaignId));
+    return jsonResult(result);
   });
 
   server.registerTool("enableCampaign", {
@@ -293,8 +266,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await enableCampaign(authForAccount(auth, accountId), campaignId);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => enableCampaign(authForAccount(auth, accountId), campaignId));
+    return jsonResult(result);
   });
 
   // ─── Tracking Templates ─────────────────────────────────────────
@@ -316,10 +289,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, level, entityId, trackingTemplate }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
-    // campaignId: direct for campaign level; resolved from prefetch for ad_group/ad; null for account
-    const campaignId = level === "campaign" ? (entityId ?? null) : (result.campaignId ?? null);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const writeResult = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
+    const campaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
+    const result = await execWrite(auth, targetId, campaignId, async () => writeResult);
+    return jsonResult(result);
   });
 
   // ─── Ad Group Management ────────────────────────────────────────
@@ -335,8 +308,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupName }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await createAdGroup(authForAccount(auth, accountId), campaignId, adGroupName);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => createAdGroup(authForAccount(auth, accountId), campaignId, adGroupName));
+    return jsonResult(result);
   });
 
   // ─── Ad Management ──────────────────────────────────────────────
@@ -363,8 +336,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await createAd(authForAccount(auth, accountId), adGroupId, { headlines, descriptions, finalUrl });
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => createAd(authForAccount(auth, accountId), adGroupId, { headlines, descriptions, finalUrl }));
+    return jsonResult(result);
   });
 
   server.registerTool("pauseAd", {
@@ -379,8 +352,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, adId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await pauseAd(authForAccount(auth, accountId), adGroupId, adId);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => pauseAd(authForAccount(auth, accountId), adGroupId, adId));
+    return jsonResult(result);
   });
 
   server.registerTool("enableAd", {
@@ -395,8 +368,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, adId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await enableAd(authForAccount(auth, accountId), adGroupId, adId);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => enableAd(authForAccount(auth, accountId), adGroupId, adId));
+    return jsonResult(result);
   });
 
   server.registerTool("updateAdFinalUrl", {
@@ -412,8 +385,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await updateAdFinalUrl(authForAccount(auth, accountId), adGroupId, adId, finalUrl);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => updateAdFinalUrl(authForAccount(auth, accountId), adGroupId, adId, finalUrl));
+    return jsonResult(result);
   });
 
   server.registerTool("updateAdAssets", {
@@ -448,8 +421,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await updateAdAssets(authForAccount(auth, accountId), adGroupId, adId, { headlines, descriptions });
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => updateAdAssets(authForAccount(auth, accountId), adGroupId, adId, { headlines, descriptions }));
+    return jsonResult(result);
   });
 
   // ─── Bulk Operations ────────────────────────────────────────────
@@ -476,10 +449,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const results = await bulkUpdateBids(authForAccount(auth, accountId), updates);
 
-    // Log each successful bid change individually so they can each be undone
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        logAndReturn(targetId, auth.userId, input.campaignId, result)
+        execWrite(auth, targetId, input.campaignId, async () => result)
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -518,7 +490,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        logAndReturn(targetId, auth.userId, input.campaignId, result)
+        execWrite(auth, targetId, input.campaignId, async () => result)
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -556,7 +528,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        logAndReturn(targetId, auth.userId, campaignId, result)
+        execWrite(auth, targetId, campaignId, async () => result)
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -591,15 +563,14 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await moveKeywords(authForAccount(auth, accountId), campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
 
-    // Log all individual add and pause results
     const addChangeIds = await Promise.all(
       result.added.filter((r) => r.success).map((r) =>
-        logAndReturn(targetId, auth.userId, campaignId, r),
+        execWrite(auth, targetId, campaignId, async () => r),
       ),
     );
     const pauseChangeIds = await Promise.all(
       result.paused.filter((r) => r.success).map((r) =>
-        logAndReturn(targetId, auth.userId, campaignId, r),
+        execWrite(auth, targetId, campaignId, async () => r),
       ),
     );
 
@@ -630,8 +601,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, newName }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await renameCampaign(authForAccount(auth, accountId), campaignId, newName);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => renameCampaign(authForAccount(auth, accountId), campaignId, newName));
+    return jsonResult(result);
   });
 
   server.registerTool("renameAdGroup", {
@@ -646,8 +617,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, async ({ accountId, campaignId, adGroupId, newName }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await renameAdGroup(authForAccount(auth, accountId), campaignId, adGroupId, newName);
-    return jsonResult(await logAndReturn(targetId, auth.userId, campaignId, result));
+    const result = await execWrite(auth, targetId, campaignId, () => renameAdGroup(authForAccount(auth, accountId), campaignId, adGroupId, newName));
+    return jsonResult(result);
   });
 
   // ─── Campaign Settings ──────────────────────────────────────────
@@ -692,9 +663,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const result = await updateCampaignSettings(authForAccount(auth, accountId), campaignId, params);
 
-    // Log each sub-result individually for granular undo
     const logged = await Promise.all(
-      result.results.map((r) => logAndReturn(targetId, auth.userId, campaignId, r)),
+      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r)),
     );
 
     return jsonResult({
@@ -722,7 +692,6 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
-    // Validate the change is undoable
     const check = await getUndoableChange(targetId, changeId);
     if ("error" in check) {
       return jsonResult({ success: false, error: check.error });
@@ -786,7 +755,6 @@ async function findAndPauseKeyword(auth: AuthContext, criterionId: string): Prom
 async function findAndUpdateBid(auth: AuthContext, criterionId: string, previousBidMicros: number): Promise<WriteResult> {
   const ctx = await findKeywordContext(auth, criterionId);
   if (!ctx) return { success: false, action: "update_bid", entityId: criterionId, beforeValue: "N/A", afterValue: String(previousBidMicros), error: NOT_FOUND_ERROR };
-  // Bypass guardrails for undo
   return updateBid(auth, ctx.campaignId, ctx.adGroupId, criterionId, previousBidMicros, {
     maxBidChangePct: 1.0,
     maxBudgetChangePct: 1.0,
@@ -820,12 +788,10 @@ export async function executeUndoForChange(
       return updateCampaignBudget(auth, entityId, budgetMicros, { maxBidChangePct: 1.0, maxBudgetChangePct: 1.0, maxKeywordPausePct: 1.0 });
     }
     case "add_keyword": {
-      // beforeValue holds the adGroupId saved at creation time
       if (!beforeValue) return { success: false, action: "remove_keyword", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: missing adGroupId" };
       return removeKeyword(auth, beforeValue, entityId);
     }
     case "remove_keyword": {
-      // Not generally undoable — we'd need keyword text + match type
       return { success: false, action: "add_keyword", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo keyword removal (keyword text not stored)" };
     }
     case "add_negative_keyword":
@@ -843,19 +809,14 @@ export async function executeUndoForChange(
       return setTrackingTemplate(auth, level, beforeValue, actualId);
     }
     case "create_ad_group":
-      // Ad group removal is complex and potentially destructive — not supported
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo ad group creation (would require removing all ads and keywords inside it)" };
     case "create_ad":
-      // entityId = adId, beforeValue = adGroupId
       return pauseAd(auth, beforeValue, entityId);
     case "pause_ad":
-      // entityId = adId, beforeValue = adGroupId
       return enableAd(auth, beforeValue, entityId);
     case "enable_ad":
-      // entityId = adId, beforeValue = adGroupId
       return pauseAd(auth, beforeValue, entityId);
     case "update_ad_final_url": {
-      // entityId = adGroupId~adId, beforeValue = old URL
       const [adGroupIdPart, adIdPart] = entityId.split("~");
       if (!adGroupIdPart || !adIdPart) {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: malformed entity ID" };
@@ -866,7 +827,6 @@ export async function executeUndoForChange(
       return updateAdFinalUrl(auth, adGroupIdPart, adIdPart, beforeValue);
     }
     case "update_ad_assets": {
-      // entityId = adGroupId~adId, beforeValue = JSON {h: AdAsset[], d: AdAsset[]} (or legacy {h: string[], d: string[]})
       const [adGroupIdPart, adIdPart] = entityId.split("~");
       if (!adGroupIdPart || !adIdPart) {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: malformed entity ID" };
@@ -887,12 +847,10 @@ export async function executeUndoForChange(
       }
     }
     case "update_campaign_networks": {
-      // entityId = campaignId, beforeValue = JSON {googleSearch, searchPartners, displayNetwork}
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous network settings not recorded" };
       try {
         const prev = JSON.parse(beforeValue) as { googleSearch: boolean; searchPartners: boolean; displayNetwork: boolean };
         const result = await updateCampaignSettings(auth, entityId, { networks: prev });
-        // Return the inner result directly
         return result.results[0] ?? { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "No result from network settings update" };
       } catch {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous network settings" };
@@ -900,14 +858,11 @@ export async function executeUndoForChange(
     }
     case "add_campaign_location":
     case "remove_campaign_location":
-      // Location criterion changes can't be auto-undone: executeUndoForChange only receives beforeValue, but we need afterValue to know which criteria were added/removed.
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location changes cannot be automatically undone. Use updateCampaignSettings to adjust locations manually." };
     case "rename_campaign":
-      // entityId = campaignId, beforeValue = old name
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
       return renameCampaign(auth, entityId, beforeValue);
     case "rename_ad_group":
-      // entityId = adGroupId, beforeValue = old name, campaignId from change record
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
       return renameAdGroup(auth, change.campaignId ?? "", entityId, beforeValue);
     default:

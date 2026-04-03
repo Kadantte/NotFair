@@ -6,6 +6,7 @@ import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampa
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
+import { getUsageInfo, getHourlyUsage } from "@/lib/mcp/rate-limit";
 
 type CampaignHistoryRow = {
     segments: {
@@ -388,4 +389,15 @@ Keep it concise and data-driven. Use specific numbers from the data.`;
         console.error("Generate Campaign Summary Error:", error);
         throw new Error("Failed to generate AI summary.");
     }
+}
+
+// ─── Usage / Rate Limit ─────────────────────────────────────────────
+
+export async function getUsageAction() {
+    const auth = await getSessionAuth();
+    const [info, hourly] = await Promise.all([
+        getUsageInfo(auth.userId),
+        getHourlyUsage(auth.userId),
+    ]);
+    return { ...info, hourly };
 }
