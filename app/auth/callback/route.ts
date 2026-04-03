@@ -317,12 +317,14 @@ async function createOrRedirectGoogleAdsSession({
 async function reuseExistingSession({
   origin,
   userId,
+  googleEmail,
   refreshToken,
   popup,
   next,
 }: {
   origin: string;
   userId: string | null;
+  googleEmail: string | null;
   refreshToken: string;
   popup: boolean;
   next: string;
@@ -361,6 +363,7 @@ async function reuseExistingSession({
     .set({
       refreshToken,
       userId,
+      ...(googleEmail ? { googleEmail } : {}),
       expiresAt: expiresAt.toISOString(),
     })
     .where(eq(schema.mcpSessions.id, existingSession.id));
@@ -469,6 +472,7 @@ export async function GET(request: Request) {
     const reusedResponse = await reuseExistingSession({
       origin,
       userId: user?.id ?? null,
+      googleEmail: user?.email ?? null,
       refreshToken: tokenData.refresh_token,
       popup,
       next,
