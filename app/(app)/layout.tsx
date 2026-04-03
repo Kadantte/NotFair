@@ -120,14 +120,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 }`}
             >
                 {/* Header */}
-                <div className={`flex h-14 shrink-0 items-center px-3 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+                <div className={`flex h-14 shrink-0 items-center px-2 ${collapsed ? 'justify-center' : 'justify-between'}`}>
                     {!collapsed && (
                         <Link
                             href="/"
-                            className="flex items-center gap-2.5 rounded-lg px-1 py-1 transition hover:bg-[#E8E4DD]/5"
+                            className="flex items-center rounded-lg px-3 py-1 transition hover:bg-[#E8E4DD]/5"
                         >
-                            <Image src="/logo.svg" alt="AdsAgent" width={22} height={22} />
-                            <span className="text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
+                            <Image src="/logo.svg" alt="AdsAgent" width={18} height={18} className="shrink-0" />
+                            <span className="ml-3 text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
                         </Link>
                     )}
                     <Button
