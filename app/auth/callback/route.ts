@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { clearSessionCookies, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers } from "@/lib/google-ads";
@@ -35,22 +35,37 @@ function getSafeNext(next: string | null | undefined) {
   return next;
 }
 
-function decodeState(state: string | null): AuthState {
-  if (!state) return {};
+/**
+ * Verify the OAuth state nonce against the DB, consume it, and return the
+ * original payload. Returns null if the nonce is missing, expired, or unknown.
+ */
+async function verifyAndConsumeState(nonce: string | null): Promise<AuthState | null> {
+  if (!nonce) return null;
+
+  // Delete expired states opportunistically (non-blocking cleanup)
+  db().delete(schema.oauthStates)
+    .where(lt(schema.oauthStates.expiresAt, new Date()))
+    .catch(() => {});
+
+  // Atomically consume the nonce: delete + return in one query
+  const [row] = await db()
+    .delete(schema.oauthStates)
+    .where(
+      and(
+        eq(schema.oauthStates.nonce, nonce),
+        gte(schema.oauthStates.expiresAt, new Date()),
+      ),
+    )
+    .returning({ payload: schema.oauthStates.payload });
+
+  if (!row) return null;
 
   try {
-    const parsed = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+    const parsed = JSON.parse(row.payload);
     if (!parsed || typeof parsed !== "object") return {};
-
     return {
-      next:
-        "next" in parsed && typeof parsed.next === "string"
-          ? parsed.next
-          : undefined,
-      popup:
-        "popup" in parsed && typeof parsed.popup === "boolean"
-          ? parsed.popup
-          : undefined,
+      next: typeof parsed.next === "string" ? parsed.next : undefined,
+      popup: typeof parsed.popup === "boolean" ? parsed.popup : undefined,
     };
   } catch {
     return {};
@@ -387,7 +402,14 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const explicitNext = searchParams.get("next");
-  const state = decodeState(searchParams.get("state"));
+  const stateParam = searchParams.get("state");
+
+  // Verify the OAuth state nonce to prevent CSRF
+  const state = await verifyAndConsumeState(stateParam);
+  if (!state) {
+    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  }
+
   const popup = state.popup === true || searchParams.get("popup") === "1";
   const next = getSafeNext(state.next ?? explicitNext);
 

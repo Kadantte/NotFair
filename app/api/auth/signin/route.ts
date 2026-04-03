@@ -1,14 +1,7 @@
+import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
-
-type AuthState = {
-  next: string;
-  popup: boolean;
-};
-
-function encodeState(state: AuthState) {
-  return Buffer.from(JSON.stringify(state)).toString("base64url");
-}
+import { db, schema } from "@/lib/db";
 
 function getSafeNext(next: string | null) {
   if (!next || !next.startsWith("/")) {
@@ -34,8 +27,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const state = encodeState({ next, popup });
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
+  // Generate a random nonce and store it in the DB with the payload.
+  // The callback will verify this nonce exists before proceeding.
+  const nonce = randomBytes(16).toString("hex");
+  const payload = JSON.stringify({ next, popup });
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await db().insert(schema.oauthStates).values({ nonce, payload, expiresAt });
+
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(nonce)}`;
 
   return NextResponse.redirect(url);
 }

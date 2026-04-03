@@ -32,49 +32,39 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
     ? authHeader.slice(7)
     : null;
 
-  if (bearerToken) {
-    try {
-      const [session] = await db()
-        .select()
-        .from(schema.mcpSessions)
-        .where(
-          and(
-            eq(schema.mcpSessions.accessToken, bearerToken),
-            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-          ),
-        )
-        .limit(1);
-
-      if (session) {
-        if (!session.customerId) {
-          throw new Error("Account selection pending. Complete setup at /connect.");
-        }
-        const customerIds = parseCustomerIds(session.customerIds);
-          return {
-            refreshToken: session.refreshToken,
-            customerId: session.customerId,
-            customerIds: customerIds.length > 0
-              ? customerIds
-              : [{ id: session.customerId, name: "" }],
-            userId: session.userId ?? null,
-            sessionToken: bearerToken,
-          };
-        }
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("Account selection pending")) {
-        throw e;
-      }
-      // DB unavailable — fall through to env vars
-    }
-  }
-
-  // Fallback: env vars (founder's account)
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN ?? "";
-  const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID ?? "";
-  if (!refreshToken || !customerId) {
+  if (!bearerToken) {
     throw new Error("No valid authentication. Sign in at /connect to get your MCP token.");
   }
-  return { refreshToken, customerId };
+
+  const [session] = await db()
+    .select()
+    .from(schema.mcpSessions)
+    .where(
+      and(
+        eq(schema.mcpSessions.accessToken, bearerToken),
+        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+      ),
+    )
+    .limit(1);
+
+  if (!session) {
+    throw new Error("Session not found or expired. Sign in at /connect to get a new MCP token.");
+  }
+
+  if (!session.customerId) {
+    throw new Error("Account selection pending. Complete setup at /connect.");
+  }
+
+  const customerIds = parseCustomerIds(session.customerIds);
+  return {
+    refreshToken: session.refreshToken,
+    customerId: session.customerId,
+    customerIds: customerIds.length > 0
+      ? customerIds
+      : [{ id: session.customerId, name: "" }],
+    userId: session.userId ?? null,
+    sessionToken: bearerToken,
+  };
 }
 
 // ─── MCP Server ──────────────────────────────────────────────────────

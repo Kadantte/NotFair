@@ -6,12 +6,25 @@ const {
   mockListAccessibleCustomers,
   mockSelectRows,
   mockUpdateWhere,
+  mockDeleteReturning,
+  mockCookieGet,
+  mockCookieGetAll,
 } = vi.hoisted(() => ({
   mockSignInWithIdToken: vi.fn(),
   mockInsertValues: vi.fn(),
   mockListAccessibleCustomers: vi.fn(),
   mockSelectRows: vi.fn(),
   mockUpdateWhere: vi.fn(),
+  mockDeleteReturning: vi.fn(),
+  mockCookieGet: vi.fn(),
+  mockCookieGetAll: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({
+    get: mockCookieGet,
+    getAll: mockCookieGetAll,
+  })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -54,6 +67,15 @@ vi.mock("@/lib/db", () => ({
         where: (...args: unknown[]) => mockUpdateWhere(...args),
       })),
     })),
+    delete: vi.fn(() => ({
+      where: vi.fn(() => {
+        // Cleanup call uses .catch(), consume call uses .returning()
+        // Return a thenable that also has .returning()
+        const p = Promise.resolve();
+        (p as any).returning = vi.fn(async () => mockDeleteReturning());
+        return p;
+      }),
+    })),
   }),
   schema: {
     mcpSessions: {
@@ -66,6 +88,11 @@ vi.mock("@/lib/db", () => ({
       customerIds: "customer_ids",
       accessToken: "access_token",
     },
+    oauthStates: {
+      nonce: "nonce",
+      payload: "payload",
+      expiresAt: "expires_at",
+    },
   },
 }));
 
@@ -76,6 +103,10 @@ function makeRequest(url: string): Request {
 }
 
 describe("Auth callback route — GET", () => {
+  // Helper: the state param is now a nonce verified against the DB.
+  // Tests pass a nonce value and mock the DB delete+returning to resolve it.
+  const VALID_NONCE = "test-nonce-abc123";
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.GOOGLE_ADS_CLIENT_ID = "client-id";
@@ -84,6 +115,10 @@ describe("Auth callback route — GET", () => {
     mockSelectRows.mockResolvedValue([]);
     mockInsertValues.mockResolvedValue(undefined);
     mockUpdateWhere.mockResolvedValue(undefined);
+    mockCookieGet.mockReturnValue(undefined);
+    mockCookieGetAll.mockReturnValue([]);
+    // By default, nonce verification succeeds with a payload pointing to /campaigns
+    mockDeleteReturning.mockResolvedValue([{ payload: JSON.stringify({ next: "/campaigns", popup: false }) }]);
     mockSignInWithIdToken.mockResolvedValue({
       data: { user: { id: "user-123", email: "user@example.com" }, session: null },
       error: null,
@@ -109,8 +144,19 @@ describe("Auth callback route — GET", () => {
     );
   });
 
+  it("redirects to /login?error=auth_failed when state nonce is invalid", async () => {
+    mockDeleteReturning.mockResolvedValue([]);
+
+    const response = await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=bad-nonce`),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/login?error=auth_failed");
+  });
+
   it("redirects to /login?error=auth_failed when no code param", async () => {
-    const response = await GET(makeRequest("http://localhost:3000/auth/callback"));
+    const response = await GET(makeRequest(`http://localhost:3000/auth/callback?state=${VALID_NONCE}`));
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/login?error=auth_failed");
@@ -128,7 +174,7 @@ describe("Auth callback route — GET", () => {
     );
 
     const response = await GET(
-      makeRequest("http://localhost:3000/auth/callback?code=invalid"),
+      makeRequest(`http://localhost:3000/auth/callback?code=invalid&state=${VALID_NONCE}`),
     );
 
     expect(response.status).toBe(307);
@@ -136,8 +182,10 @@ describe("Auth callback route — GET", () => {
   });
 
   it("redirects to the requested next path after successful connect", async () => {
+    mockDeleteReturning.mockResolvedValue([{ payload: JSON.stringify({ next: "/tools", popup: false }) }]);
+
     const response = await GET(
-      makeRequest("http://localhost:3000/auth/callback?code=valid-code&next=/tools"),
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${VALID_NONCE}`),
     );
 
     expect(response.status).toBe(307);
@@ -148,7 +196,7 @@ describe("Auth callback route — GET", () => {
 
   it("redirects to /campaigns by default after successful connect", async () => {
     const response = await GET(
-      makeRequest("http://localhost:3000/auth/callback?code=valid-code"),
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${VALID_NONCE}`),
     );
 
     const location = response.headers.get("location") ?? "";
@@ -162,7 +210,7 @@ describe("Auth callback route — GET", () => {
     ]);
 
     const response = await GET(
-      makeRequest("http://localhost:3000/auth/callback?code=valid-code"),
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${VALID_NONCE}`),
     );
 
     expect(response.status).toBe(307);
@@ -170,6 +218,7 @@ describe("Auth callback route — GET", () => {
   });
 
   it("reuses an existing connected session for the same user", async () => {
+    mockDeleteReturning.mockResolvedValue([{ payload: JSON.stringify({ next: "/tools", popup: false }) }]);
     mockSelectRows.mockResolvedValue([
       {
         id: 7,
@@ -180,7 +229,7 @@ describe("Auth callback route — GET", () => {
     ]);
 
     const response = await GET(
-      makeRequest("http://localhost:3000/auth/callback?code=valid-code&next=/tools"),
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${VALID_NONCE}`),
     );
 
     expect(response.status).toBe(307);

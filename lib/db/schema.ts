@@ -84,6 +84,15 @@ export const performanceSnapshots = pgTable(
   ],
 );
 
+// ─── OAuth State (CSRF nonce) ────────────────────────────────────────
+
+export const oauthStates = pgTable("oauth_states", {
+  nonce: text("nonce").primaryKey(),
+  payload: text("payload").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ─── MCP Auth Sessions ───────────────────────────────────────────────
 
 export const mcpSessions = pgTable("mcp_sessions", {

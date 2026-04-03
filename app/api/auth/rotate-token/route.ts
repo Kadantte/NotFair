@@ -14,34 +14,31 @@ export async function POST() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const [session] = await db()
-    .select()
-    .from(schema.mcpSessions)
+  const newToken = randomBytes(32).toString("hex");
+  const newExpiresAt = new Date();
+  newExpiresAt.setFullYear(newExpiresAt.getFullYear() + 1);
+
+  // Atomic: UPDATE only if the old token still matches and hasn't expired.
+  // If two concurrent requests race, only one will match — the other gets 0 rows.
+  const [updated] = await db()
+    .update(schema.mcpSessions)
+    .set({
+      accessToken: newToken,
+      expiresAt: newExpiresAt.toISOString(),
+    })
     .where(
       and(
         eq(schema.mcpSessions.accessToken, oldToken),
         gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
       ),
     )
-    .limit(1);
+    .returning({ customerIds: schema.mcpSessions.customerIds });
 
-  if (!session) {
+  if (!updated) {
     return NextResponse.json({ error: "Session not found or expired" }, { status: 404 });
   }
 
-  const newToken = randomBytes(32).toString("hex");
-  const newExpiresAt = new Date();
-  newExpiresAt.setFullYear(newExpiresAt.getFullYear() + 1);
-
-  await db()
-    .update(schema.mcpSessions)
-    .set({
-      accessToken: newToken,
-      expiresAt: newExpiresAt.toISOString(),
-    })
-    .where(eq(schema.mcpSessions.id, session.id));
-
   const response = NextResponse.json({ token: newToken });
-  setSessionCookies(response, newToken, deriveCustomerName(session.customerIds));
+  setSessionCookies(response, newToken, deriveCustomerName(updated.customerIds));
   return response;
 }
