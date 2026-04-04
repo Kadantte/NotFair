@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-03.
+> Source of truth for all analytics events. Last updated: 2026-04-04.
 > Platform: PostHog. Check here before adding a new event.
 
 ---
@@ -38,9 +38,13 @@
 |---|---|---|---|
 | `tool_name` | string | `"pause_keyword"` | Which write tool was executed |
 | `entity_type` | string | `"keyword"` | Entity type affected (keyword or campaign) |
+| `account_id` | string | `"1301265570"` | Google Ads account ID |
+| `campaign_id` | string \| null | `"20345678"` | Campaign affected (null if not campaign-scoped) |
+| `before_value` | string \| null | `"ENABLED"` | State before the change |
+| `after_value` | string \| null | `"PAUSED"` | State after the change |
 
 ```json
-{ "event": "ai_change_executed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword" } }
+{ "event": "ai_change_executed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "PAUSED" } }
 ```
 
 **Files:** `lib/tools/execute.ts`

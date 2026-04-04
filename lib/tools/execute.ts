@@ -37,6 +37,10 @@ export async function execWrite(
   trackServerEvent(auth.userId, "ai_change_executed", {
     tool_name: result.action,
     entity_type: result.action.includes("keyword") || result.action.includes("bid") ? "keyword" : "campaign",
+    account_id: accountId,
+    campaign_id: campaignId,
+    before_value: result.beforeValue || null,
+    after_value: result.afterValue || null,
   });
   return { ...result, changeId: change?.id ?? null };
 }

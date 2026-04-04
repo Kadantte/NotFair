@@ -204,6 +204,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     }
 
     function openAgenticAi() {
+        trackEvent('chat_opened_from_connect');
         window.location.assign('/chat');
     }
 
