@@ -54,7 +54,7 @@ export function DashboardContent({
 
   return (
     <div className="h-full overflow-y-auto bg-[#1A1917]">
-      <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
+      <div className="mx-auto max-w-[1200px] px-4 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
         {/* Health Score + Key Metrics (renders instantly) */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
           <HealthScore data={finalHealthScore} preliminary={!details} />

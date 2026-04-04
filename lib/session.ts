@@ -5,6 +5,7 @@ import { db, schema } from "@/lib/db";
 import { eq, gte, and } from "drizzle-orm";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
+import { DEV_EMAILS } from "@/lib/dev-access";
 
 export type Session = {
   connected: true;
@@ -14,6 +15,7 @@ export type Session = {
   customerName: string;
   customerIds: { id: string; name: string }[];
   googleEmail: string | null;
+  isDev: boolean;
 } | {
   connected: false;
 };
@@ -72,6 +74,7 @@ export async function getSession(): Promise<Session> {
     customerName: deriveCustomerName(result.row.customerIds),
     customerIds: parseCustomerIds(result.row.customerIds),
     googleEmail: result.row.googleEmail,
+    isDev: !!result.row.googleEmail && DEV_EMAILS.includes(result.row.googleEmail),
   };
 }
 

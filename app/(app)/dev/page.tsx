@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, AlertCircle, Code2 } from 'lucide-react';
+import Link from 'next/link';
+import { RefreshCw, AlertCircle, Code2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type DailyUsage = {
@@ -57,33 +58,34 @@ export default function DevPage() {
         fetchStats(!!cachedStats);
     }, [fetchStats]);
 
-    const maxTotal = stats?.dailyUsage.reduce((max, d) => Math.max(max, d.total), 0) ?? 1;
+    const maxTotal = Math.max(stats?.dailyUsage.reduce((max, d) => Math.max(max, d.total), 0) ?? 0, 1);
 
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-                <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
-                        <p className="mt-0.5 text-sm text-[#9B9689]">API usage and operations tracking</p>
+                <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                    <div className="min-w-0">
+                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <Button
                         onClick={() => { cachedStats = null; fetchStats(false); }}
                         disabled={loading}
                         variant="outline"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-2"
+                        size="sm"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 shrink-0"
                     >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
                     </Button>
                 </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 space-y-8">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 space-y-6 sm:space-y-8">
                 {error && (
-                    <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-lg p-4 flex items-center gap-3 text-[#C45D4A]">
+                    <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-lg p-3 sm:p-4 flex items-center gap-3 text-[#C45D4A]">
                         <AlertCircle className="w-5 h-5 shrink-0" />
-                        <p>{error}</p>
+                        <p className="text-sm">{error}</p>
                     </div>
                 )}
 
@@ -96,8 +98,44 @@ export default function DevPage() {
                     <>
                         {/* Daily API Usage */}
                         <div>
-                            <h2 className="text-lg font-semibold text-[#E8E4DD] mb-4">API Usage by Day</h2>
-                            <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                            <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">API Usage by Day</h2>
+
+                            {/* Mobile: card layout */}
+                            <div className="sm:hidden space-y-2">
+                                {stats.dailyUsage.length === 0 ? (
+                                    <p className="text-sm text-[#9B9689] text-center py-8">No API usage in the last 30 days</p>
+                                ) : stats.dailyUsage.map(day => (
+                                    <div key={day.date} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm text-[#E8E4DD] font-mono tabular-nums">{day.date}</span>
+                                            <span className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{day.total.toLocaleString()} total</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 h-3 mb-2">
+                                            <div
+                                                className="h-full rounded-sm bg-[#4CAF6E]/60"
+                                                style={{ width: `${(day.reads / maxTotal) * 100}%` }}
+                                            />
+                                            <div
+                                                className="h-full rounded-sm bg-[#D4882A]/60"
+                                                style={{ width: `${(day.writes / maxTotal) * 100}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-4 text-xs">
+                                            <span className="text-[#9B9689]">
+                                                <span className="inline-block w-2 h-2 rounded-sm bg-[#4CAF6E]/60 mr-1" />
+                                                {day.reads.toLocaleString()} reads
+                                            </span>
+                                            <span className="text-[#D4882A]">
+                                                <span className="inline-block w-2 h-2 rounded-sm bg-[#D4882A]/60 mr-1" />
+                                                {day.writes.toLocaleString()} writes
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop: table layout */}
+                            <div className="hidden sm:block border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
@@ -160,8 +198,52 @@ export default function DevPage() {
 
                         {/* Operations by Account */}
                         <div>
-                            <h2 className="text-lg font-semibold text-[#E8E4DD] mb-4">Operations by Account</h2>
-                            <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                            <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">Operations by Account</h2>
+
+                            {/* Mobile: card layout */}
+                            <div className="sm:hidden space-y-2">
+                                {stats.accountOps.length === 0 ? (
+                                    <p className="text-sm text-[#9B9689] text-center py-8">No operations recorded</p>
+                                ) : stats.accountOps.map(acc => (
+                                    <Link
+                                        key={acc.accountId}
+                                        href={`/dev/${acc.accountId}`}
+                                        prefetch
+                                        className="block border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3 hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 transition-all"
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="min-w-0">
+                                                {acc.accountName && <div className="text-sm text-[#E8E4DD] truncate">{acc.accountName}</div>}
+                                                {acc.email && <div className="text-xs text-[#9B9689] truncate">{acc.email}</div>}
+                                                <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
+                                            </div>
+                                            <ChevronRight className="w-4 h-4 text-[#9B9689] shrink-0" />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3 text-center">
+                                            <div>
+                                                <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Reads</div>
+                                                <div className="text-sm text-[#9B9689] font-mono tabular-nums">{acc.reads.toLocaleString()}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Writes</div>
+                                                <div className="text-sm text-[#D4882A] font-mono tabular-nums">{acc.writes.toLocaleString()}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Total</div>
+                                                <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{acc.total.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 text-[10px] text-[#9B9689] font-mono">
+                                            Last active: {new Date(acc.lastActive.endsWith('Z') ? acc.lastActive : acc.lastActive + 'Z').toLocaleString(undefined, {
+                                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+                                            })}
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+
+                            {/* Desktop: table layout */}
+                            <div className="hidden sm:block border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
@@ -180,15 +262,20 @@ export default function DevPage() {
                                                 </td>
                                             </tr>
                                         ) : stats.accountOps.map(acc => (
-                                            <tr key={acc.accountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
+                                            <tr
+                                                key={acc.accountId}
+                                                className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors"
+                                            >
                                                 <td className="px-4 py-2.5">
-                                                    {acc.accountName && (
-                                                        <div className="text-sm text-[#E8E4DD]">{acc.accountName}</div>
-                                                    )}
-                                                    {acc.email && (
-                                                        <div className="text-xs text-[#9B9689]">{acc.email}</div>
-                                                    )}
-                                                    <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
+                                                    <Link href={`/dev/${acc.accountId}`} prefetch className="block">
+                                                        {acc.accountName && (
+                                                            <div className="text-sm text-[#E8E4DD]">{acc.accountName}</div>
+                                                        )}
+                                                        {acc.email && (
+                                                            <div className="text-xs text-[#9B9689]">{acc.email}</div>
+                                                        )}
+                                                        <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
+                                                    </Link>
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#9B9689] font-mono tabular-nums">
                                                     {acc.reads.toLocaleString()}

@@ -83,26 +83,26 @@ export default function UsagePage() {
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             {/* Header */}
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-                <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Usage</h1>
-                        <p className="mt-0.5 text-sm text-[#9B9689]">Daily operation usage and rate limits</p>
+                <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                    <div className="min-w-0">
+                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Usage</h1>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">Daily operation usage and rate limits</p>
                     </div>
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => fetchUsage(true)}
                         disabled={refreshing}
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD]"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] shrink-0"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-                        Refresh
+                        <span className="hidden sm:inline">Refresh</span>
                     </Button>
                 </div>
             </header>
 
             {/* Content */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
                 {loading && !data ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-20">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
@@ -124,33 +124,33 @@ export default function UsagePage() {
                         )}
 
                         {/* Usage summary cards */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
-                                <div className="flex items-center gap-2 mb-3">
+                        <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-3 sm:gap-4">
+                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
+                                <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Gauge className="w-4 h-4 text-[#9B9689]" />
                                     <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Used today</span>
                                 </div>
-                                <p className="text-3xl font-semibold tabular-nums" style={{ color }}>
+                                <p className="text-2xl sm:text-3xl font-semibold tabular-nums" style={{ color }}>
                                     {data.used}
                                 </p>
                                 <p className="text-xs text-[#9B9689] mt-1">of {data.limit} operations</p>
                             </div>
-                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
-                                <div className="flex items-center gap-2 mb-3">
+                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
+                                <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Gauge className="w-4 h-4 text-[#9B9689]" />
                                     <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Remaining</span>
                                 </div>
-                                <p className="text-3xl font-semibold text-[#E8E4DD] tabular-nums">
+                                <p className="text-2xl sm:text-3xl font-semibold text-[#E8E4DD] tabular-nums">
                                     {data.remaining}
                                 </p>
                                 <p className="text-xs text-[#9B9689] mt-1">operations left</p>
                             </div>
-                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
-                                <div className="flex items-center gap-2 mb-3">
+                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
+                                <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Clock className="w-4 h-4 text-[#9B9689]" />
                                     <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Resets in</span>
                                 </div>
-                                <p className="text-3xl font-semibold text-[#E8E4DD] tabular-nums">
+                                <p className="text-2xl sm:text-3xl font-semibold text-[#E8E4DD] tabular-nums">
                                     {countdown}
                                 </p>
                                 <p className="text-xs text-[#9B9689] mt-1">at midnight UTC</p>

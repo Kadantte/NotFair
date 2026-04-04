@@ -174,24 +174,25 @@ export default function CampaignsPage() {
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-                <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Campaigns</h1>
-                        <p className="mt-0.5 text-sm text-[#9B9689]">Manage and track your Google Ads performance</p>
+                <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                    <div className="min-w-0">
+                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Campaigns</h1>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">Manage and track your Google Ads performance</p>
                     </div>
                     <Button
                         onClick={() => { cachedCampaigns = null; fetchCampaigns(false, true); }}
                         disabled={loading}
                         variant="outline"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-2"
+                        size="sm"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 shrink-0"
                     >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
                     </Button>
                 </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
                 {error && (
                     <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-lg p-4 mb-6 flex items-center gap-3 text-[#C45D4A]">
                         <AlertCircle className="w-5 h-5 shrink-0" />
@@ -250,7 +251,7 @@ export default function CampaignsPage() {
                                     <Link
                                         href={`/campaigns/${campaign.id}`}
                                         prefetch
-                                        className={`group relative block bg-[#24231F] border border-[#3D3C36] transition-all duration-150 rounded-xl p-5 select-none
+                                        className={`group relative block bg-[#24231F] border border-[#3D3C36] transition-all duration-150 rounded-xl p-4 sm:p-5 select-none
                                             ${actingOnCampaignId
                                                 ? 'opacity-50 pointer-events-none'
                                                 : 'hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 active:scale-[0.995]'
@@ -295,8 +296,8 @@ export default function CampaignsPage() {
                                                 })()}
                                             </div>
 
-                                            <div className="flex items-center gap-6">
-                                                <div className="grid grid-cols-4 gap-8 border-t md:border-t-0 md:border-l border-[#3D3C36] pt-4 md:pt-0 md:pl-8">
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-8 border-t sm:border-t-0 sm:border-l border-[#3D3C36] pt-3 sm:pt-0 sm:pl-8">
                                                     <div>
                                                         <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
                                                             <TrendingUp className="w-3 h-3" />

@@ -57,7 +57,7 @@ export const TOOL_CODE = {
 type ToolCode = (typeof TOOL_CODE)[keyof typeof TOOL_CODE];
 
 /** Reverse lookup: code → tool name */
-const CODE_TO_TOOL: Record<number, string> = Object.fromEntries(
+export const CODE_TO_TOOL: Record<number, string> = Object.fromEntries(
   Object.entries(TOOL_CODE).map(([name, code]) => [code, name]),
 );
 
@@ -67,7 +67,7 @@ export const ENTITY_CODE = {
   unknown: 2,
 } as const;
 
-const CODE_TO_ENTITY: Record<number, string> = Object.fromEntries(
+export const CODE_TO_ENTITY: Record<number, string> = Object.fromEntries(
   Object.entries(ENTITY_CODE).map(([name, code]) => [code, name]),
 );
 
