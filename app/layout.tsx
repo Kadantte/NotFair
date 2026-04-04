@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
+import { PostHogProvider } from "@/components/posthog-provider";
+import { getSession } from "@/lib/session";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,17 +60,29 @@ export const metadata: Metadata = {
   category: "marketing",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+  const bootstrapUser = session.connected && session.userId
+    ? {
+        distinctId: session.userId,
+        properties: {
+          email: session.googleEmail,
+          google_ads_customer_id: session.customerId,
+          google_ads_customer_name: session.customerName,
+        },
+      }
+    : null;
+
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
-        {children}
+        <PostHogProvider bootstrapUser={bootstrapUser}>{children}</PostHogProvider>
       </body>
     </html>
   );

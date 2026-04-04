@@ -38,6 +38,8 @@
     "mcp-handler": "^1.1.0",
     "next": "16.1.6",
     "postgres": "^3.4.8",
+    "posthog-js": "^1.364.7",
+    "posthog-node": "^5.28.11",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",

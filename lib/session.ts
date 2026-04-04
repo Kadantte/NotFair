@@ -9,6 +9,7 @@ import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedA
 export type Session = {
   connected: true;
   token: string;
+  userId: string | null;
   customerId: string;
   customerName: string;
   customerIds: { id: string; name: string }[];
@@ -66,6 +67,7 @@ export async function getSession(): Promise<Session> {
   return {
     connected: true,
     token: result.token,
+    userId: result.row.userId,
     customerId: result.row.customerId,
     customerName: deriveCustomerName(result.row.customerIds),
     customerIds: parseCustomerIds(result.row.customerIds),

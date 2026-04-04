@@ -6,6 +6,7 @@ import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw } 
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
+import { trackEvent } from '@/lib/analytics';
 
 function buildSetupPrompt(token: string): string {
     return `curl -fsSL ${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token} | bash`;
@@ -153,6 +154,10 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
 
     useEffect(() => {
         if (urlToken) {
+            trackEvent('account_connected', {
+                account_count: 1,
+                auth_method: 'google',
+            });
             window.history.replaceState({}, '', '/connect');
             return;
         }
@@ -225,6 +230,10 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
             });
             const data = await res.json();
             if (data.redirectUrl) {
+                trackEvent('account_connected', {
+                    account_count: selected.length,
+                    auth_method: 'google',
+                });
                 window.location.assign(data.redirectUrl);
             } else if (data.error) {
                 router.push(`/connect?error=${encodeURIComponent(data.error)}`);
@@ -375,7 +384,10 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                 ] as const).map(([id, label]) => (
                                     <button
                                         key={id}
-                                        onClick={() => setSetupTab(id)}
+                                        onClick={() => {
+                                            setSetupTab(id);
+                                            trackEvent('setup_tab_selected', { tab: id });
+                                        }}
                                         className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                                             setupTab === id
                                                 ? 'bg-[#3D3C36] text-[#E8E4DD]'
@@ -415,6 +427,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                         onCopy={() => {
                                             navigator.clipboard.writeText(coworkPrompt);
                                             setCopied(true);
+                                            trackEvent('install_command_copied', { setup_tab: 'claude-cowork', step: 'install' });
                                             setTimeout(() => setCopied(false), 2000);
                                         }}
                                     />
@@ -434,6 +447,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                                 onCopy={() => {
                                                     navigator.clipboard.writeText(prompt);
                                                     setCopied(true);
+                                                    trackEvent('install_command_copied', { setup_tab: setupTab, step: 'install' });
                                                     setTimeout(() => setCopied(false), 2000);
                                                 }}
                                             />

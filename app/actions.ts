@@ -7,6 +7,7 @@ import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 import { getUsageInfo, getHourlyUsage } from "@/lib/mcp/rate-limit";
+import { trackServerEvent } from "@/lib/analytics-server";
 
 type CampaignHistoryRow = {
     segments: {
@@ -94,6 +95,12 @@ export async function undoChangeAction(changeId: number) {
 
         await markRolledBack(changeId);
         await logChange(customerId, userId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
+
+        const changeAge = Date.now() - check.change.createdAt.getTime();
+        trackServerEvent(userId, "ai_change_undone", {
+            tool_name: check.change.toolName,
+            minutes_since_change: Math.round(changeAge / 60_000),
+        });
 
         return { success: true, changeId };
     });

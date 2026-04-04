@@ -2,6 +2,7 @@ import { logChange, logRead } from "@/lib/db/tracking";
 import { invalidateCache } from "@/lib/google-ads";
 import type { WriteResult } from "@/lib/google-ads";
 import { enforceRateLimit, recordOperation } from "@/lib/mcp/rate-limit";
+import { trackServerEvent } from "@/lib/analytics-server";
 
 /**
  * Minimal auth needed for tool execution: refresh token, customer ID, and user ID.
@@ -33,6 +34,10 @@ export async function execWrite(
   invalidateCache(accountId);
   const change = await logChange(accountId, auth.userId, campaignId, result, reasoning);
   recordOperation(auth.userId);
+  trackServerEvent(auth.userId, "ai_change_executed", {
+    tool_name: result.action,
+    entity_type: result.action.includes("keyword") || result.action.includes("bid") ? "keyword" : "campaign",
+  });
   return { ...result, changeId: change?.id ?? null };
 }
 
