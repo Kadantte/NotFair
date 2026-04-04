@@ -150,14 +150,3 @@ No properties.
 
 **Files:** `components/connect-page.tsx`
 
----
-
-## Phase 2 Backlog
-
-| Event | Hypothesis |
-|---|---|
-| `dashboard_action_taken` | Do dashboard recommendations drive action? Validates dashboard feature ROI. |
-| `chat_message_sent` | Built-in chat engagement frequency — informs chat vs MCP investment. |
-| `campaign_action_taken` | Do users manage campaigns via UI? Informs direct management UX investment. |
-| `mcp_tool_invoked` | Which MCP read tools are most used? Informs tool development priority. |
-| `campaign_summary_viewed` | AI summary engagement — validates the feature. |
