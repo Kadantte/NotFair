@@ -18,7 +18,7 @@ else
 fi
 
 # Run setup — auto-detect all available hosts
-"$SKILL_DIR/setup" --skill google-ads --api-key "$API_KEY"
+"$SKILL_DIR/setup" --skill ads --api-key "$API_KEY"
 `;
 }
 
