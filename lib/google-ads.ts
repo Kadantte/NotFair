@@ -73,6 +73,8 @@ export type WriteResult = {
   beforeValue: string;
   afterValue: string;
   error?: string;
+  /** Human-readable label for the entity (e.g. keyword text). Stored in operations log. */
+  label?: string | null;
   /** Owning campaign ID — set by operations that resolve it as a side-effect (e.g. ad_group/ad tracking template updates). */
   campaignId?: string | null;
 };
@@ -631,6 +633,23 @@ export async function getSearchTermReport(
   };
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+/** Fetch keyword text by criterion ID. Returns null if not found. */
+async function fetchKeywordText(customer: any, criterionId: string): Promise<string | null> {
+  try {
+    const result = await customer.query(`
+      SELECT ad_group_criterion.keyword.text
+      FROM keyword_view
+      WHERE ad_group_criterion.criterion_id = ${Number(criterionId)}
+      LIMIT 1
+    `);
+    return (result as any[])[0]?.ad_group_criterion?.keyword?.text ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Write Functions ─────────────────────────────────────────────────
 
 export async function pauseKeyword(
@@ -643,14 +662,18 @@ export async function pauseKeyword(
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
-  // Check blast radius: count active keywords in campaign
+  // Check blast radius: count active keywords in campaign + fetch target keyword text
   const countResult = await customer.query(`
-    SELECT ad_group_criterion.criterion_id
+    SELECT ad_group_criterion.criterion_id, ad_group_criterion.keyword.text
     FROM keyword_view
     WHERE campaign.id = ${cid}
       AND ad_group_criterion.status = 'ENABLED'
   `);
   const totalActive = (countResult as any[]).length;
+  const targetRow = (countResult as any[]).find(
+    (r) => String(r.ad_group_criterion?.criterion_id) === String(criterionId),
+  );
+  const keywordText = targetRow?.ad_group_criterion?.keyword?.text ?? null;
 
   // Count how many are already paused this session (tracked externally)
   // For single-action guardrail, we check: can't pause if it would exceed threshold
@@ -661,6 +684,7 @@ export async function pauseKeyword(
       entityId: criterionId,
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
+      label: keywordText,
       error: "Cannot pause the only active keyword in this campaign",
     };
   }
@@ -683,6 +707,7 @@ export async function pauseKeyword(
       entityId: criterionId,
       beforeValue: "ENABLED",
       afterValue: "PAUSED",
+      label: keywordText,
     };
   } catch (error) {
     return {
@@ -703,6 +728,9 @@ export async function enableKeyword(
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
 
+  // Fetch keyword text for logging
+  const keywordText = await fetchKeywordText(customer, criterionId);
+
   try {
     await customer.mutateResources([
       {
@@ -721,6 +749,7 @@ export async function enableKeyword(
       entityId: criterionId,
       beforeValue: "PAUSED",
       afterValue: "ENABLED",
+      label: keywordText,
     };
   } catch (error) {
     return {
@@ -745,17 +774,19 @@ export async function updateBid(
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
-  // Single query: fetch bidding strategy + current bid together
+  // Single query: fetch bidding strategy + current bid + keyword text together
   const preCheckResult = await customer.query(`
     SELECT
       campaign.bidding_strategy_type,
-      ad_group_criterion.cpc_bid_micros
+      ad_group_criterion.cpc_bid_micros,
+      ad_group_criterion.keyword.text
     FROM keyword_view
     WHERE campaign.id = ${cid}
       AND ad_group_criterion.criterion_id = ${Number(criterionId)}
     LIMIT 1
   `);
   const row = (preCheckResult as any[])[0];
+  const keywordText: string | null = row?.ad_group_criterion?.keyword?.text ?? null;
   const strategy = row?.campaign?.bidding_strategy_type;
   const manualStrategies = ["MANUAL_CPC", "ENHANCED_CPC"];
   if (strategy && !manualStrategies.includes(strategy)) {
@@ -765,6 +796,7 @@ export async function updateBid(
       entityId: criterionId,
       beforeValue: "N/A",
       afterValue: String(newBidMicros),
+      label: keywordText,
       error: `Bid changes not supported for ${strategy} strategy. Only MANUAL_CPC and ENHANCED_CPC allow individual bid overrides. Consider adjusting campaign budget instead.`,
     };
   }
@@ -780,6 +812,7 @@ export async function updateBid(
         entityId: criterionId,
         beforeValue: String(currentBidMicros),
         afterValue: String(newBidMicros),
+        label: keywordText,
         error: `Bid change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBidChangePct * 100).toFixed(0)}%. Adjust guardrails via setGoals if needed.`,
       };
     }
@@ -792,6 +825,7 @@ export async function updateBid(
       entityId: criterionId,
       beforeValue: String(currentBidMicros),
       afterValue: String(newBidMicros),
+      label: keywordText,
       error: "Bid must be greater than zero",
     };
   }
@@ -814,6 +848,7 @@ export async function updateBid(
       entityId: criterionId,
       beforeValue: String(currentBidMicros),
       afterValue: String(newBidMicros),
+      label: keywordText,
     };
   } catch (error) {
     return {
@@ -822,6 +857,7 @@ export async function updateBid(
       entityId: criterionId,
       beforeValue: String(currentBidMicros),
       afterValue: String(newBidMicros),
+      label: keywordText,
       error: extractErrorMessage(error),
     };
   }
@@ -1133,6 +1169,9 @@ export async function removeKeyword(
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
 
+  // Fetch keyword text before removal
+  const keywordText = await fetchKeywordText(customer, criterionId);
+
   try {
     await customer.mutateResources([
       {
@@ -1148,6 +1187,7 @@ export async function removeKeyword(
       entityId: criterionId,
       beforeValue: criterionId,
       afterValue: "",
+      label: keywordText,
     };
   } catch (error) {
     return {

@@ -2,6 +2,16 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.6.0] - 2026-04-04
+
+### Changed
+- Keyword operations (pause, enable, update bid, remove) now log the keyword text alongside the criterion ID
+- Operations page shows human-readable keyword names in the Entity column instead of raw IDs
+
+### Added
+- `label` column on `operations` table to store human-readable entity names
+- `fetchKeywordText` helper to look up keyword text by criterion ID from Google Ads API
+
 ## [0.2.5.1] - 2026-04-04
 
 ### Changed

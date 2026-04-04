@@ -12,6 +12,7 @@ type Change = {
     action: string;
     entityType: string;
     entityId: string;
+    label: string | null;
     beforeValue: string;
     afterValue: string;
     reasoning: string | null;
@@ -189,8 +190,12 @@ export default function OperationsPage() {
                                                         {change.entityType}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 pr-4 text-xs text-[#9B9689] font-mono max-w-[120px] truncate" title={change.entityId}>
-                                                    {change.entityId}
+                                                <td className="py-3 pr-4 text-xs max-w-[160px] truncate" title={change.label ? `${change.label} (${change.entityId})` : change.entityId}>
+                                                    {change.label ? (
+                                                        <span className="text-[#E8E4DD]">{change.label}</span>
+                                                    ) : (
+                                                        <span className="text-[#9B9689] font-mono">{change.entityId}</span>
+                                                    )}
                                                 </td>
                                                 <td className="py-3 pr-4 text-sm text-[#9B9689] font-mono tabular-nums">
                                                     {formatValue(change.action, change.beforeValue)}

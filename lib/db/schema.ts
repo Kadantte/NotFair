@@ -48,6 +48,8 @@ export const operations = pgTable("operations", {
   /** Compact entity type — see ENTITY_CODE in tracking.ts */
   entityCode: smallint("entity_code"),
   entityId: text("entity_id"),
+  /** Human-readable label for the entity (e.g. keyword text) */
+  label: text("label"),
   beforeValue: text("before_value"),
   afterValue: text("after_value"),
   reasoning: text("reasoning"),
