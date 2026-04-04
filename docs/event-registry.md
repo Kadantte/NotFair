@@ -93,6 +93,24 @@
 
 ---
 
+## chat_opened_from_connect
+
+**Phase:** 1
+**Category:** activation
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the "Open Chat" button on the connect page.
+**Hypothesis:** We believe tracking this tells us how many users choose built-in chat over MCP setup, which lets us prioritize chat vs MCP investment.
+
+No properties.
+
+```json
+{ "event": "chat_opened_from_connect" }
+```
+
+**Files:** `components/connect-page.tsx`
+
+---
+
 ## page_viewed
 
 **Phase:** 1
