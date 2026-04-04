@@ -17,6 +17,15 @@ export function initPostHog(bootstrapUser?: BootstrapUser) {
     person_profiles: "identified_only",
     capture_pageview: false, // we handle this manually for SPA routes
     capture_pageleave: true,
+    disable_session_recording: false,
+    session_recording: {
+      maskAllInputs: false,
+      maskInputFn: (text, element) => {
+        // Mask password fields
+        if (element?.getAttribute("type") === "password") return "*".repeat(text.length);
+        return text;
+      },
+    },
     bootstrap: bootstrapUser
       ? { distinctID: bootstrapUser.distinctId, isIdentifiedID: true }
       : undefined,
