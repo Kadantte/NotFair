@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -386,6 +386,35 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
     } catch (error) {
         console.error("Get Campaign Keywords Error:", error);
         throw new Error("Failed to fetch campaign keywords.");
+    }
+    });
+}
+
+export async function getCampaignAdsAction(campaignId: string) {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+        const result = await listAds(auth, campaignId);
+        return result.ads.map((ad) => ({
+            adId: ad.adId,
+            status: ad.status,
+            adGroupName: ad.adGroupName,
+            finalUrls: ad.finalUrls,
+            headlines: ad.headlines,
+            descriptions: ad.descriptions,
+            impressions: ad.impressions,
+            clicks: ad.clicks,
+            cost: ad.cost,
+            conversions: ad.conversions,
+        }));
+    } catch (error) {
+        console.error("Get Campaign Ads Error:", error);
+        throw new Error("Failed to fetch campaign ads.");
     }
     });
 }
