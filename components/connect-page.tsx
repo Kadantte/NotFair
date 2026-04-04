@@ -31,9 +31,9 @@ function buildCoworkPrompt(token: string): string {
 }
 
 const UNINSTALL_COMMAND = `# Remove skill files from all clients
-rm -rf ~/.claude/skills/toprank ~/.claude/skills/google-ads
+rm -rf ~/.claude/skills/toprank ~/.claude/skills/ads
 rm -rf ~/.codex/skills/toprank-*
-rm -rf ~/.openclaw/workspace/skills/google-ads
+rm -rf ~/.openclaw/workspace/skills/ads
 rm -rf ~/.adsagent ~/.toprank`;
 
 type SetupTab = 'claude-code' | 'codex' | 'openclaw' | 'claude-cowork' | 'uninstall';
@@ -462,15 +462,15 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                             <p className="text-sm font-medium text-[#E8E4DD]">
                                                 {setupTab === 'claude-code' ? (
                                                     <>
-                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/google-ads</code> inside Claude Code to start managing your Google Ads with your AI.
+                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code> inside Claude Code to start managing your Google Ads with your AI.
                                                     </>
                                                 ) : setupTab === 'codex' ? (
                                                     <>
-                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">$toprank-google-ads</code> inside Codex to start managing your Google Ads with your AI.
+                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">$toprank-ads</code> inside Codex to start managing your Google Ads with your AI.
                                                     </>
                                                 ) : (
                                                     <>
-                                                        Start a new session with <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/new</code> and ask OpenClaw <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">use the google-ads skill to show my campaigns and their performance.</code>
+                                                        Start a new session with <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/new</code> and ask OpenClaw to <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">use the ads skill to show my campaigns and their performance.</code>
                                                     </>
                                                 )}
                                             </p>
