@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
 import { PostHogProvider } from "@/components/posthog-provider";
+import { GadsConversionTracker } from "@/components/gads-conversion-tracker";
 import { getSession } from "@/lib/session";
+
+const GADS_CONVERSION_ID = "AW-18054900065";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -82,7 +86,22 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
-        <PostHogProvider bootstrapUser={bootstrapUser}>{children}</PostHogProvider>
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GADS_CONVERSION_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GADS_CONVERSION_ID}');
+          `}
+        </Script>
+        <PostHogProvider bootstrapUser={bootstrapUser}>
+          <GadsConversionTracker />
+          {children}
+        </PostHogProvider>
       </body>
     </html>
   );

@@ -257,6 +257,15 @@ async function createOrRedirectGoogleAdsSession({
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
+  // Check if this is a first-time user (no prior sessions) for conversion tracking
+  const isFirstSignup = userId
+    ? (await db()
+        .select({ id: schema.mcpSessions.id })
+        .from(schema.mcpSessions)
+        .where(eq(schema.mcpSessions.userId, userId))
+        .limit(1)).length === 0
+    : false;
+
   if (usableAccounts.length === 1) {
     const account = usableAccounts[0];
     const accessToken = randomBytes(32).toString("hex");
@@ -285,6 +294,9 @@ async function createOrRedirectGoogleAdsSession({
 
     const response = NextResponse.redirect(`${origin}${next}`);
     setSessionCookies(response, accessToken, account.name || "Google Ads Account");
+    if (isFirstSignup) {
+      response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
+    }
     return response;
   }
 

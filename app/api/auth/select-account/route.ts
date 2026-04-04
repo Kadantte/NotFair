@@ -124,9 +124,13 @@ export async function POST(request: Request) {
 
   const accountNames = deriveCustomerName(customerIds);
 
+  const isNewSignup = pendingToken && !session.customerId;
   const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}/connect`,
   });
   setSessionCookies(response, session.accessToken, accountNames);
+  if (isNewSignup) {
+    response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
+  }
   return response;
 }
