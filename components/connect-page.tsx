@@ -9,7 +9,7 @@ import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 
 function buildSetupPrompt(token: string): string {
-    return `curl -fsSL ${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token} | bash`;
+    return `curl -fsSL "${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token}" | bash`;
 }
 
 function buildCoworkPrompt(token: string): string {
