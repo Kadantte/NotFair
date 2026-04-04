@@ -3,7 +3,7 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import type { ElementType, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   ChevronDown,
@@ -537,6 +537,15 @@ export default function ChatPage() {
     persistChatThreads(nextThreads, activeThreadId);
   }, [activeThreadId, isHydrated, messages, threads]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change (streaming or new message)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
   const isReady = isHydrated && account.connected;
   const isSending = status === "submitted" || status === "streaming";
   const displayThreads = activeThreadId
@@ -556,7 +565,7 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex min-h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
             <div className="mb-6 inline-flex items-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-1.5 text-sm text-[#4CAF6E] shadow-[0_0_20px_rgba(76,175,110,0.16)]">
