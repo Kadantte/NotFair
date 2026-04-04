@@ -60,5 +60,10 @@ export async function execRead<T>(
   const result = await fn();
   void logRead(accountId, auth.userId, toolName, campaignId);
   recordOperation(auth.userId);
+  trackServerEvent(auth.userId, "ai_read_executed", {
+    tool_name: toolName,
+    account_id: accountId,
+    campaign_id: campaignId ?? null,
+  });
   return result;
 }

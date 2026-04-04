@@ -51,6 +51,28 @@
 
 ---
 
+## ai_read_executed
+
+**Phase:** 1
+**Category:** ambient
+**Platform:** PostHog (server)
+**Trigger:** Fires when an AI read operation completes via MCP or chat agent.
+**Hypothesis:** We believe tracking this tells us which read tools are most used, which lets us prioritize tool development and understand user intent patterns.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `tool_name` | string | `"getCampaignPerformance"` | Which read tool was executed |
+| `account_id` | string | `"1301265570"` | Google Ads account ID |
+| `campaign_id` | string \| null | `"20345678"` | Campaign queried (null if account-level) |
+
+```json
+{ "event": "ai_read_executed", "properties": { "tool_name": "getCampaignPerformance", "account_id": "1301265570", "campaign_id": "20345678" } }
+```
+
+**Files:** `lib/tools/execute.ts`
+
+---
+
 ## ai_change_undone
 
 **Phase:** 1
