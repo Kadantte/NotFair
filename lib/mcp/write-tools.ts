@@ -277,21 +277,33 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       level: z.enum(["account", "campaign", "ad_group", "ad"]),
-      entityId: z
+      campaignId: z
         .string()
         .optional()
-        .describe("Required for campaign, ad_group, and ad levels; omit for account level"),
+        .describe("The campaign ID. Required when level is 'campaign'."),
+      adGroupId: z
+        .string()
+        .optional()
+        .describe("The ad group ID. Required when level is 'ad_group'."),
+      adId: z
+        .string()
+        .optional()
+        .describe("The ad ID. Required when level is 'ad'."),
       trackingTemplate: z
         .string()
         .describe("Tracking URL template (e.g. '{lpurl}?utm_source=google&utm_medium=cpc'). Empty string to remove."),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, level, entityId, trackingTemplate }) => {
+  }, async ({ accountId, level, campaignId, adGroupId, adId, trackingTemplate }) => {
+    const entityId = level === "campaign" ? campaignId
+      : level === "ad_group" ? adGroupId
+      : level === "ad" ? adId
+      : undefined;
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const writeResult = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
-    const campaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
-    const result = await execWrite(auth, targetId, campaignId, async () => writeResult);
+    const resolvedCampaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
+    const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult);
     return jsonResult(result);
   });
 

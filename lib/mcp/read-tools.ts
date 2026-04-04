@@ -174,13 +174,25 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       level: z.enum(["account", "campaign", "ad_group", "ad"]),
-      entityId: z
+      campaignId: z
         .string()
         .optional()
-        .describe("Required for campaign, ad_group, and ad levels; omit for account level"),
+        .describe("The campaign ID. Required when level is 'campaign'."),
+      adGroupId: z
+        .string()
+        .optional()
+        .describe("The ad group ID. Required when level is 'ad_group'."),
+      adId: z
+        .string()
+        .optional()
+        .describe("The ad ID. Required when level is 'ad'."),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, level, entityId }) => {
+  }, async ({ accountId, level, campaignId, adGroupId, adId }) => {
+    const entityId = level === "campaign" ? campaignId
+      : level === "ad_group" ? adGroupId
+      : level === "ad" ? adId
+      : undefined;
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_tracking_template", () => getTrackingTemplate(authForAccount(auth, accountId), level, entityId));
