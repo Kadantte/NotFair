@@ -27,6 +27,7 @@ export async function GET() {
     db()
       .select({
         accountId: schema.operations.accountId,
+        accountName: sql<string | null>`max((SELECT elem->>'name' FROM jsonb_array_elements(CASE WHEN ${schema.mcpSessions.customerIds} IS NOT NULL AND ${schema.mcpSessions.customerIds} != '' AND ${schema.mcpSessions.customerIds} != '[]' THEN ${schema.mcpSessions.customerIds}::jsonb ELSE '[]'::jsonb END) AS elem WHERE elem->>'id' = ${schema.operations.accountId} LIMIT 1))`.as("account_name"),
         email: sql<string | null>`max(${schema.mcpSessions.googleEmail})`.as("email"),
         reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
         writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),

@@ -2,6 +2,15 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.5.1] - 2026-04-04
+
+### Changed
+- Dev dashboard "Operations by Account" now shows the Google Ads account name alongside email and account ID
+- Timestamps in the dev dashboard now display in the viewer's local timezone with timezone indicator
+
+### Fixed
+- Dev dashboard SQL query now handles null or empty `customerIds` without crashing
+
 ## [0.2.5] - 2026-04-04
 
 ### Added

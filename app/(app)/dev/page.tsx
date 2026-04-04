@@ -13,6 +13,7 @@ type DailyUsage = {
 
 type AccountOps = {
     accountId: string;
+    accountName: string | null;
     email: string | null;
     reads: number;
     writes: number;
@@ -181,10 +182,13 @@ export default function DevPage() {
                                         ) : stats.accountOps.map(acc => (
                                             <tr key={acc.accountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
                                                 <td className="px-4 py-2.5">
-                                                    {acc.email && (
-                                                        <div className="text-sm text-[#E8E4DD]">{acc.email}</div>
+                                                    {acc.accountName && (
+                                                        <div className="text-sm text-[#E8E4DD]">{acc.accountName}</div>
                                                     )}
-                                                    <div className="text-xs text-[#9B9689] font-mono tabular-nums">{acc.accountId}</div>
+                                                    {acc.email && (
+                                                        <div className="text-xs text-[#9B9689]">{acc.email}</div>
+                                                    )}
+                                                    <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#9B9689] font-mono tabular-nums">
                                                     {acc.reads.toLocaleString()}
@@ -196,8 +200,8 @@ export default function DevPage() {
                                                     {acc.total.toLocaleString()}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
-                                                    {new Date(acc.lastActive).toLocaleString(undefined, {
-                                                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                                                    {new Date(acc.lastActive.endsWith('Z') ? acc.lastActive : acc.lastActive + 'Z').toLocaleString(undefined, {
+                                                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
                                                     })}
                                                 </td>
                                             </tr>
