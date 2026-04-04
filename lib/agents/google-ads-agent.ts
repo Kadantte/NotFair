@@ -16,6 +16,7 @@ import {
   updateCampaignBudget,
   pauseCampaign,
   enableCampaign,
+  removeCampaign,
   toMicros,
 } from "@/lib/google-ads";
 import { logChange, getChanges, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
@@ -173,6 +174,14 @@ Rules:
         }),
         execute: ({ campaignId }) =>
           execWrite(auth, auth.customerId, campaignId, () => enableCampaign(auth, campaignId)),
+      }),
+      removeCampaign: tool({
+        description: "Permanently remove a campaign. Sets status to REMOVED and cannot be undone. The campaign and all its ad groups, ads, and keywords will stop serving.",
+        inputSchema: z.object({
+          campaignId: z.string(),
+        }),
+        execute: ({ campaignId }) =>
+          execWrite(auth, auth.customerId, campaignId, () => removeCampaign(auth, campaignId)),
       }),
 
       // ─── Change History & Undo ────────────────────────────────

@@ -270,6 +270,25 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(result);
   });
 
+  server.registerTool("removeCampaign", {
+    description: "Permanently remove a campaign. This sets status to REMOVED and cannot be undone. The campaign and all its ad groups, ads, and keywords will stop serving. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  }, async ({ accountId, campaignId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => removeCampaign(authForAccount(auth, accountId), campaignId));
+    return jsonResult(result);
+  });
+
   // ─── Tracking Templates ─────────────────────────────────────────
 
   server.registerTool("setTrackingTemplate", {
@@ -816,6 +835,8 @@ export async function executeUndoForChange(
       return pauseCampaign(auth, entityId);
     case "create_campaign":
       return removeCampaign(auth, entityId);
+    case "remove_campaign":
+      return { success: false, action: "remove_campaign", entityId, beforeValue, afterValue: beforeValue, error: "Campaign removal is permanent in Google Ads and cannot be undone." };
     case "set_tracking_template": {
       const { level, entityId: actualId } = decodeTrackingEntityId(entityId);
       return setTrackingTemplate(auth, level, beforeValue, actualId);

@@ -2,6 +2,13 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.5] - 2026-04-04
+
+### Added
+- `removeCampaign` MCP tool for permanently removing Google Ads campaigns (sets status to REMOVED)
+- `removeCampaign` tool in AI SDK agent for chat-based campaign removal
+- Explicit undo handler for campaign removal with clear "permanent and cannot be undone" message
+
 ## [0.2.4] - 2026-04-03
 
 ### Added
