@@ -9,34 +9,19 @@ import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 
 function buildSetupPrompt(token: string): string {
-    return `curl -fsSL "${process.env.NEXT_PUBLIC_APP_URL}/install?token=${token}" | bash`;
+    return `Set up the toprank Google Ads plugin for Claude Code.
+
+1. Read my Claude Code user settings at ~/.claude/settings.json. If it doesn't exist, create it with an empty JSON object.
+
+2. Merge these entries into the settings (preserve all existing entries, overwrite if keys already exist):
+   - In "extraKnownMarketplaces", set "nowork-studio": { "source": { "source": "github", "repo": "nowork-studio/toprank" } }
+   - In "enabledPlugins", set "toprank@nowork-studio": true
+   - In "env", set "ADSAGENT_API_KEY": "${token}"
+
+3. Write the updated settings file back.
+
+After setup, I'll restart Claude Code and use /ads to manage my Google Ads.`;
 }
-
-function buildCoworkPrompt(token: string): string {
-    const config = JSON.stringify({
-        'google-ads': {
-            command: 'npx',
-            args: [
-                '-y',
-                'mcp-remote',
-                `${process.env.NEXT_PUBLIC_APP_URL}/api/mcp`,
-                '--transport',
-                'http-first',
-                '--header',
-                `Authorization:Bearer ${token}`,
-            ],
-        },
-    }, null, 2);
-    return `Find the claude_desktop_config.json file on my local machine (check ~/Library/Application Support/Claude/ on macOS or %APPDATA%/Claude/ on Windows). Read it, merge the following MCP server into the mcpServers object, and write the file back.\n\n${config}`;
-}
-
-const UNINSTALL_COMMAND = `# Remove skill files from all clients
-rm -rf ~/.claude/skills/toprank ~/.claude/skills/ads
-rm -rf ~/.codex/skills/toprank-*
-rm -rf ~/.openclaw/workspace/skills/ads
-rm -rf ~/.adsagent ~/.toprank`;
-
-type SetupTab = 'claude-code' | 'codex' | 'openclaw' | 'claude-cowork' | 'uninstall';
 
 const emptySession: Session = { connected: false };
 
@@ -116,7 +101,6 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-    const [setupTab, setSetupTab] = useState<SetupTab>('claude-code');
 
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
@@ -187,7 +171,6 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     }, [pendingToken, selectionMode, accounts, preselectedAccountIds]);
 
     const prompt = token ? buildSetupPrompt(token) : '';
-    const coworkPrompt = token ? buildCoworkPrompt(token) : '';
 
     async function beginGoogleSignIn() {
         setError(null);
@@ -270,7 +253,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                 <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
-                        <p className="mt-0.5 text-sm text-[#9B9689]">Connect Google Ads and generate the MCP setup prompt for your AI client.</p>
+                        <p className="mt-0.5 text-sm text-[#9B9689]">Connect Google Ads and get the setup prompt for Claude Code.</p>
                     </div>
                     {token ? (
                         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -359,7 +342,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                         <div className="flex flex-col items-center space-y-6 pt-12 text-center">
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect Google Ads</h2>
                             <p className="max-w-md text-lg text-[#9B9689]">
-                                Sign in with your Google Ads account. You&apos;ll get a prompt to paste into your AI.
+                                Sign in with your Google Ads account. You&apos;ll get a setup prompt to paste into Claude Code.
                             </p>
                             <Button
                                 size="lg"
@@ -372,112 +355,25 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center space-y-8 text-center">
-                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your AI client</h2>
+                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up Claude Code</h2>
+                            <p className="max-w-md text-sm text-[#9B9689]">
+                                Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
+                            </p>
 
-                            {/* Tab switcher */}
-                            <div className="inline-flex flex-wrap justify-center rounded-lg border border-[#3D3C36] bg-[#24231F] p-1">
-                                {([
-                                    ['claude-code', 'Claude Code'],
-                                    ['codex', 'Codex'],
-                                    ['openclaw', 'OpenClaw'],
-                                    ['claude-cowork', 'Claude Cowork'],
-                                    ...(process.env.NODE_ENV === 'development' ? [['uninstall', 'Uninstall'] as const] : []),
-                                ] as const).map(([id, label]) => (
-                                    <button
-                                        key={id}
-                                        onClick={() => {
-                                            setSetupTab(id);
-                                            trackEvent('setup_tab_selected', { tab: id });
-                                        }}
-                                        className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                                            setupTab === id
-                                                ? 'bg-[#3D3C36] text-[#E8E4DD]'
-                                                : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                                        }`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
+                            <SetupCodeBlock
+                                content={prompt}
+                                copied={copied}
+                                onCopy={() => {
+                                    navigator.clipboard.writeText(prompt);
+                                    setCopied(true);
+                                    trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'install' });
+                                    setTimeout(() => setCopied(false), 2000);
+                                }}
+                            />
 
-                            {setupTab === 'uninstall' ? (
-                                <>
-                                    <p className="max-w-md text-sm text-[#9B9689]">
-                                        Run this in your terminal to remove AdsAgent from all clients.
-                                    </p>
-
-                                    <SetupCodeBlock
-                                        content={UNINSTALL_COMMAND}
-                                        copied={copied}
-                                        onCopy={() => {
-                                            navigator.clipboard.writeText(UNINSTALL_COMMAND);
-                                            setCopied(true);
-                                            setTimeout(() => setCopied(false), 2000);
-                                        }}
-                                    />
-                                </>
-                            ) : setupTab === 'claude-cowork' ? (
-                                <>
-                                    <p className="max-w-md text-sm text-[#9B9689]">
-                                        Paste this into Claude Cowork. It will install the MCP server for you.
-                                    </p>
-
-                                    <SetupCodeBlock
-                                        content={coworkPrompt}
-                                        copied={copied}
-                                        onCopy={() => {
-                                            navigator.clipboard.writeText(coworkPrompt);
-                                            setCopied(true);
-                                            trackEvent('install_command_copied', { setup_tab: 'claude-cowork', step: 'install' });
-                                            setTimeout(() => setCopied(false), 2000);
-                                        }}
-                                    />
-                                </>
-                            ) : (
-                                <div className="w-full space-y-6 text-left">
-                                    {/* Step 1 */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E] text-sm font-semibold text-[#1A1917]">1</span>
-                                            <p className="text-sm font-medium text-[#E8E4DD]">Run install command in your terminal</p>
-                                        </div>
-                                        <div className="ml-10">
-                                            <SetupCodeBlock
-                                                content={prompt}
-                                                copied={copied}
-                                                onCopy={() => {
-                                                    navigator.clipboard.writeText(prompt);
-                                                    setCopied(true);
-                                                    trackEvent('install_command_copied', { setup_tab: setupTab, step: 'install' });
-                                                    setTimeout(() => setCopied(false), 2000);
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Step 2 */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E] text-sm font-semibold text-[#1A1917]">2</span>
-                                            <p className="text-sm font-medium text-[#E8E4DD]">
-                                                {setupTab === 'claude-code' ? (
-                                                    <>
-                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code> inside Claude Code to start managing your Google Ads with your AI.
-                                                    </>
-                                                ) : setupTab === 'codex' ? (
-                                                    <>
-                                                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">$toprank-ads</code> inside Codex to start managing your Google Ads with your AI.
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        Start a new session with <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/new</code> and ask OpenClaw to <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">use the ads skill to show my campaigns and their performance.</code>
-                                                    </>
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            <p className="max-w-md text-sm text-[#9B9689]">
+                                After setup, restart Claude Code and run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code> to start managing your Google Ads.
+                            </p>
 
                             <div className="flex w-full items-center gap-4">
                                 <div className="h-px flex-1 bg-[#3D3C36]" />

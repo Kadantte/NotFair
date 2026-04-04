@@ -159,8 +159,8 @@ No properties.
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks a setup method tab (Claude Code, Codex, OpenClaw, Claude Cowork) on the connect page.
-**Hypothesis:** We believe tracking this tells us AI client preference distribution, which lets us prioritize integration investment.
+**Trigger:** Deprecated — the connect page now only supports Claude Code setup. Previously tracked tab selection across multiple AI clients.
+**Hypothesis:** No longer applicable since setup is Claude Code only.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
