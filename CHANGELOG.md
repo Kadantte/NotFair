@@ -2,6 +2,13 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.4] - 2026-04-03
+
+### Added
+- YouTube demo video embedded on landing page showing how to use AdsAgent MCP in Claude
+- Privacy-enhanced embed (`youtube-nocookie.com`) to avoid tracking cookies before consent
+- Tightened iframe permissions to minimum required for video playback
+
 ## [0.2.3] - 2026-04-03
 
 ### Added

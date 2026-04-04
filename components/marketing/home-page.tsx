@@ -145,6 +145,32 @@ export function HomePage() {
         <div className="container mx-auto max-w-5xl">
           <div className="mb-10 max-w-2xl">
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              See it in action
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              How to use AdsAgent MCP in Claude
+            </h2>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-[#3D3C36]">
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+              <iframe
+                className="absolute inset-0 h-full w-full"
+                src="https://www.youtube-nocookie.com/embed/_QM01o0N-TY"
+                title="How to use AdsAgent MCP in Claude"
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="encrypted-media; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 pb-20">
+        <div className="container mx-auto max-w-5xl">
+          <div className="mb-10 max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
               What AdsAgent helps with
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
