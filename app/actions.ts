@@ -57,6 +57,70 @@ function normalizeCampaignStatus(status: string | number | null | undefined): st
     }
 }
 
+function normalizeChannelType(type: string | number | null | undefined): string {
+    const value = String(type ?? "UNKNOWN").toUpperCase();
+
+    switch (value) {
+        case "2":
+            return "SEARCH";
+        case "3":
+            return "DISPLAY";
+        case "6":
+            return "SHOPPING";
+        case "7":
+            return "VIDEO";
+        case "8":
+            return "MULTI_CHANNEL";
+        case "9":
+            return "LOCAL";
+        case "10":
+            return "SMART";
+        case "11":
+            return "PERFORMANCE_MAX";
+        case "12":
+            return "LOCAL_SERVICES";
+        case "13":
+            return "DISCOVERY";
+        case "14":
+            return "TRAVEL";
+        case "15":
+            return "DEMAND_GEN";
+        default:
+            return value;
+    }
+}
+
+function normalizeBiddingStrategy(strategy: string | number | null | undefined): string {
+    const value = String(strategy ?? "UNKNOWN").toUpperCase();
+
+    switch (value) {
+        case "2":
+            return "MANUAL_CPC";
+        case "3":
+            return "MANUAL_CPV";
+        case "4":
+            return "MANUAL_CPM";
+        case "5":
+            return "MAXIMIZE_CONVERSIONS";
+        case "6":
+            return "MAXIMIZE_CONVERSION_VALUE";
+        case "7":
+            return "TARGET_CPA";
+        case "8":
+            return "TARGET_IMPRESSION_SHARE";
+        case "9":
+            return "TARGET_ROAS";
+        case "10":
+            return "TARGET_SPEND";
+        case "11":
+            return "ENHANCED_CPC";
+        case "12":
+            return "TARGET_CPM";
+        default:
+            return value;
+    }
+}
+
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     return fn().catch((err) => {
         if (err instanceof Error && err.message === "Not authenticated") {
@@ -114,10 +178,14 @@ function mapCampaigns(response: Awaited<ReturnType<typeof listCampaigns>>) {
         id: campaign.id,
         name: campaign.name || 'Untitled Campaign',
         status: normalizeCampaignStatus(campaign.status),
-        type: campaign.channelType || 'UNKNOWN',
+        type: normalizeChannelType(campaign.channelType),
         impressions: campaign.impressions || 0,
         clicks: campaign.clicks || 0,
-        cost: campaign.cost || 0
+        cost: campaign.cost || 0,
+        conversions: campaign.conversions || 0,
+        biddingStrategy: normalizeBiddingStrategy(campaign.biddingStrategy),
+        networkDisplayEnabled: campaign.networkDisplayEnabled ?? false,
+        trackingTemplate: campaign.trackingTemplate ?? null,
     }));
 }
 

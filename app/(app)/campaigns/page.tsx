@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Play, Trash2 } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Play, Trash2, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { listCampaignsAction, pauseCampaignAction, enableCampaignAction, removeCampaignAction } from '@/app/actions';
@@ -16,6 +16,48 @@ interface Campaign {
     impressions: number;
     clicks: number;
     cost: number;
+    conversions: number;
+    biddingStrategy: string;
+    networkDisplayEnabled: boolean;
+    trackingTemplate: string | null;
+}
+
+type HealthWarning = {
+    key: string;
+    severity: 'danger' | 'warning';
+    message: string;
+};
+
+function getCampaignWarnings(campaign: Campaign): HealthWarning[] {
+    const warnings: HealthWarning[] = [];
+
+    if (campaign.status !== 'ENABLED') return warnings;
+
+    if (campaign.type === 'SEARCH' && campaign.networkDisplayEnabled) {
+        warnings.push({
+            key: 'display-on-search',
+            severity: 'warning',
+            message: 'Display Network enabled on Search campaign',
+        });
+    }
+
+    if (!campaign.trackingTemplate) {
+        warnings.push({
+            key: 'no-tracking-template',
+            severity: 'warning',
+            message: 'No tracking template',
+        });
+    }
+
+    if (campaign.biddingStrategy === 'MAXIMIZE_CONVERSIONS' && campaign.conversions === 0) {
+        warnings.push({
+            key: 'max-conv-no-history',
+            severity: 'warning',
+            message: 'Maximize Conversions with no conversion data',
+        });
+    }
+
+    return warnings;
 }
 
 const statusColors = {
@@ -225,11 +267,36 @@ export default function CampaignsPage() {
                                                 <h3 className="text-[15px] font-medium text-[#E8E4DD] truncate pr-4 group-hover:text-white transition-colors">
                                                     {campaign.name}
                                                 </h3>
-                                                <p className="text-xs text-[#9B9689] mt-1 capitalize">{String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</p>
+                                                <p className="text-xs text-[#9B9689] mt-1">
+                                                    <span className="capitalize"><span className="text-[#9B9689]/60">Ads Type</span> {String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</span>
+                                                    <span className="mx-1.5 text-[#3D3C36]">|</span>
+                                                    <span className="capitalize"><span className="text-[#9B9689]/60">Bidding Strategy</span> {String(campaign.biddingStrategy || '').replace(/_/g, ' ').toLowerCase()}</span>
+                                                </p>
+                                                {(() => {
+                                                    const warnings = getCampaignWarnings(campaign);
+                                                    if (warnings.length === 0) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                                            {warnings.map(w => (
+                                                                <span
+                                                                    key={w.key}
+                                                                    className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                                                        w.severity === 'danger'
+                                                                            ? 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20'
+                                                                            : 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20'
+                                                                    }`}
+                                                                >
+                                                                    <AlertCircle className="w-2.5 h-2.5" />
+                                                                    {w.message}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
 
                                             <div className="flex items-center gap-6">
-                                                <div className="grid grid-cols-3 gap-8 border-t md:border-t-0 md:border-l border-[#3D3C36] pt-4 md:pt-0 md:pl-8">
+                                                <div className="grid grid-cols-4 gap-8 border-t md:border-t-0 md:border-l border-[#3D3C36] pt-4 md:pt-0 md:pl-8">
                                                     <div>
                                                         <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
                                                             <TrendingUp className="w-3 h-3" />
@@ -250,6 +317,13 @@ export default function CampaignsPage() {
                                                             Cost
                                                         </div>
                                                         <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                            <Target className="w-3 h-3" />
+                                                            Conversions
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.conversions || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">

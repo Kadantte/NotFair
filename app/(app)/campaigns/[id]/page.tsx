@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState, use } from 'react';
 import { motion } from 'framer-motion';
-import { History, Search, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { History, Search, AlertCircle, Sparkles, Loader2, TrendingUp, MousePointer2, DollarSign, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCampaignHistoryAction, getCampaignKeywordsAction, generateCampaignSummaryAction } from '@/app/actions';
+import { getCampaignHistoryAction, getCampaignKeywordsAction, generateCampaignSummaryAction, listCampaignsAction } from '@/app/actions';
 import {
     XAxis,
     YAxis,
@@ -36,6 +36,47 @@ interface CampaignKeyword {
     cost: number;
     averageCpc: number;
 }
+
+interface CampaignInfo {
+    name: string;
+    status: string;
+    type: string;
+    impressions: number;
+    clicks: number;
+    cost: number;
+    conversions: number;
+    biddingStrategy: string;
+    networkDisplayEnabled: boolean;
+    trackingTemplate: string | null;
+}
+
+type HealthWarning = {
+    severity: 'danger' | 'warning';
+    message: string;
+};
+
+function getCampaignWarnings(campaign: CampaignInfo): HealthWarning[] {
+    const warnings: HealthWarning[] = [];
+    if (campaign.status !== 'ENABLED') return warnings;
+
+    if (campaign.type === 'SEARCH' && campaign.networkDisplayEnabled) {
+        warnings.push({ severity: 'warning', message: 'Display Network enabled on Search campaign' });
+    }
+    if (!campaign.trackingTemplate) {
+        warnings.push({ severity: 'warning', message: 'No tracking template configured' });
+    }
+    if (campaign.biddingStrategy === 'MAXIMIZE_CONVERSIONS' && campaign.conversions === 0) {
+        warnings.push({ severity: 'warning', message: 'Maximize Conversions with no conversion data' });
+    }
+    return warnings;
+}
+
+const statusColors: Record<string, string> = {
+    ENABLED: 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20',
+    PAUSED: 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20',
+    REMOVED: 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20',
+    UNKNOWN: 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20',
+};
 
 type TimeRange = 'ALL' | '5Y' | '1Y' | '6M' | '3M' | '1M' | '1W' | 'YESTERDAY' | 'TODAY';
 
@@ -95,6 +136,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [history, setHistory] = useState<CampaignHistory[]>([]);
     const [keywords, setKeywords] = useState<CampaignKeyword[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [campaignInfo, setCampaignInfo] = useState<CampaignInfo | null>(null);
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -105,12 +147,15 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         const { startDate, endDate } = getDateRange(timeRange);
 
         try {
-            const [historyData, keywordsData] = await Promise.all([
+            const [historyData, keywordsData, campaignsData] = await Promise.all([
                 getCampaignHistoryAction(campaignId, startDate, endDate),
-                getCampaignKeywordsAction(campaignId, startDate, endDate)
+                getCampaignKeywordsAction(campaignId, startDate, endDate),
+                listCampaignsAction(),
             ]);
             setHistory(historyData);
             setKeywords(keywordsData);
+            const match = campaignsData.find(c => c.id === campaignId);
+            if (match) setCampaignInfo(match);
         } catch (err) {
             console.error(err);
             setError('Failed to fetch campaign details. Please try again.');
@@ -170,8 +215,54 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
                 <div className="flex flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Campaign Details</h1>
-                        <p className="mt-0.5 text-sm text-[#9B9689]">Campaign ID: {campaignId}</p>
+                        <div className="flex items-center gap-2.5 mb-1">
+                            {campaignInfo && (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-wide uppercase ${statusColors[campaignInfo.status] || statusColors.UNKNOWN}`}>
+                                    {campaignInfo.status}
+                                </span>
+                            )}
+                            <span className="text-xs text-[#9B9689] font-mono">ID: {campaignId}</span>
+                        </div>
+                        <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">
+                            {campaignInfo?.name || 'Campaign Details'}
+                        </h1>
+                        {campaignInfo && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                    <span className="text-[#9B9689]">Ads Type</span>
+                                    <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.type.replace(/_/g, ' ').toLowerCase()}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                    <span className="text-[#9B9689]">Bidding Strategy</span>
+                                    <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.biddingStrategy.replace(/_/g, ' ').toLowerCase()}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                    <span className="text-[#9B9689]">UTM</span>
+                                    <span className="text-[#E8E4DD] font-medium font-mono">{campaignInfo.trackingTemplate || 'Not set'}</span>
+                                </div>
+                            </div>
+                        )}
+                        {campaignInfo && (() => {
+                            const warnings = getCampaignWarnings(campaignInfo);
+                            if (warnings.length === 0) return null;
+                            return (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {warnings.map((w, i) => (
+                                        <span
+                                            key={i}
+                                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                                w.severity === 'danger'
+                                                    ? 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20'
+                                                    : 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20'
+                                            }`}
+                                        >
+                                            <AlertCircle className="w-2.5 h-2.5" />
+                                            {w.message}
+                                        </span>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1 bg-[#1A1917] p-1 rounded-lg border border-[#3D3C36]">
@@ -209,6 +300,44 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                     </div>
                 ) : (
                     <div className="space-y-6">
+                        {/* Campaign Metrics Overview */}
+                        {campaignInfo && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 16 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                            >
+                                <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
+                                    <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        Impressions
+                                    </div>
+                                    <p className="text-xl font-semibold text-[#E8E4DD] tabular-nums">{campaignInfo.impressions.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
+                                    <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
+                                        <MousePointer2 className="w-3.5 h-3.5" />
+                                        Clicks
+                                    </div>
+                                    <p className="text-xl font-semibold text-[#E8E4DD] tabular-nums">{campaignInfo.clicks.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
+                                    <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
+                                        <DollarSign className="w-3.5 h-3.5" />
+                                        Cost
+                                    </div>
+                                    <p className="text-xl font-semibold text-[#E8E4DD] tabular-nums">${campaignInfo.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
+                                    <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
+                                        <Target className="w-3.5 h-3.5" />
+                                        Conversions
+                                    </div>
+                                    <p className="text-xl font-semibold text-[#E8E4DD] tabular-nums">{campaignInfo.conversions.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                                </div>
+                            </motion.div>
+                        )}
+
                         {/* AI Summary */}
                         <motion.div
                             initial={{ opacity: 0, y: 16 }}
