@@ -19,11 +19,13 @@ function buildSetupPrompt(token: string): string {
   }
 }
 
-2. Install the toprank plugin (run this in Claude Code):
+2. Run these commands in Claude Code:
 
 /plugin marketplace add nowork-studio/toprank
+/plugin install toprank@nowork-studio
+/reload-plugins
 
-3. Restart Claude Code. Then use /ads to manage your Google Ads.`;
+3. Use /ads to manage your Google Ads.`;
 }
 
 const emptySession: Session = { connected: false };
