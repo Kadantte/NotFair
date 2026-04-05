@@ -3,6 +3,7 @@ import {
   text,
   smallint,
   integer,
+  boolean,
   doublePrecision,
   serial,
   uniqueIndex,
@@ -85,6 +86,30 @@ export const performanceSnapshots = pgTable(
     ),
   ],
 );
+
+// ─── OAuth Clients (per-user credentials for Claude Connector) ──────
+
+export const oauthClients = pgTable("oauth_clients", {
+  id: serial("id").primaryKey(),
+  clientId: text("client_id").notNull().unique(),
+  clientSecretHash: text("client_secret_hash").notNull(),
+  sessionId: integer("session_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── OAuth Authorization Codes (for Claude Connector flow) ──────────
+
+export const authorizationCodes = pgTable("authorization_codes", {
+  code: text("code").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  clientId: text("client_id").notNull(),
+  codeChallenge: text("code_challenge"),
+  codeChallengeMethod: text("code_challenge_method"),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // ─── MCP Auth Sessions ───────────────────────────────────────────────
 
