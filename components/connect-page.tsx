@@ -9,18 +9,21 @@ import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 
 function buildSetupPrompt(token: string): string {
-    return `Set up the toprank Google Ads plugin for Claude Code.
+    return `Set up AdsAgent for Claude Code:
 
-1. Read my Claude Code user settings at ~/.claude/settings.json. If it doesn't exist, create it with an empty JSON object.
+1. Add your API key to ~/.claude/settings.json:
 
-2. Merge these entries into the settings (preserve all existing entries, overwrite if keys already exist):
-   - In "extraKnownMarketplaces", set "nowork-studio": { "source": { "source": "github", "repo": "nowork-studio/toprank" } }
-   - In "enabledPlugins", set "toprank@nowork-studio": true
-   - In "env", set "ADSAGENT_API_KEY": "${token}"
+{
+  "env": {
+    "ADSAGENT_API_KEY": "${token}"
+  }
+}
 
-3. Write the updated settings file back.
+2. Install the toprank plugin (run this in Claude Code):
 
-After setup, I'll restart Claude Code and use /ads to manage my Google Ads.`;
+/plugin marketplace add nowork-studio/toprank
+
+3. Restart Claude Code. Then use /ads to manage your Google Ads.`;
 }
 
 const emptySession: Session = { connected: false };
