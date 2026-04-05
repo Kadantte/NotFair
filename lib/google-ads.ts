@@ -2929,9 +2929,11 @@ export async function getCampaignSettings(
   const ns = c.network_settings ?? {};
 
   // Split combined criteria by type
-  const locationRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "LOCATION");
-  const proximityRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "PROXIMITY");
-  const scheduleRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === "AD_SCHEDULE");
+  // google-ads-api returns enum fields as numeric values, not strings
+  const CRITERION_TYPE = { LOCATION: 7, AD_SCHEDULE: 9, PROXIMITY: 17 } as const;
+  const locationRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === CRITERION_TYPE.LOCATION);
+  const proximityRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === CRITERION_TYPE.PROXIMITY);
+  const scheduleRows = (criteriaResult as any[]).filter((r) => r.campaign_criterion?.type === CRITERION_TYPE.AD_SCHEDULE);
 
   const locations = locationRows.map((row) => {
     const cc = row.campaign_criterion ?? {};
