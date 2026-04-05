@@ -217,19 +217,8 @@ function ClaudeConnectorSection() {
                 </div>
                 <div className="ml-8 space-y-3">
                     <p className="text-sm text-[#9B9689]">Fill in the connector form:</p>
-                    <ul className="space-y-1.5 text-sm text-[#9B9689]">
-                        <li className="flex gap-2">
-                            <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
-                            <span className="flex items-center gap-2"><strong className="text-[#E8E4DD]">Name:</strong> AdsAgent <CopyButton text="AdsAgent" /></span>
-                        </li>
-                        <li className="flex gap-2">
-                            <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
-                            <span><strong className="text-[#E8E4DD]">Remote MCP Server URL:</strong></span>
-                        </li>
-                    </ul>
-                    <div className="ml-4">
-                        <CredentialField label="" value={serverUrl} />
-                    </div>
+                    <CredentialField label="Name" value="AdsAgent" />
+                    <CredentialField label="Remote MCP Server URL" value={serverUrl} />
 
                     <p className="text-sm text-[#9B9689]">
                         Expand <strong className="text-[#E8E4DD]">Advanced Settings</strong> and enter:
