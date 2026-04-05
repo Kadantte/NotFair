@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw, Key, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw, Key, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
@@ -94,7 +94,7 @@ function CredentialField({ label, value, mono }: { label: string; value: string;
     const [copied, setCopied] = useState(false);
     return (
         <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-widest text-[#9B9689]">{label}</label>
+            {label && <label className="text-[11px] font-semibold uppercase tracking-widest text-[#9B9689]">{label}</label>}
             <div className="flex items-center gap-2">
                 <div className={`min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 text-sm text-[#E8E4DD] ${mono ? 'font-mono' : ''}`}>
                     {value}
@@ -117,8 +117,25 @@ function CredentialField({ label, value, mono }: { label: string; value: string;
 function ClaudeConnectorSection() {
     const [credentials, setCredentials] = useState<OAuthCredentials | null>(null);
     const [generating, setGenerating] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [showSecret, setShowSecret] = useState(false);
+
+    // Check for existing credentials on mount
+    useEffect(() => {
+        fetch('/api/oauth/clients', { credentials: 'include' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.exists) {
+                    setCredentials({
+                        client_id: data.client_id,
+                        client_secret: data.client_secret,
+                        mcp_server_url: data.mcp_server_url,
+                    });
+                }
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, []);
 
     const generateCredentials = useCallback(async () => {
         setGenerating(true);
@@ -134,7 +151,6 @@ function ClaudeConnectorSection() {
                 return;
             }
             setCredentials(data);
-            setShowSecret(true);
             trackEvent('oauth_credentials_generated');
         } catch {
             setError('Failed to generate credentials');
@@ -143,85 +159,138 @@ function ClaudeConnectorSection() {
         }
     }, []);
 
-    return (
-        <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
-            <div className="mb-1 flex items-center gap-2">
-                <Key className="h-4 w-4 text-[#9B9689]" />
-                <p className="text-sm font-medium text-[#E8E4DD]">Use with Claude Connector</p>
-            </div>
-            <p className="mb-4 text-sm text-[#9B9689]">
-                Generate OAuth credentials to connect AdsAgent as a custom MCP server in Claude.
-            </p>
+    const serverUrl = credentials?.mcp_server_url ?? 'https://adsagent.org/api/mcp';
 
+    return (
+        <div className="w-full space-y-6 text-left">
             {error && (
-                <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-3">
+                <div className="flex items-start gap-2 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-3">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#C45D4A]" />
                     <p className="text-sm text-[#C45D4A]">{error}</p>
                 </div>
             )}
 
-            {!credentials ? (
-                <Button
-                    onClick={generateCredentials}
-                    disabled={generating}
-                    className="h-10 rounded-lg bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C] disabled:opacity-50"
-                >
-                    {generating ? (
-                        <>
-                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                            Generating...
-                        </>
-                    ) : (
-                        'Generate Credentials'
-                    )}
-                </Button>
-            ) : (
-                <div className="space-y-3">
-                    <CredentialField label="Server URL" value={credentials.mcp_server_url} />
-                    <CredentialField label="Client ID" value={credentials.client_id} mono />
-                    <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold uppercase tracking-widest text-[#9B9689]">Client Secret</label>
-                        <div className="flex items-center gap-2">
-                            <div className="min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]">
-                                {showSecret ? credentials.client_secret : '••••••••••••••••••••••••••••••••'}
-                            </div>
-                            <button
-                                onClick={() => setShowSecret(s => !s)}
-                                className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+            {/* Step 1 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">1</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Open Claude Connectors</p>
+                </div>
+                <div className="ml-8">
+                    <p className="text-sm text-[#9B9689]">
+                        Go to{' '}
+                        <a
+                            href="https://claude.ai/customize/connectors"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
+                        >
+                            claude.ai/customize/connectors
+                        </a>{' '}
+                        and click the <strong className="text-[#E8E4DD]">+</strong> icon to add a custom connector.
+                    </p>
+                </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">2</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Configure the connector</p>
+                </div>
+                <div className="ml-8 space-y-3">
+                    <p className="text-sm text-[#9B9689]">Fill in the connector form:</p>
+                    <ul className="space-y-1.5 text-sm text-[#9B9689]">
+                        <li className="flex gap-2">
+                            <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
+                            <span><strong className="text-[#E8E4DD]">Name:</strong> AdsAgent (or any name you prefer)</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
+                            <span><strong className="text-[#E8E4DD]">Remote MCP Server URL:</strong></span>
+                        </li>
+                    </ul>
+                    <div className="ml-4">
+                        <CredentialField label="" value={serverUrl} />
+                    </div>
+
+                    <p className="text-sm text-[#9B9689]">
+                        Expand <strong className="text-[#E8E4DD]">Advanced Settings</strong> and enter:
+                    </p>
+
+                    {loading ? (
+                        <div className="flex items-center gap-2 py-2">
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
+                            <span className="text-sm text-[#9B9689]">Loading credentials...</span>
+                        </div>
+                    ) : !credentials ? (
+                        <div className="space-y-3">
+                            <p className="text-sm text-[#9B9689]">Generate credentials to get your Client ID and Client Secret.</p>
+                            <Button
+                                onClick={generateCredentials}
+                                disabled={generating}
+                                className="h-10 rounded-lg bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C] disabled:opacity-50"
                             >
-                                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
+                                {generating ? (
+                                    <>
+                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    'Generate Credentials'
+                                )}
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <ul className="space-y-1.5 text-sm text-[#9B9689]">
+                                <li className="flex gap-2">
+                                    <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
+                                    <span><strong className="text-[#E8E4DD]">Client ID:</strong></span>
+                                </li>
+                            </ul>
+                            <div className="ml-4">
+                                <CredentialField label="" value={credentials.client_id} mono />
+                            </div>
+
+                            <ul className="space-y-1.5 text-sm text-[#9B9689]">
+                                <li className="flex gap-2">
+                                    <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
+                                    <span><strong className="text-[#E8E4DD]">Client Secret:</strong></span>
+                                </li>
+                            </ul>
+
+                            <div className="ml-4">
+                                <CredentialField label="" value={credentials.client_secret} mono />
+                            </div>
+
                             <button
                                 onClick={() => {
-                                    navigator.clipboard.writeText(credentials.client_secret);
+                                    setCredentials(null);
+                                    generateCredentials();
                                 }}
-                                className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                                className="flex items-center gap-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
                             >
-                                <Copy className="h-4 w-4" />
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                Regenerate credentials
                             </button>
                         </div>
-                    </div>
-
-                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#D4882A]/30 bg-[#D4882A]/10 p-3">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#D4882A]" />
-                        <p className="text-xs text-[#D4882A]">
-                            Copy your client secret now — it won&apos;t be shown again. If you lose it, generate new credentials.
-                        </p>
-                    </div>
-
-                    <button
-                        onClick={() => {
-                            setCredentials(null);
-                            setShowSecret(false);
-                            generateCredentials();
-                        }}
-                        className="mt-2 flex items-center gap-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
-                    >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Regenerate credentials
-                    </button>
+                    )}
                 </div>
-            )}
+            </div>
+
+            {/* Step 3 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">3</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Save and start using</p>
+                </div>
+                <div className="ml-8">
+                    <p className="text-sm text-[#9B9689]">
+                        Click <strong className="text-[#E8E4DD]">Save</strong>. Claude will now have access to your Google Ads tools through AdsAgent.
+                    </p>
+                </div>
+            </div>
         </div>
     );
 }

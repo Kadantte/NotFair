@@ -92,6 +92,7 @@ export const performanceSnapshots = pgTable(
 export const oauthClients = pgTable("oauth_clients", {
   id: serial("id").primaryKey(),
   clientId: text("client_id").notNull().unique(),
+  clientSecret: text("client_secret").notNull(),
   clientSecretHash: text("client_secret_hash").notNull(),
   sessionId: integer("session_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
