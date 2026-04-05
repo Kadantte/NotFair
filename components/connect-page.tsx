@@ -155,7 +155,7 @@ function ClaudeConnectorSection() {
                     });
                 }
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false));
     }, []);
 
@@ -350,21 +350,19 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat }: {
             <div className="flex w-full max-w-md rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
                 <button
                     onClick={() => setActiveTab('claude-code')}
-                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                        activeTab === 'claude-code'
+                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${activeTab === 'claude-code'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
                             : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                    }`}
+                        }`}
                 >
                     Claude Code
                 </button>
                 <button
                     onClick={() => setActiveTab('connector')}
-                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                        activeTab === 'connector'
+                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${activeTab === 'connector'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
                             : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                    }`}
+                        }`}
                 >
                     Claude Connector
                 </button>
@@ -635,15 +633,13 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                             key={account.id}
                                             onClick={() => toggleAccount(account.id)}
                                             disabled={selecting}
-                                            className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${
-                                                isSelected
+                                            className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${isSelected
                                                     ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
                                                     : 'border-[#3D3C36] bg-[#24231F] hover:border-[#9B9689]/40 hover:bg-[#2E2D28]'
-                                            }`}
+                                                }`}
                                         >
-                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                                                isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#9B9689]/40'
-                                            }`}>
+                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#9B9689]/40'
+                                                }`}>
                                                 {isSelected && <Check className="h-3 w-3 text-[#1A1917]" />}
                                             </div>
                                             <div>
