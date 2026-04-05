@@ -84,6 +84,22 @@ function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: 
     );
 }
 
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+    return (
+        <button
+            onClick={() => {
+                navigator.clipboard.writeText(text);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            }}
+            className="inline-flex shrink-0 rounded border border-[#3D3C36] bg-[#24231F] p-1 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+        >
+            {copied ? <Check className="h-3 w-3 text-[#4CAF6E]" /> : <Copy className="h-3 w-3" />}
+        </button>
+    );
+}
+
 type OAuthCredentials = {
     client_id: string;
     client_secret: string;
@@ -119,6 +135,7 @@ function ClaudeConnectorSection() {
     const [generating, setGenerating] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
     // Check for existing credentials on mount
     useEffect(() => {
@@ -203,7 +220,7 @@ function ClaudeConnectorSection() {
                     <ul className="space-y-1.5 text-sm text-[#9B9689]">
                         <li className="flex gap-2">
                             <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
-                            <span><strong className="text-[#E8E4DD]">Name:</strong> AdsAgent (or any name you prefer)</span>
+                            <span className="flex items-center gap-2"><strong className="text-[#E8E4DD]">Name:</strong> AdsAgent <CopyButton text="AdsAgent" /></span>
                         </li>
                         <li className="flex gap-2">
                             <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
@@ -265,15 +282,42 @@ function ClaudeConnectorSection() {
                             </div>
 
                             <button
-                                onClick={() => {
-                                    setCredentials(null);
-                                    generateCredentials();
-                                }}
+                                onClick={() => setShowRegenConfirm(true)}
                                 className="flex items-center gap-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
                             >
                                 <RefreshCw className="h-3.5 w-3.5" />
                                 Regenerate credentials
                             </button>
+
+                            {showRegenConfirm && (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowRegenConfirm(false)}>
+                                    <div className="mx-4 w-full max-w-md rounded-lg border border-[#3D3C36] bg-[#24231F] p-6" onClick={e => e.stopPropagation()}>
+                                        <h3 className="text-lg font-semibold text-[#E8E4DD]">Regenerate credentials?</h3>
+                                        <p className="mt-3 text-sm text-[#9B9689]">
+                                            This will invalidate your current credentials. You&apos;ll need to <strong className="text-[#E8E4DD]">remove the existing connector</strong> in Claude and <strong className="text-[#E8E4DD]">add a new one</strong> with the new credentials.
+                                        </p>
+                                        <div className="mt-5 flex justify-end gap-3">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowRegenConfirm(false)}
+                                                className="border-[#3D3C36] bg-[#24231F] text-[#9B9689] hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                onClick={() => {
+                                                    setShowRegenConfirm(false);
+                                                    setCredentials(null);
+                                                    generateCredentials();
+                                                }}
+                                                className="bg-[#C45D4A] text-white hover:bg-[#C45D4A]/80"
+                                            >
+                                                Regenerate
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
