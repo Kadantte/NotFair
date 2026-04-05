@@ -63,7 +63,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("enableKeyword", {
-    description: "Re-enable a paused keyword. Returns changeId.",
+    description: "Re-enable a paused keyword. Only needs adGroupId + criterionId (no campaignId, unlike pauseKeyword). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       adGroupId: z.string(),
@@ -118,26 +118,28 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Negative Keywords ──────────────────────────────────────────
 
   server.registerTool("addNegativeKeyword", {
-    description: "Add a phrase-match negative keyword to a campaign. Returns changeId.",
+    description: "Add a negative keyword to a campaign. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
-      keyword: z.string().min(1).describe("Keyword text to block (added as phrase match)"),
+      keyword: z.string().min(1).describe("Keyword text to block"),
+      matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("PHRASE").describe("Match type for the negative keyword (default: PHRASE)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, keyword }) => {
+  }, async ({ accountId, campaignId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword));
+    const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword, matchType));
     return jsonResult(result);
   });
 
   server.registerTool("removeNegativeKeyword", {
-    description: "Remove a negative keyword from a campaign. Returns changeId.",
+    description: "Remove a negative keyword from a campaign. If the same keyword text exists under multiple match types, specify matchType to remove the correct one. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
       keyword: z.string().min(1).describe("Exact negative keyword text to remove"),
+      matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).optional().describe("Match type to disambiguate if the same text exists under multiple match types"),
     },
     annotations: {
       readOnlyHint: false,
@@ -145,10 +147,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       idempotentHint: true,
       openWorldHint: false,
     },
-  }, async ({ accountId, campaignId, keyword }) => {
+  }, async ({ accountId, campaignId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword));
+    const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword, matchType));
     return jsonResult(result);
   });
 
@@ -271,7 +273,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   });
 
   server.registerTool("removeCampaign", {
-    description: "Permanently remove a campaign. This sets status to REMOVED and cannot be undone. The campaign and all its ad groups, ads, and keywords will stop serving. Returns changeId.",
+    description: "PERMANENTLY remove a campaign — cannot be undone, not even with undoChange. The campaign and all its ad groups, ads, and keywords will be deleted. Prefer pauseCampaign in most cases. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -576,7 +578,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Move Keywords ─────────────────────────────────────────────────
 
   server.registerTool("moveKeywords", {
-    description: "Move keywords between ad groups in the same campaign. Adds to destination first, then pauses in source only if all adds succeed — rolls back on partial failure. Returns changeIds for both adds and pauses.",
+    description: "Move keywords between ad groups in the same campaign. matchType defaults to PHRASE and does NOT inherit from source — specify explicitly to preserve original match types. Adds to destination first, then pauses in source only if all adds succeed — rolls back on partial failure. Returns changeIds for both adds and pauses.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -708,7 +710,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
-    description: "Undo a previous write operation by changeId. Only works within 7 days and if the entity hasn't been modified since.",
+    description: "Undo a previous write operation by changeId. Only works within 7 days AND only if the entity hasn't been modified since the original change. Returns error if either condition is not met.",
     inputSchema: {
       accountId: accountIdParam,
       changeId: z.number().int().positive().describe("changeId returned by the original write operation"),
@@ -796,7 +798,7 @@ async function findAndUpdateBid(auth: AuthContext, criterionId: string, previous
 /** Execute the reverse operation for a change record. Used by both MCP undoChange and the dashboard undo action. */
 export async function executeUndoForChange(
   auth: AuthContext,
-  change: { toolName: string; entityId: string | null; campaignId: string | null; beforeValue: string | null },
+  change: { toolName: string; entityId: string | null; campaignId: string | null; beforeValue: string | null; afterValue: string | null },
 ): Promise<WriteResult> {
   const entityId = change.entityId ?? "";
   const beforeValue = change.beforeValue ?? "";
@@ -825,10 +827,18 @@ export async function executeUndoForChange(
     case "remove_keyword": {
       return { success: false, action: "add_keyword", entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo keyword removal (keyword text not stored)" };
     }
-    case "add_negative_keyword":
-      return removeNegativeKeyword(auth, change.campaignId ?? "", entityId);
-    case "remove_negative_keyword":
-      return addNegativeKeyword(auth, change.campaignId ?? "", entityId);
+    case "add_negative_keyword": {
+      const afterVal = change.afterValue ?? "";
+      const pipeIdx = afterVal.lastIndexOf("|");
+      const undoMatchType = pipeIdx > 0 ? afterVal.slice(pipeIdx + 1) as "BROAD" | "PHRASE" | "EXACT" : undefined;
+      return removeNegativeKeyword(auth, change.campaignId ?? "", entityId, undoMatchType);
+    }
+    case "remove_negative_keyword": {
+      const pipeIdx = beforeValue.lastIndexOf("|");
+      const undoMatchType = pipeIdx > 0 ? beforeValue.slice(pipeIdx + 1) as "BROAD" | "PHRASE" | "EXACT" : "PHRASE";
+      const undoText = pipeIdx > 0 ? beforeValue.slice(0, pipeIdx) : entityId;
+      return addNegativeKeyword(auth, change.campaignId ?? "", undoText, undoMatchType);
+    }
     case "pause_campaign":
       return enableCampaign(auth, entityId);
     case "enable_campaign":
