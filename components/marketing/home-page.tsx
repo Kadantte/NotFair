@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Link2, Sparkles, ShieldCheck } from "lucide-react";
+import { ArrowRight, Link2, Sparkles, ShieldCheck, Terminal, DollarSign, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session-provider";
 import { startGoogleConnect } from "@/lib/google-oauth";
@@ -196,6 +196,199 @@ export function HomePage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* 10X Efficiency with Claude Code */}
+      <section className="px-4 pb-24">
+        <div className="container mx-auto max-w-5xl">
+          <div className="mb-10 max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              10X your efficiency
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Manage Google Ads from Claude Code
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+              Stop clicking through the Google Ads UI. With AdsAgent MCP connected to Claude Code, you manage campaigns by describing what you want in plain English.
+            </p>
+          </div>
+
+          <div className="grid gap-px overflow-hidden rounded-lg border border-[#3D3C36] bg-[#3D3C36] md:grid-cols-2">
+            {[
+              {
+                icon: Terminal,
+                title: "Bulk operations in seconds",
+                description:
+                  "Pause 50 underperforming keywords, adjust bids across ad groups, add negatives in bulk — one sentence instead of 30 minutes of clicking.",
+              },
+              {
+                icon: Terminal,
+                title: "Campaign audits on demand",
+                description:
+                  "Ask Claude to audit your account. It pulls search terms, flags wasted spend, finds missing negatives, and suggests bid changes — all in one conversation.",
+              },
+              {
+                icon: Terminal,
+                title: "Ad copy iteration at speed",
+                description:
+                  "Generate RSA variants, test new headlines, swap descriptions — Claude writes the copy and pushes it live, you just approve.",
+              },
+              {
+                icon: Terminal,
+                title: "Scheduled workflows",
+                description:
+                  "Set up recurring checks: weekly search term reviews, daily budget monitoring, monthly performance reports. Claude Code runs them on autopilot.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="flex gap-4 bg-[#24231F] p-6"
+              >
+                <item.icon className="mt-0.5 h-5 w-5 shrink-0 text-[#4CAF6E]" />
+                <div>
+                  <h3 className="text-lg font-semibold text-[#E8E4DD]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                    {item.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
+            <p className="font-mono text-sm text-[#9B9689]">
+              <span className="text-[#4CAF6E]">you →</span>{" "}
+              &quot;Pause all keywords with CPA above $50 and less than 2 conversions in the last 30 days&quot;
+            </p>
+            <p className="mt-3 font-mono text-sm text-[#9B9689]">
+              <span className="text-[#4CAF6E]">claude →</span>{" "}
+              Found 23 keywords matching criteria. Pausing… done. Estimated monthly savings: $1,847.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Save Money */}
+      <section className="px-4 pb-24">
+        <div className="container mx-auto max-w-5xl">
+          <div className="mb-10 max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              Cut wasted spend
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Stop bleeding money on bad clicks
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+              Most Google Ads accounts waste 20–40% of budget on irrelevant search terms, overbid keywords, and zombie campaigns. AdsAgent finds the leaks.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              {
+                icon: DollarSign,
+                title: "Search term mining",
+                description:
+                  "Claude reviews your search term reports, identifies irrelevant queries burning budget, and adds them as negatives — weekly, automatically.",
+              },
+              {
+                icon: DollarSign,
+                title: "Bid optimization",
+                description:
+                  "Spot keywords where you're overpaying for position 1 when position 2 converts the same. Lower bids, same results, less spend.",
+              },
+              {
+                icon: DollarSign,
+                title: "Zombie campaign cleanup",
+                description:
+                  "Find campaigns and ad groups with spend but no conversions. Pause them, reallocate budget to what works, and stop funding dead weight.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6"
+              >
+                <item.icon className="h-5 w-5 text-[#4CAF6E]" />
+                <h3 className="mt-4 text-lg font-semibold text-[#E8E4DD]">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-[#9B9689]">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Experiments & Iteration */}
+      <section className="px-4 pb-24">
+        <div className="container mx-auto max-w-5xl">
+          <div className="mb-10 max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              Iterate faster
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Set up experiments in minutes, not days
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+              The fastest way to improve Google Ads is to run more experiments. AdsAgent makes the setup instant so you can focus on learning, not logistics.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              {
+                step: "1",
+                title: "Describe the experiment",
+                description:
+                  "Tell Claude what you want to test: \"Split test my top campaign — same keywords, two ad groups with different landing pages.\"",
+              },
+              {
+                step: "2",
+                title: "Claude sets it up",
+                description:
+                  "It creates the campaign structure, duplicates keywords, writes ad variants, sets budgets — you review and approve each change before it goes live.",
+              },
+              {
+                step: "3",
+                title: "Monitor and decide",
+                description:
+                  "Ask Claude for a daily performance comparison. When you have a winner, it pauses the loser and scales the winner — one sentence.",
+              },
+            ].map((item) => (
+              <div
+                key={item.step}
+                className="flex gap-6 rounded-lg border border-[#3D3C36] bg-[#24231F] p-6"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#4CAF6E] font-mono text-sm font-semibold text-[#4CAF6E]">
+                  {item.step}
+                </span>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#E8E4DD]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                    {item.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <Button
+              size="lg"
+              onClick={handleCTA}
+              className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
+            >
+              {session.connected ? "Go to Connect" : "Get Started — Free"}{" "}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
           </div>
         </div>
       </section>
