@@ -2,6 +2,18 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.6.1] - 2026-04-05
+
+### Changed
+- `addNegativeKeyword` now accepts a `matchType` parameter (BROAD, PHRASE, EXACT) instead of hardcoding PHRASE match
+- `removeNegativeKeyword` accepts optional `matchType` to disambiguate when the same keyword text exists under multiple match types
+- Undo operations for negative keywords now preserve the original match type instead of defaulting to PHRASE
+- `listCampaigns` default limit increased from 20 to 100 so LLM clients see the full account
+- Improved tool descriptions for `enableKeyword`, `moveKeywords`, `getImpressionShare`, `undoChange`, and `removeCampaign` to surface constraints and caveats that LLMs need
+
+### Fixed
+- `addNegativeKeyword` was sending match_type=2 (EXACT) while claiming PHRASE — now uses the correct enum mapping
+
 ## [0.2.6.0] - 2026-04-04
 
 ### Changed

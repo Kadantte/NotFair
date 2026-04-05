@@ -49,7 +49,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     description: "List all campaigns with lifetime metrics (impressions, clicks, cost, conversions).",
     inputSchema: {
       accountId: accountIdParam,
-      limit: z.number().int().min(1).max(100).default(20),
+      limit: z.number().int().min(1).max(100).default(100),
       includeRemoved: z.boolean().default(false),
     },
     annotations: READ_ANNOTATIONS,
@@ -236,7 +236,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Competitive Intelligence ────────────────────────────────────
 
   server.registerTool("getImpressionShare", {
-    description: "Impression share metrics for a campaign: search IS, absolute top IS, top IS, budget-lost IS, and rank-lost IS.",
+    description: "Impression share metrics for a campaign: search IS, absolute top IS, top IS, budget-lost IS, and rank-lost IS. Max 90 days (unlike most tools which support 365).",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),

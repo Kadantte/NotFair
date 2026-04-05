@@ -867,6 +867,7 @@ export async function addNegativeKeyword(
   auth: AuthContext,
   campaignId: string,
   keywordText: string,
+  matchType: "BROAD" | "PHRASE" | "EXACT" = "PHRASE",
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
   safeEntityId(campaignId);
@@ -893,7 +894,7 @@ export async function addNegativeKeyword(
           negative: true,
           keyword: {
             text,
-            match_type: 2, // PHRASE match
+            match_type: MATCH_TYPE[matchType],
           },
         },
       },
@@ -904,7 +905,7 @@ export async function addNegativeKeyword(
       action: "add_negative_keyword",
       entityId: text,
       beforeValue: "",
-      afterValue: text,
+      afterValue: `${text}|${matchType}`,
     };
   } catch (error) {
     const msg = extractErrorMessage(error);
@@ -913,7 +914,7 @@ export async function addNegativeKeyword(
       action: "add_negative_keyword",
       entityId: text,
       beforeValue: "",
-      afterValue: text,
+      afterValue: `${text}|${matchType}`,
       error: msg.includes("ALREADY_EXISTS")
         ? `Negative keyword "${text}" already exists in this campaign`
         : msg,
@@ -1205,15 +1206,16 @@ export async function removeNegativeKeyword(
   auth: AuthContext,
   campaignId: string,
   keywordText: string,
+  matchType?: "BROAD" | "PHRASE" | "EXACT",
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
   try {
-    // Find the negative keyword criterion by text.
+    // Find the negative keyword criterion by text (and optionally matchType).
     // Query all negatives for the campaign and filter in code to avoid GAQL string interpolation.
     const result = await customer.query(`
-      SELECT campaign_criterion.criterion_id, campaign_criterion.keyword.text
+      SELECT campaign_criterion.criterion_id, campaign_criterion.keyword.text, campaign_criterion.keyword.match_type
       FROM campaign_criterion
       WHERE campaign.id = ${cid}
         AND campaign_criterion.negative = TRUE
@@ -1221,7 +1223,11 @@ export async function removeNegativeKeyword(
     `);
 
     const match = (result as any[]).find(
-      (row) => row.campaign_criterion?.keyword?.text === keywordText,
+      (row) => {
+        if (row.campaign_criterion?.keyword?.text !== keywordText) return false;
+        if (matchType && row.campaign_criterion?.keyword?.match_type !== MATCH_TYPE[matchType]) return false;
+        return true;
+      },
     );
     const criterionId = match?.campaign_criterion?.criterion_id;
     if (!criterionId) {
@@ -1235,6 +1241,7 @@ export async function removeNegativeKeyword(
       };
     }
 
+    const resolvedMatchType = MATCH_TYPE_NAME[match.campaign_criterion?.keyword?.match_type as number] ?? "PHRASE";
     const customerId = normalizeCustomerId(auth.customerId);
     await customer.mutateResources([
       {
@@ -1248,7 +1255,7 @@ export async function removeNegativeKeyword(
       success: true,
       action: "remove_negative_keyword",
       entityId: keywordText,
-      beforeValue: keywordText,
+      beforeValue: `${keywordText}|${resolvedMatchType}`,
       afterValue: "",
     };
   } catch (error) {
@@ -1317,6 +1324,7 @@ export type CreateCampaignResult = {
 };
 
 const MATCH_TYPE = { EXACT: 2, PHRASE: 3, BROAD: 4 } as const;
+const MATCH_TYPE_NAME: Record<number, "EXACT" | "PHRASE" | "BROAD"> = { 2: "EXACT", 3: "PHRASE", 4: "BROAD" };
 
 /**
  * Create a complete Search campaign: budget + campaign + ad group + keywords + RSA.
