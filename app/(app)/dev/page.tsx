@@ -38,7 +38,8 @@ export default function DevPage() {
         if (!background) setLoading(true);
         setError(null);
         try {
-            const res = await fetch('/api/dev', { credentials: 'include' });
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const res = await fetch(`/api/dev?tz=${encodeURIComponent(tz)}`, { credentials: 'include' });
             if (res.status === 403) {
                 setError('Access denied');
                 return;

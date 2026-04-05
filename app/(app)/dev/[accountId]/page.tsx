@@ -59,7 +59,8 @@ export default function DevAccountDetailPage() {
         if (!background) setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/dev/${accountId}`, { credentials: 'include' });
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const res = await fetch(`/api/dev/${accountId}?tz=${encodeURIComponent(tz)}`, { credentials: 'include' });
             if (res.status === 403) { setError('Access denied'); return; }
             if (!res.ok) throw new Error('Failed to fetch');
             const result: AccountDetail = await res.json();

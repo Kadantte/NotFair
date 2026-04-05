@@ -3,25 +3,32 @@ import { db, schema } from "@/lib/db";
 import { sql, desc, eq } from "drizzle-orm";
 import { DEV_EMAILS } from "@/lib/dev-access";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getSession();
   if (!session.connected || !session.googleEmail || !DEV_EMAILS.includes(session.googleEmail)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const url = new URL(request.url);
+  const tz = url.searchParams.get("tz") || "America/Los_Angeles";
+  // Sanitize: only allow IANA timezone names (letters, digits, underscores, slashes, hyphens)
+  if (!/^[A-Za-z0-9_/+-]+$/.test(tz)) {
+    return Response.json({ error: "Invalid timezone" }, { status: 400 });
   }
 
   const [dailyUsage, accountOps] = await Promise.all([
     // Daily API usage for last 30 days
     db()
       .select({
-        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`.as("date"),
+        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`.as("date"),
         reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
         writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
         total: sql<number>`count(*)`.as("total"),
       })
       .from(schema.operations)
       .where(sql`${schema.operations.createdAt} >= now() - interval '30 days'`)
-      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`)
-      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`)),
+      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)
+      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)),
 
     // Total operations by account, with email from mcp_sessions
     db()

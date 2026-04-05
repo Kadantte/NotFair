@@ -5,7 +5,7 @@ import { DEV_EMAILS } from "@/lib/dev-access";
 import { OP_TYPE, CODE_TO_TOOL, CODE_TO_ENTITY, ENTITY_CODE } from "@/lib/db/tracking";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ accountId: string }> },
 ) {
   const session = await getSession();
@@ -14,6 +14,11 @@ export async function GET(
   }
 
   const { accountId } = await params;
+  const url = new URL(request.url);
+  const tz = url.searchParams.get("tz") || "America/Los_Angeles";
+  if (!/^[A-Za-z0-9_/+-]+$/.test(tz)) {
+    return Response.json({ error: "Invalid timezone" }, { status: 400 });
+  }
 
   const [accountInfo, recentOps, dailyUsage, campaignStats] = await Promise.all([
     // Account info from most recent session
@@ -45,7 +50,7 @@ export async function GET(
     // Daily usage for last 14 days
     db()
       .select({
-        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`.as("date"),
+        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`.as("date"),
         reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
         writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
         total: sql<number>`count(*)`.as("total"),
@@ -57,8 +62,8 @@ export async function GET(
           sql`${schema.operations.createdAt} >= now() - interval '14 days'`,
         ),
       )
-      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`)
-      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`)),
+      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)
+      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)),
 
     // Distinct campaigns touched in operations
     db()
