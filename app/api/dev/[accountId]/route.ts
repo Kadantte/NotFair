@@ -48,22 +48,26 @@ export async function GET(
       .limit(50),
 
     // Daily usage for last 14 days
-    db()
-      .select({
-        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`.as("date"),
-        reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
-        writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
-        total: sql<number>`count(*)`.as("total"),
-      })
-      .from(schema.operations)
-      .where(
-        and(
-          eq(schema.operations.accountId, accountId),
-          sql`${schema.operations.createdAt} >= now() - interval '14 days'`,
-        ),
-      )
-      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)
-      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)),
+    (() => {
+      // tz is already sanitized via regex — safe to inline as literal
+      const tzLiteral = sql.raw(`'${tz}'`);
+      return db()
+        .select({
+          date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`.as("date"),
+          reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
+          writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
+          total: sql<number>`count(*)`.as("total"),
+        })
+        .from(schema.operations)
+        .where(
+          and(
+            eq(schema.operations.accountId, accountId),
+            sql`${schema.operations.createdAt} >= now() - interval '14 days'`,
+          ),
+        )
+        .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`)
+        .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`));
+    })(),
 
     // Distinct campaigns touched in operations
     db()

@@ -16,19 +16,22 @@ export async function GET(request: Request) {
     return Response.json({ error: "Invalid timezone" }, { status: 400 });
   }
 
+  // tz is already sanitized above via regex — safe to use sql.raw
+  const tzLiteral = sql.raw(`'${tz}'`);
+
   const [dailyUsage, accountOps] = await Promise.all([
     // Daily API usage for last 30 days
     db()
       .select({
-        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`.as("date"),
+        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`.as("date"),
         reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
         writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
         total: sql<number>`count(*)`.as("total"),
       })
       .from(schema.operations)
       .where(sql`${schema.operations.createdAt} >= now() - interval '30 days'`)
-      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)
-      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tz})`)),
+      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`)
+      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`)),
 
     // Total operations by account, with email from mcp_sessions
     db()

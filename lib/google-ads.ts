@@ -2361,11 +2361,13 @@ export async function bulkUpdateBids(
     validMutations.push({ update: u, newBidMicros, currentBidMicros: data.bidMicros });
   }
 
-  // Single batch mutate for all valid updates
-  if (validMutations.length > 0) {
+  // Batch mutate in chunks to avoid API limits and isolate failures
+  const CHUNK_SIZE = 10;
+  for (let i = 0; i < validMutations.length; i += CHUNK_SIZE) {
+    const chunk = validMutations.slice(i, i + CHUNK_SIZE);
     try {
       await customer.mutateResources(
-        validMutations.map(({ update, newBidMicros }) => ({
+        chunk.map(({ update, newBidMicros }) => ({
           entity: "ad_group_criterion" as any,
           operation: "update" as const,
           resource: {
@@ -2374,13 +2376,12 @@ export async function bulkUpdateBids(
           },
         })),
       );
-      for (const { update, newBidMicros, currentBidMicros } of validMutations) {
+      for (const { update, newBidMicros, currentBidMicros } of chunk) {
         results.push({ success: true, action: "update_bid", entityId: update.criterionId, beforeValue: String(currentBidMicros), afterValue: String(newBidMicros), input: update });
       }
     } catch (error) {
-      // If batch fails, report all as failed
       const msg = extractErrorMessage(error);
-      for (const { update, newBidMicros, currentBidMicros } of validMutations) {
+      for (const { update, newBidMicros, currentBidMicros } of chunk) {
         results.push({ success: false, action: "update_bid", entityId: update.criterionId, beforeValue: String(currentBidMicros), afterValue: String(newBidMicros), error: msg, input: update });
       }
     }
@@ -2444,11 +2445,13 @@ export async function bulkPauseKeywords(
     }
   }
 
-  // Single batch mutate for all valid pauses
-  if (validKeywords.length > 0) {
+  // Batch mutate in chunks to avoid API limits and isolate failures
+  const CHUNK_SIZE = 10;
+  for (let i = 0; i < validKeywords.length; i += CHUNK_SIZE) {
+    const chunk = validKeywords.slice(i, i + CHUNK_SIZE);
     try {
       await customer.mutateResources(
-        validKeywords.map((k) => ({
+        chunk.map((k) => ({
           entity: "ad_group_criterion" as any,
           operation: "update" as const,
           resource: {
@@ -2457,12 +2460,12 @@ export async function bulkPauseKeywords(
           },
         })),
       );
-      for (const k of validKeywords) {
+      for (const k of chunk) {
         results.push({ success: true, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "PAUSED", input: k });
       }
     } catch (error) {
       const msg = extractErrorMessage(error);
-      for (const k of validKeywords) {
+      for (const k of chunk) {
         results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: msg, input: k });
       }
     }
@@ -2501,42 +2504,46 @@ export async function bulkAddKeywords(
 
   if (valid.length === 0) return results;
 
-  // Single batch mutate for all valid keywords
-  try {
-    const response = await customer.mutateResources(
-      valid.map(({ text, matchType }) => ({
-        entity: "ad_group_criterion" as any,
-        operation: "create" as const,
-        resource: {
-          ad_group: `customers/${cid}/adGroups/${adGroupId}`,
-          status: STATUS.ENABLED,
-          keyword: {
-            text,
-            match_type: MATCH_TYPE[matchType],
+  // Batch mutate in chunks to avoid API limits and isolate failures
+  const CHUNK_SIZE = 10;
+  for (let i = 0; i < valid.length; i += CHUNK_SIZE) {
+    const chunk = valid.slice(i, i + CHUNK_SIZE);
+    try {
+      const response = await customer.mutateResources(
+        chunk.map(({ text, matchType }) => ({
+          entity: "ad_group_criterion" as any,
+          operation: "create" as const,
+          resource: {
+            ad_group: `customers/${cid}/adGroups/${adGroupId}`,
+            status: STATUS.ENABLED,
+            keyword: {
+              text,
+              match_type: MATCH_TYPE[matchType],
+            },
           },
-        },
-      })),
-    );
+        })),
+      );
 
-    const responses = (response as any)?.mutate_operation_responses ?? [];
-    for (let i = 0; i < valid.length; i++) {
-      const { input, text, matchType } = valid[i];
-      const resourceName = responses[i]?.ad_group_criterion_result?.resource_name as string | undefined;
-      const criterionId = resourceName?.split("~").pop() ?? "";
-      if (criterionId) {
-        results.push({ success: true, action: "add_keyword", entityId: criterionId, beforeValue: adGroupId, afterValue: `${text} (${matchType})`, input });
-      } else {
-        results.push({ success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text, error: "Keyword created but criterion ID could not be extracted", input });
+      const responses = (response as any)?.mutate_operation_responses ?? [];
+      for (let j = 0; j < chunk.length; j++) {
+        const { input, text, matchType } = chunk[j];
+        const resourceName = responses[j]?.ad_group_criterion_result?.resource_name as string | undefined;
+        const criterionId = resourceName?.split("~").pop() ?? "";
+        if (criterionId) {
+          results.push({ success: true, action: "add_keyword", entityId: criterionId, beforeValue: adGroupId, afterValue: `${text} (${matchType})`, input });
+        } else {
+          results.push({ success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text, error: "Keyword created but criterion ID could not be extracted", input });
+        }
       }
-    }
-  } catch (error) {
-    const msg = extractErrorMessage(error);
-    for (const { input, text } of valid) {
-      results.push({
-        success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text,
-        error: msg.includes("ALREADY_EXISTS") ? `Keyword "${text}" already exists in this ad group` : msg,
-        input,
-      });
+    } catch (error) {
+      const msg = extractErrorMessage(error);
+      for (const { input, text } of chunk) {
+        results.push({
+          success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text,
+          error: msg.includes("ALREADY_EXISTS") ? `Keyword "${text}" already exists in this ad group` : msg,
+          input,
+        });
+      }
     }
   }
 
