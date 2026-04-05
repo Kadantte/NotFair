@@ -51,9 +51,10 @@ export async function GET(
     (() => {
       // tz is already sanitized via regex — safe to inline as literal
       const tzLiteral = sql.raw(`'${tz}'`);
+      const localDate = sql`date((${schema.operations.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral})`;
       return db()
         .select({
-          date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`.as("date"),
+          date: sql<string>`${localDate}`.as("date"),
           reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
           writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
           total: sql<number>`count(*)`.as("total"),
@@ -65,8 +66,8 @@ export async function GET(
             sql`${schema.operations.createdAt} >= now() - interval '14 days'`,
           ),
         )
-        .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`)
-        .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE ${tzLiteral})`));
+        .groupBy(localDate)
+        .orderBy(desc(localDate));
     })(),
 
     // Distinct campaigns touched in operations
