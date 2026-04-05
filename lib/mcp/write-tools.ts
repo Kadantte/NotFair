@@ -578,7 +578,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Move Keywords ─────────────────────────────────────────────────
 
   server.registerTool("moveKeywords", {
-    description: "Move keywords between ad groups in the same campaign. matchType defaults to PHRASE and does NOT inherit from source — specify explicitly to preserve original match types. Adds to destination first, then pauses in source only if all adds succeed — rolls back on partial failure. Returns changeIds for both adds and pauses.",
+    description: "Move keywords between ad groups in the same campaign. Inherits match type from source keywords by default — specify matchType only to override. Allows partial success: successfully-added keywords are paused in source, failed ones are left untouched. Returns changeIds for both adds and pauses.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -587,8 +587,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       criterionIds: z.array(z.string()).min(1).max(100).describe("Keyword criterion IDs (from getKeywords)"),
       matchType: z
         .enum(["BROAD", "PHRASE", "EXACT"])
-        .default("PHRASE")
-        .describe("Match type in destination — does not inherit from source"),
+        .optional()
+        .describe("Override match type in destination — omit to inherit from source"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {

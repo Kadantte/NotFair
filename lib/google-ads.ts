@@ -91,6 +91,9 @@ const AD_GROUP_TYPE = {
   SEARCH_STANDARD: 2,
 } as const;
 
+const MATCH_TYPE = { EXACT: 2, PHRASE: 3, BROAD: 4 } as const;
+const MATCH_TYPE_NAME: Record<number, "EXACT" | "PHRASE" | "BROAD"> = { 2: "EXACT", 3: "PHRASE", 4: "BROAD" };
+
 // ─── Client Factory ──────────────────────────────────────────────────
 
 function requiredEnv(name: string): string {
@@ -558,6 +561,7 @@ export async function getKeywords(
       ad_group.name,
       ad_group_criterion.criterion_id,
       ad_group_criterion.keyword.text,
+      ad_group_criterion.keyword.match_type,
       ad_group_criterion.status,
       ad_group_criterion.quality_info.quality_score,
       metrics.impressions, metrics.clicks, metrics.ctr,
@@ -572,20 +576,24 @@ export async function getKeywords(
   return {
     campaignId,
     dateRange: { start, end, days: boundedDays },
-    keywords: (result as any[]).map((row) => ({
-      criterionId: String(row.ad_group_criterion.criterion_id),
-      adGroupId: String(row.ad_group?.id ?? ""),
-      adGroupName: row.ad_group?.name ?? "Unknown",
-      text: row.ad_group_criterion.keyword?.text ?? "",
-      status: row.ad_group_criterion.status ?? "UNKNOWN",
-      qualityScore: row.ad_group_criterion.quality_info?.quality_score ?? null,
-      impressions: row.metrics.impressions ?? 0,
-      clicks: row.metrics.clicks ?? 0,
-      ctr: row.metrics.ctr ?? 0,
-      cost: micros(row.metrics.cost_micros),
-      averageCpc: micros(row.metrics.average_cpc),
-      conversions: row.metrics.conversions ?? 0,
-    })),
+    keywords: (result as any[]).map((row) => {
+      const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
+      return {
+        criterionId: String(row.ad_group_criterion.criterion_id),
+        adGroupId: String(row.ad_group?.id ?? ""),
+        adGroupName: row.ad_group?.name ?? "Unknown",
+        text: row.ad_group_criterion.keyword?.text ?? "",
+        matchType: (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "UNKNOWN",
+        status: row.ad_group_criterion.status ?? "UNKNOWN",
+        qualityScore: row.ad_group_criterion.quality_info?.quality_score ?? null,
+        impressions: row.metrics.impressions ?? 0,
+        clicks: row.metrics.clicks ?? 0,
+        ctr: row.metrics.ctr ?? 0,
+        cost: micros(row.metrics.cost_micros),
+        averageCpc: micros(row.metrics.average_cpc),
+        conversions: row.metrics.conversions ?? 0,
+      };
+    }),
   };
 }
 
@@ -1041,13 +1049,18 @@ export async function pauseCampaign(
       afterValue: "PAUSED",
     };
   } catch (error) {
+    let msg = extractErrorMessage(error);
+    // Provide actionable message for trial/experiment campaigns
+    if (msg.toLowerCase().includes("trial") || msg.toLowerCase().includes("experiment") || msg.includes("CANNOT_MODIFY_FOR_TRIAL_CAMPAIGN")) {
+      msg = `Cannot pause this campaign — it may be a trial/experiment campaign. Trial campaigns are controlled by their experiment and cannot be paused directly. Pause the base campaign or end the experiment instead. (Original error: ${msg})`;
+    }
     return {
       success: false,
       action: "pause_campaign",
       entityId: campaignId,
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
-      error: extractErrorMessage(error),
+      error: msg,
     };
   }
 }
@@ -1322,9 +1335,6 @@ export type CreateCampaignResult = {
   biddingStrategy?: string;
   error?: string;
 };
-
-const MATCH_TYPE = { EXACT: 2, PHRASE: 3, BROAD: 4 } as const;
-const MATCH_TYPE_NAME: Record<number, "EXACT" | "PHRASE" | "BROAD"> = { 2: "EXACT", 3: "PHRASE", 4: "BROAD" };
 
 /**
  * Create a complete Search campaign: budget + campaign + ad group + keywords + RSA.
@@ -2445,12 +2455,13 @@ export async function bulkPauseKeywords(
     }
   }
 
-  // Batch mutate in chunks to avoid API limits and isolate failures
+  // Batch mutate in chunks with partial_failure so valid operations succeed
+  // even if some fail (e.g. negative criteria mixed in with positive ones)
   const CHUNK_SIZE = 10;
   for (let i = 0; i < validKeywords.length; i += CHUNK_SIZE) {
     const chunk = validKeywords.slice(i, i + CHUNK_SIZE);
     try {
-      await customer.mutateResources(
+      const response = await customer.mutateResources(
         chunk.map((k) => ({
           entity: "ad_group_criterion" as any,
           operation: "update" as const,
@@ -2459,11 +2470,32 @@ export async function bulkPauseKeywords(
             status: STATUS.PAUSED,
           },
         })),
+        { partial_failure: true },
       );
-      for (const k of chunk) {
-        results.push({ success: true, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "PAUSED", input: k });
+
+      // With partial_failure, the library decodes partial_failure_error into a
+      // GoogleAdsFailure with an errors[] array. Each error has location.field_path_elements
+      // where the first element's index is the operation index.
+      const failedIndices = new Map<number, string>();
+      const partialErrors = (response as any)?.partial_failure_error?.errors ?? [];
+      for (const err of partialErrors) {
+        const opIndex = err?.location?.field_path_elements?.[0]?.index;
+        if (typeof opIndex === "number") {
+          failedIndices.set(opIndex, err?.message ?? "Unknown error");
+        }
+      }
+
+      for (let j = 0; j < chunk.length; j++) {
+        const k = chunk[j];
+        const errorMsg = failedIndices.get(j);
+        if (errorMsg) {
+          results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: errorMsg, input: k });
+        } else {
+          results.push({ success: true, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "PAUSED", input: k });
+        }
       }
     } catch (error) {
+      // Full batch failure (network error, auth, etc.) — mark all in chunk as failed
       const msg = extractErrorMessage(error);
       for (const k of chunk) {
         results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: msg, input: k });
@@ -2565,12 +2597,12 @@ export async function moveKeywords(
   fromAdGroupId: string,
   toAdGroupId: string,
   criterionIds: string[],
-  matchType: "BROAD" | "PHRASE" | "EXACT" = "PHRASE",
+  matchType?: "BROAD" | "PHRASE" | "EXACT",
 ): Promise<MoveKeywordsResult> {
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
-  // Step 1: Look up keyword text for each criterionId from the source ad group
+  // Step 1: Look up keyword text and match type for each criterionId from the source ad group
   const result = await customer.query(`
     SELECT
       ad_group_criterion.criterion_id,
@@ -2582,11 +2614,13 @@ export async function moveKeywords(
       AND ad_group_criterion.criterion_id IN (${criterionIds.map((id) => safeEntityId(id)).join(",")})
   `);
 
-  const keywordMap = new Map<string, { text: string }>();
+  const keywordMap = new Map<string, { text: string; sourceMatchType: "BROAD" | "PHRASE" | "EXACT" }>();
   for (const row of result as any[]) {
     const critId = String(row.ad_group_criterion?.criterion_id ?? "");
     const text = row.ad_group_criterion?.keyword?.text ?? "";
-    if (critId && text) keywordMap.set(critId, { text });
+    const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
+    const sourceMatchType = (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "BROAD";
+    if (critId && text) keywordMap.set(critId, { text, sourceMatchType });
   }
 
   // Validate all keywords were found
@@ -2600,7 +2634,7 @@ export async function moveKeywords(
     };
   }
 
-  // Step 2: Add keywords to the destination ad group
+  // Step 2: Add keywords to the destination ad group (partial success — don't roll back)
   const added: Array<WriteResult & { criterionId: string }> = [];
   const CHUNK_SIZE = 5;
   for (let i = 0; i < criterionIds.length; i += CHUNK_SIZE) {
@@ -2608,48 +2642,41 @@ export async function moveKeywords(
     const chunkResults = await Promise.all(
       chunk.map(async (critId) => {
         const kw = keywordMap.get(critId)!;
-        const addResult = await addKeyword(auth, toAdGroupId, kw.text, matchType);
+        // Use explicit matchType override if provided, otherwise inherit from source
+        const effectiveMatchType = matchType ?? kw.sourceMatchType;
+        const addResult = await addKeyword(auth, toAdGroupId, kw.text, effectiveMatchType);
         return { ...addResult, criterionId: critId };
       }),
     );
     added.push(...chunkResults);
   }
 
-  // If any adds failed, roll back successful adds and abort
-  const addFailures = added.filter((r) => !r.success);
-  if (addFailures.length > 0) {
-    // Best-effort cleanup: remove successfully-added keywords from destination
-    const successfulAdds = added.filter((r) => r.success && r.entityId);
-    for (const add of successfulAdds) {
-      try {
-        await removeKeyword(auth, toAdGroupId, add.entityId);
-      } catch {
-        // Cleanup failure is logged but doesn't change the error result
-      }
-    }
-    return {
-      success: false,
-      added,
-      paused: [],
-      error: `${addFailures.length} keyword(s) failed to add to destination — rolled back ${successfulAdds.length} successful add(s), originals left untouched`,
-    };
-  }
-
-  // Step 3: Pause keywords in the source ad group (sequential to respect guardrails)
+  // Step 3: Pause only successfully-added keywords in the source ad group
+  const successfulCriterionIds = added.filter((r) => r.success).map((r) => r.criterionId);
   const paused: Array<WriteResult & { criterionId: string }> = [];
-  for (const critId of criterionIds) {
+  for (const critId of successfulCriterionIds) {
     const pauseResult = await pauseKeyword(auth, campaignId, fromAdGroupId, critId);
     paused.push({ ...pauseResult, criterionId: critId });
   }
 
+  const addFailures = added.filter((r) => !r.success);
   const pauseFailures = paused.filter((r) => !r.success);
+  const hasErrors = addFailures.length > 0 || pauseFailures.length > 0;
+
+  let error: string | undefined;
+  if (addFailures.length > 0 && pauseFailures.length > 0) {
+    error = `${addFailures.length} keyword(s) failed to add, ${pauseFailures.length} failed to pause in source — check per-keyword results`;
+  } else if (addFailures.length > 0) {
+    error = `${addFailures.length} of ${criterionIds.length} keyword(s) failed to add — ${successfulCriterionIds.length} moved successfully`;
+  } else if (pauseFailures.length > 0) {
+    error = `Keywords added successfully but ${pauseFailures.length} failed to pause in source — may be duplicated`;
+  }
+
   return {
-    success: pauseFailures.length === 0,
+    success: !hasErrors,
     added,
     paused,
-    error: pauseFailures.length > 0
-      ? `Keywords added successfully but ${pauseFailures.length} failed to pause in source — may be duplicated`
-      : undefined,
+    error,
   };
 }
 
