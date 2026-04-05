@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw, Key, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
@@ -79,6 +79,229 @@ function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: 
                 <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
                     This contains your personal access token. Don&apos;t share it publicly.
                 </p>
+            </div>
+        </div>
+    );
+}
+
+type OAuthCredentials = {
+    client_id: string;
+    client_secret: string;
+    mcp_server_url: string;
+};
+
+function CredentialField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+    const [copied, setCopied] = useState(false);
+    return (
+        <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-[#9B9689]">{label}</label>
+            <div className="flex items-center gap-2">
+                <div className={`min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 text-sm text-[#E8E4DD] ${mono ? 'font-mono' : ''}`}>
+                    {value}
+                </div>
+                <button
+                    onClick={() => {
+                        navigator.clipboard.writeText(value);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                >
+                    {copied ? <Check className="h-4 w-4 text-[#4CAF6E]" /> : <Copy className="h-4 w-4" />}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function ClaudeConnectorSection() {
+    const [credentials, setCredentials] = useState<OAuthCredentials | null>(null);
+    const [generating, setGenerating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [showSecret, setShowSecret] = useState(false);
+
+    const generateCredentials = useCallback(async () => {
+        setGenerating(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/oauth/clients', {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error || 'Failed to generate credentials');
+                return;
+            }
+            setCredentials(data);
+            setShowSecret(true);
+            trackEvent('oauth_credentials_generated');
+        } catch {
+            setError('Failed to generate credentials');
+        } finally {
+            setGenerating(false);
+        }
+    }, []);
+
+    return (
+        <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
+            <div className="mb-1 flex items-center gap-2">
+                <Key className="h-4 w-4 text-[#9B9689]" />
+                <p className="text-sm font-medium text-[#E8E4DD]">Use with Claude Connector</p>
+            </div>
+            <p className="mb-4 text-sm text-[#9B9689]">
+                Generate OAuth credentials to connect AdsAgent as a custom MCP server in Claude.
+            </p>
+
+            {error && (
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-3">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#C45D4A]" />
+                    <p className="text-sm text-[#C45D4A]">{error}</p>
+                </div>
+            )}
+
+            {!credentials ? (
+                <Button
+                    onClick={generateCredentials}
+                    disabled={generating}
+                    className="h-10 rounded-lg bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C] disabled:opacity-50"
+                >
+                    {generating ? (
+                        <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Generating...
+                        </>
+                    ) : (
+                        'Generate Credentials'
+                    )}
+                </Button>
+            ) : (
+                <div className="space-y-3">
+                    <CredentialField label="Server URL" value={credentials.mcp_server_url} />
+                    <CredentialField label="Client ID" value={credentials.client_id} mono />
+                    <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold uppercase tracking-widest text-[#9B9689]">Client Secret</label>
+                        <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]">
+                                {showSecret ? credentials.client_secret : '••••••••••••••••••••••••••••••••'}
+                            </div>
+                            <button
+                                onClick={() => setShowSecret(s => !s)}
+                                className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                            >
+                                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(credentials.client_secret);
+                                }}
+                                className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                            >
+                                <Copy className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#D4882A]/30 bg-[#D4882A]/10 p-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#D4882A]" />
+                        <p className="text-xs text-[#D4882A]">
+                            Copy your client secret now — it won&apos;t be shown again. If you lose it, generate new credentials.
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={() => {
+                            setCredentials(null);
+                            setShowSecret(false);
+                            generateCredentials();
+                        }}
+                        className="mt-2 flex items-center gap-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                    >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Regenerate credentials
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+type SetupTab = 'claude-code' | 'connector';
+
+function SetupTabs({ prompt, copied, onCopy, onOpenChat }: {
+    prompt: string;
+    copied: boolean;
+    onCopy: () => void;
+    onOpenChat: () => void;
+}) {
+    const [activeTab, setActiveTab] = useState<SetupTab>('claude-code');
+
+    return (
+        <div className="flex flex-col items-center space-y-8 text-center">
+            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your client</h2>
+            {/* Tab switcher */}
+            <div className="flex w-full max-w-md rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
+                <button
+                    onClick={() => setActiveTab('claude-code')}
+                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
+                        activeTab === 'claude-code'
+                            ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
+                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                    }`}
+                >
+                    Claude Code
+                </button>
+                <button
+                    onClick={() => setActiveTab('connector')}
+                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
+                        activeTab === 'connector'
+                            ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
+                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                    }`}
+                >
+                    Claude Connector
+                </button>
+            </div>
+
+            {/* Tab content */}
+            {activeTab === 'claude-code' ? (
+                <>
+                    <p className="max-w-md text-sm text-[#9B9689]">
+                        Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
+                    </p>
+                    <SetupCodeBlock content={prompt} copied={copied} onCopy={onCopy} />
+                    <p className="max-w-md text-sm text-[#9B9689]">
+                        After setup, restart Claude Code and run{' '}
+                        <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
+                        to start managing your Google Ads.
+                    </p>
+                </>
+            ) : (
+                <ClaudeConnectorSection />
+            )}
+
+            {/* Chat CTA */}
+            <div className="flex w-full items-center gap-4">
+                <div className="h-px flex-1 bg-[#3D3C36]" />
+                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#9B9689]">or</span>
+                <div className="h-px flex-1 bg-[#3D3C36]" />
+            </div>
+
+            <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium text-[#E8E4DD]">Don&apos;t want to set up MCP yourself?</p>
+                        <p className="text-sm text-[#9B9689]">
+                            Try our agentic AI instead. AdsAgent Chat is already wired up and ready to use out of the box.
+                        </p>
+                    </div>
+                    <Button
+                        onClick={onOpenChat}
+                        className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
+                    >
+                        Open Chat
+                    </Button>
+                </div>
             </div>
         </div>
     );
@@ -354,50 +577,17 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                             <p className="text-xs text-[#9B9689]/60">OAuth 2.0 — we never see your password.</p>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center space-y-8 text-center">
-                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up Claude Code</h2>
-                            <p className="max-w-md text-sm text-[#9B9689]">
-                                Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
-                            </p>
-
-                            <SetupCodeBlock
-                                content={prompt}
-                                copied={copied}
-                                onCopy={() => {
-                                    navigator.clipboard.writeText(prompt);
-                                    setCopied(true);
-                                    trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'install' });
-                                    setTimeout(() => setCopied(false), 2000);
-                                }}
-                            />
-
-                            <p className="max-w-md text-sm text-[#9B9689]">
-                                After setup, restart Claude Code and run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code> to start managing your Google Ads.
-                            </p>
-
-                            <div className="flex w-full items-center gap-4">
-                                <div className="h-px flex-1 bg-[#3D3C36]" />
-                                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#9B9689]">or</span>
-                                <div className="h-px flex-1 bg-[#3D3C36]" />
-                            </div>
-
-                            <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
-                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium text-[#E8E4DD]">Don&apos;t want to set up MCP yourself?</p>
-                                        <p className="text-sm text-[#9B9689]">
-                                            Try our agentic AI instead. AdsAgent Chat is already wired up and ready to use out of the box.
-                                        </p>
-                                    </div>
-                                    <Button
-                                        onClick={openAgenticAi}
-                                        className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
-                                    >
-                                        Open Chat
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
+                        <SetupTabs
+                            prompt={prompt}
+                            copied={copied}
+                            onCopy={() => {
+                                navigator.clipboard.writeText(prompt);
+                                setCopied(true);
+                                trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'install' });
+                                setTimeout(() => setCopied(false), 2000);
+                            }}
+                            onOpenChat={openAgenticAi}
+                        />
                     )}
                 </div>
             </div>
