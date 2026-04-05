@@ -45,7 +45,7 @@ export async function GET(
     // Daily usage for last 14 days
     db()
       .select({
-        date: sql<string>`date(${schema.operations.createdAt})`.as("date"),
+        date: sql<string>`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`.as("date"),
         reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
         writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
         total: sql<number>`count(*)`.as("total"),
@@ -57,8 +57,8 @@ export async function GET(
           sql`${schema.operations.createdAt} >= now() - interval '14 days'`,
         ),
       )
-      .groupBy(sql`date(${schema.operations.createdAt})`)
-      .orderBy(desc(sql`date(${schema.operations.createdAt})`)),
+      .groupBy(sql`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`)
+      .orderBy(desc(sql`date(${schema.operations.createdAt} AT TIME ZONE 'America/Los_Angeles')`)),
 
     // Distinct campaigns touched in operations
     db()
