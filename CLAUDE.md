@@ -56,15 +56,15 @@ These are mandatory patterns for all frontend components. Follow them by default
 
 ## Deploy Configuration (configured by /setup-deploy)
 - Platform: Vercel
-- Production URL: https://adsagent.ai
+- Production URL: https://adsagent.org
 - Deploy workflow: auto-deploy on push (Vercel Git integration)
 - Deploy status command: HTTP health check
 - Merge method: squash
 - Project type: web app (Next.js)
-- Post-deploy health check: https://adsagent.ai/api/health
+- Post-deploy health check: https://adsagent.org/api/health
 
 ### Custom deploy hooks
 - Pre-merge: none
 - Deploy trigger: automatic on push to main (Vercel)
-- Deploy status: poll https://adsagent.ai/api/health for 200
-- Health check: https://adsagent.ai/api/health
+- Deploy status: poll https://adsagent.org/api/health for 200
+- Health check: https://adsagent.org/api/health

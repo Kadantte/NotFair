@@ -11,7 +11,7 @@ import { db, schema } from "@/lib/db";
  * an authorization code → redirect back to Claude.
  *
  * No browser login is needed because the client_id already identifies
- * the user (they generated it on adsagent.ai while logged in).
+ * the user (they generated it on adsagent.org while logged in).
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
   if (!client) {
     return NextResponse.json(
-      { error: "invalid_client", error_description: "Unknown client_id. Generate credentials at adsagent.ai." },
+      { error: "invalid_client", error_description: "Unknown client_id. Generate credentials at adsagent.org." },
       { status: 401 },
     );
   }
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
   if (!session) {
     return NextResponse.json(
-      { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at adsagent.ai and generate new credentials." },
+      { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at adsagent.org and generate new credentials." },
       { status: 403 },
     );
   }
