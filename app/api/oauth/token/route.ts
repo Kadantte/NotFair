@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
@@ -140,10 +140,9 @@ export async function POST(request: Request) {
     .set({ used: true })
     .where(eq(schema.authorizationCodes.code, code));
 
-  // Look up the MCP session to get the access token
+  // Look up the MCP session to check it's still valid
   const [session] = await db()
     .select({
-      accessToken: schema.mcpSessions.accessToken,
       expiresAt: schema.mcpSessions.expiresAt,
     })
     .from(schema.mcpSessions)
@@ -157,13 +156,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // Issue a dedicated OAuth access token (independent of the MCP session token)
+  const oauthAccessToken = `oat_${randomBytes(32).toString("hex")}`;
+
+  await db()
+    .update(schema.oauthClients)
+    .set({ oauthAccessToken })
+    .where(eq(schema.oauthClients.clientId, clientId));
+
   const expiresIn = Math.max(
     0,
     Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000),
   );
 
   return NextResponse.json({
-    access_token: session.accessToken,
+    access_token: oauthAccessToken,
     token_type: "Bearer",
     expires_in: expiresIn,
   });

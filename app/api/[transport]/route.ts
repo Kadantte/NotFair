@@ -36,16 +36,37 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
     throw new Error("No valid authentication. Sign in at /connect to get your MCP token.");
   }
 
-  const [session] = await db()
-    .select()
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.accessToken, bearerToken),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .limit(1);
+  // Resolve bearer token to MCP session (one query either path)
+  let session;
+
+  if (bearerToken.startsWith("oat_")) {
+    // OAuth access token from Claude Connector — join to resolve in one query
+    const [row] = await db()
+      .select({ session: schema.mcpSessions })
+      .from(schema.oauthClients)
+      .innerJoin(schema.mcpSessions, eq(schema.oauthClients.sessionId, schema.mcpSessions.id))
+      .where(
+        and(
+          eq(schema.oauthClients.oauthAccessToken, bearerToken),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        ),
+      )
+      .limit(1);
+    session = row?.session;
+  } else {
+    // Direct MCP session token
+    const [s] = await db()
+      .select()
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.accessToken, bearerToken),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        ),
+      )
+      .limit(1);
+    session = s;
+  }
 
   if (!session) {
     throw new Error("Session not found or expired. Sign in at /connect to get a new MCP token.");
