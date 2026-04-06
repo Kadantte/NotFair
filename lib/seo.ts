@@ -4,18 +4,18 @@ export const SITE_NAME = "AdsAgent";
 export const SITE_URL = "https://adsagent.org";
 export const DEFAULT_OG_IMAGE = "/opengraph-image";
 export const SITE_DESCRIPTION =
-  "AdsAgent is an AI Google Ads agent and Google Ads MCP server that lets you connect Google Ads to Claude, ChatGPT-style MCP workflows, and OpenClaw.";
+  "AdsAgent is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude for Work and let AI analyze campaigns, optimize spend, and manage changes.";
 export const SITE_KEYWORDS = [
-  "AI Google Ads agent",
-  "Google Ads MCP",
   "Google Ads MCP server",
+  "Google Ads MCP",
   "connect Google Ads to Claude",
-  "connect Google Ads to ChatGPT",
-  "connect Google Ads to OpenClaw",
+  "Claude Google Ads",
+  "AI Google Ads agent",
   "Google Ads AI agent",
   "Google Ads automation",
   "Google Ads optimization",
-  "Google Ads impact tracking",
+  "Claude Code Google Ads",
+  "MCP server for Claude",
 ];
 
 type MetadataInput = {
@@ -103,7 +103,7 @@ export function buildHomepageJsonLd() {
       applicationSubCategory: "Google Ads Management Software",
       operatingSystem: "Web",
       description:
-        "Connect Google Ads to Claude, ChatGPT-style MCP clients, or OpenClaw so an AI agent can analyze campaigns, recommend optimizations, and track impact.",
+        "The Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude for Work and let AI analyze campaigns, optimize spend, and manage changes.",
       offers: {
         "@type": "Offer",
         price: "0",

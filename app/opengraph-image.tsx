@@ -52,8 +52,8 @@ export default function OpenGraphImage() {
               maxWidth: 880,
             }}
           >
-            <span>Connect Google Ads</span>
-            <span style={{ color: "#4CAF6E" }}>to AI workflows</span>
+            <span>Google Ads MCP</span>
+            <span style={{ color: "#4CAF6E" }}>built for Claude</span>
           </div>
           <div
             style={{
@@ -64,8 +64,8 @@ export default function OpenGraphImage() {
               color: "#B3ADA2",
             }}
           >
-            AI Google Ads agent, Google Ads MCP, optimization guidance, and
-            impact tracking.
+            Connect your ad account to Claude Code. Analyze campaigns,
+            optimize spend, and manage changes through natural conversation.
           </div>
         </div>
 
@@ -77,9 +77,11 @@ export default function OpenGraphImage() {
             color: "#B3ADA2",
           }}
         >
-          <span>Claude</span>
-          <span>OpenClaw</span>
-          <span>MCP-compatible workflows</span>
+          <span>Claude Code</span>
+          <span style={{ color: "#3D3C36" }}>|</span>
+          <span>Claude for Work</span>
+          <span style={{ color: "#3D3C36" }}>|</span>
+          <span>MCP Protocol</span>
         </div>
       </div>
     ),

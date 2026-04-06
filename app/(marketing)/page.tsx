@@ -2,16 +2,17 @@ import { HomePage } from "@/components/marketing/home-page";
 import { buildHomepageJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "AI Google Ads Agent & Google Ads MCP Server",
+  title: "Google Ads MCP Server for Claude | AdsAgent",
   description:
-    "AdsAgent lets you connect Google Ads to Claude, OpenClaw, and other MCP-compatible AI workflows so you can analyze campaigns, approve changes, and track impact.",
+    "AdsAgent is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude for Work and let AI manage your campaigns.",
   path: "/",
   keywords: [
-    "AI Google Ads agent",
-    "Google Ads MCP",
     "Google Ads MCP server",
+    "Google Ads MCP",
     "connect Google Ads to Claude",
-    "connect Google Ads to OpenClaw",
+    "Claude Google Ads",
+    "AI Google Ads agent",
+    "Claude Code Google Ads",
     "Google Ads AI optimization",
   ],
 });

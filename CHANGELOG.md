@@ -2,6 +2,25 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.7.0] - 2026-04-05
+
+### Added
+- "Built for Claude" homepage positioning with Claude Code and Claude for Work as primary AI clients
+- Claude workflows section showing terminal, workspace, spend recovery, and A/B test use cases
+- Conversation demo showing Claude managing Google Ads in natural language
+- "Also works with" section for Cursor, Windsurf, and Claude Agent SDK
+- Blog infrastructure: data store, rendering component, dynamic routes, and blog index page
+- "What is MCP" blog post with FAQPage structured data
+- Claude icon SVG asset for hero badge
+
+### Changed
+- Homepage hero cycles "Claude Code", "Claude", "AI agent" (previously included ChatGPT, OpenClaw)
+- Homepage subtitle and 3-step onboarding rewritten for Claude-first messaging
+- SEO metadata across site updated: title, description, keywords lead with Claude
+- OG image updated: "Google Ads MCP built for Claude"
+- Homepage FAQ rewritten with Claude-specific language and MCP explanation
+- Sitemap now includes blog routes with per-post lastmod dates
+
 ## [0.2.6.1] - 2026-04-05
 
 ### Changed
