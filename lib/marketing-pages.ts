@@ -370,21 +370,26 @@ export const homepageFaq: FaqItem[] = [
   {
     question: "What is AdsAgent?",
     answer:
-      "AdsAgent is an AI Google Ads agent and Google Ads MCP server that connects your account to MCP-compatible AI workflows for analysis, recommendations, and reviewable optimization.",
+      "AdsAgent is a Google Ads MCP server built for Claude. It connects your Google Ads account to Claude Code, Claude for Work, and other MCP-compatible AI clients so you can analyze campaigns, optimize spend, and manage changes through natural conversation.",
   },
   {
     question: "Who is AdsAgent built for?",
     answer:
-      "It is built for teams who want live Google Ads context inside AI workflows such as Claude or OpenClaw instead of manually exporting data into chat prompts.",
+      "Teams and founders who use Claude to manage their business and want to extend it to Google Ads. Instead of manually exporting CSVs and pasting them into chat, AdsAgent gives Claude live access to your campaign data.",
   },
   {
-    question: "What can I do after connecting Google Ads?",
+    question: "What can Claude do with AdsAgent?",
     answer:
-      "You can ask for campaign summaries, wasted-spend analysis, search term review, optimization ideas, and tracked changes with before and after context.",
+      "Claude can pull campaign performance, analyze search terms, find wasted spend, recommend negative keywords, adjust bids, pause underperforming campaigns, and track the impact of every change — all through natural language with your approval at each step.",
+  },
+  {
+    question: "Does AdsAgent work with other AI tools?",
+    answer:
+      "Yes. AdsAgent uses the open MCP protocol, so it works with any MCP-compatible client including Cursor, Windsurf, and custom agents built with the Claude Agent SDK. Claude Code and Claude for Work are the recommended primary clients.",
   },
   {
     question: "Why does AdsAgent use MCP?",
     answer:
-      "MCP is the cleanest way to connect AI workflows to structured tools and live campaign context without building a custom integration layer for every client.",
+      "MCP (Model Context Protocol) is the open standard created by Anthropic for connecting AI to external tools. It gives Claude structured access to Google Ads data and actions without custom integrations — one protocol that works everywhere.",
   },
 ];
