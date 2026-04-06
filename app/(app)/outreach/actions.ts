@@ -2,6 +2,7 @@
 
 import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
+import { validateEmails } from "@/lib/email-validation";
 
 // ─── Contacts (Leads) ──────────────────────────────────────────────
 
@@ -25,13 +26,26 @@ export async function importContactsAction(
     return true;
   });
 
+  const emailsToValidate = unique.map((r) => r.email.toLowerCase().trim());
+  const validationResults = await validateEmails(emailsToValidate);
+
   let imported = 0;
+  const invalidEmails: string[] = [];
+
   for (const row of unique) {
+    const email = row.email.toLowerCase().trim();
+    const result = validationResults.get(email);
+
+    if (result && !result.valid) {
+      invalidEmails.push(`${email} (${result.reason})`);
+      continue;
+    }
+
     try {
       await db()
         .insert(schema.contacts)
         .values({
-          email: row.email.toLowerCase().trim(),
+          email,
           firstName: row.firstName?.trim() || null,
           lastName: row.lastName?.trim() || null,
           company: row.company?.trim() || null,
@@ -43,7 +57,7 @@ export async function importContactsAction(
     }
   }
 
-  return { imported, skipped: unique.length - imported };
+  return { imported, skipped: unique.length - imported, invalidEmails };
 }
 
 export async function deleteContactAction(contactId: number) {
@@ -72,6 +86,10 @@ export async function sendOutreachAction(contactId: number) {
 
   if (!contact || !contact.draftSubject || !contact.draftBody) {
     throw new Error("No draft to send");
+  }
+
+  if (contact.unsubscribed || contact.status === "bounced") {
+    throw new Error("Contact is unsubscribed or previously bounced");
   }
 
   // Send via Resend

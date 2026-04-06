@@ -121,8 +121,9 @@ export const contacts = pgTable("contacts", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   company: text("company"),
-  /** new, drafted, scheduled, contacted, replied */
+  /** new, drafted, scheduled, contacted, replied, bounced */
   status: text("status").notNull().default("new"),
+  bounceCount: integer("bounce_count").default(0).notNull(),
   draftSubject: text("draft_subject"),
   draftBody: text("draft_body"),
   scheduledAt: timestamp("scheduled_at"),

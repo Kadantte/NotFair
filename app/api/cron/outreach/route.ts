@@ -45,6 +45,11 @@ export async function GET(request: Request) {
       continue;
     }
 
+    if (contact.unsubscribed || contact.status === "bounced") {
+      results.push({ email: contact.email, company: contact.company, success: false, error: "Bounced/unsubscribed" });
+      continue;
+    }
+
     // Wait 3 minutes between sends (skip delay for the first one)
     if (i > 0) {
       await new Promise((r) => setTimeout(r, DELAY_MS));
