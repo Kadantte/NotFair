@@ -218,17 +218,26 @@ export async function deleteCampaignAction(campaignId: number) {
   const session = await getSession();
   const userEmail = requireEmail(session);
 
-  // Delete emails first, then campaign
+  // Verify ownership first
+  const [campaign] = await db()
+    .select({ id: schema.outreachCampaigns.id })
+    .from(schema.outreachCampaigns)
+    .where(
+      and(
+        eq(schema.outreachCampaigns.id, campaignId),
+        eq(schema.outreachCampaigns.userEmail, userEmail)
+      )
+    )
+    .limit(1);
+
+  if (!campaign) return;
+
+  // Safe to delete now — ownership verified
   await db()
     .delete(schema.outreachEmails)
     .where(eq(schema.outreachEmails.campaignId, campaignId));
 
   await db()
     .delete(schema.outreachCampaigns)
-    .where(
-      and(
-        eq(schema.outreachCampaigns.id, campaignId),
-        eq(schema.outreachCampaigns.userEmail, userEmail)
-      )
-    );
+    .where(eq(schema.outreachCampaigns.id, campaignId));
 }

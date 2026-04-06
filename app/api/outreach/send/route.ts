@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, count } from "drizzle-orm";
 import { getResend } from "@/lib/resend";
 
 // Vercel Cron runs this every minute
@@ -28,10 +28,8 @@ function interpolate(
 export async function GET(request: Request) {
   // Verify cron secret (Vercel sets this)
   const authHeader = request.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -49,7 +47,43 @@ export async function GET(request: Request) {
     // Calculate how many to send this minute (sendRate is per hour)
     const perMinute = Math.max(1, Math.ceil(campaign.sendRate / 60));
 
-    // Get pending emails with contact info
+    // Atomically claim pending emails by setting status to 'sending'
+    // This prevents duplicate sends if cron double-fires
+    const claimed = await db()
+      .execute(
+        sql`UPDATE outreach_emails SET status = 'sending'
+            WHERE id IN (
+              SELECT id FROM outreach_emails
+              WHERE campaign_id = ${campaign.id} AND status = 'pending'
+              LIMIT ${perMinute}
+              FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id`
+      );
+
+    const claimedIds = (claimed as unknown as { id: number }[]).map((r) => r.id);
+
+    if (claimedIds.length === 0) {
+      // Check if there are any non-terminal emails left
+      const [remaining] = await db()
+        .select({ c: count() })
+        .from(schema.outreachEmails)
+        .where(
+          and(
+            eq(schema.outreachEmails.campaignId, campaign.id),
+            sql`${schema.outreachEmails.status} IN ('pending', 'sending')`
+          )
+        );
+      if (Number(remaining.c) === 0) {
+        await db()
+          .update(schema.outreachCampaigns)
+          .set({ status: "completed" })
+          .where(eq(schema.outreachCampaigns.id, campaign.id));
+      }
+      continue;
+    }
+
+    // Fetch contact info for claimed emails
     const pendingEmails = await db()
       .select({
         emailId: schema.outreachEmails.id,
@@ -65,22 +99,7 @@ export async function GET(request: Request) {
         schema.contacts,
         eq(schema.outreachEmails.contactId, schema.contacts.id)
       )
-      .where(
-        and(
-          eq(schema.outreachEmails.campaignId, campaign.id),
-          eq(schema.outreachEmails.status, "pending")
-        )
-      )
-      .limit(perMinute);
-
-    if (pendingEmails.length === 0) {
-      // All emails sent — mark campaign as completed
-      await db()
-        .update(schema.outreachCampaigns)
-        .set({ status: "completed" })
-        .where(eq(schema.outreachCampaigns.id, campaign.id));
-      continue;
-    }
+      .where(sql`${schema.outreachEmails.id} IN (${sql.join(claimedIds.map(id => sql`${id}`), sql`, `)})`);
 
     for (const pending of pendingEmails) {
       // Skip unsubscribed contacts
