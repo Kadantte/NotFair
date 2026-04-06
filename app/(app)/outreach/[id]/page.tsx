@@ -112,8 +112,8 @@ export default function CampaignDetailPage() {
             disabled={toggling}
             className={
               campaign.status === "active"
-                ? "gap-2 bg-[#D4882A] text-white hover:bg-[#C07B24]"
-                : "gap-2 bg-[#4CAF6E] text-white hover:bg-[#3D9A5C]"
+                ? "gap-2 bg-[#D4882A] text-[#E8E4DD] hover:bg-[#C07B24]"
+                : "gap-2 bg-[#4CAF6E] text-[#E8E4DD] hover:bg-[#3D9A5C]"
             }
           >
             {toggling ? (

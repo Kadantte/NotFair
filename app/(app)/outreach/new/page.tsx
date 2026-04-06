@@ -325,7 +325,7 @@ export default function NewCampaignPage() {
           <Button
             onClick={handleCreate}
             disabled={creating}
-            className="gap-2 bg-[#4CAF6E] text-white hover:bg-[#3D9A5C]"
+            className="gap-2 bg-[#4CAF6E] text-[#E8E4DD] hover:bg-[#3D9A5C]"
           >
             {creating && <Loader2 className="h-4 w-4 animate-spin" />}
             Create Campaign

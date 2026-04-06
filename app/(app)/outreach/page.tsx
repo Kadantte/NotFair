@@ -77,7 +77,7 @@ export default function OutreachPage() {
             </p>
           </div>
           <Link href="/outreach/new" prefetch>
-            <Button className="gap-2 bg-[#4CAF6E] text-white hover:bg-[#3D9A5C]">
+            <Button className="gap-2 bg-[#4CAF6E] text-[#E8E4DD] hover:bg-[#3D9A5C]">
               <Plus className="h-4 w-4" />
               New Campaign
             </Button>
