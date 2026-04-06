@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import {
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
 
+type Toast = { type: "success" | "error"; message: string };
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -22,6 +24,8 @@ export default function NewCampaignPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -30,6 +34,13 @@ export default function NewCampaignPage() {
   const [replyTo, setReplyTo] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
   const [sendRate, setSendRate] = useState(50);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const fetchContacts = useCallback(async () => {
     setLoadingContacts(true);
@@ -70,7 +81,7 @@ export default function NewCampaignPage() {
     );
 
     if (emailIdx === -1) {
-      alert('CSV must have an "email" column');
+      setToast({ type: "error", message: 'CSV must have an "email" column' });
       setImporting(false);
       return;
     }
@@ -88,7 +99,7 @@ export default function NewCampaignPage() {
     const result = await importContactsAction(rows);
     await fetchContacts();
     setImporting(false);
-    alert(`Imported ${result.imported} contacts (${result.skipped} skipped)`);
+    setToast({ type: "success", message: `Imported ${result.imported} contacts (${result.skipped} skipped)` });
 
     // Reset file input
     e.target.value = "";
@@ -111,9 +122,10 @@ export default function NewCampaignPage() {
 
   async function handleCreate() {
     if (!name || !subject || !bodyHtml || !fromName || selectedIds.size === 0) {
-      alert("Fill in all required fields and select at least one contact.");
+      setFormError("Fill in all required fields and select at least one contact.");
       return;
     }
+    setFormError(null);
 
     setCreating(true);
     const campaign = await createCampaignAction({
@@ -144,6 +156,24 @@ export default function NewCampaignPage() {
         <h1 className="mb-8 font-['General_Sans'] text-2xl font-semibold text-[#E8E4DD]">
           New Campaign
         </h1>
+
+        {/* Inline toast */}
+        {toast && (
+          <div
+            className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-3 text-[13px] ${
+              toast.type === "success"
+                ? "border-[#5DBE82]/30 bg-[#5DBE82]/5 text-[#5DBE82]"
+                : "border-[#C45D4A]/30 bg-[#C45D4A]/5 text-[#C45D4A]"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0" />
+            )}
+            {toast.message}
+          </div>
+        )}
 
         {/* Campaign details */}
         <div className="space-y-5">
@@ -311,6 +341,14 @@ export default function NewCampaignPage() {
             </div>
           )}
         </div>
+
+        {/* Form error */}
+        {formError && (
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/5 px-4 py-3 text-[13px] text-[#C45D4A]">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {formError}
+          </div>
+        )}
 
         {/* Submit */}
         <div className="mt-8 flex justify-end gap-3 pb-8">

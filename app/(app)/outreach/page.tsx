@@ -5,6 +5,14 @@ import Link from "next/link";
 import { Plus, Mail, Play, Pause, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   getCampaignsAction,
   updateCampaignStatusAction,
   deleteCampaignAction,
@@ -18,6 +26,8 @@ export default function OutreachPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>(cachedCampaigns ?? []);
   const [loading, setLoading] = useState(!cachedCampaigns);
   const [actionId, setActionId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchCampaigns = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -39,12 +49,13 @@ export default function OutreachPage() {
     setActionId(null);
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this campaign and all its emails?")) return;
-    setActionId(id);
-    await deleteCampaignAction(id);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await deleteCampaignAction(deleteTarget.id);
     await fetchCampaigns(true);
-    setActionId(null);
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
   function statusBadge(status: string) {
@@ -162,7 +173,7 @@ export default function OutreachPage() {
                       variant="ghost"
                       size="icon-sm"
                       disabled={actionId === c.id}
-                      onClick={() => handleDelete(c.id)}
+                      onClick={() => setDeleteTarget(c)}
                       className="text-[#9B9689] hover:text-[#C45D4A]"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -174,6 +185,37 @@ export default function OutreachPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }}>
+        <DialogContent className="border-[#3D3C36] bg-[#24231F]">
+          <DialogHeader>
+            <DialogTitle className="text-[#E8E4DD]">Delete Campaign</DialogTitle>
+            <DialogDescription className="text-[#9B9689]">
+              This will permanently delete <span className="font-medium text-[#E8E4DD]">{deleteTarget?.name}</span> and
+              all {deleteTarget?.stats.total} queued emails. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+              className="border-[#3D3C36] text-[#9B9689] hover:text-[#E8E4DD]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="gap-2 bg-[#C45D4A] text-[#E8E4DD] hover:bg-[#B54E3D]"
+            >
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
