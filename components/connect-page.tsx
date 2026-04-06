@@ -609,9 +609,17 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
                 <div className="mx-auto max-w-2xl">
                     {error && (
-                        <div className="mb-8 flex items-start gap-3 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-4">
-                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#C45D4A]" />
-                            <p className="text-sm text-[#C45D4A]">{error}</p>
+                        <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#C45D4A]" />
+                                <p className="text-sm text-[#C45D4A]">{error}</p>
+                            </div>
+                            <button
+                                onClick={beginGoogleSignIn}
+                                className="mt-3 ml-8 text-sm font-medium text-[#C45D4A] underline underline-offset-2 hover:text-[#E8E4DD]"
+                            >
+                                Try again
+                            </button>
                         </div>
                     )}
 

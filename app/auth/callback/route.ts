@@ -67,6 +67,17 @@ function describeError(error: unknown) {
     return error.message;
   }
 
+  // gRPC / Google Ads errors are sometimes plain objects
+  if (error && typeof error === "object") {
+    const obj = error as Record<string, unknown>;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.details === "string") return obj.details;
+    if (Array.isArray(obj.errors) && obj.errors.length > 0) {
+      const first = obj.errors[0];
+      if (typeof first?.message === "string") return first.message;
+    }
+  }
+
   return "Unknown error";
 }
 
@@ -223,15 +234,14 @@ async function createOrRedirectGoogleAdsSession({
   try {
     customers = await listAccessibleCustomers(refreshToken);
   } catch (error) {
+    console.error("[auth] Failed to load Google Ads accounts:", error);
+    const raw = describeError(error);
+    const msg = raw.includes("PERMISSION_DENIED") || raw.includes("insufficient authentication scopes")
+      ? "Google Ads access was not granted. Please try again and make sure to approve all permissions on the Google consent screen."
+      : "Failed to load Google Ads accounts. Please try again.";
     return popup
-      ? popupErrorResponse(
-          origin,
-          `Failed to load Google Ads accounts: ${describeError(error)}`,
-        )
-      : redirectWithError(
-          origin,
-          `Failed to load Google Ads accounts: ${describeError(error)}`,
-        );
+      ? popupErrorResponse(origin, msg)
+      : redirectWithError(origin, msg);
   }
 
   const usableAccounts = customers.filter(
@@ -457,6 +467,16 @@ export async function GET(request: Request) {
     return popup
       ? popupErrorResponse(origin, message)
       : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  }
+
+  // Verify the adwords scope was actually granted (Google granular permissions
+  // let users uncheck individual scopes on the consent screen)
+  const grantedScopes = typeof tokenData.scope === "string" ? tokenData.scope : "";
+  if (!grantedScopes.includes("adwords")) {
+    const msg = "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.";
+    return popup
+      ? popupErrorResponse(origin, msg)
+      : redirectWithError(origin, msg);
   }
 
   const supabase = await createClient();
