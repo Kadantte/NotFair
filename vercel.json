@@ -5,8 +5,8 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/outreach/send",
-      "schedule": "* * * * *"
+      "path": "/api/cron/outreach",
+      "schedule": "3 16 * * 1-5"
     }
   ]
 }
