@@ -168,13 +168,14 @@ function getCachedCustomer(auth: AuthContext) {
     get(target, prop) {
       if (prop === "query") {
         return async (query: string) => {
-          const key = cacheKey(customerId, query);
+          const optimizedQuery = appendGaqlParameters(query);
+          const key = cacheKey(customerId, optimizedQuery);
           const now = Date.now();
           const cached = queryCache.get(key);
           if (cached && cached.expiresAt > now) {
             return cached.data;
           }
-          const result = await target.query(query);
+          const result = await target.query(optimizedQuery);
           queryCache.set(key, { data: result, expiresAt: now + CACHE_TTL_MS });
           return result;
         };
@@ -182,6 +183,18 @@ function getCachedCustomer(auth: AuthContext) {
       return (target as any)[prop];
     },
   });
+}
+
+/**
+ * Append PARAMETERS omit_unselected_resource_names=true to a GAQL SELECT query
+ * if not already present. Reduces response payload by omitting resource names
+ * for fields not in the SELECT clause (Google Ads API best practice).
+ */
+function appendGaqlParameters(query: string): string {
+  const trimmed = query.trim();
+  if (/\bPARAMETERS\b/i.test(trimmed)) return trimmed;
+  if (!/^\s*SELECT\b/i.test(trimmed)) return trimmed;
+  return `${trimmed} PARAMETERS omit_unselected_resource_names=true`;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -3331,4 +3344,75 @@ export async function runSafeGaqlReport(auth: AuthContext, rawQuery: string) {
   const customer = getCachedCustomer(auth);
   const rows = await customer.query(query);
   return { rowCount: rows.length, rows: rows.slice(0, 50) };
+}
+
+// ─── Resource Metadata (Field Discovery) ────────────────────────────
+
+/**
+ * Discover selectable, filterable, and sortable fields for a GAQL resource.
+ * Uses the GoogleAdsFieldService API — avoids hardcoded field lists.
+ */
+export async function getResourceMetadata(auth: AuthContext, resourceName: string) {
+  const customer = getCustomer(auth) as any;
+  const fieldService = customer.googleAdsFields as {
+    searchGoogleAdsFields: (req: { query: string }) => Promise<[{ results?: any[] }]>;
+  };
+  const query = `SELECT name, selectable, filterable, sortable, data_type, is_repeated WHERE name LIKE '${resourceName}.%'`;
+
+  try {
+    const [response] = await fieldService.searchGoogleAdsFields({ query });
+    const fields = (response.results ?? []).map((f: any) => ({
+      name: f.name,
+      dataType: f.dataType ?? f.data_type,
+      selectable: f.selectable ?? false,
+      filterable: f.filterable ?? false,
+      sortable: f.sortable ?? false,
+      isRepeated: f.isRepeated ?? f.is_repeated ?? false,
+    }));
+
+    if (fields.length === 0) {
+      // Fallback: try fetching the resource itself (for top-level resource info)
+      const fallbackQuery = `SELECT name, selectable, filterable, sortable, data_type, is_repeated WHERE name = '${resourceName}'`;
+      const [fallbackResponse] = await fieldService.searchGoogleAdsFields({ query: fallbackQuery });
+      const meta = fallbackResponse.results?.[0];
+      if (!meta) {
+        throw new Error(`Resource '${resourceName}' not found. Use listQueryableResources to see available resources.`);
+      }
+      return {
+        resource: resourceName,
+        fields: [],
+        note: `'${resourceName}' is a field, not a resource. Query its parent resource for fields.`,
+      };
+    }
+
+    return {
+      resource: resourceName,
+      fieldCount: fields.length,
+      fields,
+    };
+  } catch (error) {
+    throw new Error(`Failed to get metadata for '${resourceName}': ${extractErrorMessage(error)}`);
+  }
+}
+
+/**
+ * List all queryable GAQL resources (e.g. campaign, ad_group, keyword_view).
+ */
+export async function listQueryableResources(auth: AuthContext) {
+  const customer = getCustomer(auth) as any;
+  const fieldService = customer.googleAdsFields as {
+    searchGoogleAdsFields: (req: { query: string }) => Promise<[{ results?: any[] }]>;
+  };
+  const query = `SELECT name WHERE category = 'RESOURCE'`;
+
+  try {
+    const [response] = await fieldService.searchGoogleAdsFields({ query });
+    const resources = (response.results ?? [])
+      .map((f: any) => f.name as string)
+      .filter((name: string) => !name.includes("."))
+      .sort();
+    return { count: resources.length, resources };
+  } catch (error) {
+    throw new Error(`Failed to list resources: ${extractErrorMessage(error)}`);
+  }
 }

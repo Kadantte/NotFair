@@ -15,6 +15,8 @@ import {
   getCampaignSettings,
   getRecommendations,
   getNegativeKeywords,
+  getResourceMetadata,
+  listQueryableResources,
   authForAccount,
   resolveAccountId,
 } from "@/lib/google-ads";
@@ -147,13 +149,19 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Custom Query ───────────────────────────────────────────────
 
   server.registerTool("runGaqlQuery", {
-    description: "Run a read-only GAQL SELECT query. Returns up to 50 rows.",
+    description:
+      "Run a read-only GAQL SELECT query against the Google Ads API. Returns up to 50 rows. " +
+      "GAQL tips: (1) Use getResourceMetadata to discover valid fields before querying — never guess field names. " +
+      "(2) Dates must be literal YYYY-MM-DD strings (e.g. segments.date >= '2024-01-01'), no date functions or relative dates. " +
+      "(3) The change_event resource requires LIMIT <= 10000. " +
+      "(4) Customer IDs are plain numbers without hyphens. " +
+      "(5) Use listQueryableResources to see all available resources.",
     inputSchema: {
       accountId: accountIdParam,
       query: z
         .string()
         .min(1)
-        .describe("GAQL SELECT query (e.g. 'SELECT campaign.id, campaign.name FROM campaign')"),
+        .describe("GAQL SELECT query (e.g. 'SELECT campaign.id, campaign.name FROM campaign WHERE campaign.status = 'ENABLED'')"),
     },
     annotations: {
       readOnlyHint: true,
@@ -324,6 +332,38 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_changes", () => getChanges(targetId, { limit, campaignId }));
+    return jsonResult(result);
+  });
+
+  // ─── Field & Resource Discovery ─────────────────────────────────────
+
+  server.registerTool("getResourceMetadata", {
+    description:
+      "Discover available fields for a GAQL resource. Returns selectable, filterable, and sortable fields with data types. Use this before constructing GAQL queries to avoid invalid field errors. Example: getResourceMetadata('campaign') returns all campaign.* fields.",
+    inputSchema: {
+      accountId: accountIdParam,
+      resourceName: z
+        .string()
+        .min(1)
+        .describe("The GAQL resource name (e.g. 'campaign', 'ad_group', 'keyword_view', 'search_term_view')"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId, resourceName }) => {
+    const auth = currentAuth();
+    const result = await getResourceMetadata(authForAccount(auth, accountId), resourceName);
+    return jsonResult(result);
+  });
+
+  server.registerTool("listQueryableResources", {
+    description:
+      "List all queryable GAQL resources (e.g. campaign, ad_group, keyword_view). Use this to discover what data is available for custom GAQL queries.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, async ({ accountId }) => {
+    const auth = currentAuth();
+    const result = await listQueryableResources(authForAccount(auth, accountId));
     return jsonResult(result);
   });
 };
