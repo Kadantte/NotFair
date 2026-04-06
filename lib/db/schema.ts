@@ -113,6 +113,57 @@ export const authorizationCodes = pgTable("authorization_codes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Outreach: Contacts ─────────────────────────────────────────────
+
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  userEmail: text("user_email").notNull(),
+  email: text("email").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  company: text("company"),
+  unsubscribed: boolean("unsubscribed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("contacts_user_email_idx").on(table.userEmail, table.email),
+]);
+
+// ─── Outreach: Campaigns ────────────────────────────────────────────
+
+export const outreachCampaigns = pgTable("outreach_campaigns", {
+  id: serial("id").primaryKey(),
+  userEmail: text("user_email").notNull(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  bodyHtml: text("body_html").notNull(),
+  fromName: text("from_name").notNull(),
+  replyTo: text("reply_to"),
+  /** draft, active, paused, completed */
+  status: text("status").notNull().default("draft"),
+  /** Max emails per hour */
+  sendRate: integer("send_rate").notNull().default(50),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("outreach_campaigns_user_idx").on(table.userEmail),
+]);
+
+// ─── Outreach: Emails (join between campaign + contact) ─────────────
+
+export const outreachEmails = pgTable("outreach_emails", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull(),
+  contactId: integer("contact_id").notNull(),
+  /** pending, sent, failed, opened */
+  status: text("status").notNull().default("pending"),
+  sentAt: timestamp("sent_at"),
+  openedAt: timestamp("opened_at"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("outreach_emails_campaign_idx").on(table.campaignId, table.status),
+  index("outreach_emails_contact_idx").on(table.contactId),
+]);
+
 // ─── MCP Auth Sessions ───────────────────────────────────────────────
 
 export const mcpSessions = pgTable("mcp_sessions", {
