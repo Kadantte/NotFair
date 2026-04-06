@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, and, sql, count } from "drizzle-orm";
 import { getResend } from "@/lib/resend";
+import { makeToken } from "@/lib/outreach-tokens";
 
 // Vercel Cron runs this every minute
 // It picks up active campaigns and sends pending emails respecting the send rate
@@ -113,9 +114,11 @@ export async function GET(request: Request) {
 
       const subject = interpolate(campaign.subject, pending);
 
-      // Add tracking pixel and unsubscribe link
-      const trackingPixel = `<img src="${BASE_URL}/api/outreach/track/${pending.emailId}" width="1" height="1" style="display:none" />`;
-      const unsubLink = `${BASE_URL}/api/outreach/unsubscribe/${pending.contactId}`;
+      // Add tracking pixel and unsubscribe link (signed to prevent enumeration)
+      const trackToken = makeToken(pending.emailId, "track");
+      const unsubToken = makeToken(pending.contactId, "unsub");
+      const trackingPixel = `<img src="${BASE_URL}/api/outreach/track/${trackToken}" width="1" height="1" style="display:none" />`;
+      const unsubLink = `${BASE_URL}/api/outreach/unsubscribe/${unsubToken}`;
       const unsubFooter = `<br/><p style="font-size:11px;color:#999;margin-top:24px;">
         <a href="${unsubLink}" style="color:#999;">Unsubscribe</a>
       </p>`;

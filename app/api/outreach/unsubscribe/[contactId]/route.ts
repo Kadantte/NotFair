@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { verifyToken } from "@/lib/outreach-tokens";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ contactId: string }> }
 ) {
   const { contactId } = await params;
-  const id = Number(contactId);
+  const id = verifyToken(contactId, "unsub");
 
-  if (!isNaN(id)) {
+  if (id !== null) {
     await db()
       .update(schema.contacts)
       .set({ unsubscribed: true })

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { verifyToken } from "@/lib/outreach-tokens";
 
 // 1x1 transparent PNG
 const PIXEL = Buffer.from(
@@ -13,9 +14,9 @@ export async function GET(
   { params }: { params: Promise<{ emailId: string }> }
 ) {
   const { emailId } = await params;
-  const id = Number(emailId);
+  const id = verifyToken(emailId, "track");
 
-  if (!isNaN(id)) {
+  if (id !== null) {
     // Only update if currently "sent" (don't overwrite "failed")
     await db()
       .update(schema.outreachEmails)
