@@ -470,13 +470,25 @@ export async function GET(request: Request) {
   }
 
   // Verify the adwords scope was actually granted (Google granular permissions
-  // let users uncheck individual scopes on the consent screen)
-  const grantedScopes = typeof tokenData.scope === "string" ? tokenData.scope : "";
-  if (!grantedScopes.includes("adwords")) {
-    const msg = "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.";
-    return popup
-      ? popupErrorResponse(origin, msg)
-      : redirectWithError(origin, msg);
+  // let users uncheck individual scopes on the consent screen).
+  // Per RFC 6749 §5.1, scope may be omitted when it matches the request — treat that as granted.
+  if (typeof tokenData.scope === "string") {
+    const grantedScopes = tokenData.scope.split(" ");
+    if (!grantedScopes.includes("https://www.googleapis.com/auth/adwords")) {
+      const msg = "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.";
+      const scopeResponse = popup
+        ? popupErrorResponse(origin, msg)
+        : redirectWithError(origin, msg);
+      // Clean up cookies even on scope failure to avoid 431 errors
+      scopeResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
+      const requestCookiesForCleanup = (await cookies()).getAll();
+      for (const { name } of requestCookiesForCleanup) {
+        if (name.startsWith("sb-")) {
+          scopeResponse.cookies.set(name, "", { maxAge: 0, path: "/" });
+        }
+      }
+      return scopeResponse;
+    }
   }
 
   const supabase = await createClient();

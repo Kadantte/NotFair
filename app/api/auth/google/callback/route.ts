@@ -230,13 +230,16 @@ export async function GET(request: Request) {
     }
 
     // Verify the adwords scope was actually granted (Google granular permissions
-    // let users uncheck individual scopes on the consent screen)
-    const grantedScopes = typeof tokenData.scope === "string" ? tokenData.scope : "";
-    if (!grantedScopes.includes("adwords")) {
-      return errorResponse(
-        "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.",
-        isPopup,
-      );
+    // let users uncheck individual scopes on the consent screen).
+    // Per RFC 6749 §5.1, scope may be omitted when it matches the request — treat that as granted.
+    if (typeof tokenData.scope === "string") {
+      const grantedScopes = tokenData.scope.split(" ");
+      if (!grantedScopes.includes("https://www.googleapis.com/auth/adwords")) {
+        return errorResponse(
+          "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.",
+          isPopup,
+        );
+      }
     }
 
     // Fetch Google email from userinfo endpoint
