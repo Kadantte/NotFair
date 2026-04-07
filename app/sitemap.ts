@@ -6,6 +6,8 @@ import { SITE_URL } from "@/lib/seo";
 const publicMarketingRoutes = [
   "/",
   "/google-ads-audit",
+  "/google-ads-claude",
+  "/google-ads-mcp-server",
   "/impact",
   "/privacy",
   "/terms",
@@ -13,7 +15,7 @@ const publicMarketingRoutes = [
   ...allLandingPages.map((page) => `/${page.slug}`),
 ];
 
-const highPriorityRoutes = new Set(["/", "/google-ads-audit"]);
+const highPriorityRoutes = new Set(["/", "/google-ads-audit", "/google-ads-claude", "/google-ads-mcp-server"]);
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

@@ -1,5 +1,6 @@
 import { HomePage } from "@/components/marketing/home-page";
-import { buildHomepageJsonLd, buildMetadata } from "@/lib/seo";
+import { buildHomepageJsonLd, buildFaqJsonLd, buildMetadata } from "@/lib/seo";
+import { homepageFaq } from "@/lib/marketing-pages";
 
 export const metadata = buildMetadata({
   title: "Google Ads MCP Server & Free Audit for Claude | AdsAgent",
@@ -19,12 +20,17 @@ export const metadata = buildMetadata({
 
 export default function Home() {
   const jsonLd = buildHomepageJsonLd();
+  const faqJsonLd = buildFaqJsonLd(homepageFaq);
 
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <HomePage />
     </>

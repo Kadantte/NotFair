@@ -29,6 +29,220 @@ export type BlogSection = {
 };
 
 export const blogPosts: Record<string, BlogPost> = {
+  "google-ads-ai-agent": {
+    slug: "google-ads-ai-agent",
+    title: "Google Ads AI Agent: What It Actually Does (and What It Can't)",
+    seoTitle: "Google Ads AI Agent: What It Actually Does",
+    description:
+      "Learn what a Google Ads AI agent can actually do — audit wasted spend, find negative keyword gaps, and optimize bids. Real examples, no hype.",
+    keywords: [
+      "google ads ai agent",
+      "ai google ads management",
+      "ai google ads optimization",
+      "google ads automation ai",
+      "ai ppc management",
+    ],
+    publishedAt: "2026-04-07",
+    updatedAt: "2026-04-07",
+    author: {
+      name: "AdsAgent Team",
+      role: "AI ads infrastructure",
+    },
+    content: [
+      {
+        type: "text",
+        content:
+          "A Google Ads AI agent is software that can read your campaign data, identify problems, and take action — or recommend actions — using natural language instead of a manual workflow. Think of it as giving an AI access to your Google Ads account so it can audit spend, surface patterns, and make changes on your behalf or with your approval.",
+      },
+      {
+        type: "text",
+        content:
+          "This guide covers what AI agents can realistically do for Google Ads management, how they differ from Google's built-in automation, and what \"human in the loop\" means in practice. If you're evaluating whether AI can actually manage your ads — not just generate copy — this is for you.",
+      },
+      {
+        type: "heading",
+        content: "What Is a Google Ads AI Agent?",
+      },
+      {
+        type: "text",
+        content:
+          "The term \"AI agent\" gets used loosely. For Google Ads, it means an AI system that can read live account data, reason about that data to identify waste patterns and missed opportunities, take actions like pausing keywords or adjusting bids, and communicate in plain language — you ask a question or give an instruction, it responds with findings or executes a task.",
+      },
+      {
+        type: "text",
+        content:
+          "This is different from a dashboard or a reporting tool. An agent doesn't just display data — it interprets it and can act on it. The meaningful distinction: can the AI actually query your account in real time and take actions based on what it finds? If yes, it's an agent. If it just takes text input and generates suggestions without reading your data, it's a writing tool.",
+      },
+      {
+        type: "text",
+        content:
+          "Tools like AdsAgent implement this as an MCP server — a Model Context Protocol server that lets AI assistants like Claude connect to external systems and call structured tools against live data.",
+      },
+      {
+        type: "heading",
+        content: "What AI Agents Can Actually Do",
+      },
+      {
+        type: "subheading",
+        content: "Auditing for Wasted Spend",
+      },
+      {
+        type: "text",
+        content:
+          "This is where AI earns its keep most clearly. A manual spend audit on a mid-size account — 10 campaigns, 50+ ad groups, several hundred keywords — typically takes 2–4 hours. An AI agent can do the same structural analysis in under a minute.",
+      },
+      {
+        type: "callout",
+        content:
+          "Example: In one account audit, an AI agent reviewed the search terms report across all campaigns and flagged that a single broad-match keyword had generated impressions across 214 unique search queries — but the campaign had no negative keyword list at all. Of those 214 queries, 73 were clearly irrelevant. The wasted spend attributable to those terms over 30 days: $1,847. A human auditor would eventually find this, but it would take 2–3 hours of manual filtering and judgment calls.",
+      },
+      {
+        type: "subheading",
+        content: "Finding Negative Keyword Gaps",
+      },
+      {
+        type: "text",
+        content:
+          "Negative keywords are one of the highest-ROI activities in Google Ads management, and one of the most neglected. An AI agent can pull the full search terms report for any date range, identify terms that spent money without converting, group them by theme (brand, location, intent modifier), generate a negative keyword list with suggested match types, and add them directly to the campaign.",
+      },
+      {
+        type: "text",
+        content:
+          "The grouping step is where AI adds real value. It's not just finding individual bad terms — it's noticing that you're wasting money on every variant of a competitor brand name and suggesting a phrase-match negative that blocks the whole category.",
+      },
+      {
+        type: "subheading",
+        content: "Bid Optimization Analysis",
+      },
+      {
+        type: "text",
+        content:
+          "AI agents can analyze bid performance more granularly than manual review allows: device bid adjustments (if mobile converts at half the rate of desktop but bids are equal), dayparting gaps (hours where CPA spikes without a bid reduction), and auction insights cross-referencing impression share loss against budget vs. rank. These analyses exist in the Google Ads interface, but pulling them together and reaching a recommendation involves 4–5 different reports. An agent does it in one query.",
+      },
+      {
+        type: "heading",
+        content: "How AI Agents Differ From Google's Built-In Automation",
+      },
+      {
+        type: "text",
+        content:
+          "The critical difference is reviewability. Smart Campaigns and Performance Max operate as black boxes — they adjust bids, select audiences, and rotate creative without explaining why. An AI agent can show its work. You can ask \"why did you recommend pausing that keyword?\" and get a specific, auditable answer you can evaluate and override.",
+      },
+      {
+        type: "list",
+        content: "",
+        items: [
+          "Google Smart Campaigns / Performance Max: reads data, takes action automatically, does not explain reasoning, limited human control",
+          "Rule-based automation: reads data, takes action by predefined rules, no explanation, campaign-level control",
+          "AI Agent (AdsAgent): reads data, takes action only with approval, explains reasoning, full account scope, natural language interface",
+        ],
+      },
+      {
+        type: "heading",
+        content: "Why \"Human in the Loop\" Matters for Ads",
+      },
+      {
+        type: "text",
+        content:
+          "Budget risk is asymmetric. A wrong bid adjustment doesn't just fail to help — it actively spends money. An AI that autonomously raises CPCs by 40% because it misread a conversion spike can burn significant budget before you notice. There's also context the AI doesn't have: a campaign that appears underperforming might be intentionally throttled because you're waiting on a landing page redesign.",
+      },
+      {
+        type: "text",
+        content:
+          "The AdsAgent approach implements review-first workflow: the AI audits and recommends, you approve. You can ask it to execute directly on lower-stakes changes (adding a negative keyword) while keeping approval gates on higher-stakes changes (bid strategy changes, budget adjustments). That trust is earned incrementally through consistent, accurate recommendations.",
+      },
+      {
+        type: "heading",
+        content: "Getting Started With an AI Google Ads Agent",
+      },
+      {
+        type: "list",
+        content: "",
+        items: [
+          "Use AdsAgent: connects your Google Ads account and gives you an AI interface immediately. No setup beyond authentication. Run a free audit to see what AI finds in your account.",
+          "Use Claude with MCP: Anthropic's Claude supports Model Context Protocol, which AdsAgent uses. You get a conversational interface to your account data — ask questions, get analysis, approve actions.",
+          "Build with the Google Ads API directly: for developers or agencies managing many accounts. The main costs are API authentication complexity and maintenance over time.",
+        ],
+      },
+      {
+        type: "text",
+        content:
+          "Start with a campaign audit focused on spend efficiency. Ask the agent to pull the search terms report for the last 30 days, identify keywords without negative lists that have over $100 in spend, and show the distribution of query match types. Those three data points will surface the highest-ROI quick wins in most accounts.",
+      },
+      {
+        type: "heading",
+        content: "Common Mistakes When Using AI for Google Ads",
+      },
+      {
+        type: "list",
+        content: "",
+        items: [
+          "Treating AI output as automatically correct — AI agents read data accurately but can misinterpret context. A keyword with high CPA might be your highest-LTV acquisition channel. Always ask \"why\" before approving a change.",
+          "Starting with autonomous mode — if a tool offers fully autonomous optimization, run it in recommendation-only mode for at least 30 days first. Establish a baseline for the quality of its judgment.",
+          "Ignoring the search terms report — tools that can't show you specific queries driving waste are not analyzing your account. Generic advice without data access is a writing tool, not an agent.",
+          "Expecting AI to replace campaign strategy — AI agents are good at identifying waste and optimizing within an existing structure. They are poor at deciding whether to expand into a new product category or restructure your account.",
+        ],
+      },
+      {
+        type: "heading",
+        content: "FAQ",
+      },
+    ],
+    faq: [
+      {
+        question: "What's the difference between a Google Ads AI agent and Google's AI features?",
+        answer:
+          "Google's AI features (Smart Bidding, Performance Max) optimize automatically within their defined scope and don't explain their decisions. An external AI agent reads your account data and reasons about it conversationally — you can ask 'what's wasting money?' and get a specific, auditable answer. The two can coexist: use Smart Bidding for bid execution, use an AI agent for account-level analysis and oversight.",
+      },
+      {
+        question: "Can an AI agent actually make changes to my Google Ads account?",
+        answer:
+          "Yes, if the tool has API write access. AdsAgent can pause keywords, add negative keywords, adjust bids, and create ad variations. The question is whether it does so autonomously or with your approval. Review-first mode is safer for most use cases.",
+      },
+      {
+        question: "How accurate is AI spend analysis?",
+        answer:
+          "As accurate as the data it reads — Google Ads API-level accuracy for spend, clicks, and conversions. The risk isn't data accuracy; it's interpretation. Make sure the agent understands your optimization goal (CPA vs. ROAS vs. LTV) before acting on its recommendations.",
+      },
+      {
+        question: "Do I need technical skills to use a Google Ads AI agent?",
+        answer:
+          "For managed tools like AdsAgent: no. Authentication is handled through OAuth and the interface is conversational. For building a custom agent with the Google Ads API directly: yes, developer skills are required.",
+      },
+      {
+        question: "Is AI Google Ads management worth it for small accounts?",
+        answer:
+          "The ROI case is clearer for accounts spending $5K+/month where waste patterns are large enough to matter. For smaller accounts, AI agents are still useful for audit purposes — spending 15 minutes having an AI review your account is faster than spending 3 hours doing it manually, regardless of account size.",
+      },
+      {
+        question: "What data does an AI agent need access to?",
+        answer:
+          "At minimum: campaigns, ad groups, keywords, bids, spend data, and the search terms report. Some analyses require conversion data. The AI doesn't need your billing details or personal account information.",
+      },
+      {
+        question: "Can AI write good Google Ads copy?",
+        answer:
+          "AI can write competent ad copy that follows format requirements and includes relevant keywords. Best practice: use AI to generate 10–15 headline variations quickly, then edit the best 3–4 for accuracy and brand voice. This is faster than writing from scratch, but slower than just publishing what the AI produces.",
+      },
+    ],
+    relatedLinks: [
+      {
+        href: "/google-ads-audit",
+        title: "Free Google Ads Audit",
+        description: "Run a free AI-powered audit — find wasted spend in 5 minutes.",
+      },
+      {
+        href: "/google-ads-claude",
+        title: "Google Ads + Claude",
+        description: "Connect Google Ads to Claude and manage campaigns in natural language.",
+      },
+      {
+        href: "/google-ads-mcp-server",
+        title: "Google Ads MCP Server",
+        description: "The technical details: tools, auth, and setup for the MCP server.",
+      },
+    ],
+  },
   "what-is-mcp": {
     slug: "what-is-mcp",
     title: "What Is MCP (Model Context Protocol)?",
