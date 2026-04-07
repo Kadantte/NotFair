@@ -705,8 +705,8 @@ export function HomePage() {
               <div
                 key={tier.name}
                 className={`relative rounded-lg border p-6 ${tier.popular
-                    ? "border-[#4CAF6E] bg-[#24231F]"
-                    : "border-[#3D3C36] bg-[#24231F]"
+                  ? "border-[#4CAF6E] bg-[#24231F]"
+                  : "border-[#3D3C36] bg-[#24231F]"
                   }`}
               >
                 {tier.popular && (
