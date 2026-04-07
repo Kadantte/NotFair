@@ -12,6 +12,10 @@ import {
   listAds,
   getNegativeKeywords,
   listAdGroups,
+  pauseCampaign,
+  addNegativeKeyword,
+  pauseKeyword,
+  invalidateCache,
 } from "@/lib/google-ads";
 import { getAuthContext } from "@/lib/session";
 import { computeAuditScore, type AuditInput, type AuditResult } from "@/lib/audit/scoring";
@@ -192,6 +196,7 @@ export async function getAuditDetails() {
     // Flatten results
     const allKeywords = keywordResults.flat().map((k: any) => ({
       criterionId: String(k.criterionId ?? ""),
+      adGroupId: String(k.adGroupId ?? ""),
       text: k.text ?? "",
       qualityScore: k.qualityScore ?? null,
       impressions: k.impressions ?? 0,
@@ -296,4 +301,38 @@ export async function getAuditDetails() {
 
     return { auditResult };
   });
+}
+
+// ─── Mutation actions ────────────────────────────────────────────────
+
+type MutationResult = { success: boolean; error?: string };
+
+async function mutateWithAuth(
+  fn: (auth: Awaited<ReturnType<typeof getAuthContext>>["auth"]) => Promise<MutationResult>,
+): Promise<MutationResult> {
+  return requireAuth(async () => {
+    const { auth } = await getAuthContext();
+    const result = await fn(auth);
+    if (result.success) invalidateCache(auth.customerId);
+    return result;
+  });
+}
+
+export async function pauseCampaignAction(campaignId: string): Promise<MutationResult> {
+  return mutateWithAuth((auth) => pauseCampaign(auth, campaignId));
+}
+
+export async function addNegativeKeywordAction(
+  searchTerm: string,
+  campaignId: string,
+): Promise<MutationResult> {
+  return mutateWithAuth((auth) => addNegativeKeyword(auth, campaignId, searchTerm, "BROAD"));
+}
+
+export async function pauseKeywordAction(
+  campaignId: string,
+  adGroupId: string,
+  criterionId: string,
+): Promise<MutationResult> {
+  return mutateWithAuth((auth) => pauseKeyword(auth, campaignId, adGroupId, criterionId));
 }

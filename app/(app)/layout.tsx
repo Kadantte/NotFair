@@ -332,7 +332,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </aside>
 
             {/* Content */}
-            <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-y-auto">
                 {children}
             </div>
 

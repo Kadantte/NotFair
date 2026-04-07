@@ -47,6 +47,7 @@ export type AuditInput = {
   }>;
   keywords: Array<{
     criterionId: string;
+    adGroupId?: string;
     text: string;
     qualityScore: number | null;
     impressions: number;
@@ -127,6 +128,10 @@ export type TopAction = {
   action: string;
   impact: string;
   category: string;
+  actionType?: "pause_campaign" | "add_negative" | "pause_keyword";
+  targetId?: string;
+  campaignId?: string;
+  adGroupId?: string;
 };
 
 export type AuditResult = {
@@ -143,6 +148,20 @@ export type AuditResult = {
     topCampaign: string | null;
     wastedSpend: number;
   };
+  wastedSearchTerms: Array<{
+    searchTerm: string;
+    cost: number;
+    clicks: number;
+    campaignName: string;
+    campaignId: string;
+    adGroupName: string;
+  }>;
+  zeroCvCampaigns: Array<{
+    id: string;
+    name: string;
+    cost: number;
+    clicks: number;
+  }>;
 };
 
 // ─── Status helpers ──────────────────────────────────────────────────
@@ -650,8 +669,18 @@ function computeISDiagnosis(input: AuditInput): ImpressionShareDiagnosis {
 
 // ─── Top Actions ────────────────────────────────────────────────────
 
+const ACTION_VERBS: Record<string, string> = {
+  pause_keyword: "Pause",
+  add_negative_keyword: "Add negative",
+  review_keyword: "Review",
+  reduce_bid: "Reduce bid on",
+};
+
 function computeTopActions(input: AuditInput): TopAction[] {
-  // Convert to heuristic engine format
+  // Build lookup maps for action wiring
+  const kwById = new Map(input.keywords.map((k) => [k.criterionId, k]));
+  const stCampaignId = new Map(input.searchTerms.map((t) => [t.searchTerm, t.campaignId]));
+
   const heuristicKeywords: KeywordData[] = input.keywords.map((k) => ({
     criterionId: k.criterionId,
     text: k.text,
@@ -681,7 +710,7 @@ function computeTopActions(input: AuditInput): TopAction[] {
   }));
 
   const all: Recommendation[] = [
-    ...findWastefulKeywords(heuristicKeywords, 10), // lower threshold for new accounts
+    ...findWastefulKeywords(heuristicKeywords, 10),
     ...findIrrelevantSearchTerms(heuristicSearchTerms, 1),
     ...findLowQualityKeywords(heuristicKeywords, 3, 5),
     ...findZeroImpressionKeywords(heuristicKeywords),
@@ -692,16 +721,40 @@ function computeTopActions(input: AuditInput): TopAction[] {
     ),
   ];
 
-  // Sort by savings, take top 3
   const sorted = all.sort((a, b) => b.estimatedMonthlySavings - a.estimatedMonthlySavings);
 
-  return sorted.slice(0, 3).map((r) => ({
-    action: `${r.action === "pause_keyword" ? "Pause" : r.action === "add_negative_keyword" ? "Add negative" : r.action === "review_keyword" ? "Review" : r.action === "reduce_bid" ? "Reduce bid on" : "Review"} "${r.target.name}"${r.target.campaignName ? ` in ${r.target.campaignName}` : ""}`,
-    impact: r.estimatedMonthlySavings > 0
-      ? `Save ~$${r.estimatedMonthlySavings.toFixed(2)}/month`
-      : "Improve account health",
-    category: r.action,
-  }));
+  return sorted.slice(0, 5).map((r) => {
+    let actionType: TopAction["actionType"];
+    let targetId: string | undefined;
+    let campaignId: string | undefined;
+    let adGroupId: string | undefined;
+
+    if (r.action === "pause_keyword") {
+      actionType = "pause_keyword";
+      targetId = r.target.id;
+      const kw = kwById.get(r.target.id);
+      campaignId = kw?.campaignId;
+      adGroupId = kw?.adGroupId;
+    } else if (r.action === "add_negative_keyword") {
+      actionType = "add_negative";
+      targetId = r.target.id;
+      campaignId = stCampaignId.get(r.target.id);
+    }
+
+    const verb = ACTION_VERBS[r.action] ?? "Review";
+
+    return {
+      action: `${verb} "${r.target.name}"${r.target.campaignName ? ` in ${r.target.campaignName}` : ""}`,
+      impact: r.estimatedMonthlySavings > 0
+        ? `Save ~$${r.estimatedMonthlySavings.toFixed(2)}/month`
+        : "Improve account health",
+      category: r.action,
+      actionType,
+      targetId,
+      campaignId,
+      adGroupId,
+    };
+  });
 }
 
 // ─── Main Entry ─────────────────────────────────────────────────────
@@ -743,6 +796,25 @@ export function computeAuditScore(input: AuditInput): AuditResult {
 
   const wastedSpend = computeWastedSpend(input);
 
+  const wastedSearchTerms = input.searchTerms
+    .filter((t) => t.conversions === 0 && t.cost > 0)
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 10)
+    .map((t) => ({
+      searchTerm: t.searchTerm,
+      cost: t.cost,
+      clicks: t.clicks,
+      campaignName: t.campaignName,
+      campaignId: t.campaignId,
+      adGroupName: t.adGroupName,
+    }));
+
+  const zeroCvCampaigns = input.campaigns
+    .filter((c) => isEnabled(c.status) && c.cost > 20 && c.clicks > 20 && c.conversions === 0)
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 5)
+    .map((c) => ({ id: c.id, name: c.name, cost: c.cost, clicks: c.clicks }));
+
   return {
     overallScore: clampedScore,
     category: overallCategory(clampedScore),
@@ -757,5 +829,7 @@ export function computeAuditScore(input: AuditInput): AuditResult {
       topCampaign: topCampaign?.name ?? null,
       wastedSpend: wastedSpend.total,
     },
+    wastedSearchTerms,
+    zeroCvCampaigns,
   };
 }
