@@ -809,9 +809,9 @@ function computeISDiagnosis(input: AuditInput): ImpressionShareDiagnosis {
       const campDiagnosis: CampaignISBreakdown["diagnosis"] =
         cb && cr ? "structural" : cb ? "budget" : cr ? "rank" : "healthy";
 
-      // Find top keywords for this campaign, sorted by cost
+      // Find top keywords for this campaign by spend (include paused — they may have recent spend/impressions)
       const campKeywords = input.keywords
-        .filter((k) => k.campaignName === is.campaignName && isEnabled(k.status))
+        .filter((k) => k.campaignName === is.campaignName && (k.cost > 0 || k.impressions > 0))
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 5)
         .map((k) => ({

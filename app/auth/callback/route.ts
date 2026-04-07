@@ -299,6 +299,9 @@ async function createOrRedirectGoogleAdsSession({
         ...(googleEmail ? { googleEmail } : {}),
       });
       setSessionCookies(response, accessToken, account.name || "Google Ads Account");
+      if (isFirstSignup) {
+        response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
+      }
       return response;
     }
 
