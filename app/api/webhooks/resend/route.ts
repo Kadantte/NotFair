@@ -8,7 +8,7 @@ const SOFT_BOUNCE_LIMIT = 3;
  * Resend webhook handler for bounce & complaint events.
  *
  * Configure in Resend dashboard → Webhooks → POST to:
- *   https://adsagent.org/api/webhooks/resend
+ *   https://www.adsagent.org/api/webhooks/resend
  *
  * Events to subscribe: email.bounced, email.complained, email.delivery_delayed
  */

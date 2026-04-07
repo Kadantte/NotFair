@@ -341,15 +341,48 @@ function WastedSpendSection({ result }: { result: AuditResult }) {
 
 // ─── Impression Share Section ────────────────────────────────────────
 
+const DIAGNOSIS_COLORS: Record<string, string> = {
+  healthy: "#4CAF6E",
+  budget: "#D4882A",
+  rank: "#C45D4A",
+  structural: "#C45D4A",
+};
+
+const DIAGNOSIS_LABELS: Record<string, string> = {
+  healthy: "Healthy",
+  budget: "Budget-limited",
+  rank: "Rank-limited",
+  structural: "Structural issue",
+};
+
+const QS_SUB_COLORS: Record<string, string> = {
+  ABOVE_AVERAGE: "#4CAF6E",
+  AVERAGE: "#D4882A",
+  BELOW_AVERAGE: "#C45D4A",
+  UNKNOWN: "#6B6760",
+  UNSPECIFIED: "#6B6760",
+};
+
+const QS_SUB_LABELS: Record<string, string> = {
+  ABOVE_AVERAGE: "Above Avg",
+  AVERAGE: "Average",
+  BELOW_AVERAGE: "Below Avg",
+  UNKNOWN: "—",
+  UNSPECIFIED: "—",
+};
+
+function isColor(val: number): string {
+  return val >= 0.65 ? "#4CAF6E" : val >= 0.4 ? "#D4882A" : "#C45D4A";
+}
+
 function ImpressionShareSection({ result }: { result: AuditResult }) {
   const { impressionShareDiagnosis } = result;
+  const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+
   if (impressionShareDiagnosis.avgIS === null) return null;
 
-  const isColor = (impressionShareDiagnosis.avgIS ?? 0) >= 0.65
-    ? "#4CAF6E"
-    : (impressionShareDiagnosis.avgIS ?? 0) >= 0.4
-      ? "#D4882A"
-      : "#C45D4A";
+  const avgColor = isColor(impressionShareDiagnosis.avgIS ?? 0);
+  const { campaignBreakdown } = impressionShareDiagnosis;
 
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
@@ -357,10 +390,12 @@ function ImpressionShareSection({ result }: { result: AuditResult }) {
         <TrendingDown className="h-4 w-4 text-[#D4882A]" />
         Impression Share Analysis
       </div>
+
+      {/* Account-level summary */}
       <div className="mt-3 flex flex-wrap gap-6">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Search IS</div>
-          <div className="font-mono text-[20px] font-bold" style={{ color: isColor }}>
+          <div className="font-mono text-[20px] font-bold" style={{ color: avgColor }}>
             {fmtPct(impressionShareDiagnosis.avgIS ?? 0)}
           </div>
         </div>
@@ -384,6 +419,205 @@ function ImpressionShareSection({ result }: { result: AuditResult }) {
       <div className="mt-3 text-[13px] text-[#9B9689]">
         {impressionShareDiagnosis.diagnosis}
       </div>
+
+      {/* Per-campaign breakdown */}
+      {campaignBreakdown.length > 0 && (
+        <div className="mt-5 border-t border-[#3D3C36] pt-4">
+          <div className="text-[12px] font-medium uppercase tracking-wider text-[#9B9689] mb-3">
+            By Campaign
+          </div>
+          <div className="space-y-2">
+            {campaignBreakdown.map((camp) => {
+              const campColor = isColor(camp.impressionShare ?? 0);
+              const isExpanded = expandedCampaign === camp.campaignName;
+              const hasKeywords = camp.topKeywords.length > 0;
+              const hasIssue = camp.diagnosis !== "healthy";
+
+              return (
+                <div key={camp.campaignName} className="rounded border border-[#3D3C36] bg-[#1A1917]">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCampaign(isExpanded ? null : camp.campaignName)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {isExpanded
+                        ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#9B9689]" />
+                        : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#9B9689]" />}
+                      <span className="text-[13px] font-medium text-[#E8E4DD] truncate">{camp.campaignName}</span>
+                      <span
+                        className="shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium"
+                        style={{ backgroundColor: `${DIAGNOSIS_COLORS[camp.diagnosis]}20`, color: DIAGNOSIS_COLORS[camp.diagnosis] }}
+                      >
+                        {DIAGNOSIS_LABELS[camp.diagnosis]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0 ml-3">
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase text-[#6B6760]">IS</div>
+                        <div className="font-mono text-[13px] font-bold" style={{ color: campColor }}>
+                          {fmtPct(camp.impressionShare ?? 0)}
+                        </div>
+                      </div>
+                      {camp.budgetLostIS !== null && camp.budgetLostIS > 0 && (
+                        <div className="text-right hidden sm:block">
+                          <div className="text-[10px] uppercase text-[#6B6760]">Budget</div>
+                          <div className="font-mono text-[13px] text-[#9B9689]">
+                            -{fmtPct(camp.budgetLostIS)}
+                          </div>
+                        </div>
+                      )}
+                      {camp.rankLostIS !== null && camp.rankLostIS > 0 && (
+                        <div className="text-right hidden sm:block">
+                          <div className="text-[10px] uppercase text-[#6B6760]">Rank</div>
+                          <div className="font-mono text-[13px] text-[#9B9689]">
+                            -{fmtPct(camp.rankLostIS)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-[#3D3C36] px-4 py-3">
+                      {/* Campaign-level recommendation */}
+                      {hasIssue && (
+                        <div className="mb-3 rounded bg-[#24231F] px-3 py-2 text-[12px] text-[#9B9689]">
+                          {camp.diagnosis === "budget" && (
+                            <>
+                              <span className="font-medium text-[#D4882A]">Recommendation:</span> Your ads are competitive when shown — you&apos;re just running out of budget.
+                              Increase daily budget or pause low-performing keywords to redistribute spend.
+                            </>
+                          )}
+                          {camp.diagnosis === "rank" && (
+                            <>
+                              <span className="font-medium text-[#C45D4A]">Recommendation:</span> You&apos;re losing impressions to ad rank.
+                              Focus on improving Quality Score components below — especially any marked &ldquo;Below Avg&rdquo;.
+                              Better QS = lower CPC + higher position.
+                            </>
+                          )}
+                          {camp.diagnosis === "structural" && (
+                            <>
+                              <span className="font-medium text-[#C45D4A]">Recommendation:</span> Both budget and rank are limiting you.
+                              Tighten targeting first (pause broad/low-QS keywords), then reallocate budget to your best performers.
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Top keywords table */}
+                      {hasKeywords ? (
+                        <div className="overflow-x-auto">
+                          <div className="text-[11px] font-medium uppercase tracking-wider text-[#6B6760] mb-2">
+                            Top Keywords by Spend
+                          </div>
+                          <table className="w-full text-[12px]">
+                            <thead>
+                              <tr className="border-b border-[#3D3C36] text-[10px] uppercase tracking-wider text-[#6B6760]">
+                                <th className="pb-2 text-left">Keyword</th>
+                                <th className="pb-2 text-center">QS</th>
+                                <th className="pb-2 text-center hidden md:table-cell">Ad Relevance</th>
+                                <th className="pb-2 text-center hidden md:table-cell">Landing Page</th>
+                                <th className="pb-2 text-center hidden md:table-cell">Expected CTR</th>
+                                <th className="pb-2 text-right">Spend</th>
+                                <th className="pb-2 text-right hidden sm:table-cell">Impr</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {camp.topKeywords.map((kw) => {
+                                const qsColor = kw.qualityScore === null ? "#6B6760"
+                                  : kw.qualityScore >= 7 ? "#4CAF6E"
+                                  : kw.qualityScore >= 4 ? "#D4882A"
+                                  : "#C45D4A";
+                                return (
+                                  <tr key={kw.text} className="border-b border-[#3D3C36] last:border-0">
+                                    <td className="py-2 pr-3 text-[#E8E4DD] max-w-[180px]">
+                                      <span className="font-mono text-[11px]">{kw.text}</span>
+                                      <span className="ml-1.5 text-[10px] text-[#6B6760]">[{kw.matchType === "EXACT" ? "Exact" : kw.matchType === "PHRASE" ? "Phrase" : "Broad"}]</span>
+                                    </td>
+                                    <td className="py-2 text-center">
+                                      <span className="font-mono font-bold" style={{ color: qsColor }}>
+                                        {kw.qualityScore ?? "—"}
+                                      </span>
+                                      <span className="text-[#6B6760]">/10</span>
+                                    </td>
+                                    <td className="py-2 text-center hidden md:table-cell">
+                                      <span
+                                        className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                        style={{
+                                          backgroundColor: `${QS_SUB_COLORS[kw.creativeQuality]}15`,
+                                          color: QS_SUB_COLORS[kw.creativeQuality],
+                                        }}
+                                      >
+                                        {QS_SUB_LABELS[kw.creativeQuality]}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-center hidden md:table-cell">
+                                      <span
+                                        className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                        style={{
+                                          backgroundColor: `${QS_SUB_COLORS[kw.postClickQuality]}15`,
+                                          color: QS_SUB_COLORS[kw.postClickQuality],
+                                        }}
+                                      >
+                                        {QS_SUB_LABELS[kw.postClickQuality]}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-center hidden md:table-cell">
+                                      <span
+                                        className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                        style={{
+                                          backgroundColor: `${QS_SUB_COLORS[kw.searchPredictedCtr]}15`,
+                                          color: QS_SUB_COLORS[kw.searchPredictedCtr],
+                                        }}
+                                      >
+                                        {QS_SUB_LABELS[kw.searchPredictedCtr]}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-right font-mono text-[#E8E4DD]">{fmt$(kw.cost)}</td>
+                                    <td className="py-2 text-right font-mono text-[#9B9689] hidden sm:table-cell">{fmtN(kw.impressions)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+
+                          {/* QS improvement hints for rank-limited campaigns */}
+                          {(camp.diagnosis === "rank" || camp.diagnosis === "structural") && (() => {
+                            const belowAvgAd = camp.topKeywords.filter(k => k.creativeQuality === "BELOW_AVERAGE").length;
+                            const belowAvgLp = camp.topKeywords.filter(k => k.postClickQuality === "BELOW_AVERAGE").length;
+                            const belowAvgCtr = camp.topKeywords.filter(k => k.searchPredictedCtr === "BELOW_AVERAGE").length;
+                            const hints: string[] = [];
+                            if (belowAvgAd > 0) hints.push(`${belowAvgAd} keyword${belowAvgAd > 1 ? "s" : ""} have below-average ad relevance — rewrite ad copy to better match these keywords`);
+                            if (belowAvgLp > 0) hints.push(`${belowAvgLp} keyword${belowAvgLp > 1 ? "s" : ""} have below-average landing page experience — improve page speed, relevance, and mobile UX`);
+                            if (belowAvgCtr > 0) hints.push(`${belowAvgCtr} keyword${belowAvgCtr > 1 ? "s" : ""} have below-average expected CTR — test new headlines and make ads more compelling`);
+                            if (hints.length === 0) return null;
+                            return (
+                              <div className="mt-3 space-y-1.5">
+                                <div className="text-[11px] font-medium uppercase tracking-wider text-[#6B6760]">
+                                  Fix These to Improve Rank
+                                </div>
+                                {hints.map((hint, i) => (
+                                  <div key={i} className="flex items-start gap-2 text-[11px] text-[#9B9689]">
+                                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#C45D4A]" />
+                                    {hint}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <div className="text-[12px] text-[#6B6760] italic">No keyword data available for this campaign.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

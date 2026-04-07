@@ -618,6 +618,9 @@ export async function getKeywords(
       ad_group_criterion.keyword.match_type,
       ad_group_criterion.status,
       ad_group_criterion.quality_info.quality_score,
+      ad_group_criterion.quality_info.creative_quality,
+      ad_group_criterion.quality_info.post_click_quality_score,
+      ad_group_criterion.quality_info.search_predicted_ctr,
       metrics.impressions, metrics.clicks, metrics.ctr,
       metrics.cost_micros, metrics.average_cpc, metrics.conversions
     FROM keyword_view
@@ -640,6 +643,9 @@ export async function getKeywords(
         matchType: (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "UNKNOWN",
         status: row.ad_group_criterion.status ?? "UNKNOWN",
         qualityScore: row.ad_group_criterion.quality_info?.quality_score ?? null,
+        creativeQuality: row.ad_group_criterion.quality_info?.creative_quality ?? null,
+        postClickQuality: row.ad_group_criterion.quality_info?.post_click_quality_score ?? null,
+        searchPredictedCtr: row.ad_group_criterion.quality_info?.search_predicted_ctr ?? null,
         impressions: row.metrics.impressions ?? 0,
         clicks: row.metrics.clicks ?? 0,
         ctr: row.metrics.ctr ?? 0,

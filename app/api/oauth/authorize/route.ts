@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
   if (!client) {
     return NextResponse.json(
-      { error: "invalid_client", error_description: "Unknown client_id. Generate credentials at adsagent.org." },
+      { error: "invalid_client", error_description: "Unknown client_id. Generate credentials at www.adsagent.org." },
       { status: 401 },
     );
   }
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
   if (!session) {
     return NextResponse.json(
-      { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at adsagent.org and generate new credentials." },
+      { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at www.adsagent.org and generate new credentials." },
       { status: 403 },
     );
   }

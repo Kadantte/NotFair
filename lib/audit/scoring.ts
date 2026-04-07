@@ -51,6 +51,9 @@ export type AuditInput = {
     adGroupId?: string;
     text: string;
     qualityScore: number | null;
+    creativeQuality: number | string | null;
+    postClickQuality: number | string | null;
+    searchPredictedCtr: number | string | null;
     impressions: number;
     clicks: number;
     cost: number;
@@ -124,11 +127,45 @@ export type WastedSpendBreakdown = {
   };
 };
 
+export type QsSubLabel = "ABOVE_AVERAGE" | "AVERAGE" | "BELOW_AVERAGE" | "UNSPECIFIED" | "UNKNOWN";
+
+function normalizeQsLabel(val: number | string | null): QsSubLabel {
+  if (val === null || val === undefined) return "UNKNOWN";
+  const QS_ENUM: Record<number, QsSubLabel> = { 0: "UNSPECIFIED", 1: "UNKNOWN", 2: "BELOW_AVERAGE", 3: "AVERAGE", 4: "ABOVE_AVERAGE" };
+  if (typeof val === "number") return QS_ENUM[val] ?? "UNKNOWN";
+  const s = String(val).toUpperCase();
+  if (s === "ABOVE_AVERAGE" || s === "AVERAGE" || s === "BELOW_AVERAGE") return s;
+  return "UNKNOWN";
+}
+
+export type CampaignISBreakdown = {
+  campaignName: string;
+  impressionShare: number | null;
+  budgetLostIS: number | null;
+  rankLostIS: number | null;
+  totalImpressions: number;
+  totalCost: number;
+  diagnosis: "budget" | "rank" | "structural" | "healthy";
+  topKeywords: Array<{
+    text: string;
+    matchType: string;
+    qualityScore: number | null;
+    creativeQuality: QsSubLabel;
+    postClickQuality: QsSubLabel;
+    searchPredictedCtr: QsSubLabel;
+    impressions: number;
+    clicks: number;
+    cost: number;
+    ctr: number;
+  }>;
+};
+
 export type ImpressionShareDiagnosis = {
   avgIS: number | null;
   budgetLost: number | null;
   rankLost: number | null;
   diagnosis: string;
+  campaignBreakdown: CampaignISBreakdown[];
 };
 
 export type TopAction = {
@@ -734,7 +771,7 @@ function computeWastedSpend(input: AuditInput): WastedSpendBreakdown {
 function computeISDiagnosis(input: AuditInput): ImpressionShareDiagnosis {
   const withData = input.impressionShare.filter((is) => is.impressionShare !== null);
   if (withData.length === 0) {
-    return { avgIS: null, budgetLost: null, rankLost: null, diagnosis: "No impression share data available." };
+    return { avgIS: null, budgetLost: null, rankLost: null, diagnosis: "No impression share data available.", campaignBreakdown: [] };
   }
 
   const totalImpressions = withData.reduce((s, r) => s + r.totalImpressions, 0);
@@ -762,7 +799,47 @@ function computeISDiagnosis(input: AuditInput): ImpressionShareDiagnosis {
     diagnosis = `Structural problem — losing ${((budgetLost ?? 0) * 100).toFixed(0)}% to budget and ${((rankLost ?? 0) * 100).toFixed(0)}% to rank. Consider restructuring keywords and targeting.`;
   }
 
-  return { avgIS, budgetLost, rankLost, diagnosis };
+  // Per-campaign breakdown with top keywords
+  const campaignBreakdown: CampaignISBreakdown[] = input.impressionShare
+    .filter((is) => is.impressionShare !== null)
+    .sort((a, b) => b.totalImpressions - a.totalImpressions)
+    .map((is) => {
+      const cb = (is.budgetLostIS ?? 0) > 0.15;
+      const cr = (is.rankLostIS ?? 0) > 0.20;
+      const campDiagnosis: CampaignISBreakdown["diagnosis"] =
+        cb && cr ? "structural" : cb ? "budget" : cr ? "rank" : "healthy";
+
+      // Find top keywords for this campaign, sorted by cost
+      const campKeywords = input.keywords
+        .filter((k) => k.campaignName === is.campaignName && isEnabled(k.status))
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 5)
+        .map((k) => ({
+          text: k.text,
+          matchType: k.matchType,
+          qualityScore: k.qualityScore,
+          creativeQuality: normalizeQsLabel(k.creativeQuality),
+          postClickQuality: normalizeQsLabel(k.postClickQuality),
+          searchPredictedCtr: normalizeQsLabel(k.searchPredictedCtr),
+          impressions: k.impressions,
+          clicks: k.clicks,
+          cost: k.cost,
+          ctr: k.ctr,
+        }));
+
+      return {
+        campaignName: is.campaignName,
+        impressionShare: is.impressionShare,
+        budgetLostIS: is.budgetLostIS,
+        rankLostIS: is.rankLostIS,
+        totalImpressions: is.totalImpressions,
+        totalCost: is.totalCost,
+        diagnosis: campDiagnosis,
+        topKeywords: campKeywords,
+      };
+    });
+
+  return { avgIS, budgetLost, rankLost, diagnosis, campaignBreakdown };
 }
 
 // ─── Top Actions ────────────────────────────────────────────────────

@@ -39,9 +39,9 @@ function wellOptimizedInput(): AuditInput {
       { id: "2", name: "Non-Brand Services", status: 2, cost: 1500, conversions: 30, clicks: 600, impressions: 15000 },
     ],
     keywords: [
-      { criterionId: "1", text: "brand name", qualityScore: 9, impressions: 3000, clicks: 150, cost: 300, conversions: 40, status: 2, matchType: "EXACT", campaignName: "Brand", campaignId: "1", adGroupName: "Brand", averageCpc: 2.0, ctr: 0.05 },
-      { criterionId: "2", text: "plumber near me", qualityScore: 7, impressions: 8000, clicks: 400, cost: 1200, conversions: 25, status: 2, matchType: "PHRASE", campaignName: "Non-Brand Services", campaignId: "2", adGroupName: "Plumbing", averageCpc: 3.0, ctr: 0.05 },
-      { criterionId: "3", text: "emergency plumber", qualityScore: 8, impressions: 4000, clicks: 200, cost: 500, conversions: 15, status: 2, matchType: "BROAD", campaignName: "Non-Brand Services", campaignId: "2", adGroupName: "Emergency", averageCpc: 2.5, ctr: 0.05 },
+      { criterionId: "1", text: "brand name", qualityScore: 9, creativeQuality: 4, postClickQuality: 4, searchPredictedCtr: 4, impressions: 3000, clicks: 150, cost: 300, conversions: 40, status: 2, matchType: "EXACT", campaignName: "Brand", campaignId: "1", adGroupName: "Brand", averageCpc: 2.0, ctr: 0.05 },
+      { criterionId: "2", text: "plumber near me", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 8000, clicks: 400, cost: 1200, conversions: 25, status: 2, matchType: "PHRASE", campaignName: "Non-Brand Services", campaignId: "2", adGroupName: "Plumbing", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "3", text: "emergency plumber", qualityScore: 8, creativeQuality: 4, postClickQuality: 3, searchPredictedCtr: 4, impressions: 4000, clicks: 200, cost: 500, conversions: 15, status: 2, matchType: "BROAD", campaignName: "Non-Brand Services", campaignId: "2", adGroupName: "Emergency", averageCpc: 2.5, ctr: 0.05 },
     ],
     searchTerms: [
       { searchTerm: "best plumber near me", impressions: 500, clicks: 30, cost: 90, conversions: 5, campaignName: "Non-Brand Services", campaignId: "2", adGroupName: "Plumbing" },
@@ -75,8 +75,8 @@ function newAccountInput(): AuditInput {
       { id: "1", name: "Test Campaign", status: 2, cost: 1.38, conversions: 0, clicks: 2, impressions: 22 },
     ],
     keywords: [
-      { criterionId: "1", text: "google ads skill", qualityScore: null, impressions: 21, clicks: 2, cost: 1.38, conversions: 0, status: 3, matchType: "BROAD", campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1", averageCpc: 0.69, ctr: 0.095 },
-      { criterionId: "2", text: "google ads ai tool", qualityScore: null, impressions: 0, clicks: 0, cost: 0, conversions: 0, status: 2, matchType: "BROAD", campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1", averageCpc: 0, ctr: 0 },
+      { criterionId: "1", text: "google ads skill", qualityScore: null, creativeQuality: null, postClickQuality: null, searchPredictedCtr: null, impressions: 21, clicks: 2, cost: 1.38, conversions: 0, status: 3, matchType: "BROAD", campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1", averageCpc: 0.69, ctr: 0.095 },
+      { criterionId: "2", text: "google ads ai tool", qualityScore: null, creativeQuality: null, postClickQuality: null, searchPredictedCtr: null, impressions: 0, clicks: 0, cost: 0, conversions: 0, status: 2, matchType: "BROAD", campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1", averageCpc: 0, ctr: 0 },
     ],
     searchTerms: [
       { searchTerm: "google skillshop", impressions: 6, clicks: 2, cost: 1.38, conversions: 0, campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1" },
@@ -303,7 +303,7 @@ describe("wasted spend breakdown", () => {
       { id: "1", name: "Services", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000 },
     ];
     input.keywords = [
-      { criterionId: "1", text: "plumber services", qualityScore: 7, impressions: 1000, clicks: 50, cost: 200, conversions: 5, status: 2, matchType: "PHRASE", campaignName: "Services", campaignId: "1", adGroupName: "AG1", averageCpc: 4.0, ctr: 0.05 },
+      { criterionId: "1", text: "plumber services", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 1000, clicks: 50, cost: 200, conversions: 5, status: 2, matchType: "PHRASE", campaignName: "Services", campaignId: "1", adGroupName: "AG1", averageCpc: 4.0, ctr: 0.05 },
     ];
     // "emergency plumber services" shares words with "plumber services" keyword → likely_relevant
     // Has no conversions and >= $10 spend → should appear in qualityIssues
@@ -327,7 +327,7 @@ describe("wasted spend breakdown", () => {
       { id: "1", name: "Services", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000 },
     ];
     input.keywords = [
-      { criterionId: "1", text: "plumber services", qualityScore: 7, impressions: 1000, clicks: 50, cost: 200, conversions: 5, status: 2, matchType: "PHRASE", campaignName: "Services", campaignId: "1", adGroupName: "AG1", averageCpc: 4.0, ctr: 0.05 },
+      { criterionId: "1", text: "plumber services", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 1000, clicks: 50, cost: 200, conversions: 5, status: 2, matchType: "PHRASE", campaignName: "Services", campaignId: "1", adGroupName: "AG1", averageCpc: 4.0, ctr: 0.05 },
     ];
     // "plumber jobs" hits the "job seeker" low-intent pattern → confirmed_waste
     input.searchTerms = [

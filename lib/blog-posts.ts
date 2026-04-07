@@ -236,7 +236,7 @@ export const blogPosts: Record<string, BlogPost> = {
         type: "list",
         content: "",
         items: [
-          "For Google Ads — AdsAgent gives you a ready-to-use MCP server. Connect your Google Ads account at adsagent.org/connect, add the server to your MCP client config, and start querying campaigns in natural language.",
+          "For Google Ads — AdsAgent gives you a ready-to-use MCP server. Connect your Google Ads account at www.adsagent.org/connect, add the server to your MCP client config, and start querying campaigns in natural language.",
           "For development tools — Claude Desktop and Cursor ship with built-in MCP server support for file systems and common dev tools. Check your client's documentation for what is available out of the box.",
           "For other tools — Search the MCP server registries (Smithery, mcp.so) for your specific tool. Most servers include setup instructions that take under five minutes.",
           "For building your own — The MCP specification is open. Anthropic publishes SDKs for TypeScript and Python. If your tool has an API, you can wrap it in an MCP server to make it accessible to any MCP client.",

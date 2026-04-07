@@ -105,7 +105,7 @@ Follow this structure loosely — it's a guide, not a straitjacket:
 
 **The ask (1-2 sentences):**
 - The reader needs to know exactly what to do next. A vague "there's a free tier" with no link is a dead end — the reader nods and closes the email.
-- Include a concrete action: a link to try it (`adsagent.org`), an invitation to reply, or a specific offer ("I can pull a free report on your account").
+- Include a concrete action: a link to try it (`www.adsagent.org`), an invitation to reply, or a specific offer ("I can pull a free report on your account").
 - Best CTAs for cold email: (1) a link they can click right now, (2) "just reply and I'll..." which feels low-effort, or (3) a specific time-bound offer like a free audit.
 - Don't be pushy or create fake urgency. But do make it effortless to say yes.
 
@@ -131,7 +131,7 @@ Your opening line here.
 
 The bridge and offer.
 
-The ask. Try it free at adsagent.org — or just reply.
+The ask. Try it free at www.adsagent.org — or just reply.
 
 — Tong
 Founder, AdsAgent
