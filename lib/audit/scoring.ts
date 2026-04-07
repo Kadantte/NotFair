@@ -116,6 +116,12 @@ export type WastedSpendBreakdown = {
   pct: number;
   annualized: number;
   categories: Array<{ label: string; amount: number; items: string[] }>;
+  // Separate bucket for relevant-but-not-converting spend (fix funnel, don't add negatives)
+  qualityIssues: {
+    total: number;
+    pct: number;
+    categories: Array<{ label: string; amount: number; description: string; items: string[] }>;
+  };
 };
 
 export type ImpressionShareDiagnosis = {
@@ -552,9 +558,18 @@ export function scoreSpendEfficiency(input: AuditInput): Omit<DimensionScore, "k
   const wastedKw = keywords.filter((k) => k.conversions === 0 && k.clicks > 10);
   const wastedKwSpend = wastedKw.reduce((s, k) => s + k.cost, 0);
 
-  // Wasted search term spend (0 conversions)
-  const wastedST = searchTerms.filter((t) => t.conversions === 0 && t.clicks > 0);
-  const wastedSTSpend = wastedST.reduce((s, t) => s + t.cost, 0);
+  // Wasted search term spend: use semantic analysis (same as computeWastedSpend)
+  const totalCampaignClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalCampaignImpressions = campaigns.reduce((s, c) => s + c.impressions, 0);
+  const avgCtr = totalCampaignImpressions > 0 ? totalCampaignClicks / totalCampaignImpressions : 0;
+  const avgCpc = totalCampaignClicks > 0 ? totalSpend / totalCampaignClicks : 0;
+  const kwTexts = keywords.filter(k => isEnabled(k.status)).map(k => k.text);
+
+  const semanticWastedSTs = searchTerms
+    .filter(t => t.conversions === 0 && t.cost > 0)
+    .map(t => analyzeSearchTermWaste(t, kwTexts, avgCtr, avgCpc))
+    .filter(r => r.classification === "confirmed_waste" || r.classification === "likely_waste");
+  const wastedSTSpend = semanticWastedSTs.reduce((s, r) => s + r.cost, 0);
 
   const totalWaste = wastedKwSpend + wastedSTSpend;
   const wastePct = totalWaste / totalSpend;
@@ -595,33 +610,118 @@ export function scoreSpendEfficiency(input: AuditInput): Omit<DimensionScore, "k
 
 function computeWastedSpend(input: AuditInput): WastedSpendBreakdown {
   const totalSpend = input.campaigns.reduce((s, c) => s + c.cost, 0);
+  const totalClicks = input.campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalImpressions = input.campaigns.reduce((s, c) => s + c.impressions, 0);
+  const accountAvgCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+  const accountAvgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
+  const activeKeywordTexts = input.keywords.filter(k => isEnabled(k.status)).map(k => k.text);
 
-  // Non-converting keywords with >10 clicks
-  const wastedKw = input.keywords.filter((k) => k.conversions === 0 && k.clicks > 10);
-  const kwAmount = wastedKw.reduce((s, k) => s + k.cost, 0);
-  const kwItems = wastedKw
-    .sort((a, b) => b.cost - a.cost)
-    .slice(0, 5)
-    .map((k) => `"${k.text}": $${k.cost.toFixed(2)} (${k.clicks} clicks, 0 conv)`);
+  // ── Semantic analysis on all non-converting search terms ─────────
+  const nonConvertingSTs = input.searchTerms.filter(t => t.conversions === 0 && t.cost > 0);
+  const stAnalyses = nonConvertingSTs.map(t =>
+    analyzeSearchTermWaste(t, activeKeywordTexts, accountAvgCtr, accountAvgCpc)
+  );
 
-  // Irrelevant search terms
-  const wastedST = input.searchTerms.filter((t) => t.conversions === 0 && t.clicks > 0);
-  const stAmount = wastedST.reduce((s, t) => s + t.cost, 0);
-  const stItems = wastedST
-    .sort((a, b) => b.cost - a.cost)
-    .slice(0, 5)
-    .map((t) => `"${t.searchTerm}": $${t.cost.toFixed(2)} (${t.clicks} clicks)`);
+  // TRUE WASTE: irrelevant traffic — add negatives or tighten match type
+  const wastedSTs = stAnalyses.filter(r =>
+    r.classification === "confirmed_waste" || r.classification === "likely_waste"
+  );
 
-  const total = kwAmount + stAmount;
+  // QUALITY ISSUE: relevant traffic not converting — fix landing page/offer/ad copy
+  // Only flag when there's meaningful spend ($10+) to avoid noise
+  const qualityIssueSTs = stAnalyses.filter(r =>
+    (r.classification === "likely_relevant" || r.classification === "possible_waste") && r.cost >= 10
+  );
+
+  const stWasteAmount = wastedSTs.reduce((s, r) => s + r.cost, 0);
+  const stQualityAmount = qualityIssueSTs.reduce((s, r) => s + r.cost, 0);
+
+  // ── Broad match structural waste ─────────────────────────────────
+  // Broad match keywords with no conversions whose campaigns aren't covered
+  // by our search term data sample (avoids double-counting)
+  const campaignsWithSTData = new Set(input.searchTerms.map(t => t.campaignId));
+  const enabledKws = input.keywords.filter(k => isEnabled(k.status));
+
+  const broadLeakageKws = enabledKws.filter(k =>
+    (k.matchType === "BROAD" || k.matchType === "2") &&
+    k.conversions === 0 &&
+    k.clicks > 20 &&
+    !campaignsWithSTData.has(k.campaignId)
+  );
+  const broadLeakageAmount = broadLeakageKws.reduce((s, k) => s + k.cost, 0);
+
+  // ── Low Quality Score spend (quality issue) ───────────────────────
+  // QS < 4 means Google is charging a CPC premium (est. 50-200% above market rate)
+  // This is a quality issue: improve ad relevance + landing page to fix
+  const lowQsKws = enabledKws.filter(k =>
+    k.qualityScore !== null && k.qualityScore > 0 && k.qualityScore < 4 && k.cost >= 10
+  );
+  const lowQsAmount = lowQsKws.reduce((s, k) => s + k.cost, 0);
+
+  // ── Build waste categories ────────────────────────────────────────
+  const wasteCategories: Array<{ label: string; amount: number; items: string[] }> = [];
+
+  if (stWasteAmount > 0) {
+    wasteCategories.push({
+      label: "Irrelevant search terms",
+      amount: stWasteAmount,
+      items: [...wastedSTs]
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 5)
+        .map(r => `"${r.searchTerm}": $${r.cost.toFixed(2)} — ${r.reason}`),
+    });
+  }
+
+  if (broadLeakageAmount > 0) {
+    wasteCategories.push({
+      label: "Broad match leakage",
+      amount: broadLeakageAmount,
+      items: [...broadLeakageKws]
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 3)
+        .map(k => `"${k.text}" [Broad]: $${k.cost.toFixed(2)}, ${k.clicks} clicks, 0 conv`),
+    });
+  }
+
+  // ── Build quality issue categories ───────────────────────────────
+  const qualityCategories: Array<{ label: string; amount: number; description: string; items: string[] }> = [];
+
+  if (stQualityAmount > 0) {
+    qualityCategories.push({
+      label: "Relevant queries not converting",
+      amount: stQualityAmount,
+      description: "Queries matching your keywords but not buying. Likely a landing page, offer, or ad copy issue — don't add as negatives.",
+      items: [...qualityIssueSTs]
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 5)
+        .map(r => `"${r.searchTerm}": $${r.cost.toFixed(2)} — ${r.reason}`),
+    });
+  }
+
+  if (lowQsAmount > 0) {
+    qualityCategories.push({
+      label: "Low Quality Score spend (CPC premium)",
+      amount: lowQsAmount,
+      description: "Keywords with QS < 4 paying an estimated 50–200% CPC premium. Fix: improve ad/keyword relevance and landing page experience.",
+      items: [...lowQsKws]
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 4)
+        .map(k => `"${k.text}": QS ${k.qualityScore}/10, $${k.cost.toFixed(2)} spent`),
+    });
+  }
+
+  const total = stWasteAmount + broadLeakageAmount;
 
   return {
     total,
     pct: totalSpend > 0 ? total / totalSpend : 0,
     annualized: total * 12,
-    categories: [
-      { label: "Non-converting keywords", amount: kwAmount, items: kwItems },
-      { label: "Irrelevant search terms", amount: stAmount, items: stItems },
-    ].filter((c) => c.amount > 0),
+    categories: wasteCategories,
+    qualityIssues: {
+      total: stQualityAmount + lowQsAmount,
+      pct: totalSpend > 0 ? (stQualityAmount + lowQsAmount) / totalSpend : 0,
+      categories: qualityCategories,
+    },
   };
 }
 

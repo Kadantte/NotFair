@@ -38,7 +38,7 @@ export function buildMetadata({
   const canonical = new URL(path, SITE_URL).toString();
 
   return {
-    title,
+    title: { absolute: title },
     description,
     keywords,
     category,

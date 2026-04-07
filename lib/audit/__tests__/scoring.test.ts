@@ -270,8 +270,75 @@ describe("wasted spend breakdown", () => {
 
   it("returns zero waste for well-optimized account", () => {
     const result = computeAuditScore(wellOptimizedInput());
-    // All keywords have conversions in the well-optimized input
+    // All search terms have conversions in the well-optimized input
     expect(result.wastedSpend.total).toBe(0);
+  });
+
+  it("wastedSpend has qualityIssues field with correct shape", () => {
+    const result = computeAuditScore(newAccountInput());
+    expect(result.wastedSpend.qualityIssues).toBeDefined();
+    expect(typeof result.wastedSpend.qualityIssues.total).toBe("number");
+    expect(typeof result.wastedSpend.qualityIssues.pct).toBe("number");
+    expect(result.wastedSpend.qualityIssues.pct).toBeGreaterThanOrEqual(0);
+    expect(result.wastedSpend.qualityIssues.pct).toBeLessThanOrEqual(1);
+    expect(Array.isArray(result.wastedSpend.qualityIssues.categories)).toBe(true);
+  });
+
+  it("quality issue categories have description field", () => {
+    const result = computeAuditScore(newAccountInput());
+    for (const cat of result.wastedSpend.qualityIssues.categories) {
+      expect(typeof cat.label).toBe("string");
+      expect(typeof cat.amount).toBe("number");
+      expect(typeof cat.description).toBe("string");
+      expect(cat.description.length).toBeGreaterThan(0);
+      expect(Array.isArray(cat.items)).toBe(true);
+    }
+  });
+
+  it("relevant-but-not-converting search terms go into qualityIssues, not waste categories", () => {
+    // Build an input where search term shares core words with an active keyword
+    // (so it is "likely_relevant") but has no conversions and meaningful spend
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Services", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000 },
+    ];
+    input.keywords = [
+      { criterionId: "1", text: "plumber services", qualityScore: 7, impressions: 1000, clicks: 50, cost: 200, conversions: 5, status: 2, matchType: "PHRASE", campaignName: "Services", campaignId: "1", adGroupName: "AG1", averageCpc: 4.0, ctr: 0.05 },
+    ];
+    // "emergency plumber services" shares words with "plumber services" keyword → likely_relevant
+    // Has no conversions and >= $10 spend → should appear in qualityIssues
+    input.searchTerms = [
+      { searchTerm: "emergency plumber services", impressions: 200, clicks: 20, cost: 80, conversions: 0, campaignName: "Services", campaignId: "1", adGroupName: "AG1" },
+    ];
+    const result = computeAuditScore(input);
+
+    // Should NOT appear in true waste categories
+    const wasteItems = result.wastedSpend.categories.flatMap(c => c.items);
+    expect(wasteItems.some(item => item.includes("emergency plumber services"))).toBe(false);
+
+    // Should appear in quality issues
+    const qualityItems = result.wastedSpend.qualityIssues.categories.flatMap(c => c.items);
+    expect(qualityItems.some(item => item.includes("emergency plumber services"))).toBe(true);
+  });
+
+  it("confirmed waste search terms go into waste categories, not qualityIssues", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Services", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000 },
+    ];
+    input.keywords = [
+      { criterionId: "1", text: "plumber services", qualityScore: 7, impressions: 1000, clicks: 50, cost: 200, conversions: 5, status: 2, matchType: "PHRASE", campaignName: "Services", campaignId: "1", adGroupName: "AG1", averageCpc: 4.0, ctr: 0.05 },
+    ];
+    // "plumber jobs" hits the "job seeker" low-intent pattern → confirmed_waste
+    input.searchTerms = [
+      { searchTerm: "plumber jobs hiring", impressions: 500, clicks: 50, cost: 200, conversions: 0, campaignName: "Services", campaignId: "1", adGroupName: "AG1" },
+    ];
+    const result = computeAuditScore(input);
+
+    // Should appear in true waste categories (irrelevant search terms)
+    const wasteItems = result.wastedSpend.categories.flatMap(c => c.items);
+    expect(wasteItems.some(item => item.includes("plumber jobs hiring"))).toBe(true);
+    expect(result.wastedSpend.total).toBeGreaterThan(0);
   });
 });
 

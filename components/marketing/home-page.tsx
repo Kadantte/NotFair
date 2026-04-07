@@ -58,7 +58,7 @@ const comparisonRows = [
     dim: "Monthly cost",
     self: '"Free" (your time)',
     agency: "$1,500–$6,000",
-    us: "$149–$699",
+    us: "Free – $99/mo",
   },
   {
     dim: "Your time",
@@ -135,42 +135,31 @@ const verticals = [
 
 const pricingTiers = [
   {
-    name: "Starter",
-    spend: "$1K–$5K/mo ad spend",
-    price: 149,
-    savings: "90% cheaper than an agency",
+    name: "Free",
+    spend: "Get started at no cost",
+    price: 0,
+    savings: "No credit card required",
     features: [
+      "300 operations/month",
       "Full campaign audit",
       "Wasted spend detection",
       "Negative keyword management",
-      "Weekly AI check-ins",
+      "Unlimited ad accounts",
+      "Works in Claude for Work & Claude Code",
     ],
   },
   {
     name: "Growth",
-    spend: "$5K–$15K/mo ad spend",
-    price: 349,
-    savings: "80% cheaper than an agency",
+    spend: "For serious advertisers",
+    price: 99,
+    savings: "Fraction of what agencies charge",
     popular: true,
     features: [
-      "Everything in Starter",
+      "Unlimited operations",
+      "Everything in Free",
       "Bid optimization",
       "Search term analysis",
-      "A/B test setup",
-      "Daily monitoring",
-    ],
-  },
-  {
-    name: "Pro",
-    spend: "$15K–$50K/mo ad spend",
-    price: 699,
-    savings: "70% cheaper than an agency",
-    features: [
-      "Everything in Growth",
-      "Multi-campaign strategy",
-      "Competitor analysis",
       "Priority support",
-      "Custom reporting",
     ],
   },
 ];
@@ -231,9 +220,9 @@ function AuditCTA({ session }: { session: { connected: boolean } }) {
     if (loading) return;
     setLoading(true);
     if (session.connected) {
-      window.location.assign("/connect");
+      window.location.assign("/audit");
     } else {
-      startGoogleConnect("/connect");
+      startGoogleConnect("/audit");
     }
   }
 
@@ -757,7 +746,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="mx-auto grid max-w-2xl gap-4 md:grid-cols-2">
             {pricingTiers.map((tier) => (
               <div
                 key={tier.name}
@@ -776,10 +765,16 @@ export function HomePage() {
                 </h3>
                 <p className="mt-1 text-xs text-[#9B9689]">{tier.spend}</p>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-[#E8E4DD]">
-                    ${tier.price}
-                  </span>
-                  <span className="text-sm text-[#9B9689]">/mo</span>
+                  {tier.price === 0 ? (
+                    <span className="text-3xl font-bold text-[#E8E4DD]">Free</span>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-[#E8E4DD]">
+                        ${tier.price}
+                      </span>
+                      <span className="text-sm text-[#9B9689]">/mo</span>
+                    </>
+                  )}
                 </div>
                 <p className="mt-1 text-xs font-medium text-[#4CAF6E]">
                   {tier.savings}

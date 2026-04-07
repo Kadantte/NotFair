@@ -331,8 +331,9 @@ async function createOrRedirectGoogleAdsSession({
   }
 
   const accountsParam = encodeURIComponent(JSON.stringify(accountsList));
+  const nextParam = next !== "/connect" ? `&next=${encodeURIComponent(next)}` : "";
   return NextResponse.redirect(
-    `${origin}/connect?pending=${pendingToken}&accounts=${accountsParam}`,
+    `${origin}/connect?pending=${pendingToken}&accounts=${accountsParam}${nextParam}`,
   );
 }
 

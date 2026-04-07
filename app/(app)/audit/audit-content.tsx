@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench } from "lucide-react";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, DimensionScore } from "@/lib/audit/scoring";
@@ -250,7 +250,7 @@ function ScorecardTable({ dimensions, loading }: { dimensions: DimensionScore[] 
 
 function WastedSpendSection({ result }: { result: AuditResult }) {
   const { wastedSpend } = result;
-  if (wastedSpend.total === 0) return null;
+  if (wastedSpend.total === 0 && wastedSpend.qualityIssues.total === 0) return null;
 
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
@@ -258,39 +258,81 @@ function WastedSpendSection({ result }: { result: AuditResult }) {
         <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
         Wasted Spend Analysis
       </div>
-      <div className="mt-3 flex flex-wrap gap-6">
-        <div>
-          <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">30-Day Waste</div>
-          <div className="font-mono text-[20px] font-bold text-[#C45D4A]">{fmt$(wastedSpend.total)}</div>
-        </div>
-        <div>
-          <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">% of Spend</div>
-          <div className="font-mono text-[20px] font-bold text-[#C45D4A]">{fmtPct(wastedSpend.pct)}</div>
-        </div>
-        <div>
-          <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Annualized</div>
-          <div className="font-mono text-[20px] font-bold text-[#D4882A]">~{fmt$(wastedSpend.annualized)}</div>
-        </div>
-      </div>
-      {wastedSpend.categories.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {wastedSpend.categories.map((cat) => (
-            <div key={cat.label}>
-              <div className="flex items-center justify-between text-[12px]">
-                <span className="text-[#9B9689]">{cat.label}</span>
-                <span className="font-mono text-[#E8E4DD]">{fmt$(cat.amount)}</span>
-              </div>
-              {cat.items.length > 0 && (
-                <ul className="mt-1 space-y-0.5">
-                  {cat.items.map((item) => (
-                    <li key={item} className="text-[11px] text-[#9B9689] pl-3">
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              )}
+      {wastedSpend.total > 0 && (
+        <>
+          <div className="mt-3 flex flex-wrap gap-6">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">30-Day Waste</div>
+              <div className="font-mono text-[20px] font-bold text-[#C45D4A]">{fmt$(wastedSpend.total)}</div>
             </div>
-          ))}
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">% of Spend</div>
+              <div className="font-mono text-[20px] font-bold text-[#C45D4A]">{fmtPct(wastedSpend.pct)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Annualized</div>
+              <div className="font-mono text-[20px] font-bold text-[#D4882A]">~{fmt$(wastedSpend.annualized)}</div>
+            </div>
+          </div>
+          {wastedSpend.categories.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {wastedSpend.categories.map((cat) => (
+                <div key={cat.label}>
+                  <div className="flex items-center justify-between text-[12px]">
+                    <span className="text-[#9B9689]">{cat.label}</span>
+                    <span className="font-mono text-[#E8E4DD]">{fmt$(cat.amount)}</span>
+                  </div>
+                  {cat.items.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {cat.items.map((item) => (
+                        <li key={item} className="text-[11px] text-[#9B9689] pl-3">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {wastedSpend.qualityIssues.total > 0 && (
+        <div className={wastedSpend.total > 0 ? "mt-4 border-t border-[#3D3C36] pt-4" : "mt-3"}>
+          <div className="flex items-center gap-2 text-[13px] font-medium text-[#D4882A]">
+            <Wrench className="h-3.5 w-3.5" />
+            Quality Issues — Fix the Funnel, Don&apos;t Block
+          </div>
+          <div className="mt-2 flex flex-wrap gap-6">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Fixable Spend</div>
+              <div className="font-mono text-[18px] font-bold text-[#D4882A]">{fmt$(wastedSpend.qualityIssues.total)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">% of Spend</div>
+              <div className="font-mono text-[18px] font-bold text-[#D4882A]">{fmtPct(wastedSpend.qualityIssues.pct)}</div>
+            </div>
+          </div>
+          {wastedSpend.qualityIssues.categories.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {wastedSpend.qualityIssues.categories.map((cat) => (
+                <div key={cat.label}>
+                  <div className="flex items-center justify-between text-[12px]">
+                    <span className="text-[#9B9689]">{cat.label}</span>
+                    <span className="font-mono text-[#E8E4DD]">{fmt$(cat.amount)}</span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-[#6B6760] italic">{cat.description}</p>
+                  {cat.items.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {cat.items.map((item) => (
+                        <li key={item} className="text-[11px] text-[#9B9689] pl-3">{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

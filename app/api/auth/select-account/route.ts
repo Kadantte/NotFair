@@ -14,7 +14,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { pendingToken, accounts } = body;
+  const { pendingToken, accounts, next: rawNext } = body;
+  const next = typeof rawNext === 'string' && rawNext.startsWith('/') ? rawNext : '/connect';
 
   if (!Array.isArray(accounts) || accounts.length === 0) {
     return NextResponse.json(
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
 
   const isNewSignup = pendingToken && !session.customerId;
   const response = NextResponse.json({
-    redirectUrl: `${getAppOrigin()}/connect`,
+    redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect'}`,
   });
   setSessionCookies(response, session.accessToken, accountNames);
   if (isNewSignup) {

@@ -78,6 +78,11 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
+        href: "/google-ads-audit",
+        title: "Free Google Ads Audit",
+        description: "Score your account across 7 dimensions and find wasted spend in 5 minutes.",
+      },
+      {
         href: "/google-ads-mcp",
         title: "Google Ads MCP",
         description: "See how AdsAgent works as a Google Ads MCP server.",
@@ -86,11 +91,6 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         href: "/ai-google-ads-optimization",
         title: "AI Google Ads optimization",
         description: "Learn how teams use AdsAgent to prioritize optimizations.",
-      },
-      {
-        href: "/impact",
-        title: "Impact tracking",
-        description: "Review how AdsAgent records changes and before/after context.",
       },
     ],
   },
@@ -342,14 +342,14 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
+        href: "/google-ads-audit",
+        title: "Free Google Ads Audit",
+        description: "Start with a free account audit to find the biggest optimization wins.",
+      },
+      {
         href: "/ai-google-ads-agent",
         title: "AI Google Ads agent",
         description: "Start with the broader AdsAgent positioning.",
-      },
-      {
-        href: "/impact",
-        title: "Impact tracking",
-        description: "See where AdsAgent records post-change context.",
       },
       {
         href: "/google-ads-mcp",

@@ -2,7 +2,7 @@ import { HomePage } from "@/components/marketing/home-page";
 import { buildHomepageJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Google Ads MCP Server for Claude | AdsAgent",
+  title: "Google Ads MCP Server & Free Audit for Claude | AdsAgent",
   description:
     "AdsAgent is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude Cowork and let AI manage your campaigns.",
   path: "/",

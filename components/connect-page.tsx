@@ -422,6 +422,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
     const selectionMode = searchParams.get('mode');
     const accountsParam = searchParams.get('accounts');
     const selectedParam = searchParams.get('selected');
+    const nextAfterConnect = searchParams.get('next') ?? '/connect';
 
     const [session, setSession] = useState<Session>(initialSession);
     const [error, setError] = useState<string | null>(urlError);
@@ -538,6 +539,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                 body: JSON.stringify({
                     pendingToken,
                     accounts: selected,
+                    next: nextAfterConnect,
                 }),
             });
             const data = await res.json();
