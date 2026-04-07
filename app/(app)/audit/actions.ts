@@ -1,0 +1,299 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import {
+  getAccountInfo,
+  getAccountSettings,
+  listCampaigns,
+  getConversionActions,
+  getKeywords,
+  getSearchTermReport,
+  getImpressionShare,
+  listAds,
+  getNegativeKeywords,
+  listAdGroups,
+} from "@/lib/google-ads";
+import { getAuthContext } from "@/lib/session";
+import { computeAuditScore, type AuditInput, type AuditResult } from "@/lib/audit/scoring";
+
+function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+  return fn().catch((err) => {
+    if (err instanceof Error && err.message === "Not authenticated") {
+      redirect("/connect");
+    }
+    throw err;
+  });
+}
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export type AuditOverview = Awaited<ReturnType<typeof getAuditOverview>>;
+export type AuditDetails = Awaited<ReturnType<typeof getAuditDetails>>;
+
+// ─── Phase 1: Fast overview (~4 parallel API calls) ─────────────────
+
+export async function getAuditOverview() {
+  return requireAuth(async () => {
+    const { auth, session } = await getAuthContext();
+
+    const [accountInfo, accountSettingsResult, campaigns, conversionActionsResult] =
+      await Promise.all([
+        getAccountInfo(auth),
+        getAccountSettings(auth),
+        listCampaigns(auth, { limit: 50, days: 30 }),
+        getConversionActions(auth),
+      ]);
+
+    const enabledCampaigns = campaigns.filter(
+      (c) => c.status === "ENABLED" || c.status === 2,
+    );
+
+    const totalSpend = campaigns.reduce((s, c) => s + c.cost, 0);
+    const totalConversions = campaigns.reduce((s, c) => s + c.conversions, 0);
+    const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+    const totalImpressions = campaigns.reduce((s, c) => s + c.impressions, 0);
+
+    return {
+      accountId: session.customerId,
+      accountName: accountInfo.name,
+      isEmpty: enabledCampaigns.length === 0 && totalSpend === 0,
+      metrics: {
+        totalSpend,
+        totalConversions,
+        totalClicks,
+        totalImpressions,
+        cpa: totalConversions > 0 ? totalSpend / totalConversions : null,
+        campaignCount: enabledCampaigns.length,
+      },
+      accountSettings: {
+        autoTaggingEnabled: accountSettingsResult.autoTaggingEnabled,
+        conversionTrackingId: accountSettingsResult.conversionTrackingId,
+        trackingUrlTemplate: accountSettingsResult.trackingUrlTemplate,
+      },
+      conversionActions: conversionActionsResult,
+      campaigns: campaigns.map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        cost: c.cost,
+        conversions: c.conversions,
+        clicks: c.clicks,
+        impressions: c.impressions,
+      })),
+    };
+  });
+}
+
+// ─── Phase 2: Detailed analysis (parallel per-campaign) ─────────────
+
+export async function getAuditDetails() {
+  return requireAuth(async () => {
+    const { auth, session } = await getAuthContext();
+
+    const campaigns = await listCampaigns(auth, { limit: 50, days: 30 });
+    const enabledCampaigns = campaigns.filter(
+      (c) => c.status === "ENABLED" || c.status === 2,
+    );
+
+    if (enabledCampaigns.length === 0 && campaigns.reduce((s, c) => s + c.cost, 0) === 0) {
+      return { auditResult: null };
+    }
+
+    // Top 5 campaigns by impressions
+    const topCampaigns = [...enabledCampaigns]
+      .sort((a, b) => b.impressions - a.impressions)
+      .slice(0, 5);
+
+    const campaignIds = topCampaigns.map((c) => c.id);
+
+    // Parallel fetch per campaign
+    const [
+      keywordResults,
+      searchTermResults,
+      impressionShareResults,
+      adResults,
+      negativeResults,
+      adGroupResults,
+    ] = await Promise.all([
+      Promise.all(
+        campaignIds.map(async (id) => {
+          try {
+            const r = await getKeywords(auth, id, 30, 100);
+            return r.keywords;
+          } catch {
+            return [];
+          }
+        }),
+      ),
+      Promise.all(
+        campaignIds.map(async (id) => {
+          try {
+            const r = await getSearchTermReport(auth, id, 30, 100);
+            return r.searchTerms;
+          } catch {
+            return [];
+          }
+        }),
+      ),
+      Promise.all(
+        campaignIds.map(async (id, idx) => {
+          try {
+            const r = await getImpressionShare(auth, id, 30);
+            return {
+              campaignName: topCampaigns[idx].name,
+              impressionShare: r.impressionShare,
+              budgetLostIS: r.budgetLostImpressionShare,
+              rankLostIS: r.rankLostImpressionShare,
+              totalImpressions: r.totalImpressions,
+              totalCost: r.totalCost ?? 0,
+            };
+          } catch {
+            return {
+              campaignName: topCampaigns[idx].name,
+              impressionShare: null as number | null,
+              budgetLostIS: null as number | null,
+              rankLostIS: null as number | null,
+              totalImpressions: 0,
+              totalCost: 0,
+            };
+          }
+        }),
+      ),
+      Promise.all(
+        campaignIds.map(async (id) => {
+          try {
+            const r = await listAds(auth, id, undefined, 30, 50);
+            return r.ads;
+          } catch {
+            return [];
+          }
+        }),
+      ),
+      Promise.all(
+        campaignIds.map(async (id) => {
+          try {
+            return await getNegativeKeywords(auth, id, 500);
+          } catch {
+            return [];
+          }
+        }),
+      ),
+      Promise.all(
+        campaignIds.map(async (id) => {
+          try {
+            return await listAdGroups(auth, id, 100);
+          } catch {
+            return [];
+          }
+        }),
+      ),
+    ]);
+
+    // Flatten results
+    const allKeywords = keywordResults.flat().map((k: any) => ({
+      criterionId: String(k.criterionId ?? ""),
+      text: k.text ?? "",
+      qualityScore: k.qualityScore ?? null,
+      impressions: k.impressions ?? 0,
+      clicks: k.clicks ?? 0,
+      cost: k.cost ?? 0,
+      conversions: k.conversions ?? 0,
+      status: k.status ?? "UNKNOWN",
+      matchType: k.matchType ?? "UNKNOWN",
+      campaignName: k.adGroupName ? topCampaigns.find((c) => keywordResults.some((kr, i) => kr.includes(k) && campaignIds[i] === c.id))?.name ?? "" : "",
+      campaignId: "",
+      adGroupName: k.adGroupName ?? "",
+      averageCpc: k.averageCpc ?? 0,
+      ctr: k.ctr ?? 0,
+    }));
+
+    // Fix campaignId/campaignName mapping
+    for (let i = 0; i < campaignIds.length; i++) {
+      for (const kw of keywordResults[i] as any[]) {
+        const match = allKeywords.find(
+          (ak) => ak.criterionId === String(kw.criterionId ?? ""),
+        );
+        if (match) {
+          match.campaignId = campaignIds[i];
+          match.campaignName = topCampaigns[i].name;
+        }
+      }
+    }
+
+    const allSearchTerms = searchTermResults.flat().map((t: any, _idx: number) => {
+      // Find which campaign this search term belongs to
+      let campaignId = "";
+      let campaignName = "";
+      for (let i = 0; i < campaignIds.length; i++) {
+        if ((searchTermResults[i] as any[]).includes(t)) {
+          campaignId = campaignIds[i];
+          campaignName = topCampaigns[i].name;
+          break;
+        }
+      }
+      return {
+        searchTerm: t.searchTerm ?? "",
+        impressions: t.impressions ?? 0,
+        clicks: t.clicks ?? 0,
+        cost: t.cost ?? 0,
+        conversions: t.conversions ?? 0,
+        campaignName,
+        campaignId,
+        adGroupName: t.adGroupName ?? "",
+      };
+    });
+
+    const allAds = adResults.flat().map((a: any) => ({
+      adId: String(a.adId ?? ""),
+      type: a.type ?? "UNKNOWN",
+      headlines: a.headlines ?? [],
+      descriptions: a.descriptions ?? [],
+      impressions: a.impressions ?? 0,
+      clicks: a.clicks ?? 0,
+      cost: a.cost ?? 0,
+      conversions: a.conversions ?? 0,
+      adGroupId: String(a.adGroupId ?? ""),
+      adGroupName: a.adGroupName ?? "",
+      status: a.status ?? "UNKNOWN",
+    }));
+
+    const allNegatives = negativeResults.flat().map((n: any) => ({
+      text: n.text ?? "",
+      campaignId: "",
+    }));
+
+    const totalAdGroups = adGroupResults.flat().length;
+
+    // Build the overview data again for scoring (needs account settings + conversion actions)
+    const accountSettingsResult = await getAccountSettings(auth);
+    const conversionActionsResult = await getConversionActions(auth);
+
+    const auditInput: AuditInput = {
+      accountSettings: {
+        autoTaggingEnabled: accountSettingsResult.autoTaggingEnabled,
+        conversionTrackingId: accountSettingsResult.conversionTrackingId,
+        trackingUrlTemplate: accountSettingsResult.trackingUrlTemplate,
+      },
+      conversionActions: conversionActionsResult,
+      campaigns: campaigns.map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        cost: c.cost,
+        conversions: c.conversions,
+        clicks: c.clicks,
+        impressions: c.impressions,
+      })),
+      keywords: allKeywords,
+      searchTerms: allSearchTerms,
+      ads: allAds,
+      impressionShare: impressionShareResults,
+      negativeKeywords: allNegatives,
+      adGroupCount: totalAdGroups,
+    };
+
+    const auditResult = computeAuditScore(auditInput);
+
+    return { auditResult };
+  });
+}

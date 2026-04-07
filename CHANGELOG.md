@@ -2,6 +2,19 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.9.0] - 2026-04-06
+
+### Added
+- **Account Audit page** (`/audit`) — 7-dimension scoring engine evaluates conversion tracking, campaign structure, keyword health, search term quality, ad copy, impression share, and spend efficiency on a 0-5 scale, weighted to a 0-100 overall score
+- Wasted spend analysis with dollar breakdown by category (non-converting keywords + irrelevant search terms) and annualized projection
+- Impression share diagnosis using a 2x2 matrix (budget-lost vs rank-lost) with actionable recommendations
+- Top 3 actions derived from the heuristics engine, sorted by estimated monthly savings
+- Expandable detailed findings per dimension for any scoring 0-3
+- Two-phase data loading: fast overview (4 parallel API calls) then detailed analysis (25 parallel per-campaign calls)
+- Module-level client cache for instant return visits (stale-while-revalidate pattern)
+- 29 unit tests for the scoring engine covering empty, well-optimized, and new account scenarios
+- Audit nav item in sidebar and mobile bottom nav
+
 ## [0.2.8.0] - 2026-04-07
 
 ### Added

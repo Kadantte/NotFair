@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
 import { AccountSwitcher } from '@/components/account-switcher';
@@ -206,6 +206,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Nav items */}
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
                 <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} />
+                <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} />
                 <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} />
                 <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} collapsed={isCollapsed} />
             </nav>
@@ -339,9 +340,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <nav className="flex md:hidden shrink-0 border-t border-[#3D3C36] bg-[#24231F]">
                 <MobileNavItem href="/dashboard" icon={Home} label="Home" active={pathname === '/dashboard'} />
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} />
-                <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} />
+                <MobileNavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} />
                 <MobileNavItem href="/operations" icon={Activity} label="Ops" active={pathname === '/operations'} />
-                <MobileNavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} />
+                <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} />
             </nav>
         </div>
     );
