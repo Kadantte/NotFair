@@ -307,6 +307,45 @@ export async function getAccountInfo(auth: AuthContext) {
   };
 }
 
+/**
+ * Get budget summary for an account: total daily budget across all active campaigns,
+ * number of active campaigns, and currency code.
+ */
+export async function getAccountBudgetSummary(auth: AuthContext) {
+  const customer = getCachedCustomer(auth);
+  const result = await customer.query(`
+    SELECT
+      campaign.id,
+      campaign.campaign_budget,
+      campaign_budget.amount_micros,
+      customer.currency_code
+    FROM campaign
+    WHERE campaign.status = 'ENABLED'
+  `);
+  const rows = result as any[];
+  // Deduplicate budgets by resource name (shared budgets)
+  const seenBudgets = new Set<string>();
+  let totalBudgetMicros = 0;
+  let currencyCode: string | null = null;
+  let enabledCampaigns = 0;
+
+  for (const row of rows) {
+    enabledCampaigns++;
+    if (!currencyCode) currencyCode = row.customer?.currency_code ?? null;
+    const budgetName = row.campaign?.campaign_budget;
+    if (budgetName && !seenBudgets.has(budgetName)) {
+      seenBudgets.add(budgetName);
+      totalBudgetMicros += row.campaign_budget?.amount_micros ?? 0;
+    }
+  }
+
+  return {
+    totalDailyBudget: micros(totalBudgetMicros),
+    activeCampaigns: enabledCampaigns,
+    currencyCode,
+  };
+}
+
 export async function listAccessibleCustomers(refreshToken: string) {
   const client = getClient();
   const response = (await client.listAccessibleCustomers(refreshToken)) as {

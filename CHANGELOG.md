@@ -2,6 +2,19 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.8.0] - 2026-04-07
+
+### Added
+- Account budget overview on the dev page: total daily budget and active campaign count per connected Google Ads account
+- Budget deduplication for shared campaign budgets so totals are accurate
+- Proper currency formatting via `Intl.NumberFormat` with support for non-USD currencies
+- Unit tests for budget summary function covering deduplication, edge cases, and empty states
+
+### Changed
+- Dev API route uses single `getAuthContext()` call instead of separate `getSession()` + `getSessionAuth()` queries
+- Error handling in dev route now returns 500 for unexpected errors instead of blanket 403
+- Campaign budget query filters to `ENABLED` campaigns only (was `!= REMOVED`, which included paused)
+
 ## [0.2.7.0] - 2026-04-05
 
 ### Added

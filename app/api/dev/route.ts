@@ -1,11 +1,23 @@
-import { getSession } from "@/lib/session";
+import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { sql, desc, eq } from "drizzle-orm";
 import { DEV_EMAILS } from "@/lib/dev-access";
+import { getAccountBudgetSummary } from "@/lib/google-ads";
 
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session.connected || !session.googleEmail || !DEV_EMAILS.includes(session.googleEmail)) {
+  let auth: { refreshToken: string };
+  let googleEmail: string | null = null;
+  try {
+    const ctx = await getAuthContext();
+    auth = ctx.auth;
+    googleEmail = ctx.session.googleEmail;
+  } catch (err) {
+    if (err instanceof Error && err.message === "Not authenticated") {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+  if (!googleEmail || !DEV_EMAILS.includes(googleEmail)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -54,5 +66,26 @@ export async function GET(request: Request) {
       .orderBy(desc(sql`count(*)`)),
   ]);
 
-  return Response.json({ dailyUsage, accountOps });
+  // Fetch budget summaries for each account using the current session's refresh token
+  const budgets: Record<string, { totalDailyBudget: number; activeCampaigns: number; currencyCode: string | null }> = {};
+  const budgetResults = await Promise.allSettled(
+    accountOps.map(async (acc) => {
+      const summary = await getAccountBudgetSummary({
+        refreshToken: auth.refreshToken,
+        customerId: acc.accountId,
+      });
+      return { accountId: acc.accountId, ...summary };
+    }),
+  );
+  for (const result of budgetResults) {
+    if (result.status === "fulfilled") {
+      budgets[result.value.accountId] = {
+        totalDailyBudget: result.value.totalDailyBudget,
+        activeCampaigns: result.value.activeCampaigns,
+        currencyCode: result.value.currencyCode,
+      };
+    }
+  }
+
+  return Response.json({ dailyUsage, accountOps, budgets });
 }

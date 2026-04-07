@@ -28,10 +28,31 @@ type AccountOps = {
     lastActive: string;
 };
 
+type BudgetSummary = {
+    totalDailyBudget: number;
+    activeCampaigns: number;
+    currencyCode: string | null;
+};
+
 type DevStats = {
     dailyUsage: DailyUsage[];
     accountOps: AccountOps[];
+    budgets: Record<string, BudgetSummary>;
 };
+
+function formatBudget(budget: BudgetSummary): string {
+    if (budget.currencyCode) {
+        try {
+            return new Intl.NumberFormat(undefined, {
+                style: 'currency',
+                currency: budget.currencyCode,
+            }).format(budget.totalDailyBudget);
+        } catch {
+            // invalid currency code fallback
+        }
+    }
+    return `$${budget.totalDailyBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
 
@@ -276,7 +297,9 @@ export default function DevPage() {
                             <div className="sm:hidden space-y-2">
                                 {stats.accountOps.length === 0 ? (
                                     <p className="text-sm text-[#9B9689] text-center py-8">No operations recorded</p>
-                                ) : stats.accountOps.map(acc => (
+                                ) : stats.accountOps.map(acc => {
+                                    const budget = stats.budgets?.[acc.accountId];
+                                    return (
                                     <Link
                                         key={acc.accountId}
                                         href={`/dev/${acc.accountId}`}
@@ -291,6 +314,20 @@ export default function DevPage() {
                                             </div>
                                             <ChevronRight className="w-4 h-4 text-[#9B9689] shrink-0" />
                                         </div>
+                                        {budget && (
+                                            <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
+                                                <div className="flex-1">
+                                                    <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Daily Budget</div>
+                                                    <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
+                                                        {formatBudget(budget)}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Campaigns</div>
+                                                    <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{budget.activeCampaigns}</div>
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="grid grid-cols-3 gap-3 text-center">
                                             <div>
                                                 <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Reads</div>
@@ -311,7 +348,8 @@ export default function DevPage() {
                                             })}
                                         </div>
                                     </Link>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             {/* Desktop: table layout */}
@@ -319,7 +357,7 @@ export default function DevPage() {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
-                                            {['Account', 'Reads', 'Writes', 'Total', 'Last Active'].map((h, i) => (
+                                            {['Account', 'Daily Budget', 'Campaigns', 'Reads', 'Writes', 'Total', 'Last Active'].map((h, i) => (
                                                 <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">
                                                     {h}
                                                 </th>
@@ -329,11 +367,13 @@ export default function DevPage() {
                                     <tbody>
                                         {stats.accountOps.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#9B9689]">
+                                                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#9B9689]">
                                                     No operations recorded
                                                 </td>
                                             </tr>
-                                        ) : stats.accountOps.map(acc => (
+                                        ) : stats.accountOps.map(acc => {
+                                            const budget = stats.budgets?.[acc.accountId];
+                                            return (
                                             <tr
                                                 key={acc.accountId}
                                                 className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors"
@@ -348,6 +388,12 @@ export default function DevPage() {
                                                         )}
                                                         <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
                                                     </Link>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
+                                                    {budget ? formatBudget(budget) : <span className="text-[#9B9689]/40">—</span>}
+                                                </td>
+                                                <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">
+                                                    {budget ? budget.activeCampaigns : <span className="text-[#9B9689]/40">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#9B9689] font-mono tabular-nums">
                                                     {acc.reads.toLocaleString()}
@@ -364,7 +410,8 @@ export default function DevPage() {
                                                     })}
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
