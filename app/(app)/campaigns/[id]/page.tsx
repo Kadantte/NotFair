@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, use } from 'react';
 import { motion } from 'framer-motion';
 import { History, Search, AlertCircle, Sparkles, Loader2, TrendingUp, MousePointer2, DollarSign, Target, FileText, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCampaignHistoryAction, getCampaignKeywordsAction, getCampaignAdsAction, generateCampaignSummaryAction, listCampaignsAction } from '@/app/actions';
+import { getCampaignHistoryAction, getCampaignKeywordsAction, getCampaignAdsAction, generateCampaignSummaryAction, listCampaignsAction, getConversionActionsAction } from '@/app/actions';
 import {
     XAxis,
     YAxis,
@@ -63,6 +63,13 @@ interface CampaignInfo {
     biddingStrategy: string;
     networkDisplayEnabled: boolean;
     trackingTemplate: string | null;
+}
+
+interface ConversionAction {
+    id: string;
+    name: string;
+    category: string;
+    includeInConversions: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -129,6 +136,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [ads, setAds] = useState<CampaignAd[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [campaignInfo, setCampaignInfo] = useState<CampaignInfo | null>(null);
+    const [conversionActions, setConversionActions] = useState<ConversionAction[]>([]);
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -139,15 +147,17 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         const { startDate, endDate } = getDateRange(timeRange);
 
         try {
-            const [historyData, keywordsData, adsData, campaignsData] = await Promise.all([
+            const [historyData, keywordsData, adsData, campaignsData, conversionActionsData] = await Promise.all([
                 getCampaignHistoryAction(campaignId, startDate, endDate),
                 getCampaignKeywordsAction(campaignId, startDate, endDate),
                 getCampaignAdsAction(campaignId),
                 listCampaignsAction(),
+                getConversionActionsAction(),
             ]);
             setHistory(historyData);
             setKeywords(keywordsData);
             setAds(adsData);
+            setConversionActions((conversionActionsData ?? []).filter((ca: ConversionAction) => ca.includeInConversions));
             const match = campaignsData.find(c => c.id === campaignId);
             if (match) setCampaignInfo(match);
         } catch (err) {
@@ -253,14 +263,44 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
 
                         {/* ── 1. Campaign Settings + Health ── */}
                         {campaignInfo && (
-                            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+                            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+                                {/* Primary info: website, CPA, conversions */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {(() => {
+                                        const domains = [...new Set(ads.flatMap(a => a.finalUrls).map(url => {
+                                            try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+                                        }).filter(Boolean))];
+                                        return domains.length > 0 ? (
+                                            <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                                <LinkIcon className="w-3 h-3 text-[#4CAF6E]" />
+                                                <span className="text-[#9B9689]">Website</span>
+                                                <span className="text-[#E8E4DD] font-medium font-mono">{domains.join(', ')}</span>
+                                            </div>
+                                        ) : null;
+                                    })()}
+                                    {campaignInfo.conversions > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                            <Target className="w-3 h-3 text-[#4CAF6E]" />
+                                            <span className="text-[#9B9689]">Cost / Conv.</span>
+                                            <span className="text-[#E8E4DD] font-medium font-mono">${(campaignInfo.cost / campaignInfo.conversions).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {conversionActions.length > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                            <Target className="w-3 h-3 text-[#9B9689]" />
+                                            <span className="text-[#9B9689]">Tracking</span>
+                                            <span className="text-[#E8E4DD] font-medium">{conversionActions.map(ca => ca.name).join(', ')}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Secondary info: campaign settings */}
                                 <div className="flex flex-wrap items-center gap-2">
                                     <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                        <span className="text-[#9B9689]">Ads Type</span>
+                                        <span className="text-[#9B9689]">Type</span>
                                         <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.type.replace(/_/g, ' ').toLowerCase()}</span>
                                     </div>
                                     <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                        <span className="text-[#9B9689]">Bidding Strategy</span>
+                                        <span className="text-[#9B9689]">Bidding</span>
                                         <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.biddingStrategy.replace(/_/g, ' ').toLowerCase()}</span>
                                     </div>
                                     <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">

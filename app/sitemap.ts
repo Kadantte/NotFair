@@ -13,10 +13,10 @@ const publicMarketingRoutes = [
   ...allLandingPages.map((page) => `/${page.slug}`),
 ];
 
+const highPriorityRoutes = new Set(["/", "/google-ads-audit"]);
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-
-  const highPriorityRoutes = new Set(["/", "/google-ads-audit"]);
   const marketingEntries: MetadataRoute.Sitemap = publicMarketingRoutes.map(
     (route) => ({
       url: new URL(route, SITE_URL).toString(),

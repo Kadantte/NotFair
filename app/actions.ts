@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -224,6 +224,23 @@ export async function listCampaignsAction(options?: { skipCache?: boolean }) {
 
 export async function invalidateCampaignsCache() {
     campaignsCache.clear();
+}
+
+export async function getConversionActionsAction() {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+        return await getConversionActions(auth);
+    } catch (error) {
+        console.error("Get Conversion Actions Error:", error);
+        return [];
+    }
+    });
 }
 
 export async function pauseCampaignAction(campaignId: string) {

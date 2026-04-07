@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRight,
   Target,
   Search,
   Layers,
@@ -13,9 +11,8 @@ import {
   DollarSign,
   AlertTriangle,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session-provider";
-import { startGoogleConnect } from "@/lib/google-oauth";
+import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
 
 /* ─────────────────────────────────────────────────────── Data ──────────── */
 
@@ -123,60 +120,7 @@ const mockDimensions = [
   { name: "Ad Copy", score: 4, max: 5, color: "#4CAF6E" },
 ];
 
-/* ──────────────────────────────────────────── Animation variants ────────── */
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: "easeOut" as const },
-  },
-};
-
 /* ─────────────────────────────────────────────── Sub-components ────────── */
-
-function AuditCTA({
-  session,
-  size = "default",
-}: {
-  session: { connected: boolean };
-  size?: "default" | "lg";
-}) {
-  const [loading, setLoading] = useState(false);
-
-  function handleCTA() {
-    if (loading) return;
-    setLoading(true);
-    if (session.connected) {
-      window.location.assign("/audit");
-    } else {
-      startGoogleConnect("/audit");
-    }
-  }
-
-  const sizeClasses = size === "lg" ? "h-14 px-10 text-lg" : "h-12 px-8 text-base";
-
-  return (
-    <Button
-      onClick={handleCTA}
-      disabled={loading}
-      className={`${sizeClasses} rounded-full bg-[#4CAF6E] font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70`}
-    >
-      {loading ? (
-        <span className="inline-flex items-center gap-2">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1A1917] border-t-transparent" />
-          Connecting...
-        </span>
-      ) : (
-        <>
-          {session.connected ? "View Your Audit" : "Audit Now"}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </>
-      )}
-    </Button>
-  );
-}
 
 function ScoreBar({
   name,

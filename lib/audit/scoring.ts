@@ -541,6 +541,20 @@ export function scoreImpressionShare(input: AuditInput): Omit<DimensionScore, "k
   };
 }
 
+// ─── Shared account metrics ─────────────────────────────────────────
+
+const MIN_NOISE_SPEND_USD = 10;
+
+function computeAccountMetrics(input: AuditInput) {
+  const totalSpend = input.campaigns.reduce((s, c) => s + c.cost, 0);
+  const totalClicks = input.campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalImpressions = input.campaigns.reduce((s, c) => s + c.impressions, 0);
+  const avgCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+  const avgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
+  const activeKeywordTexts = input.keywords.filter(k => isEnabled(k.status)).map(k => k.text);
+  return { totalSpend, totalClicks, totalImpressions, avgCtr, avgCpc, activeKeywordTexts };
+}
+
 // ─── Dimension 7: Spend Efficiency (weight 10%) ─────────────────────
 
 export function scoreSpendEfficiency(input: AuditInput): Omit<DimensionScore, "key" | "label" | "weight"> {
@@ -558,16 +572,11 @@ export function scoreSpendEfficiency(input: AuditInput): Omit<DimensionScore, "k
   const wastedKw = keywords.filter((k) => k.conversions === 0 && k.clicks > 10);
   const wastedKwSpend = wastedKw.reduce((s, k) => s + k.cost, 0);
 
-  // Wasted search term spend: use semantic analysis (same as computeWastedSpend)
-  const totalCampaignClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
-  const totalCampaignImpressions = campaigns.reduce((s, c) => s + c.impressions, 0);
-  const avgCtr = totalCampaignImpressions > 0 ? totalCampaignClicks / totalCampaignImpressions : 0;
-  const avgCpc = totalCampaignClicks > 0 ? totalSpend / totalCampaignClicks : 0;
-  const kwTexts = keywords.filter(k => isEnabled(k.status)).map(k => k.text);
+  const { avgCtr, avgCpc, activeKeywordTexts } = computeAccountMetrics(input);
 
   const semanticWastedSTs = searchTerms
     .filter(t => t.conversions === 0 && t.cost > 0)
-    .map(t => analyzeSearchTermWaste(t, kwTexts, avgCtr, avgCpc))
+    .map(t => analyzeSearchTermWaste(t, activeKeywordTexts, avgCtr, avgCpc))
     .filter(r => r.classification === "confirmed_waste" || r.classification === "likely_waste");
   const wastedSTSpend = semanticWastedSTs.reduce((s, r) => s + r.cost, 0);
 
@@ -609,12 +618,7 @@ export function scoreSpendEfficiency(input: AuditInput): Omit<DimensionScore, "k
 // ─── Wasted Spend Breakdown ─────────────────────────────────────────
 
 function computeWastedSpend(input: AuditInput): WastedSpendBreakdown {
-  const totalSpend = input.campaigns.reduce((s, c) => s + c.cost, 0);
-  const totalClicks = input.campaigns.reduce((s, c) => s + c.clicks, 0);
-  const totalImpressions = input.campaigns.reduce((s, c) => s + c.impressions, 0);
-  const accountAvgCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
-  const accountAvgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-  const activeKeywordTexts = input.keywords.filter(k => isEnabled(k.status)).map(k => k.text);
+  const { totalSpend, avgCtr: accountAvgCtr, avgCpc: accountAvgCpc, activeKeywordTexts } = computeAccountMetrics(input);
 
   // ── Semantic analysis on all non-converting search terms ─────────
   const nonConvertingSTs = input.searchTerms.filter(t => t.conversions === 0 && t.cost > 0);
@@ -630,7 +634,7 @@ function computeWastedSpend(input: AuditInput): WastedSpendBreakdown {
   // QUALITY ISSUE: relevant traffic not converting — fix landing page/offer/ad copy
   // Only flag when there's meaningful spend ($10+) to avoid noise
   const qualityIssueSTs = stAnalyses.filter(r =>
-    (r.classification === "likely_relevant" || r.classification === "possible_waste") && r.cost >= 10
+    (r.classification === "likely_relevant" || r.classification === "possible_waste") && r.cost >= MIN_NOISE_SPEND_USD
   );
 
   const stWasteAmount = wastedSTs.reduce((s, r) => s + r.cost, 0);
@@ -890,12 +894,7 @@ export function computeAuditScore(input: AuditInput): AuditResult {
 
   const wastedSpend = computeWastedSpend(input);
 
-  const totalClicks = input.campaigns.reduce((s, c) => s + c.clicks, 0);
-  const totalImpressions = input.campaigns.reduce((s, c) => s + c.impressions, 0);
-  const totalCost = input.campaigns.reduce((s, c) => s + c.cost, 0);
-  const accountAvgCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
-  const accountAvgCpc = totalClicks > 0 ? totalCost / totalClicks : 0;
-  const activeKeywordTexts = input.keywords.map((k) => k.text);
+  const { avgCtr: accountAvgCtr, avgCpc: accountAvgCpc, activeKeywordTexts } = computeAccountMetrics(input);
 
   const wastedSearchTerms = input.searchTerms
     .filter((t) => t.conversions === 0 && t.cost > 0)

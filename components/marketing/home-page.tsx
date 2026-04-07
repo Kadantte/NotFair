@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRight,
   ArrowUp,
   DollarSign,
   Eye,
@@ -22,9 +21,8 @@ import {
   BarChart3,
   Ban,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session-provider";
-import { startGoogleConnect } from "@/lib/google-oauth";
+import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
 
 /* ────────────────────────────── Data ────────────────────────────── */
 
@@ -203,50 +201,6 @@ const faqs = [
     a: "The free audit shows wasted spend immediately. Most customers see measurable improvements within the first week — typically from cutting irrelevant search terms and pausing underperforming keywords.",
   },
 ];
-
-/* ────────────────────────────── Animation ────────────────────────────── */
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
-};
-
-/* ────────────────────────────── Helpers ────────────────────────────── */
-
-function AuditCTA({ session }: { session: { connected: boolean } }) {
-  const [loading, setLoading] = useState(false);
-
-  function handleCTA() {
-    if (loading) return;
-    setLoading(true);
-    if (session.connected) {
-      window.location.assign("/audit");
-    } else {
-      startGoogleConnect("/audit");
-    }
-  }
-
-  return (
-    <Button
-      size="lg"
-      onClick={handleCTA}
-      disabled={loading}
-      className="h-14 w-full rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70 md:w-auto"
-    >
-      {loading ? (
-        <span className="inline-flex items-center gap-2">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#1A1917] border-t-transparent" />
-          Connecting...
-        </span>
-      ) : (
-        <>
-          {session.connected ? "Go to Dashboard" : "Get Your Free Audit"}
-          <ArrowRight className="ml-2 h-5 w-5" />
-        </>
-      )}
-    </Button>
-  );
-}
 
 function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
