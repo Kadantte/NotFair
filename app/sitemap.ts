@@ -16,15 +16,23 @@ const publicMarketingRoutes = [
 ];
 
 const highPriorityRoutes = new Set(["/", "/google-ads-audit", "/google-ads-claude", "/google-ads-mcp-server"]);
+const seoLandingRoutes = new Set([
+  "/ai-google-ads-agent",
+  "/google-ads-mcp",
+  "/connect-google-ads-to-claude",
+  "/connect-google-ads-to-chatgpt",
+  "/ai-google-ads-optimization",
+]);
+const marketingPagesLastModified = new Date("2026-04-07");
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const marketingEntries: MetadataRoute.Sitemap = publicMarketingRoutes.map(
     (route) => ({
       url: new URL(route, SITE_URL).toString(),
-      lastModified: now,
+      lastModified: route === "/" ? now : marketingPagesLastModified,
       changeFrequency: route === "/" ? "weekly" : "monthly",
-      priority: highPriorityRoutes.has(route) ? 1 : 0.6,
+      priority: highPriorityRoutes.has(route) ? 1 : seoLandingRoutes.has(route) ? 0.8 : 0.6,
     })
   );
 

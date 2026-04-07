@@ -2,7 +2,7 @@ import { buildMetadata, buildFaqJsonLd } from "@/lib/seo";
 import { GoogleAdsAuditPage } from "./google-ads-audit-page";
 
 export const metadata = buildMetadata({
-  title: "Free Google Ads Audit — Score Your Account in 5 Minutes | AdsAgent",
+  title: "Free Google Ads Audit — Score in 5 Minutes | AdsAgent",
   description:
     "Get a free Google Ads audit instantly. AI scores 7 dimensions — conversion tracking, keyword health, search term waste, ad copy, and more. No credit card. No agency.",
   path: "/google-ads-audit",
