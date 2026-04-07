@@ -35,6 +35,8 @@ export type AuthContext = {
   customerId: string;
   customerIds?: ConnectedAccount[];
   userId?: string | null;
+  /** Set when a dev is impersonating — contains the dev's real email for auth gates. */
+  realGoogleEmail?: string | null;
 };
 
 /**

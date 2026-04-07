@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -71,8 +71,32 @@ export default function DevPage() {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [sendingId, setSendingId] = useState<number | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
+    const [impersonatingAccountId, setImpersonatingAccountId] = useState<string | null>(null);
 
     const metrics = useMemo(() => contacts.length > 0 ? deriveMetrics(contacts) : null, [contacts]);
+
+    async function handleViewAs(accountId: string, e: React.MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        setImpersonatingAccountId(accountId);
+        try {
+            const res = await fetch('/api/dev/impersonate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError(data.error || 'Failed to impersonate');
+                setImpersonatingAccountId(null);
+                return;
+            }
+            window.location.assign('/campaigns');
+        } catch {
+            setError('Failed to impersonate');
+            setImpersonatingAccountId(null);
+        }
+    }
 
     const fetchContacts = useCallback(async (background = false) => {
         if (!background) setLoadingContacts(true);
@@ -315,7 +339,20 @@ export default function DevPage() {
                                                 {acc.email && <div className="text-xs text-[#9B9689] truncate">{acc.email}</div>}
                                                 <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
                                             </div>
-                                            <ChevronRight className="w-4 h-4 text-[#9B9689] shrink-0" />
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleViewAs(acc.accountId, e)}
+                                                    disabled={impersonatingAccountId === acc.accountId}
+                                                    className="p-1.5 rounded-md text-[#9B9689] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
+                                                    title="View as this account"
+                                                >
+                                                    {impersonatingAccountId === acc.accountId
+                                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        : <Eye className="w-3.5 h-3.5" />}
+                                                </button>
+                                                <ChevronRight className="w-4 h-4 text-[#9B9689]" />
+                                            </div>
                                         </div>
                                         {budget && (
                                             <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
@@ -360,7 +397,7 @@ export default function DevPage() {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
-                                            {['Account', 'Daily Budget', 'Campaigns', 'Reads', 'Writes', 'Total', 'Last Active'].map((h, i) => (
+                                            {['Account', 'Daily Budget', 'Campaigns', 'Reads', 'Writes', 'Total', 'Last Active', ''].map((h, i) => (
                                                 <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">
                                                     {h}
                                                 </th>
@@ -370,7 +407,7 @@ export default function DevPage() {
                                     <tbody>
                                         {stats.accountOps.length === 0 ? (
                                             <tr>
-                                                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#9B9689]">
+                                                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#9B9689]">
                                                     No operations recorded
                                                 </td>
                                             </tr>
@@ -411,6 +448,19 @@ export default function DevPage() {
                                                     {new Date(acc.lastActive.endsWith('Z') ? acc.lastActive : acc.lastActive + 'Z').toLocaleString(undefined, {
                                                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
                                                     })}
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleViewAs(acc.accountId, e)}
+                                                        disabled={impersonatingAccountId === acc.accountId}
+                                                        className="p-1.5 rounded-md text-[#9B9689] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
+                                                        title="View as this account"
+                                                    >
+                                                        {impersonatingAccountId === acc.accountId
+                                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                            : <Eye className="w-3.5 h-3.5" />}
+                                                    </button>
                                                 </td>
                                             </tr>
                                             );

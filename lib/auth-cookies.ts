@@ -11,7 +11,13 @@ const COOKIE_OPTIONS = {
 export const COOKIE_NAMES = {
   token: "adsagent_token",
   customer: "adsagent_customer",
+  impersonate: "adsagent_impersonate",
 } as const;
+
+const IMPERSONATE_COOKIE_OPTIONS = {
+  ...COOKIE_OPTIONS,
+  maxAge: 60 * 60 * 8, // 8 hours — safety limit for dev impersonation
+};
 
 export function setSessionCookies(
   response: NextResponse,
@@ -22,7 +28,16 @@ export function setSessionCookies(
   response.cookies.set(COOKIE_NAMES.customer, encodeURIComponent(customerName), COOKIE_OPTIONS);
 }
 
+export function setImpersonateCookie(response: NextResponse, sessionId: string) {
+  response.cookies.set(COOKIE_NAMES.impersonate, sessionId, IMPERSONATE_COOKIE_OPTIONS);
+}
+
+export function clearImpersonateCookie(response: NextResponse) {
+  response.cookies.delete(COOKIE_NAMES.impersonate);
+}
+
 export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(COOKIE_NAMES.token);
   response.cookies.delete(COOKIE_NAMES.customer);
+  response.cookies.delete(COOKIE_NAMES.impersonate);
 }

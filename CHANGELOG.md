@@ -2,6 +2,14 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.12.0] - 2026-04-07
+
+### Added
+- Dev impersonation: select any account from the /dev page and see the app exactly as that user sees it, with full read/write access for debugging and support
+- Amber "Viewing as" banner with stop button shows during impersonation
+- Account switcher disabled during impersonation to prevent modifying the real user's session
+- 17 tests covering impersonation session logic, API routes, and sign-out cookie clearing
+
 ## [0.2.11.0] - 2026-04-06
 
 ### Changed

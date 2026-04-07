@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   try {
     const ctx = await getAuthContext();
     auth = ctx.auth;
-    googleEmail = ctx.session.googleEmail;
+    // When impersonating, use the real dev's email for the dev gate check
+    googleEmail = ctx.auth.realGoogleEmail ?? ctx.session.googleEmail;
   } catch (err) {
     if (err instanceof Error && err.message === "Not authenticated") {
       return Response.json({ error: "Forbidden" }, { status: 403 });

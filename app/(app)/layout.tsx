@@ -8,6 +8,7 @@ import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, T
 import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
 import { AccountSwitcher } from '@/components/account-switcher';
+import { ImpersonationBanner } from '@/components/impersonation-banner';
 import { dispatchThreadEvent } from '@/lib/thread-events';
 import { getChatSidebarServerSnapshot, getChatSidebarSnapshot, setStoredActiveThreadId, subscribeChatSidebar } from '@/lib/chat-thread-store';
 
@@ -333,6 +334,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Content */}
             <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-y-auto">
+                <ImpersonationBanner />
                 {children}
             </div>
 

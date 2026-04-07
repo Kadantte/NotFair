@@ -8,6 +8,7 @@ type Account = { id: string; name: string };
 type AccountData = {
     customerId: string;
     customerIds: Account[];
+    impersonating: boolean;
 };
 
 let cachedAccountData: AccountData | null = null;
@@ -27,6 +28,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 const d: AccountData = {
                     customerId: session.customerId,
                     customerIds: session.customerIds ?? [],
+                    impersonating: !!session.impersonating,
                 };
                 cachedAccountData = d;
                 setData(d);
@@ -48,6 +50,9 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
 
     const active = data.customerIds.find((a) => a.id === data.customerId);
     const displayName = active?.name || active?.id || 'Account';
+
+    // Disable account switching during impersonation to prevent mutating the real user's session
+    const canSwitch = !data.impersonating;
 
     async function switchTo(accountId: string) {
         if (accountId === data?.customerId || switching) return;
@@ -72,9 +77,9 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
             <div ref={ref} className="relative px-2 pb-2">
                 <button
                     type="button"
-                    onClick={() => setOpen(!open)}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-[#9B9689] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
-                    title={displayName}
+                    onClick={() => canSwitch && setOpen(!open)}
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg text-[#9B9689] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
+                    title={data.impersonating ? `Viewing as ${displayName}` : displayName}
                 >
                     <div className="flex h-6 w-6 items-center justify-center rounded bg-[#4CAF6E]/15 text-[11px] font-semibold text-[#4CAF6E]">
                         {(active?.name || 'A')[0].toUpperCase()}
@@ -123,8 +128,8 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
         <div ref={ref} className="relative px-2 pb-2">
             <button
                 type="button"
-                onClick={() => setOpen(!open)}
-                className="flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left transition hover:bg-[#E8E4DD]/6"
+                onClick={() => canSwitch && setOpen(!open)}
+                className={`flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left transition hover:bg-[#E8E4DD]/6 ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
             >
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-[#4CAF6E]/15 text-[11px] font-semibold text-[#4CAF6E]">
                     {(active?.name || 'A')[0].toUpperCase()}

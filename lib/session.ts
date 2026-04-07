@@ -16,6 +16,7 @@ export type Session = {
   customerIds: { id: string; name: string }[];
   googleEmail: string | null;
   isDev: boolean;
+  impersonating?: boolean;
 } | {
   connected: false;
 };
@@ -28,13 +29,19 @@ type SessionRow = {
   googleEmail: string | null;
 };
 
-async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | null> {
+type LoadSessionResult = {
+  token: string;
+  row: SessionRow;
+  impersonating?: { sessionId: number; realEmail: string };
+};
+
+async function loadSessionRow(): Promise<LoadSessionResult | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAMES.token)?.value;
 
   if (!token) return null;
 
-  const [row] = await db()
+  const [realRow] = await db()
     .select({
       refreshToken: schema.mcpSessions.refreshToken,
       customerId: schema.mcpSessions.customerId,
@@ -51,20 +58,51 @@ async function loadSessionRow(): Promise<{ token: string; row: SessionRow } | nu
     )
     .limit(1);
 
-  if (!row || !row.customerId) return null;
+  if (!realRow || !realRow.customerId) return null;
 
-  return {
-    token,
-    row: {
-      ...row,
-      userId: row.userId ?? null,
-    },
-  };
+  const row: SessionRow = { ...realRow, userId: realRow.userId ?? null };
+
+  // Check for dev impersonation
+  const impersonateId = cookieStore.get(COOKIE_NAMES.impersonate)?.value;
+  if (impersonateId && row.googleEmail && DEV_EMAILS.includes(row.googleEmail)) {
+    if (!/^\d+$/.test(impersonateId)) return { token, row }; // malformed cookie → ignore, return real session
+    const sessionId = parseInt(impersonateId, 10);
+
+    const [targetRow] = await db()
+      .select({
+        refreshToken: schema.mcpSessions.refreshToken,
+        customerId: schema.mcpSessions.customerId,
+        customerIds: schema.mcpSessions.customerIds,
+        userId: schema.mcpSessions.userId,
+        googleEmail: schema.mcpSessions.googleEmail,
+      })
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.id, sessionId),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        ),
+      )
+      .limit(1);
+
+    if (!targetRow || !targetRow.customerId) return { token, row }; // target expired/missing → graceful fallback to real session
+
+    return {
+      token,
+      row: { ...targetRow, userId: targetRow.userId ?? null },
+      impersonating: { sessionId, realEmail: row.googleEmail },
+    };
+  }
+
+  return { token, row };
 }
 
 export async function getSession(): Promise<Session> {
   const result = await loadSessionRow();
   if (!result) return { connected: false };
+
+  // isDev is always based on the real user's email, not the impersonated one
+  const devEmail = result.impersonating?.realEmail ?? result.row.googleEmail;
 
   return {
     connected: true,
@@ -74,7 +112,8 @@ export async function getSession(): Promise<Session> {
     customerName: deriveCustomerName(result.row.customerIds),
     customerIds: parseCustomerIds(result.row.customerIds),
     googleEmail: result.row.googleEmail,
-    isDev: !!result.row.googleEmail && DEV_EMAILS.includes(result.row.googleEmail),
+    isDev: !!devEmail && DEV_EMAILS.includes(devEmail),
+    ...(result.impersonating && { impersonating: true }),
   };
 }
 
@@ -85,13 +124,15 @@ export async function getSessionAuth(): Promise<SessionRow> {
 }
 
 export async function getAuthContext(): Promise<{ auth: AuthContext; session: SessionRow }> {
-  const session = await getSessionAuth();
+  const result = await loadSessionRow();
+  if (!result) throw new Error("Not authenticated");
   return {
     auth: {
-      refreshToken: session.refreshToken,
-      customerId: session.customerId,
-      customerIds: parseCustomerIds(session.customerIds),
+      refreshToken: result.row.refreshToken,
+      customerId: result.row.customerId,
+      customerIds: parseCustomerIds(result.row.customerIds),
+      ...(result.impersonating && { realGoogleEmail: result.impersonating.realEmail }),
     },
-    session,
+    session: result.row,
   };
 }

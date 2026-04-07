@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 
+const mockGetAll = vi.fn(() => []);
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({
+    getAll: mockGetAll,
+  })),
+}));
+
 const mockSignOut = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
@@ -26,5 +33,12 @@ describe("Sign-out route — POST", () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(setCookie).toContain(`${COOKIE_NAMES.token}=;`);
     expect(setCookie).toContain(`${COOKIE_NAMES.customer}=;`);
+  });
+
+  it("also clears the impersonate cookie on sign-out", async () => {
+    const response = await POST();
+    const setCookie = response.headers.get("set-cookie") ?? "";
+
+    expect(setCookie).toContain(`${COOKIE_NAMES.impersonate}=;`);
   });
 });

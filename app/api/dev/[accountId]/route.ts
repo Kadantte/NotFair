@@ -1,7 +1,6 @@
 import { getSession } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { sql, desc, eq, and } from "drizzle-orm";
-import { DEV_EMAILS } from "@/lib/dev-access";
 import { OP_TYPE, CODE_TO_TOOL, CODE_TO_ENTITY, ENTITY_CODE } from "@/lib/db/tracking";
 
 export async function GET(
@@ -9,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ accountId: string }> },
 ) {
   const session = await getSession();
-  if (!session.connected || !session.googleEmail || !DEV_EMAILS.includes(session.googleEmail)) {
+  if (!session.connected || !session.isDev) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
