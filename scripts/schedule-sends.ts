@@ -2,10 +2,15 @@
  * Schedule drafted contacts for staggered sending.
  *
  * Usage:
- *   npx tsx scripts/schedule-sends.ts --start "2026-04-07T09:00:00-07:00" --per-day 3
+ *   npx tsx scripts/schedule-sends.ts --start "2026-04-08T09:00:00-07:00" --per-day 15
  *
  * Assigns send times to all "drafted" contacts, spreading them across
- * Tue-Thu mornings (skipping weekends). Marks status as "scheduled".
+ * weekdays (Mon-Fri, skipping weekends). Marks status as "scheduled".
+ *
+ * Day-specific windows (PT):
+ *   Monday:    12:00 PM – 5:00 PM
+ *   Tue–Thu:    9:00 AM – 12:00 PM
+ *   Friday:     9:00 AM – 12:00 PM
  */
 
 import { readFileSync } from "fs";
@@ -52,6 +57,11 @@ function nextWeekday(date: Date): Date {
   return d;
 }
 
+/** Return the start hour (PT) for a given day of week. Mon=12pm, others=9am. */
+function startHourForDay(dayOfWeek: number): number {
+  return dayOfWeek === 1 ? 12 : 9; // Monday = 1
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const startStr = args.start || "2026-04-07T09:00:00-07:00";
@@ -78,13 +88,15 @@ async function main() {
   console.log(`\n📅 Scheduling ${drafted.length} contacts, ${perDay}/day starting ${startStr}\n`);
 
   let currentDate = new Date(startStr);
-  let countToday = 0;
+  // Set the correct start hour for the first day
+  const firstHour = startHourForDay(currentDate.getDay());
+  currentDate.setHours(firstHour, 0, 0, 0);
 
-  const gapMinutes = parseInt(args["gap"] || "3", 10);
+  let countToday = 0;
+  const gapMinutes = parseInt(args["gap"] || "1", 10);
   let emailIndex = 0;
 
   for (const contact of drafted) {
-    // Space emails 3 minutes apart within each day
     const offset = emailIndex * gapMinutes * 60 * 1000;
     const scheduledAt = new Date(currentDate.getTime() + offset);
 
@@ -103,8 +115,9 @@ async function main() {
       countToday = 0;
       emailIndex = 0;
       currentDate = nextWeekday(currentDate);
-      // Reset to 9am on the next day
-      currentDate.setHours(currentDate.getHours(), 0, 0, 0);
+      // Set the correct start hour for the new day
+      const hour = startHourForDay(currentDate.getDay());
+      currentDate.setHours(hour, 0, 0, 0);
     }
   }
 

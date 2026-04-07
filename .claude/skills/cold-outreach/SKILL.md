@@ -92,11 +92,34 @@ Total length: 2-4 sentences, 50-75 words. Three short paragraphs max.
 
 **CTA (1 sentence):**
 - Optimize for the LOWEST friction reply. Don't ask them to visit a URL — ask a question they can answer with one sentence.
-- Best CTAs (ranked by reply rate):
+- Two CTA styles depending on the campaign angle:
+
+**Style A: Curiosity CTAs** (for general outreach)
   1. "Mind if I send over how it works?" — permission-based, easy yes
   2. "Would it be weird if I ran a quick analysis on your account?" — specific, intriguing
   3. "Worth a look, or totally off base?" — binary, disarming
   4. "Want me to send a 2-min video of how it works for firms like yours?" — specific deliverable
+
+**Style B: Free Audit CTAs** (for audit campaigns — use when user requests audit-style outreach)
+  The offer: a free Google Ads audit. The actual process requires them to connect their Google Ads account at adsagent.org/google-ads-audit (read-only, ~2 minutes). But NEVER put the URL in the cold email — that kills deliverability and feels spammy. Instead, the cold email just gets the reply. Once they reply "yes," Tong sends a warm follow-up with the link.
+
+  **Cold email CTAs (no URL — just get the reply):**
+  1. "I can run a free audit on your Google Ads — takes about 2 minutes on your end. Want me to send over how it works?" — specific, low commitment
+  2. "Happy to pull a free audit of your ad account. Want me to send over the details?" — casual, disarming
+  3. "We're doing free Google Ads audits for [industry] firms this month. Want me to send you the details?" — scarcity + curiosity
+  4. "I can show you exactly where your Google Ads budget is going — free, no strings. Interested?" — result-led
+
+  **Follow-up template (sent AFTER they reply — this one includes the URL):**
+  ```
+  Awesome — here's how it works:
+
+  Connect your account at adsagent.org/google-ads-audit (read-only access, takes about 2 minutes, no credit card). You'll get a full breakdown of what's working and where budget is leaking.
+
+  Let me know if you have any questions.
+
+  - Tong
+  ```
+
 - Avoid: bare URLs with no question ("check it out: www.adsagent.org"), "Would love to connect", calendar links
 
 **Sign-off:**
@@ -150,6 +173,39 @@ Subject: quick one for caffee law
 Hey Jeffrey — we helped an injury firm in WA cut about 30% of their wasted ad spend last month.
 
 Would it be weird if I showed you what we found works?
+
+- Tong
+```
+
+**Example E (free audit — achievement opener):**
+```
+Subject: free ads audit for pendas law
+
+12 offices across Florida — that's a lot of Google Ads campaigns to keep honest.
+
+I can run a free audit and show you exactly where budget is going — takes about 2 minutes on your end. Want me to send over how it works?
+
+- Tong
+```
+
+**Example F (free audit — direct opener):**
+```
+Subject: eric — free google ads checkup
+
+Quick one — we're doing free Google Ads audits for law firms this month.
+
+You get a plain-English breakdown of what's working and what's bleeding money. Want me to send you the details?
+
+- Tong
+```
+
+**Example G (free audit — ultra-short):**
+```
+Subject: free audit for your google ads
+
+Hey — I can show you exactly where your Google Ads budget is going. Free, no strings.
+
+Interested?
 
 - Tong
 ```
@@ -239,14 +295,95 @@ When the user asks about replies, use the Gmail MCP tools to search for emails f
 
 ## Batch Workflow
 
-When asked to draft emails for a batch:
+When the user asks to draft emails for a batch (e.g., "draft outreach for all new leads", "email 100 leads", "batch outreach"), use parallel Agent subagents to process leads concurrently. This is dramatically faster than one-at-a-time and costs nothing extra.
 
-1. Read contacts with status `new` from the database
-2. Research each lead (parallelize website fetches when possible)
-3. Draft and save each email
-4. Present a summary table: lead name, subject line, opener type, CTA type
+### Step 1: Fetch leads
 
-Work through leads one at a time so the user can review. But move fast — research, draft, save, show, next.
+```bash
+npx tsx scripts/fetch-new-leads.ts --limit 100
+```
+
+This outputs JSON with `id`, `email`, `firstName`, `lastName`, `company` for all contacts with `status = "new"`. Adjust `--limit` based on user request.
+
+### Step 2: Split into chunks and spawn parallel agents
+
+Split the leads into chunks of ~10 leads each. For each chunk, spawn an Agent subagent **in the same message** (so they run in parallel). Use `model: "sonnet"` for speed and efficiency.
+
+Each agent's prompt must include:
+1. **The outreach guidelines** — copy the condensed rules below into each agent prompt
+2. **The leads chunk** — the JSON array of leads for that agent
+3. **Instructions** — research each lead's website (derive URL from email domain or company name), draft the email, and save via `save-draft.ts`
+
+Here is the **exact prompt template** for each agent:
+
+```
+You are drafting cold outreach emails for AdsAgent. For each lead below, you will:
+1. Research their website (try https://{email_domain} or https://www.{email_domain})
+2. Draft a short, personalized cold email (50-75 words max, plain text)
+3. Save the draft using: npx tsx scripts/save-draft.ts --to "<email>" --subject "<subject>" --body "<body>"
+
+## Email Rules
+- 2-4 sentences, 50-75 words max. Plain text only.
+- Subject: 3-6 words, lowercase, casual. Include first name or company.
+- Opening: reference something SPECIFIC about them. Vary opener style (achievement, observation, direct, contextual).
+- Body: 1-2 sentences bridging one pain point to curiosity. Lead with RESULT, not mechanism.
+- CTA: permission-based question ("Mind if I send over how it works?", "Worth a look?", etc.)
+- Sign off: just "- Tong"
+- NEVER exceed 75 words. NEVER explain what AdsAgent does in detail. NEVER use "came across [company]" pattern. NEVER list features. NEVER use exclamation marks. NEVER use bullet points.
+
+## Pain points (pick ONE per lead)
+- "I'm wasting money and can't tell"
+- "Agencies are a black box"
+- "I don't have time for this"
+- "I'm scared to touch anything"
+- "Agency math doesn't work at my spend level"
+
+## AdsAgent pitch angles (pick ONE, hint obliquely)
+- Claude becomes your Google Ads manager
+- Free to try, no credit card
+- No incentive to inflate spend (unlike agencies)
+- Every change logged with reasoning
+- Built for small teams
+
+## Leads to process:
+{leads_json}
+
+For each lead:
+1. Try to fetch their website. If it fails, use company name for personalization.
+2. Draft the email. Make each one unique — vary subject style, opener type, pain point, CTA.
+3. Save with save-draft.ts.
+4. Report: email, subject, opener type, word count.
+```
+
+**Important spawn settings:**
+- Use `model: "sonnet"` — fast and cheap, great for short creative writing
+- Use `mode: "bypassPermissions"` so agents can run save-draft.ts without prompting
+- Spawn ALL chunk agents in a single message for true parallelism
+
+Example with 30 leads (3 agents of 10):
+
+```
+Agent 1: leads[0..9]   — spawned simultaneously
+Agent 2: leads[10..19]  — spawned simultaneously  
+Agent 3: leads[20..29]  — spawned simultaneously
+```
+
+### Step 3: Collect results and report
+
+As agents complete, collect their results. Present a summary table:
+
+```
+| #  | Email                      | Company           | Subject                  | Opener Type  | Words |
+|----|----------------------------|-------------------|--------------------------|--------------|-------|
+| 1  | jay@chinook.com            | Chinook Services  | jay - quick question     | achievement  | 62    |
+| 2  | info@seattleplumbing.com   | Seattle Plumbing  | thought about seattle... | observation  | 58    |
+```
+
+Tell the user: "Drafted X emails across Y parallel agents. Review them in /dev or ask me to revise any."
+
+### Single-lead mode
+
+If the user asks about a specific lead or a small number (< 5), skip the batch flow. Research, draft, save, and show inline — one at a time so they can review each one.
 
 ## Anti-patterns (Hard Rules)
 
