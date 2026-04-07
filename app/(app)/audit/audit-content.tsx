@@ -14,8 +14,9 @@ function fmt$(n: number): string {
 }
 
 function fmtN(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
+  const rounded = Math.round(n);
+  if (rounded >= 1000) return `${(rounded / 1000).toFixed(1)}k`;
+  return String(rounded);
 }
 
 function fmtPct(n: number): string {
@@ -398,37 +399,47 @@ function ZeroCvCampaignsSection({
 function WastedSearchTermsSection({
   terms,
 }: {
-  terms: Array<{ searchTerm: string; cost: number; clicks: number; campaignName: string; campaignId: string; adGroupName: string }>;
+  terms: AuditResult["wastedSearchTerms"];
 }) {
   if (terms.length === 0) return null;
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
       <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
         <AlertTriangle className="h-4 w-4 text-[#D4882A]" />
-        Top non-converting search terms
+        Irrelevant search terms
       </div>
       <p className="mt-1 text-[12px] text-[#9B9689]">
-        Queries that triggered your ads, spent budget, but generated zero conversions.
-        Add as negatives to stop wasting spend.
+        Queries that triggered your ads but are unlikely to convert — job seekers,
+        researchers, and off-topic searches. Add as negatives to reclaim wasted budget.
       </p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#9B9689]">
               <th className="pb-2 text-left">Search Term</th>
+              <th className="pb-2 text-left pl-3 hidden md:table-cell">Why flagged</th>
               <th className="pb-2 text-right">Spend</th>
               <th className="pb-2 text-right">Clicks</th>
-              <th className="pb-2 text-left pl-4 hidden sm:table-cell">Campaign</th>
               <th className="pb-2 text-right" />
             </tr>
           </thead>
           <tbody>
             {terms.map((t) => (
               <tr key={t.searchTerm} className="border-b border-[#3D3C36] last:border-0">
-                <td className="py-2.5 pr-4 font-mono text-[12px] text-[#E8E4DD]">"{t.searchTerm}"</td>
-                <td className="py-2.5 pr-4 text-right font-mono text-[#D4882A]">{fmt$(t.cost)}</td>
-                <td className="py-2.5 pr-4 text-right text-[#9B9689]">{fmtN(t.clicks)}</td>
-                <td className="py-2.5 pl-4 pr-4 text-[#9B9689] hidden sm:table-cell truncate max-w-[160px]">{t.campaignName}</td>
+                <td className="py-2.5 pr-3 font-mono text-[12px] text-[#E8E4DD] max-w-[200px] truncate">
+                  &ldquo;{t.searchTerm}&rdquo;
+                </td>
+                <td className="py-2.5 pl-3 pr-3 hidden md:table-cell">
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                    t.classification === "confirmed_waste"
+                      ? "bg-[#C45D4A]/15 text-[#C45D4A]"
+                      : "bg-[#D4882A]/15 text-[#D4882A]"
+                  }`}>
+                    {t.reason}
+                  </span>
+                </td>
+                <td className="py-2.5 pr-3 text-right font-mono text-[#D4882A]">{fmt$(t.cost)}</td>
+                <td className="py-2.5 pr-3 text-right text-[#9B9689]">{fmtN(t.clicks)}</td>
                 <td className="py-2.5 text-right">
                   {t.campaignId ? (
                     <ActionButton

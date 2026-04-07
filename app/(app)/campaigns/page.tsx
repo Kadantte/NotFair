@@ -324,7 +324,7 @@ export default function CampaignsPage() {
                                                             <Target className="w-3 h-3" />
                                                             Conversions
                                                         </div>
-                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.conversions || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.conversions || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">

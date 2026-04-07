@@ -5,9 +5,11 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  ArrowUp,
   DollarSign,
-  Clock,
   Eye,
+  Globe,
+  Layers,
   Shield,
   TrendingUp,
   Check,
@@ -173,6 +175,19 @@ const pricingTiers = [
   },
 ];
 
+const examplePrompts = [
+  "Pause keywords with no conversions this month",
+  "Create a Search campaign for 'Austin Plumbing'",
+  "Draft 5 ad headlines for a dental practice",
+  "Show me search terms wasting money",
+  "Analyze ROAS for the last 30 days",
+  "What's my impression share on brand campaigns?",
+  "Add negatives for irrelevant searches",
+  "Launch a PMAX campaign for my store",
+  "Which campaigns have the best CPA?",
+  "Optimize bids on my top keywords",
+];
+
 const faqs = [
   {
     q: "Is my Google Ads data safe?",
@@ -283,19 +298,20 @@ export function HomePage() {
               transition={{ duration: 0.6, ease: "easeOut" }}
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                AI-powered Google Ads management
+                Google Ads MCP for Claude
               </p>
               <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-6xl">
-                You&rsquo;re wasting
+                Turn Claude into
                 <br />
-                <span className="text-[#4CAF6E]">15–25%</span> of your
+                your Google Ads
                 <br />
-                Google Ads budget.
+                <span className="text-[#4CAF6E]">manager.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#9B9689]">
-                AdsAgent finds the wasted spend, cuts it, and optimizes
-                what&rsquo;s left — for a fraction of what agencies charge.
-                Get a free audit in 5&nbsp;minutes.
+                Claude has no commissions, no incentive to overspend your budget.
+                AdsAgent gives Claude the tools to monitor your campaigns 24/7,
+                cut waste, and tirelessly surface opportunities —
+                with your best interest at heart.
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-4">
@@ -373,6 +389,93 @@ export function HomePage() {
               </div>
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Claude demo UI ── */}
+      <section className="px-4 pb-24">
+        <div className="container mx-auto max-w-2xl">
+          {/* Section header */}
+          <motion.div
+            className="mb-10 text-center"
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+          >
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              Works in Cowork &amp; Claude Code
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Your ads manager, just a message away
+            </h2>
+            <p className="mt-3 text-base leading-relaxed text-[#9B9689]">
+              Open Claude, ask anything about your campaigns. AdsAgent handles the rest.
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+          >
+            {/* Unified card — everything inside */}
+            <div className="overflow-hidden rounded-2xl border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6)]">
+
+              {/* Top bar: model selector */}
+              <div className="flex items-center border-b border-[#3D3C36] px-5 py-3.5">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#E8E4DD]">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#C96442] text-[9px] font-bold text-white leading-none">
+                    C
+                  </span>
+                  <span>Claude</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-[#9B9689]" />
+                </div>
+              </div>
+
+              {/* Headline */}
+              <div className="px-8 pb-6 pt-10 text-center">
+                <h3 className="font-display text-2xl font-bold tracking-tight text-[#E8E4DD] md:text-3xl">
+                  How can I help you run ads today?
+                </h3>
+              </div>
+
+              {/* Input */}
+              <div className="px-6 pb-6">
+                <div className="rounded-xl border border-[#4D4C46] bg-[#1A1917] px-4 pb-3 pt-4 ring-1 ring-[#4D4C46]/40">
+                  <p className="text-[#E8E4DD]">
+                    Pause keywords with no conversions in the last 30 days
+                    <span className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[1px] animate-[pulse_1s_ease-in-out_infinite] bg-[#E8E4DD] align-middle" />
+                  </p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-xs font-medium text-[#4CAF6E]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
+                      AdsAgent
+                    </div>
+                    <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8E4DD] text-[#1A1917] shadow-sm transition-all hover:scale-105 hover:bg-white">
+                      <ArrowUp className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-[#3D3C36]" />
+
+              {/* Prompt chips — contained inside card */}
+              <div className="flex gap-2 overflow-x-auto px-5 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {examplePrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    className="shrink-0 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-xs whitespace-nowrap text-[#9B9689] transition-colors hover:border-[#4D4C46] hover:text-[#E8E4DD]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -463,83 +566,51 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* ── Conversation example ── */}
-      <section className="px-4 pb-20">
-        <div className="container mx-auto max-w-5xl">
-          <div className="mb-10 max-w-2xl">
-            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              Plain English, not dashboards
-            </p>
-            <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Just tell it what you want
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
-              No need to learn a complex dashboard. Describe what you need in
-              normal language, and your AI agent handles the rest.
-            </p>
-          </div>
-          <div className="space-y-4">
-            <div className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
-              <p className="font-mono-jb text-sm text-[#9B9689]">
-                <span className="text-[#E8E4DD]">you &rarr;</span>{" "}
-                &quot;Pause all keywords with CPA above $50 and less than 2
-                conversions in the last 30 days&quot;
-              </p>
-              <div className="mt-3 border-l-2 border-[#4CAF6E] pl-4">
-                <span className="text-[10px] font-medium uppercase tracking-widest text-[#4CAF6E]">Agent</span>
-                <p className="mt-1 font-mono-jb text-sm text-[#9B9689]">
-                  Found 23 keywords matching criteria. Pausing&hellip; done.
-                  Estimated monthly savings: <span className="text-[#E8E4DD]">$1,847</span>.
-                </p>
-              </div>
-            </div>
-            <div className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
-              <p className="font-mono-jb text-sm text-[#9B9689]">
-                <span className="text-[#E8E4DD]">you &rarr;</span>{" "}
-                &quot;Show me search terms that are wasting money&quot;
-              </p>
-              <div className="mt-3 border-l-2 border-[#4CAF6E] pl-4">
-                <span className="text-[10px] font-medium uppercase tracking-widest text-[#4CAF6E]">Agent</span>
-                <p className="mt-1 font-mono-jb text-sm text-[#9B9689]">
-                  Found 47 irrelevant search terms costing $2,134/mo. Top
-                  offenders: &quot;free legal advice&quot; ($340), &quot;law
-                  school requirements&quot; ($215), &quot;legal aid
-                  pro bono&quot; ($189). Want me to add these as negative
-                  keywords?
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── What you get ── */}
       <section className="px-4 pb-16">
         <div className="container mx-auto max-w-5xl">
           <div className="mb-10 max-w-2xl">
             <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Agency-quality management. Without the agency.
+              An ads manager with your best interest at heart.
             </h2>
           </div>
           <div className="divide-y divide-[#3D3C36] border-y border-[#3D3C36]">
             {[
               {
+                icon: Heart,
+                title: "Your best interest, always",
+                stat: "$0",
+                desc: "No commissions, no retainers tied to spend. Claude has no incentive to burn your budget — every recommendation is purely in your interest.",
+              },
+              {
+                icon: TrendingUp,
+                title: "Tirelessly finds opportunities",
+                stat: "24/7",
+                desc: "Claude monitors your campaigns around the clock, surfacing wins you'd miss with a monthly agency check-in.",
+              },
+              {
+                icon: Layers,
+                title: "Unlimited ad accounts",
+                stat: "∞",
+                desc: "Connect as many Google Ads accounts as you manage. One subscription covers them all — no per-account fees.",
+              },
+              {
+                icon: Globe,
+                title: "Works wherever you use Claude",
+                stat: "MCP",
+                desc: "Claude.ai, Claude Code, Cursor, or any MCP-compatible client — your ads account goes where you go.",
+              },
+              {
                 icon: DollarSign,
                 title: "Wasted spend recovery",
                 stat: "15–25%",
-                desc: "AI analyzes your search terms and keywords to find irrelevant clicks bleeding your budget.",
+                desc: "Claude analyzes your search terms and keywords to find irrelevant clicks bleeding your budget.",
               },
               {
                 icon: Eye,
                 title: "Full transparency & control",
                 stat: "100%",
                 desc: "Every change is explained in plain English with before/after data. Nothing happens without your approval.",
-              },
-              {
-                icon: Clock,
-                title: "Always-on, not 2 hours a month",
-                stat: "24/7",
-                desc: "Agencies give your account 2–4 hours per month. Your AI agent monitors continuously.",
               },
             ].map((item) => {
               const Icon = item.icon;
@@ -690,11 +761,10 @@ export function HomePage() {
             {pricingTiers.map((tier) => (
               <div
                 key={tier.name}
-                className={`relative rounded-lg border p-6 ${
-                  tier.popular
+                className={`relative rounded-lg border p-6 ${tier.popular
                     ? "border-[#4CAF6E] bg-[#24231F]"
                     : "border-[#3D3C36] bg-[#24231F]"
-                }`}
+                  }`}
               >
                 {tier.popular && (
                   <span className="absolute -top-3 left-6 rounded-full bg-[#4CAF6E] px-3 py-1 text-xs font-semibold text-[#1A1917]">
@@ -764,10 +834,10 @@ export function HomePage() {
       <section className="px-4 pb-24">
         <div className="container mx-auto max-w-5xl">
           <h2 className="font-display text-3xl font-bold tracking-tight text-[#E8E4DD] md:text-4xl">
-            Find out how much you&rsquo;re wasting.
+            Let Claude manage your Google Ads.
           </h2>
           <p className="mt-4 text-lg text-[#9B9689]">
-            Free audit. 5 minutes. No credit card required.
+            Free audit in 5 minutes. No credit card required.
           </p>
           <div className="mt-8 flex flex-col items-start gap-4">
             <AuditCTA session={session} />

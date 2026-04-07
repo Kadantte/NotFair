@@ -18,6 +18,7 @@ import {
   type SearchTermData,
   type Recommendation,
 } from "@/lib/intelligence/heuristics";
+import { analyzeSearchTermWaste, type SearchTermWasteAnalysis } from "@/lib/audit/search-term-waste";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -148,14 +149,7 @@ export type AuditResult = {
     topCampaign: string | null;
     wastedSpend: number;
   };
-  wastedSearchTerms: Array<{
-    searchTerm: string;
-    cost: number;
-    clicks: number;
-    campaignName: string;
-    campaignId: string;
-    adGroupName: string;
-  }>;
+  wastedSearchTerms: Array<SearchTermWasteAnalysis>;
   zeroCvCampaigns: Array<{
     id: string;
     name: string;
@@ -796,18 +790,19 @@ export function computeAuditScore(input: AuditInput): AuditResult {
 
   const wastedSpend = computeWastedSpend(input);
 
+  const totalClicks = input.campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalImpressions = input.campaigns.reduce((s, c) => s + c.impressions, 0);
+  const totalCost = input.campaigns.reduce((s, c) => s + c.cost, 0);
+  const accountAvgCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+  const accountAvgCpc = totalClicks > 0 ? totalCost / totalClicks : 0;
+  const activeKeywordTexts = input.keywords.map((k) => k.text);
+
   const wastedSearchTerms = input.searchTerms
     .filter((t) => t.conversions === 0 && t.cost > 0)
+    .map((t) => analyzeSearchTermWaste(t, activeKeywordTexts, accountAvgCtr, accountAvgCpc))
+    .filter((r) => r.classification === "confirmed_waste" || r.classification === "likely_waste")
     .sort((a, b) => b.cost - a.cost)
-    .slice(0, 10)
-    .map((t) => ({
-      searchTerm: t.searchTerm,
-      cost: t.cost,
-      clicks: t.clicks,
-      campaignName: t.campaignName,
-      campaignId: t.campaignId,
-      adGroupName: t.adGroupName,
-    }));
+    .slice(0, 10);
 
   const zeroCvCampaigns = input.campaigns
     .filter((c) => isEnabled(c.status) && c.cost > 20 && c.clicks > 20 && c.conversions === 0)

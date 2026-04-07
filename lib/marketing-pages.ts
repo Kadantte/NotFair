@@ -8,11 +8,11 @@ export type MarketingLink = {
 
 export type LandingPageContent = {
   slug:
-    | "ai-google-ads-agent"
-    | "google-ads-mcp"
-    | "connect-google-ads-to-claude"
-    | "connect-google-ads-to-chatgpt"
-    | "ai-google-ads-optimization";
+  | "ai-google-ads-agent"
+  | "google-ads-mcp"
+  | "connect-google-ads-to-claude"
+  | "connect-google-ads-to-chatgpt"
+  | "ai-google-ads-optimization";
   title: string;
   description: string;
   keywords: string[];
@@ -370,7 +370,7 @@ export const homepageFaq: FaqItem[] = [
   {
     question: "What is AdsAgent?",
     answer:
-      "AdsAgent is a Google Ads MCP server built for Claude. It connects your Google Ads account to Claude Code, Claude for Work, and other MCP-compatible AI clients so you can analyze campaigns, optimize spend, and manage changes through natural conversation.",
+      "AdsAgent is a Google Ads MCP server built for Claude. It connects your Google Ads account to Claude Code, Claude Cowork, and other MCP-compatible AI clients so you can analyze campaigns, optimize spend, and manage changes through natural conversation.",
   },
   {
     question: "Who is AdsAgent built for?",
@@ -385,7 +385,7 @@ export const homepageFaq: FaqItem[] = [
   {
     question: "Does AdsAgent work with other AI tools?",
     answer:
-      "Yes. AdsAgent uses the open MCP protocol, so it works with any MCP-compatible client including Cursor, Windsurf, and custom agents built with the Claude Agent SDK. Claude Code and Claude for Work are the recommended primary clients.",
+      "Yes. AdsAgent uses the open MCP protocol, so it works with any MCP-compatible client including Cursor, Windsurf, and custom agents built with the Claude Agent SDK. Claude Code and Claude Cowork are the recommended primary clients.",
   },
   {
     question: "Why does AdsAgent use MCP?",

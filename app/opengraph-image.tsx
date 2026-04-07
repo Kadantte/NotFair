@@ -79,7 +79,7 @@ export default function OpenGraphImage() {
         >
           <span>Claude Code</span>
           <span style={{ color: "#3D3C36" }}>|</span>
-          <span>Claude for Work</span>
+          <span>Claude Cowork</span>
           <span style={{ color: "#3D3C36" }}>|</span>
           <span>MCP Protocol</span>
         </div>

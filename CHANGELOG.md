@@ -63,7 +63,7 @@ All notable changes to AdsAgent will be documented in this file.
 ## [0.2.7.0] - 2026-04-05
 
 ### Added
-- "Built for Claude" homepage positioning with Claude Code and Claude for Work as primary AI clients
+- "Built for Claude" homepage positioning with Claude Code and Claude Cowork as primary AI clients
 - Claude workflows section showing terminal, workspace, spend recovery, and A/B test use cases
 - Conversation demo showing Claude managing Google Ads in natural language
 - "Also works with" section for Cursor, Windsurf, and Claude Agent SDK

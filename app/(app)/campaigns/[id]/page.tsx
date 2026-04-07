@@ -291,7 +291,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                     { icon: TrendingUp, label: 'Impressions', value: campaignInfo.impressions.toLocaleString() },
                                     { icon: MousePointer2, label: 'Clicks', value: campaignInfo.clicks.toLocaleString() },
                                     { icon: DollarSign, label: 'Cost', value: `$${campaignInfo.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-                                    { icon: Target, label: 'Conversions', value: campaignInfo.conversions.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 }) },
+                                    { icon: Target, label: 'Conversions', value: campaignInfo.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
                                 ].map(({ icon: Icon, label, value }) => (
                                     <div key={label} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
                                         <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
