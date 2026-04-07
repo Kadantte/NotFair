@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.10.0] - 2026-04-06
+
+### Added
+- Outreach metrics dashboard on the /dev page: bounce rate, reply rate, status pipeline, and per-domain bounce breakdown
+- Unit tests for outreach metrics derivation covering all edge cases
+
+### Changed
+- Status colors unified into shared STATUS_CONFIG used by both pipeline bars and lead badges
+- Metrics derived client-side from already-fetched contacts — no extra DB queries
+- Refresh button now clears both stats and contacts cache
+
 ## [0.2.9.0] - 2026-04-06
 
 ### Added

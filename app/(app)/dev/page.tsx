@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import {
     deleteContactAction,
     sendOutreachAction,
 } from '../outreach/actions';
+import { deriveMetrics, STATUS_CONFIG, BOUNCE_RATE_WARN } from '@/lib/outreach-metrics';
 
 type DailyUsage = {
     date: string;
@@ -70,6 +71,8 @@ export default function DevPage() {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [sendingId, setSendingId] = useState<number | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
+
+    const metrics = useMemo(() => contacts.length > 0 ? deriveMetrics(contacts) : null, [contacts]);
 
     const fetchContacts = useCallback(async (background = false) => {
         if (!background) setLoadingContacts(true);
@@ -162,7 +165,7 @@ export default function DevPage() {
                         <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <Button
-                        onClick={() => { cachedStats = null; fetchStats(false); }}
+                        onClick={() => { cachedStats = null; cachedContacts = null; fetchStats(false); fetchContacts(false); }}
                         disabled={loading}
                         variant="outline"
                         size="sm"
@@ -419,6 +422,76 @@ export default function DevPage() {
                     </>
                 ) : null}
 
+                {/* ── Outreach Metrics ── */}
+                {metrics && metrics.sent > 0 && (
+                    <div>
+                        <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">Outreach</h2>
+
+                        {/* Summary cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                            {[
+                                { label: 'Total Leads', value: metrics.total, color: 'text-[#E8E4DD]' },
+                                { label: 'Sent', value: metrics.sent, color: 'text-[#E8E4DD]' },
+                                { label: 'Bounce Rate', value: `${(metrics.bounceRate * 100).toFixed(1)}%`, color: metrics.bounceRate > BOUNCE_RATE_WARN ? 'text-[#C45D4A]' : 'text-[#4CAF6E]' },
+                                { label: 'Reply Rate', value: `${(metrics.replyRate * 100).toFixed(1)}%`, color: metrics.replyRate > 0 ? 'text-[#4CAF6E]' : 'text-[#9B9689]' },
+                            ].map((card) => (
+                                <div key={card.label} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3 sm:p-4">
+                                    <div className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest mb-1">{card.label}</div>
+                                    <div className={`text-xl sm:text-2xl font-mono tabular-nums font-semibold ${card.color}`}>{card.value}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Status funnel */}
+                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden mb-4">
+                            <div className="px-4 py-3 border-b border-[#3D3C36]">
+                                <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Pipeline</span>
+                            </div>
+                            <div className="px-4 py-3 space-y-2">
+                                {STATUS_CONFIG
+                                    .filter((s) => (metrics.byStatus[s.key] ?? 0) > 0)
+                                    .map((stage) => {
+                                        const count = metrics.byStatus[stage.key]!;
+                                        const pct = (count / metrics.total) * 100;
+                                        return (
+                                            <div key={stage.key} className="flex items-center gap-3">
+                                                <span className="text-[12px] text-[#9B9689] w-20 shrink-0">{stage.label}</span>
+                                                <div className="flex-1 h-5 bg-[#1A1917] rounded overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded transition-all"
+                                                        style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: stage.color, opacity: 0.7 }}
+                                                    />
+                                                </div>
+                                                <span className="text-[12px] font-mono tabular-nums text-[#E8E4DD] w-8 text-right">{count}</span>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+
+                        {/* Domain bounce breakdown */}
+                        {metrics.domainBreakdown.length > 0 && (
+                            <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-[#3D3C36]">
+                                    <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Bounce Rate by Domain</span>
+                                </div>
+                                <div className="divide-y divide-[#3D3C36]/50">
+                                    {metrics.domainBreakdown.map((d) => (
+                                        <div key={d.domain} className="flex items-center gap-3 px-4 py-2">
+                                            <span className="text-[13px] font-mono text-[#E8E4DD] min-w-0 truncate flex-1">{d.domain}</span>
+                                            <span className="text-[12px] font-mono tabular-nums text-[#9B9689] shrink-0">{d.total} sent</span>
+                                            <span className="text-[12px] font-mono tabular-nums text-[#C45D4A] shrink-0">{d.bounced} bounced</span>
+                                            <span className={`text-[12px] font-mono tabular-nums shrink-0 w-14 text-right font-medium ${d.bounceRate > BOUNCE_RATE_WARN ? 'text-[#C45D4A]' : 'text-[#4CAF6E]'}`}>
+                                                {(d.bounceRate * 100).toFixed(0)}%
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ── Leads ── */}
                 <div>
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -459,13 +532,10 @@ export default function DevPage() {
                             )}
                             <div className="max-h-[32rem] overflow-y-auto divide-y divide-[#3D3C36]/50">
                                 {contacts.map((c) => {
-                                    const statusColors: Record<string, string> = {
-                                        new: 'bg-[#9B9689]/15 text-[#9B9689]',
-                                        drafted: 'bg-[#6B8AED]/15 text-[#6B8AED]',
-                                        scheduled: 'bg-[#C084FC]/15 text-[#C084FC]',
-                                        contacted: 'bg-[#D4882A]/15 text-[#D4882A]',
-                                        replied: 'bg-[#4CAF6E]/15 text-[#4CAF6E]',
-                                    };
+                                    const sc = STATUS_CONFIG.find((s) => s.key === c.status);
+                                    const badgeStyle = sc
+                                        ? { backgroundColor: `${sc.color}26`, color: sc.color }
+                                        : { backgroundColor: '#9B968926', color: '#9B9689' };
                                     const isExpanded = expandedId === c.id;
                                     const hasDraft = !!c.draftSubject;
                                     return (
@@ -477,7 +547,7 @@ export default function DevPage() {
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="truncate text-[13px] text-[#E8E4DD] font-mono">{c.email}</span>
-                                                        <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${statusColors[c.status] || statusColors.new}`}>
+                                                        <span className="shrink-0 rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider" style={badgeStyle}>
                                                             {c.status}
                                                         </span>
                                                     </div>
