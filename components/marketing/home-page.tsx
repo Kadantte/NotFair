@@ -266,6 +266,13 @@ export function HomePage() {
                   <span className="h-1 w-1 rounded-full bg-[#3D3C36]" />
                   <span>No credit card</span>
                 </div>
+                <Link
+                  href="/google-ads-claude"
+                  prefetch
+                  className="text-sm text-[#9B9689] underline underline-offset-4 hover:text-[#E8E4DD] transition-colors"
+                >
+                  Using Claude? See how it works with Google Ads →
+                </Link>
               </div>
             </motion.div>
 

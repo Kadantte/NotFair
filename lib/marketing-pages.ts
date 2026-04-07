@@ -78,6 +78,11 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
+        href: "/google-ads-claude",
+        title: "Google Ads + Claude",
+        description: "Set up Claude with live Google Ads access in under 2 minutes via MCP.",
+      },
+      {
         href: "/google-ads-audit",
         title: "Free Google Ads Audit",
         description: "Score your account across 7 dimensions and find wasted spend in 5 minutes.",
@@ -86,11 +91,6 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         href: "/google-ads-mcp",
         title: "Google Ads MCP",
         description: "See how AdsAgent works as a Google Ads MCP server.",
-      },
-      {
-        href: "/ai-google-ads-optimization",
-        title: "AI Google Ads optimization",
-        description: "Learn how teams use AdsAgent to prioritize optimizations.",
       },
     ],
   },
@@ -144,14 +144,14 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
+        href: "/google-ads-claude",
+        title: "Google Ads + Claude",
+        description: "The Claude-specific setup guide — connect in under 2 minutes.",
+      },
+      {
         href: "/connect-google-ads-to-claude",
         title: "Connect Google Ads to Claude",
         description: "See the Claude-specific setup and workflow fit.",
-      },
-      {
-        href: "/connect-google-ads-to-chatgpt",
-        title: "Connect Google Ads to ChatGPT",
-        description: "See the ChatGPT-style workflow positioning and caveats.",
       },
       {
         href: "/ai-google-ads-agent",
@@ -210,6 +210,11 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
+        href: "/google-ads-claude",
+        title: "Google Ads + Claude",
+        description: "The full Claude setup guide — MCP config, OAuth, and first prompts.",
+      },
+      {
         href: "/google-ads-mcp",
         title: "Google Ads MCP",
         description: "Understand the MCP layer behind the Claude workflow.",
@@ -218,11 +223,6 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         href: "/ai-google-ads-optimization",
         title: "AI Google Ads optimization",
         description: "See the optimization use cases teams usually pursue next.",
-      },
-      {
-        href: "/impact",
-        title: "Impact tracking",
-        description: "Review how AdsAgent tracks changes after Claude-driven workflows.",
       },
     ],
   },
