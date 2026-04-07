@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const SITE_NAME = "AdsAgent";
-export const SITE_URL = "https://www.adsagent.org";
+export const SITE_URL = "https://adsagent.org";
 export const DEFAULT_OG_IMAGE = "/opengraph-image";
 export const SITE_DESCRIPTION =
   "AdsAgent is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude Cowork and let AI analyze campaigns, optimize spend, and manage changes.";
