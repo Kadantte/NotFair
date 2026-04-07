@@ -10,6 +10,9 @@ export const STATUS_CONFIG = [
     { key: 'drafted', label: 'Drafted', color: '#6B8AED' },
     { key: 'scheduled', label: 'Scheduled', color: '#C084FC' },
     { key: 'contacted', label: 'Contacted', color: '#D4882A' },
+    { key: 'delivered', label: 'Delivered', color: '#A78BFA' },
+    { key: 'opened', label: 'Opened', color: '#60A5FA' },
+    { key: 'clicked', label: 'Clicked', color: '#34D399' },
     { key: 'replied', label: 'Replied', color: '#4CAF6E' },
     { key: 'bounced', label: 'Bounced', color: '#C45D4A' },
 ];
@@ -34,13 +37,15 @@ export function deriveMetrics(contacts: ContactLike[]): OutreachMetrics {
     }
     const bounced = byStatus['bounced'] ?? 0;
     const replied = byStatus['replied'] ?? 0;
-    const contacted = byStatus['contacted'] ?? 0;
+    const contacted = (byStatus['contacted'] ?? 0) + (byStatus['delivered'] ?? 0) + (byStatus['opened'] ?? 0) + (byStatus['clicked'] ?? 0);
     const sent = contacted + replied + bounced;
+
+    const SENT_STATUSES = new Set(['contacted', 'delivered', 'opened', 'clicked', 'replied', 'bounced']);
 
     // Domain breakdown for sent emails only
     const domainMap = new Map<string, { total: number; bounced: number }>();
     for (const c of contacts) {
-        if (c.status !== 'contacted' && c.status !== 'replied' && c.status !== 'bounced') continue;
+        if (!SENT_STATUSES.has(c.status)) continue;
         const domain = c.email.split('@')[1] ?? '';
         const entry = domainMap.get(domain) ?? { total: 0, bounced: 0 };
         entry.total++;

@@ -1,40 +1,62 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { inArray, sql } from "drizzle-orm";
+import { and, inArray, notInArray, sql } from "drizzle-orm";
+import { getResend } from "@/lib/resend";
 
 const SOFT_BOUNCE_LIMIT = 3;
 
-/**
- * Resend webhook handler for bounce & complaint events.
- *
- * Configure in Resend dashboard → Webhooks → POST to:
- *   https://www.adsagent.org/api/webhooks/resend
- *
- * Events to subscribe: email.bounced, email.complained, email.delivery_delayed
- */
+// Statuses that count as "already better" — don't downgrade them
+const BETTER_THAN_DELIVERED = ["opened", "clicked", "replied"];
+const BETTER_THAN_OPENED = ["clicked", "replied"];
+const BETTER_THAN_CLICKED = ["replied"];
+const TERMINAL_BAD = ["bounced"];
+
 export async function POST(request: Request) {
-  let event: { type: string; data: { to?: string[] | string; email_id?: string } };
+  const body = await request.text();
+
+  // Verify Resend webhook signature — fail closed if secret is missing
+  const secret = process.env.RESEND_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error("RESEND_WEBHOOK_SECRET is not set — rejecting webhook");
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+  const svixId = request.headers.get("svix-id");
+  const svixTimestamp = request.headers.get("svix-timestamp");
+  const svixSignature = request.headers.get("svix-signature");
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    return NextResponse.json({ error: "Missing svix headers" }, { status: 401 });
+  }
   try {
-    event = await request.json();
+    const resend = getResend();
+    resend.webhooks.verify({
+      payload: body,
+      headers: { id: svixId, timestamp: svixTimestamp, signature: svixSignature },
+      webhookSecret: secret,
+    });
+  } catch {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let event: { type: string; data: { to?: string[] | string } };
+  try {
+    event = JSON.parse(body);
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const recipients = Array.isArray(event.data.to)
-    ? event.data.to
-    : event.data.to
-      ? [event.data.to]
-      : [];
-
+  const toField = event.data?.to;
+  const recipients = Array.isArray(toField) ? toField : toField ? [toField] : [];
   if (recipients.length === 0) {
     return NextResponse.json({ ok: true, action: "no_recipients" });
   }
-
   const emails = recipients.map((e) => e.toLowerCase());
 
   switch (event.type) {
+    // ── Hard failures → bounced ──────────────────────────────────────
     case "email.bounced":
-    case "email.complained": {
+    case "email.complained":
+    case "email.failed":
+    case "email.suppressed": {
       await db()
         .update(schema.contacts)
         .set({
@@ -43,13 +65,11 @@ export async function POST(request: Request) {
           bounceCount: sql`${schema.contacts.bounceCount} + 1`,
         })
         .where(inArray(schema.contacts.email, emails));
-
-      const action = event.type === "email.bounced" ? "hard_bounce" : "complaint";
-      return NextResponse.json({ ok: true, action, emails });
+      return NextResponse.json({ ok: true, action: "bounced" });
     }
 
+    // ── Soft bounce → increment, mark bounced at threshold ──────────
     case "email.delivery_delayed": {
-      // Increment bounce count and mark as bounced if over threshold — single query
       await db()
         .update(schema.contacts)
         .set({
@@ -58,8 +78,47 @@ export async function POST(request: Request) {
           status: sql`CASE WHEN ${schema.contacts.bounceCount} + 1 >= ${SOFT_BOUNCE_LIMIT} THEN 'bounced' ELSE ${schema.contacts.status} END`,
         })
         .where(inArray(schema.contacts.email, emails));
+      return NextResponse.json({ ok: true, action: "soft_bounce" });
+    }
 
-      return NextResponse.json({ ok: true, action: "soft_bounce", emails });
+    // ── Positive engagement — upgrade only, never downgrade ─────────
+    case "email.delivered": {
+      await db()
+        .update(schema.contacts)
+        .set({ status: "delivered" })
+        .where(
+          and(
+            inArray(schema.contacts.email, emails),
+            notInArray(schema.contacts.status, [...BETTER_THAN_DELIVERED, ...TERMINAL_BAD]),
+          )
+        );
+      return NextResponse.json({ ok: true, action: "delivered" });
+    }
+
+    case "email.opened": {
+      await db()
+        .update(schema.contacts)
+        .set({ status: "opened" })
+        .where(
+          and(
+            inArray(schema.contacts.email, emails),
+            notInArray(schema.contacts.status, [...BETTER_THAN_OPENED, ...TERMINAL_BAD]),
+          )
+        );
+      return NextResponse.json({ ok: true, action: "opened" });
+    }
+
+    case "email.clicked": {
+      await db()
+        .update(schema.contacts)
+        .set({ status: "clicked" })
+        .where(
+          and(
+            inArray(schema.contacts.email, emails),
+            notInArray(schema.contacts.status, [...BETTER_THAN_CLICKED, ...TERMINAL_BAD]),
+          )
+        );
+      return NextResponse.json({ ok: true, action: "clicked" });
     }
 
     default:
