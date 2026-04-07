@@ -2,6 +2,27 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.11.0] - 2026-04-06
+
+### Changed
+- Landing page rewritten for SMB audience: pain-driven hero with mock audit preview, comparison table (Self-Manage vs Agency vs AdsAgent), vertical targeting (Legal, Home Services, Healthcare, Insurance), pricing tiers ($149/$349/$699), FAQ, and conversion-focused CTAs
+- Font stack updated to match DESIGN.md: General Sans for headings, DM Sans for body, JetBrains Mono for code/data
+- AI conversation demo now uses DESIGN.md's plumbing treatment (green left border + "Agent" label)
+- "What you get" section restructured from 3-column icon grid to editorial divided list
+- Section rhythm varied to break cookie-cutter feel (different padding per section, selective eyebrow labels)
+- Final CTA left-aligned to match asymmetric layout from DESIGN.md
+- Footer copy updated from developer jargon (MCP) to SMB-friendly language
+- Vertical card colors corrected to on-brand palette (removed blue/violet)
+
+### Fixed
+- Touch targets on footer and pricing links now meet 44px minimum
+- FAQ accordion now has proper ARIA disclosure attributes (aria-expanded, aria-controls)
+- Added color-scheme: dark to html element for native dark UI controls
+- CTA button now full-width on mobile to prevent overflow in pricing cards
+
+### Added
+- Scroll-triggered fade-in animations on stats bar and comparison table
+
 ## [0.2.10.0] - 2026-04-06
 
 ### Added

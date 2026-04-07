@@ -16,8 +16,8 @@ export function SiteFooter() {
                             AdsAgent
                         </h2>
                         <p className="text-sm leading-relaxed text-[#9B9689]">
-                            Connect Google Ads to AI workflows through MCP, keep
-                            optimization reviewable, and track what changed.
+                            AI-powered Google Ads management that finds wasted
+                            spend and optimizes your campaigns automatically.
                         </p>
                     </div>
 
@@ -25,12 +25,12 @@ export function SiteFooter() {
                         <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#E8E4DD]">
                             Articles
                         </h3>
-                        <div className="mt-4 grid gap-3">
+                        <div className="mt-4 grid gap-1">
                             {articleLinks.map((link) => (
                                 <Link
                                     key={link.href}
                                     href={link.href}
-                                    className="text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                    className="py-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
                                 >
                                     {link.label}
                                 </Link>
@@ -42,16 +42,16 @@ export function SiteFooter() {
                         <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#E8E4DD]">
                             Company
                         </h3>
-                        <div className="mt-4 grid gap-3">
+                        <div className="mt-4 grid gap-1">
                             <Link
                                 href="/privacy"
-                                className="text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                className="py-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
                             >
                                 Privacy Policy
                             </Link>
                             <Link
                                 href="/terms"
-                                className="text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                className="py-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
                             >
                                 Terms of Service
                             </Link>
