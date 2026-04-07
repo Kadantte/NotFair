@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -57,23 +57,43 @@ function formatBudget(budget: BudgetSummary): string {
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
 
+type CustomerAccount = { id: string; name: string };
+type Customer = {
+    userId: string | null;
+    googleEmail: string | null;
+    primaryAccountId: string;
+    accounts: CustomerAccount[];
+    accountCount: number;
+    sessions: number;
+    lastActive: string;
+    firstSeen: string;
+};
+
+type Tab = 'usage' | 'outreach' | 'customers';
+
 let cachedStats: DevStats | null = null;
 let cachedContacts: Contact[] | null = null;
+let cachedCustomers: Customer[] | null = null;
 
 export default function DevPage() {
+    const [activeTab, setActiveTab] = useState<Tab>('usage');
     const [stats, setStats] = useState<DevStats | null>(cachedStats);
     const [loading, setLoading] = useState(!cachedStats);
     const [error, setError] = useState<string | null>(null);
     const [contacts, setContacts] = useState<Contact[]>(cachedContacts ?? []);
     const [loadingContacts, setLoadingContacts] = useState(!cachedContacts);
+    const [customers, setCustomers] = useState<Customer[]>(cachedCustomers ?? []);
+    const [loadingCustomers, setLoadingCustomers] = useState(!cachedCustomers);
     const [importing, setImporting] = useState(false);
     const [deletingContactId, setDeletingContactId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [sendingId, setSendingId] = useState<number | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
     const [impersonatingAccountId, setImpersonatingAccountId] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
     const metrics = useMemo(() => contacts.length > 0 ? deriveMetrics(contacts) : null, [contacts]);
+    const filteredContacts = useMemo(() => statusFilter === 'all' ? contacts : contacts.filter((c) => c.status === statusFilter), [contacts, statusFilter]);
 
     async function handleViewAs(accountId: string, e: React.MouseEvent) {
         e.preventDefault();
@@ -132,10 +152,26 @@ export default function DevPage() {
         }
     }, []);
 
+    const fetchCustomers = useCallback(async (background = false) => {
+        if (!background) setLoadingCustomers(true);
+        try {
+            const res = await fetch('/api/dev/customers', { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch');
+            const data = await res.json();
+            setCustomers(data.customers);
+            cachedCustomers = data.customers;
+        } catch {
+            setError('Failed to load customers');
+        } finally {
+            setLoadingCustomers(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchStats(!!cachedStats);
         fetchContacts(!!cachedContacts);
-    }, [fetchStats, fetchContacts]);
+        fetchCustomers(!!cachedCustomers);
+    }, [fetchStats, fetchContacts, fetchCustomers]);
 
     async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -189,7 +225,7 @@ export default function DevPage() {
                         <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <Button
-                        onClick={() => { cachedStats = null; cachedContacts = null; fetchStats(false); fetchContacts(false); }}
+                        onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false); fetchContacts(false); fetchCustomers(false); }}
                         disabled={loading}
                         variant="outline"
                         size="sm"
@@ -198,6 +234,21 @@ export default function DevPage() {
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                         <span className="hidden sm:inline">Refresh</span>
                     </Button>
+                </div>
+                <div className="flex gap-0 px-4 sm:px-6 border-t border-[#3D3C36]/50">
+                    {(['usage', 'outreach', 'customers'] as const).map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-4 py-2.5 text-[13px] font-medium capitalize transition-colors border-b-2 -mb-px ${
+                                activeTab === tab
+                                    ? 'border-[#4CAF6E] text-[#E8E4DD]'
+                                    : 'border-transparent text-[#9B9689] hover:text-[#E8E4DD]'
+                            }`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
                 </div>
             </header>
 
@@ -209,7 +260,7 @@ export default function DevPage() {
                     </div>
                 )}
 
-                {loading && !stats ? (
+                {activeTab === 'usage' && (loading && !stats ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
                         <p className="text-[#9B9689] animate-pulse text-sm">Loading dev stats...</p>
@@ -470,10 +521,10 @@ export default function DevPage() {
                             </div>
                         </div>
                     </>
-                ) : null}
+                ) : null)}
 
-                {/* ── Outreach Metrics ── */}
-                {metrics && metrics.sent > 0 && (
+                {/* ── Outreach Tab ── */}
+                {activeTab === 'outreach' && metrics && metrics.sent > 0 && (
                     <div>
                         <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">Outreach</h2>
 
@@ -490,33 +541,6 @@ export default function DevPage() {
                                     <div className={`text-xl sm:text-2xl font-mono tabular-nums font-semibold ${card.color}`}>{card.value}</div>
                                 </div>
                             ))}
-                        </div>
-
-                        {/* Status funnel */}
-                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden mb-4">
-                            <div className="px-4 py-3 border-b border-[#3D3C36]">
-                                <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Pipeline</span>
-                            </div>
-                            <div className="px-4 py-3 space-y-2">
-                                {STATUS_CONFIG
-                                    .filter((s) => (metrics.byStatus[s.key] ?? 0) > 0)
-                                    .map((stage) => {
-                                        const count = metrics.byStatus[stage.key]!;
-                                        const pct = (count / metrics.total) * 100;
-                                        return (
-                                            <div key={stage.key} className="flex items-center gap-3">
-                                                <span className="text-[12px] text-[#9B9689] w-20 shrink-0">{stage.label}</span>
-                                                <div className="flex-1 h-5 bg-[#1A1917] rounded overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded transition-all"
-                                                        style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: stage.color, opacity: 0.7 }}
-                                                    />
-                                                </div>
-                                                <span className="text-[12px] font-mono tabular-nums text-[#E8E4DD] w-8 text-right">{count}</span>
-                                            </div>
-                                        );
-                                    })}
-                            </div>
                         </div>
 
                         {/* Domain bounce breakdown */}
@@ -543,33 +567,52 @@ export default function DevPage() {
                 )}
 
                 {/* ── Leads ── */}
+                {activeTab === 'outreach' && (
                 <div>
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
                         <div className="flex items-center gap-3">
                             <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD]">Leads</h2>
                             {!loadingContacts && (
-                                <span className="font-mono text-xs text-[#9B9689]">{contacts.length}</span>
+                                <span className="font-mono text-xs text-[#9B9689]">
+                                    {statusFilter === 'all' ? contacts.length : `${filteredContacts.length}/${contacts.length}`}
+                                </span>
                             )}
                         </div>
-                        <label>
-                            <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
-                            <Button variant="outline" size="sm" disabled={importing} className="gap-1.5 border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD]" asChild>
-                                <span>
-                                    {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                                    <span className="hidden sm:inline">Import CSV</span>
-                                </span>
-                            </Button>
-                        </label>
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#9B9689] pointer-events-none" />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="appearance-none pl-7 pr-6 py-1.5 text-[12px] rounded-md border border-[#3D3C36] bg-[#24231F] text-[#E8E4DD] hover:bg-[#2E2D28] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]/50 cursor-pointer"
+                                >
+                                    <option value="all">All statuses</option>
+                                    {STATUS_CONFIG.map((s) => (
+                                        <option key={s.key} value={s.key}>{s.label}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#9B9689] pointer-events-none" />
+                            </div>
+                            <label>
+                                <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
+                                <Button variant="outline" size="sm" disabled={importing} className="gap-1.5 border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD]" asChild>
+                                    <span>
+                                        {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                                        <span className="hidden sm:inline">Import CSV</span>
+                                    </span>
+                                </Button>
+                            </label>
+                        </div>
                     </div>
 
                     {loadingContacts ? (
                         <div className="flex items-center justify-center py-12">
                             <Loader2 className="h-5 w-5 animate-spin text-[#9B9689]" />
                         </div>
-                    ) : contacts.length === 0 ? (
+                    ) : filteredContacts.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-10 text-center">
                             <Users className="mx-auto mb-3 h-8 w-8 text-[#9B9689]/30" />
-                            <p className="text-sm text-[#9B9689]">No leads yet. Import a CSV or add via script.</p>
+                            <p className="text-sm text-[#9B9689]">{contacts.length === 0 ? 'No leads yet. Import a CSV or add via script.' : 'No leads match this filter.'}</p>
                         </div>
                     ) : (
                         <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
@@ -581,7 +624,7 @@ export default function DevPage() {
                                 </div>
                             )}
                             <div className="max-h-[32rem] overflow-y-auto divide-y divide-[#3D3C36]/50">
-                                {contacts.map((c) => {
+                                {filteredContacts.map((c) => {
                                     const sc = STATUS_CONFIG.find((s) => s.key === c.status);
                                     const badgeStyle = sc
                                         ? { backgroundColor: `${sc.color}26`, color: sc.color }
@@ -656,6 +699,107 @@ export default function DevPage() {
                         </div>
                     )}
                 </div>
+                )}
+
+                {/* ── Customers Tab ── */}
+                {activeTab === 'customers' && (loadingCustomers ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
+                        <p className="text-[#9B9689] animate-pulse text-sm">Loading customers...</p>
+                    </div>
+                ) : customers.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-10 text-center">
+                        <Users className="mx-auto mb-3 h-8 w-8 text-[#9B9689]/30" />
+                        <p className="text-sm text-[#9B9689]">No customers yet.</p>
+                    </div>
+                ) : (
+                    <div>
+                        <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">
+                            Customers
+                            <span className="ml-2 font-mono text-xs text-[#9B9689] font-normal">{customers.length}</span>
+                        </h2>
+
+                        {/* Mobile: card layout */}
+                        <div className="sm:hidden space-y-2">
+                            {customers.map((c) => (
+                                <div key={c.userId ?? c.primaryAccountId} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="min-w-0">
+                                            <div className="text-sm text-[#E8E4DD] truncate">{c.googleEmail || c.userId || 'Unknown'}</div>
+                                            <div className="text-xs text-[#9B9689]/60 font-mono">{c.primaryAccountId}</div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-3 text-center">
+                                        <div>
+                                            <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Accounts</div>
+                                            <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.accountCount}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Sessions</div>
+                                            <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Last Active</div>
+                                            <div className="text-[11px] text-[#9B9689] font-mono">
+                                                {new Date(c.lastActive.endsWith('Z') ? c.lastActive : c.lastActive + 'Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {c.accounts.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            {c.accounts.map((a) => (
+                                                <span key={a.id} className="text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#9B9689] font-mono">{a.name || a.id}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop: table layout */}
+                        <div className="hidden sm:block border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-[#3D3C36]">
+                                        {['Customer', 'Accounts', 'Sessions', 'First Seen', 'Last Active'].map((h, i) => (
+                                            <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customers.map((c) => (
+                                        <tr key={c.userId ?? c.primaryAccountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
+                                            <td className="px-4 py-2.5">
+                                                <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
+                                                <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {c.accounts.length === 0 ? (
+                                                        <span className="text-sm text-[#9B9689]/40">—</span>
+                                                    ) : c.accounts.map((a) => (
+                                                        <span key={a.id} className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#9B9689] font-mono">{a.name || a.id}</span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</td>
+                                            <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
+                                                {new Date(c.firstSeen.endsWith('Z') ? c.firstSeen : c.firstSeen + 'Z').toLocaleDateString(undefined, {
+                                                    month: 'short', day: 'numeric', year: 'numeric',
+                                                })}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
+                                                {new Date(c.lastActive.endsWith('Z') ? c.lastActive : c.lastActive + 'Z').toLocaleString(undefined, {
+                                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+                                                })}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
             </div>
         </section>
     );

@@ -5,113 +5,164 @@ description: "Draft and send personalized cold outreach emails to leads in the A
 
 # Cold Outreach Drafter
 
-You write cold emails that sound like they came from a real human founder — not a marketing team, not a bot, not a template. The goal is to start a conversation, not close a sale.
+You write cold emails that get replies. Not opens — replies. Every word earns its place or gets cut. The goal is to start a conversation, not explain a product.
 
 ## Philosophy
 
-Cold email has a bad reputation because most of it is lazy: mass-blasted templates with a thin veneer of personalization. The emails you write are the opposite. Each one should feel like the founder sat down, looked at the company, and wrote a genuine note. Because that's basically what's happening — you're the AI doing the looking, the founder is approving the result.
+Most cold email fails because it's a pitch disguised as a conversation. These emails are the opposite: a genuine, ultra-short note that makes someone curious enough to reply.
 
 **Core principles:**
-- **One human writing to another.** No corporate voice. No "I hope this email finds you well." Write like you'd write to someone you met at a conference.
-- **Earn the right to ask.** Before you ask for anything, demonstrate that you actually looked at their business. Reference something specific — a product they sell, a campaign they're running, a problem their industry has.
-- **Short beats long.** The best cold emails are 4-6 sentences. If you can't say it in under 100 words, you're trying too hard.
-- **One ask, one email.** Don't pitch features AND ask for a meeting AND share a case study. Pick one thing you want them to do.
-- **Plain text only.** We send plain text emails, not HTML. This is critical for deliverability — HTML triggers Gmail's Promotions tab. No formatting, no links wrapped in anchor tags, just bare URLs. A few short paragraphs, one URL max. That's it.
+- **Brevity is king.** 2-4 sentences. 50-75 words max. If you're over 75 words, you're explaining too much. The best cold emails look like they took 30 seconds to write.
+- **Optimize for replies, not clicks.** A reply means engagement. A link click means nothing. The CTA should invite a reply ("mind if I send over...?") not point to a URL.
+- **Create curiosity, not clarity.** Don't explain what AdsAgent does. Hint at a result. Make them want to ask "how?" The moment you fully explain, there's no reason to reply.
+- **One email, one idea.** Don't stack pain points, features, or angles. Pick ONE sharp hook per email.
+- **Plain text only.** No HTML, no formatting, no links wrapped in anchor tags. Plain text lands in Primary inbox, not Promotions. One bare URL max (and only if essential — often zero is better).
+- **Sound human, not polished.** Use contractions, casual phrasing, even the occasional "btw" or "lmk." If it reads like marketing copy, rewrite it. If it reads like a quick text to a colleague, you're close.
 
 ## Know Their Pain
 
-Before you write a single word, understand what keeps small business owners up at night about Google Ads. These are real fears — the email should acknowledge one of them (without being preachy) to show you get their world.
+Pick the ONE pain that fits this specific lead. Never mention more than one.
 
-**"I'm wasting money and can't tell"** — Clicks happen, budget disappears, but they can't connect it to actual customers. The Google Ads dashboard is a wall of metrics that doesn't answer the one question they care about: is this working?
+- **"I'm wasting money and can't tell"** — Clicks happen, budget vanishes, but they can't connect it to real customers.
+- **"Agencies are a black box"** — They've been burned. Agency charges $3k/month, sends a jargon PDF, barely touches the account.
+- **"I don't have time for this"** — Google Ads has 47 tabs. They just want cases/customers, not a part-time job.
+- **"I'm scared to touch anything"** — Horror stories about blowing through budget overnight. So it sits on autopilot.
+- **"Agency math doesn't work at my spend level"** — Spending $1-3k/month on ads, can't justify another $2k for an agency. Stuck.
+- **"Google's automation just spends my money"** — Smart Campaigns and Performance Max optimize for Google's revenue, not theirs.
 
-**"Agencies are a black box"** — Many have been burned. An agency charges $1-5k/month, sends a PDF report full of jargon, and nothing visibly changes. They ask what's happening and get "we're optimizing." When they leave, they find the agency was barely touching the account.
+## The AdsAgent Pitch (Internal Reference)
 
-**"I don't have time to learn this"** — They know they should manage it themselves but Google Ads has 47 tabs, auction insights, quality scores, match types... they just want customers, not a part-time job.
+Use these to inform your writing, but NEVER dump them into the email. Pick ONE angle and hint at it.
 
-**"I'm scared to touch anything"** — They've heard horror stories about someone changing a bid and blowing through their entire monthly budget overnight. So the account sits on autopilot.
+**One-line pitch:** Your Claude becomes your Google Ads manager — it does the work, you ask questions from your phone.
 
-**"I can't justify an agency at my spend level"** — If they spend $1-3k/month on ads, paying an agency another $1-2k on top is absurd math. But they can't manage it themselves either. They're stuck.
+**Angles** (pick ONE per email):
+- It lives inside Claude — no new dashboard, no new login
+- Free to try — no credit card, connect in 2 minutes
+- Unlike an agency, no incentive to inflate spend
+- Every change logged with reasoning — full transparency
+- Built for small teams who can't justify a PPC hire
 
-**"Google's automation just spends my money"** — Smart Campaigns and Performance Max feel like giving Google a blank check. The "AI" is optimizing for Google's revenue, not their ROI.
-
-Pick the pain that fits the lead's situation. A SaaS company worries about CAC and wasted spend. A local pet care business worries about agencies and not having time. A small tool company worries about the cost of getting help.
-
-## The AdsAgent Pitch (What to Weave In)
-
-**What AdsAgent actually is:** We turn your Claude into a tireless expert Google Ads manager who has your best interest at heart. It does all the dirty operational work — and a lot more than just bid tweaking. And because it all happens inside Claude, you can talk to it from your phone or desktop anytime you want.
-
-That's the core message. Frame it in whatever way fits the lead, but keep coming back to: **your Claude becomes your Google Ads manager.**
-
-**What Claude can actually do with AdsAgent** (pick 1-2 per email based on relevance — never list them all):
-- Tune keywords and bids based on real performance data
-- Write and create new ads — headlines, descriptions, A/B test variants
-- Improve quality scores by analyzing landing page relevance and ad copy alignment
-- Set up experiments to test different strategies
-- Generate performance reports and explain what's happening in plain English
-- Find opportunities to get more conversions and leads
-- Cut waste — pause bad keywords, add negatives from search terms, kill underperforming campaigns
-- Answer any question about the account anytime — "how did last week go?", "which campaign is wasting money?", "what should I try next?"
-
-**Angles to weave in** (pick 1-2 per email):
-- **It lives in Claude** — not another dashboard, not another login. Ask "how are my ads doing?" from their phone at lunch. If they already use Claude, this is just one more thing it can do.
-- **Free to try** — generous free tier, no credit card. Connect and start talking.
-- **A tireless expert on your side** — unlike an agency, it has their best interest at heart. No incentive to inflate their spend.
-- **Full transparency** — every change logged with before/after and reasoning. Ask it why and it explains.
-- **Guardrails** — budget caps, bid limits, approval flows. Nothing happens without them seeing it.
-- **Built for small teams** — for businesses that can't justify an agency or a dedicated PPC person.
+**Capabilities** (reference at most ONE, obliquely — never list):
+- Keyword/bid optimization
+- Ad copy writing and testing
+- Waste cutting (negatives, pausing losers)
+- Plain-English performance reports
+- Answer any account question anytime
 
 ## The Research Step
 
-Before writing any email, understand who you're writing to. For each lead:
+Before writing any email, understand who you're writing to:
 
-1. **Check what we know** — read the contact from the DB (company, email, any name)
-2. **Research the company** — visit their website (use the browse/fetch tools). Look for:
-   - What they actually do (product/service)
-   - Their size/stage (startup? established? funded?)
-   - Whether they're visibly running Google Ads (check if they're in a competitive PPC space)
-   - Any recent news, launches, or blog posts
-3. **Find the angle** — which of the pains above is most likely to resonate? What specific problem would AdsAgent solve for THIS company?
+1. **Check DB data** — company, email, name, location, business_size, practice areas
+2. **Visit their website** (use browse/fetch tools). Look for:
+   - What they specifically do (practice areas, specialization)
+   - Something concrete to reference (a specific service page, case type, location focus)
+   - Size signals (solo? multi-office? team page?)
+3. **Pick ONE angle** — which pain fits? What single thing would make them curious?
 
-Spend 1-2 minutes researching. If you can't find a specific angle, a well-crafted industry-aware email is better than a generic one with a forced personalization.
+If research turns up something specific and interesting (a recent blog post, a niche practice area, a unique positioning), use it. If not, a well-targeted industry observation beats a forced "personalization."
 
 ## Email Structure
 
-Follow this structure loosely — it's a guide, not a straitjacket:
+Total length: 2-4 sentences, 50-75 words. Three short paragraphs max.
 
 **Subject line:**
-- Lowercase, casual. Like you'd text a colleague.
-- Reference their company or something specific. Never generic.
-- 4-8 words max. No clickbait, no questions, no emojis.
-- Examples: "saw rezgo's booking flow", "quick thought on your google ads", "sematext + ai for ads"
+- Include their first name or company name when possible.
+- Lowercase, casual. Like a phone notification they'd actually tap.
+- 3-6 words. Never generic.
+- Good: "john-paul - quick question", "thought about caffee law", "re: your google ads"
+- Bad: "google ads management solution", "caffee law + google ads" (too structured, feels templated)
 
 **Opening line (1 sentence):**
-- This is the hardest line. The instinct is to write a mini industry analysis to prove you did research — don't. That screams "AI wrote this" or "agency template." A real person would be casual and offhand, not analytical.
-- Think: how would you start a message to someone you met at a meetup? You'd say something short and natural, not deliver a thesis about their business model.
-- Bad: "Tour and activity operators live and die by seasonal demand — and Google Ads is probably one of the biggest levers for filling those off-peak slots." (too analytical, sounds like a blog post)
-- Bad: "Running Google Ads for a software comparison platform with 50+ categories is a different beast." (consultant voice)
-- Good: "Saw Rezgo while looking into booking platforms — figured you're probably running Google Ads to some degree."
-- Good: "Came across Sematext and noticed you're in a pretty competitive space for monitoring keywords."
-- Good: "Hey — ran into PawsVIP while looking at pet care businesses running ads."
-- The bar: would a real founder actually write this sentence in a quick email? If it sounds like something from a pitch deck or blog, rewrite it.
+- Reference something SPECIFIC. Not "came across your firm while looking at X firms running ads in Y" — that pattern is a dead giveaway of automation when repeated.
+- Vary the opener style across leads. Use different structures:
+  - Achievement/compliment: "273 five-star reviews is no joke — clearly doing something right."
+  - Observation: "Noticed you're running ads across both DUI and PI — that's a tricky combo to optimize."
+  - Direct: "Quick question about your Google Ads."
+  - Contextual: "Fellow Seattle founder here."
+- The test: if you swapped the company name and the sentence still works for 10 other leads, it's too generic. Rewrite.
 
-**Bridge (1-2 sentences):**
-- Now connect to a pain point — but keep the same casual tone. Don't suddenly shift into formal consultant mode.
-- Talk about their world, not your product. Empathize with a real problem, don't analyze their business from the outside.
+**Body (1-2 sentences):**
+- Bridge pain → curiosity in the tightest possible space.
+- Lead with the RESULT, not the mechanism. Don't explain what AdsAgent is or how it works. Hint at what it does for them.
+- Good: "We've been helping injury firms cut their wasted ad spend by about 30% — figured it might be relevant."
+- Good: "Built something that manages Google Ads inside Claude. A few solo attorneys are using it instead of an agency."
+- Bad: "We built AdsAgent — it turns Claude (the AI) into a full-time Google Ads manager that handles keywords, bids, ad copy, and waste cutting, and you can ask it questions from your phone." (way too much — this is a pitch deck paragraph)
 
-**The offer (1-2 sentences):**
-- Optimize for curiosity, not information. You're trying to get them to click a link or reply — not educate them on every benefit. Say just enough that they think "huh, interesting" and want to learn more.
-- Pick the ONE angle that's most relevant to this lead. Don't stack benefits. One sharp hook beats three decent ones.
-- If it fits naturally, mention the free tier or that it works inside Claude. Don't force it.
-
-**The ask (1-2 sentences):**
-- The reader needs to know exactly what to do next. A vague "there's a free tier" with no link is a dead end — the reader nods and closes the email.
-- Include a concrete action: a link to try it (`www.adsagent.org`), an invitation to reply, or a specific offer ("I can pull a free report on your account").
-- Best CTAs for cold email: (1) a link they can click right now, (2) "just reply and I'll..." which feels low-effort, or (3) a specific time-bound offer like a free audit.
-- Don't be pushy or create fake urgency. But do make it effortless to say yes.
+**CTA (1 sentence):**
+- Optimize for the LOWEST friction reply. Don't ask them to visit a URL — ask a question they can answer with one sentence.
+- Best CTAs (ranked by reply rate):
+  1. "Mind if I send over how it works?" — permission-based, easy yes
+  2. "Would it be weird if I ran a quick analysis on your account?" — specific, intriguing
+  3. "Worth a look, or totally off base?" — binary, disarming
+  4. "Want me to send a 2-min video of how it works for firms like yours?" — specific deliverable
+- Avoid: bare URLs with no question ("check it out: www.adsagent.org"), "Would love to connect", calendar links
 
 **Sign-off:**
-- Just a name and title. No phone number, no social links, no disclaimers.
-- "— Tong" or "Tong" with "Founder, AdsAgent" on the next line.
+- Just "Tong" on its own line, or "- Tong" for slightly more casual feel.
+- No title, no company name, no links, no disclaimers. Like how you'd sign a text.
+- The less it looks like a business email, the better.
+
+## Example Emails (Calibration)
+
+These show the target length and tone. Study them — then write originals, don't copy them.
+
+**Example A (achievement opener):**
+```
+Subject: john-paul - quick question
+
+273 five-star reviews for a solo disability firm is seriously impressive.
+
+Curious — are you managing your Google Ads yourself or using an agency? We've been helping a few solo attorneys handle it through AI instead, and the results have been solid.
+
+Mind if I send over how it works?
+
+- Tong
+```
+
+**Example B (observation opener):**
+```
+Subject: thought about nextlaw
+
+Noticed you're running ads across criminal, DUI, and PI — that's three completely different bidding strategies most agencies treat the same way.
+
+Built something that might be relevant. Mind if I share a quick overview?
+
+- Tong
+```
+
+**Example C (ultra-short):**
+```
+Subject: re: your google ads
+
+Hey Andrew — do you have someone managing your Google Ads, or is it mostly on autopilot?
+
+Either way, built something that a few PI attorneys are using instead of an agency. Happy to share if you're curious.
+
+- Tong
+```
+
+**Example D (result-led):**
+```
+Subject: quick one for caffee law
+
+Hey Jeffrey — we helped an injury firm in WA cut about 30% of their wasted ad spend last month.
+
+Would it be weird if I showed you what we found works?
+
+- Tong
+```
+
+## Variation Rules
+
+When drafting a batch of emails, you MUST vary:
+- **Subject line structure** — don't use the same pattern twice in a row
+- **Opening line type** — rotate between achievement, observation, direct, contextual
+- **CTA phrasing** — use different permission-based asks
+- **Body angle** — different pain points for different leads
+
+If you catch yourself writing "came across [company] while looking at [type] firms running ads in [city]" more than once in a batch — STOP. That's the autopilot pattern. Rewrite with a different structure.
 
 ## Saving Drafts
 
@@ -124,22 +175,19 @@ npx tsx scripts/save-draft.ts \
   --body "<plain text body>"
 ```
 
-The body must be **plain text** — no HTML tags, no `<p>`, no `<a href>`. Just write it like a real email. Use blank lines between paragraphs. For the sign-off, just write it naturally:
+The body must be **plain text** — no HTML. Use blank lines between paragraphs. Example:
 
 ```
-Your opening line here.
+Opening line.
 
-The bridge and offer.
+Body — pain bridge + curiosity hook.
 
-The ask. Try it free at www.adsagent.org — or just reply.
+CTA question.
 
-— Tong
-Founder, AdsAgent
+- Tong
 ```
 
-Why plain text? HTML emails get routed to Gmail's Promotions tab. Plain text looks like a real person wrote it and lands in Primary inbox, which dramatically improves open rates.
-
-After saving, tell the user you've drafted it and show them the subject + body in the conversation for quick review. They can then approve and send from the Dev page at `/dev`, or ask you to revise.
+After saving, show the user the subject + body for quick review. They can approve and send from `/dev`, or ask you to revise.
 
 ## Sending
 
@@ -154,7 +202,36 @@ npx tsx scripts/send-email.ts \
   --reply-to "tong.chen@adsagent.org"
 ```
 
-Always confirm with the user before sending. Show them what will be sent.
+Always confirm with the user before sending.
+
+## Follow-Up Sequence
+
+When the user asks to create follow-ups, use a 3-email sequence spaced 2-3 days apart:
+
+**Follow-up 1 (Day 2-3):** Ultra-short bump. Different angle, not a reminder.
+```
+Hey — forgot to mention, it's free to try. No credit card or anything.
+
+Figured that might matter more than my pitch did.
+
+- Tong
+```
+
+**Follow-up 2 (Day 5-7):** Value-first. Offer something concrete for free.
+```
+Pulled a quick look at [industry/location] Google Ads benchmarks — mind if I send over what I found? Might be useful regardless.
+
+- Tong
+```
+
+**Follow-up 3 (Day 10-14):** Breakup. Light, zero pressure.
+```
+Hey [name] — guessing this isn't a priority right now, which is totally fine.
+
+If your Google Ads situation changes, I'm at tong.chen@adsagent.org.
+
+- Tong
+```
 
 ## Checking for Replies
 
@@ -162,27 +239,26 @@ When the user asks about replies, use the Gmail MCP tools to search for emails f
 
 ## Batch Workflow
 
-When asked to draft emails for all leads (or a subset):
+When asked to draft emails for a batch:
 
-1. Read all contacts with status `new` from the database
-2. For each lead, research and draft a personalized email
-3. Save each draft via the save-draft script
-4. Present a summary: who got drafted, the subject lines, and a note to review them at `/dev`
+1. Read contacts with status `new` from the database
+2. Research each lead (parallelize website fetches when possible)
+3. Draft and save each email
+4. Present a summary table: lead name, subject line, opener type, CTA type
 
-Work through leads one at a time. Show each draft to the user as you go — they may want to adjust tone or angle before you continue to the next one.
+Work through leads one at a time so the user can review. But move fast — research, draft, save, show, next.
 
-## Anti-patterns to Avoid
+## Anti-patterns (Hard Rules)
 
-- "I hope this finds you well" — dead giveaway of a template
-- "I came across your company and was impressed" — vague, insincere
-- Opening with industry analysis — "Tour operators live and die by seasonal demand" sounds like a blog post, not a human. Keep the opener casual and offhand.
-- Starting with "My name is..." or "I'm the founder of..." — they can see that in the signature
-- Bullet points listing features — this is a note, not a pitch deck
-- "Would love to connect" — meaningless, say what you actually want
-- Exclamation marks — one max per email, zero is better
-- "Personalized" compliments that could apply to any company — "your website looks great" etc.
-- Long paragraphs — if a paragraph is more than 2 sentences, break it up
-- Multiple CTAs — one ask only
-- Mentioning price as "$X/month" — instead, mention the free tier casually. Let them discover pricing on their own.
-- Listing all the features — pick 1-2 that matter for THIS lead
-- Sounding like a SaaS landing page — this is a personal note, not a product page
+- **NEVER exceed 75 words** in the email body (excluding sign-off)
+- **NEVER use the same opening pattern** for consecutive leads in a batch
+- **NEVER explain what AdsAgent is** in detail — hint, don't tell
+- **NEVER use "came across [company] while looking at [X] firms running ads in [Y]"** — this is the #1 AI-cold-email tell
+- **NEVER list features** — not even two
+- **NEVER use "I hope this finds you well"**, "I came across your company and was impressed", "Would love to connect", or "My name is..."
+- **NEVER use exclamation marks** — zero, not "one max"
+- **NEVER include more than one URL** — and prefer zero URLs in initial email
+- **NEVER use bullet points** in the email body
+- **NEVER start with the founder's name/title** — they see it in the signature
+- **NEVER sound like a SaaS landing page** — no "handles keywords, bids, ad copy, and waste cutting" feature stacking
+- **NEVER use "we built"** followed by a feature list — the "we built AdsAgent — it does X, Y, Z" pattern is a dead giveaway
