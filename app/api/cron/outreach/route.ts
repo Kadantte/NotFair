@@ -3,14 +3,11 @@ import { db, schema } from "@/lib/db";
 import { eq, and, lte, asc } from "drizzle-orm";
 import { getResend } from "@/lib/resend";
 
-const DELAY_MS = 3 * 60 * 1000; // 3 minutes between emails
-
 /**
- * Send scheduled outreach emails that are due, spaced 3 minutes apart.
+ * Send scheduled outreach emails that are due.
  *
- * Triggered by Vercel Cron weekdays at 9am PT (see vercel.json).
- * Finds all contacts with scheduled_at <= now, sends them one at a time
- * with a 3-minute delay between each to improve deliverability.
+ * Triggered by Vercel Cron weekdays at 9:15am PT (see vercel.json).
+ * Emails are already staggered by scheduled_at, so no artificial delay needed.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -48,11 +45,6 @@ export async function GET(request: Request) {
     if (contact.unsubscribed || contact.status === "bounced") {
       results.push({ email: contact.email, company: contact.company, success: false, error: "Bounced/unsubscribed" });
       continue;
-    }
-
-    // Wait 3 minutes between sends (skip delay for the first one)
-    if (i > 0) {
-      await new Promise((r) => setTimeout(r, DELAY_MS));
     }
 
     const { error } = await resend.emails.send({
