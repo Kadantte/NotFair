@@ -40,6 +40,8 @@ export type AuthContext = {
   loginCustomerId?: string | null;
   /** Set when a dev is impersonating — contains the dev's real email for auth gates. */
   realGoogleEmail?: string | null;
+  /** Raw MCP clientInfo.name from the session. Null for chat/agent paths. */
+  clientName?: string | null;
 };
 
 /**

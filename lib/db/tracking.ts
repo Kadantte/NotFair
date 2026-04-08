@@ -90,6 +90,7 @@ export async function logChange(
   campaignId: string | null,
   writeResult: WriteResult,
   reasoning?: string,
+  clientSource?: string | null,
 ) {
   try {
     const code = toolNameToCode(writeResult.action);
@@ -112,6 +113,7 @@ export async function logChange(
         beforeValue: writeResult.beforeValue,
         afterValue: writeResult.afterValue,
         reasoning: reasoning ?? null,
+        clientSource: clientSource ?? null,
       })
       .returning();
 
@@ -130,6 +132,7 @@ export async function logRead(
   userId: string | null | undefined,
   toolName: string,
   campaignId?: string | null,
+  clientSource?: string | null,
 ) {
   try {
     const code = toolNameToCode(toolName);
@@ -143,6 +146,7 @@ export async function logRead(
         campaignId: campaignId ?? null,
         opType: OP_TYPE.READ,
         toolCode: code,
+        clientSource: clientSource ?? null,
       });
   } catch (error) {
     // Never block read operations for logging failures

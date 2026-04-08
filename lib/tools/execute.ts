@@ -12,6 +12,7 @@ export type ToolAuth = {
   refreshToken: string;
   customerId: string;
   userId?: string | null;
+  clientName?: string | null;
 };
 
 /**
@@ -32,7 +33,7 @@ export async function execWrite(
   if (!result.success) return { ...result, changeId: null };
 
   invalidateCache(accountId);
-  const change = await logChange(accountId, auth.userId, campaignId, result, reasoning);
+  const change = await logChange(accountId, auth.userId, campaignId, result, reasoning, auth.clientName);
   recordOperation(auth.userId);
   trackServerEvent(auth.userId, "ai_change_executed", {
     tool_name: result.action,
@@ -58,7 +59,7 @@ export async function execRead<T>(
 ): Promise<T> {
   await enforceRateLimit(auth.userId);
   const result = await fn();
-  void logRead(accountId, auth.userId, toolName, campaignId);
+  void logRead(accountId, auth.userId, toolName, campaignId, auth.clientName);
   recordOperation(auth.userId);
   trackServerEvent(auth.userId, "ai_read_executed", {
     tool_name: toolName,

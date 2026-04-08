@@ -55,6 +55,8 @@ export const operations = pgTable("operations", {
   afterValue: text("after_value"),
   reasoning: text("reasoning"),
   rolledBack: smallint("rolled_back").default(0),
+  /** Raw MCP clientInfo.name — e.g. "claude-code", "claude-desktop". Null for chat/agent. */
+  clientSource: text("client_source"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("ops_account_created_idx").on(table.accountId, table.createdAt),
