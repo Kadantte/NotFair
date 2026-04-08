@@ -6,6 +6,7 @@ import { clearSessionCookies, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
+import { getAppOrigin } from "@/lib/app-url";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -436,7 +437,7 @@ export async function GET(request: Request) {
 
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
-  const redirectUri = `${origin}/auth/callback`;
+  const redirectUri = `${getAppOrigin()}/auth/callback`;
 
   if (!clientId || !clientSecret) {
     return popup
