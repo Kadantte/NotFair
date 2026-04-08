@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
+import { trackEvent } from "@/lib/analytics";
 
 export const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -12,11 +13,13 @@ export const fadeInUp = {
 
 export function AuditCTA({
   session,
+  page,
   size = "default",
   connectedLabel = "View Your Audit",
   disconnectedLabel = "Audit Now",
 }: {
   session: { connected: boolean };
+  page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server";
   size?: "default" | "lg";
   connectedLabel?: string;
   disconnectedLabel?: string;
@@ -26,6 +29,10 @@ export function AuditCTA({
   function handleCTA() {
     if (loading) return;
     setLoading(true);
+    trackEvent("cta_clicked", {
+      page,
+      cta: session.connected ? "view_audit" : "audit_now",
+    });
     if (session.connected) {
       window.location.assign("/audit");
     } else {

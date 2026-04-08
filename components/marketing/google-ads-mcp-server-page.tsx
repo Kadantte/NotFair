@@ -92,7 +92,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 the ability to take reviewed actions.
               </p>
               <div className="mt-8 flex flex-col items-start gap-3">
-                <AuditCTA session={session} size="lg" />
+                <AuditCTA session={session} page="google-ads-mcp-server" size="lg" />
                 <p className="text-sm text-[#9B9689]">
                   Free to connect · 2-minute setup · No API key needed
                 </p>
@@ -395,7 +395,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">
-              <AuditCTA session={session} size="lg" />
+              <AuditCTA session={session} page="google-ads-mcp-server" size="lg" />
               <p className="text-sm text-[#9B9689]">
                 Read-only OAuth · changes require approval · no credit card
               </p>

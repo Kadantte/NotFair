@@ -258,7 +258,7 @@ export function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-4">
-                <AuditCTA session={session} />
+                <AuditCTA session={session} page="homepage" />
                 <div className="flex items-center gap-5 text-sm text-[#9B9689]">
                   <span>Free</span>
                   <span className="h-1 w-1 rounded-full bg-[#3D3C36]" />
@@ -752,7 +752,7 @@ export function HomePage() {
                   ))}
                 </ul>
                 <div className="mt-6">
-                  <AuditCTA session={session} />
+                  <AuditCTA session={session} page="homepage" />
                 </div>
               </div>
             ))}
@@ -796,7 +796,7 @@ export function HomePage() {
             Free audit in 5 minutes. No credit card required.
           </p>
           <div className="mt-8 flex flex-col items-start gap-4">
-            <AuditCTA session={session} />
+            <AuditCTA session={session} page="homepage" />
             <p className="max-w-md text-xs leading-relaxed text-[#9B9689]">
               By connecting Google Ads, you agree to our{" "}
               <Link

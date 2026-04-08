@@ -187,7 +187,7 @@ export function GoogleAdsAuditPage() {
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3">
-                <AuditCTA session={session} size="lg" />
+                <AuditCTA session={session} page="google-ads-audit" size="lg" />
                 <p className="text-sm text-[#9B9689]">
                   Just connect to Google — no forms, no credit card, nothing to fill in.
                 </p>
@@ -422,7 +422,7 @@ export function GoogleAdsAuditPage() {
             </div>
 
             <div className="flex flex-col items-start gap-3">
-              <AuditCTA session={session} size="lg" />
+              <AuditCTA session={session} page="google-ads-audit" size="lg" />
               <p className="text-sm text-[#9B9689]">
                 Just connect to Google — no forms, no credit card, nothing to fill in.
               </p>

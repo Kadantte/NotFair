@@ -1,7 +1,28 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-04.
+> Source of truth for all analytics events. Last updated: 2026-04-07.
 > Platform: PostHog. Check here before adding a new event.
+
+---
+
+## cta_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the primary CTA button (`AuditCTA`) on any marketing page.
+**Hypothesis:** We believe tracking this tells us button click rate vs. page view rate per landing page, which lets us measure copy/design effectiveness and A/B test CTAs.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `page` | string | `"homepage"` | Which marketing page the CTA is on (`homepage`, `google-ads-audit`, `google-ads-claude`, `google-ads-mcp-server`) |
+| `cta` | string | `"audit_now"` | Which CTA variant was shown (`audit_now` for logged-out, `view_audit` for logged-in) |
+
+```json
+{ "event": "cta_clicked", "properties": { "page": "homepage", "cta": "audit_now" } }
+```
+
+**Files:** `components/marketing/audit-cta.tsx`
 
 ---
 

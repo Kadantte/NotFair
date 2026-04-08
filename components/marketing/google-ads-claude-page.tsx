@@ -202,6 +202,7 @@ export function GoogleAdsClaudePage() {
               <div className="mt-8 flex flex-col items-start gap-3">
                 <AuditCTA
                   session={session}
+                  page="google-ads-claude"
                   size="lg"
                   disconnectedLabel="Connect Google Ads to Claude"
                   connectedLabel="Open Your Account"
@@ -479,6 +480,7 @@ export function GoogleAdsClaudePage() {
             <div className="flex flex-col items-start gap-3">
               <AuditCTA
                 session={session}
+                page="google-ads-claude"
                 size="lg"
                 disconnectedLabel="Get Free Audit"
                 connectedLabel="View Your Audit"
@@ -531,6 +533,7 @@ export function GoogleAdsClaudePage() {
             <div className="flex flex-col items-start gap-3">
               <AuditCTA
                 session={session}
+                page="google-ads-claude"
                 size="lg"
                 disconnectedLabel="Connect Google Ads to Claude"
                 connectedLabel="Open Your Account"
