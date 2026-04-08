@@ -24,13 +24,13 @@ const seoLandingRoutes = new Set([
   "/ai-google-ads-optimization",
 ]);
 const marketingPagesLastModified = new Date("2026-04-07");
+const homepageLastModified = new Date("2026-04-08");
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
   const marketingEntries: MetadataRoute.Sitemap = publicMarketingRoutes.map(
     (route) => ({
       url: new URL(route, SITE_URL).toString(),
-      lastModified: route === "/" ? now : marketingPagesLastModified,
+      lastModified: route === "/" ? homepageLastModified : marketingPagesLastModified,
       changeFrequency: route === "/" ? "weekly" : "monthly",
       priority: highPriorityRoutes.has(route) ? 1 : seoLandingRoutes.has(route) ? 0.8 : 0.6,
     })
