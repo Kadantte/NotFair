@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw, Key, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
@@ -42,9 +43,10 @@ async function readServerSession(): Promise<Session> {
 
 type ConnectPageProps = {
     initialSession?: Session;
+    slug?: string[];
 };
 
-export function ConnectPage({ initialSession = emptySession }: ConnectPageProps) {
+export function ConnectPage({ initialSession = emptySession, slug }: ConnectPageProps) {
     return (
         <Suspense
             fallback={
@@ -53,7 +55,7 @@ export function ConnectPage({ initialSession = emptySession }: ConnectPageProps)
                 </div>
             }
         >
-            <ConnectContent initialSession={initialSession} />
+            <ConnectContent initialSession={initialSession} slug={slug} />
         </Suspense>
     );
 }
@@ -356,10 +358,6 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                             <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/plugin install toprank@nowork-studio</code>
                             <CopyButton text="/plugin install toprank@nowork-studio" />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/reload-plugins</code>
-                            <CopyButton text="/reload-plugins" />
-                        </div>
                     </div>
                 </div>
             </div>
@@ -370,12 +368,12 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">2</span>
                     <p className="text-sm font-medium text-[#E8E4DD]">Run /ads</p>
                 </div>
-                <div className="ml-8">
-                    <p className="text-sm text-[#9B9689]">
-                        Restart Claude Code and run{' '}
-                        <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
-                        to start managing your Google Ads.
-                    </p>
+                <div className="ml-8 space-y-2">
+                    <p className="text-sm text-[#9B9689]">Restart Claude Code and run:</p>
+                    <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/ads</code>
+                        <CopyButton text="/ads" />
+                    </div>
                 </div>
             </div>
 
@@ -402,39 +400,40 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
     );
 }
 
-function SetupTabs({ prompt, copied, onCopy, onOpenChat, token }: {
+function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeSubTab }: {
     prompt: string;
     copied: boolean;
     onCopy: () => void;
     onOpenChat: () => void;
     token: string;
+    activeTab: SetupTab;
+    codeSubTab: ClaudeCodeSubTab;
 }) {
-    const [activeTab, setActiveTab] = useState<SetupTab>('claude-code');
-    const [codeSubTab, setCodeSubTab] = useState<ClaudeCodeSubTab>('auto');
-
     return (
         <div className="flex flex-col items-center space-y-8 text-center">
             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your client</h2>
             {/* Tab switcher */}
             <div className="flex w-full max-w-md rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
-                <button
-                    onClick={() => setActiveTab('claude-code')}
-                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${activeTab === 'claude-code'
+                <Link
+                    href="/connect/claude-code/manual"
+                    prefetch
+                    className={`flex-1 rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'claude-code'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
                             : 'text-[#9B9689] hover:text-[#E8E4DD]'
                         }`}
                 >
                     Claude Code
-                </button>
-                <button
-                    onClick={() => setActiveTab('connector')}
-                    className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 ${activeTab === 'connector'
+                </Link>
+                <Link
+                    href="/connect/claude-connector"
+                    prefetch
+                    className={`flex-1 rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'connector'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
                             : 'text-[#9B9689] hover:text-[#E8E4DD]'
                         }`}
                 >
                     Claude Connector
-                </button>
+                </Link>
             </div>
 
             {/* Tab content */}
@@ -442,24 +441,26 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token }: {
                 <>
                     {/* Sub-tab switcher */}
                     <div className="flex w-full max-w-xs rounded-md border border-[#3D3C36]/60 bg-[#1A1917]/60 p-0.5">
-                        <button
-                            onClick={() => setCodeSubTab('auto')}
-                            className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all duration-150 ${codeSubTab === 'auto'
-                                    ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
-                                    : 'text-[#9B9689] hover:text-[#E8E4DD]'
-                                }`}
-                        >
-                            Let Claude set it up
-                        </button>
-                        <button
-                            onClick={() => setCodeSubTab('manual')}
-                            className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all duration-150 ${codeSubTab === 'manual'
+                        <Link
+                            href="/connect/claude-code/manual"
+                            prefetch
+                            className={`flex-1 rounded px-3 py-1.5 text-center text-xs font-medium transition-all duration-150 ${codeSubTab === 'manual'
                                     ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
                                     : 'text-[#9B9689] hover:text-[#E8E4DD]'
                                 }`}
                         >
                             Install manually
-                        </button>
+                        </Link>
+                        <Link
+                            href="/connect/claude-code/auto"
+                            prefetch
+                            className={`flex-1 rounded px-3 py-1.5 text-center text-xs font-medium transition-all duration-150 ${codeSubTab === 'auto'
+                                    ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
+                                    : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                                }`}
+                        >
+                            Let Claude set it up
+                        </Link>
                     </div>
 
                     {codeSubTab === 'auto' ? (
@@ -509,7 +510,18 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token }: {
     );
 }
 
-function ConnectContent({ initialSession }: { initialSession: Session }) {
+function parseSlug(slug?: string[]): { activeTab: SetupTab; codeSubTab: ClaudeCodeSubTab } {
+    if (!slug || slug.length === 0) return { activeTab: 'claude-code', codeSubTab: 'manual' };
+    if (slug[0] === 'claude-connector') return { activeTab: 'connector', codeSubTab: 'manual' };
+    if (slug[0] === 'claude-code') {
+        const sub = slug[1] === 'auto' ? 'auto' : 'manual';
+        return { activeTab: 'claude-code', codeSubTab: sub };
+    }
+    return { activeTab: 'claude-code', codeSubTab: 'manual' };
+}
+
+function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
+    const { activeTab, codeSubTab } = parseSlug(slug);
     const searchParams = useSearchParams();
     const router = useRouter();
     const urlToken = searchParams.get('token');
@@ -568,7 +580,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                 account_count: 1,
                 auth_method: 'google',
             });
-            window.history.replaceState({}, '', '/connect');
+            window.history.replaceState({}, '', '/connect/claude-code/manual');
             return;
         }
 
@@ -798,6 +810,8 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                             }}
                             onOpenChat={openAgenticAi}
                             token={token}
+                            activeTab={activeTab}
+                            codeSubTab={codeSubTab}
                         />
                     )}
                 </div>
