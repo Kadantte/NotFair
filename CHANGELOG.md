@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.15.1] - 2026-04-08
+
+### Changed
+- Split `lib/google-ads.ts` (3,703 lines) into 9 focused modules under `lib/google-ads/` for better maintainability: types, client, helpers, reads, writes, campaign-ops, bulk, settings, and barrel index
+
 ## [0.2.15.0] - 2026-04-08
 
 ### Fixed
