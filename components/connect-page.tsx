@@ -181,7 +181,7 @@ function ClaudeConnectorSection() {
         }
     }, []);
 
-    const serverUrl = credentials?.mcp_server_url ?? 'https://www.adsagent.org/api/mcp';
+    const serverUrl = credentials?.mcp_server_url ?? 'https://adsagent.org/api/mcp';
 
     return (
         <div className="w-full space-y-6 text-left">
