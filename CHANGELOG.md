@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.16.0] - 2026-04-08
+
+### Added
+- `searchGeoTargets` MCP tool: search for geo target locations by name (cities, counties, states, countries) and get their IDs for use with `updateCampaignSettings` location targeting and exclusions. Enables fully self-contained location targeting workflows without leaving the AI conversation.
+
 ## [0.2.15.1] - 2026-04-08
 
 ### Changed

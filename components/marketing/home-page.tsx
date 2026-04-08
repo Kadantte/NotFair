@@ -23,6 +23,46 @@ import {
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
+import { Button } from "@/components/ui/button";
+import { startGoogleConnect } from "@/lib/google-oauth";
+import { trackEvent } from "@/lib/analytics";
+
+/* ────────────────────────────── Components ─────────────────────── */
+
+function ConnectClaudeCTA({ session }: { session: { connected: boolean } }) {
+  const [loading, setLoading] = useState(false);
+
+  function handleClick() {
+    if (loading) return;
+    setLoading(true);
+    trackEvent("cta_clicked", { page: "homepage", cta: "connect_claude" });
+    if (session.connected) {
+      window.location.assign("/connect");
+    } else {
+      startGoogleConnect("/connect");
+    }
+  }
+
+  return (
+    <Button
+      onClick={handleClick}
+      disabled={loading}
+      className="h-12 rounded-full bg-[#D97757] px-8 text-base font-semibold text-white transition-all hover:scale-[1.02] hover:bg-[#C4684A] disabled:opacity-70"
+    >
+      {loading ? (
+        <span className="inline-flex items-center gap-2">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          Connecting...
+        </span>
+      ) : (
+        <>
+          Connect Claude
+          <img src="/claude-icon.svg" alt="" className="ml-2 h-5 w-5 brightness-0 invert" />
+        </>
+      )}
+    </Button>
+  );
+}
 
 /* ────────────────────────────── Data ────────────────────────────── */
 
@@ -258,7 +298,10 @@ export function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-4">
-                <AuditCTA session={session} page="homepage" />
+                <div className="flex flex-wrap items-center gap-3">
+                  <AuditCTA session={session} page="homepage" />
+                  <ConnectClaudeCTA session={session} />
+                </div>
                 <div className="flex items-center gap-5 text-sm text-[#9B9689]">
                   <span>Free</span>
                   <span className="h-1 w-1 rounded-full bg-[#3D3C36]" />
