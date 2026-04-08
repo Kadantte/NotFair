@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, Plus, RotateCw, Key, RefreshCw } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
@@ -538,6 +538,8 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     const [copied, setCopied] = useState(false);
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
+    const [showRotateConfirm, setShowRotateConfirm] = useState(false);
+    const [keyCopied, setKeyCopied] = useState(false);
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
     const token = urlToken || (session.connected ? session.token : null);
@@ -619,11 +621,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         }
     }
 
-    function beginAddAccount() {
-        setError(null);
-        window.location.assign('/api/auth/add-account');
-    }
-
     function openAgenticAi() {
         trackEvent('chat_opened_from_connect');
         window.location.assign('/chat');
@@ -696,21 +693,24 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     </div>
                     {token ? (
                         <div className="flex flex-wrap items-center justify-end gap-3">
-                            <div className="flex items-center gap-2 text-[#4CAF6E]">
-                                <CheckCircle2 className="h-4 w-4" />
-                                <span className="text-sm font-medium">{customerName || 'Google Ads'}</span>
-                            </div>
-                            <button onClick={beginAddAccount} className={actionBtnClass}>
-                                <Plus className="h-4 w-4" />
-                                Add Account
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(token);
+                                    setKeyCopied(true);
+                                    setTimeout(() => setKeyCopied(false), 2000);
+                                }}
+                                className={actionBtnClass}
+                            >
+                                {keyCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                {keyCopied ? 'Copied' : 'Copy API Key'}
                             </button>
                             <button
-                                onClick={rotateToken}
+                                onClick={() => setShowRotateConfirm(true)}
                                 disabled={rotating}
                                 className={`${actionBtnClass} disabled:opacity-50`}
                             >
                                 <RotateCw className={`h-4 w-4 ${rotating ? 'animate-spin' : ''}`} />
-                                {rotating ? 'Rotating...' : 'Rotate Token'}
+                                {rotating ? 'Rotating...' : 'Rotate API Key'}
                             </button>
                         </div>
                     ) : null}
@@ -816,6 +816,34 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     )}
                 </div>
             </div>
+            {/* Rotate API Key confirmation modal */}
+            {showRotateConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                    <div className="mx-4 w-full max-w-md rounded-xl border border-[#3D3C36] bg-[#24231F] p-6 shadow-2xl">
+                        <h3 className="text-lg font-semibold text-[#E8E4DD]">Rotate API Key?</h3>
+                        <p className="mt-2 text-sm text-[#9B9689]">
+                            This will invalidate your current API key immediately. Any integrations using the old key will stop working until updated with the new one.
+                        </p>
+                        <div className="mt-6 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => setShowRotateConfirm(false)}
+                                className="rounded-lg border border-[#3D3C36] px-4 py-2 text-sm text-[#9B9689] transition hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowRotateConfirm(false);
+                                    rotateToken();
+                                }}
+                                className="rounded-lg bg-[#C45D4A] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#B04E3D]"
+                            >
+                                Rotate API Key
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </section>
     );
 }
