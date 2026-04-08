@@ -971,3 +971,63 @@ export async function listQueryableResources(auth: AuthContext) {
     throw new Error(`Failed to list resources: ${extractErrorMessage(error)}`);
   }
 }
+
+// ─── Geo Target Search ─────────────────────────────────────────────
+
+/**
+ * Search for geo target constants by name (cities, counties, states, countries, etc.).
+ * Uses the GeoTargetConstantService.SuggestGeoTargetConstants API for fuzzy matching.
+ * Returns geo target constant IDs that can be used with updateCampaignSettings location targeting.
+ */
+const MAX_GEO_RESULTS = 10;
+
+export async function searchGeoTargets(
+  auth: AuthContext,
+  query: string,
+  countryCode?: string,
+  locale?: string,
+) {
+  const customer = getCustomer(auth) as any;
+  const geoService = customer.geoTargetConstants as {
+    suggestGeoTargetConstants: (req: {
+      locale?: string;
+      country_code?: string;
+      location_names?: { names: string[] };
+    }) => Promise<any>;
+  };
+
+  try {
+    const normalizedCountryCode = countryCode?.trim().toUpperCase();
+    const response = await geoService.suggestGeoTargetConstants({
+      locale: locale?.trim() || "en",
+      ...(normalizedCountryCode && { country_code: normalizedCountryCode }),
+      location_names: { names: [query.trim()] },
+    });
+
+    // Response structure: { geo_target_constant_suggestions: [...] } or array
+    const suggestions = Array.isArray(response)
+      ? response
+      : response?.geo_target_constant_suggestions ?? response?.geoTargetConstantSuggestions ?? [];
+
+    return {
+      query,
+      results: suggestions.slice(0, MAX_GEO_RESULTS).map((s: any) => {
+        const gtc = s.geo_target_constant ?? s.geoTargetConstant ?? {};
+        const resourceName = gtc.resource_name ?? gtc.resourceName ?? "";
+        const id = resourceName.split("/").pop() ?? "";
+        return {
+          id,
+          resourceName,
+          name: gtc.name ?? null,
+          canonicalName: gtc.canonical_name ?? gtc.canonicalName ?? null,
+          targetType: gtc.target_type ?? gtc.targetType ?? null,
+          countryCode: gtc.country_code ?? gtc.countryCode ?? null,
+          reach: s.reach != null ? Number(s.reach) : null,
+          searchTerm: s.search_term ?? s.searchTerm ?? null,
+        };
+      }).filter((r: { id: string }) => r.id !== ""),
+    };
+  } catch (error) {
+    throw new Error(`Geo target search failed for "${query}": ${extractErrorMessage(error)}`);
+  }
+}

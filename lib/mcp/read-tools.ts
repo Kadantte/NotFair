@@ -17,6 +17,7 @@ import {
   getNegativeKeywords,
   getResourceMetadata,
   listQueryableResources,
+  searchGeoTargets,
 } from "@/lib/google-ads";
 import { getChanges } from "@/lib/db/tracking";
 import { execRead } from "@/lib/tools/execute";
@@ -284,6 +285,38 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_campaign_settings", () => getCampaignSettings(targetAuth, campaignId), campaignId);
+    return jsonResult(result);
+  }));
+
+  // ─── Geo Target Search ──────────────────────────────────────────
+
+  server.registerTool("searchGeoTargets", {
+    description:
+      "Search for geo target locations by name (cities, counties, states, countries). " +
+      "Returns geo target constant IDs that can be used with updateCampaignSettings locationTargeting and negativeLocationTargeting. " +
+      "Example: search 'Kitsap County' to get its ID, then pass that ID to updateCampaignSettings to target or exclude it.",
+    inputSchema: {
+      accountId: accountIdParam,
+      query: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("Location name to search for (e.g. 'Kitsap County', 'Seattle', 'Washington', 'United States')"),
+      countryCode: z
+        .string()
+        .length(2)
+        .optional()
+        .describe("ISO 3166-1 alpha-2 country code to narrow results (e.g. 'US', 'CA', 'GB')"),
+      locale: z
+        .string()
+        .max(10)
+        .optional()
+        .describe("Locale for results (default: 'en')"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, query, countryCode, locale }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "search_geo_targets", () => searchGeoTargets(targetAuth, query, countryCode, locale));
     return jsonResult(result);
   }));
 
