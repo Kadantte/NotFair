@@ -283,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem href="/connect" icon={PlugZap} label="Connect" active={pathname === '/connect'} collapsed={isCollapsed} />
+                <NavItem href="/connect" icon={PlugZap} label="Connect Claude" active={pathname === '/connect'} collapsed={isCollapsed} />
                 <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} />
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} />}
                 <SignOutButton isCollapsed={isCollapsed} />
