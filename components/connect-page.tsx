@@ -334,14 +334,83 @@ function ClaudeConnectorSection() {
 }
 
 type SetupTab = 'claude-code' | 'connector';
+type ClaudeCodeSubTab = 'auto' | 'manual';
 
-function SetupTabs({ prompt, copied, onCopy, onOpenChat }: {
+function ClaudeCodeManualSection({ token }: { token: string }) {
+    return (
+        <div className="w-full space-y-6 text-left">
+            {/* Step 1 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">1</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Install the toprank plugin</p>
+                </div>
+                <div className="ml-8 space-y-2">
+                    <p className="text-sm text-[#9B9689]">Inside Claude Code, run these commands:</p>
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/plugin marketplace add nowork-studio/toprank</code>
+                            <CopyButton text="/plugin marketplace add nowork-studio/toprank" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/plugin install toprank@nowork-studio</code>
+                            <CopyButton text="/plugin install toprank@nowork-studio" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/reload-plugins</code>
+                            <CopyButton text="/reload-plugins" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">2</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Run /ads</p>
+                </div>
+                <div className="ml-8">
+                    <p className="text-sm text-[#9B9689]">
+                        Restart Claude Code and run{' '}
+                        <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
+                        to start managing your Google Ads.
+                    </p>
+                </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">3</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Paste your API key</p>
+                </div>
+                <div className="ml-8 space-y-2">
+                    <p className="text-sm text-[#9B9689]">
+                        Claude will ask you for your API key. Paste it into Claude Code:
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <code className="min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">{token}</code>
+                        <CopyButton text={token} />
+                    </div>
+                    <p className="text-xs text-[#9B9689]/60">
+                        This is your personal access token. Don&apos;t share it publicly.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SetupTabs({ prompt, copied, onCopy, onOpenChat, token }: {
     prompt: string;
     copied: boolean;
     onCopy: () => void;
     onOpenChat: () => void;
+    token: string;
 }) {
     const [activeTab, setActiveTab] = useState<SetupTab>('claude-code');
+    const [codeSubTab, setCodeSubTab] = useState<ClaudeCodeSubTab>('auto');
 
     return (
         <div className="flex flex-col items-center space-y-8 text-center">
@@ -371,15 +440,43 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat }: {
             {/* Tab content */}
             {activeTab === 'claude-code' ? (
                 <>
-                    <p className="max-w-md text-sm text-[#9B9689]">
-                        Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
-                    </p>
-                    <SetupCodeBlock content={prompt} copied={copied} onCopy={onCopy} />
-                    <p className="max-w-md text-sm text-[#9B9689]">
-                        After setup, restart Claude Code and run{' '}
-                        <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
-                        to start managing your Google Ads.
-                    </p>
+                    {/* Sub-tab switcher */}
+                    <div className="flex w-full max-w-xs rounded-md border border-[#3D3C36]/60 bg-[#1A1917]/60 p-0.5">
+                        <button
+                            onClick={() => setCodeSubTab('auto')}
+                            className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all duration-150 ${codeSubTab === 'auto'
+                                    ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
+                                    : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                                }`}
+                        >
+                            Let Claude set it up
+                        </button>
+                        <button
+                            onClick={() => setCodeSubTab('manual')}
+                            className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all duration-150 ${codeSubTab === 'manual'
+                                    ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
+                                    : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                                }`}
+                        >
+                            Install manually
+                        </button>
+                    </div>
+
+                    {codeSubTab === 'auto' ? (
+                        <>
+                            <p className="max-w-md text-sm text-[#9B9689]">
+                                Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
+                            </p>
+                            <SetupCodeBlock content={prompt} copied={copied} onCopy={onCopy} />
+                            <p className="max-w-md text-sm text-[#9B9689]">
+                                After setup, restart Claude Code and run{' '}
+                                <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
+                                to start managing your Google Ads.
+                            </p>
+                        </>
+                    ) : (
+                        <ClaudeCodeManualSection token={token} />
+                    )}
                 </>
             ) : (
                 <ClaudeConnectorSection />
@@ -700,6 +797,7 @@ function ConnectContent({ initialSession }: { initialSession: Session }) {
                                 setTimeout(() => setCopied(false), 2000);
                             }}
                             onOpenChat={openAgenticAi}
+                            token={token}
                         />
                     )}
                 </div>
