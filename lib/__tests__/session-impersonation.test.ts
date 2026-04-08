@@ -171,7 +171,7 @@ describe("Session impersonation", () => {
     expect(session.impersonating).toBeUndefined();
   });
 
-  it("falls back to real session when impersonated session is expired/missing", async () => {
+  it("hard-fails when impersonated session is expired/missing", async () => {
     mockCookies._set("adsagent_token", "real-token");
     mockCookies._set("adsagent_impersonate", "42");
     mockSelectChain.mockResolvedValueOnce([REAL_SESSION]);
@@ -180,11 +180,8 @@ describe("Session impersonation", () => {
 
     const session = await getSession();
 
-    // Graceful fallback: returns the dev's own session
-    expect(session.connected).toBe(true);
-    if (!session.connected) return;
-    expect(session.customerId).toBe("111-111-1111");
-    expect(session.impersonating).toBeUndefined();
+    // Hard-fail: returns disconnected to prevent accidental writes to real account
+    expect(session.connected).toBe(false);
   });
 
   it("falls back to real session when impersonate cookie has malformed value", async () => {
@@ -200,14 +197,13 @@ describe("Session impersonation", () => {
     expect(session.impersonating).toBeUndefined();
   });
 
-  it("getSessionAuth returns real session when impersonated session missing", async () => {
+  it("getSessionAuth throws when impersonated session missing", async () => {
     mockCookies._set("adsagent_token", "real-token");
     mockCookies._set("adsagent_impersonate", "42");
     mockSelectChain.mockResolvedValueOnce([REAL_SESSION]);
     mockSelectChain.mockResolvedValueOnce([]);
 
-    const row = await getSessionAuth();
-    expect(row.customerId).toBe("111-111-1111");
+    await expect(getSessionAuth()).rejects.toThrow("Not authenticated");
   });
 
   it("getAuthContext includes realGoogleEmail when impersonating", async () => {

@@ -25,18 +25,18 @@ describe("resolveAccountId", () => {
     expect(resolveAccountId(baseAuth, "333-333-3333")).toBe("333-333-3333");
   });
 
-  it("falls back to default when accountId is not in customerIds", () => {
-    expect(resolveAccountId(baseAuth, "999-999-9999")).toBe("111-111-1111");
+  it("throws when accountId is not in customerIds", () => {
+    expect(() => resolveAccountId(baseAuth, "999-999-9999")).toThrow("Account 999-999-9999 is not connected");
   });
 
-  it("falls back to default when customerIds is undefined", () => {
+  it("throws when customerIds is undefined", () => {
     const auth: AuthContext = { refreshToken: "t", customerId: "111" };
-    expect(resolveAccountId(auth, "222")).toBe("111");
+    expect(() => resolveAccountId(auth, "222")).toThrow("Account 222 is not connected");
   });
 
-  it("falls back to default when customerIds is empty", () => {
+  it("throws when customerIds is empty", () => {
     const auth: AuthContext = { refreshToken: "t", customerId: "111", customerIds: [] };
-    expect(resolveAccountId(auth, "222")).toBe("111");
+    expect(() => resolveAccountId(auth, "222")).toThrow("Account 222 is not connected");
   });
 });
 
@@ -48,9 +48,8 @@ describe("authForAccount", () => {
     expect(result.customerIds).toBe(baseAuth.customerIds);
   });
 
-  it("returns auth with default customerId when accountId not valid", () => {
-    const result = authForAccount(baseAuth, "999-999-9999");
-    expect(result.customerId).toBe("111-111-1111");
+  it("throws when accountId not valid", () => {
+    expect(() => authForAccount(baseAuth, "999-999-9999")).toThrow("Account 999-999-9999 is not connected");
   });
 
   it("returns auth unchanged when no accountId provided", () => {

@@ -100,8 +100,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate redirect_uri
-  if (redirectUri && authCode.redirectUri !== redirectUri) {
+  // Validate redirect_uri (required per RFC 6749 §4.1.3 when included in authorization request)
+  if (!redirectUri) {
+    return NextResponse.json(
+      { error: "invalid_request", error_description: "Missing redirect_uri" },
+      { status: 400 },
+    );
+  }
+  if (authCode.redirectUri !== redirectUri) {
     return NextResponse.json(
       { error: "invalid_grant", error_description: "redirect_uri mismatch" },
       { status: 400 },

@@ -88,7 +88,7 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
       )
       .limit(1);
 
-    if (!targetRow || !targetRow.customerId) return { token, row }; // target expired/missing → graceful fallback to real session
+    if (!targetRow || !targetRow.customerId) return null; // target expired/missing → hard-fail to prevent accidental writes to real account
 
     return {
       token,

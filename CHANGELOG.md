@@ -2,6 +2,24 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.15.0] - 2026-04-08
+
+### Fixed
+- Impersonation now hard-fails when target session expires (prevents accidental writes to wrong account)
+- `resolveAccountId` throws on invalid account IDs instead of silently falling back to default
+- OAuth token endpoint enforces `redirect_uri` match per RFC 6749 S4.1.3
+- Rate limit bypass in `createCampaign` and `setTrackingTemplate` (API was called before rate check)
+- `findKeywordContext` uses `safeEntityId` for consistent validation instead of raw `Number()`
+- Guardrail error messages now reference `setGuardrails` (previously referenced unreachable `setGoals`)
+
+### Added
+- `setGuardrails` / `getGuardrails` MCP tools for customizing bid, budget, and pause limits per account or campaign
+- `DESTRUCTIVE_WRITE_ANNOTATIONS` for bulk/replacement operations (bulkPauseKeywords, bulkUpdateBids, updateAdAssets, moveKeywords)
+- `resolveToolAuth` helper to reduce auth boilerplate across 33 MCP tool handlers
+- Query cache max-size eviction at 500 entries (prevents unbounded memory growth)
+- Parallel pre-check queries in `bulkPauseKeywords` (Promise.all instead of sequential)
+- 42 new tests: undo system (23), rate limiting (12), execution layer (7)
+
 ## [0.2.14.0] - 2026-04-08
 
 ### Added

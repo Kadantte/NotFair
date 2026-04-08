@@ -52,7 +52,11 @@ export type AuthContext = {
 export function resolveAccountId(auth: AuthContext, accountId?: string): string {
   if (!accountId) return auth.customerId;
   if (auth.customerIds?.some((a) => a.id === accountId)) return accountId;
-  return auth.customerId;
+  throw new Error(
+    `Account ${accountId} is not connected to this session. ` +
+    `Connected accounts: ${(auth.customerIds ?? []).map((a) => a.id).join(", ") || auth.customerId}. ` +
+    `Use listConnectedAccounts to see available accounts.`,
+  );
 }
 
 /** Build an AuthContext targeting a specific account (for per-tool targeting). */
@@ -139,6 +143,7 @@ export function getCustomer(auth: AuthContext) {
 // Mutations invalidate all entries for the affected customerId.
 
 const CACHE_TTL_MS = 45_000; // 45 seconds
+const CACHE_MAX_SIZE = 500;
 
 type CacheEntry = {
   data: any;
@@ -146,6 +151,17 @@ type CacheEntry = {
 };
 
 const queryCache = new Map<string, CacheEntry>();
+
+/** Evict oldest entries when cache exceeds max size. Map insertion order = age. */
+function evictIfNeeded() {
+  if (queryCache.size <= CACHE_MAX_SIZE) return;
+  const toDelete = queryCache.size - CACHE_MAX_SIZE;
+  const iter = queryCache.keys();
+  for (let i = 0; i < toDelete; i++) {
+    const { value } = iter.next();
+    if (value) queryCache.delete(value);
+  }
+}
 
 function cacheKey(customerId: string, query: string, loginCustomerId?: string | null): string {
   const prefix = loginCustomerId
@@ -192,6 +208,7 @@ function getCachedCustomer(auth: AuthContext) {
           }
           const result = await target.query(optimizedQuery);
           queryCache.set(key, { data: result, expiresAt: now + CACHE_TTL_MS });
+          evictIfNeeded();
           return result;
         };
       }
@@ -268,7 +285,7 @@ export function toMicros(dollars: number): number {
   return Math.round(dollars * 1_000_000);
 }
 
-function safeEntityId(value: string, label = "campaign"): number {
+export function safeEntityId(value: string, label = "campaign"): number {
   const id = Number(value);
   if (!Number.isFinite(id) || id <= 0) {
     throw new Error(`Invalid ${label} ID: ${value}`);
@@ -930,7 +947,7 @@ export async function updateBid(
         beforeValue: String(currentBidMicros),
         afterValue: String(newBidMicros),
         label: keywordText,
-        error: `Bid change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBidChangePct * 100).toFixed(0)}%. Adjust guardrails via setGoals if needed.`,
+        error: `Bid change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBidChangePct * 100).toFixed(0)}%. Use setGuardrails to adjust limits.`,
       };
     }
   }
@@ -1084,7 +1101,7 @@ export async function updateCampaignBudget(
         entityId: campaignId,
         beforeValue: String(currentBudgetMicros),
         afterValue: String(newDailyBudgetMicros),
-        error: `Budget change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBudgetChangePct * 100).toFixed(0)}%. Adjust guardrails via setGoals if needed.`,
+        error: `Budget change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBudgetChangePct * 100).toFixed(0)}%. Use setGuardrails to adjust limits.`,
       };
     }
   }
@@ -2697,18 +2714,20 @@ export async function bulkPauseKeywords(
     byCampaign.set(k.campaignId, arr);
   }
 
-  // 1 query per campaign: count active keywords
+  // 1 query per campaign: count active keywords (parallelized)
   const activeCountByCampaign = new Map<string, number>();
-  for (const campaignId of byCampaign.keys()) {
-    const campId = safeEntityId(campaignId);
-    const countResult = await customer.query(`
-      SELECT ad_group_criterion.criterion_id
-      FROM keyword_view
-      WHERE campaign.id = ${campId}
-        AND ad_group_criterion.status = 'ENABLED'
-    `);
-    activeCountByCampaign.set(campaignId, (countResult as any[]).length);
-  }
+  await Promise.all(
+    [...byCampaign.keys()].map(async (campaignId) => {
+      const campId = safeEntityId(campaignId);
+      const countResult = await customer.query(`
+        SELECT ad_group_criterion.criterion_id
+        FROM keyword_view
+        WHERE campaign.id = ${campId}
+          AND ad_group_criterion.status = 'ENABLED'
+      `);
+      activeCountByCampaign.set(campaignId, (countResult as any[]).length);
+    }),
+  );
 
   // Validate: ensure we don't pause all active keywords in any campaign
   const results: Array<WriteResult & { input: BulkPauseKeywordInput }> = [];

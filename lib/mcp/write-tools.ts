@@ -15,6 +15,7 @@ import {
   setTrackingTemplate,
   decodeTrackingEntityId,
   getCustomer,
+  safeEntityId,
   toMicros,
   authForAccount,
   resolveAccountId,
@@ -34,10 +35,12 @@ import {
   updateCampaignBidding,
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType } from "@/lib/google-ads";
-import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
+import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
-import { jsonResult, safeHandler, accountIdParam, WRITE_ANNOTATIONS } from "./types";
+import { enforceRateLimit } from "@/lib/mcp/rate-limit";
+import { jsonResult, safeHandler, accountIdParam, READ_ANNOTATIONS, WRITE_ANNOTATIONS, DESTRUCTIVE_WRITE_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
+import { resolveToolAuth } from "./helpers";
 
 /**
  * Write tools that mutate Google Ads account state.
@@ -57,9 +60,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => pauseKeyword(authForAccount(auth, accountId), campaignId, adGroupId, criterionId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => pauseKeyword(targetAuth, campaignId, adGroupId, criterionId));
     return jsonResult(result);
   }));
 
@@ -72,9 +74,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, adGroupId, criterionId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, null, () => enableKeyword(authForAccount(auth, accountId), adGroupId, criterionId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => enableKeyword(targetAuth, adGroupId, criterionId));
     return jsonResult(result);
   }));
 
@@ -89,9 +90,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => addKeyword(authForAccount(auth, accountId), adGroupId, keyword, matchType));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => addKeyword(targetAuth, adGroupId, keyword, matchType));
     return jsonResult(result);
   }));
 
@@ -108,10 +108,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () =>
-      updateBid(authForAccount(auth, accountId), campaignId, adGroupId, criterionId, toMicros(newBidDollars)),
+      updateBid(targetAuth, campaignId, adGroupId, criterionId, toMicros(newBidDollars)),
     );
     return jsonResult(result);
   }));
@@ -128,9 +127,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword, matchType));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(targetAuth, campaignId, keyword, matchType));
     return jsonResult(result);
   }));
 
@@ -149,9 +147,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       openWorldHint: false,
     },
   }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword, matchType));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(targetAuth, campaignId, keyword, matchType));
     return jsonResult(result);
   }));
 
@@ -166,10 +163,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, newDailyBudgetDollars }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () =>
-      updateCampaignBudget(authForAccount(auth, accountId), campaignId, toMicros(newDailyBudgetDollars)),
+      updateCampaignBudget(targetAuth, campaignId, toMicros(newDailyBudgetDollars)),
     );
     return jsonResult(result);
   }));
@@ -205,6 +201,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    await enforceRateLimit(auth.userId); // Check before API call (not deferred to execWrite)
 
     const createResult = await createSearchCampaign(authForAccount(auth, accountId), {
       campaignName,
@@ -253,9 +250,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       openWorldHint: false,
     },
   }, safeHandler(async ({ accountId, campaignId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => pauseCampaign(authForAccount(auth, accountId), campaignId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => pauseCampaign(targetAuth, campaignId));
     return jsonResult(result);
   }));
 
@@ -267,9 +263,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => enableCampaign(authForAccount(auth, accountId), campaignId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => enableCampaign(targetAuth, campaignId));
     return jsonResult(result);
   }));
 
@@ -286,9 +281,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       openWorldHint: false,
     },
   }, safeHandler(async ({ accountId, campaignId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => removeCampaign(authForAccount(auth, accountId), campaignId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => removeCampaign(targetAuth, campaignId));
     return jsonResult(result);
   }));
 
@@ -323,6 +317,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       : undefined;
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    await enforceRateLimit(auth.userId); // Check before API call (not deferred to execWrite)
     const writeResult = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
     const resolvedCampaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
     const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult);
@@ -340,9 +335,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupName }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => createAdGroup(authForAccount(auth, accountId), campaignId, adGroupName));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => createAdGroup(targetAuth, campaignId, adGroupName));
     return jsonResult(result);
   }));
 
@@ -368,9 +362,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => createAd(authForAccount(auth, accountId), adGroupId, { headlines, descriptions, finalUrl }));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => createAd(targetAuth, adGroupId, { headlines, descriptions, finalUrl }));
     return jsonResult(result);
   }));
 
@@ -384,9 +377,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => pauseAd(authForAccount(auth, accountId), adGroupId, adId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => pauseAd(targetAuth, adGroupId, adId));
     return jsonResult(result);
   }));
 
@@ -400,9 +392,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => enableAd(authForAccount(auth, accountId), adGroupId, adId));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => enableAd(targetAuth, adGroupId, adId));
     return jsonResult(result);
   }));
 
@@ -417,9 +408,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => updateAdFinalUrl(authForAccount(auth, accountId), adGroupId, adId, finalUrl));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => updateAdFinalUrl(targetAuth, adGroupId, adId, finalUrl));
     return jsonResult(result);
   }));
 
@@ -451,11 +441,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .max(4)
         .describe("Complete replacement descriptions (2-4, max 90 chars each)"),
     },
-    annotations: WRITE_ANNOTATIONS,
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => updateAdAssets(authForAccount(auth, accountId), adGroupId, adId, { headlines, descriptions }));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => updateAdAssets(targetAuth, adGroupId, adId, { headlines, descriptions }));
     return jsonResult(result);
   }));
 
@@ -477,7 +466,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .min(1)
         .max(50),
     },
-    annotations: WRITE_ANNOTATIONS,
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, updates }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
@@ -516,7 +505,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .min(1)
         .max(100),
     },
-    annotations: WRITE_ANNOTATIONS,
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, keywords }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
@@ -591,7 +580,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .optional()
         .describe("Override match type in destination — omit to inherit from source"),
     },
-    annotations: WRITE_ANNOTATIONS,
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
@@ -633,9 +622,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, newName }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => renameCampaign(authForAccount(auth, accountId), campaignId, newName));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => renameCampaign(targetAuth, campaignId, newName));
     return jsonResult(result);
   }));
 
@@ -649,9 +637,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, newName }) => {
-    const auth = currentAuth();
-    const targetId = resolveAccountId(auth, accountId);
-    const result = await execWrite(auth, targetId, campaignId, () => renameAdGroup(authForAccount(auth, accountId), campaignId, adGroupId, newName));
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => renameAdGroup(targetAuth, campaignId, adGroupId, newName));
     return jsonResult(result);
   }));
 
@@ -738,6 +725,59 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     });
   }));
 
+  // ─── Guardrails ─────────────────────────────────────────────────
+
+  server.registerTool("setGuardrails", {
+    description: "Set guardrail limits for bid changes, budget changes, and keyword pauses. Can be set at account level (omit campaignId) or per-campaign. These limits cap how much the AI can change in a single operation.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().optional().describe("Campaign ID for campaign-specific guardrails (omit for account-level defaults)"),
+      targetCpa: z.number().positive().optional().describe("Target CPA in dollars"),
+      monthlyCap: z.number().positive().optional().describe("Monthly spend cap in dollars"),
+      maxBidChangePct: z.number().min(0.01).max(1.0).optional().describe("Max bid change per adjustment as decimal (e.g. 0.25 = 25%)"),
+      maxBudgetChangePct: z.number().min(0.01).max(1.0).optional().describe("Max budget change per adjustment as decimal (e.g. 0.50 = 50%)"),
+      maxKeywordPausePct: z.number().min(0.01).max(1.0).optional().describe("Max fraction of keywords that can be paused at once (e.g. 0.30 = 30%)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, targetCpa, monthlyCap, maxBidChangePct, maxBudgetChangePct, maxKeywordPausePct }) => {
+    const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
+    await enforceRateLimit(auth.userId);
+    const goals: Parameters<typeof setGoals>[2] = {};
+    if (targetCpa !== undefined) goals.targetCpa = targetCpa;
+    if (monthlyCap !== undefined) goals.monthlyCap = monthlyCap;
+    if (maxBidChangePct !== undefined) goals.maxBidChangePct = maxBidChangePct;
+    if (maxBudgetChangePct !== undefined) goals.maxBudgetChangePct = maxBudgetChangePct;
+    if (maxKeywordPausePct !== undefined) goals.maxKeywordPausePct = maxKeywordPausePct;
+    const result = await setGoals(targetId, campaignId ?? null, goals);
+    return jsonResult({ success: true, ...result });
+  }));
+
+  server.registerTool("getGuardrails", {
+    description: "Get current guardrail limits. Returns campaign-specific guardrails if set, otherwise account-level defaults. Shows target CPA, monthly cap, and max change percentages for bids, budgets, and keyword pauses.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().optional().describe("Campaign ID to check campaign-specific guardrails"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId }) => {
+    const { targetId } = resolveToolAuth(currentAuth, accountId);
+    const goals = await getGoals(targetId, campaignId);
+    if (!goals) {
+      return jsonResult({
+        source: "defaults",
+        targetCpa: null,
+        monthlyCap: null,
+        maxBidChangePct: 0.25,
+        maxBudgetChangePct: 0.50,
+        maxKeywordPausePct: 0.30,
+      });
+    }
+    return jsonResult({
+      source: campaignId && goals.campaignId === campaignId ? "campaign" : "account",
+      ...goals,
+    });
+  }));
+
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
@@ -788,10 +828,11 @@ async function findKeywordContext(
 ): Promise<{ adGroupId: string; campaignId: string } | null> {
   const customer = getCustomer(auth);
 
+  const cid = safeEntityId(criterionId, "criterion");
   const result = await customer.query(`
     SELECT ad_group.id, campaign.id
     FROM keyword_view
-    WHERE ad_group_criterion.criterion_id = ${Number(criterionId)}
+    WHERE ad_group_criterion.criterion_id = ${cid}
     LIMIT 1
   `);
 

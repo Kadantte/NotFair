@@ -58,3 +58,11 @@ export const WRITE_ANNOTATIONS = {
   idempotentHint: true,
   openWorldHint: false,
 } as const;
+
+/** For bulk/replacement operations that are hard to reverse or have wide blast radius. */
+export const DESTRUCTIVE_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
