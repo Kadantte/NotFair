@@ -16,6 +16,8 @@ import { jsonResult } from "@/lib/mcp/types";
 
 type AuthContextWithSession = AuthContext & {
   sessionToken?: string;
+  sessionId?: number;
+  clientName?: string | null;
 };
 
 const authStore = new AsyncLocalStorage<AuthContextWithSession>();
@@ -85,7 +87,9 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
       : [{ id: session.customerId, name: "" }],
     loginCustomerId: session.loginCustomerId ?? null,
     userId: session.userId ?? null,
-    sessionToken: bearerToken,
+      sessionToken: bearerToken,
+    sessionId: session.id,
+    clientName: session.clientName ?? null,
   };
 }
 
@@ -140,6 +144,31 @@ async function isSchemaRequest(request: Request): Promise<{ schemaOnly: boolean;
   }
 }
 
+// ─── Client identity capture ─────────────────────────────────────────
+
+/**
+ * On the first `initialize` request for a session, extract clientInfo.name/version
+ * and persist them raw on the session row. Fire-and-forget — never blocks.
+ */
+async function captureClientInfo(cloned: Request, sessionId: number): Promise<void> {
+  try {
+    const body = await cloned.json();
+    if (body?.method !== "initialize") return;
+    const clientName = body?.params?.clientInfo?.name;
+    const clientVersion = body?.params?.clientInfo?.version;
+    if (typeof clientName !== "string" || !clientName) return;
+    await db()
+      .update(schema.mcpSessions)
+      .set({
+        clientName,
+        clientVersion: typeof clientVersion === "string" ? clientVersion : null,
+      })
+      .where(eq(schema.mcpSessions.id, sessionId));
+  } catch {
+    // Never block the request for tracking failures
+  }
+}
+
 // ─── Request handler ─────────────────────────────────────────────────
 
 async function handler(request: Request): Promise<Response> {
@@ -157,6 +186,12 @@ async function handler(request: Request): Promise<Response> {
       { status: 401, headers: { "Content-Type": "application/json" } },
     );
   }
+
+  // Capture client identity once per session — skip if already known
+  if (request.method === "POST" && auth.sessionId != null && !auth.clientName) {
+    void captureClientInfo(request.clone(), auth.sessionId);
+  }
+
   return authStore.run(auth, () => mcpHandler(request));
 }
 

@@ -44,3 +44,4 @@ next-env.d.ts
 .gstack/
 toprank/
 .gstack-screenshots/
+.mcp.json

@@ -146,5 +146,9 @@ export const mcpSessions = pgTable("mcp_sessions", {
   userId: text("user_id"),
   googleEmail: text("google_email"),
   expiresAt: text("expires_at").notNull(),
+  /** MCP clientInfo.name — set once on initialize, e.g. "claude-code". */
+  clientName: text("client_name"),
+  /** MCP clientInfo.version — set once on initialize. */
+  clientVersion: text("client_version"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
