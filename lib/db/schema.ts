@@ -142,6 +142,7 @@ export const mcpSessions = pgTable("mcp_sessions", {
   refreshToken: text("refresh_token").notNull(),
   customerId: text("customer_id").notNull(),
   customerIds: text("customer_ids").notNull().default("[]"),
+  loginCustomerId: text("login_customer_id"),
   userId: text("user_id"),
   googleEmail: text("google_email"),
   expiresAt: text("expires_at").notNull(),

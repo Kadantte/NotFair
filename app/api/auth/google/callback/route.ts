@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 import { getEnv } from "@/lib/env";
-import { listAccessibleCustomers } from "@/lib/google-ads";
+import { listAccessibleCustomers, listClientAccountsUnderManager } from "@/lib/google-ads";
 import { randomBytes } from "crypto";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { setSessionCookies } from "@/lib/auth-cookies";
@@ -269,43 +269,77 @@ export async function GET(request: Request) {
       return errorResponse(msg, isPopup);
     }
 
-    const usableAccounts = customers.filter(
+    const directAccounts = customers.filter(
       (c) => !("error" in c) && !c.isManager,
     );
+    const managerAccounts = customers.filter(
+      (c) => !("error" in c) && c.isManager,
+    );
+
+    // If there are no direct accounts, try fetching client accounts from manager accounts
+    type AccountEntry = { id: string; name: string; loginCustomerId?: string };
+    let usableAccounts: AccountEntry[];
+
+    if (directAccounts.length > 0) {
+      usableAccounts = directAccounts.map((a) => ({ id: a.id, name: a.name || "" }));
+    } else if (managerAccounts.length > 0) {
+      // Cap concurrent Google API calls to avoid rate-limit / quota exhaustion
+      const managersToQuery = managerAccounts.slice(0, 10);
+      const clientResults = await Promise.all(
+        managersToQuery.map(async (mgr) => {
+          try {
+            const clients = await listClientAccountsUnderManager(
+              tokenData.refresh_token,
+              mgr.id,
+            );
+            return clients.map((c) => ({ ...c, loginCustomerId: mgr.id }));
+          } catch (err) {
+            console.warn(`[auth] Failed to list clients under manager ${mgr.id}:`, err);
+            return [];
+          }
+        }),
+      );
+      usableAccounts = clientResults.flat();
+    } else {
+      usableAccounts = [];
+    }
 
     // No usable accounts — error
     if (usableAccounts.length === 0) {
-      const msg =
-        "No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.";
+      const msg = managerAccounts.length > 0
+        ? "No client accounts found under your manager account. Make sure you have at least one active Google Ads client account."
+        : "No Google Ads accounts found. Connect a Google account that has access to at least one Google Ads account.";
       return errorResponse(msg, isPopup);
+    }
+
+    // Helper to create a session for a single confirmed account
+    async function createSession(account: AccountEntry) {
+      const accessToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      const customerIds = JSON.stringify([{ id: account.id, name: account.name }]);
+      await db().insert(schema.mcpSessions).values({
+        accessToken,
+        refreshToken: tokenData.refresh_token,
+        customerId: account.id,
+        customerIds,
+        loginCustomerId: account.loginCustomerId ?? null,
+        userId,
+        googleEmail,
+        expiresAt: expiresAt.toISOString(),
+      });
+      return accessToken;
     }
 
     // If only one account, skip selection
     if (usableAccounts.length === 1) {
       const account = usableAccounts[0];
-      const accessToken = randomBytes(32).toString("hex");
-      const expiresAt = new Date();
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-      const customerIds = JSON.stringify([
-        { id: account.id, name: account.name || "" },
-      ]);
-
+      let accessToken: string;
       try {
-        await db().insert(schema.mcpSessions).values({
-          accessToken,
-          refreshToken: tokenData.refresh_token,
-          customerId: account.id,
-          customerIds,
-          userId,
-          googleEmail,
-          expiresAt: expiresAt.toISOString(),
-        });
+        accessToken = await createSession(account);
       } catch (error) {
         console.error("[auth] Failed to create MCP session:", error);
-        return redirectWithError(
-          `Failed to create session: ${describeError(error)}`,
-        );
+        return redirectWithError(`Failed to create session: ${describeError(error)}`);
       }
 
       if (isPopup) {
@@ -318,15 +352,15 @@ export async function GET(request: Request) {
         return response;
       }
 
-      const redirectResponse = NextResponse.redirect(
-        `${getAppOrigin()}/connect`,
-      );
+      const redirectResponse = NextResponse.redirect(`${getAppOrigin()}/connect`);
       setSessionCookies(redirectResponse, accessToken, account.name || "Google Ads Account");
       return redirectResponse;
     }
 
-    // Multiple accounts — show account selection
-    const accountsList = usableAccounts.map((a) => ({ id: a.id, name: a.name }));
+    // Multiple accounts — show account selection.
+    // Store pre-validated accounts (including loginCustomerId) in customerIds so
+    // select-account can verify selections without re-querying Google.
+    const accountsList = usableAccounts.map((a) => ({ id: a.id, name: a.name, loginCustomerId: a.loginCustomerId }));
     const pendingToken = randomBytes(32).toString("hex");
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -336,28 +370,27 @@ export async function GET(request: Request) {
         accessToken: pendingToken,
         refreshToken: tokenData.refresh_token,
         customerId: "", // pending selection
+        customerIds: JSON.stringify(accountsList), // pre-validated options
         userId,
         googleEmail,
         expiresAt: expiresAt.toISOString(),
       });
     } catch (error) {
       console.error("[auth] Failed to create pending MCP session:", error);
-      return redirectWithError(
-        `Failed to create session: ${describeError(error)}`,
-      );
+      return redirectWithError(`Failed to create session: ${describeError(error)}`);
     }
 
     if (isPopup) {
       return popupAccountSelectionResponse(
-        accountsList,
+        accountsList.map((a) => ({ id: a.id, name: a.name })),
         pendingToken,
         getAppOrigin(),
       );
     }
 
-    const accountsParam = encodeURIComponent(
-      JSON.stringify(accountsList),
-    );
+    const accountsParam = encodeURIComponent(JSON.stringify(
+      accountsList.map((a) => ({ id: a.id, name: a.name })),
+    ));
 
     return NextResponse.redirect(
       `${getAppOrigin()}/connect?pending=${pendingToken}&accounts=${accountsParam}`,

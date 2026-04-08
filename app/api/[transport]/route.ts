@@ -83,6 +83,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
     customerIds: customerIds.length > 0
       ? customerIds
       : [{ id: session.customerId, name: "" }],
+    loginCustomerId: session.loginCustomerId ?? null,
     userId: session.userId ?? null,
     sessionToken: bearerToken,
   };

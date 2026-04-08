@@ -25,6 +25,7 @@ type SessionRow = {
   refreshToken: string;
   customerId: string;
   customerIds: string;
+  loginCustomerId: string | null;
   userId: string | null;
   googleEmail: string | null;
 };
@@ -46,6 +47,7 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
       refreshToken: schema.mcpSessions.refreshToken,
       customerId: schema.mcpSessions.customerId,
       customerIds: schema.mcpSessions.customerIds,
+      loginCustomerId: schema.mcpSessions.loginCustomerId,
       userId: schema.mcpSessions.userId,
       googleEmail: schema.mcpSessions.googleEmail,
     })
@@ -60,7 +62,7 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
 
   if (!realRow || !realRow.customerId) return null;
 
-  const row: SessionRow = { ...realRow, userId: realRow.userId ?? null };
+  const row: SessionRow = { ...realRow, userId: realRow.userId ?? null, loginCustomerId: realRow.loginCustomerId ?? null };
 
   // Check for dev impersonation
   const impersonateId = cookieStore.get(COOKIE_NAMES.impersonate)?.value;
@@ -73,6 +75,7 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
         refreshToken: schema.mcpSessions.refreshToken,
         customerId: schema.mcpSessions.customerId,
         customerIds: schema.mcpSessions.customerIds,
+        loginCustomerId: schema.mcpSessions.loginCustomerId,
         userId: schema.mcpSessions.userId,
         googleEmail: schema.mcpSessions.googleEmail,
       })
@@ -89,7 +92,7 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
 
     return {
       token,
-      row: { ...targetRow, userId: targetRow.userId ?? null },
+      row: { ...targetRow, userId: targetRow.userId ?? null, loginCustomerId: targetRow.loginCustomerId ?? null },
       impersonating: { sessionId, realEmail: row.googleEmail },
     };
   }
@@ -131,6 +134,7 @@ export async function getAuthContext(): Promise<{ auth: AuthContext; session: Se
       refreshToken: result.row.refreshToken,
       customerId: result.row.customerId,
       customerIds: parseCustomerIds(result.row.customerIds),
+      loginCustomerId: result.row.loginCustomerId,
       ...(result.impersonating && { realGoogleEmail: result.impersonating.realEmail }),
     },
     session: result.row,

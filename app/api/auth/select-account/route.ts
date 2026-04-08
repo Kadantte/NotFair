@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
-import { listAccessibleCustomers, deriveCustomerName } from "@/lib/google-ads";
+import { listAccessibleCustomers, deriveCustomerName, parseCustomerIds } from "@/lib/google-ads";
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
 
 export async function POST(request: Request) {
@@ -24,13 +24,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate accounts shape
+  // Validate accounts shape — accept optional loginCustomerId for manager-routed accounts
   const validAccounts = accounts.filter(
-    (a: unknown): a is { id: string; name: string } =>
+    (a: unknown): a is { id: string; name: string; loginCustomerId?: string } =>
       typeof a === "object" &&
       a !== null &&
       "id" in a &&
-      typeof a.id === "string",
+      typeof (a as any).id === "string",
   );
 
   if (validAccounts.length === 0) {
@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       accessToken: schema.mcpSessions.accessToken,
       refreshToken: schema.mcpSessions.refreshToken,
       customerId: schema.mcpSessions.customerId,
+      customerIds: schema.mcpSessions.customerIds,
       userId: schema.mcpSessions.userId,
     })
     .from(schema.mcpSessions)
@@ -82,24 +83,66 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify all selected account IDs are accessible
-  const accessible = await listAccessibleCustomers(session.refreshToken);
-  const accessibleIds = new Set(
-    accessible.filter((c) => !("error" in c)).map((c) => c.id),
-  );
+  // Verify all selected account IDs are accessible.
+  // For pending sessions, we stored pre-validated accounts (including manager-routed ones)
+  // in customerIds during the OAuth callback — verify against those to avoid re-querying Google.
+  // For existing sessions (account switcher), fall back to listAccessibleCustomers.
+  const storedAccounts = parseCustomerIds(session.customerIds ?? "[]");
+  const isPreValidated = pendingToken && storedAccounts.length > 0;
 
-  const inaccessible = validAccounts.filter((a) => !accessibleIds.has(a.id));
-  if (inaccessible.length > 0) {
-    return NextResponse.json(
-      { error: `Account(s) not accessible: ${inaccessible.map((a) => a.id).join(", ")}` },
-      { status: 403 },
+  if (isPreValidated) {
+    const storedIds = new Set(storedAccounts.map((a) => a.id));
+    const inaccessible = validAccounts.filter((a) => !storedIds.has(a.id));
+    if (inaccessible.length > 0) {
+      return NextResponse.json(
+        { error: `Account(s) not in authorized set: ${inaccessible.map((a) => a.id).join(", ")}` },
+        { status: 403 },
+      );
+    }
+  } else {
+    const accessible = await listAccessibleCustomers(session.refreshToken);
+    const accessibleIds = new Set(
+      accessible.filter((c) => !("error" in c)).map((c) => c.id),
     );
+    const inaccessible = validAccounts.filter((a) => !accessibleIds.has(a.id));
+    if (inaccessible.length > 0) {
+      return NextResponse.json(
+        { error: `Account(s) not accessible: ${inaccessible.map((a) => a.id).join(", ")}` },
+        { status: 403 },
+      );
+    }
   }
 
   // Keep the current primary account if it remains selected; otherwise use the first selected account.
   const primaryAccount =
     validAccounts.find((account) => account.id === session.customerId) ??
     validAccounts[0];
+
+  // For manager-routed accounts: look up loginCustomerId from the server-stored pre-validated
+  // data — do NOT trust loginCustomerId from the request body (client strips it, and it could
+  // be forged). Also enforce that all selected accounts belong to the same manager account.
+  let loginCustomerId: string | null = null;
+  if (isPreValidated && session.customerIds) {
+    try {
+      const stored: Array<{ id: string; name: string; loginCustomerId?: string }> = JSON.parse(
+        session.customerIds,
+      );
+      const managerIds = new Set(
+        validAccounts
+          .map((a) => stored.find((s) => s.id === a.id)?.loginCustomerId)
+          .filter((id): id is string => !!id),
+      );
+      if (managerIds.size > 1) {
+        return NextResponse.json(
+          { error: "Cannot connect accounts from different manager accounts in a single session." },
+          { status: 400 },
+        );
+      }
+      loginCustomerId = stored.find((s) => s.id === primaryAccount.id)?.loginCustomerId ?? null;
+    } catch {
+      // Malformed stored data — proceed without loginCustomerId
+    }
+  }
   const customerIds = JSON.stringify(
     validAccounts.map((a) => ({ id: a.id, name: a.name || "" })),
   );
@@ -109,6 +152,7 @@ export async function POST(request: Request) {
     .set({
       customerId: primaryAccount.id,
       customerIds,
+      loginCustomerId,
     })
     .where(eq(schema.mcpSessions.id, session.id));
 

@@ -6,6 +6,7 @@ import { getRequiredEnv } from "@/lib/env";
 export type ConnectedAccount = {
   id: string;
   name: string;
+  loginCustomerId?: string;
 };
 
 /** Parse a JSON-encoded customer_ids string into ConnectedAccount[]. */
@@ -35,6 +36,8 @@ export type AuthContext = {
   customerId: string;
   customerIds?: ConnectedAccount[];
   userId?: string | null;
+  /** Set when accessing a client account through a manager (MCC) account. */
+  loginCustomerId?: string | null;
   /** Set when a dev is impersonating — contains the dev's real email for auth gates. */
   realGoogleEmail?: string | null;
 };
@@ -124,6 +127,7 @@ export function getCustomer(auth: AuthContext) {
   return getClient().Customer({
     customer_id: normalizeCustomerId(auth.customerId),
     refresh_token: auth.refreshToken,
+    ...(auth.loginCustomerId && { login_customer_id: normalizeCustomerId(auth.loginCustomerId) }),
   });
 }
 
@@ -141,15 +145,21 @@ type CacheEntry = {
 
 const queryCache = new Map<string, CacheEntry>();
 
-function cacheKey(customerId: string, query: string): string {
-  return `${normalizeCustomerId(customerId)}::${query.replace(/\s+/g, " ").trim()}`;
+function cacheKey(customerId: string, query: string, loginCustomerId?: string | null): string {
+  const prefix = loginCustomerId
+    ? `${normalizeCustomerId(loginCustomerId)}/${normalizeCustomerId(customerId)}`
+    : normalizeCustomerId(customerId);
+  return `${prefix}::${query.replace(/\s+/g, " ").trim()}`;
 }
 
 /** Invalidate all cached queries for a customer (call after mutations). */
 export function invalidateCache(customerId: string) {
-  const prefix = `${normalizeCustomerId(customerId)}::`;
+  const normalized = normalizeCustomerId(customerId);
   for (const key of queryCache.keys()) {
-    if (key.startsWith(prefix)) queryCache.delete(key);
+    // Match both direct keys (customerId::...) and manager-routed keys (managerId/customerId::...)
+    if (key.includes(`${normalized}::`) || key.includes(`/${normalized}::`)) {
+      queryCache.delete(key);
+    }
   }
 }
 
@@ -165,13 +175,14 @@ export function clearCache() {
 function getCachedCustomer(auth: AuthContext) {
   const raw = getCustomer(auth);
   const customerId = auth.customerId;
+  const loginCustomerId = auth.loginCustomerId;
 
   return new Proxy(raw, {
     get(target, prop) {
       if (prop === "query") {
         return async (query: string) => {
           const optimizedQuery = appendGaqlParameters(query);
-          const key = cacheKey(customerId, optimizedQuery);
+          const key = cacheKey(customerId, optimizedQuery, loginCustomerId);
           const now = Date.now();
           const cached = queryCache.get(key);
           if (cached && cached.expiresAt > now) {
@@ -373,6 +384,42 @@ export async function listAccessibleCustomers(refreshToken: string) {
       }
     }),
   );
+}
+
+/**
+ * List all non-manager client accounts under a manager (MCC) account.
+ * Used when the user only has manager accounts — we fetch their clients so
+ * they can connect to an actual ad account.
+ */
+export async function listClientAccountsUnderManager(
+  refreshToken: string,
+  managerId: string,
+): Promise<{ id: string; name: string }[]> {
+  const customer = getClient().Customer({
+    customer_id: normalizeCustomerId(managerId),
+    login_customer_id: normalizeCustomerId(managerId),
+    refresh_token: refreshToken,
+  });
+
+  const result = (await customer.query(`
+    SELECT
+      customer_client.id,
+      customer_client.descriptive_name,
+      customer_client.manager,
+      customer_client.hidden,
+      customer_client.status
+    FROM customer_client
+    WHERE customer_client.manager = false
+      AND customer_client.hidden = false
+      AND customer_client.status = 'ENABLED'
+  `)) as any[];
+
+  return result
+    .map((row) => ({
+      id: String(row.customer_client?.id ?? ""),
+      name: row.customer_client?.descriptive_name || "",
+    }))
+    .filter((c) => c.id);
 }
 
 export async function listCampaigns(
