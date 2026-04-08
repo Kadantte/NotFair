@@ -24,7 +24,7 @@ const seoLandingRoutes = new Set([
   "/ai-google-ads-optimization",
 ]);
 const marketingPagesLastModified = new Date("2026-04-07");
-const homepageLastModified = new Date("2026-04-08");
+const homepageLastModified = new Date("2026-04-07");
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const marketingEntries: MetadataRoute.Sitemap = publicMarketingRoutes.map(

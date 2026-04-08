@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversion Analysis: Home Page vs. Free Audit Page</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      line-height: 1.55;
+      padding: 32px 40px 64px;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      margin-bottom: 28px;
+    }
+    .header-meta {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .header-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .header-question {
+      font-size: 14px;
+      color: #475569;
+      font-style: italic;
+    }
+
+    /* ---- Verdict card ---- */
+    .verdict-card {
+      background: #2563EB;
+      color: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .verdict-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+    .verdict-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ---- KPI grid ---- */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi-tile {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.1;
+    }
+    .kpi-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .card-accent-amber {
+      border-left: 3px solid #D97706;
+    }
+    .card-accent-red {
+      border-left: 3px solid #DC2626;
+    }
+    .body-text {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    /* ---- Findings ---- */
+    .findings-list {
+      list-style: none;
+    }
+    .finding-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .finding-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .finding-item:first-child { padding-top: 0; }
+    .finding-label {
+      font-size: 14px;
+      color: #0F172A;
+      flex: 1;
+      line-height: 1.5;
+    }
+    .finding-value {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      flex: 2;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* ---- Charts ---- */
+    .chart-header {
+      margin-bottom: 16px;
+    }
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    .chart-subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 3px;
+    }
+    .chart-insight {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+      font-style: italic;
+      border-left: 2px solid #2563EB;
+      padding-left: 8px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ---- Tables ---- */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      background: #F1F5F9;
+      font-weight: 600;
+      font-size: 11px;
+      color: #475569;
+      border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable-header:hover { background: #E2E8F0; }
+    .sort-icon { opacity: 0.4; font-size: 10px; margin-left: 4px; }
+    tbody tr:hover { background: #F8FAFC; }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody td:not(:first-child) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- So what ---- */
+    .action-list {
+      list-style: none;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .action-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .action-item:first-child { padding-top: 0; }
+    .action-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background: #2563EB;
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .action-text {
+      font-size: 14px;
+      color: #0F172A;
+      line-height: 1.5;
+    }
+    .action-reason {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      margin-top: 28px;
+      font-size: 11px;
+      color: #94A3B8;
+      text-align: center;
+      line-height: 1.7;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <div class="header-meta">Analysis · 2026-04-08 00:20 PST</div>
+      <div class="header-title">Conversion Analysis: Home Page vs. Free Audit Page</div>
+      <div class="header-question">"Which page converts better, where does the funnel leak, and what are the highest-leverage fixes?"</div>
+    </div>
+
+    <div class="verdict-card">
+      <div class="verdict-label">Bottom line</div>
+      <div class="verdict-text">The audit page converts 6x better than the homepage (50% vs 8.5% to /connect), but it only launched Apr 7 with 6 total visitors. Fix the 40% OAuth dropout and build sustainable traffic to the audit page — it's the higher-converting entry point.</div>
+    </div>
+
+    
+
+    <div class="section-label">Key metrics</div><div class="kpi-grid"><div class="kpi-tile">  <div class="kpi-label">Home → /connect</div>  <div class="kpi-value">8.5%</div>  <div class="kpi-change" style="color:#059669">↑ +2% vs prior</div></div><div class="kpi-tile">  <div class="kpi-label">Audit → /connect</div>  <div class="kpi-value">50%</div>  <div class="kpi-change" style="color:#059669">↑ 6x better than home</div></div><div class="kpi-tile">  <div class="kpi-label">OAuth dropout</div>  <div class="kpi-value">40%</div>  <div class="kpi-change" style="color:#DC2626">↓ 4 lost accounts</div></div><div class="kpi-tile">  <div class="kpi-label">Organic Google</div>  <div class="kpi-value">4 users</div>  <div class="kpi-change" style="color:#DC2626">↓ 95% non-organic</div></div></div>
+
+    <div class="card">
+      <div class="section-label">Why</div>
+      <ul class='findings-list'><li class="finding-item">  <div class="finding-label">Audit page converts 6x better than homepage — 50% vs 8.5% click-through to /connect</div>  <div class="finding-value"></div></li><li class="finding-item">  <div class="finding-label">39% of home traffic is mobile — structurally unable to convert for a CLI product <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value"></div></li><li class="finding-item">  <div class="finding-label">40% OAuth dropout — 10 started credentials, only 6 connected accounts <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value"></div></li><li class="finding-item">  <div class="finding-label">95% of traffic is non-organic — no sustainable acquisition channel exists <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value"></div></li><li class="finding-item">  <div class="finding-label">Rage clicks on /audit (5) and /connect (4) signal UX friction in the post-conversion flow <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value"></div></li><li class="finding-item">  <div class="finding-label">No CTA click tracking — blind to what happens between pageview and /connect visit</div>  <div class="finding-value"></div></li></ul>
+    </div>
+
+    
+
+    <div class="card">  <div class="chart-header">    <div class="chart-title">Audit page converts 6x better per visitor than homepage</div>    <div class="chart-subtitle">% of unique page visitors who reached /connect (last 4 days)</div>    <div class="chart-insight">50% vs 8.5% — audit page anchors specific value ('see your score')</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_0"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Launch spike faded — traffic collapsed 90% after Apr 4</div>    <div class="chart-subtitle">Daily unique users to home page (Apr 4–8)</div>    <div class="chart-insight">50 visitors on launch day → 4–19 after. No sustainable channel.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_1"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Reddit + direct drive nearly all traffic — Google organic is 5%</div>    <div class="chart-subtitle">Home page unique users by referrer source (last 30d)</div>    <div class="chart-insight">Only 4 users from Google organic — SEO is untapped</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_2"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">39% mobile traffic with no conversion path</div>    <div class="chart-subtitle">Home page visitors by device (last 30d)</div>    <div class="chart-insight">29 mobile users cannot install CLI — desktop conv. rate is 15%, not 8.5%</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_3"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">40% OAuth dropout — 4 motivated users lost mid-flow</div>    <div class="chart-subtitle">Users at each step of the OAuth setup funnel (last 30d)</div>    <div class="chart-insight">4 rage clicks on /connect confirm friction in the auth experience</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_4"></canvas>  </div></div>
+
+    <div class="card">  <div class="section-label">Full funnel — home page and audit page (Apr 4–8, 2026)</div>  <div class="table-wrapper">    <table id="table_0">      <thead><tr></tr></thead>      <tbody><tr><td>Unique visitors</td><td>82</td><td>6</td><td>Audit launched Apr 7</td></tr><tr><td>Desktop visitors</td><td>46 (56%)</td><td>~5 est.</td><td>Mobile can't convert</td></tr><tr><td>Reached /connect</td><td>7 (8.5%)</td><td>3 (50%)</td><td>Audit 6x better</td></tr><tr><td>Started OAuth</td><td>10 total</td><td>—</td><td>Both pages combined</td></tr><tr><td>account_connected</td><td>6 total</td><td>—</td><td>Both pages combined</td></tr><tr><td>OAuth completion</td><td>60% (6/10)</td><td>—</td><td>40% dropout</td></tr></tbody>    </table>  </div></div>
+
+    <div class="card">
+      <div class="section-label">So what</div>
+      <ol class='action-list'><li class="action-item">  <span class="action-num">1</span>  <span class="action-text"><strong>Debug the OAuth dropout (40% lost) — review /connect rage clicks and exception logs</strong><br><span class="action-reason">10 users started OAuth, 4 never finished. These are highest-intent users. 4 rage clicks on /connect confirm a specific UX blockage. Fixing this likely adds 2-3 accounts at current traffic levels with zero acquisition spend.</span></span></li><li class="action-item">  <span class="action-num">2</span>  <span class="action-text"><strong>Drive traffic to /google-ads-audit, not just the homepage — test Reddit posts, Google Ads, SEO</strong><br><span class="action-reason">The audit page converts 6x better (50% vs 8.5% to /connect). Same user, dramatically different intent signal. A specific audit offer ('see your score') outperforms the broad homepage pitch. More traffic here = more conversions per dollar.</span></span></li><li class="action-item">  <span class="action-num">3</span>  <span class="action-text"><strong>Add CTA click tracking to both pages ('Audit Now' button → track as cta_clicked with page property)</strong><br><span class="action-reason">Currently blind to what happens between pageview and /connect. Can't know if 50% audit→connect is due to button placement, message, or self-selection. One tracking call unblocks all future A/B testing on CTAs.</span></span></li><li class="action-item">  <span class="action-num">4</span>  <span class="action-text"><strong>Add mobile email capture on home page — 'Get setup guide sent to your desktop'</strong><br><span class="action-reason">39% of home page visitors (29 users) are on mobile and structurally can't convert to CLI. Capturing email recovers this otherwise-lost traffic. Even 10% email capture on mobile = 3 leads/week at current traffic.</span></span></li></ol>
+    </div>
+
+    <div class="footer">
+      Data sources: PostHog project 368485 — $pageview (pathname filter), account_connected, oauth_credentials_generated, $rageclick, $exception — Apr 4–8, 2026 (4 days data)
+    </div>
+
+  </div>
+
+  <script>
+    // Register datalabels and annotation plugins globally
+    Chart.register(ChartDataLabels);
+    Chart.register(window['chartjs-plugin-annotation']?.default || {});
+
+    // Sort table by column
+    function sortTable(th, tableIdx) {
+      const table = document.getElementById('table_' + tableIdx);
+      const tbody = table.querySelector('tbody');
+      const headers = table.querySelectorAll('th');
+      const colIdx = Array.from(headers).indexOf(th);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.dataset.sortDir !== 'asc';
+      th.dataset.sortDir = asc ? 'asc' : 'desc';
+      headers.forEach(h => h.querySelector('.sort-icon').textContent = '↕');
+      th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+      rows.sort((a, b) => {
+        const aVal = a.cells[colIdx]?.textContent.trim() || '';
+        const bVal = b.cells[colIdx]?.textContent.trim() || '';
+        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Initialize charts
+    
+        new Chart(document.getElementById('chart_0'), {
+          type: 'bar',
+          data: {
+            labels: ["Home page /", "Audit page /google-ads-audit"],
+            datasets: [{"label": "% to /connect", "data": [8.5, 50], "borderColor": "#6366f1", "borderWidth": 2, "backgroundColor": "#6366f1", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_1'), {
+          type: 'line',
+          data: {
+            labels: ["Apr 4", "Apr 5", "Apr 6", "Apr 7", "Apr 8"],
+            datasets: [{"label": "Home page visitors", "data": [50, 4, 8, 19, 1], "borderColor": "#6366f1", "borderWidth": 2, "backgroundColor": "#6366f11A", "fill": true, "tension": 0.25, "pointRadius": 4, "pointHoverRadius": 6, "pointBackgroundColor": "#6366f1"}, {"label": "Audit page visitors", "data": [0, 0, 0, 5, 1], "borderColor": "#10b981", "borderWidth": 2, "backgroundColor": "#10b9811A", "fill": false, "tension": 0.25, "pointRadius": 4, "pointHoverRadius": 6, "pointBackgroundColor": "#10b981"}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              datalabels: { display: false },
+              
+              annotation: {
+                annotations: {
+                  refLine: {
+                    type: 'line',
+                    yMin: 10,
+                    yMax: 10,
+                    borderColor: '#D97706',
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    label: {
+                      display: true,
+                      content: "Target daily minimum: 10",
+                      position: 'end',
+                      backgroundColor: '#D97706',
+                      color: '#fff',
+                      font: { size: 10, family: 'Inter, sans-serif' },
+                      padding: { x: 6, y: 3 },
+                      borderRadius: 3,
+                    }
+                  }
+                }
+              },
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_2'), {
+          type: 'bar',
+          data: {
+            labels: ["Direct", "Reddit", "Email", "Google", "GitHub", "Twitter"],
+            datasets: [{"label": "Unique users", "data": [41, 15, 9, 4, 4, 2], "borderColor": "#6366f1", "borderWidth": 2, "backgroundColor": "#6366f1", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_3'), {
+          type: 'doughnut',
+          data: {
+            labels: ["Desktop", "Mobile"],
+            datasets: [{"label": "Visitors", "data": [46, 29], "borderColor": "#FFFFFF", "borderWidth": 2, "backgroundColor": "#2563EB"}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              datalabels: { display: false },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_4'), {
+          type: 'bar',
+          data: {
+            labels: ["Reached /connect", "Started OAuth", "Connected account"],
+            datasets: [{"label": "Unique events", "data": [11, 10, 6], "borderColor": "#6366f1", "borderWidth": 2, "backgroundColor": "#6366f1", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+  </script>
+</body>
+</html>
