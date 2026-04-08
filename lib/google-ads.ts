@@ -219,7 +219,7 @@ function appendGaqlParameters(query: string): string {
  * The google-ads-api library throws GoogleAdsFailure objects (not Error instances)
  * with an `errors` array containing detailed failure info.
  */
-function extractErrorMessage(
+export function extractErrorMessage(
   error: unknown,
   options: { log?: boolean } = {},
 ): string {
@@ -3437,9 +3437,13 @@ export async function runSafeGaqlReport(auth: AuthContext, rawQuery: string) {
     throw new Error("The query contains forbidden keywords.");
   }
 
-  const customer = getCachedCustomer(auth);
-  const rows = await customer.query(query);
-  return { rowCount: rows.length, rows: rows.slice(0, 50) };
+  try {
+    const customer = getCachedCustomer(auth);
+    const rows = await customer.query(query);
+    return { rowCount: rows.length, rows: rows.slice(0, 50) };
+  } catch (error) {
+    throw new Error(`GAQL query failed: ${extractErrorMessage(error)}`);
+  }
 }
 
 // ─── Resource Metadata (Field Discovery) ────────────────────────────
@@ -3456,8 +3460,10 @@ export async function getResourceMetadata(auth: AuthContext, resourceName: strin
   const query = `SELECT name, selectable, filterable, sortable, data_type, is_repeated WHERE name LIKE '${resourceName}.%'`;
 
   try {
-    const [response] = await fieldService.searchGoogleAdsFields({ query });
-    const fields = (response.results ?? []).map((f: any) => ({
+    // gRPC auto-pagination: response is the results array directly, not { results: [...] }
+    const [results] = await fieldService.searchGoogleAdsFields({ query });
+    const resultArray = Array.isArray(results) ? results : [];
+    const fields = resultArray.map((f: any) => ({
       name: f.name,
       dataType: f.dataType ?? f.data_type,
       selectable: f.selectable ?? false,
@@ -3469,9 +3475,9 @@ export async function getResourceMetadata(auth: AuthContext, resourceName: strin
     if (fields.length === 0) {
       // Fallback: try fetching the resource itself (for top-level resource info)
       const fallbackQuery = `SELECT name, selectable, filterable, sortable, data_type, is_repeated WHERE name = '${resourceName}'`;
-      const [fallbackResponse] = await fieldService.searchGoogleAdsFields({ query: fallbackQuery });
-      const meta = fallbackResponse.results?.[0];
-      if (!meta) {
+      const [fallbackResults] = await fieldService.searchGoogleAdsFields({ query: fallbackQuery });
+      const fallbackArray = Array.isArray(fallbackResults) ? fallbackResults : [];
+      if (fallbackArray.length === 0) {
         throw new Error(`Resource '${resourceName}' not found. Use listQueryableResources to see available resources.`);
       }
       return {
@@ -3502,8 +3508,10 @@ export async function listQueryableResources(auth: AuthContext) {
   const query = `SELECT name WHERE category = 'RESOURCE'`;
 
   try {
-    const [response] = await fieldService.searchGoogleAdsFields({ query });
-    const resources = (response.results ?? [])
+    // gRPC auto-pagination: response is the results array directly, not { results: [...] }
+    const [results] = await fieldService.searchGoogleAdsFields({ query });
+    const resultArray = Array.isArray(results) ? results : [];
+    const resources = resultArray
       .map((f: any) => f.name as string)
       .filter((name: string) => !name.includes("."))
       .sort();

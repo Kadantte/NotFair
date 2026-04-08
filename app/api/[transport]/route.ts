@@ -87,7 +87,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
       : [{ id: session.customerId, name: "" }],
     loginCustomerId: session.loginCustomerId ?? null,
     userId: session.userId ?? null,
-      clientName: session.clientName ?? null,
+    clientName: session.clientName ?? null,
     sessionToken: bearerToken,
     sessionId: session.id,
   };

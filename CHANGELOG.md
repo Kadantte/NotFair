@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.13.0] - 2026-04-08
+
+### Fixed
+- MCP tool errors now return actual Google Ads API error messages instead of `[object Object]`
+- `getResourceMetadata` and `listQueryableResources` now return results (fixed gRPC response destructuring)
+- `getKeywords` Quality Score subcomponent fields (creative quality, predicted CTR, landing page quality) now work correctly
+
+### Changed
+- All 44 MCP tool handlers wrapped with error boundaries via `safeHandler` for consistent error reporting
+- MCP server URL updated to canonical `www.adsagent.org` domain
+
 ## [0.2.12.0] - 2026-04-07
 
 ### Added

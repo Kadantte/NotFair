@@ -35,7 +35,7 @@ import {
 import type { WriteResult, AuthContext, UpdateCampaignSettingsParams } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
-import { jsonResult, accountIdParam, WRITE_ANNOTATIONS } from "./types";
+import { jsonResult, safeHandler, accountIdParam, WRITE_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 
 /**
@@ -55,12 +55,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, criterionId }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pauseKeyword(authForAccount(auth, accountId), campaignId, adGroupId, criterionId));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("enableKeyword", {
     description: "Re-enable a paused keyword. Only needs adGroupId + criterionId (no campaignId, unlike pauseKeyword). Returns changeId.",
@@ -70,12 +70,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, adGroupId, criterionId }) => {
+  }, safeHandler(async ({ accountId, adGroupId, criterionId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, null, () => enableKeyword(authForAccount(auth, accountId), adGroupId, criterionId));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("addKeyword", {
     description: "Add a keyword to an ad group (starts enabled). Returns changeId.",
@@ -87,12 +87,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("BROAD"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => addKeyword(authForAccount(auth, accountId), adGroupId, keyword, matchType));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Bid Management ─────────────────────────────────────────────
 
@@ -106,14 +106,14 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       newBidDollars: z.number().positive().describe("New bid in dollars (e.g. 1.50)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () =>
       updateBid(authForAccount(auth, accountId), campaignId, adGroupId, criterionId, toMicros(newBidDollars)),
     );
     return jsonResult(result);
-  });
+  }));
 
   // ─── Negative Keywords ──────────────────────────────────────────
 
@@ -126,12 +126,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("PHRASE").describe("Match type for the negative keyword (default: PHRASE)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, keyword, matchType }) => {
+  }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword, matchType));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("removeNegativeKeyword", {
     description: "Remove a negative keyword from a campaign. If the same keyword text exists under multiple match types, specify matchType to remove the correct one. Returns changeId.",
@@ -147,12 +147,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       idempotentHint: true,
       openWorldHint: false,
     },
-  }, async ({ accountId, campaignId, keyword, matchType }) => {
+  }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(authForAccount(auth, accountId), campaignId, keyword, matchType));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Budget Management ──────────────────────────────────────────
 
@@ -164,14 +164,14 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       newDailyBudgetDollars: z.number().positive().describe("New daily budget in dollars (e.g. 25.00)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, newDailyBudgetDollars }) => {
+  }, safeHandler(async ({ accountId, campaignId, newDailyBudgetDollars }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () =>
       updateCampaignBudget(authForAccount(auth, accountId), campaignId, toMicros(newDailyBudgetDollars)),
     );
     return jsonResult(result);
-  });
+  }));
 
   // ─── Create Campaign ────────────────────────────────────────────
 
@@ -201,7 +201,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .default("BROAD"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
+  }, safeHandler(async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
@@ -235,7 +235,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         ? "Campaign created as PAUSED. Review settings in Google Ads, then use enableCampaign to start running ads."
         : undefined,
     });
-  });
+  }));
 
   // ─── Campaign Status ────────────────────────────────────────────
 
@@ -251,12 +251,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       idempotentHint: true,
       openWorldHint: false,
     },
-  }, async ({ accountId, campaignId }) => {
+  }, safeHandler(async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pauseCampaign(authForAccount(auth, accountId), campaignId));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("enableCampaign", {
     description: "Re-enable a paused campaign. Returns changeId.",
@@ -265,12 +265,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId }) => {
+  }, safeHandler(async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enableCampaign(authForAccount(auth, accountId), campaignId));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("removeCampaign", {
     description: "PERMANENTLY remove a campaign — cannot be undone, not even with undoChange. The campaign and all its ad groups, ads, and keywords will be deleted. Prefer pauseCampaign in most cases. Returns changeId.",
@@ -284,12 +284,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       idempotentHint: true,
       openWorldHint: false,
     },
-  }, async ({ accountId, campaignId }) => {
+  }, safeHandler(async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => removeCampaign(authForAccount(auth, accountId), campaignId));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Tracking Templates ─────────────────────────────────────────
 
@@ -315,7 +315,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .describe("Tracking URL template (e.g. '{lpurl}?utm_source=google&utm_medium=cpc'). Empty string to remove."),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, level, campaignId, adGroupId, adId, trackingTemplate }) => {
+  }, safeHandler(async ({ accountId, level, campaignId, adGroupId, adId, trackingTemplate }) => {
     const entityId = level === "campaign" ? campaignId
       : level === "ad_group" ? adGroupId
       : level === "ad" ? adId
@@ -326,7 +326,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const resolvedCampaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
     const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Ad Group Management ────────────────────────────────────────
 
@@ -338,12 +338,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       adGroupName: z.string().min(1),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupName }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupName }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => createAdGroup(authForAccount(auth, accountId), campaignId, adGroupName));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Ad Management ──────────────────────────────────────────────
 
@@ -366,12 +366,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       finalUrl: z.string().url(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => createAd(authForAccount(auth, accountId), adGroupId, { headlines, descriptions, finalUrl }));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("pauseAd", {
     description: "Pause an active ad. Returns changeId.",
@@ -382,12 +382,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       adId: z.string(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, adId }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pauseAd(authForAccount(auth, accountId), adGroupId, adId));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("enableAd", {
     description: "Re-enable a paused ad. Returns changeId.",
@@ -398,12 +398,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       adId: z.string(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, adId }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enableAd(authForAccount(auth, accountId), adGroupId, adId));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("updateAdFinalUrl", {
     description: "Update the landing page URL for an ad. Returns changeId.",
@@ -415,12 +415,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       finalUrl: z.string().url(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => updateAdFinalUrl(authForAccount(auth, accountId), adGroupId, adId, finalUrl));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("updateAdAssets", {
     description: "Replace all headlines and descriptions for a Responsive Search Ad. COMPLETE replacement — provide every asset, not just changed ones. Optionally pin assets to fixed positions. Returns changeId.",
@@ -451,12 +451,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .describe("Complete replacement descriptions (2-4, max 90 chars each)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => updateAdAssets(authForAccount(auth, accountId), adGroupId, adId, { headlines, descriptions }));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Bulk Operations ────────────────────────────────────────────
 
@@ -477,7 +477,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .max(50),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, updates }) => {
+  }, safeHandler(async ({ accountId, updates }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const results = await bulkUpdateBids(authForAccount(auth, accountId), updates);
@@ -496,7 +496,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
-  });
+  }));
 
   // ─── Bulk Keyword Operations ─────────────────────────────────────
 
@@ -516,7 +516,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .max(100),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, keywords }) => {
+  }, safeHandler(async ({ accountId, keywords }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const results = await bulkPauseKeywords(authForAccount(auth, accountId), keywords);
@@ -535,7 +535,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
-  });
+  }));
 
   server.registerTool("bulkAddKeywords", {
     description: "Add up to 100 keywords to an ad group in one call. Partial success is possible. Returns per-keyword results with individual changeIds.",
@@ -554,7 +554,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .max(100),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, keywords }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, keywords }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const results = await bulkAddKeywords(authForAccount(auth, accountId), adGroupId, keywords);
@@ -573,7 +573,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
-  });
+  }));
 
   // ─── Move Keywords ─────────────────────────────────────────────────
 
@@ -591,7 +591,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .describe("Override match type in destination — omit to inherit from source"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
+  }, safeHandler(async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await moveKeywords(authForAccount(auth, accountId), campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
@@ -619,7 +619,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       },
       error: result.error,
     });
-  });
+  }));
 
   // ─── Rename Campaign / Ad Group ────────────────────────────────────
 
@@ -631,12 +631,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       newName: z.string().min(1),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, newName }) => {
+  }, safeHandler(async ({ accountId, campaignId, newName }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => renameCampaign(authForAccount(auth, accountId), campaignId, newName));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("renameAdGroup", {
     description: "Rename an ad group. Returns changeId.",
@@ -647,12 +647,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       newName: z.string().min(1),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, newName }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, newName }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => renameAdGroup(authForAccount(auth, accountId), campaignId, adGroupId, newName));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Campaign Settings ──────────────────────────────────────────
 
@@ -685,7 +685,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .describe("Negative location targeting — where ads should NOT show"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting }) => {
+  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
@@ -705,7 +705,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       error: result.error,
       results: logged,
     });
-  });
+  }));
 
   // ─── Undo ───────────────────────────────────────────────────────
 
@@ -721,7 +721,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       idempotentHint: false,
       openWorldHint: false,
     },
-  }, async ({ accountId, changeId }) => {
+  }, safeHandler(async ({ accountId, changeId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
@@ -745,7 +745,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       undoneChangeId: changeId,
       originalAction: change.toolName,
     });
-  });
+  }));
 };
 
 // ─── Undo Helpers ─────────────────────────────────────────────────

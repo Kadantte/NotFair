@@ -22,7 +22,7 @@ import {
 } from "@/lib/google-ads";
 import { getChanges } from "@/lib/db/tracking";
 import { execRead } from "@/lib/tools/execute";
-import { jsonResult, accountIdParam, READ_ANNOTATIONS } from "./types";
+import { jsonResult, safeHandler, accountIdParam, READ_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 
 /**
@@ -38,12 +38,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId }) => {
+  }, safeHandler(async ({ accountId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_account_info", () => getAccountInfo(authForAccount(auth, accountId)));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Campaigns ──────────────────────────────────────────────────
 
@@ -55,12 +55,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       includeRemoved: z.boolean().default(false),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, limit, includeRemoved }) => {
+  }, safeHandler(async ({ accountId, limit, includeRemoved }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "list_campaigns", () => listCampaigns(authForAccount(auth, accountId), { limit, includeRemoved }));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("getCampaignPerformance", {
     description:
@@ -88,14 +88,14 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       comparePreviousPeriod: z.boolean().default(false),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, days, startDate, endDate, comparePreviousPeriod }) => {
+  }, safeHandler(async ({ accountId, campaignId, days, startDate, endDate, comparePreviousPeriod }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_campaign_performance", () =>
       getCampaignPerformance(authForAccount(auth, accountId), campaignId, { days, startDate, endDate, comparePreviousPeriod }),
     campaignId);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Keywords & Search Terms ────────────────────────────────────
 
@@ -108,12 +108,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, days, limit }) => {
+  }, safeHandler(async ({ accountId, campaignId, days, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_keywords", () => getKeywords(authForAccount(auth, accountId), campaignId, days, limit), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("getNegativeKeywords", {
     description: "List negative keywords for a campaign. Check before adding new negatives to avoid duplicates.",
@@ -123,12 +123,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(500).default(100),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, limit }) => {
+  }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_negative_keywords", () => getNegativeKeywords(authForAccount(auth, accountId), campaignId, limit), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("getSearchTermReport", {
     description: "Actual search queries that triggered ads, ordered by cost. Use to find irrelevant terms to add as negative keywords.",
@@ -139,12 +139,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, days, limit }) => {
+  }, safeHandler(async ({ accountId, campaignId, days, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_search_term_report", () => getSearchTermReport(authForAccount(auth, accountId), campaignId, days, limit), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Custom Query ───────────────────────────────────────────────
 
@@ -168,12 +168,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       destructiveHint: false,
       openWorldHint: true,
     },
-  }, async ({ accountId, query }) => {
+  }, safeHandler(async ({ accountId, query }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "run_gaql_query", () => runSafeGaqlReport(authForAccount(auth, accountId), query));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Tracking Templates ──────────────────────────────────────────
 
@@ -196,7 +196,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .describe("The ad ID. Required when level is 'ad'."),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, level, campaignId, adGroupId, adId }) => {
+  }, safeHandler(async ({ accountId, level, campaignId, adGroupId, adId }) => {
     const entityId = level === "campaign" ? campaignId
       : level === "ad_group" ? adGroupId
       : level === "ad" ? adId
@@ -205,7 +205,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_tracking_template", () => getTrackingTemplate(authForAccount(auth, accountId), level, entityId));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Ad Groups & Ads ────────────────────────────────────────────
 
@@ -217,12 +217,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, limit }) => {
+  }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "list_ad_groups", () => listAdGroups(authForAccount(auth, accountId), campaignId, limit), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("listAds", {
     description: "List ads in a campaign with RSA headlines, descriptions, final URLs, status, and performance metrics for a given date range. Optionally filter to one ad group.",
@@ -234,12 +234,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(100).default(50),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, adGroupId, days, limit }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, days, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "list_ads", () => listAds(authForAccount(auth, accountId), campaignId, adGroupId, days, limit), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Competitive Intelligence ────────────────────────────────────
 
@@ -251,12 +251,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       days: z.number().int().min(1).max(90).default(30),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, days }) => {
+  }, safeHandler(async ({ accountId, campaignId, days }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_impression_share", () => getImpressionShare(authForAccount(auth, accountId), campaignId, days), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Conversion Tracking ─────────────────────────────────────────
 
@@ -266,12 +266,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId }) => {
+  }, safeHandler(async ({ accountId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_conversion_actions", () => getConversionActions(authForAccount(auth, accountId)));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Account & Campaign Settings ────────────────────────────────
 
@@ -281,12 +281,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId }) => {
+  }, safeHandler(async ({ accountId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_account_settings", () => getAccountSettings(authForAccount(auth, accountId)));
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("getCampaignSettings", {
     description: "Campaign configuration: bidding strategy, network targeting (Search Partners, Display), location targeting, and ad schedule.",
@@ -295,12 +295,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId }) => {
+  }, safeHandler(async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_campaign_settings", () => getCampaignSettings(authForAccount(auth, accountId), campaignId), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Recommendations ─────────────────────────────────────────────
 
@@ -311,12 +311,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string().optional(),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId }) => {
+  }, safeHandler(async ({ accountId, campaignId }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_recommendations", () => getRecommendations(authForAccount(auth, accountId), campaignId), campaignId);
     return jsonResult(result);
-  });
+  }));
 
   // ─── Change History ───────────────────────────────────────────
 
@@ -328,12 +328,12 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(100).default(20),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, campaignId, limit }) => {
+  }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const result = await execRead(auth, targetId, "get_changes", () => getChanges(targetId, { limit, campaignId }));
     return jsonResult(result);
-  });
+  }));
 
   // ─── Field & Resource Discovery ─────────────────────────────────────
 
@@ -348,11 +348,11 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .describe("The GAQL resource name (e.g. 'campaign', 'ad_group', 'keyword_view', 'search_term_view')"),
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId, resourceName }) => {
+  }, safeHandler(async ({ accountId, resourceName }) => {
     const auth = currentAuth();
     const result = await getResourceMetadata(authForAccount(auth, accountId), resourceName);
     return jsonResult(result);
-  });
+  }));
 
   server.registerTool("listQueryableResources", {
     description:
@@ -361,9 +361,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
     },
     annotations: READ_ANNOTATIONS,
-  }, async ({ accountId }) => {
+  }, safeHandler(async ({ accountId }) => {
     const auth = currentAuth();
     const result = await listQueryableResources(authForAccount(auth, accountId));
     return jsonResult(result);
-  });
+  }));
 };

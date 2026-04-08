@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { extractErrorMessage } from "@/lib/google-ads";
 
 /**
  * A function that registers tools on an MCP server.
@@ -14,6 +15,28 @@ export type ToolRegistrar = (
 /** Wrap a value as an MCP text content response. */
 export function jsonResult(value: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
+}
+
+/** Wrap an error as an MCP error response with the actual error message. */
+export function errorResult(error: unknown): CallToolResult {
+  return { content: [{ type: "text", text: extractErrorMessage(error) }], isError: true };
+}
+
+/**
+ * Wrap an async tool handler with try-catch error boundary.
+ * Ensures errors are returned as proper MCP error responses with readable messages
+ * instead of propagating as raw objects (which become "[object Object]").
+ */
+export function safeHandler<A>(
+  fn: (args: A) => Promise<CallToolResult>,
+): (args: A) => Promise<CallToolResult> {
+  return async (args: A) => {
+    try {
+      return await fn(args);
+    } catch (error) {
+      return errorResult(error);
+    }
+  };
 }
 
 /** Shared optional accountId param for all tools (multi-account targeting). */
