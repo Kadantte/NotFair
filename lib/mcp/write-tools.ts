@@ -31,8 +31,9 @@ import {
   renameCampaign,
   renameAdGroup,
   updateCampaignSettings,
+  updateCampaignBidding,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
 import { jsonResult, safeHandler, accountIdParam, WRITE_ANNOTATIONS } from "./types";
@@ -654,6 +655,36 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(result);
   }));
 
+  // ─── Campaign Bidding Strategy ──────────────────────────────────
+
+  server.registerTool("updateCampaignBidding", {
+    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS, MANUAL_CPC. For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS, targetRoas is required (e.g. 2.0 = 200% ROAS). Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      biddingStrategy: z.enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CLICKS", "MANUAL_CPC", "TARGET_CPA", "TARGET_ROAS"])
+        .describe("The bidding strategy to set"),
+      targetCpa: z.number().optional()
+        .describe("Target CPA in dollars (e.g. 10.50 for $10.50). Required for TARGET_CPA, optional cap for MAXIMIZE_CONVERSIONS."),
+      targetRoas: z.number().optional()
+        .describe("Target ROAS as a multiplier (e.g. 2.0 = 200% return). Required for TARGET_ROAS."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, async ({ accountId, campaignId, biddingStrategy, targetCpa, targetRoas }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+
+    const logged = await execWrite(auth, targetId, campaignId, () =>
+      updateCampaignBidding(authForAccount(auth, accountId), campaignId, {
+        biddingStrategy: biddingStrategy as BiddingStrategyType,
+        targetCpaMicros: targetCpa != null ? toMicros(targetCpa) : undefined,
+        targetRoas,
+      }),
+    );
+
+    return jsonResult(logged);
+  });
+
   // ─── Campaign Settings ──────────────────────────────────────────
 
   server.registerTool("updateCampaignSettings", {
@@ -902,6 +933,19 @@ export async function executeUndoForChange(
     case "add_campaign_location":
     case "remove_campaign_location":
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Location changes cannot be automatically undone. Use updateCampaignSettings to adjust locations manually." };
+    case "update_bidding": {
+      if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous bidding strategy not recorded" };
+      try {
+        const prev = JSON.parse(beforeValue) as { strategy: string; targetCpaMicros: number | null; targetRoas: number | null };
+        return updateCampaignBidding(auth, entityId, {
+          biddingStrategy: prev.strategy as BiddingStrategyType,
+          targetCpaMicros: prev.targetCpaMicros ?? undefined,
+          targetRoas: prev.targetRoas ?? undefined,
+        });
+      } catch {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous bidding strategy" };
+      }
+    }
     case "rename_campaign":
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
       return renameCampaign(auth, entityId, beforeValue);

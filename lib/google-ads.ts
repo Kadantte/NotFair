@@ -1131,6 +1131,168 @@ export async function updateCampaignBudget(
   }
 }
 
+// ─── Update Campaign Bidding Strategy ─────────────────────────────
+
+export type BiddingStrategyType =
+  | "MAXIMIZE_CONVERSIONS"
+  | "MAXIMIZE_CLICKS"
+  | "MANUAL_CPC"
+  | "TARGET_CPA"
+  | "TARGET_ROAS";
+
+export interface UpdateCampaignBiddingParams {
+  biddingStrategy: BiddingStrategyType;
+  targetCpaMicros?: number;  // required for TARGET_CPA, optional for MAXIMIZE_CONVERSIONS
+  targetRoas?: number;       // required for TARGET_ROAS
+}
+
+export async function updateCampaignBidding(
+  auth: AuthContext,
+  campaignId: string,
+  params: UpdateCampaignBiddingParams,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = safeEntityId(campaignId);
+  const customerId = normalizeCustomerId(auth.customerId);
+  const campaignResourceName = `customers/${customerId}/campaigns/${cid}`;
+
+  // Fetch current bidding strategy for beforeValue
+  const result = await customer.query(`
+    SELECT
+      campaign.bidding_strategy_type,
+      campaign.target_cpa.target_cpa_micros,
+      campaign.maximize_conversions.target_cpa_micros,
+      campaign.target_roas.target_roas
+    FROM campaign
+    WHERE campaign.id = ${cid}
+    LIMIT 1
+  `);
+  const row = (result as any[])[0];
+  if (!row) {
+    return {
+      success: false,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue: "unknown",
+      afterValue: params.biddingStrategy,
+      error: "Campaign not found",
+    };
+  }
+
+  const currentStrategy = row.campaign?.bidding_strategy_type ?? "UNKNOWN";
+  const currentTargetCpa = row.campaign?.target_cpa?.target_cpa_micros
+    ?? row.campaign?.maximize_conversions?.target_cpa_micros
+    ?? null;
+  const currentTargetRoas = row.campaign?.target_roas?.target_roas ?? null;
+
+  const beforeValue = JSON.stringify({
+    strategy: currentStrategy,
+    targetCpaMicros: currentTargetCpa,
+    targetRoas: currentTargetRoas,
+  });
+
+  // Validate params
+  if (params.biddingStrategy === "TARGET_CPA" && params.targetCpaMicros == null) {
+    return {
+      success: false,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue,
+      afterValue: params.biddingStrategy,
+      error: "targetCpaMicros is required for TARGET_CPA strategy",
+    };
+  }
+  if (params.biddingStrategy === "TARGET_ROAS" && params.targetRoas == null) {
+    return {
+      success: false,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue,
+      afterValue: params.biddingStrategy,
+      error: "targetRoas is required for TARGET_ROAS strategy (e.g. 2.0 = 200% ROAS)",
+    };
+  }
+  if (params.targetRoas != null && params.targetRoas <= 0) {
+    return {
+      success: false,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue,
+      afterValue: params.biddingStrategy,
+      error: "Target ROAS must be greater than 0 (e.g. 2.0 = 200% return)",
+    };
+  }
+  if (params.targetCpaMicros != null && params.targetCpaMicros < 100_000) {
+    return {
+      success: false,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue,
+      afterValue: params.biddingStrategy,
+      error: "Target CPA must be at least $0.10 (100,000 micros)",
+    };
+  }
+
+  // Build the campaign resource with the new bidding strategy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resource: Record<string, any> = {
+    resource_name: campaignResourceName,
+  };
+
+  switch (params.biddingStrategy) {
+    case "TARGET_CPA":
+      resource.target_cpa = { target_cpa_micros: params.targetCpaMicros };
+      break;
+    case "MAXIMIZE_CONVERSIONS":
+      resource.maximize_conversions = params.targetCpaMicros
+        ? { target_cpa_micros: params.targetCpaMicros }
+        : {};
+      break;
+    case "TARGET_ROAS":
+      resource.target_roas = { target_roas: params.targetRoas };
+      break;
+    case "MAXIMIZE_CLICKS":
+      resource.target_spend = {};
+      break;
+    case "MANUAL_CPC":
+      resource.manual_cpc = { enhanced_cpc_enabled: false };
+      break;
+  }
+
+  const afterValue = JSON.stringify({
+    strategy: params.biddingStrategy,
+    targetCpaMicros: params.targetCpaMicros ?? null,
+    targetRoas: params.targetRoas ?? null,
+  });
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "campaign" as any,
+        operation: "update",
+        resource,
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue,
+      afterValue,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue,
+      afterValue,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
 export async function pauseCampaign(
   auth: AuthContext,
   campaignId: string,

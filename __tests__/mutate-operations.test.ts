@@ -55,6 +55,7 @@ import {
   enableCampaign,
   addNegativeKeyword,
   updateCampaignSettings,
+  updateCampaignBidding,
   type AuthContext,
 } from "@/lib/google-ads";
 
@@ -355,5 +356,177 @@ describe("resource name format", () => {
       ? op.resource
       : op.resource?.resource_name;
     expect(resourceStr).toMatch(/campaignCriteria\/555~999$/);
+  });
+});
+
+describe("updateCampaignBidding", () => {
+  beforeEach(() => {
+    mockMutateResources.mockClear();
+    mockQuery.mockClear();
+    mockMutateResources.mockResolvedValue({
+      mutate_operation_responses: [],
+    });
+  });
+
+  const mockCurrentBidding = (strategy = "MANUAL_CPC") => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: {
+          bidding_strategy_type: strategy,
+          target_cpa: null,
+          maximize_conversions: null,
+          target_roas: null,
+        },
+      },
+    ]);
+  };
+
+  it("returns error when campaign not found", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    const result = await updateCampaignBidding(AUTH, "999", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Campaign not found");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("returns error when TARGET_CPA missing targetCpaMicros", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_CPA",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("targetCpaMicros is required");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("returns error when TARGET_ROAS missing targetRoas", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_ROAS",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("targetRoas is required");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("returns error when targetRoas is zero or negative", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_ROAS",
+      targetRoas: 0,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("greater than 0");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("returns error when targetCpaMicros below minimum", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CONVERSIONS",
+      targetCpaMicros: 50_000,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("at least $0.10");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("TARGET_CPA sets target_cpa field with correct micros", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_CPA",
+      targetCpaMicros: 5_000_000,
+    });
+    expect(result.success).toBe(true);
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.operation).toBe("update");
+    expect(op.resource.target_cpa).toEqual({ target_cpa_micros: 5_000_000 });
+  });
+
+  it("MAXIMIZE_CONVERSIONS without cap sets empty object", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CONVERSIONS",
+    });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.maximize_conversions).toEqual({});
+  });
+
+  it("MAXIMIZE_CONVERSIONS with cap sets target_cpa_micros", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CONVERSIONS",
+      targetCpaMicros: 10_000_000,
+    });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.maximize_conversions).toEqual({
+      target_cpa_micros: 10_000_000,
+    });
+  });
+
+  it("TARGET_ROAS sets target_roas field", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_ROAS",
+      targetRoas: 2.5,
+    });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.target_roas).toEqual({ target_roas: 2.5 });
+  });
+
+  it("MAXIMIZE_CLICKS sets target_spend field", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+    });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.target_spend).toEqual({});
+  });
+
+  it("MANUAL_CPC sets manual_cpc field", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MANUAL_CPC",
+    });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.manual_cpc).toEqual({ enhanced_cpc_enabled: false });
+  });
+
+  it("records beforeValue with current strategy", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: {
+          bidding_strategy_type: "TARGET_CPA",
+          target_cpa: { target_cpa_micros: 3_000_000 },
+          maximize_conversions: null,
+          target_roas: null,
+        },
+      },
+    ]);
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+    });
+    expect(result.success).toBe(true);
+    const before = JSON.parse(result.beforeValue!);
+    expect(before.strategy).toBe("TARGET_CPA");
+    expect(before.targetCpaMicros).toBe(3_000_000);
+  });
+
+  it("returns error when mutateResources throws", async () => {
+    mockCurrentBidding();
+    mockMutateResources.mockRejectedValueOnce(new Error("API failure"));
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
   });
 });

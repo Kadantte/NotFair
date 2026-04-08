@@ -72,6 +72,8 @@ import {
   enableAd,
   updateAdFinalUrl,
   updateAdAssets,
+  // Bidding strategy
+  updateCampaignBidding,
   // Bulk operations
   bulkUpdateBids,
   bulkPauseKeywords,
@@ -302,6 +304,74 @@ describe("protobuf validation: campaign management", () => {
       { campaign: { name: "Old Name" } },
     ]);
     await renameCampaign(AUTH, "100", "New Name");
+    assertAllCapturedOpsEncode();
+  });
+});
+
+describe("protobuf validation: updateCampaignBidding", () => {
+  beforeEach(resetMocks);
+
+  const mockCurrentBidding = () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: {
+          bidding_strategy_type: "MANUAL_CPC",
+          target_cpa: null,
+          maximize_conversions: null,
+          target_roas: null,
+        },
+      },
+    ]);
+  };
+
+  it("TARGET_CPA strategy", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_CPA",
+      targetCpaMicros: 5_000_000,
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("MAXIMIZE_CONVERSIONS strategy (no cap)", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CONVERSIONS",
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("MAXIMIZE_CONVERSIONS strategy (with target CPA cap)", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CONVERSIONS",
+      targetCpaMicros: 10_000_000,
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("TARGET_ROAS strategy", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_ROAS",
+      targetRoas: 2.0,
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("MAXIMIZE_CLICKS strategy", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("MANUAL_CPC strategy", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MANUAL_CPC",
+    });
     assertAllCapturedOpsEncode();
   });
 });

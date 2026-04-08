@@ -2,6 +2,14 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.14.0] - 2026-04-08
+
+### Added
+- `updateCampaignBidding` MCP tool: change a campaign's bidding strategy (TARGET_CPA, MAXIMIZE_CONVERSIONS, TARGET_ROAS, MAXIMIZE_CLICKS, MANUAL_CPC) with target CPA and ROAS support
+- Full undo support for bidding strategy changes via `undoChange`
+- Validation guardrails: minimum $0.10 target CPA, positive ROAS required, required params enforced per strategy
+- 18 new tests covering all bidding strategies, validation paths, error handling, and protobuf wire format
+
 ## [0.2.13.0] - 2026-04-08
 
 ### Fixed
