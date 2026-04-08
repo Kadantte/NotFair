@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
+import { UTM_KEYS } from "@/lib/utm";
 
 function getSafeNext(next: string | null) {
   if (!next || !next.startsWith("/")) {
@@ -26,11 +27,23 @@ export async function GET(request: Request) {
     );
   }
 
+  // Capture UTM params to thread through the OAuth round-trip
+  const utm: Record<string, string> = {};
+  for (const key of UTM_KEYS) {
+    const val = searchParams.get(key);
+    if (val) utm[key] = val;
+  }
+
   // Generate a random nonce for CSRF protection.
   // The nonce goes into both the OAuth state param and a short-lived cookie.
   // The callback verifies they match before proceeding.
   const nonce = randomBytes(16).toString("hex");
-  const state = Buffer.from(JSON.stringify({ nonce, next, popup })).toString("base64url");
+  const state = Buffer.from(JSON.stringify({
+    nonce,
+    next,
+    popup,
+    ...(Object.keys(utm).length > 0 ? { utm } : {}),
+  })).toString("base64url");
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
 

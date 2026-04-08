@@ -26,7 +26,7 @@ type AccountOps = {
     reads: number;
     writes: number;
     total: number;
-    lastActive: string;
+    lastActive: string | null;
 };
 
 type BudgetSummary = {
@@ -53,6 +53,21 @@ function formatBudget(budget: BudgetSummary): string {
         }
     }
     return `$${budget.totalDailyBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Parse a timestamp string (with or without trailing Z) into a Date */
+function parseTs(iso: string): Date {
+    return new Date(iso.endsWith('Z') ? iso : iso + 'Z');
+}
+
+function formatDateTime(iso: string): string {
+    return parseTs(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+    });
+}
+
+function formatDateShort(iso: string, year = false): string {
+    return parseTs(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(year && { year: 'numeric' }) });
 }
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
@@ -434,9 +449,7 @@ export default function DevPage() {
                                             </div>
                                         </div>
                                         <div className="mt-2 text-[10px] text-[#9B9689] font-mono">
-                                            Last active: {new Date(acc.lastActive.endsWith('Z') ? acc.lastActive : acc.lastActive + 'Z').toLocaleString(undefined, {
-                                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
-                                            })}
+                                            Last active: {acc.lastActive ? formatDateTime(acc.lastActive) : 'Never'}
                                         </div>
                                     </Link>
                                     );
@@ -496,9 +509,7 @@ export default function DevPage() {
                                                     {acc.total.toLocaleString()}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
-                                                    {new Date(acc.lastActive.endsWith('Z') ? acc.lastActive : acc.lastActive + 'Z').toLocaleString(undefined, {
-                                                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
-                                                    })}
+                                                    {acc.lastActive ? formatDateTime(acc.lastActive) : 'Never'}
                                                 </td>
                                                 <td className="px-4 py-2.5">
                                                     <button
@@ -741,7 +752,7 @@ export default function DevPage() {
                                         <div>
                                             <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Last Active</div>
                                             <div className="text-[11px] text-[#9B9689] font-mono">
-                                                {new Date(c.lastActive.endsWith('Z') ? c.lastActive : c.lastActive + 'Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                {formatDateShort(c.lastActive)}
                                             </div>
                                         </div>
                                     </div>
@@ -784,14 +795,10 @@ export default function DevPage() {
                                             </td>
                                             <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</td>
                                             <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
-                                                {new Date(c.firstSeen.endsWith('Z') ? c.firstSeen : c.firstSeen + 'Z').toLocaleDateString(undefined, {
-                                                    month: 'short', day: 'numeric', year: 'numeric',
-                                                })}
+                                                {formatDateShort(c.firstSeen, true)}
                                             </td>
                                             <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
-                                                {new Date(c.lastActive.endsWith('Z') ? c.lastActive : c.lastActive + 'Z').toLocaleString(undefined, {
-                                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
-                                                })}
+                                                {formatDateTime(c.lastActive)}
                                             </td>
                                         </tr>
                                     ))}

@@ -1,10 +1,19 @@
 "use client";
 
+import { UTM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
+
 function buildAuthUrl(next: string, popup: boolean) {
   const url = new URL("/api/auth/signin", window.location.origin);
   url.searchParams.set("next", next);
   if (popup) {
     url.searchParams.set("popup", "1");
+  }
+  // Forward UTM params — prefer current URL, fall back to sessionStorage
+  const currentParams = new URLSearchParams(window.location.search);
+  for (const key of UTM_KEYS) {
+    const val = currentParams.get(key)
+      ?? sessionStorage.getItem(`${UTM_STORAGE_PREFIX}${key}`);
+    if (val) url.searchParams.set(key, val);
   }
   return url.toString();
 }

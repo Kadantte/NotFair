@@ -7,6 +7,8 @@ import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
+import { trackServerEvent } from "@/lib/analytics-server";
+import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -26,6 +28,7 @@ function clearSupabaseCookies(response: NextResponse, requestCookies: { name: st
 type AuthState = {
   next?: string;
   popup?: boolean;
+  utm?: UtmParams;
 };
 
 function getSafeNext(next: string | null | undefined) {
@@ -48,9 +51,21 @@ function verifyState(stateParam: string | null, cookieNonce: string | undefined)
     if (!parsed || typeof parsed !== "object") return null;
     if (parsed.nonce !== cookieNonce) return null;
 
+    // Extract UTM params if present
+    let utm: UtmParams | undefined;
+    if (parsed.utm && typeof parsed.utm === "object") {
+      const raw = parsed.utm as Record<string, unknown>;
+      const cleaned: UtmParams = {};
+      for (const key of UTM_KEYS) {
+        if (typeof raw[key] === "string") cleaned[key] = raw[key];
+      }
+      if (Object.keys(cleaned).length > 0) utm = cleaned;
+    }
+
     return {
       next: typeof parsed.next === "string" ? parsed.next : undefined,
       popup: typeof parsed.popup === "boolean" ? parsed.popup : undefined,
+      utm,
     };
   } catch {
     return null;
@@ -512,6 +527,20 @@ export async function GET(request: Request) {
 
   const user = authData.user ?? authData.session?.user ?? null;
 
+  // Save UTM attribution data to user metadata on first sign-up
+  if (user && state.utm) {
+    const existingMeta = user.user_metadata ?? {};
+    // Only write UTMs if not already set (don't overwrite on re-auth)
+    if (!existingMeta.utm_source) {
+      await supabase.auth.updateUser({
+        data: {
+          ...state.utm,
+          signup_referrer: request.headers.get("referer") ?? undefined,
+        },
+      });
+    }
+  }
+
   // Reuse cookieStore from nonce check above to identify sb-* cookies to clear
   const requestCookies = cookieStore.getAll();
 
@@ -540,6 +569,18 @@ export async function GET(request: Request) {
     response = popup
       ? popupErrorResponse(origin, describeError(sessionError))
       : redirectWithError(origin, describeError(sessionError));
+  }
+
+  // Track signup event with UTM attribution in PostHog
+  const isNewSignup = response.cookies.get("gads_new_signup")?.value === "1";
+  if (isNewSignup && user?.id) {
+    const utmProps = state.utm ?? {};
+    trackServerEvent(user.id, "user_signed_up", {
+      ...utmProps,
+      signup_referrer: request.headers.get("referer") ?? undefined,
+      google_email: user.email,
+      signup_method: "google_oauth",
+    });
   }
 
   // Clear the one-time OAuth nonce cookie

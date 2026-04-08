@@ -4,6 +4,7 @@ import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
+import { UTM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { GadsConversionTracker } from "@/components/gads-conversion-tracker";
 import { getSession } from "@/lib/session";
@@ -95,6 +96,9 @@ export default async function RootLayout({
       <body
         className={`${dmSans.variable} ${jetbrainsMono.variable} antialiased h-full`}
       >
+        <Script id="utm-persist" strategy="beforeInteractive">
+          {`(function(){try{var u=new URLSearchParams(location.search),k=${JSON.stringify(UTM_KEYS)},s=sessionStorage,p="${UTM_STORAGE_PREFIX}";if(k.some(function(x){return u.has(x)})){k.forEach(function(x){var v=u.get(x);if(v)s.setItem(p+x,v);else s.removeItem(p+x)})}if(document.referrer&&!s.getItem(p+"referrer")){try{var r=new URL(document.referrer);if(r.hostname!==location.hostname)s.setItem(p+"referrer",document.referrer)}catch(e){}}}catch(e){}})()`}
+        </Script>
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GADS_CONVERSION_ID}`}
           strategy="afterInteractive"
