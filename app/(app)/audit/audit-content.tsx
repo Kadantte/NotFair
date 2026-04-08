@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench, MessageCircle } from "lucide-react";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, DimensionScore } from "@/lib/audit/scoring";
@@ -88,6 +88,21 @@ function ActionButton({
       className="flex items-center gap-1 rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] font-medium text-[#E8E4DD] transition hover:bg-[#4D4C46] disabled:opacity-50"
     >
       {state === "loading" ? <Loader2 className="h-3 w-3 animate-spin" /> : label}
+    </button>
+  );
+}
+
+// ─── Ask AI Button ──────────────────────────────────────────────────
+
+function AskAIButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-[11px] font-medium text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#4CAF6E]"
+    >
+      <MessageCircle className="h-3 w-3" />
+      Ask AI
     </button>
   );
 }
@@ -248,15 +263,26 @@ function ScorecardTable({ dimensions, loading }: { dimensions: DimensionScore[] 
 
 // ─── Wasted Spend Section ────────────────────────────────────────────
 
-function WastedSpendSection({ result }: { result: AuditResult }) {
+function WastedSpendSection({ result, onAskAI }: { result: AuditResult; onAskAI?: (prompt: string) => void }) {
   const { wastedSpend } = result;
   if (wastedSpend.total === 0 && wastedSpend.qualityIssues.total === 0) return null;
 
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
-      <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
-        <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
-        Wasted Spend Analysis
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
+          <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
+          Wasted Spend Analysis
+        </div>
+        {onAskAI && (
+          <AskAIButton
+            onClick={() =>
+              onAskAI(
+                `I have ${fmt$(wastedSpend.total)} in wasted spend (${fmtPct(wastedSpend.pct)} of total spend, ~${fmt$(wastedSpend.annualized)} annualized). Categories: ${wastedSpend.categories.map((c) => `${c.label}: ${fmt$(c.amount)}`).join(", ")}. How should I reduce this wasted spend? What are the highest-impact actions?`,
+              )
+            }
+          />
+        )}
       </div>
       {wastedSpend.total > 0 && (
         <>
@@ -375,7 +401,7 @@ function isColor(val: number): string {
   return val >= 0.65 ? "#4CAF6E" : val >= 0.4 ? "#D4882A" : "#C45D4A";
 }
 
-function ImpressionShareSection({ result }: { result: AuditResult }) {
+function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAskAI?: (prompt: string) => void }) {
   const { impressionShareDiagnosis } = result;
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
 
@@ -419,6 +445,19 @@ function ImpressionShareSection({ result }: { result: AuditResult }) {
       <div className="mt-3 text-[13px] text-[#9B9689]">
         {impressionShareDiagnosis.diagnosis}
       </div>
+
+      {/* Ask AI */}
+      {onAskAI && (
+        <div className="mt-3 flex justify-end">
+          <AskAIButton
+            onClick={() =>
+              onAskAI(
+                `My Search Impression Share is ${fmtPct(impressionShareDiagnosis.avgIS ?? 0)}. Budget-lost: ${fmtPct(impressionShareDiagnosis.budgetLost ?? 0)}, Rank-lost: ${fmtPct(impressionShareDiagnosis.rankLost ?? 0)}. Diagnosis: "${impressionShareDiagnosis.diagnosis}". How can I improve my impression share? Give me specific steps.`,
+              )
+            }
+          />
+        </div>
+      )}
 
       {/* Per-campaign breakdown */}
       {campaignBreakdown.length > 0 && (
@@ -674,15 +713,28 @@ function ZeroCvCampaignsSection({
 
 function WastedSearchTermsSection({
   terms,
+  onAskAI,
 }: {
   terms: AuditResult["wastedSearchTerms"];
+  onAskAI?: (prompt: string) => void;
 }) {
   if (terms.length === 0) return null;
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
-      <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
-        <AlertTriangle className="h-4 w-4 text-[#D4882A]" />
-        Irrelevant search terms
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
+          <AlertTriangle className="h-4 w-4 text-[#D4882A]" />
+          Irrelevant search terms
+        </div>
+        {onAskAI && (
+          <AskAIButton
+            onClick={() =>
+              onAskAI(
+                `I have ${terms.length} irrelevant search terms triggering my ads: ${terms.slice(0, 5).map((t) => `"${t.searchTerm}" (${fmt$(t.cost)})`).join(", ")}${terms.length > 5 ? ` and ${terms.length - 5} more` : ""}. How should I handle these? Should I add all as negatives, or are there better strategies?`,
+              )
+            }
+          />
+        )}
       </div>
       <p className="mt-1 text-[12px] text-[#9B9689]">
         Queries that triggered your ads but are unlikely to convert — job seekers,
@@ -735,14 +787,25 @@ function WastedSearchTermsSection({
 
 // ─── Top Actions ─────────────────────────────────────────────────────
 
-function TopActionsSection({ result }: { result: AuditResult }) {
+function TopActionsSection({ result, onAskAI }: { result: AuditResult; onAskAI?: (prompt: string) => void }) {
   if (result.topActions.length === 0) return null;
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
-        <Zap className="h-4 w-4 text-[#4CAF6E]" />
-        Top Actions
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
+          <Zap className="h-4 w-4 text-[#4CAF6E]" />
+          Top Actions
+        </div>
+        {onAskAI && (
+          <AskAIButton
+            onClick={() =>
+              onAskAI(
+                `Here are my top recommended actions:\n${result.topActions.map((a, i) => `${i + 1}. ${a.action} (${a.impact})`).join("\n")}\n\nWhich of these should I prioritize first and why? Walk me through implementing them.`,
+              )
+            }
+          />
+        )}
       </div>
       {result.topActions.map((action, i) => (
         <div key={i} className="rounded border border-[#3D3C36] bg-[#24231F] p-4">
@@ -781,7 +844,7 @@ function TopActionsSection({ result }: { result: AuditResult }) {
 
 // ─── Detailed Findings (expandable) ─────────────────────────────────
 
-function DetailedFindings({ dimensions }: { dimensions: DimensionScore[] }) {
+function DetailedFindings({ dimensions, onAskAI }: { dimensions: DimensionScore[]; onAskAI?: (prompt: string) => void }) {
   const needsAttention = dimensions.filter((d) => d.score <= 3 && d.details.length > 0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -830,6 +893,17 @@ function DetailedFindings({ dimensions }: { dimensions: DimensionScore[] }) {
                   {detail}
                 </div>
               ))}
+              {onAskAI && (
+                <div className="pt-2 flex justify-end">
+                  <AskAIButton
+                    onClick={() =>
+                      onAskAI(
+                        `My "${d.label}" score is ${d.score}/5 (${STATUS_LABELS[d.status]}). Finding: "${d.finding}". Details: ${d.details.join("; ")}. What should I do to fix this? Give me specific, actionable steps.`,
+                      )
+                    }
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -843,9 +917,11 @@ function DetailedFindings({ dimensions }: { dimensions: DimensionScore[] }) {
 export function AuditContent({
   overview,
   details,
+  onAskAI,
 }: {
   overview: AuditOverview;
   details: AuditDetails | null;
+  onAskAI?: (prompt: string) => void;
 }) {
   const auditResult = details?.auditResult ?? null;
   const detailsLoading = details === null;
@@ -915,11 +991,11 @@ export function AuditContent({
         {/* Detail sections — only after Phase 2 */}
         {auditResult && (
           <>
-            <WastedSearchTermsSection terms={auditResult.wastedSearchTerms} />
-            <WastedSpendSection result={auditResult} />
-            <ImpressionShareSection result={auditResult} />
-            <TopActionsSection result={auditResult} />
-            <DetailedFindings dimensions={auditResult.dimensions} />
+            <WastedSearchTermsSection terms={auditResult.wastedSearchTerms} onAskAI={onAskAI} />
+            <WastedSpendSection result={auditResult} onAskAI={onAskAI} />
+            <ImpressionShareSection result={auditResult} onAskAI={onAskAI} />
+            <TopActionsSection result={auditResult} onAskAI={onAskAI} />
+            <DetailedFindings dimensions={auditResult.dimensions} onAskAI={onAskAI} />
           </>
         )}
       </div>

@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { getAuditOverview, getAuditDetails } from "./actions";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { AuditContent } from "./audit-content";
+import {
+  AuditChatDrawer,
+  AuditChatFab,
+  type AuditChatContext,
+} from "@/components/chat/audit-chat-drawer";
 
 // Module-level cache keyed by account ID
 let cachedAccountId: string | null = null;
@@ -24,6 +29,8 @@ export default function AuditPage() {
   const [details, setDetails] = useState<AuditDetails | null>(cachedDetails);
   const [loading, setLoading] = useState(!cachedOverview);
   const [error, setError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const fetchData = useCallback(async (background: boolean) => {
     if (!background) setLoading(true);
@@ -90,5 +97,38 @@ export default function AuditPage() {
     );
   }
 
-  return <AuditContent overview={overview} details={details} />;
+  const chatContext: AuditChatContext | null =
+    overview
+      ? {
+          accountName: overview.accountName,
+          overallScore: details?.auditResult?.overallScore ?? null,
+          category: details?.auditResult?.category ?? null,
+          dimensions:
+            details?.auditResult?.dimensions.map((d) => ({
+              label: d.label,
+              score: d.score,
+              status: d.finding,
+              finding: d.finding,
+            })) ?? [],
+        }
+      : null;
+
+  function handleAskAI(prompt: string) {
+    setPendingPrompt(prompt);
+    setDrawerOpen(true);
+  }
+
+  return (
+    <>
+      <AuditContent overview={overview} details={details} onAskAI={handleAskAI} />
+      {!drawerOpen && <AuditChatFab onClick={() => setDrawerOpen(true)} />}
+      <AuditChatDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        pendingPrompt={pendingPrompt}
+        onPromptConsumed={() => setPendingPrompt(null)}
+        context={chatContext}
+      />
+    </>
+  );
 }
