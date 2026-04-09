@@ -17,19 +17,16 @@ import {
   Home,
   Heart,
   Briefcase,
-  Search,
-  BarChart3,
-  Ban,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
-import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
+import { fadeInUp } from "@/components/marketing/audit-cta";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
 
 /* ────────────────────────────── Components ─────────────────────── */
 
-function ConnectClaudeCTA({ session }: { session: { connected: boolean } }) {
+function ConnectClaudeCTA({ session, label }: { session: { connected: boolean }; label?: string }) {
   const [loading, setLoading] = useState(false);
 
   function handleClick() {
@@ -47,7 +44,7 @@ function ConnectClaudeCTA({ session }: { session: { connected: boolean } }) {
     <Button
       onClick={handleClick}
       disabled={loading}
-      className="h-12 rounded-full bg-[#D97757] px-8 text-base font-semibold text-white transition-all hover:scale-[1.02] hover:bg-[#C4684A] disabled:opacity-70"
+      className="h-12 rounded-full bg-[#4CAF6E] px-8 text-base font-semibold text-white transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70"
     >
       {loading ? (
         <span className="inline-flex items-center gap-2">
@@ -56,8 +53,8 @@ function ConnectClaudeCTA({ session }: { session: { connected: boolean } }) {
         </span>
       ) : (
         <>
-          Connect Claude
-          <img src="/claude-icon.svg" alt="" className="ml-2 h-5 w-5 brightness-0 invert" />
+          {label ?? "Connect Google Ads to Claude"}
+          {!label && <img src="/claude-icon.svg" alt="" className="ml-2 h-5 w-5 brightness-0 invert" />}
         </>
       )}
     </Button>
@@ -178,7 +175,7 @@ const pricingTiers = [
     price: 0,
     savings: "No credit card required",
     features: [
-      "300 operations/month",
+      "300 operations/day",
       "Full campaign audit",
       "Wasted spend detection",
       "Negative keyword management",
@@ -299,7 +296,6 @@ export function HomePage() {
 
               <div className="mt-8 flex flex-col items-start gap-4">
                 <div className="flex flex-wrap items-center gap-3">
-                  <AuditCTA session={session} page="homepage" />
                   <ConnectClaudeCTA session={session} />
                 </div>
                 <div className="flex items-center gap-5 text-sm text-[#9B9689]">
@@ -310,165 +306,79 @@ export function HomePage() {
                   <span>No credit card</span>
                 </div>
                 <Link
-                  href="/google-ads-claude"
+                  href="/google-ads-audit"
                   prefetch
                   className="text-sm text-[#9B9689] underline underline-offset-4 hover:text-[#E8E4DD] transition-colors"
                 >
-                  Using Claude? See how it works with Google Ads →
+                  Free Google Ads Audit →
                 </Link>
               </div>
             </motion.div>
 
-            {/* Right — mock audit card */}
+            {/* Right — Claude chat mockup */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
-              className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 md:p-8"
             >
-              <div className="mb-5 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#4CAF6E]">
-                  Free Audit Preview
-                </span>
-                <span className="rounded-full border border-[#3D3C36] px-3 py-1 text-xs text-[#9B9689]">
-                  Sample result
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-[#3D3C36] pb-4">
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="h-5 w-5 text-[#C45D4A]" />
-                    <span className="text-sm text-[#9B9689]">
-                      Wasted spend found
+              <p className="mb-5 text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+                Works in Cowork &amp; Claude Code
+              </p>
+              <div className="overflow-hidden rounded-2xl border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6)]">
+                {/* Top bar: model selector */}
+                <div className="flex items-center border-b border-[#3D3C36] px-5 py-3.5">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#E8E4DD]">
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
+                      <img src="/claude-icon.svg" alt="" className="h-2.5 w-2.5 brightness-0 invert" />
                     </span>
+                    <span>Claude</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-[#9B9689]" />
                   </div>
-                  <span className="text-xl font-bold text-[#C45D4A]">
-                    $3,847/mo
-                  </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-[#3D3C36] pb-4">
-                  <div className="flex items-center gap-3">
-                    <Search className="h-5 w-5 text-[#D4882A]" />
-                    <span className="text-sm text-[#9B9689]">
-                      Irrelevant search terms
-                    </span>
-                  </div>
-                  <span className="text-xl font-bold text-[#D4882A]">47</span>
+                {/* Headline */}
+                <div className="px-8 pb-6 pt-10 text-center">
+                  <h3 className="font-display text-2xl font-bold tracking-tight text-[#E8E4DD] md:text-3xl">
+                    How can I help you run ads today?
+                  </h3>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-[#3D3C36] pb-4">
-                  <div className="flex items-center gap-3">
-                    <Ban className="h-5 w-5 text-[#D4882A]" />
-                    <span className="text-sm text-[#9B9689]">
-                      Underperforming keywords
-                    </span>
+                {/* Input */}
+                <div className="px-6 pb-6">
+                  <div className="rounded-xl border border-[#4D4C46] bg-[#1A1917] px-4 pb-3 pt-4 ring-1 ring-[#4D4C46]/40">
+                    <p className="text-[#E8E4DD]">
+                      Pause keywords with no conversions in the last 30 days
+                      <span className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[1px] animate-[pulse_1s_ease-in-out_infinite] bg-[#E8E4DD] align-middle" />
+                    </p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-xs font-medium text-[#4CAF6E]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
+                        AdsAgent
+                      </div>
+                      <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8E4DD] text-[#1A1917] shadow-sm transition-all hover:scale-105 hover:bg-white">
+                        <ArrowUp className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-xl font-bold text-[#D4882A]">23</span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="h-5 w-5 text-[#4CAF6E]" />
-                    <span className="text-sm text-[#9B9689]">
-                      Optimization score
-                    </span>
-                  </div>
-                  <span className="text-xl font-bold text-[#4CAF6E]">
-                    62/100
-                  </span>
+                {/* Divider */}
+                <div className="border-t border-[#3D3C36]" />
+
+                {/* Prompt chips */}
+                <div className="flex gap-2 overflow-x-auto px-5 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {examplePrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      className="shrink-0 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-xs whitespace-nowrap text-[#9B9689] transition-colors hover:border-[#4D4C46] hover:text-[#E8E4DD]"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
                 </div>
               </div>
             </motion.div>
           </div>
-        </div>
-      </section>
-
-      {/* ── Claude demo UI ── */}
-      <section className="px-4 pb-24">
-        <div className="container mx-auto max-w-2xl">
-          {/* Section header */}
-          <motion.div
-            className="mb-10 text-center"
-            variants={fadeInUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-          >
-            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              Works in Cowork &amp; Claude Code
-            </p>
-            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Your ads manager, just a message away
-            </h2>
-            <p className="mt-3 text-base leading-relaxed text-[#9B9689]">
-              Open Claude, ask anything about your campaigns. AdsAgent handles the rest.
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={fadeInUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-          >
-            {/* Unified card — everything inside */}
-            <div className="overflow-hidden rounded-2xl border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_64px_-12px_rgba(0,0,0,0.6)]">
-
-              {/* Top bar: model selector */}
-              <div className="flex items-center border-b border-[#3D3C36] px-5 py-3.5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#E8E4DD]">
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#C96442] text-[9px] font-bold text-white leading-none">
-                    C
-                  </span>
-                  <span>Claude</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-[#9B9689]" />
-                </div>
-              </div>
-
-              {/* Headline */}
-              <div className="px-8 pb-6 pt-10 text-center">
-                <h3 className="font-display text-2xl font-bold tracking-tight text-[#E8E4DD] md:text-3xl">
-                  How can I help you run ads today?
-                </h3>
-              </div>
-
-              {/* Input */}
-              <div className="px-6 pb-6">
-                <div className="rounded-xl border border-[#4D4C46] bg-[#1A1917] px-4 pb-3 pt-4 ring-1 ring-[#4D4C46]/40">
-                  <p className="text-[#E8E4DD]">
-                    Pause keywords with no conversions in the last 30 days
-                    <span className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[1px] animate-[pulse_1s_ease-in-out_infinite] bg-[#E8E4DD] align-middle" />
-                  </p>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-xs font-medium text-[#4CAF6E]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
-                      AdsAgent
-                    </div>
-                    <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8E4DD] text-[#1A1917] shadow-sm transition-all hover:scale-105 hover:bg-white">
-                      <ArrowUp className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-[#3D3C36]" />
-
-              {/* Prompt chips — contained inside card */}
-              <div className="flex gap-2 overflow-x-auto px-5 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {examplePrompts.map((prompt) => (
-                  <button
-                    key={prompt}
-                    className="shrink-0 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-xs whitespace-nowrap text-[#9B9689] transition-colors hover:border-[#4D4C46] hover:text-[#E8E4DD]"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
         </div>
       </section>
 
@@ -754,7 +664,7 @@ export function HomePage() {
             {pricingTiers.map((tier) => (
               <div
                 key={tier.name}
-                className={`relative rounded-lg border p-6 ${tier.popular
+                className={`relative flex flex-col rounded-lg border p-6 ${tier.popular
                   ? "border-[#4CAF6E] bg-[#24231F]"
                   : "border-[#3D3C36] bg-[#24231F]"
                   }`}
@@ -769,16 +679,10 @@ export function HomePage() {
                 </h3>
                 <p className="mt-1 text-xs text-[#9B9689]">{tier.spend}</p>
                 <div className="mt-4 flex items-baseline gap-1">
-                  {tier.price === 0 ? (
-                    <span className="text-3xl font-bold text-[#E8E4DD]">Free</span>
-                  ) : (
-                    <>
-                      <span className="text-3xl font-bold text-[#E8E4DD]">
-                        ${tier.price}
-                      </span>
-                      <span className="text-sm text-[#9B9689]">/mo</span>
-                    </>
-                  )}
+                    <span className="text-3xl font-bold text-[#E8E4DD]">
+                    ${tier.price}
+                  </span>
+                  <span className="text-sm text-[#9B9689]">/mo</span>
                 </div>
                 <p className="mt-1 text-xs font-medium text-[#4CAF6E]">
                   {tier.savings}
@@ -794,8 +698,8 @@ export function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-6">
-                  <AuditCTA session={session} page="homepage" />
+                <div className="mt-auto pt-6">
+                  <ConnectClaudeCTA session={session} label="Get Started" />
                 </div>
               </div>
             ))}
@@ -836,10 +740,10 @@ export function HomePage() {
             Let Claude manage your Google Ads.
           </h2>
           <p className="mt-4 text-lg text-[#9B9689]">
-            Free audit in 5 minutes. No credit card required.
+            Connect in 5 minutes. No credit card required.
           </p>
           <div className="mt-8 flex flex-col items-start gap-4">
-            <AuditCTA session={session} page="homepage" />
+            <ConnectClaudeCTA session={session} />
             <p className="max-w-md text-xs leading-relaxed text-[#9B9689]">
               By connecting Google Ads, you agree to our{" "}
               <Link
