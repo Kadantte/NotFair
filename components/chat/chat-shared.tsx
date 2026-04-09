@@ -1,7 +1,7 @@
 "use client";
 
 import type { ElementType, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   ChevronDown,
@@ -262,7 +262,7 @@ function ToolGroupBlock({
           {parts.length > 1 && completedCount > 0
             ? ` (${completedCount + 1}/${parts.length})`
             : ""}
-          <span className="ml-0.5 animate-pulse">…</span>
+          <ThinkingDots />
         </span>
       </div>
     );
@@ -360,8 +360,41 @@ function groupMessageParts(parts: GoogleAdsAgentUIMessage["parts"]) {
   return groups;
 }
 
-export function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
+function ThinkingDots() {
+  const [count, setCount] = useState(1);
+  useEffect(() => {
+    const id = setInterval(() => setCount(c => (c % 3) + 1), 500);
+    return () => clearInterval(id);
+  }, []);
+  return <span>{".".repeat(count)}</span>;
+}
+
+export function ThinkingIndicator() {
+  return (
+    <div className="flex items-center gap-2.5 py-1">
+      <Sparkles className="h-3.5 w-3.5 animate-pulse text-[#4CAF6E]" />
+      <span className="text-sm text-[#E8E4DD]/70">
+        Thinking<ThinkingDots />
+      </span>
+    </div>
+  );
+}
+
+export function Message({
+  message,
+  isActivelyStreaming = false,
+}: {
+  message: GoogleAdsAgentUIMessage;
+  isActivelyStreaming?: boolean;
+}) {
   const isUser = message.role === "user";
+  const groups = groupMessageParts(message.parts);
+
+  // Show thinking indicator at the end of the assistant message while streaming,
+  // UNTIL the final text part is actively streaming out.
+  const lastPart = message.parts[message.parts.length - 1];
+  const finalTextIsStreaming = lastPart?.type === "text" && lastPart.text.length > 0;
+  const showThinking = !isUser && isActivelyStreaming && !finalTextIsStreaming;
 
   return (
     <div className="flex w-full gap-4 px-6 py-6">
@@ -375,7 +408,7 @@ export function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
       <div className="min-w-0 flex-1 space-y-3 pt-0.5">
-        {groupMessageParts(message.parts).map(group => {
+        {groups.map(group => {
           if (group.kind === "text") {
             const part = group.part;
             if (part.type !== "text") return null;
@@ -396,6 +429,7 @@ export function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
             />
           );
         })}
+        {showThinking && <ThinkingIndicator />}
       </div>
     </div>
   );

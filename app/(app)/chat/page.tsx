@@ -3,7 +3,7 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+import { Bot, Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
@@ -16,7 +16,7 @@ import {
   type StoredChatThread,
 } from "@/lib/chat-thread-store";
 import type { Session } from "@/lib/session";
-import { Message } from "@/components/chat/chat-shared";
+import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 
 type StoredAccount = {
   connected: boolean;
@@ -284,9 +284,25 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="divide-y divide-[#3D3C36]/50">
-            {messages.map(message => (
-              <Message key={message.id} message={message} />
+            {messages.map((message, index) => (
+              <Message
+                key={message.id}
+                message={message}
+                isActivelyStreaming={
+                  isSending && index === messages.length - 1 && message.role === "assistant"
+                }
+              />
             ))}
+            {isSending && (messages.length === 0 || messages[messages.length - 1].role === "user") && (
+              <div className="flex w-full gap-4 px-6 py-6">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="pt-0.5">
+                  <ThinkingIndicator />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
