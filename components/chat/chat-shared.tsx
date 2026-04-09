@@ -6,6 +6,7 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
+  Sparkles,
   User,
   Wrench,
 } from "lucide-react";
@@ -216,54 +217,147 @@ export function renderMarkdown(text: string): ReactNode[] {
 
 // ── Chat UI components ──────────────────────────────────────────────
 
-export function ToolBlock({
-  part,
+/** Pretty-print a tool name: "listCampaigns" → "List Campaigns" */
+function formatToolName(name: string): string {
+  return name
+    .replace(/^(get|list|run|search|create|update|pause|enable|remove|add|bulk|set|undo|rename|move|upload)/, "$1 ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^\w/, c => c.toUpperCase())
+    .trim();
+}
+
+type ToolPart = Extract<GoogleAdsAgentUIMessage["parts"][number], { type: string }>;
+
+function ToolGroupBlock({
+  parts,
+  messageId,
 }: {
-  part: Extract<GoogleAdsAgentUIMessage["parts"][number], { type: string }>;
+  parts: ToolPart[];
+  messageId: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [expandedTool, setExpandedTool] = useState<number | null>(null);
 
-  if (!part.type.startsWith("tool-")) return null;
+  const DONE_STATES = new Set(["output-available", "output-error", "output-denied"]);
+  const isDone = (p: ToolPart) => "state" in p && DONE_STATES.has(p.state as string);
 
-  const title = part.type.replace("tool-", "");
+  const allDone = parts.every(isDone);
+  const toolNames = parts.map(p => formatToolName(p.type.replace("tool-", "")));
 
-  if (!("state" in part) || part.state !== "output-available") {
+  if (!allDone) {
+    // Thinking / running state
+    const completedCount = parts.filter(isDone).length;
+    const currentTool = parts.find(p => !isDone(p));
+    const currentName = currentTool
+      ? formatToolName(currentTool.type.replace("tool-", ""))
+      : "";
+
     return (
-      <button
-        type="button"
-        className="flex w-full items-center gap-3 rounded border border-[#3D3C36] bg-[#24231F] px-4 py-3 text-left text-sm text-[#9B9689]"
-      >
-        <Wrench className="h-3.5 w-3.5 text-[#4CAF6E]" />
-        <span className="font-medium text-[#E8E4DD]">{title}</span>
-        <span className="text-[#9B9689]">Running...</span>
-      </button>
+      <div className="flex items-center gap-2.5 py-1 text-sm text-[#9B9689]">
+        <div className="relative flex h-5 w-5 items-center justify-center">
+          <Sparkles className="h-3.5 w-3.5 animate-pulse text-[#4CAF6E]" />
+        </div>
+        <span className="text-[#E8E4DD]/70">
+          {currentName}
+          {parts.length > 1 && completedCount > 0
+            ? ` (${completedCount + 1}/${parts.length})`
+            : ""}
+          <span className="ml-0.5 animate-pulse">…</span>
+        </span>
+      </div>
     );
   }
 
+  // Completed state — single collapsible line
+  const summary =
+    parts.length === 1
+      ? toolNames[0]
+      : `Used ${parts.length} tools`;
+
   return (
-    <div className="rounded border border-[#3D3C36] bg-[#24231F]">
+    <div className="py-1">
       <button
         type="button"
-        onClick={() => setIsOpen(current => !current)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        onClick={() => setIsOpen(o => !o)}
+        className="flex items-center gap-2.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]/70"
       >
         {isOpen ? (
-          <ChevronDown className="h-4 w-4 text-[#9B9689]" />
+          <ChevronDown className="h-3.5 w-3.5" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-[#9B9689]" />
+          <ChevronRight className="h-3.5 w-3.5" />
         )}
-        <Wrench className="h-3.5 w-3.5 text-[#4CAF6E]" />
-        <span className="text-sm font-medium text-[#E8E4DD]">{title}</span>
+        <Sparkles className="h-3.5 w-3.5 text-[#4CAF6E]" />
+        <span>{summary}</span>
       </button>
+
       {isOpen && (
-        <div className="border-t border-[#3D3C36] px-4 py-4">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-[#E8E4DD]">
-            {JSON.stringify("output" in part ? part.output : null, null, 2)}
-          </pre>
+        <div className="ml-3 mt-2 space-y-1 border-l border-[#3D3C36] pl-4">
+          {parts.map((part, i) => {
+            const isExpanded = expandedTool === i;
+            return (
+              <div key={`${messageId}-tool-${i}`}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedTool(isExpanded ? null : i)}
+                  className="flex items-center gap-2 py-1.5 text-xs text-[#9B9689] transition-colors hover:text-[#E8E4DD]/70"
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                  <Wrench className="h-3 w-3 text-[#4CAF6E]/60" />
+                  <span>{toolNames[i]}</span>
+                </button>
+                {isExpanded && (
+                  <pre className={`ml-7 mt-1 max-h-60 overflow-auto rounded bg-[#24231F] p-3 text-xs leading-5 ${
+                    "state" in part && part.state === "output-error"
+                      ? "text-[#C45D4A]/80"
+                      : "text-[#E8E4DD]/80"
+                  }`}>
+                    {"errorText" in part && part.errorText
+                      ? String(part.errorText)
+                      : JSON.stringify(
+                          "output" in part ? part.output : null,
+                          null,
+                          2,
+                        )}
+                  </pre>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * Group consecutive tool parts together, interleaving with text parts.
+ * Returns an array of { type: "text", ... } or { type: "tool-group", parts: [...] }.
+ */
+function groupMessageParts(parts: GoogleAdsAgentUIMessage["parts"]) {
+  const groups: (
+    | { kind: "text"; part: (typeof parts)[number]; index: number }
+    | { kind: "tool-group"; parts: ToolPart[]; startIndex: number }
+  )[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part.type.startsWith("tool-")) {
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.kind === "tool-group") {
+        lastGroup.parts.push(part as ToolPart);
+      } else {
+        groups.push({ kind: "tool-group", parts: [part as ToolPart], startIndex: i });
+      }
+    } else {
+      groups.push({ kind: "text", part, index: i });
+    }
+  }
+
+  return groups;
 }
 
 export function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
@@ -281,31 +375,26 @@ export function Message({ message }: { message: GoogleAdsAgentUIMessage }) {
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
       <div className="min-w-0 flex-1 space-y-3 pt-0.5">
-        {message.parts.map((part, index) => {
-          switch (part.type) {
-            case "text":
-              return (
-                <div
-                  key={`${message.id}-${index}`}
-                  className="space-y-4 text-[15px] leading-7 text-[#E8E4DD]"
-                >
-                  {renderMarkdown(part.text)}
-                </div>
-              );
-            default:
-              if (!part.type.startsWith("tool-")) return null;
-              return (
-                <ToolBlock
-                  key={`${message.id}-${index}`}
-                  part={
-                    part as Extract<
-                      GoogleAdsAgentUIMessage["parts"][number],
-                      { type: string }
-                    >
-                  }
-                />
-              );
+        {groupMessageParts(message.parts).map(group => {
+          if (group.kind === "text") {
+            const part = group.part;
+            if (part.type !== "text") return null;
+            return (
+              <div
+                key={`${message.id}-${group.index}`}
+                className="space-y-4 text-[15px] leading-7 text-[#E8E4DD]"
+              >
+                {renderMarkdown(part.text)}
+              </div>
+            );
           }
+          return (
+            <ToolGroupBlock
+              key={`${message.id}-tools-${group.startIndex}`}
+              parts={group.parts}
+              messageId={message.id}
+            />
+          );
         })}
       </div>
     </div>

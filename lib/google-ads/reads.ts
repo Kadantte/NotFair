@@ -364,7 +364,8 @@ export async function getKeywords(
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
   const { start, end } = getDateRange(boundedDays);
 
-  const result = await customer.query(`
+  // Query 1: keyword_view for metrics (quality_info sub-fields aren't available here)
+  const metricsResult = await customer.query(`
     SELECT
       ad_group.id,
       ad_group.name,
@@ -372,10 +373,6 @@ export async function getKeywords(
       ad_group_criterion.keyword.text,
       ad_group_criterion.keyword.match_type,
       ad_group_criterion.status,
-      ad_group_criterion.quality_info.quality_score,
-      ad_group_criterion.quality_info.creative_quality,
-      ad_group_criterion.quality_info.post_click_quality_score,
-      ad_group_criterion.quality_info.search_predicted_ctr,
       metrics.impressions, metrics.clicks, metrics.ctr,
       metrics.cost_micros, metrics.average_cpc, metrics.conversions
     FROM keyword_view
@@ -385,22 +382,44 @@ export async function getKeywords(
     LIMIT ${boundedLimit}
   `);
 
+  // Query 2: ad_group_criterion for full quality_info (no date range needed)
+  const qualityResult = await customer.query(`
+    SELECT
+      ad_group_criterion.criterion_id,
+      ad_group_criterion.quality_info.quality_score,
+      ad_group_criterion.quality_info.creative_quality_score,
+      ad_group_criterion.quality_info.post_click_quality_score,
+      ad_group_criterion.quality_info.search_predicted_ctr
+    FROM ad_group_criterion
+    WHERE campaign.id = ${id}
+      AND ad_group_criterion.type = 'KEYWORD'
+      AND ad_group_criterion.status != 'REMOVED'
+  `);
+
+  // Index quality data by criterion ID for fast lookup
+  const qualityMap = new Map<string, any>();
+  for (const row of qualityResult as any[]) {
+    qualityMap.set(String(row.ad_group_criterion.criterion_id), row.ad_group_criterion.quality_info);
+  }
+
   return {
     campaignId,
     dateRange: { start, end, days: boundedDays },
-    keywords: (result as any[]).map((row) => {
+    keywords: (metricsResult as any[]).map((row) => {
       const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
+      const criterionId = String(row.ad_group_criterion.criterion_id);
+      const quality = qualityMap.get(criterionId);
       return {
-        criterionId: String(row.ad_group_criterion.criterion_id),
+        criterionId,
         adGroupId: String(row.ad_group?.id ?? ""),
         adGroupName: row.ad_group?.name ?? "Unknown",
         text: row.ad_group_criterion.keyword?.text ?? "",
         matchType: (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "UNKNOWN",
         status: row.ad_group_criterion.status ?? "UNKNOWN",
-        qualityScore: row.ad_group_criterion.quality_info?.quality_score ?? null,
-        creativeQuality: row.ad_group_criterion.quality_info?.creative_quality ?? null,
-        postClickQuality: row.ad_group_criterion.quality_info?.post_click_quality_score ?? null,
-        searchPredictedCtr: row.ad_group_criterion.quality_info?.search_predicted_ctr ?? null,
+        qualityScore: quality?.quality_score ?? null,
+        creativeQuality: quality?.creative_quality_score ?? null,
+        postClickQuality: quality?.post_click_quality_score ?? null,
+        searchPredictedCtr: quality?.search_predicted_ctr ?? null,
         impressions: row.metrics.impressions ?? 0,
         clicks: row.metrics.clicks ?? 0,
         ctr: row.metrics.ctr ?? 0,
