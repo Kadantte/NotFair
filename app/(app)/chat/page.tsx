@@ -2,8 +2,8 @@
 
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
@@ -230,6 +230,20 @@ export default function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setIsAtBottom(atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
 
   // Only scroll to bottom when flagged (user sends a message)
   useEffect(() => {
@@ -257,22 +271,19 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="relative min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="flex min-h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
-            <h1 className="text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
-              How can I help with your Google Ads account?
+          <div className="flex min-h-full w-full flex-col items-center justify-center px-4 md:px-6">
+            <h1 className="text-2xl font-medium text-white md:text-3xl">
+              What can I help with your Google Ads account today?
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[#9B9689]">
-              Ask for audits, campaign summaries, keyword analysis, or GAQL reports.
-            </p>
-            <div className="mt-8 grid w-full max-w-4xl gap-3 sm:grid-cols-2">
+            <div className="mx-auto mt-8 grid w-full max-w-3xl gap-2 sm:grid-cols-2">
               {starterPrompts.map(prompt => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => { if (isReady) { shouldScrollRef.current = true; sendMessage({ text: prompt }); } }}
-                  className="rounded border border-[#3D3C36] bg-[#24231F] px-4 py-4 text-left text-sm leading-6 text-[#E8E4DD] transition hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
+                  className="rounded-2xl border border-[#4a4a48] bg-[#2c2c2b] px-4 py-3 text-left text-sm leading-6 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white"
                 >
                   {prompt}
                 </button>
@@ -299,7 +310,18 @@ export default function ChatPage() {
         )}
       </div>
 
-      <div className="shrink-0 bg-[#222221] px-4 pb-4 pt-2">
+      <div className="relative shrink-0 bg-[#222221] px-4 pb-4 pt-2">
+        {!isAtBottom && messages.length > 0 && (
+          <div className="absolute -top-12 left-1/2 z-10 -translate-x-1/2">
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#4a4a48] bg-[#2c2c2b] text-[#b0b0ae] shadow-lg transition-colors hover:bg-[#3a3a39] hover:text-white"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <div className="mx-auto w-full max-w-3xl">
           {error && (
             <div className="mb-3 rounded-lg bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
