@@ -606,9 +606,13 @@ export async function enableAd(auth: AuthContext, adGroupId: string, adId: strin
 // Used by both create and update functions.
 const CONVERSION_CATEGORY_MAP: Record<string, number> = {
   DEFAULT: 2, PAGE_VIEW: 3, PURCHASE: 4, SIGNUP: 5,
-  ADD_TO_CART: 8, BEGIN_CHECKOUT: 9, SUBSCRIBE_PAID: 10,
-  LEAD: 12, SUBMIT_LEAD_FORM: 13, BOOK_APPOINTMENT: 14,
-  OTHER: 2, // No distinct OTHER in ConversionActionCategoryEnum — falls back to DEFAULT
+  DOWNLOAD: 7, ADD_TO_CART: 8, BEGIN_CHECKOUT: 9, SUBSCRIBE_PAID: 10,
+  PHONE_CALL_LEAD: 11, IMPORTED_LEAD: 12, SUBMIT_LEAD_FORM: 13,
+  BOOK_APPOINTMENT: 14, REQUEST_QUOTE: 15, GET_DIRECTIONS: 16,
+  OUTBOUND_CLICK: 17, CONTACT: 18, ENGAGEMENT: 19,
+  STORE_VISIT: 20, STORE_SALE: 21, QUALIFIED_LEAD: 22, CONVERTED_LEAD: 23,
+  LEAD: 12, // Alias for IMPORTED_LEAD
+  OTHER: 2, // No distinct OTHER in ConversionActionCategoryEnum, falls back to DEFAULT
 };
 const CONVERSION_TYPE_MAP: Record<string, number> = {
   UPLOAD_CALLS: 6, UPLOAD_CLICKS: 7, WEBPAGE: 8,
@@ -617,7 +621,7 @@ const CONVERSION_COUNTING_MAP: Record<string, number> = {
   ONE_PER_CLICK: 2, MANY_PER_CLICK: 3,
 };
 const CONVERSION_STATUS_MAP: Record<string, number> = {
-  ENABLED: 2, REMOVED: 3, HIDDEN: 4,
+  ENABLED: 2, REMOVED: 3,
 };
 
 // Reverse-lookup maps for normalizing numeric GAQL responses to string names.
@@ -657,6 +661,33 @@ async function enableEcfl(
   }
 }
 
+/**
+ * Set whether a conversion action is "primary" (included in Conversions column)
+ * or "secondary" (observation only). Updates primary_for_goal on the ConversionAction resource.
+ */
+async function setPrimaryForGoal(
+  customer: ReturnType<typeof getCustomer>,
+  cid: string,
+  conversionActionId: string,
+  primary: boolean,
+): Promise<string | null> {
+  try {
+    await customer.mutateResources([
+      {
+        entity: "conversion_action" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}/conversionActions/${conversionActionId}`,
+          primary_for_goal: primary,
+        },
+      },
+    ]);
+    return null;
+  } catch (error) {
+    return extractErrorMessage(error);
+  }
+}
+
 export type CreateConversionActionParams = {
   name: string;
   category?: string;
@@ -665,6 +696,7 @@ export type CreateConversionActionParams = {
   defaultValue?: number;
   alwaysUseDefaultValue?: boolean;
   status?: string;
+  primaryForGoal?: boolean;
   enhancedConversionsForLeads?: boolean;
   viewThroughLookbackWindowDays?: number;
   clickThroughLookbackWindowDays?: number;
@@ -721,19 +753,18 @@ export async function createConversionAction(
       return { success: false, action: "create_conversion_action", entityId: "", beforeValue: "", afterValue: params.name, error: "Conversion action created but ID could not be extracted from response" };
     }
 
+    const warnings: string[] = [];
+
+    // Set as secondary (observation only) if requested
+    if (params.primaryForGoal === false) {
+      const goalError = await setPrimaryForGoal(customer, cid, conversionActionId, false);
+      if (goalError) warnings.push(`Setting as secondary failed: ${goalError}`);
+    }
+
     // Enable Enhanced Conversions for Leads at account level if requested
     if (params.enhancedConversionsForLeads) {
       const ecflError = await enableEcfl(customer, cid);
-      if (ecflError) {
-        return {
-          success: true,
-          action: "create_conversion_action",
-          entityId: conversionActionId,
-          beforeValue: "",
-          afterValue: params.name,
-          label: `Warning: Conversion action created, but enabling Enhanced Conversions for Leads failed: ${ecflError}`,
-        };
-      }
+      if (ecflError) warnings.push(`Enabling Enhanced Conversions for Leads failed: ${ecflError}`);
     }
 
     return {
@@ -742,6 +773,7 @@ export async function createConversionAction(
       entityId: conversionActionId,
       beforeValue: "",
       afterValue: params.name,
+      ...(warnings.length > 0 ? { label: `Warning: ${warnings.join(". ")}` } : {}),
     };
   } catch (error) {
     return {
@@ -763,6 +795,7 @@ export type UpdateConversionActionParams = {
   defaultValue?: number;
   alwaysUseDefaultValue?: boolean;
   status?: string;
+  primaryForGoal?: boolean;
   enhancedConversionsForLeads?: boolean;
   viewThroughLookbackWindowDays?: number;
   clickThroughLookbackWindowDays?: number;
@@ -856,19 +889,18 @@ export async function updateConversionAction(
       },
     ]);
 
+    const warnings: string[] = [];
+
+    // Set primary/secondary via ConversionAction.primary_for_goal
+    if (params.primaryForGoal !== undefined) {
+      const goalError = await setPrimaryForGoal(customer, cid, params.conversionActionId, params.primaryForGoal);
+      if (goalError) warnings.push(`Setting primary_for_goal failed: ${goalError}`);
+    }
+
     // Enable Enhanced Conversions for Leads at account level if requested
     if (params.enhancedConversionsForLeads) {
       const ecflError = await enableEcfl(customer, cid);
-      if (ecflError) {
-        return {
-          success: true,
-          action: "update_conversion_action",
-          entityId: params.conversionActionId,
-          beforeValue,
-          afterValue,
-          label: `Warning: Conversion action updated, but enabling Enhanced Conversions for Leads failed: ${ecflError}`,
-        };
-      }
+      if (ecflError) warnings.push(`Enabling Enhanced Conversions for Leads failed: ${ecflError}`);
     }
 
     return {
@@ -877,6 +909,7 @@ export async function updateConversionAction(
       entityId: params.conversionActionId,
       beforeValue,
       afterValue,
+      ...(warnings.length > 0 ? { label: `Warning: ${warnings.join(". ")}` } : {}),
     };
   } catch (error) {
     return {

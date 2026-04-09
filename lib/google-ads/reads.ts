@@ -653,7 +653,8 @@ export async function getConversionActions(auth: AuthContext) {
       conversion_action.include_in_conversions_metric,
       conversion_action.counting_type,
       conversion_action.value_settings.default_value,
-      conversion_action.value_settings.always_use_default_value
+      conversion_action.value_settings.always_use_default_value,
+      conversion_action.primary_for_goal
     FROM conversion_action
     WHERE conversion_action.status != 'REMOVED'
     ORDER BY conversion_action.name ASC
@@ -668,6 +669,7 @@ export async function getConversionActions(auth: AuthContext) {
       status: ca.status ?? "UNKNOWN",
       category: ca.category ?? "UNKNOWN",
       includeInConversions: ca.include_in_conversions_metric ?? true,
+      primaryForGoal: ca.primary_for_goal ?? true,
       countingType: ca.counting_type ?? "UNKNOWN",
       defaultValue: ca.value_settings?.default_value ?? null,
       alwaysUseDefaultValue: ca.value_settings?.always_use_default_value ?? false,

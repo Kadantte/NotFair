@@ -736,9 +736,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       name: z.string().min(1).describe("Conversion action name, e.g. 'First Booking'"),
       category: z.enum([
-        "PURCHASE", "LEAD", "SIGNUP", "BOOK_APPOINTMENT",
-        "SUBMIT_LEAD_FORM", "SUBSCRIBE_PAID", "ADD_TO_CART",
-        "BEGIN_CHECKOUT", "PAGE_VIEW", "DEFAULT", "OTHER",
+        "PURCHASE", "LEAD", "IMPORTED_LEAD", "QUALIFIED_LEAD", "CONVERTED_LEAD",
+        "SIGNUP", "BOOK_APPOINTMENT", "SUBMIT_LEAD_FORM", "REQUEST_QUOTE",
+        "SUBSCRIBE_PAID", "ADD_TO_CART", "BEGIN_CHECKOUT", "PAGE_VIEW",
+        "DOWNLOAD", "PHONE_CALL_LEAD", "GET_DIRECTIONS", "OUTBOUND_CLICK",
+        "CONTACT", "ENGAGEMENT", "STORE_VISIT", "STORE_SALE", "DEFAULT",
       ]).default("PURCHASE"),
       type: z.enum(["UPLOAD_CLICKS", "WEBPAGE", "UPLOAD_CALLS"]).default("UPLOAD_CLICKS")
         .describe("UPLOAD_CLICKS for offline/import conversions, WEBPAGE for website events, UPLOAD_CALLS for call tracking"),
@@ -746,22 +748,23 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .describe("ONE_PER_CLICK counts one conversion per click (leads), MANY_PER_CLICK counts every conversion (purchases)"),
       defaultValue: z.number().optional().describe("Default conversion value in account currency"),
       alwaysUseDefaultValue: z.boolean().default(true).describe("Always use default value vs. transaction-specific values"),
-      status: z.enum(["ENABLED", "HIDDEN"]).default("ENABLED")
-        .describe("ENABLED = primary (included in Conversions column), HIDDEN = secondary (observation only)"),
+      status: z.enum(["ENABLED"]).default("ENABLED"),
+      primaryForGoal: z.boolean().default(true)
+        .describe("true = primary (included in Conversions column for bidding), false = secondary (observation only)"),
       enhancedConversionsForLeads: z.boolean().default(false)
-        .describe("Enable Enhanced Conversions for Leads at account level — allows matching via hashed email/phone"),
+        .describe("Enable Enhanced Conversions for Leads at account level. Requires customer data terms to be accepted in Google Ads UI first."),
       viewThroughLookbackWindowDays: z.number().int().min(1).max(30).optional()
         .describe("View-through conversion lookback window (1-30 days)"),
       clickThroughLookbackWindowDays: z.number().int().min(1).max(90).optional()
         .describe("Click-through conversion lookback window (1-90 days)"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, name, category, type, countingType, defaultValue, alwaysUseDefaultValue, status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) => {
+  }, safeHandler(async ({ accountId, name, category, type, countingType, defaultValue, alwaysUseDefaultValue, status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () =>
       createConversionAction(targetAuth, {
         name, category, type, countingType, defaultValue, alwaysUseDefaultValue,
-        status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
+        status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
       }),
     );
     return jsonResult(result);
@@ -774,27 +777,31 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       conversionActionId: z.string().describe("Conversion action ID (from getConversionActions)"),
       name: z.string().min(1).optional(),
       category: z.enum([
-        "PURCHASE", "LEAD", "SIGNUP", "BOOK_APPOINTMENT",
-        "SUBMIT_LEAD_FORM", "SUBSCRIBE_PAID", "ADD_TO_CART",
-        "BEGIN_CHECKOUT", "PAGE_VIEW", "DEFAULT", "OTHER",
+        "PURCHASE", "LEAD", "IMPORTED_LEAD", "QUALIFIED_LEAD", "CONVERTED_LEAD",
+        "SIGNUP", "BOOK_APPOINTMENT", "SUBMIT_LEAD_FORM", "REQUEST_QUOTE",
+        "SUBSCRIBE_PAID", "ADD_TO_CART", "BEGIN_CHECKOUT", "PAGE_VIEW",
+        "DOWNLOAD", "PHONE_CALL_LEAD", "GET_DIRECTIONS", "OUTBOUND_CLICK",
+        "CONTACT", "ENGAGEMENT", "STORE_VISIT", "STORE_SALE", "DEFAULT",
       ]).optional(),
       countingType: z.enum(["ONE_PER_CLICK", "MANY_PER_CLICK"]).optional(),
       defaultValue: z.number().optional().describe("Default conversion value in account currency"),
       alwaysUseDefaultValue: z.boolean().optional(),
-      status: z.enum(["ENABLED", "HIDDEN", "REMOVED"]).optional()
-        .describe("ENABLED = primary, HIDDEN = secondary, REMOVED = delete"),
+      status: z.enum(["ENABLED", "REMOVED"]).optional()
+        .describe("ENABLED = active, REMOVED = permanently delete"),
+      primaryForGoal: z.boolean().optional()
+        .describe("true = primary (included in Conversions column for bidding), false = secondary (observation only)"),
       enhancedConversionsForLeads: z.boolean().optional()
         .describe("Enable Enhanced Conversions for Leads at account level"),
       viewThroughLookbackWindowDays: z.number().int().min(1).max(30).optional(),
       clickThroughLookbackWindowDays: z.number().int().min(1).max(90).optional(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue, status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) => {
+  }, safeHandler(async ({ accountId, conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue, status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () =>
       updateConversionAction(targetAuth, {
         conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue,
-        status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
+        status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
       }),
     );
     return jsonResult(result);
