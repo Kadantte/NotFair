@@ -8,6 +8,7 @@ const {
   mockUpdateWhere,
   mockCookieGet,
   mockCookieGetAll,
+  mockVerifyOAuthNonce,
 } = vi.hoisted(() => ({
   mockSignInWithIdToken: vi.fn(),
   mockInsertValues: vi.fn(),
@@ -16,6 +17,7 @@ const {
   mockUpdateWhere: vi.fn(),
   mockCookieGet: vi.fn(),
   mockCookieGetAll: vi.fn(),
+  mockVerifyOAuthNonce: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -46,11 +48,16 @@ vi.mock("@/lib/google-ads", () => ({
   listAccessibleCustomers: mockListAccessibleCustomers,
 }));
 
+vi.mock("@/lib/oauth-nonce", () => ({
+  verifyOAuthNonce: (...args: unknown[]) => mockVerifyOAuthNonce(...args),
+}));
+
 vi.mock("@/lib/db", () => ({
   db: () => ({
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
+          limit: vi.fn(async () => mockSelectRows()),
           orderBy: vi.fn(() => ({
             limit: vi.fn(async () => mockSelectRows()),
           })),
@@ -97,7 +104,10 @@ describe("Auth callback route — GET", () => {
     vi.clearAllMocks();
     process.env.GOOGLE_ADS_CLIENT_ID = "client-id";
     process.env.GOOGLE_ADS_CLIENT_SECRET = "client-secret";
+    process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
 
+    // By default, server-side nonce fallback is disabled
+    mockVerifyOAuthNonce.mockResolvedValue(false);
     mockSelectRows.mockResolvedValue([]);
     mockInsertValues.mockResolvedValue(undefined);
     mockUpdateWhere.mockResolvedValue(undefined);
@@ -158,6 +168,20 @@ describe("Auth callback route — GET", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/login?error=auth_failed");
+  });
+
+  it("succeeds via server-side nonce when cookie is missing", async () => {
+    mockCookieGet.mockReturnValue(undefined);
+    mockVerifyOAuthNonce.mockResolvedValue(true);
+
+    const state = encodeState();
+    const response = await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    const location = response.headers.get("location") ?? "";
+    expect(location).toMatch(/\/campaigns$/);
+    expect(mockVerifyOAuthNonce).toHaveBeenCalledWith(NONCE);
   });
 
   it("redirects to /login?error=auth_failed when no code param", async () => {

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
+import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -40,16 +41,33 @@ function getSafeNext(next: string | null | undefined) {
 }
 
 /**
- * Decode the OAuth state param and verify its nonce matches the cookie.
- * Returns null if the state is missing, malformed, or the nonce doesn't match.
+ * Decode the OAuth state param and verify it's legitimate.
+ * Primary check: nonce matches the cookie (standard CSRF protection).
+ * Fallback: if the cookie was lost (browser privacy settings), verify the
+ * nonce against the server-side store (single-use, auto-expiring).
  */
-function verifyState(stateParam: string | null, cookieNonce: string | undefined): AuthState | null {
-  if (!stateParam || !cookieNonce) return null;
+async function verifyState(stateParam: string | null, cookieNonce: string | undefined): Promise<AuthState | null> {
+  if (!stateParam) return null;
 
   try {
     const parsed = JSON.parse(Buffer.from(stateParam, "base64url").toString("utf8"));
-    if (!parsed || typeof parsed !== "object") return null;
-    if (parsed.nonce !== cookieNonce) return null;
+    if (!parsed || typeof parsed !== "object" || !parsed.nonce) return null;
+
+    // Primary: cookie nonce match
+    let verified = false;
+    if (cookieNonce && parsed.nonce === cookieNonce) {
+      verified = true;
+    }
+
+    // Fallback: server-side nonce verification (handles missing cookies)
+    if (!verified) {
+      verified = await verifyOAuthNonce(parsed.nonce);
+      if (verified) {
+        console.log("[auth/callback] State verified via server-side nonce (cookie was missing)");
+      }
+    }
+
+    if (!verified) return null;
 
     // Extract UTM params if present
     let utm: UtmParams | undefined;
@@ -436,9 +454,14 @@ export async function GET(request: Request) {
   // Verify the OAuth state nonce matches the cookie to prevent CSRF
   const cookieStore = await cookies();
   const cookieNonce = cookieStore.get("oauth_nonce")?.value;
-  const state = verifyState(stateParam, cookieNonce);
+  const state = await verifyState(stateParam, cookieNonce);
   if (!state) {
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+    const reason = !stateParam ? "missing_state" : !cookieNonce ? "missing_cookie" : "nonce_mismatch";
+    console.error(`[auth/callback] State verification failed: ${reason}`, {
+      hasState: !!stateParam,
+      hasCookie: !!cookieNonce,
+    });
+    return NextResponse.redirect(`${origin}/login?error=auth_failed&reason=${reason}`);
   }
 
   const popup = state.popup === true || searchParams.get("popup") === "1";
