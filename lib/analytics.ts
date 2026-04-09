@@ -15,7 +15,7 @@ export function initPostHog(bootstrapUser?: BootstrapUser) {
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
     ui_host: "https://us.posthog.com",
-    person_profiles: "identified_only",
+    person_profiles: "always",
     capture_pageview: false, // we handle this manually for SPA routes
     capture_pageleave: true,
     disable_session_recording: false,

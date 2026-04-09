@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Visitor Geography & Traffic Sources — Apr 8</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      line-height: 1.55;
+      padding: 32px 40px 64px;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      margin-bottom: 28px;
+    }
+    .header-meta {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .header-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .header-question {
+      font-size: 14px;
+      color: #475569;
+      font-style: italic;
+    }
+
+    /* ---- Verdict card ---- */
+    .verdict-card {
+      background: #2563EB;
+      color: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .verdict-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+    .verdict-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ---- KPI grid ---- */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi-tile {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.1;
+    }
+    .kpi-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .card-accent-amber {
+      border-left: 3px solid #D97706;
+    }
+    .card-accent-red {
+      border-left: 3px solid #DC2626;
+    }
+    .body-text {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    /* ---- Findings ---- */
+    .findings-list {
+      list-style: none;
+    }
+    .finding-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .finding-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .finding-item:first-child { padding-top: 0; }
+    .finding-label {
+      font-size: 14px;
+      color: #0F172A;
+      flex: 1;
+      line-height: 1.5;
+    }
+    .finding-value {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      flex: 2;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* ---- Charts ---- */
+    .chart-header {
+      margin-bottom: 16px;
+    }
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    .chart-subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 3px;
+    }
+    .chart-insight {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+      font-style: italic;
+      border-left: 2px solid #2563EB;
+      padding-left: 8px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ---- Tables ---- */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      background: #F1F5F9;
+      font-weight: 600;
+      font-size: 11px;
+      color: #475569;
+      border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable-header:hover { background: #E2E8F0; }
+    .sort-icon { opacity: 0.4; font-size: 10px; margin-left: 4px; }
+    tbody tr:hover { background: #F8FAFC; }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody td:not(:first-child) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- So what ---- */
+    .action-list {
+      list-style: none;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .action-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .action-item:first-child { padding-top: 0; }
+    .action-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background: #2563EB;
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .action-text {
+      font-size: 14px;
+      color: #0F172A;
+      line-height: 1.5;
+    }
+    .action-reason {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      margin-top: 28px;
+      font-size: 11px;
+      color: #94A3B8;
+      text-align: center;
+      line-height: 1.7;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <div class="header-meta">Analysis · 2026-04-08 17:57 PST</div>
+      <div class="header-title">New Visitor Geography & Traffic Sources — Apr 8</div>
+      <div class="header-question">"Where are new visitors located and where are they coming from?"</div>
+    </div>
+
+    <div class="verdict-card">
+      <div class="verdict-label">Bottom line</div>
+      <div class="verdict-text">Visitors are 55% US (concentrated in WA/CO/NY), 9% India, and scattered across 20+ countries — but 95% of high-engagement pageviews come from the US Pacific Northwest. Traffic is 47% direct/bookmarks, 20% Reddit, 8% email blast, 6% GitHub, 6% Google — no sustainable organic channel yet.</div>
+    </div>
+
+    
+
+    <div class="section-label">Key metrics</div><div class="kpi-grid"><div class="kpi-tile">  <div class="kpi-label">Total unique visitors (14d)</div>  <div class="kpi-value">~100</div>  <div class="kpi-change" style="color:#94A3B8">→ 20+ countries</div></div><div class="kpi-tile">  <div class="kpi-label">US share</div>  <div class="kpi-value">55%</div>  <div class="kpi-change" style="color:#94A3B8">→ 54 of ~100 visitors</div></div><div class="kpi-tile">  <div class="kpi-label">Top non-US</div>  <div class="kpi-value">India (9%)</div>  <div class="kpi-change" style="color:#94A3B8">→ 9 visitors, mostly single-page</div></div><div class="kpi-tile">  <div class="kpi-label">Top traffic source</div>  <div class="kpi-value">Direct (47%)</div>  <div class="kpi-change" style="color:#94A3B8">→ 54 visitors, 1028 pageviews</div></div></div>
+
+    <div class="card">
+      <div class="section-label">Why</div>
+      <ul class='findings-list'><li class="finding-item">  <div class="finding-label">US dominates with 55% of visitors and 89% of pageviews <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">54 visitors, 960 pageviews <span style="color:#94A3B8;font-weight:600">→ WA state alone: Seattle (4), Bellevue (3), Renton (3), Marysville (2), Redmond (1) = 13 visitors. Heavy engagement (avg 18 pv/visitor).</span></div></li><li class="finding-item">  <div class="finding-label">India is 2nd largest by visitors (9%) but low engagement <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">9 visitors, 18 pageviews <span style="color:#94A3B8;font-weight:600">→ 2 pv/visitor avg — mostly single-session bounces. Pune (2), rest scattered.</span></div></li><li class="finding-item">  <div class="finding-label">Türkiye shows power-user pattern <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">2 visitors, 33 pageviews <span style="color:#059669;font-weight:600">↑ 16.5 pv/visitor — both from Istanbul, deep navigation (/campaigns, /operations, /chat, /usage). Likely real users.</span></div></li><li class="finding-item">  <div class="finding-label">Reddit drove the launch spike — 19 visitors (20%) <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">19 visitors from reddit.com + 4 from Reddit app <span style="color:#DC2626;font-weight:600">↓ Total 23 Reddit visitors. Mostly landed on homepage (/). Some reached /google-ads-audit. All concentrated around Apr 4 launch.</span></div></li><li class="finding-item">  <div class="finding-label">Google organic is anemic — 7 visitors in 14 days <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">7 visitors, 15 pageviews <span style="color:#94A3B8;font-weight:600">→ 2 came via CPC (utm_source=google, utm_medium=cpc). Organic Google is only ~5 visitors total.</span></div></li><li class="finding-item">  <div class="finding-label">Twitter/X sent 5 visitors via t.co <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">5 visitors, 6 pageviews <span style="color:#94A3B8;font-weight:600">→ Low engagement — 1.2 pv/visitor. Likely saw a tweet, clicked, bounced.</span></div></li><li class="finding-item">  <div class="finding-label">Email blast (Sendinblue) drove 9 visitors <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">9 visitors from mq88x.r.ag.d.sendibm3.com <span style="color:#DC2626;font-weight:600">↓ All landed on homepage. One-time channel.</span></div></li><li class="finding-item">  <div class="finding-label">GitHub brought 7 visitors <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">7 visitors, 14 pageviews <span style="color:#94A3B8;font-weight:600">→ 2 pv/visitor — likely developers checking the repo then visiting the site.</span></div></li></ul>
+    </div>
+
+    
+
+    <div class="card">  <div class="chart-header">    <div class="chart-title">US accounts for 55% of visitors but 89% of all pageviews</div>    <div class="chart-subtitle">Unique visitors by country, last 14 days (Mar 25 – Apr 8)</div>    <div class="chart-insight">Non-US visitors rarely engage beyond 1-2 pages — except Türkiye (16.5 pv/visitor).</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_0"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Reddit and email drove the launch spike — no sustainable channel yet</div>    <div class="chart-subtitle">Unique visitors by traffic source, last 14 days</div>    <div class="chart-insight">Direct traffic (54) includes bookmarks, Slack links, and untagged sources. Google organic is only 5 visitors.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_1"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Apr 4 launch spike faded — daily US visitors stabilized at 5-18</div>    <div class="chart-subtitle">Daily unique visitors, US vs International, Mar 25 – Apr 9</div>    <div class="chart-insight">Apr 4 saw 27 US visitors (Reddit + email launch), now settling around 10-18/day.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_2"></canvas>  </div></div>
+
+    <div class="card">  <div class="section-label">Top US Cities by Visitors</div>  <div class="table-wrapper">    <table id="table_0">      <thead><tr><th onclick="sortTable(this, 0)" class="sortable-header">City, State <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Visitors <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Pageviews <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">PV/Visitor <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>Seattle, WA</td><td>4</td><td>211</td><td>52.8</td></tr><tr><td>Bellevue, WA</td><td>3</td><td>367</td><td>122.3</td></tr><tr><td>Renton, WA</td><td>3</td><td>123</td><td>41.0</td></tr><tr><td>Highlands Ranch, CO</td><td>2</td><td>2</td><td>1.0</td></tr><tr><td>Aurora, CO</td><td>2</td><td>14</td><td>7.0</td></tr><tr><td>Marysville, WA</td><td>2</td><td>101</td><td>50.5</td></tr><tr><td>Brooklyn, NY</td><td>2</td><td>4</td><td>2.0</td></tr><tr><td>Bend, OR</td><td>2</td><td>2</td><td>1.0</td></tr></tbody>    </table>  </div></div>
+<div class="card">  <div class="section-label">Traffic Sources × Landing Page</div>  <div class="table-wrapper">    <table id="table_1">      <thead><tr><th onclick="sortTable(this, 1)" class="sortable-header">Source <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Landing Page <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Visitors <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>Direct</td><td>/ (homepage)</td><td>29</td></tr><tr><td>Sendinblue email</td><td>/ (homepage)</td><td>7</td></tr><tr><td>Direct</td><td>/connect</td><td>7</td></tr><tr><td>Direct</td><td>/audit</td><td>6</td></tr><tr><td>Reddit</td><td>/ (homepage)</td><td>6</td></tr><tr><td>Twitter/X</td><td>/ (homepage)</td><td>4</td></tr><tr><td>Direct</td><td>/google-ads-claude</td><td>4</td></tr><tr><td>Google</td><td>/connect</td><td>3</td></tr><tr><td>Direct</td><td>/google-ads-audit</td><td>3</td></tr><tr><td>Google</td><td>/audit</td><td>2</td></tr><tr><td>Reddit</td><td>/google-ads-audit</td><td>2</td></tr><tr><td>GitHub</td><td>/ (homepage)</td><td>2</td></tr></tbody>    </table>  </div></div>
+
+    <div class="card">
+      <div class="section-label">So what</div>
+      <ol class='action-list'><li class="action-item">  <span class="action-num">1</span>  <span class="action-text">Build SEO content targeting 'Google Ads MCP server', 'Google Ads AI agent', 'connect Google Ads to Claude' — Google organic is only 5 visitors in 14 days despite being the highest-intent channel (3 went directly to /connect or /audit). Even modest rankings could 3-5x organic traffic.</span></li><li class="action-item">  <span class="action-num">2</span>  <span class="action-text">Double down on Reddit distribution — it drove 23 visitors (20% of all traffic) from a single launch post. Post weekly tips/case-studies to r/PPC, r/googleads, r/ClaudeAI. This is the only proven acquisition channel beyond your network.</span></li><li class="action-item">  <span class="action-num">3</span>  <span class="action-text">Ignore international targeting for now — India (9 visitors) and other non-US markets show low engagement (2 pv/visitor). The WA-state cluster (13 visitors, 800+ pageviews) suggests product-market fit is local/US first. Google Ads is a US-centric product.</span></li><li class="action-item">  <span class="action-num">4</span>  <span class="action-text">Tag all outbound links with UTM parameters — 54 'direct' visitors (47%) means you're flying blind on which channels work. Add utm_source to Reddit posts, email links, Twitter, and GitHub README.</span></li></ol>
+    </div>
+
+    <div class="footer">
+      Data sources: PostHog project 368485 — $pageview with $geoip_country_name, $geoip_city_name, $referring_domain, utm_source — Mar 25 – Apr 8, 2026
+    </div>
+
+  </div>
+
+  <script>
+    // Register datalabels and annotation plugins globally
+    Chart.register(ChartDataLabels);
+    Chart.register(window['chartjs-plugin-annotation']?.default || {});
+
+    // Sort table by column
+    function sortTable(th, tableIdx) {
+      const table = document.getElementById('table_' + tableIdx);
+      const tbody = table.querySelector('tbody');
+      const headers = table.querySelectorAll('th');
+      const colIdx = Array.from(headers).indexOf(th);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.dataset.sortDir !== 'asc';
+      th.dataset.sortDir = asc ? 'asc' : 'desc';
+      headers.forEach(h => h.querySelector('.sort-icon').textContent = '↕');
+      th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+      rows.sort((a, b) => {
+        const aVal = a.cells[colIdx]?.textContent.trim() || '';
+        const bVal = b.cells[colIdx]?.textContent.trim() || '';
+        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Initialize charts
+    
+        new Chart(document.getElementById('chart_0'), {
+          type: 'bar',
+          data: {
+            labels: ["United States", "India", "Italy", "United Kingdom", "Singapore", "Netherlands", "Germany", "Finland", "Brazil", "Belgium", "Australia", "France", "T\u00fcrkiye"],
+            datasets: [{"label": "Unique Visitors", "data": [54, 9, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_1'), {
+          type: 'bar',
+          data: {
+            labels: ["Direct / Bookmark", "Reddit", "Email (Sendinblue)", "GitHub", "Google (organic)", "Twitter/X", "Reddit App", "Google (CPC)", "MS Teams"],
+            datasets: [{"label": "Unique Visitors", "data": [54, 19, 9, 7, 5, 5, 4, 2, 1], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+              annotation: {
+                annotations: {
+                  refLine: {
+                    type: 'line',
+                    xMin: 10,
+                    xMax: 10,
+                    borderColor: '#D97706',
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    label: {
+                      display: true,
+                      content: "Sustainable threshold: 10",
+                      position: 'start',
+                      backgroundColor: '#D97706',
+                      color: '#fff',
+                      font: { size: 10, family: 'Inter, sans-serif' },
+                      padding: { x: 6, y: 3 },
+                      borderRadius: 3,
+                    }
+                  }
+                }
+              },
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_2'), {
+          type: 'line',
+          data: {
+            labels: ["Apr 4", "Apr 5", "Apr 6", "Apr 7", "Apr 8", "Apr 9"],
+            datasets: [{"label": "US", "data": [27, 3, 5, 11, 18, 2], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB1A", "fill": true, "tension": 0.25, "pointRadius": 4, "pointHoverRadius": 6, "pointBackgroundColor": "#2563EB"}, {"label": "International", "data": [27, 2, 3, 10, 9, 0], "borderColor": "#94A3B8", "borderWidth": 2, "backgroundColor": "#94A3B81A", "fill": false, "tension": 0.25, "pointRadius": 4, "pointHoverRadius": 6, "pointBackgroundColor": "#94A3B8"}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              datalabels: { display: false },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+  </script>
+</body>
+</html>
