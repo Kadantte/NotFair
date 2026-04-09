@@ -19,6 +19,7 @@ import {
 } from "@/lib/google-ads";
 import { getAuthContext } from "@/lib/session";
 import { computeAuditScore, type AuditInput, type AuditResult } from "@/lib/audit/scoring";
+import { analyzeAdLandingPages } from "@/lib/audit/landing-page";
 
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
@@ -256,6 +257,7 @@ export async function getAuditDetails() {
       type: a.type ?? "UNKNOWN",
       headlines: a.headlines ?? [],
       descriptions: a.descriptions ?? [],
+      finalUrls: a.finalUrls ?? [],
       impressions: a.impressions ?? 0,
       clicks: a.clicks ?? 0,
       cost: a.cost ?? 0,
@@ -272,9 +274,12 @@ export async function getAuditDetails() {
 
     const totalAdGroups = adGroupResults.flat().length;
 
-    // Build the overview data again for scoring (needs account settings + conversion actions)
-    const accountSettingsResult = await getAccountSettings(auth);
-    const conversionActionsResult = await getConversionActions(auth);
+    // Fetch landing pages, account settings, and conversion actions in parallel
+    const [landingPages, accountSettingsResult, conversionActionsResult] = await Promise.all([
+      analyzeAdLandingPages(allAds, 10),
+      getAccountSettings(auth),
+      getConversionActions(auth),
+    ]);
 
     const auditInput: AuditInput = {
       accountSettings: {
@@ -295,6 +300,7 @@ export async function getAuditDetails() {
       keywords: allKeywords,
       searchTerms: allSearchTerms,
       ads: allAds,
+      landingPages,
       impressionShare: impressionShareResults,
       negativeKeywords: allNegatives,
       adGroupCount: totalAdGroups,
