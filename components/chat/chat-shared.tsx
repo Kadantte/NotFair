@@ -3,12 +3,9 @@
 import type { ElementType, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
-  Bot,
   ChevronDown,
   ChevronRight,
   Sparkles,
-  User,
-  Wrench,
 } from "lucide-react";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 
@@ -26,7 +23,7 @@ export function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode
       return (
         <code
           key={key}
-          className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-[0.95em] text-[#E8E4DD]"
+          className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-[0.95em] text-white"
         >
           {part.slice(1, -1)}
         </code>
@@ -93,7 +90,7 @@ export function renderMarkdown(text: string): ReactNode[] {
       nodes.push(
         <pre
           key={`code-${nodes.length}`}
-          className="overflow-x-auto rounded border border-[#3D3C36] bg-[#24231F] p-4 text-sm leading-6 text-[#E8E4DD]"
+          className="overflow-x-auto rounded border border-[#3D3C36] bg-[#24231F] p-4 text-sm leading-6 text-white"
         >
           {language ? (
             <div className="mb-3 text-[11px] uppercase tracking-[0.16em] text-[#9B9689]">
@@ -111,12 +108,12 @@ export function renderMarkdown(text: string): ReactNode[] {
       const level = headingMatch[1].length;
       const className =
         level === 1
-          ? "text-3xl font-semibold text-[#E8E4DD]"
+          ? "text-3xl font-semibold text-white"
           : level === 2
-            ? "text-2xl font-semibold text-[#E8E4DD]"
+            ? "text-2xl font-semibold text-white"
             : level === 3
-              ? "text-xl font-semibold text-[#E8E4DD]"
-              : "text-base font-semibold text-[#E8E4DD]";
+              ? "text-xl font-semibold text-white"
+              : "text-base font-semibold text-white";
       const Tag = `h${Math.min(level, 6)}` as ElementType;
       nodes.push(
         <Tag key={`heading-${nodes.length}`} className={className}>
@@ -142,7 +139,7 @@ export function renderMarkdown(text: string): ReactNode[] {
       nodes.push(
         <blockquote
           key={`quote-${nodes.length}`}
-          className="border-l-2 border-[#3D3C36] pl-4 text-[#E8E4DD]"
+          className="border-l-2 border-[#3D3C36] pl-4 text-white"
         >
           {quoteLines.map((quoteLine, quoteIndex) => (
             <p key={`quote-line-${quoteIndex}`}>
@@ -161,7 +158,7 @@ export function renderMarkdown(text: string): ReactNode[] {
         index += 1;
       }
       nodes.push(
-        <ul key={`ul-${nodes.length}`} className="list-disc space-y-2 pl-6 text-[#E8E4DD]">
+        <ul key={`ul-${nodes.length}`} className="list-disc space-y-2 pl-6 text-white">
           {items.map((item, itemIndex) => (
             <li key={`ul-item-${itemIndex}`}>
               {renderInlineMarkdown(item, `ul-${itemIndex}`)}
@@ -179,7 +176,7 @@ export function renderMarkdown(text: string): ReactNode[] {
         index += 1;
       }
       nodes.push(
-        <ol key={`ol-${nodes.length}`} className="list-decimal space-y-2 pl-6 text-[#E8E4DD]">
+        <ol key={`ol-${nodes.length}`} className="list-decimal space-y-2 pl-6 text-white">
           {items.map((item, itemIndex) => (
             <li key={`ol-item-${itemIndex}`}>
               {renderInlineMarkdown(item, `ol-${itemIndex}`)}
@@ -206,7 +203,7 @@ export function renderMarkdown(text: string): ReactNode[] {
     }
 
     nodes.push(
-      <p key={`p-${nodes.length}`} className="text-[15px] leading-7 text-[#E8E4DD]">
+      <p key={`p-${nodes.length}`} className="text-base leading-7 text-white">
         {renderInlineMarkdown(paragraphLines.join(" "), `p-${nodes.length}`)}
       </p>,
     );
@@ -253,11 +250,8 @@ function ToolGroupBlock({
       : "";
 
     return (
-      <div className="flex items-center gap-2.5 py-1 text-sm text-[#9B9689]">
-        <div className="relative flex h-5 w-5 items-center justify-center">
-          <Sparkles className="h-3.5 w-3.5 animate-pulse text-[#4CAF6E]" />
-        </div>
-        <span className="text-[#E8E4DD]/70">
+      <div className="flex items-center gap-2 py-0.5 text-sm text-[#8b8b89]">
+        <span>
           {currentName}
           {parts.length > 1 && completedCount > 0
             ? ` (${completedCount + 1}/${parts.length})`
@@ -268,52 +262,48 @@ function ToolGroupBlock({
     );
   }
 
-  // Completed state — single collapsible line
+  // Completed state — simple text link like Claude
   const summary =
     parts.length === 1
       ? toolNames[0]
-      : `Used ${parts.length} tools`;
+      : toolNames.join(", ");
 
   return (
-    <div className="py-1">
+    <div className="py-0.5">
       <button
         type="button"
         onClick={() => setIsOpen(o => !o)}
-        className="flex items-center gap-2.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]/70"
+        className="text-left text-sm text-[#8b8b89] underline decoration-[#8b8b89]/30 underline-offset-4 transition-colors hover:text-[#b0b0ae]"
       >
+        {summary}
         {isOpen ? (
-          <ChevronDown className="h-3.5 w-3.5" />
+          <ChevronDown className="ml-1 inline h-3 w-3" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="ml-1 inline h-3 w-3" />
         )}
-        <Sparkles className="h-3.5 w-3.5 text-[#4CAF6E]" />
-        <span>{summary}</span>
       </button>
 
       {isOpen && (
-        <div className="ml-3 mt-2 space-y-1 border-l border-[#3D3C36] pl-4">
+        <div className="mt-2 space-y-1">
           {parts.map((part, i) => {
             const isExpanded = expandedTool === i;
             return (
               <div key={`${messageId}-tool-${i}`}>
-                <button
-                  type="button"
-                  onClick={() => setExpandedTool(isExpanded ? null : i)}
-                  className="flex items-center gap-2 py-1.5 text-xs text-[#9B9689] transition-colors hover:text-[#E8E4DD]/70"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-3 w-3" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3" />
-                  )}
-                  <Wrench className="h-3 w-3 text-[#4CAF6E]/60" />
-                  <span>{toolNames[i]}</span>
-                </button>
-                {isExpanded && (
-                  <pre className={`ml-7 mt-1 max-h-60 overflow-auto rounded bg-[#24231F] p-3 text-xs leading-5 ${
+                {parts.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTool(isExpanded ? null : i)}
+                    className="flex items-center gap-1.5 py-1 text-xs text-[#8b8b89] transition-colors hover:text-[#b0b0ae]"
+                  >
+                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    <span>{toolNames[i]}</span>
+                  </button>
+                )}
+                {(isExpanded || parts.length === 1) && (
+                  <pre className={`mt-1 max-h-60 overflow-auto rounded-lg bg-[#2c2c2b] p-3 text-xs leading-5 ${
                     "state" in part && part.state === "output-error"
                       ? "text-[#C45D4A]/80"
-                      : "text-[#E8E4DD]/80"
+                      : "text-white/60"
                   }`}>
                     {"errorText" in part && part.errorText
                       ? String(part.errorText)
@@ -396,18 +386,31 @@ export function Message({
   const finalTextIsStreaming = lastPart?.type === "text" && lastPart.text.length > 0;
   const showThinking = !isUser && isActivelyStreaming && !finalTextIsStreaming;
 
-  return (
-    <div className="flex w-full gap-4 px-6 py-6">
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-          isUser
-            ? "border-[#3D3C36] bg-[#2E2D28] text-[#E8E4DD]"
-            : "border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]"
-        }`}
-      >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+  if (isUser) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-3 md:px-6">
+        <div className="flex justify-end">
+          <div className="max-w-[85%] rounded-3xl bg-[#2c2c2b] px-5 py-3">
+            {groups.map(group => {
+              if (group.kind !== "text" || group.part.type !== "text") return null;
+              return (
+                <div
+                  key={`${message.id}-${group.index}`}
+                  className="text-base leading-7 text-white"
+                >
+                  {renderInlineMarkdown(group.part.text, `${message.id}-${group.index}`)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
-      <div className="min-w-0 flex-1 space-y-3 pt-0.5">
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-3 md:px-6">
+      <div className="space-y-3">
         {groups.map(group => {
           if (group.kind === "text") {
             const part = group.part;
@@ -415,7 +418,7 @@ export function Message({
             return (
               <div
                 key={`${message.id}-${group.index}`}
-                className="space-y-4 text-[15px] leading-7 text-[#E8E4DD]"
+                className="space-y-4 text-base leading-7 text-white"
               >
                 {renderMarkdown(part.text)}
               </div>

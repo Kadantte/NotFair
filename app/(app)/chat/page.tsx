@@ -3,7 +3,7 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Send, Square } from "lucide-react";
+import { Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
@@ -229,9 +229,12 @@ export default function ChatPage() {
   }, [activeThreadId, isHydrated, messages, threads]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldScrollRef = useRef(false);
 
-  // Auto-scroll to bottom when messages change (streaming or new message)
+  // Only scroll to bottom when flagged (user sends a message)
   useEffect(() => {
+    if (!shouldScrollRef.current) return;
+    shouldScrollRef.current = false;
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
@@ -244,25 +247,19 @@ export default function ChatPage() {
     : threads;
 
   return (
-    <section className="flex h-full flex-col overflow-hidden">
-      <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-        <div className="flex w-full items-center gap-4 px-6 py-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">
-              {displayThreads.find(thread => thread.id === activeThreadId)?.title ??
-                "New chat"}
-            </h1>
-          </div>
+    <section className="flex h-full flex-col overflow-hidden bg-[#222221]">
+      <header className="shrink-0 bg-[#222221]">
+        <div className="flex w-full items-center gap-4 px-6 py-3">
+          <h1 className="text-base font-medium text-[#E8E4DD]/80">
+            {displayThreads.find(thread => thread.id === activeThreadId)?.title ??
+              "New chat"}
+          </h1>
         </div>
       </header>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex min-h-full w-full flex-col items-center justify-center px-6 py-12 text-center">
-            <div className="mb-6 inline-flex items-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-1.5 text-sm text-[#4CAF6E] shadow-[0_0_20px_rgba(76,175,110,0.16)]">
-              <span className="mr-2 h-2 w-2 rounded-full bg-[#4CAF6E] shadow-[0_0_10px_rgba(76,175,110,0.5)]" />
-              ADSAGENT COPILOT
-            </div>
             <h1 className="text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
               How can I help with your Google Ads account?
             </h1>
@@ -274,7 +271,7 @@ export default function ChatPage() {
                 <button
                   key={prompt}
                   type="button"
-                  onClick={() => setInput(prompt)}
+                  onClick={() => { if (isReady) { shouldScrollRef.current = true; sendMessage({ text: prompt }); } }}
                   className="rounded border border-[#3D3C36] bg-[#24231F] px-4 py-4 text-left text-sm leading-6 text-[#E8E4DD] transition hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
                 >
                   {prompt}
@@ -283,7 +280,7 @@ export default function ChatPage() {
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-[#3D3C36]/50">
+          <div>
             {messages.map((message, index) => (
               <Message
                 key={message.id}
@@ -294,23 +291,18 @@ export default function ChatPage() {
               />
             ))}
             {isSending && (messages.length === 0 || messages[messages.length - 1].role === "user") && (
-              <div className="flex w-full gap-4 px-6 py-6">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div className="pt-0.5">
-                  <ThinkingIndicator />
-                </div>
+              <div className="mx-auto w-full max-w-3xl px-4 py-3 md:px-6">
+                <ThinkingIndicator />
               </div>
             )}
           </div>
         )}
       </div>
 
-      <div className="shrink-0 border-t border-[#3D3C36] bg-[#1A1917]/95 px-4 py-4 backdrop-blur-xl">
-        <div className="w-full px-2">
+      <div className="shrink-0 bg-[#222221] px-4 pb-4 pt-2">
+        <div className="mx-auto w-full max-w-3xl">
           {error && (
-            <div className="mb-3 rounded border border-[#C45D4A]/20 bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
+            <div className="mb-3 rounded-lg bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
               {error.message}
             </div>
           )}
@@ -318,25 +310,26 @@ export default function ChatPage() {
             onSubmit={event => {
               event.preventDefault();
               if (!input.trim() || !isReady || isSending) return;
+              shouldScrollRef.current = true;
               sendMessage({ text: input });
               setInput("");
             }}
-            className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+            className="rounded-2xl border border-[#4a4a48] bg-[#2c2c2b] p-3"
           >
             <div className="flex items-end gap-3">
               <Input
                 value={input}
                 onChange={event => setInput(event.currentTarget.value)}
-                placeholder={isReady ? "Message AdsAgent" : "Connect Google Ads first..."}
+                placeholder={isReady ? "Reply..." : "Connect Google Ads first..."}
                 disabled={!isReady || isSending}
-                className="h-12 border-0 bg-transparent px-2 text-[15px] text-[#E8E4DD] shadow-none placeholder:text-[#9B9689] focus-visible:ring-0"
+                className="h-11 border-0 bg-transparent px-2 text-base text-white shadow-none placeholder:text-[#8b8b89] focus-visible:ring-0"
               />
               {isSending ? (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => stop()}
-                  className="h-10 w-10 rounded-full text-[#E8E4DD] hover:bg-[#2E2D28]"
+                  className="h-9 w-9 rounded-full text-[#8b8b89] hover:bg-[#3a3a39]"
                 >
                   <Square className="h-4 w-4 fill-current" />
                 </Button>
@@ -344,7 +337,7 @@ export default function ChatPage() {
                 <Button
                   type="submit"
                   disabled={!isReady || !input.trim()}
-                  className="h-10 w-10 rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]"
+                  className="h-9 w-9 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
