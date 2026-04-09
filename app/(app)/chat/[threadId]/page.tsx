@@ -126,12 +126,14 @@ export default function ChatPage() {
 
   // Only scroll to bottom when flagged (user sends a message)
   useEffect(() => {
-    if (!shouldScrollRef.current) return;
-    shouldScrollRef.current = false;
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages]);
+    if (shouldScrollRef.current) {
+      shouldScrollRef.current = false;
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+    // Re-check isAtBottom as content grows during streaming
+    handleScroll();
+  }, [messages, handleScroll]);
 
   // Refresh sidebar when streaming completes (title will be in DB by then)
   const prevStatusRef = useRef(status);
