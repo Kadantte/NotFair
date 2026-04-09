@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
   timestamp,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // ─── Goals & Guardrails ──────────────────────────────────────────────
@@ -154,3 +155,30 @@ export const mcpSessions = pgTable("mcp_sessions", {
   clientVersion: text("client_version"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ─── Chat Threads ───────────────────────────────────────────────────
+
+export const chatThreads = pgTable("chat_threads", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  accountId: text("account_id").notNull(),
+  title: text("title"),
+  shareId: text("share_id").unique(),
+  isShared: boolean("is_shared").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("chat_threads_user_account_idx").on(table.userId, table.accountId, table.updatedAt),
+]);
+
+// ─── Chat Messages ──────────────────────────────────────────────────
+
+export const chatMessages = pgTable("chat_messages", {
+  id: text("id").primaryKey(),
+  threadId: text("thread_id").notNull(),
+  role: text("role").notNull(),
+  parts: jsonb("parts").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("chat_messages_thread_idx").on(table.threadId, table.createdAt),
+]);

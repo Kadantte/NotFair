@@ -64,8 +64,12 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 body: JSON.stringify({ customerId: accountId }),
             });
             if (res.ok) {
-                // Full reload to clear all module-level caches (campaigns, dashboard, etc.)
-                window.location.reload();
+                // Navigate to base path to clear thread-specific state on chat pages
+                if (window.location.pathname.startsWith('/chat/')) {
+                    window.location.assign('/chat');
+                } else {
+                    window.location.reload();
+                }
             }
         } finally {
             setSwitching(false);

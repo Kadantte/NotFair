@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { SignOutButton } from '@/components/sign-out-button';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { ImpersonationBanner } from '@/components/impersonation-banner';
-import { dispatchThreadEvent } from '@/lib/thread-events';
-import { getChatSidebarServerSnapshot, getChatSidebarSnapshot, setStoredActiveThreadId, subscribeChatSidebar } from '@/lib/chat-thread-store';
+import { onThreadEvent } from '@/lib/thread-events';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -110,14 +109,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
     const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false);
-    const { threads, activeThreadId } = useSyncExternalStore(
-        subscribeChatSidebar,
-        getChatSidebarSnapshot,
-        getChatSidebarServerSnapshot,
-    );
-    const isOnChat = pathname === '/chat';
+    const [sidebarThreads, setSidebarThreads] = useState<{ id: string; title: string; updatedAt: string }[]>([]);
+    const isOnChat = pathname.startsWith('/chat');
     const [isDev, setIsDev] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    const refreshThreads = useCallback(() => {
+        fetch('/api/chat/threads', { credentials: 'include' })
+            .then(r => r.json())
+            .then(({ threads }) => {
+                if (threads) setSidebarThreads(threads.map((t: { id: string; title: string | null; updatedAt: string }) => ({
+                    id: t.id,
+                    title: t.title ?? 'New chat',
+                    updatedAt: t.updatedAt,
+                })));
+            })
+            .catch(() => {});
+    }, []);
+
+    // Fetch threads on mount and when "refresh" event fires
+    useEffect(() => {
+        refreshThreads();
+        const unsub = onThreadEvent('refresh', () => refreshThreads());
+        return unsub;
+    }, [refreshThreads]);
 
     // Close mobile menu on navigation
     useEffect(() => {
@@ -149,20 +164,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     function handleNewChat() {
-        if (isOnChat) {
-            dispatchThreadEvent('create');
-        } else {
-            router.push('/chat');
-        }
+        const newId = crypto.randomUUID();
+        setSidebarThreads(prev => [{
+            id: newId,
+            title: 'New chat',
+            updatedAt: new Date().toISOString(),
+        }, ...prev]);
+        router.push(`/chat/${newId}`);
     }
 
     function handleSelectThread(threadId: string) {
-        if (isOnChat) {
-            dispatchThreadEvent('select', threadId);
-        } else {
-            setStoredActiveThreadId(threadId);
-            router.push('/chat');
-        }
+        router.push(`/chat/${threadId}`);
     }
 
     function renderSidebar(isCollapsed: boolean, isMobile: boolean) { return (
@@ -209,7 +221,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} />
                 <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} />
                 <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} />
-                <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} collapsed={isCollapsed} />
+                <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} collapsed={isCollapsed} />
             </nav>
 
             {isOnChat && (
@@ -239,16 +251,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <div className="mx-3 shrink-0 border-t border-[#3D3C36]" />
 
                     {/* Thread list */}
-                    {hydrated && !isCollapsed && threads.length > 0 && (
+                    {hydrated && !isCollapsed && sidebarThreads.length > 0 && (
                         <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-                    {threads.map(thread => (
+                    {sidebarThreads.map(thread => {
+                        const isActive = pathname === `/chat/${thread.id}`;
+                        return (
                         <div
                             key={thread.id}
-                            className={`mb-0.5 rounded-lg transition ${
-                                isOnChat && thread.id === activeThreadId
-                                    ? 'bg-[#E8E4DD]/5'
-                                    : 'hover:bg-[#E8E4DD]/5'
-                            }`}
+                            className={`mb-0.5 rounded-lg transition ${isActive ? 'bg-[#E8E4DD]/5' : 'hover:bg-[#E8E4DD]/5'}`}
                         >
                             <div className="flex items-start gap-1">
                                 <button
@@ -260,26 +270,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         {thread.title}
                                     </div>
                                     <div className="mt-0.5 text-[11px] text-[#9B9689]">
-                                        {formatDate(thread.updatedAt)} · {thread.messageCount}m
+                                        {formatDate(thread.updatedAt)}
                                     </div>
                                 </button>
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon-sm"
-                                    onClick={() => dispatchThreadEvent('delete', thread.id)}
+                                    onClick={() => {
+                                        fetch('/api/chat/threads', {
+                                            method: 'DELETE',
+                                            credentials: 'include',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ threadId: thread.id }),
+                                        })
+                                            .then(() => {
+                                                refreshThreads();
+                                                // If we're viewing the deleted thread, navigate away
+                                                if (pathname === `/chat/${thread.id}`) {
+                                                    router.push('/chat');
+                                                }
+                                            })
+                                            .catch(() => {});
+                                    }}
                                     className="mt-1.5 mr-1 shrink-0 rounded-lg text-[#9B9689] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] [div:hover>&]:opacity-100"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                         </div>
                     )}
                 </>
             )}
-            {(isCollapsed || !isOnChat || threads.length === 0) && <div className="flex-1" />}
+            {(isCollapsed || !isOnChat || sidebarThreads.length === 0) && <div className="flex-1" />}
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
@@ -344,7 +370,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} />
                 <MobileNavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} />
                 <MobileNavItem href="/operations" icon={Activity} label="Ops" active={pathname === '/operations'} />
-                <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname === '/chat'} />
+                <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} />
             </nav>
         </div>
     );
