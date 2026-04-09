@@ -63,10 +63,19 @@ type AgentAuth = {
   userId?: string | null;
 };
 
+const MAX_STEPS = 8;
+
 export function createGoogleAdsAgent(auth: AgentAuth) {
   return new ToolLoopAgent({
     model: openai("gpt-5-mini"),
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(MAX_STEPS),
+    prepareStep: ({ stepNumber }) => {
+      // On the last step, force text-only response by disabling tool calls
+      if (stepNumber >= MAX_STEPS - 1) {
+        return { toolChoice: "none" as const };
+      }
+      return {};
+    },
     instructions: `You are AdsAgent, a Google Ads copilot in a chat interface.
 
 You are currently operating on one connected Google Ads account chosen by the user.
@@ -80,7 +89,8 @@ Rules:
 - Prefer concise answers unless the user explicitly asks for a deeper audit.
 - Never make write changes without explicit user confirmation. Always show what you plan to change, the current value, and the new value before executing.
 - After every write, tell the user the changeId so they can undo within 7 days.
-- Guardrails are server-side: bid changes >25% and budget changes >50% will be rejected.`,
+- Guardrails are server-side: bid changes >25% and budget changes >50% will be rejected.
+- IMPORTANT: Always end your response with a text summary. Never stop after tool calls without explaining the results to the user.`,
     tools: {
       // ─── Read Tools ──────────────────────────────────────────
 

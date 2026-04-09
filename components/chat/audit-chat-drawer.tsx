@@ -3,11 +3,11 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Send, Square, X } from "lucide-react";
+import { ArrowDown, Expand, MessageCircle, Send, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
-import { Message } from "@/components/chat/chat-shared";
+import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -84,6 +84,7 @@ export function AuditChatDrawer({
       const fullMessage = contextPrefix
         ? `${contextPrefix}\n${prompt}`
         : prompt;
+      shouldScrollRef.current = true;
       sendMessage({ text: fullMessage });
       onPromptConsumed();
     },
@@ -96,12 +97,30 @@ export function AuditChatDrawer({
     }
   }, [pendingPrompt, open, sendPending]);
 
-  // Auto-scroll
-  useEffect(() => {
+  const shouldScrollRef = useRef(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages]);
+    setIsAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
+
+  // Scroll to bottom only when flagged (user sends a message)
+  useEffect(() => {
+    if (shouldScrollRef.current) {
+      shouldScrollRef.current = false;
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+    handleScroll();
+  }, [messages, handleScroll]);
 
   return (
     <>
@@ -120,24 +139,35 @@ export function AuditChatDrawer({
         }`}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F]/80 px-4 py-3 backdrop-blur-xl">
+        <div className="flex shrink-0 items-center justify-between bg-[#1A1917] px-4 py-3">
           <div className="flex items-center gap-2">
             <MessageCircle className="h-4 w-4 text-[#4CAF6E]" />
             <span className="text-[14px] font-medium text-[#E8E4DD]">
               Audit Help
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <a
+                href={`/chat/${threadId.current}`}
+                className="rounded p-1 text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+                title="Open in full chat"
+              >
+                <Expand className="h-4 w-4" />
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1 text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
           {messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
               <MessageCircle className="mb-3 h-8 w-8 text-[#4CAF6E]/40" />
@@ -150,16 +180,38 @@ export function AuditChatDrawer({
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-[#3D3C36]/50">
-              {messages.map((message) => (
-                <Message key={message.id} message={message} />
+            <div>
+              {messages.map((message, index) => (
+                <Message
+                  key={message.id}
+                  message={message}
+                  isActivelyStreaming={
+                    isSending && index === messages.length - 1 && message.role === "assistant"
+                  }
+                />
               ))}
+              {isSending && (messages.length === 0 || messages[messages.length - 1].role === "user") && (
+                <div className="mx-auto w-full max-w-3xl px-4 py-3 md:px-6">
+                  <ThinkingIndicator />
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Input */}
-        <div className="shrink-0 border-t border-[#3D3C36] bg-[#1A1917]/95 px-3 py-3 backdrop-blur-xl">
+        <div className="relative shrink-0 bg-[#1A1917]/95 px-3 py-3 backdrop-blur-xl">
+          {!isAtBottom && messages.length > 0 && (
+            <div className="absolute -top-10 left-1/2 z-10 -translate-x-1/2">
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-[#3D3C36] bg-[#24231F] text-[#9B9689] shadow-lg transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+              >
+                <ArrowDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           {error && (
             <div className="mb-2 rounded border border-[#C45D4A]/20 bg-[#C45D4A]/10 px-3 py-2 text-[12px] text-[#C45D4A]">
               {error.message}
@@ -169,6 +221,7 @@ export function AuditChatDrawer({
             onSubmit={(e) => {
               e.preventDefault();
               if (!input.trim() || isSending) return;
+              shouldScrollRef.current = true;
               const fullMessage = contextPrefix
                 ? `${contextPrefix}\n${input}`
                 : input;

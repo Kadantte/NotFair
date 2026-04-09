@@ -3,7 +3,7 @@ import { eq, gte, and, sql } from "drizzle-orm";
 
 // ─── Config ────────────────────────────────────────────────────────
 
-const DAILY_OP_LIMIT = 300;
+const DAILY_OP_LIMIT = process.env.NODE_ENV === "development" ? 999999 : 300;
 
 // ─── In-memory cache to avoid DB hit on every tool call ────────────
 
