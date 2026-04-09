@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  ArrowRight,
   ArrowUp,
   DollarSign,
   Eye,
@@ -44,17 +45,17 @@ function ConnectClaudeCTA({ session, label }: { session: { connected: boolean };
     <Button
       onClick={handleClick}
       disabled={loading}
-      className="h-12 rounded-full bg-[#4CAF6E] px-8 text-base font-semibold text-white transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70"
+      className="h-12 rounded-full bg-[#4CAF6E] px-8 text-base font-semibold text-black transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70"
     >
       {loading ? (
         <span className="inline-flex items-center gap-2">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-black border-t-transparent" />
           Connecting...
         </span>
       ) : (
         <>
           {label ?? "Connect Google Ads to Claude"}
-          {!label && <img src="/claude-icon.svg" alt="" className="ml-2 h-5 w-5 brightness-0 invert" />}
+          {!label && <ArrowRight className="ml-2 h-5 w-5" />}
         </>
       )}
     </Button>
