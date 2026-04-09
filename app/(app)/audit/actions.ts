@@ -339,3 +339,8 @@ export async function pauseKeywordAction(
 ): Promise<MutationResult> {
   return mutateWithAuth((auth) => pauseKeyword(auth, campaignId, adGroupId, criterionId));
 }
+
+export async function clearAuditCache(): Promise<void> {
+  const { session } = await getAuthContext();
+  invalidateCache(session.customerId);
+}

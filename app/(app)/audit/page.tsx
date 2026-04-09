@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getAuditOverview, getAuditDetails } from "./actions";
+import { getAuditOverview, getAuditDetails, clearAuditCache } from "./actions";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { AuditContent } from "./audit-content";
 import {
@@ -28,7 +28,9 @@ export default function AuditPage() {
   const [overview, setOverview] = useState<AuditOverview | null>(cachedOverview);
   const [details, setDetails] = useState<AuditDetails | null>(cachedDetails);
   const [loading, setLoading] = useState(!cachedOverview);
+  const [redoLoading, setRedoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastAuditTime, setLastAuditTime] = useState<Date | null>(cachedOverview ? new Date() : null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
@@ -46,6 +48,7 @@ export default function AuditPage() {
         cachedDetails = null;
       }
       setLoading(false);
+      setLastAuditTime(new Date());
 
       // Phase 2: Detailed analysis
       if (!ov.isEmpty) {
@@ -64,6 +67,19 @@ export default function AuditPage() {
       }
     }
   }, []);
+
+  const redoAudit = useCallback(async () => {
+    setRedoLoading(true);
+    try {
+      await clearAuditCache();
+      cachedOverview = null;
+      cachedDetails = null;
+      cachedAccountId = null;
+      await fetchData(true);
+    } finally {
+      setRedoLoading(false);
+    }
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData(!!cachedOverview);
@@ -120,7 +136,14 @@ export default function AuditPage() {
 
   return (
     <>
-      <AuditContent overview={overview} details={details} onAskAI={handleAskAI} />
+      <AuditContent
+        overview={overview}
+        details={details}
+        onAskAI={handleAskAI}
+        onRedoAudit={redoAudit}
+        redoLoading={redoLoading}
+        lastAuditTime={lastAuditTime}
+      />
       {!drawerOpen && <AuditChatFab onClick={() => setDrawerOpen(true)} />}
       <AuditChatDrawer
         open={drawerOpen}

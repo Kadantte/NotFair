@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench, MessageCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench, MessageCircle, RefreshCw } from "lucide-react";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, DimensionScore } from "@/lib/audit/scoring";
@@ -914,14 +914,31 @@ function DetailedFindings({ dimensions, onAskAI }: { dimensions: DimensionScore[
 
 // ─── Main Component ──────────────────────────────────────────────────
 
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export function AuditContent({
   overview,
   details,
   onAskAI,
+  onRedoAudit,
+  redoLoading,
+  lastAuditTime,
 }: {
   overview: AuditOverview;
   details: AuditDetails | null;
   onAskAI?: (prompt: string) => void;
+  onRedoAudit?: () => void;
+  redoLoading?: boolean;
+  lastAuditTime?: Date | null;
 }) {
   const auditResult = details?.auditResult ?? null;
   const detailsLoading = details === null;
@@ -939,11 +956,29 @@ export function AuditContent({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[20px] font-semibold text-[#E8E4DD]">{overview.accountName}</h1>
-            <p className="text-[13px] text-[#9B9689]">Account Audit</p>
+            <p className="text-[13px] text-[#9B9689]">
+              Account Audit
+              {lastAuditTime && (
+                <span className="ml-2 text-[#9B9689]/60">· {formatTimeAgo(lastAuditTime)}</span>
+              )}
+            </p>
           </div>
-          <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#9B9689]">
-            Last 30 days
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#9B9689]">
+              Last 30 days
+            </span>
+            {onRedoAudit && (
+              <button
+                type="button"
+                onClick={onRedoAudit}
+                disabled={redoLoading}
+                className="flex items-center gap-1.5 rounded-sm bg-[#3D3C36] px-2.5 py-1 text-[11px] font-medium text-[#E8E4DD] transition hover:bg-[#4D4C46] disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${redoLoading ? "animate-spin" : ""}`} />
+                Redo Audit
+              </button>
+            )}
+          </div>
         </div>
 
         {showConversionBanner && (
