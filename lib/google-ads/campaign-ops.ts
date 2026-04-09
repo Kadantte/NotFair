@@ -600,6 +600,503 @@ export async function enableAd(auth: AuthContext, adGroupId: string, adId: strin
   return setAdStatus(auth, adGroupId, adId, false);
 }
 
+// ─── Conversion Action Management ──────────────────────────────────
+
+// Shared enum maps — values from google-ads-api protobuf (enums.js).
+// Used by both create and update functions.
+const CONVERSION_CATEGORY_MAP: Record<string, number> = {
+  DEFAULT: 2, PAGE_VIEW: 3, PURCHASE: 4, SIGNUP: 5,
+  ADD_TO_CART: 8, BEGIN_CHECKOUT: 9, SUBSCRIBE_PAID: 10,
+  LEAD: 12, SUBMIT_LEAD_FORM: 13, BOOK_APPOINTMENT: 14,
+  OTHER: 2, // No distinct OTHER in ConversionActionCategoryEnum — falls back to DEFAULT
+};
+const CONVERSION_TYPE_MAP: Record<string, number> = {
+  UPLOAD_CALLS: 6, UPLOAD_CLICKS: 7, WEBPAGE: 8,
+};
+const CONVERSION_COUNTING_MAP: Record<string, number> = {
+  ONE_PER_CLICK: 2, MANY_PER_CLICK: 3,
+};
+const CONVERSION_STATUS_MAP: Record<string, number> = {
+  ENABLED: 2, REMOVED: 3, HIDDEN: 4,
+};
+
+// Reverse-lookup maps for normalizing numeric GAQL responses to string names.
+// The google-ads-api returns numeric protobuf values for enum fields.
+function reverseMap(map: Record<string, number>): Record<number, string> {
+  const result: Record<number, string> = {};
+  for (const [key, value] of Object.entries(map)) {
+    if (!(value in result)) result[value] = key; // first key wins (handles OTHER→DEFAULT alias)
+  }
+  return result;
+}
+const CATEGORY_REVERSE = reverseMap(CONVERSION_CATEGORY_MAP);
+const STATUS_REVERSE = reverseMap(CONVERSION_STATUS_MAP);
+const COUNTING_REVERSE = reverseMap(CONVERSION_COUNTING_MAP);
+
+/** Enable Enhanced Conversions for Leads at account level (idempotent). */
+async function enableEcfl(
+  customer: ReturnType<typeof getCustomer>,
+  cid: string,
+): Promise<string | null> {
+  try {
+    await customer.mutateResources([
+      {
+        entity: "customer" as any,
+        operation: "update",
+        resource: {
+          resource_name: `customers/${cid}`,
+          conversion_tracking_setting: {
+            enhanced_conversions_for_leads_enabled: true,
+          },
+        },
+      },
+    ]);
+    return null; // success
+  } catch (error) {
+    return extractErrorMessage(error);
+  }
+}
+
+export type CreateConversionActionParams = {
+  name: string;
+  category?: string;
+  type?: string;
+  countingType?: string;
+  defaultValue?: number;
+  alwaysUseDefaultValue?: boolean;
+  status?: string;
+  enhancedConversionsForLeads?: boolean;
+  viewThroughLookbackWindowDays?: number;
+  clickThroughLookbackWindowDays?: number;
+};
+
+export async function createConversionAction(
+  auth: AuthContext,
+  params: CreateConversionActionParams,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  if (!params.name.trim()) {
+    return { success: false, action: "create_conversion_action", entityId: "", beforeValue: "", afterValue: "", error: "Conversion action name cannot be empty" };
+  }
+
+  const resource: Record<string, unknown> = {
+    name: params.name.trim(),
+    category: CONVERSION_CATEGORY_MAP[params.category ?? "PURCHASE"] ?? CONVERSION_CATEGORY_MAP.PURCHASE,
+    type: CONVERSION_TYPE_MAP[params.type ?? "UPLOAD_CLICKS"] ?? CONVERSION_TYPE_MAP.UPLOAD_CLICKS,
+    counting_type: CONVERSION_COUNTING_MAP[params.countingType ?? "ONE_PER_CLICK"] ?? CONVERSION_COUNTING_MAP.ONE_PER_CLICK,
+    status: CONVERSION_STATUS_MAP[params.status ?? "ENABLED"] ?? CONVERSION_STATUS_MAP.ENABLED,
+  };
+
+  // Value settings
+  if (params.defaultValue !== undefined || params.alwaysUseDefaultValue !== undefined) {
+    resource.value_settings = {
+      default_value: params.defaultValue ?? 0,
+      always_use_default_value: params.alwaysUseDefaultValue ?? true,
+    };
+  }
+
+  if (params.viewThroughLookbackWindowDays !== undefined) {
+    resource.view_through_lookback_window_days = params.viewThroughLookbackWindowDays;
+  }
+  if (params.clickThroughLookbackWindowDays !== undefined) {
+    resource.click_through_lookback_window_days = params.clickThroughLookbackWindowDays;
+  }
+
+  try {
+    const response = await customer.mutateResources([
+      {
+        entity: "conversion_action" as any,
+        operation: "create",
+        resource,
+      },
+    ]);
+
+    const responses = (response as any)?.mutate_operation_responses ?? [];
+    const resourceName = responses[0]?.conversion_action_result?.resource_name as string | undefined;
+    const conversionActionId = resourceName?.split("/").pop() ?? "";
+
+    if (!conversionActionId) {
+      return { success: false, action: "create_conversion_action", entityId: "", beforeValue: "", afterValue: params.name, error: "Conversion action created but ID could not be extracted from response" };
+    }
+
+    // Enable Enhanced Conversions for Leads at account level if requested
+    if (params.enhancedConversionsForLeads) {
+      const ecflError = await enableEcfl(customer, cid);
+      if (ecflError) {
+        return {
+          success: true,
+          action: "create_conversion_action",
+          entityId: conversionActionId,
+          beforeValue: "",
+          afterValue: params.name,
+          label: `Warning: Conversion action created, but enabling Enhanced Conversions for Leads failed: ${ecflError}`,
+        };
+      }
+    }
+
+    return {
+      success: true,
+      action: "create_conversion_action",
+      entityId: conversionActionId,
+      beforeValue: "",
+      afterValue: params.name,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "create_conversion_action",
+      entityId: "",
+      beforeValue: "",
+      afterValue: params.name,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+export type UpdateConversionActionParams = {
+  conversionActionId: string;
+  name?: string;
+  category?: string;
+  countingType?: string;
+  defaultValue?: number;
+  alwaysUseDefaultValue?: boolean;
+  status?: string;
+  enhancedConversionsForLeads?: boolean;
+  viewThroughLookbackWindowDays?: number;
+  clickThroughLookbackWindowDays?: number;
+};
+
+export async function updateConversionAction(
+  auth: AuthContext,
+  params: UpdateConversionActionParams,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+
+  // Fetch current state for undo record
+  let beforeValue: string;
+  try {
+    const current = await customer.query(`
+      SELECT
+        conversion_action.name,
+        conversion_action.status,
+        conversion_action.category,
+        conversion_action.counting_type,
+        conversion_action.value_settings.default_value,
+        conversion_action.value_settings.always_use_default_value
+      FROM conversion_action
+      WHERE conversion_action.id = ${safeEntityId(params.conversionActionId, "conversion action")}
+      LIMIT 1
+    `);
+    const row = (current as any[])[0]?.conversion_action ?? {};
+    // Normalize numeric enum values to string names for undo compatibility.
+    // GAQL returns numeric protobuf values (e.g. 2 for ENABLED), but the
+    // undo path passes these back through CONVERSION_STATUS_MAP which expects string keys.
+    const rawStatus = row.status;
+    const rawCategory = row.category;
+    const rawCounting = row.counting_type;
+    beforeValue = JSON.stringify({
+      name: row.name,
+      status: typeof rawStatus === "number" ? STATUS_REVERSE[rawStatus] : rawStatus,
+      category: typeof rawCategory === "number" ? CATEGORY_REVERSE[rawCategory] : rawCategory,
+      countingType: typeof rawCounting === "number" ? COUNTING_REVERSE[rawCounting] : rawCounting,
+      defaultValue: row.value_settings?.default_value,
+      alwaysUseDefaultValue: row.value_settings?.always_use_default_value,
+    });
+  } catch (fetchError) {
+    return {
+      success: false,
+      action: "update_conversion_action",
+      entityId: params.conversionActionId,
+      beforeValue: "",
+      afterValue: "",
+      error: `Could not read current conversion action before writing (undo would be unsafe): ${extractErrorMessage(fetchError)}`,
+    };
+  }
+
+  const resource: Record<string, unknown> = {
+    resource_name: `customers/${cid}/conversionActions/${params.conversionActionId}`,
+  };
+
+  if (params.name !== undefined) resource.name = params.name.trim();
+  if (params.category !== undefined) resource.category = CONVERSION_CATEGORY_MAP[params.category] ?? CONVERSION_CATEGORY_MAP.DEFAULT;
+  if (params.countingType !== undefined) resource.counting_type = CONVERSION_COUNTING_MAP[params.countingType] ?? CONVERSION_COUNTING_MAP.ONE_PER_CLICK;
+  if (params.status !== undefined) resource.status = CONVERSION_STATUS_MAP[params.status] ?? CONVERSION_STATUS_MAP.ENABLED;
+  if (params.defaultValue !== undefined || params.alwaysUseDefaultValue !== undefined) {
+    resource.value_settings = {
+      ...(params.defaultValue !== undefined && { default_value: params.defaultValue }),
+      ...(params.alwaysUseDefaultValue !== undefined && { always_use_default_value: params.alwaysUseDefaultValue }),
+    };
+  }
+  if (params.viewThroughLookbackWindowDays !== undefined) {
+    resource.view_through_lookback_window_days = params.viewThroughLookbackWindowDays;
+  }
+  if (params.clickThroughLookbackWindowDays !== undefined) {
+    resource.click_through_lookback_window_days = params.clickThroughLookbackWindowDays;
+  }
+
+  const afterValue = JSON.stringify({
+    name: params.name,
+    status: params.status,
+    category: params.category,
+    countingType: params.countingType,
+    defaultValue: params.defaultValue,
+    alwaysUseDefaultValue: params.alwaysUseDefaultValue,
+  });
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "conversion_action" as any,
+        operation: "update",
+        resource,
+      },
+    ]);
+
+    // Enable Enhanced Conversions for Leads at account level if requested
+    if (params.enhancedConversionsForLeads) {
+      const ecflError = await enableEcfl(customer, cid);
+      if (ecflError) {
+        return {
+          success: true,
+          action: "update_conversion_action",
+          entityId: params.conversionActionId,
+          beforeValue,
+          afterValue,
+          label: `Warning: Conversion action updated, but enabling Enhanced Conversions for Leads failed: ${ecflError}`,
+        };
+      }
+    }
+
+    return {
+      success: true,
+      action: "update_conversion_action",
+      entityId: params.conversionActionId,
+      beforeValue,
+      afterValue,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "update_conversion_action",
+      entityId: params.conversionActionId,
+      beforeValue,
+      afterValue,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+// ─── Upload Click Conversions ───────────────────────────────────────
+
+export type ClickConversionInput = {
+  gclid?: string;
+  conversionDateTime: string;
+  conversionValue?: number;
+  currencyCode?: string;
+  orderId?: string;
+  hashedEmail?: string;
+  hashedPhoneNumber?: string;
+};
+
+export type UploadClickConversionsResult = {
+  success: boolean;
+  action: string;
+  totalUploaded: number;
+  successCount: number;
+  failureCount: number;
+  partialErrors: Array<{ index: number; message: string }>;
+  error?: string;
+};
+
+/** Validate a string looks like a SHA-256 hash (64 hex chars). */
+function isValidSha256(value: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(value);
+}
+
+/**
+ * Convert ISO 8601 datetime to Google Ads format: "yyyy-mm-dd hh:mm:ss+|-hh:mm"
+ * Example: "2024-01-15T14:30:00-05:00" → "2024-01-15 14:30:00-05:00"
+ *
+ * Google Ads rejects milliseconds and requires an explicit timezone offset.
+ */
+function toGoogleAdsDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) {
+    throw new Error(`Invalid date: ${iso}`);
+  }
+
+  // If the input has an explicit offset (e.g. -05:00 or +00:00), preserve it.
+  // Otherwise, format in UTC with +00:00.
+  const offsetMatch = iso.match(/([+-]\d{2}:\d{2})$/);
+
+  if (offsetMatch) {
+    // Input has explicit offset — strip T, strip fractional seconds, keep offset
+    return iso
+      .replace("T", " ")
+      .replace(/\.\d+/, ""); // remove any fractional seconds (.123, .123456, etc.)
+  }
+
+  // No explicit offset (bare datetime or trailing Z) — format as UTC
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const month = pad(d.getUTCMonth() + 1);
+  const day = pad(d.getUTCDate());
+  const hours = pad(d.getUTCHours());
+  const minutes = pad(d.getUTCMinutes());
+  const seconds = pad(d.getUTCSeconds());
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}+00:00`;
+}
+
+export async function uploadClickConversions(
+  auth: AuthContext,
+  conversionActionId: string,
+  conversions: ClickConversionInput[],
+): Promise<UploadClickConversionsResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  // Validate conversionActionId
+  try {
+    safeEntityId(conversionActionId, "conversion action");
+  } catch (e) {
+    return {
+      success: false,
+      action: "upload_click_conversions",
+      totalUploaded: 0,
+      successCount: 0,
+      failureCount: conversions.length,
+      partialErrors: [],
+      error: (e as Error).message,
+    };
+  }
+
+  const conversionActionResourceName = `customers/${cid}/conversionActions/${conversionActionId}`;
+
+  // Validate each conversion
+  for (let i = 0; i < conversions.length; i++) {
+    const c = conversions[i];
+    if (!c.gclid && !c.hashedEmail && !c.hashedPhoneNumber) {
+      return {
+        success: false,
+        action: "upload_click_conversions",
+        totalUploaded: 0,
+        successCount: 0,
+        failureCount: conversions.length,
+        partialErrors: [],
+        error: `Conversion at index ${i}: must have at least one of gclid, hashedEmail, or hashedPhoneNumber`,
+      };
+    }
+    if (c.hashedEmail && !isValidSha256(c.hashedEmail)) {
+      return {
+        success: false,
+        action: "upload_click_conversions",
+        totalUploaded: 0,
+        successCount: 0,
+        failureCount: conversions.length,
+        partialErrors: [],
+        error: `Conversion at index ${i}: hashedEmail must be a valid SHA-256 hash (64 hex characters)`,
+      };
+    }
+    if (c.hashedPhoneNumber && !isValidSha256(c.hashedPhoneNumber)) {
+      return {
+        success: false,
+        action: "upload_click_conversions",
+        totalUploaded: 0,
+        successCount: 0,
+        failureCount: conversions.length,
+        partialErrors: [],
+        error: `Conversion at index ${i}: hashedPhoneNumber must be a valid SHA-256 hash (64 hex characters)`,
+      };
+    }
+  }
+
+  // Build ClickConversion objects
+  const clickConversions = conversions.map((c) => {
+    const conversion: Record<string, unknown> = {
+      conversion_action: conversionActionResourceName,
+      conversion_date_time: toGoogleAdsDateTime(c.conversionDateTime),
+    };
+
+    if (c.gclid) conversion.gclid = c.gclid;
+    if (c.conversionValue !== undefined) conversion.conversion_value = c.conversionValue;
+    if (c.currencyCode) conversion.currency_code = c.currencyCode;
+    if (c.orderId) conversion.order_id = c.orderId;
+
+    // Enhanced Conversions for Leads user identifiers
+    const userIdentifiers: Array<Record<string, unknown>> = [];
+    if (c.hashedEmail) {
+      userIdentifiers.push({
+        hashed_email: c.hashedEmail,
+        user_identifier_source: 1, // FIRST_PARTY
+      });
+    }
+    if (c.hashedPhoneNumber) {
+      userIdentifiers.push({
+        hashed_phone_number: c.hashedPhoneNumber,
+        user_identifier_source: 1, // FIRST_PARTY
+      });
+    }
+    if (userIdentifiers.length > 0) {
+      conversion.user_identifiers = userIdentifiers;
+    }
+
+    return conversion;
+  });
+
+  try {
+    const response = await customer.conversionUploads.uploadClickConversions({
+      customer_id: cid,
+      conversions: clickConversions as any,
+      partial_failure: true,
+    } as any);
+
+    // Parse partial failure errors
+    const partialErrors: Array<{ index: number; message: string }> = [];
+    const partialFailureError = (response as any).partial_failure_error;
+    if (partialFailureError?.details) {
+      for (const detail of partialFailureError.details) {
+        const errors = detail?.errors ?? [];
+        for (const err of errors) {
+          const fieldPath = err?.location?.field_path_elements?.[0];
+          const index = fieldPath?.index ?? -1;
+          partialErrors.push({
+            index: Number(index),
+            message: err.message ?? extractErrorMessage(err),
+          });
+        }
+      }
+    }
+
+    // Count unique failed conversion indices (one conversion can have multiple errors)
+    const failedIndices = new Set(partialErrors.map((e) => e.index));
+    const failureCount = failedIndices.size;
+    const successCount = conversions.length - failureCount;
+
+    return {
+      success: failureCount === 0,
+      action: "upload_click_conversions",
+      totalUploaded: conversions.length,
+      successCount,
+      failureCount,
+      partialErrors,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "upload_click_conversions",
+      totalUploaded: 0,
+      successCount: 0,
+      failureCount: conversions.length,
+      partialErrors: [],
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
 export async function updateAdFinalUrl(
   auth: AuthContext,
   adGroupId: string,

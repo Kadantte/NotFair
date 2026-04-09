@@ -33,6 +33,9 @@ import {
   renameAdGroup,
   updateCampaignSettings,
   updateCampaignBidding,
+  createConversionAction,
+  updateConversionAction,
+  uploadClickConversions,
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
@@ -725,6 +728,117 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     });
   }));
 
+  // ─── Conversion Action Management ────────────────────────────────
+
+  server.registerTool("createConversionAction", {
+    description: "Create a conversion action for tracking offline conversions (imports), web events, or calls. Optionally enable Enhanced Conversions for Leads (ECFL) for user-data matching. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      name: z.string().min(1).describe("Conversion action name, e.g. 'First Booking'"),
+      category: z.enum([
+        "PURCHASE", "LEAD", "SIGNUP", "BOOK_APPOINTMENT",
+        "SUBMIT_LEAD_FORM", "SUBSCRIBE_PAID", "ADD_TO_CART",
+        "BEGIN_CHECKOUT", "PAGE_VIEW", "DEFAULT", "OTHER",
+      ]).default("PURCHASE"),
+      type: z.enum(["UPLOAD_CLICKS", "WEBPAGE", "UPLOAD_CALLS"]).default("UPLOAD_CLICKS")
+        .describe("UPLOAD_CLICKS for offline/import conversions, WEBPAGE for website events, UPLOAD_CALLS for call tracking"),
+      countingType: z.enum(["ONE_PER_CLICK", "MANY_PER_CLICK"]).default("ONE_PER_CLICK")
+        .describe("ONE_PER_CLICK counts one conversion per click (leads), MANY_PER_CLICK counts every conversion (purchases)"),
+      defaultValue: z.number().optional().describe("Default conversion value in account currency"),
+      alwaysUseDefaultValue: z.boolean().default(true).describe("Always use default value vs. transaction-specific values"),
+      status: z.enum(["ENABLED", "HIDDEN"]).default("ENABLED")
+        .describe("ENABLED = primary (included in Conversions column), HIDDEN = secondary (observation only)"),
+      enhancedConversionsForLeads: z.boolean().default(false)
+        .describe("Enable Enhanced Conversions for Leads at account level — allows matching via hashed email/phone"),
+      viewThroughLookbackWindowDays: z.number().int().min(1).max(30).optional()
+        .describe("View-through conversion lookback window (1-30 days)"),
+      clickThroughLookbackWindowDays: z.number().int().min(1).max(90).optional()
+        .describe("Click-through conversion lookback window (1-90 days)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, name, category, type, countingType, defaultValue, alwaysUseDefaultValue, status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () =>
+      createConversionAction(targetAuth, {
+        name, category, type, countingType, defaultValue, alwaysUseDefaultValue,
+        status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
+      }),
+    );
+    return jsonResult(result);
+  }));
+
+  server.registerTool("updateConversionAction", {
+    description: "Update an existing conversion action's settings — promote secondary to primary, change value, toggle status. Use getConversionActions to find the conversionActionId first. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      conversionActionId: z.string().describe("Conversion action ID (from getConversionActions)"),
+      name: z.string().min(1).optional(),
+      category: z.enum([
+        "PURCHASE", "LEAD", "SIGNUP", "BOOK_APPOINTMENT",
+        "SUBMIT_LEAD_FORM", "SUBSCRIBE_PAID", "ADD_TO_CART",
+        "BEGIN_CHECKOUT", "PAGE_VIEW", "DEFAULT", "OTHER",
+      ]).optional(),
+      countingType: z.enum(["ONE_PER_CLICK", "MANY_PER_CLICK"]).optional(),
+      defaultValue: z.number().optional().describe("Default conversion value in account currency"),
+      alwaysUseDefaultValue: z.boolean().optional(),
+      status: z.enum(["ENABLED", "HIDDEN", "REMOVED"]).optional()
+        .describe("ENABLED = primary, HIDDEN = secondary, REMOVED = delete"),
+      enhancedConversionsForLeads: z.boolean().optional()
+        .describe("Enable Enhanced Conversions for Leads at account level"),
+      viewThroughLookbackWindowDays: z.number().int().min(1).max(30).optional(),
+      clickThroughLookbackWindowDays: z.number().int().min(1).max(90).optional(),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue, status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () =>
+      updateConversionAction(targetAuth, {
+        conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue,
+        status, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
+      }),
+    );
+    return jsonResult(result);
+  }));
+
+  server.registerTool("uploadClickConversions", {
+    description: "Upload offline click conversions to Google Ads for attribution. Supports Enhanced Conversions for Leads via hashed email/phone matching. Each conversion needs a gclid OR hashed user identifiers. Max 2000 conversions per call. Partial failures are reported per-row.",
+    inputSchema: {
+      accountId: accountIdParam,
+      conversionActionId: z.string().describe("Conversion action ID to attribute conversions to"),
+      conversions: z.array(z.object({
+        gclid: z.string().optional().describe("Google Click ID — required unless using hashed user identifiers"),
+        conversionDateTime: z.string().describe("Conversion time in ISO 8601 with timezone, e.g. '2024-01-15T14:30:00-05:00'"),
+        conversionValue: z.number().optional().describe("Value in account currency"),
+        currencyCode: z.string().length(3).optional().describe("ISO 4217 currency code, e.g. 'USD'"),
+        orderId: z.string().optional().describe("External order/transaction ID for deduplication"),
+        hashedEmail: z.string().optional().describe("SHA-256 hash of lowercase trimmed email (for Enhanced Conversions for Leads)"),
+        hashedPhoneNumber: z.string().optional().describe("SHA-256 hash of E.164 phone number (for Enhanced Conversions for Leads)"),
+      })).min(1).max(2000).describe("Conversions to upload (max 2000 per request)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, conversionActionId, conversions }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+
+    const result = await uploadClickConversions(targetAuth, conversionActionId, conversions);
+
+    // Log as a write operation for tracking (execWrite handles rate limiting)
+    if (result.successCount > 0) {
+      const writeResult = {
+        success: true,
+        action: "upload_click_conversions",
+        entityId: conversionActionId,
+        beforeValue: "",
+        afterValue: `${result.successCount} conversions`,
+      };
+      await execWrite(auth, targetId, null, async () => writeResult);
+    } else {
+      // Still rate-limit even when no successes (prevents abuse via invalid uploads)
+      await enforceRateLimit(auth.userId);
+    }
+
+    return jsonResult(result);
+  }));
+
   // ─── Guardrails ─────────────────────────────────────────────────
 
   server.registerTool("setGuardrails", {
@@ -993,6 +1107,28 @@ export async function executeUndoForChange(
     case "rename_ad_group":
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
       return renameAdGroup(auth, change.campaignId ?? "", entityId, beforeValue);
+    case "create_conversion_action":
+      // Undo creation by setting status to REMOVED
+      return updateConversionAction(auth, { conversionActionId: entityId, status: "REMOVED" });
+    case "update_conversion_action": {
+      if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous conversion action state not recorded" };
+      try {
+        const prev = JSON.parse(beforeValue) as Record<string, unknown>;
+        return updateConversionAction(auth, {
+          conversionActionId: entityId,
+          name: prev.name as string | undefined,
+          status: prev.status as string | undefined,
+          category: prev.category as string | undefined,
+          countingType: prev.countingType as string | undefined,
+          defaultValue: prev.defaultValue as number | undefined,
+          alwaysUseDefaultValue: prev.alwaysUseDefaultValue as boolean | undefined,
+        });
+      } catch {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous conversion action state" };
+      }
+    }
+    case "upload_click_conversions":
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Conversion uploads cannot be undone — uploaded conversions are permanent in Google Ads" };
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }
