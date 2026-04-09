@@ -468,9 +468,10 @@ export async function GET(request: Request) {
   const next = getSafeNext(state.next ?? explicitNext);
 
   if (!code) {
+    console.error("[auth/callback] Missing code param in callback URL");
     return popup
       ? popupErrorResponse(origin, "Authentication failed. Missing code.")
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=missing_code`);
   }
 
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
@@ -478,9 +479,10 @@ export async function GET(request: Request) {
   const redirectUri = `${getAppOrigin()}/auth/callback`;
 
   if (!clientId || !clientSecret) {
+    console.error("[auth/callback] Missing GOOGLE_ADS_CLIENT_ID or CLIENT_SECRET env vars");
     return popup
       ? popupErrorResponse(origin, "Server misconfiguration: missing Google OAuth credentials.")
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=server_config`);
   }
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -507,9 +509,16 @@ export async function GET(request: Request) {
       tokenData.error_description ||
       tokenData.error ||
       "Failed to complete Google authentication";
+    console.error("[auth/callback] Token exchange failed:", {
+      status: tokenResponse.status,
+      error: tokenData.error,
+      error_description: tokenData.error_description,
+      hasRefreshToken: !!tokenData.refresh_token,
+      hasIdToken: !!tokenData.id_token,
+    });
     return popup
       ? popupErrorResponse(origin, message)
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=token_exchange`);
   }
 
   // Verify the adwords scope was actually granted (Google granular permissions
@@ -545,7 +554,7 @@ export async function GET(request: Request) {
     console.error("[auth/callback] Supabase sign-in failed:", authError);
     return popup
       ? popupErrorResponse(origin, "Failed to establish app session.")
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=supabase_auth`);
   }
 
   const user = authData.user ?? authData.session?.user ?? null;
