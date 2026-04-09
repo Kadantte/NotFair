@@ -18,9 +18,25 @@ export const metadata = buildMetadata({
   ],
 });
 
-export default function Home() {
-  const jsonLd = buildHomepageJsonLd();
-  const faqJsonLd = buildFaqJsonLd(homepageFaq);
+async function getGitHubStars(): Promise<number | null> {
+  try {
+    const res = await fetch("https://api.github.com/repos/nowork-studio/toprank", {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.stargazers_count ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function Home() {
+  const [jsonLd, faqJsonLd, stars] = await Promise.all([
+    Promise.resolve(buildHomepageJsonLd()),
+    Promise.resolve(buildFaqJsonLd(homepageFaq)),
+    getGitHubStars(),
+  ]);
 
   return (
     <>
@@ -32,7 +48,7 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <HomePage />
+      <HomePage githubStars={stars} />
     </>
   );
 }
