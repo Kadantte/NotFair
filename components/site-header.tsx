@@ -24,11 +24,11 @@ export function GitHubStarBadge({ stars }: { stars: number | null }) {
     );
 }
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({ href, label, className = "" }: { href: string; label: string; className?: string }) {
     return (
         <Link
             href={href}
-            className="text-[14px] font-medium text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+            className={`text-[14px] font-medium text-[#9B9689] transition-colors hover:text-[#E8E4DD] ${className}`}
         >
             {label}
         </Link>
@@ -51,8 +51,8 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
-                    <NavLink href="/google-ads-audit" label="Free Google Ads Audit" />
-                    <NavLink href="/google-ads-claude-connector" label="Google Ads Claude Connector Setup Guide" />
+                    <NavLink href="/google-ads-audit" label="Free Google Ads Audit" className="hidden sm:inline" />
+                    <NavLink href="/google-ads-claude-connector" label="Google Ads Claude Connector Setup Guide" className="hidden lg:inline" />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"
