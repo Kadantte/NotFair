@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, micros } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, micros } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -423,6 +423,7 @@ export async function getCampaignAdsAction(campaignId: string) {
         return result.ads.map((ad) => ({
             adId: ad.adId,
             status: ad.status,
+            type: ad.type,
             adGroupName: ad.adGroupName,
             finalUrls: ad.finalUrls,
             headlines: ad.headlines,
@@ -522,9 +523,11 @@ export async function getSmartCampaignAdsAction(campaignId: string) {
         try {
             const { refreshToken, customerId, customerIds } = await getSessionAuth();
             const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
-            return await getSmartCampaignAds(auth, campaignId);
-        } catch (error) {
-            console.error("Get Smart Campaign Ads Error:", error);
+            const result = await getSmartCampaignAds(auth, campaignId);
+            console.log("[getSmartCampaignAdsAction] returned", result.length, "ads");
+            return result;
+        } catch (error: any) {
+            console.error("[getSmartCampaignAdsAction] FAILED:", error?.message ?? error);
             return [];
         }
     });
@@ -538,6 +541,19 @@ export async function getCampaignKeywordThemesAction(campaignId: string) {
             return await getSmartCampaignKeywordThemes(auth, campaignId);
         } catch (error) {
             console.error("Get Smart Campaign Keyword Themes Error:", error);
+            return [];
+        }
+    });
+}
+
+export async function getSmartCampaignSearchTermsAction(campaignId: string) {
+    return requireAuth(async () => {
+        try {
+            const { refreshToken, customerId, customerIds } = await getSessionAuth();
+            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            return await getSmartCampaignSearchTerms(auth, campaignId);
+        } catch (error) {
+            console.error("Get Smart Campaign Search Terms Error:", error);
             return [];
         }
     });

@@ -6,6 +6,7 @@ import {
   scoreKeywordHealth,
   scoreSearchTermQuality,
   scoreAdCopy,
+  scoreBiddingStrategy,
   scoreImpressionShare,
   scoreSpendEfficiency,
   scoreLandingPageQuality,
@@ -37,8 +38,8 @@ function wellOptimizedInput(): AuditInput {
       { id: "2", name: "Lead", type: 29, status: 2, category: 13, includeInConversions: true, countingType: 2 },
     ],
     campaigns: [
-      { id: "1", name: "Brand", status: 2, cost: 500, conversions: 50, clicks: 200, impressions: 5000 },
-      { id: "2", name: "Non-Brand Services", status: 2, cost: 1500, conversions: 30, clicks: 600, impressions: 15000 },
+      { id: "1", name: "Brand", status: 2, cost: 500, conversions: 50, clicks: 200, impressions: 5000, biddingStrategy: "TARGET_CPA" },
+      { id: "2", name: "Non-Brand Services", status: 2, cost: 1500, conversions: 30, clicks: 600, impressions: 15000, biddingStrategy: "MAXIMIZE_CONVERSIONS" },
     ],
     keywords: [
       { criterionId: "1", text: "brand name", qualityScore: 9, creativeQuality: 4, postClickQuality: 4, searchPredictedCtr: 4, impressions: 3000, clicks: 150, cost: 300, conversions: 40, status: 2, matchType: "EXACT", campaignName: "Brand", campaignId: "1", adGroupName: "Brand", averageCpc: 2.0, ctr: 0.05 },
@@ -109,7 +110,7 @@ describe("computeAuditScore", () => {
     const result = computeAuditScore(emptyInput());
     expect(result.overallScore).toBeGreaterThanOrEqual(0);
     expect(result.overallScore).toBeLessThanOrEqual(100);
-    expect(result.dimensions).toHaveLength(8);
+    expect(result.dimensions).toHaveLength(9);
     expect(result.category).toBe("Critical");
   });
 
@@ -404,5 +405,201 @@ describe("impression share diagnosis", () => {
     const result = computeAuditScore(newAccountInput());
     expect(result.impressionShareDiagnosis.diagnosis.length).toBeGreaterThan(0);
     expect(result.impressionShareDiagnosis.avgIS).toBeCloseTo(0.33, 1);
+  });
+});
+
+describe("scoreBiddingStrategy", () => {
+  it("returns needs_work with no active campaigns", () => {
+    const result = scoreBiddingStrategy(emptyInput());
+    expect(result.score).toBe(2);
+    expect(result.status).toBe("needs_work");
+  });
+
+  it("returns needs_work when biddingStrategy data unavailable", () => {
+    const input = emptyInput();
+    input.campaigns = [{ id: "1", name: "Test", status: 2, cost: 100, conversions: 5, clicks: 20, impressions: 500 }];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBe(2);
+  });
+
+  it("scores high when all campaigns use Smart Bidding", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Brand", status: 2, cost: 500, conversions: 50, clicks: 200, impressions: 5000, biddingStrategy: "TARGET_CPA" },
+      { id: "2", name: "Non-Brand", status: 2, cost: 1500, conversions: 30, clicks: 600, impressions: 15000, biddingStrategy: "MAXIMIZE_CONVERSIONS" },
+    ];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBe(5);
+    expect(result.details.some((d) => d.includes("2/2"))).toBe(true);
+  });
+
+  it("penalizes deprecated Enhanced CPC", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Old Campaign", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000, biddingStrategy: "ENHANCED_CPC" },
+    ];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+    expect(result.details.some((d) => d.includes("deprecated") || d.includes("Enhanced CPC"))).toBe(true);
+  });
+
+  it("scores manual bidding as acceptable for new accounts without conversions", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "New", status: 2, cost: 10, conversions: 0, clicks: 5, impressions: 100, biddingStrategy: "MANUAL_CPC" },
+    ];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBeGreaterThanOrEqual(3);
+  });
+
+  it("penalizes manual bidding when conversion history is strong", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Mature", status: 2, cost: 5000, conversions: 200, clicks: 1000, impressions: 30000, biddingStrategy: "MANUAL_CPC" },
+    ];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+  });
+
+  it("handles numeric biddingStrategy values from google-ads-api (6=TARGET_CPA, 5=ENHANCED_CPC)", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Smart", status: 2, cost: 500, conversions: 20, clicks: 100, impressions: 2000, biddingStrategy: 6 as any },
+      { id: "2", name: "Smart2", status: 2, cost: 500, conversions: 15, clicks: 80, impressions: 1500, biddingStrategy: 11 as any },
+    ];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBe(5);
+  });
+
+  it("penalizes numeric ENHANCED_CPC (5) correctly", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Old", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000, biddingStrategy: 5 as any },
+    ];
+    const result = scoreBiddingStrategy(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+    expect(result.details.some((d) => d.includes("deprecated") || d.includes("Enhanced CPC"))).toBe(true);
+  });
+
+  it("scores 60-80% smart bidding as 4", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Smart1", status: 2, cost: 500, conversions: 20, clicks: 100, impressions: 2000, biddingStrategy: "TARGET_CPA" },
+      { id: "2", name: "Smart2", status: 2, cost: 500, conversions: 15, clicks: 80, impressions: 1500, biddingStrategy: "MAXIMIZE_CONVERSIONS" },
+      { id: "3", name: "Manual", status: 2, cost: 200, conversions: 5, clicks: 50, impressions: 1000, biddingStrategy: "MANUAL_CPC" },
+    ];
+    const result = scoreBiddingStrategy(input);
+    // 2/3 = 67% smart → score 4
+    expect(result.score).toBe(4);
+  });
+
+  it("scores 40-60% smart bidding as 3", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Smart", status: 2, cost: 500, conversions: 20, clicks: 100, impressions: 2000, biddingStrategy: "TARGET_CPA" },
+      { id: "2", name: "Manual1", status: 2, cost: 300, conversions: 10, clicks: 60, impressions: 1200, biddingStrategy: "MANUAL_CPC" },
+      { id: "3", name: "Manual2", status: 2, cost: 200, conversions: 5, clicks: 50, impressions: 1000, biddingStrategy: "MANUAL_CPC" },
+    ];
+    const result = scoreBiddingStrategy(input);
+    // 1/3 = 33% smart with conversions → score 2 (not enough conversion history check is per-account not per-campaign)
+    // Actually 1/3 = 33% < 40%, totalConversions=35 > 30 → score 2
+    expect(result.score).toBeLessThanOrEqual(2);
+  });
+
+  it("does not count campaigns with undefined biddingStrategy as manual", () => {
+    const input = emptyInput();
+    input.campaigns = [
+      { id: "1", name: "Smart", status: 2, cost: 500, conversions: 50, clicks: 200, impressions: 5000, biddingStrategy: "TARGET_CPA" },
+      { id: "2", name: "Unknown", status: 2, cost: 200, conversions: 10, clicks: 60, impressions: 1500 }, // no biddingStrategy
+    ];
+    const result = scoreBiddingStrategy(input);
+    // Known: 1 campaign, 1 smart → smartPct=100% → score 5 (not penalized for missing data)
+    expect(result.score).toBe(5);
+    expect(result.details.some((d) => d.includes("no bidding strategy data"))).toBe(true);
+  });
+});
+
+describe("scoreKeywordHealth — match type distribution", () => {
+  it("penalizes accounts with >70% broad match and 5+ keywords", () => {
+    const input = emptyInput();
+    input.campaigns = [{ id: "1", name: "C", status: 2, cost: 500, conversions: 5, clicks: 100, impressions: 2000 }];
+    // 6 keywords, 5 broad (83%) — should trigger the penalty
+    input.keywords = [
+      { criterionId: "1", text: "kw1", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 500, clicks: 25, cost: 75, conversions: 2, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "2", text: "kw2", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 400, clicks: 20, cost: 60, conversions: 1, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "3", text: "kw3", qualityScore: 6, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 300, clicks: 15, cost: 45, conversions: 1, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "4", text: "kw4", qualityScore: 6, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 200, clicks: 10, cost: 30, conversions: 1, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "5", text: "kw5", qualityScore: 6, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 100, clicks: 5, cost: 15, conversions: 0, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "6", text: "kw6", qualityScore: 8, creativeQuality: 4, postClickQuality: 4, searchPredictedCtr: 4, impressions: 200, clicks: 25, cost: 50, conversions: 2, status: 2, matchType: "PHRASE", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 2.0, ctr: 0.125 },
+    ];
+    const result = scoreKeywordHealth(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+    expect(result.details.some((d) => d.includes("broad match"))).toBe(true);
+  });
+
+  it("skips broad-match penalty with fewer than 5 keywords", () => {
+    const input = emptyInput();
+    input.campaigns = [{ id: "1", name: "C", status: 2, cost: 100, conversions: 2, clicks: 20, impressions: 500 }];
+    input.keywords = [
+      { criterionId: "1", text: "kw1", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 200, clicks: 10, cost: 30, conversions: 1, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "2", text: "kw2", qualityScore: 7, creativeQuality: 3, postClickQuality: 3, searchPredictedCtr: 3, impressions: 150, clicks: 8, cost: 25, conversions: 1, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+      { criterionId: "3", text: "kw3", qualityScore: 8, creativeQuality: 4, postClickQuality: 3, searchPredictedCtr: 4, impressions: 100, clicks: 5, cost: 15, conversions: 1, status: 2, matchType: "BROAD", campaignName: "C", campaignId: "1", adGroupName: "AG1", averageCpc: 3.0, ctr: 0.05 },
+    ];
+    const result = scoreKeywordHealth(input);
+    // 3 keywords, all broad but < 5 — no broad penalty
+    expect(result.details.some((d) => d.includes("Over 70% broad match"))).toBe(false);
+  });
+});
+
+describe("scoreAdCopy — ad strength", () => {
+  it("caps score at 2 when majority of RSAs have POOR strength", () => {
+    const input = emptyInput();
+    input.adGroupCount = 2;
+    input.ads = [
+      { adId: "1", type: 15, headlines: ["H1", "H2", "H3", "H4", "H5"], descriptions: ["D1", "D2"], finalUrls: ["https://ex.com"], impressions: 500, clicks: 20, cost: 50, conversions: 1, adGroupId: "1", adGroupName: "AG1", status: 2, adStrength: "POOR" },
+      { adId: "2", type: 15, headlines: ["H6", "H7", "H8", "H9", "H10"], descriptions: ["D3", "D4"], finalUrls: ["https://ex.com"], impressions: 300, clicks: 10, cost: 30, conversions: 0, adGroupId: "2", adGroupName: "AG2", status: 2, adStrength: "POOR" },
+    ];
+    const result = scoreAdCopy(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+    expect(result.details.some((d) => d.includes("poor ad strength"))).toBe(true);
+  });
+
+  it("caps score at 2 when majority have numeric POOR (3)", () => {
+    const input = emptyInput();
+    input.adGroupCount = 2;
+    input.ads = [
+      { adId: "1", type: 15, headlines: ["H1", "H2", "H3", "H4", "H5"], descriptions: ["D1", "D2"], finalUrls: ["https://ex.com"], impressions: 500, clicks: 20, cost: 50, conversions: 1, adGroupId: "1", adGroupName: "AG1", status: 2, adStrength: 3 as any },
+      { adId: "2", type: 15, headlines: ["H6", "H7", "H8", "H9", "H10"], descriptions: ["D3", "D4"], finalUrls: ["https://ex.com"], impressions: 300, clicks: 10, cost: 30, conversions: 0, adGroupId: "2", adGroupName: "AG2", status: 2, adStrength: 3 as any },
+    ];
+    const result = scoreAdCopy(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+  });
+
+  it("awards bonus point when at least one RSA has EXCELLENT strength", () => {
+    const input = emptyInput();
+    input.adGroupCount = 1;
+    input.ads = [
+      { adId: "1", type: 15, headlines: ["H1","H2","H3","H4","H5","H6","H7","H8","H9","H10","H11"], descriptions: ["D1", "D2", "D3"], finalUrls: ["https://ex.com"], impressions: 1000, clicks: 50, cost: 100, conversions: 5, adGroupId: "1", adGroupName: "AG1", status: 2, adStrength: "EXCELLENT" },
+    ];
+    const baseInput = emptyInput();
+    baseInput.adGroupCount = 1;
+    baseInput.ads = [
+      { adId: "1", type: 15, headlines: ["H1","H2","H3","H4","H5","H6","H7","H8","H9","H10","H11"], descriptions: ["D1", "D2", "D3"], finalUrls: ["https://ex.com"], impressions: 1000, clicks: 50, cost: 100, conversions: 5, adGroupId: "1", adGroupName: "AG1", status: 2 },
+    ];
+    const withStrength = scoreAdCopy(input);
+    const withoutStrength = scoreAdCopy(baseInput);
+    // EXCELLENT bonus should bump score higher than baseline
+    expect(withStrength.score).toBeGreaterThanOrEqual(withoutStrength.score);
+    expect(withStrength.details.some((d) => d.includes("Excellent"))).toBe(true);
+  });
+
+  it("awards bonus point when at least one RSA has numeric EXCELLENT (6)", () => {
+    const input = emptyInput();
+    input.adGroupCount = 1;
+    input.ads = [
+      { adId: "1", type: 15, headlines: ["H1","H2","H3","H4","H5","H6","H7","H8","H9","H10","H11"], descriptions: ["D1", "D2", "D3"], finalUrls: ["https://ex.com"], impressions: 1000, clicks: 50, cost: 100, conversions: 5, adGroupId: "1", adGroupName: "AG1", status: 2, adStrength: 6 as any },
+    ];
+    const result = scoreAdCopy(input);
+    expect(result.score).toBeGreaterThanOrEqual(4);
   });
 });

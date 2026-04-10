@@ -84,6 +84,7 @@ export async function getAuditOverview() {
         conversions: c.conversions,
         clicks: c.clicks,
         impressions: c.impressions,
+        biddingStrategy: (c as any).biddingStrategy ?? undefined,
       })),
     };
   });
@@ -265,6 +266,7 @@ export async function getAuditDetails() {
       adGroupId: String(a.adGroupId ?? ""),
       adGroupName: a.adGroupName ?? "",
       status: a.status ?? "UNKNOWN",
+      adStrength: a.adStrength ?? null,
     }));
 
     const allNegatives = negativeResults.flat().map((n: any) => ({
@@ -296,6 +298,7 @@ export async function getAuditDetails() {
         conversions: c.conversions,
         clicks: c.clicks,
         impressions: c.impressions,
+        biddingStrategy: (c as any).biddingStrategy ?? undefined,
       })),
       keywords: allKeywords,
       searchTerms: allSearchTerms,

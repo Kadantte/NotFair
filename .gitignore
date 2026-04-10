@@ -45,3 +45,4 @@ next-env.d.ts
 toprank/
 .gstack-screenshots/
 .mcp.json
+.playwright-mcp/

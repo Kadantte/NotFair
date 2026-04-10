@@ -46,6 +46,7 @@ export type AuditInput = {
     conversions: number;
     clicks: number;
     impressions: number;
+    biddingStrategy?: string | number;
   }>;
   keywords: Array<{
     criterionId: string;
@@ -90,6 +91,7 @@ export type AuditInput = {
     adGroupId: string;
     adGroupName: string;
     status: number | string;
+    adStrength?: string | number | null;
   }>;
   landingPages: LandingPageAnalysis[];
   impressionShare: Array<{
@@ -385,6 +387,14 @@ export function scoreKeywordHealth(input: AuditInput): Omit<DimensionScore, "key
     details.push(`$${wastedSpend.toFixed(2)} spent on non-converting keywords (${(wastedSpend / totalSpend * 100).toFixed(0)}%)`);
   }
 
+  // Match type distribution
+  const exactCount = enabled.filter((k) => k.matchType === "EXACT").length;
+  const phraseCount = enabled.filter((k) => k.matchType === "PHRASE").length;
+  const broadCount = enabled.filter((k) => k.matchType === "BROAD" || k.matchType === "BROAD_MATCH").length;
+  if (enabled.length > 0) {
+    details.push(`Match types: ${exactCount} Exact, ${phraseCount} Phrase, ${broadCount} Broad`);
+  }
+
   // Scoring
   let score = 2; // baseline
   if (avgQS !== null) {
@@ -405,13 +415,24 @@ export function scoreKeywordHealth(input: AuditInput): Omit<DimensionScore, "key
     else if (wastePct > 0.2) score = Math.min(score, 2);
   }
 
+  // Penalize for over-reliance on broad match (risk of waste without negatives)
+  if (enabled.length >= 5) {
+    const broadPct = broadCount / enabled.length;
+    if (broadPct > 0.7) {
+      score = Math.min(score, 2);
+      details.push("Over 70% broad match keywords — high irrelevant traffic risk without extensive negatives");
+    } else if (exactCount === 0 && enabled.length > 3) {
+      details.push("No exact match keywords — consider adding exact match for core terms");
+    }
+  }
+
   const s = clamp05(score);
   return {
     score: s,
     status: scoreToStatus(s),
     finding: avgQS !== null
-      ? `Avg QS ${avgQS.toFixed(1)}, ${zombies.length} zombie keywords, ${(zombiePct * 100).toFixed(0)}% zero-impression`
-      : `${enabled.length} keywords, ${zombies.length} with zero impressions — QS data not yet available`,
+      ? `Avg QS ${avgQS.toFixed(1)}, ${zombies.length} zombie keywords, ${exactCount}E/${phraseCount}P/${broadCount}B match split`
+      : `${enabled.length} keywords (${exactCount}E/${phraseCount}P/${broadCount}B), ${zombies.length} with zero impressions`,
     details,
   };
 }
@@ -487,6 +508,18 @@ export function scoreAdCopy(input: AuditInput): Omit<DimensionScore, "key" | "la
   const allDescriptions = new Set(rsas.flatMap((a) => a.descriptions));
   details.push(`${allHeadlines.size} unique headlines, ${allDescriptions.size} unique descriptions`);
 
+  // Ad strength distribution for RSAs
+  const rsaWithStrength = rsas.filter((a) => a.adStrength && a.adStrength !== "UNSPECIFIED" && a.adStrength !== 0);
+  let excellentCount = 0;
+  let goodCount = 0;
+  let poorCount = 0;
+  if (rsaWithStrength.length > 0) {
+    excellentCount = rsaWithStrength.filter((a) => a.adStrength === "EXCELLENT" || a.adStrength === 6).length;
+    goodCount = rsaWithStrength.filter((a) => a.adStrength === "GOOD" || a.adStrength === 5).length;
+    poorCount = rsaWithStrength.filter((a) => a.adStrength === "POOR" || a.adStrength === 3 || a.adStrength === "NO_ADS" || a.adStrength === 2).length;
+    details.push(`Ad strength: ${excellentCount} Excellent, ${goodCount} Good, ${rsaWithStrength.length - excellentCount - goodCount} Average/Poor`);
+  }
+
   // Scoring
   let score = 1; // ads exist
 
@@ -501,14 +534,27 @@ export function scoreAdCopy(input: AuditInput): Omit<DimensionScore, "key" | "la
     // Headline variety bonus
     if (allHeadlines.size >= 10) score = Math.min(score + 1, 5);
     else if (allHeadlines.size < 5) score = Math.max(score - 1, 0);
+
+    // Ad strength adjustment
+    if (rsaWithStrength.length > 0) {
+      if (poorCount > rsaWithStrength.length * 0.5) {
+        score = Math.min(score, 2);
+        details.push("Most RSAs have poor ad strength — diversify headlines and descriptions");
+      } else if (excellentCount > 0) {
+        score = Math.min(score + 1, 5);
+      }
+    }
   }
 
+  const strengthSummary = rsaWithStrength.length > 0
+    ? `, ${excellentCount} Excellent/${goodCount} Good strength`
+    : "";
   const s = clamp05(score);
   return {
     score: s,
     status: scoreToStatus(s),
     finding: rsas.length > 0
-      ? `${rsas.length} RSA(s), ${allHeadlines.size} unique headlines, ${rsaPerAg.toFixed(1)} RSAs per ad group`
+      ? `${rsas.length} RSA(s), ${allHeadlines.size} unique headlines, ${rsaPerAg.toFixed(1)} RSAs/ad group${strengthSummary}`
       : "No RSAs found — ad copy needs attention",
     details,
   };
@@ -702,6 +748,77 @@ export function scoreLandingPageQuality(input: AuditInput): Omit<DimensionScore,
     finding: loaded.length > 0
       ? `${loaded.length}/${total} pages loaded — ${https.length === total ? "HTTPS" : "mixed HTTP"}, ${withForm.length} with forms, ${withMobile.length} mobile-ready`
       : `${failed.length} page(s) failed to load`,
+    details,
+  };
+}
+
+// ─── Dimension 9: Bidding Strategy (weight 10%) ─────────────────────
+
+const SMART_BIDDING_TYPES = new Set<string | number>([
+  6, 8, 11, 12,
+  "TARGET_CPA", "TARGET_ROAS", "MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE",
+]);
+const DEPRECATED_BIDDING_TYPES = new Set<string | number>([5, "ENHANCED_CPC"]);
+
+export function scoreBiddingStrategy(input: AuditInput): Omit<DimensionScore, "key" | "label" | "weight"> {
+  const { campaigns } = input;
+  const details: string[] = [];
+
+  const enabled = campaigns.filter((c) => isEnabled(c.status) && c.cost > 0);
+
+  if (enabled.length === 0) {
+    return { score: 2, status: "needs_work", finding: "No active campaigns with spend to analyze", details: ["No active campaigns with spend in the analysis period."] };
+  }
+
+  const hasBiddingData = enabled.some((c) => c.biddingStrategy && c.biddingStrategy !== "UNKNOWN" && c.biddingStrategy !== "UNSPECIFIED");
+  if (!hasBiddingData) {
+    return { score: 2, status: "needs_work", finding: "Bidding strategy data unavailable", details: ["Bidding strategy data could not be retrieved."] };
+  }
+
+  const totalConversions = campaigns.reduce((s, c) => s + c.conversions, 0);
+  const smartCount = enabled.filter((c) => c.biddingStrategy && SMART_BIDDING_TYPES.has(c.biddingStrategy)).length;
+  const deprecatedCount = enabled.filter((c) => c.biddingStrategy && DEPRECATED_BIDDING_TYPES.has(c.biddingStrategy)).length;
+  // unknownCount: campaigns where strategy data is missing or unspecified — don't treat as "manual"
+  const unknownCount = enabled.filter((c) => !c.biddingStrategy || c.biddingStrategy === 0 || c.biddingStrategy === 1 || c.biddingStrategy === "UNKNOWN" || c.biddingStrategy === "UNSPECIFIED").length;
+  const manualCount = enabled.length - smartCount - deprecatedCount - unknownCount;
+  // Base smartPct on campaigns with known strategy only (don't penalize for missing API data)
+  const knownCount = enabled.length - unknownCount;
+  const smartPct = knownCount > 0 ? smartCount / knownCount : 0;
+
+  details.push(`${smartCount}/${knownCount > 0 ? knownCount : enabled.length} campaigns use Smart Bidding (Target CPA/ROAS or Maximize Conversions)`);
+  if (unknownCount > 0) {
+    details.push(`${unknownCount} campaign(s) have no bidding strategy data — check account access`);
+  }
+  if (deprecatedCount > 0) {
+    details.push(`${deprecatedCount} campaign(s) use deprecated Enhanced CPC — migrate to Smart Bidding`);
+  }
+  if (manualCount > 0 && totalConversions > 30) {
+    details.push(`${manualCount} campaign(s) on manual bidding despite sufficient conversion history — Smart Bidding could improve efficiency`);
+  } else if (manualCount > 0 && totalConversions === 0) {
+    details.push(`${manualCount} campaign(s) on manual CPC — appropriate while building conversion history`);
+  }
+
+  let score: number;
+
+  if (deprecatedCount > 0) {
+    score = 2; // deprecated strategies cap at poor
+  } else if (smartPct >= 0.8) {
+    score = 5;
+  } else if (smartPct >= 0.6) {
+    score = 4;
+  } else if (smartPct >= 0.4) {
+    score = 3;
+  } else if (totalConversions < 30 && manualCount === knownCount) {
+    score = 3; // manual is acceptable for new accounts without conversion history
+  } else {
+    score = 2;
+  }
+
+  const s = clamp05(score);
+  return {
+    score: s,
+    status: scoreToStatus(s),
+    finding: `${smartCount}/${enabled.length} campaigns on Smart Bidding${deprecatedCount > 0 ? `, ${deprecatedCount} on deprecated Enhanced CPC` : ""}`,
     details,
   };
 }
@@ -1063,14 +1180,15 @@ function computeTopActions(input: AuditInput): TopAction[] {
 // ─── Main Entry ─────────────────────────────────────────────────────
 
 const DIMENSIONS: Array<{ key: string; label: string; weight: number; scorer: (input: AuditInput) => Omit<DimensionScore, "key" | "label" | "weight"> }> = [
-  { key: "conversion_tracking", label: "Conversion Tracking", weight: 0.18, scorer: scoreConversionTracking },
-  { key: "campaign_structure", label: "Campaign Structure", weight: 0.12, scorer: scoreCampaignStructure },
-  { key: "keyword_health", label: "Keyword Health", weight: 0.18, scorer: scoreKeywordHealth },
-  { key: "search_term_quality", label: "Search Term Quality", weight: 0.14, scorer: scoreSearchTermQuality },
+  { key: "conversion_tracking", label: "Conversion Tracking", weight: 0.16, scorer: scoreConversionTracking },
+  { key: "campaign_structure", label: "Campaign Structure", weight: 0.10, scorer: scoreCampaignStructure },
+  { key: "keyword_health", label: "Keyword Health", weight: 0.16, scorer: scoreKeywordHealth },
+  { key: "search_term_quality", label: "Search Term Quality", weight: 0.12, scorer: scoreSearchTermQuality },
   { key: "ad_copy", label: "Ad Copy", weight: 0.08, scorer: scoreAdCopy },
+  { key: "bidding_strategy", label: "Bidding Strategy", weight: 0.10, scorer: scoreBiddingStrategy },
   { key: "impression_share", label: "Impression Share", weight: 0.10, scorer: scoreImpressionShare },
   { key: "spend_efficiency", label: "Spend Efficiency", weight: 0.10, scorer: scoreSpendEfficiency },
-  { key: "landing_page_quality", label: "Landing Page Quality", weight: 0.10, scorer: scoreLandingPageQuality },
+  { key: "landing_page_quality", label: "Landing Page Quality", weight: 0.08, scorer: scoreLandingPageQuality },
 ];
 
 function overallCategory(score: number): AuditResult["category"] {

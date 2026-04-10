@@ -680,6 +680,73 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
   );
 }
 
+// ─── Campaign Performance Section ────────────────────────────────────
+
+function CampaignPerformanceSection({
+  campaigns,
+}: {
+  campaigns: Array<{ id: string; name: string; status: string | number; cost: number; clicks: number; impressions: number; conversions: number }>;
+}) {
+  const active = campaigns.filter((c) => c.cost > 0 || c.impressions > 0);
+  if (active.length === 0) return null;
+  const sorted = [...active].sort((a, b) => b.cost - a.cost);
+
+  return (
+    <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
+      <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD] mb-3">
+        <TrendingDown className="h-4 w-4 text-[#9B9689]" />
+        Campaign Performance
+        <span className="text-[11px] text-[#6B6760] font-normal">Last 30 days</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="border-b border-[#3D3C36] text-[10px] uppercase tracking-wider text-[#6B6760]">
+              <th className="pb-2 text-left">Campaign</th>
+              <th className="pb-2 text-right">Spend</th>
+              <th className="pb-2 text-right hidden sm:table-cell">Clicks</th>
+              <th className="pb-2 text-right hidden sm:table-cell">Impr</th>
+              <th className="pb-2 text-right hidden md:table-cell">CTR</th>
+              <th className="pb-2 text-right hidden md:table-cell">CPC</th>
+              <th className="pb-2 text-right">Conv</th>
+              <th className="pb-2 text-right hidden sm:table-cell">CPA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((c) => {
+              const ctr = c.impressions > 0 ? c.clicks / c.impressions : null;
+              const cpc = c.clicks > 0 ? c.cost / c.clicks : null;
+              const cpa = c.conversions > 0 ? c.cost / c.conversions : null;
+              const isEnabled = c.status === "ENABLED" || c.status === 2;
+              return (
+                <tr key={c.id} className="border-b border-[#3D3C36] last:border-0">
+                  <td className="py-2.5 pr-3 max-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[#E8E4DD] truncate">{c.name}</span>
+                      {!isEnabled && (
+                        <span className="shrink-0 rounded-sm bg-[#3D3C36] px-1.5 py-0.5 text-[9px] text-[#6B6760]">Paused</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2.5 pr-3 text-right font-mono text-[#E8E4DD]">{fmt$(c.cost)}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden sm:table-cell">{fmtN(c.clicks)}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden sm:table-cell">{fmtN(c.impressions)}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden md:table-cell">{ctr !== null ? fmtPct(ctr) : "—"}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden md:table-cell">{cpc !== null ? fmt$(cpc) : "—"}</td>
+                  <td className="py-2.5 pr-3 text-right font-mono" style={{ color: c.conversions > 0 ? "#4CAF6E" : "#9B9689" }}>
+                    {fmtN(c.conversions)}
+                  </td>
+                  <td className="py-2.5 text-right text-[#9B9689] hidden sm:table-cell">{cpa !== null ? fmt$(cpa) : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Zero-CV Campaigns Section ───────────────────────────────────────
 
 function ZeroCvCampaignsSection({
@@ -1066,6 +1133,9 @@ export function AuditContent({
             color={auditResult && auditResult.keyNumbers.wastedSpend > 0 ? "#C45D4A" : undefined}
           />
         </div>
+
+        {/* Campaign Performance Table */}
+        <CampaignPerformanceSection campaigns={overview.campaigns} />
 
         {/* Zero-conversion campaigns — actionable, shown early */}
         {auditResult && auditResult.zeroCvCampaigns.length > 0 && (

@@ -14,6 +14,7 @@ import {
     getCampaignKeywordThemesAction,
     getSmartCampaignSettingAction,
     getSmartCampaignAdsAction,
+    getSmartCampaignSearchTermsAction,
 } from '@/app/actions';
 import {
     XAxis,
@@ -41,6 +42,7 @@ interface CampaignHistory {
 interface CampaignAd {
     adId: string;
     status: string;
+    type?: string;
     adGroupName: string;
     finalUrls: string[];
     headlines: string[];
@@ -61,6 +63,13 @@ interface CampaignKeyword {
     ctr: number;
     cost: number;
     averageCpc: number;
+}
+
+interface SmartSearchTerm {
+    searchTerm: string;
+    impressions: number;
+    clicks: number;
+    cost: number;
 }
 
 interface KeywordTheme {
@@ -162,6 +171,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [history, setHistory] = useState<CampaignHistory[]>([]);
     const [keywords, setKeywords] = useState<CampaignKeyword[]>([]);
     const [keywordThemes, setKeywordThemes] = useState<KeywordTheme[]>([]);
+    const [smartSearchTerms, setSmartSearchTerms] = useState<SmartSearchTerm[]>([]);
     const [ads, setAds] = useState<CampaignAd[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [campaignInfo, setCampaignInfo] = useState<CampaignInfo | null>(null);
@@ -202,13 +212,14 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             const match = campaignsData.find(c => c.id === campaignId);
 
             // Phase 2: Smart-campaign-only data, skipped for standard campaigns
-            const [keywordThemesData, smartSettingData, smartAdsData] = match?.type === 'SMART'
+            const [keywordThemesData, smartSettingData, smartAdsData, smartSearchTermsData] = match?.type === 'SMART'
                 ? await Promise.all([
                     getCampaignKeywordThemesAction(campaignId),
                     getSmartCampaignSettingAction(campaignId),
                     getSmartCampaignAdsAction(campaignId),
+                    getSmartCampaignSearchTermsAction(campaignId),
                 ])
-                : [[], null, null];
+                : [[], null, null, []];
 
             setHistory(historyData);
             setKeywords(keywordsData);
@@ -217,6 +228,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             // can't be mixed with RSA fields in Phase 1 without breaking non-Smart accounts)
             setAds(smartAdsData ?? adsData);
             setSmartSetting(smartSettingData ?? null);
+            setSmartSearchTerms(smartSearchTermsData ?? []);
             setConversionActions((conversionActionsData ?? []).filter((ca: ConversionAction) => ca.includeInConversions));
             if (match) setCampaignInfo(match);
         } catch (err) {
@@ -454,16 +466,13 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             </div>
                         </motion.div>
 
-                        {/* ── 4. Ad Copy ── */}
-                        {ads.length > 0 && (
+                        {/* ── 4. Ad Copy (non-Smart campaigns only — Smart campaign ad copy isn't available via GAQL) ── */}
+                        {!isSmartCampaign && ads.length > 0 && (
                             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl overflow-hidden">
                                 <div className="px-6 py-4 border-b border-[#3D3C36]">
                                     <div className="flex items-center gap-2">
                                         <FileText className="w-4 h-4 text-[#9B9689]" />
                                         <h2 className="text-base font-semibold text-[#E8E4DD]">Ad Copy</h2>
-                                        {isSmartCampaign && (
-                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20 uppercase tracking-wide">Smart</span>
-                                        )}
                                     </div>
                                 </div>
                                 <div className="divide-y divide-[#3D3C36]/50">
@@ -521,7 +530,44 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             </motion.div>
                         )}
 
-                        {/* ── 5. Keywords / Keyword Themes ── */}
+                        {/* ── 5. Smart Campaign Search Terms ── */}
+                        {isSmartCampaign && smartSearchTerms.length > 0 && (
+                            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl overflow-hidden">
+                                <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <Search className="w-4 h-4 text-[#9B9689]" />
+                                        <h2 className="text-base font-semibold text-[#E8E4DD]">Search Terms</h2>
+                                    </div>
+                                    <div className="text-xs text-[#9B9689]">What people searched before clicking your ads</div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead>
+                                            <tr className="border-b border-[#3D3C36] text-[#9B9689]">
+                                                <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Search Term</th>
+                                                <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Impressions</th>
+                                                <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Clicks</th>
+                                                <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Cost</th>
+                                                <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">CTR</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-[#3D3C36]/50">
+                                            {smartSearchTerms.map((term, i) => (
+                                                <tr key={i} className="hover:bg-[#2E2D28] transition-colors">
+                                                    <td className="px-6 py-3 font-medium text-[#E8E4DD]">{term.searchTerm}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{term.impressions.toLocaleString()}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{term.clicks.toLocaleString()}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${term.cost.toFixed(2)}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{term.impressions > 0 ? ((term.clicks / term.impressions) * 100).toFixed(2) : '0.00'}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* ── 6. Keywords / Keyword Themes ── */}
                         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl overflow-hidden">
                             {isSmartCampaign ? (
                                 <>
@@ -634,7 +680,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             )}
                         </motion.div>
 
-                        {/* ── 6. AI Summary ── */}
+                        {/* ── 7. AI Summary ── */}
                         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">

@@ -567,6 +567,7 @@ export async function listAds(
       ad_group_ad.ad.final_urls,
       ad_group_ad.ad.responsive_search_ad.headlines,
       ad_group_ad.ad.responsive_search_ad.descriptions,
+      ad_group_ad.ad_strength,
       ad_group.id,
       ad_group.name,
       metrics.impressions,
@@ -598,6 +599,7 @@ export async function listAds(
         finalUrls: ad.final_urls ?? [],
         headlines: (rsa.headlines ?? []).map((h: any) => h.text ?? ""),
         descriptions: (rsa.descriptions ?? []).map((d: any) => d.text ?? ""),
+        adStrength: row.ad_group_ad?.ad_strength ?? null,
         impressions: row.metrics?.impressions ?? 0,
         clicks: row.metrics?.clicks ?? 0,
         cost: micros(row.metrics?.cost_micros),
@@ -607,9 +609,11 @@ export async function listAds(
   };
 }
 
-/** Fetch Smart campaign ad copy (separate query, only for SMART campaigns).
- *  No date filter — Smart campaign ads don't segment by date in ad_group_ad,
- *  so a segments.date WHERE clause returns zero rows even when the campaign has impressions. */
+/** Fetch Smart campaign ads (basic fields only).
+ *  Per Google Ads API docs, Smart campaign ad copy (headlines/descriptions) is NOT
+ *  available through GAQL reporting — only campaign-level metrics and
+ *  smart_campaign_search_term_view are supported for Smart campaigns.
+ *  We still query ad_group_ad for basic info (id, status, final_urls). */
 export async function getSmartCampaignAds(
   auth: AuthContext,
   campaignId: string,
@@ -623,8 +627,7 @@ export async function getSmartCampaignAds(
       ad_group_ad.ad.name,
       ad_group_ad.status,
       ad_group_ad.ad.final_urls,
-      ad_group_ad.ad.smart_campaign_ad.headlines,
-      ad_group_ad.ad.smart_campaign_ad.descriptions,
+      ad_group_ad.ad.type,
       ad_group.id,
       ad_group.name
     FROM ad_group_ad
@@ -635,7 +638,6 @@ export async function getSmartCampaignAds(
 
   return (result as any[]).map((row) => {
     const ad = row.ad_group_ad?.ad ?? {};
-    const smartAd = ad.smart_campaign_ad ?? {};
     return {
       adId: String(ad.id ?? ""),
       adName: ad.name ?? null,
@@ -644,14 +646,44 @@ export async function getSmartCampaignAds(
       adGroupId: String(row.ad_group?.id ?? ""),
       adGroupName: row.ad_group?.name ?? "",
       finalUrls: ad.final_urls ?? [],
-      headlines: (smartAd.headlines ?? []).map((h: any) => h.text ?? ""),
-      descriptions: (smartAd.descriptions ?? []).map((d: any) => d.text ?? ""),
+      headlines: [] as string[],
+      descriptions: [] as string[],
       impressions: 0,
       clicks: 0,
       cost: 0,
       conversions: 0,
     };
   });
+}
+
+/** Fetch search terms that triggered a Smart campaign's ads.
+ *  Uses smart_campaign_search_term_view (not standard search_term_view). */
+export async function getSmartCampaignSearchTerms(
+  auth: AuthContext,
+  campaignId: string,
+) {
+  const customer = getCachedCustomer(auth);
+  const id = safeEntityId(campaignId);
+
+  const result = await customer.query(`
+    SELECT
+      smart_campaign_search_term_view.search_term,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros
+    FROM smart_campaign_search_term_view
+    WHERE campaign.id = ${id}
+      AND segments.date DURING LAST_30_DAYS
+    ORDER BY metrics.impressions DESC
+    LIMIT 50
+  `);
+
+  return (result as any[]).map((row) => ({
+    searchTerm: row.smart_campaign_search_term_view?.search_term ?? "",
+    impressions: row.metrics?.impressions ?? 0,
+    clicks: row.metrics?.clicks ?? 0,
+    cost: micros(row.metrics?.cost_micros),
+  }));
 }
 
 export async function getSmartCampaignKeywordThemes(
