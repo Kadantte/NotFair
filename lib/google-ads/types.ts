@@ -95,6 +95,7 @@ export type WriteResult = {
 
 export type BiddingStrategyType =
   | "MAXIMIZE_CONVERSIONS"
+  | "MAXIMIZE_CONVERSION_VALUE"
   | "MAXIMIZE_CLICKS"
   | "MANUAL_CPC"
   | "TARGET_CPA"
@@ -103,7 +104,7 @@ export type BiddingStrategyType =
 export interface UpdateCampaignBiddingParams {
   biddingStrategy: BiddingStrategyType;
   targetCpaMicros?: number;  // required for TARGET_CPA, optional for MAXIMIZE_CONVERSIONS
-  targetRoas?: number;       // required for TARGET_ROAS
+  targetRoas?: number;       // required for TARGET_ROAS; optional cap for MAXIMIZE_CONVERSION_VALUE
 }
 
 export interface UpdateCampaignSettingsParams {

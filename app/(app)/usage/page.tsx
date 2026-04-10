@@ -7,8 +7,9 @@ import { getUsageAction } from '@/app/actions';
 
 type UsageData = {
     used: number;
-    limit: number;
-    remaining: number;
+    limit: number | null;
+    remaining: number | null;
+    unlimited?: boolean;
     resetsAt: string;
     hourly: { hour: number; count: number; isCurrent: boolean }[];
 };
@@ -75,8 +76,9 @@ export default function UsagePage() {
         return () => clearInterval(id);
     }, [data]);
 
-    const pct = data ? usagePct(data.used, data.limit) : 0;
-    const color = statusColor(pct);
+    const isUnlimited = !!data?.unlimited;
+    const pct = data && data.limit != null ? usagePct(data.used, data.limit) : 0;
+    const color = isUnlimited ? '#4CAF6E' : statusColor(pct);
     const maxHourly = data ? Math.max(...data.hourly.map((h) => h.count), 1) : 1;
 
     return (
@@ -110,8 +112,8 @@ export default function UsagePage() {
                     </div>
                 ) : data ? (
                     <div className="max-w-2xl space-y-8">
-                        {/* Limit exceeded banner */}
-                        {data.remaining === 0 && (
+                        {/* Limit exceeded banner — hidden on unlimited plans */}
+                        {!isUnlimited && data.remaining === 0 && (
                             <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-xl p-5 flex items-start gap-4">
                                 <AlertCircle className="w-5 h-5 text-[#C45D4A] shrink-0 mt-0.5" />
                                 <div>
@@ -124,7 +126,7 @@ export default function UsagePage() {
                         )}
 
                         {/* Usage summary cards */}
-                        <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-3 sm:gap-4">
+                        <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${isUnlimited ? 'min-[400px]:grid-cols-2' : 'min-[400px]:grid-cols-3'}`}>
                             <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
                                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Gauge className="w-4 h-4 text-[#9B9689]" />
@@ -133,18 +135,29 @@ export default function UsagePage() {
                                 <p className="text-2xl sm:text-3xl font-semibold tabular-nums" style={{ color }}>
                                     {data.used}
                                 </p>
-                                <p className="text-xs text-[#9B9689] mt-1">of {data.limit} operations</p>
+                                <p className="text-xs text-[#9B9689] mt-1">
+                                    {isUnlimited ? 'operations' : `of ${data.limit} operations`}
+                                </p>
                             </div>
                             <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
                                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Gauge className="w-4 h-4 text-[#9B9689]" />
                                     <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Remaining</span>
                                 </div>
-                                <p className="text-2xl sm:text-3xl font-semibold text-[#E8E4DD] tabular-nums">
-                                    {data.remaining}
+                                {isUnlimited ? (
+                                    <p className="text-2xl sm:text-3xl font-semibold text-[#4CAF6E] tracking-tight">
+                                        Unlimited
+                                    </p>
+                                ) : (
+                                    <p className="text-2xl sm:text-3xl font-semibold text-[#E8E4DD] tabular-nums">
+                                        {data.remaining}
+                                    </p>
+                                )}
+                                <p className="text-xs text-[#9B9689] mt-1">
+                                    {isUnlimited ? 'on Growth plan' : 'operations left'}
                                 </p>
-                                <p className="text-xs text-[#9B9689] mt-1">operations left</p>
                             </div>
+                            {!isUnlimited && (
                             <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
                                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Clock className="w-4 h-4 text-[#9B9689]" />
@@ -155,27 +168,30 @@ export default function UsagePage() {
                                 </p>
                                 <p className="text-xs text-[#9B9689] mt-1">at midnight UTC</p>
                             </div>
+                            )}
                         </div>
 
-                        {/* Progress bar */}
-                        <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Daily limit</span>
-                                <span className="text-sm tabular-nums" style={{ color }}>
-                                    {pct}%
-                                </span>
+                        {/* Progress bar — only meaningful when there's a limit to track against */}
+                        {!isUnlimited && (
+                            <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Daily limit</span>
+                                    <span className="text-sm tabular-nums" style={{ color }}>
+                                        {pct}%
+                                    </span>
+                                </div>
+                                <div className="h-2 bg-[#2E2D28] rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full transition-all duration-500"
+                                        style={{ width: `${pct}%`, backgroundColor: color }}
+                                    />
+                                </div>
+                                <div className="flex justify-between mt-2 text-[10px] text-[#9B9689] tabular-nums">
+                                    <span>0</span>
+                                    <span>{data.limit}</span>
+                                </div>
                             </div>
-                            <div className="h-2 bg-[#2E2D28] rounded-full overflow-hidden">
-                                <div
-                                    className="h-full rounded-full transition-all duration-500"
-                                    style={{ width: `${pct}%`, backgroundColor: color }}
-                                />
-                            </div>
-                            <div className="flex justify-between mt-2 text-[10px] text-[#9B9689] tabular-nums">
-                                <span>0</span>
-                                <span>{data.limit}</span>
-                            </div>
-                        </div>
+                        )}
 
                         {/* Hourly breakdown chart */}
                         <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
@@ -224,8 +240,9 @@ export default function UsagePage() {
 
                         {/* Info */}
                         <p className="text-xs text-[#9B9689] leading-relaxed">
-                            Every tool call (reads and writes) from both the chat interface and MCP clients counts toward your daily limit.
-                            The limit resets at midnight UTC each day. Undo operations are not counted.
+                            {isUnlimited
+                                ? 'Your Growth plan includes unlimited operations. The counter shown above tracks today\'s activity and resets at midnight UTC.'
+                                : 'Every tool call (reads and writes) from both the chat interface and MCP clients counts toward your daily limit. The limit resets at midnight UTC each day. Undo operations are not counted.'}
                         </p>
                     </div>
                 ) : null}

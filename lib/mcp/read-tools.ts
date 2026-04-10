@@ -18,6 +18,8 @@ import {
   getResourceMetadata,
   listQueryableResources,
   searchGeoTargets,
+  getPmaxAssetGroups,
+  getPmaxAssets,
 } from "@/lib/google-ads";
 import { getChanges } from "@/lib/db/tracking";
 import { execRead } from "@/lib/tools/execute";
@@ -380,6 +382,38 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await listQueryableResources(targetAuth);
+    return jsonResult(result);
+  }));
+
+  // ─── Performance Max ─────────────────────────────────────────────
+
+  server.registerTool("getPmaxAssetGroups", {
+    description:
+      "List all asset groups in a Performance Max campaign. Asset groups are the PMAX equivalent of ad groups — each contains the creative assets (headlines, descriptions, images, videos) Google uses to build ads across all eligible placements. Returns asset group IDs, names, statuses, and final URLs.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Performance Max campaign ID"),
+      limit: z.number().int().min(1).max(100).default(50),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_pmax_asset_groups", () => getPmaxAssetGroups(targetAuth, campaignId, limit), campaignId);
+    return jsonResult(result);
+  }));
+
+  server.registerTool("getPmaxAssets", {
+    description:
+      "List all assets in a Performance Max asset group, grouped by field type. Returns text assets (HEADLINE, LONG_HEADLINE, DESCRIPTION, BUSINESS_NAME), image assets (MARKETING_IMAGE, SQUARE_MARKETING_IMAGE, LOGO), video assets (YOUTUBE_VIDEO), and CALL_TO_ACTION. Use getPmaxAssetGroups first to get asset group IDs.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetGroupId: z.string().describe("Asset group ID (from getPmaxAssetGroups)"),
+      limit: z.number().int().min(1).max(200).default(100),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetGroupId, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_pmax_assets", () => getPmaxAssets(targetAuth, assetGroupId, limit));
     return jsonResult(result);
   }));
 };

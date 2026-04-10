@@ -12,7 +12,6 @@ import {
   Layers,
   Shield,
   TrendingUp,
-  Check,
   ChevronDown,
   Scale,
   Home,
@@ -25,10 +24,19 @@ import { GitHubStarBadge } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
+import { PricingSection, type PricingSectionProps } from "./pricing-cards";
 
 /* ────────────────────────────── Components ─────────────────────── */
 
-function ConnectClaudeCTA({ session, label }: { session: { connected: boolean }; label?: string }) {
+function ConnectClaudeCTA({
+  session,
+  label,
+  returnTo = "/connect",
+}: {
+  session: { connected: boolean };
+  label?: string;
+  returnTo?: string;
+}) {
   const [loading, setLoading] = useState(false);
 
   function handleClick() {
@@ -36,9 +44,9 @@ function ConnectClaudeCTA({ session, label }: { session: { connected: boolean };
     setLoading(true);
     trackEvent("cta_clicked", { page: "homepage", cta: "connect_claude" });
     if (session.connected) {
-      window.location.assign("/connect");
+      window.location.assign(returnTo);
     } else {
-      startGoogleConnect("/connect");
+      startGoogleConnect(returnTo);
     }
   }
 
@@ -170,37 +178,6 @@ const verticals = [
   },
 ];
 
-const pricingTiers = [
-  {
-    name: "Free",
-    spend: "Get started at no cost",
-    price: 0,
-    savings: "No credit card required",
-    features: [
-      "300 operations/day",
-      "Full campaign audit",
-      "Wasted spend detection",
-      "Negative keyword management",
-      "Unlimited ad accounts",
-      "Works in Claude for Work & Claude Code",
-    ],
-  },
-  {
-    name: "Growth",
-    spend: "For serious advertisers",
-    price: 99,
-    savings: "Fraction of what agencies charge",
-    popular: true,
-    features: [
-      "Unlimited operations",
-      "Everything in Free",
-      "Bid optimization",
-      "Search term analysis",
-      "Priority support",
-    ],
-  },
-];
-
 const examplePrompts = [
   "Pause keywords with no conversions this month",
   "Create a Search campaign for 'Austin Plumbing'",
@@ -264,7 +241,13 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 /* ────────────────────────────── Page ────────────────────────────── */
 
-export function HomePage({ githubStars = null }: { githubStars?: number | null }) {
+export function HomePage({
+  githubStars = null,
+  pricing,
+}: {
+  githubStars?: number | null;
+  pricing: PricingSectionProps;
+}) {
   const session = useSession();
 
   return (
@@ -682,64 +665,8 @@ export function HomePage({ githubStars = null }: { githubStars?: number | null }
       {/* ── Pricing ── */}
       <section className="px-4 pb-20">
         <div className="container mx-auto max-w-5xl">
-          <div className="mb-10 max-w-2xl">
-            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              Pricing
-            </p>
-            <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              A fraction of what agencies charge
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
-              Start with a free audit. Upgrade when you see the results.
-              Cancel anytime — no contracts.
-            </p>
-          </div>
-
-          <div className="mx-auto grid max-w-2xl gap-4 md:grid-cols-2">
-            {pricingTiers.map((tier) => (
-              <div
-                key={tier.name}
-                className={`relative flex flex-col rounded-lg border p-6 ${tier.popular
-                  ? "border-[#4CAF6E] bg-[#24231F]"
-                  : "border-[#3D3C36] bg-[#24231F]"
-                  }`}
-              >
-                {tier.popular && (
-                  <span className="absolute -top-3 left-6 rounded-full bg-[#4CAF6E] px-3 py-1 text-xs font-semibold text-[#1A1917]">
-                    Most popular
-                  </span>
-                )}
-                <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  {tier.name}
-                </h3>
-                <p className="mt-1 text-xs text-[#9B9689]">{tier.spend}</p>
-                <div className="mt-4 flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-[#E8E4DD]">
-                    ${tier.price}
-                  </span>
-                  <span className="text-sm text-[#9B9689]">/mo</span>
-                </div>
-                <p className="mt-1 text-xs font-medium text-[#4CAF6E]">
-                  {tier.savings}
-                </p>
-                <ul className="mt-5 space-y-2.5">
-                  {tier.features.map((f) => (
-                    <li
-                      key={f}
-                      className="flex items-start gap-2 text-sm text-[#9B9689]"
-                    >
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E]" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-6">
-                  <ConnectClaudeCTA session={session} label="Get Started" />
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-sm text-[#9B9689]">
+          <PricingSection {...pricing} />
+          <p className="mt-6 text-sm text-[#9B9689]">
             Spending $50K+/mo?{" "}
             <Link
               href="mailto:tong@adsagent.org"

@@ -178,6 +178,39 @@ export const accounts = pgTable("accounts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Subscriptions ──────────────────────────────────────────────────
+//
+// Canonical pattern: Stripe is the source of truth. We store ONLY the
+// columns we need to query against (user_id, stripe_customer_id, email),
+// plus the full Stripe Subscription object as `data` jsonb. Plan, status,
+// interval, period end, cancel state, trial end, etc. are all derived
+// from `data` at read time in lib/subscription.ts. Adding a new field that
+// Stripe already exposes never requires a migration.
+
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  /** Our app's stable user id (matches mcp_sessions.user_id). */
+  userId: text("user_id").notNull().unique(),
+  /** Email on file at Stripe — kept flat for support/ops queries. */
+  email: text("email"),
+  /** Webhook lookup key — flat with a unique index for indexed lookups. */
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  /** Full Stripe Subscription object, or null if the customer has none. */
+  data: jsonb("data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("subscriptions_stripe_customer_idx").on(table.stripeCustomerId),
+]);
+
+// ─── Processed Stripe webhook events (idempotency) ───────────────────
+
+export const processedStripeEvents = pgTable("processed_stripe_events", {
+  eventId: text("event_id").primaryKey(),
+  type: text("type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
 // ─── Chat Threads ───────────────────────────────────────────────────
 
 export const chatThreads = pgTable("chat_threads", {

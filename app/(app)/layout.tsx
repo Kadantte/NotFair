@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SignOutButton } from '@/components/sign-out-button';
+import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { ImpersonationBanner } from '@/components/impersonation-banner';
 import { onThreadEvent } from '@/lib/thread-events';
@@ -112,6 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [sidebarThreads, setSidebarThreads] = useState<{ id: string; title: string; updatedAt: string }[]>([]);
     const isOnChat = pathname.startsWith('/chat');
     const [isDev, setIsDev] = useState(false);
+    const [isOnGrowth, setIsOnGrowth] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const refreshThreads = useCallback(() => {
@@ -155,6 +156,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         fetch('/api/auth/session', { credentials: 'include' })
             .then(r => r.json())
             .then(s => { if (s.connected && s.isDev) setIsDev(true); })
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        fetch('/api/subscription', { credentials: 'include' })
+            .then(r => (r.ok ? r.json() : null))
+            .then(sub => { if (sub?.plan === 'growth') setIsOnGrowth(true); })
             .catch(() => {});
     }, []);
 
@@ -311,8 +319,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
                 <NavItem href="/connect" icon={PlugZap} label="Connect Claude" active={pathname === '/connect'} collapsed={isCollapsed} />
                 <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} />
+                <NavItem
+                    href="/upgrade"
+                    icon={Rocket}
+                    label={isOnGrowth ? 'Pricing' : 'Upgrade'}
+                    active={pathname === '/upgrade'}
+                    collapsed={isCollapsed}
+                />
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} />}
-                <SignOutButton isCollapsed={isCollapsed} />
+                <div className="pt-1">
+                    <UserMenu isCollapsed={isCollapsed} />
+                </div>
             </div>
         </>
     ); }
