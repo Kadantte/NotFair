@@ -33,6 +33,12 @@ export function SiteHeader({ connected = false }: { connected?: boolean }) {
                 </Link>
                 <div className="flex items-center gap-3">
                     <Link
+                        href="/pricing"
+                        className="hidden sm:inline-flex h-9 items-center px-3 text-sm font-medium text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                    >
+                        Pricing
+                    </Link>
+                    <Link
                         href="/google-ads-audit"
                         className="inline-flex h-9 items-center rounded-full bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
                     >

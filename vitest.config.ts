@@ -10,6 +10,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
+      // `server-only` is a Next.js marker module — stub it for vitest so any
+      // file importing it (e.g. lib/session.ts, lib/subscription.ts) can be
+      // pulled into a test without exploding.
+      "server-only": path.resolve(__dirname, "lib/__tests__/__stubs__/server-only.ts"),
     },
   },
 });

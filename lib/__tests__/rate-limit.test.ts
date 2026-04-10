@@ -17,6 +17,17 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+// rate-limit.ts now consults the subscription helper. Keep the legacy
+// test file focused on op-counting math by stubbing the helper to free.
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/subscription", () => ({
+  getUserPlanLimits: vi.fn().mockResolvedValue({ dailyOpLimit: 300 }),
+  PLANS: {
+    free: { limits: { dailyOpLimit: 300 } },
+    growth: { limits: { dailyOpLimit: null } },
+  },
+}));
+
 // drizzle-orm operators are used inside rate-limit.ts but we just need them not to throw
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ["eq", ...args]),

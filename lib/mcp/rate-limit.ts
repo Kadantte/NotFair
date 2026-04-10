@@ -1,9 +1,26 @@
 import { db, schema } from "@/lib/db";
 import { eq, gte, and, sql } from "drizzle-orm";
+import { getUserPlanLimits, PLANS } from "@/lib/subscription";
 
 // ─── Config ────────────────────────────────────────────────────────
 
-const DAILY_OP_LIMIT = process.env.NODE_ENV === "development" ? 999999 : 300;
+/** Default cap for users on the Free plan. Dev mode is effectively unlimited. */
+const FREE_DAILY_OP_LIMIT = process.env.NODE_ENV === "development" ? 999999 : PLANS.free.limits.dailyOpLimit ?? 300;
+
+/**
+ * Resolve a user's effective daily op limit. `null` = unlimited.
+ * Test mode is short-circuited so the rate-limit suite doesn't need to mock subscriptions.
+ */
+async function resolveDailyLimit(userId: string): Promise<number | null> {
+  // if (process.env.NODE_ENV === "development") return FREE_DAILY_OP_LIMIT;
+  try {
+    const limits = await getUserPlanLimits(userId);
+    return limits.dailyOpLimit;
+  } catch {
+    // If subscription lookup fails (e.g. table missing in tests), fall back to free.
+    return FREE_DAILY_OP_LIMIT;
+  }
+}
 
 // ─── In-memory cache to avoid DB hit on every tool call ────────────
 
@@ -106,9 +123,12 @@ function nextMidnightUTC(): Date {
 export async function enforceRateLimit(userId: string | null | undefined): Promise<void> {
   if (!userId) return; // Anonymous users are not rate-limited (they have other guards)
 
+  const limit = await resolveDailyLimit(userId);
+  if (limit === null) return; // Unlimited plan (Growth+)
+
   const used = await getUsageCount(userId);
-  if (used >= DAILY_OP_LIMIT) {
-    throw new RateLimitError(used, DAILY_OP_LIMIT);
+  if (used >= limit) {
+    throw new RateLimitError(used, limit);
   }
 }
 
@@ -125,9 +145,33 @@ export function recordOperation(userId: string | null | undefined): void {
  * Get current usage info for a user (for display purposes).
  */
 export async function getUsageInfo(userId: string | null | undefined) {
-  if (!userId) return { used: 0, limit: DAILY_OP_LIMIT, remaining: DAILY_OP_LIMIT, resetsAt: nextMidnightUTC().toISOString() };
+  if (!userId) {
+    return {
+      used: 0,
+      limit: FREE_DAILY_OP_LIMIT,
+      remaining: FREE_DAILY_OP_LIMIT,
+      unlimited: false,
+      resetsAt: nextMidnightUTC().toISOString(),
+    };
+  }
+  const limit = await resolveDailyLimit(userId);
   const used = await getUsageCount(userId);
-  return { used, limit: DAILY_OP_LIMIT, remaining: Math.max(0, DAILY_OP_LIMIT - used), resetsAt: nextMidnightUTC().toISOString() };
+  if (limit === null) {
+    return {
+      used,
+      limit: null,
+      remaining: null,
+      unlimited: true,
+      resetsAt: nextMidnightUTC().toISOString(),
+    };
+  }
+  return {
+    used,
+    limit,
+    remaining: Math.max(0, limit - used),
+    unlimited: false,
+    resetsAt: nextMidnightUTC().toISOString(),
+  };
 }
 
 /**
