@@ -82,7 +82,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 <button
                     type="button"
                     onClick={() => canSwitch && setOpen(!open)}
-                    className={`flex h-10 w-10 items-center justify-center rounded-lg text-[#9B9689] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg text-[#C4C0B6] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
                     title={data.impersonating ? `Viewing as ${displayName}` : displayName}
                 >
                     <div className="flex h-6 w-6 items-center justify-center rounded bg-[#4CAF6E]/15 text-[11px] font-semibold text-[#4CAF6E]">
@@ -91,7 +91,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 </button>
                 {open && (
                     <div className="absolute left-[60px] top-0 z-50 min-w-[220px] rounded-lg border border-[#3D3C36] bg-[#24231F] py-1 shadow-xl">
-                        <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-[#9B9689]">
+                        <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-[#C4C0B6]">
                             Switch account
                         </div>
                         {data.customerIds.map((account) => (
@@ -105,7 +105,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                                 <div className="flex h-5 w-5 items-center justify-center rounded bg-[#4CAF6E]/15 text-[10px] font-semibold text-[#4CAF6E]">
                                     {(account.name || 'A')[0].toUpperCase()}
                                 </div>
-                                <span className={`flex-1 truncate ${account.id === data.customerId ? 'text-[#E8E4DD]' : 'text-[#9B9689]'}`}>
+                                <span className={`flex-1 truncate ${account.id === data.customerId ? 'text-[#E8E4DD]' : 'text-[#C4C0B6]'}`}>
                                     {account.name || account.id}
                                 </span>
                                 {account.id === data.customerId && (
@@ -117,7 +117,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                         <button
                             type="button"
                             onClick={() => { setOpen(false); window.location.assign('/api/auth/add-account'); }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#9B9689] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#C4C0B6] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
                         >
                             <Plus className="h-4 w-4" />
                             <span>Add account</span>
@@ -141,7 +141,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#E8E4DD]">
                     {displayName}
                 </span>
-                <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#9B9689] transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#C4C0B6] transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && (
                 <div className="absolute left-2 right-2 top-11 z-50 rounded-lg border border-[#3D3C36] bg-[#24231F] py-1 shadow-xl">
@@ -156,7 +156,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#4CAF6E]/15 text-[10px] font-semibold text-[#4CAF6E]">
                                 {(account.name || 'A')[0].toUpperCase()}
                             </div>
-                            <span className={`min-w-0 flex-1 truncate ${account.id === data.customerId ? 'text-[#E8E4DD]' : 'text-[#9B9689]'}`}>
+                            <span className={`min-w-0 flex-1 truncate ${account.id === data.customerId ? 'text-[#E8E4DD]' : 'text-[#C4C0B6]'}`}>
                                 {account.name || account.id}
                             </span>
                             {account.id === data.customerId && (
@@ -168,7 +168,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                     <button
                         type="button"
                         onClick={() => { setOpen(false); window.location.assign('/api/auth/add-account'); }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#9B9689] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#C4C0B6] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
                     >
                         <Plus className="h-4 w-4" />
                         <span>Add account</span>

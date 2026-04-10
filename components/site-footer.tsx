@@ -15,7 +15,7 @@ export function SiteFooter() {
                         <h2 className="text-base font-semibold text-[#E8E4DD]">
                             AdsAgent
                         </h2>
-                        <p className="text-sm leading-relaxed text-[#9B9689]">
+                        <p className="text-sm leading-relaxed text-[#C4C0B6]">
                             AI-powered Google Ads management that finds wasted
                             spend and optimizes your campaigns automatically.
                         </p>
@@ -30,7 +30,7 @@ export function SiteFooter() {
                                 <Link
                                     key={link.href}
                                     href={link.href}
-                                    className="py-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                    className="py-1.5 text-sm text-[#C4C0B6] transition-colors hover:text-[#E8E4DD]"
                                 >
                                     {link.label}
                                 </Link>
@@ -45,13 +45,13 @@ export function SiteFooter() {
                         <div className="mt-4 grid gap-1">
                             <Link
                                 href="/privacy"
-                                className="py-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                className="py-1.5 text-sm text-[#C4C0B6] transition-colors hover:text-[#E8E4DD]"
                             >
                                 Privacy Policy
                             </Link>
                             <Link
                                 href="/terms"
-                                className="py-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                className="py-1.5 text-sm text-[#C4C0B6] transition-colors hover:text-[#E8E4DD]"
                             >
                                 Terms of Service
                             </Link>
@@ -60,7 +60,7 @@ export function SiteFooter() {
                 </div>
 
                 <div className="mt-8 border-t border-[#3D3C36] pt-6">
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         © {new Date().getFullYear()} AdsAgent. All rights reserved.
                     </p>
                 </div>

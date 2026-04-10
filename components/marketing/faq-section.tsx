@@ -17,7 +17,7 @@ export function FaqSection({
             {title}
           </h2>
           {intro ? (
-            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">{intro}</p>
+            <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">{intro}</p>
           ) : null}
         </div>
 
@@ -30,7 +30,7 @@ export function FaqSection({
               <h3 className="text-lg font-semibold text-[#E8E4DD]">
                 {item.question}
               </h3>
-              <p className="mt-3 text-sm leading-relaxed text-[#9B9689]">
+              <p className="mt-3 text-sm leading-relaxed text-[#C4C0B6]">
                 {item.answer}
               </p>
             </div>

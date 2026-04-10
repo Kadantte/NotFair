@@ -82,7 +82,7 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
         <button
           type="button"
           onClick={() => toggle(true)}
-          className="rounded p-1 text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+          className="rounded p-1 text-[#C4C0B6] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
           aria-label="Collapse panel"
         >
           <X className="h-4 w-4" />
@@ -134,7 +134,7 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
             <span className="block text-[12px] font-semibold text-[#E8E4DD]">
               Chat with our Agentic AI
             </span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-[#9B9689]">
+            <span className="mt-0.5 block text-[11px] leading-snug text-[#C4C0B6]">
               Ask questions about this audit and get instant answers.
             </span>
           </span>
@@ -177,10 +177,10 @@ function HelpItem({
         <span className="flex items-center gap-1 text-[12px] font-semibold text-[#E8E4DD]">
           {title}
           {external && (
-            <ArrowUpRight className="h-3 w-3 text-[#9B9689] group-hover:text-[#4CAF6E]" />
+            <ArrowUpRight className="h-3 w-3 text-[#C4C0B6] group-hover:text-[#4CAF6E]" />
           )}
         </span>
-        <span className="mt-0.5 block truncate text-[11px] leading-snug text-[#9B9689]">
+        <span className="mt-0.5 block truncate text-[11px] leading-snug text-[#C4C0B6]">
           {description}
         </span>
       </span>

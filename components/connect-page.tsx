@@ -89,7 +89,7 @@ function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: 
                         </>
                     )}
                 </button>
-                <p className="mt-4 pr-24 text-xs text-[#9B9689]/60">
+                <p className="mt-4 pr-24 text-xs text-[#C4C0B6]/60">
                     This contains your personal access token. Don&apos;t share it publicly.
                 </p>
             </div>
@@ -107,7 +107,7 @@ function CopyButton({ text, onCopyTracked }: { text: string; onCopyTracked?: () 
                 onCopyTracked?.();
                 setTimeout(() => setCopied(false), 2000);
             }}
-            className="inline-flex shrink-0 rounded border border-[#3D3C36] bg-[#24231F] p-1 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+            className="inline-flex shrink-0 rounded border border-[#3D3C36] bg-[#24231F] p-1 text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
         >
             {copied ? <Check className="h-3 w-3 text-[#4CAF6E]" /> : <Copy className="h-3 w-3" />}
         </button>
@@ -124,7 +124,7 @@ function CredentialField({ label, value, mono, onCopyTracked }: { label: string;
     const [copied, setCopied] = useState(false);
     return (
         <div className="space-y-1.5">
-            {label && <label className="text-[11px] font-semibold uppercase tracking-widest text-[#9B9689]">{label}</label>}
+            {label && <label className="text-[11px] font-semibold uppercase tracking-widest text-[#C4C0B6]">{label}</label>}
             <div className="flex items-center gap-2">
                 <div className={`min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 text-sm text-[#E8E4DD] ${mono ? 'font-mono' : ''}`}>
                     {value}
@@ -136,7 +136,7 @@ function CredentialField({ label, value, mono, onCopyTracked }: { label: string;
                         onCopyTracked?.();
                         setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                    className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
                 >
                     {copied ? <Check className="h-4 w-4 text-[#4CAF6E]" /> : <Copy className="h-4 w-4" />}
                 </button>
@@ -209,7 +209,7 @@ function ClaudeConnectorSection() {
                     <p className="text-sm font-medium text-[#E8E4DD]">Open Claude Connectors</p>
                 </div>
                 <div className="ml-8">
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         Go to{' '}
                         <a
                             href="https://claude.ai/customize/connectors"
@@ -235,7 +235,7 @@ function ClaudeConnectorSection() {
                     <p className="text-sm font-medium text-[#E8E4DD]">Configure the connector</p>
                 </div>
                 <div className="ml-8 space-y-3">
-                    <p className="text-sm text-[#9B9689]">Fill in the connector form:</p>
+                    <p className="text-sm text-[#C4C0B6]">Fill in the connector form:</p>
                     <CredentialField
                         label="Name"
                         value="AdsAgent"
@@ -247,18 +247,18 @@ function ClaudeConnectorSection() {
                         onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'server_url' })}
                     />
 
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         Expand <strong className="text-[#E8E4DD]">Advanced Settings</strong> and enter:
                     </p>
 
                     {loading ? (
                         <div className="flex items-center gap-2 py-2">
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
-                            <span className="text-sm text-[#9B9689]">Loading credentials...</span>
+                            <span className="text-sm text-[#C4C0B6]">Loading credentials...</span>
                         </div>
                     ) : !credentials ? (
                         <div className="space-y-3">
-                            <p className="text-sm text-[#9B9689]">Generate credentials to get your Client ID and Client Secret.</p>
+                            <p className="text-sm text-[#C4C0B6]">Generate credentials to get your Client ID and Client Secret.</p>
                             <Button
                                 onClick={generateCredentials}
                                 disabled={generating}
@@ -276,9 +276,9 @@ function ClaudeConnectorSection() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <ul className="space-y-1.5 text-sm text-[#9B9689]">
+                            <ul className="space-y-1.5 text-sm text-[#C4C0B6]">
                                 <li className="flex gap-2">
-                                    <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
+                                    <span className="shrink-0 text-[#C4C0B6]/60">&#8226;</span>
                                     <span><strong className="text-[#E8E4DD]">Client ID:</strong></span>
                                 </li>
                             </ul>
@@ -291,9 +291,9 @@ function ClaudeConnectorSection() {
                                 />
                             </div>
 
-                            <ul className="space-y-1.5 text-sm text-[#9B9689]">
+                            <ul className="space-y-1.5 text-sm text-[#C4C0B6]">
                                 <li className="flex gap-2">
-                                    <span className="shrink-0 text-[#9B9689]/60">&#8226;</span>
+                                    <span className="shrink-0 text-[#C4C0B6]/60">&#8226;</span>
                                     <span><strong className="text-[#E8E4DD]">Client Secret:</strong></span>
                                 </li>
                             </ul>
@@ -309,7 +309,7 @@ function ClaudeConnectorSection() {
 
                             <button
                                 onClick={() => setShowRegenConfirm(true)}
-                                className="flex items-center gap-1.5 text-sm text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+                                className="flex items-center gap-1.5 text-sm text-[#C4C0B6] transition-colors hover:text-[#E8E4DD]"
                             >
                                 <RefreshCw className="h-3.5 w-3.5" />
                                 Regenerate credentials
@@ -319,14 +319,14 @@ function ClaudeConnectorSection() {
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowRegenConfirm(false)}>
                                     <div className="mx-4 w-full max-w-md rounded-lg border border-[#3D3C36] bg-[#24231F] p-6" onClick={e => e.stopPropagation()}>
                                         <h3 className="text-lg font-semibold text-[#E8E4DD]">Regenerate credentials?</h3>
-                                        <p className="mt-3 text-sm text-[#9B9689]">
+                                        <p className="mt-3 text-sm text-[#C4C0B6]">
                                             This will invalidate your current credentials. You&apos;ll need to <strong className="text-[#E8E4DD]">remove the existing connector</strong> in Claude and <strong className="text-[#E8E4DD]">add a new one</strong> with the new credentials.
                                         </p>
                                         <div className="mt-5 flex justify-end gap-3">
                                             <Button
                                                 variant="outline"
                                                 onClick={() => setShowRegenConfirm(false)}
-                                                className="border-[#3D3C36] bg-[#24231F] text-[#9B9689] hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+                                                className="border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
                                             >
                                                 Cancel
                                             </Button>
@@ -361,7 +361,7 @@ function ClaudeConnectorSection() {
                     <p className="text-sm font-medium text-[#E8E4DD]">Add the connector</p>
                 </div>
                 <div className="ml-8 space-y-3">
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         Click <strong className="text-[#E8E4DD]">Add</strong>. The <strong className="text-[#E8E4DD]">AdsAgent</strong> connector will appear in your Connectors list with all available tools.
                     </p>
                     <SetupScreenshot
@@ -378,7 +378,7 @@ function ClaudeConnectorSection() {
                     <p className="text-sm font-medium text-[#E8E4DD]">Enable AdsAgent in a chat</p>
                 </div>
                 <div className="ml-8 space-y-3">
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         Open a new chat on <strong className="text-[#E8E4DD]">claude.ai</strong>, click the <strong className="text-[#E8E4DD]">+</strong> button, go to <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle <strong className="text-[#E8E4DD]">AdsAgent</strong> on.
                     </p>
                     <SetupScreenshot
@@ -395,7 +395,7 @@ function ClaudeConnectorSection() {
                     <p className="text-sm font-medium text-[#E8E4DD]">Ask Claude about your ads</p>
                 </div>
                 <div className="ml-8 space-y-3">
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         Try a prompt like <em className="text-[#E8E4DD]">&ldquo;Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.&rdquo;</em> Claude will call AdsAgent tools to read your account and respond with insights.
                     </p>
                     <SetupScreenshot
@@ -493,7 +493,7 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     <p className="text-sm font-medium text-[#E8E4DD]">Install the toprank plugin</p>
                 </div>
                 <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#9B9689]">Inside Claude Code, run these commands:</p>
+                    <p className="text-sm text-[#C4C0B6]">Inside Claude Code, run these commands:</p>
                     <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                             <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/plugin marketplace add nowork-studio/toprank</code>
@@ -520,7 +520,7 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     <p className="text-sm font-medium text-[#E8E4DD]">Run /ads</p>
                 </div>
                 <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#9B9689]">Restart Claude Code and run:</p>
+                    <p className="text-sm text-[#C4C0B6]">Restart Claude Code and run:</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/ads</code>
                         <CopyButton
@@ -538,7 +538,7 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     <p className="text-sm font-medium text-[#E8E4DD]">Paste your API key</p>
                 </div>
                 <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#9B9689]">
+                    <p className="text-sm text-[#C4C0B6]">
                         Claude will ask you for your API key. Paste it into Claude Code:
                     </p>
                     <div className="flex items-center gap-2">
@@ -548,7 +548,7 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                             onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'api_key' })}
                         />
                     </div>
-                    <p className="text-xs text-[#9B9689]/60">
+                    <p className="text-xs text-[#C4C0B6]/60">
                         This is your personal access token. Don&apos;t share it publicly.
                     </p>
                 </div>
@@ -576,7 +576,7 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                     prefetch
                     className={`flex-1 rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'claude-code'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
-                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                            : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
                         }`}
                 >
                     Claude Code
@@ -586,7 +586,7 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                     prefetch
                     className={`flex-1 whitespace-nowrap rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'connector'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
-                            : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                            : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
                         }`}
                 >
                     Claude Connector (Web / Cowork)
@@ -603,7 +603,7 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                             prefetch
                             className={`flex-1 rounded px-3 py-1.5 text-center text-xs font-medium transition-all duration-150 ${codeSubTab === 'manual'
                                     ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
-                                    : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                                    : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
                                 }`}
                         >
                             Install manually
@@ -613,7 +613,7 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                             prefetch
                             className={`flex-1 rounded px-3 py-1.5 text-center text-xs font-medium transition-all duration-150 ${codeSubTab === 'auto'
                                     ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
-                                    : 'text-[#9B9689] hover:text-[#E8E4DD]'
+                                    : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
                                 }`}
                         >
                             Let Claude set it up
@@ -622,11 +622,11 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
 
                     {codeSubTab === 'auto' ? (
                         <>
-                            <p className="max-w-md text-sm text-[#9B9689]">
+                            <p className="max-w-md text-sm text-[#C4C0B6]">
                                 Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
                             </p>
                             <SetupCodeBlock content={prompt} copied={copied} onCopy={onCopy} />
-                            <p className="max-w-md text-sm text-[#9B9689]">
+                            <p className="max-w-md text-sm text-[#C4C0B6]">
                                 After setup, restart Claude Code and run{' '}
                                 <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
                                 to start managing your Google Ads.
@@ -643,7 +643,7 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
             {/* Chat CTA */}
             <div className="flex w-full items-center gap-4">
                 <div className="h-px flex-1 bg-[#3D3C36]" />
-                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#9B9689]">or</span>
+                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]">or</span>
                 <div className="h-px flex-1 bg-[#3D3C36]" />
             </div>
 
@@ -651,7 +651,7 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
                         <p className="text-sm font-medium text-[#E8E4DD]">Don&apos;t want to set up MCP yourself?</p>
-                        <p className="text-sm text-[#9B9689]">
+                        <p className="text-sm text-[#C4C0B6]">
                             Try our agentic AI instead. AdsAgent Chat is already wired up and ready to use out of the box.
                         </p>
                     </div>
@@ -701,7 +701,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
     const token = urlToken || (session.connected ? session.token : null);
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
-    const actionBtnClass = 'flex items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-2 text-sm text-[#9B9689] transition-all hover:border-[#9B9689]/40 hover:text-[#E8E4DD]';
+    const actionBtnClass = 'flex items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-2 text-sm text-[#C4C0B6] transition-all hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]';
 
     const accounts = useMemo(() => {
         if (!accountsParam) return [] as { id: string; name: string }[];
@@ -842,7 +842,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
-                        <p className="mt-0.5 text-sm text-[#9B9689]">Connect Google Ads and get the setup prompt for Claude Code.</p>
+                        <p className="mt-0.5 text-sm text-[#C4C0B6]">Connect Google Ads and get the setup prompt for Claude Code.</p>
                     </div>
                     {token ? (
                         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -894,7 +894,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                 <span className="text-sm font-medium">Google connected</span>
                             </div>
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Select accounts</h2>
-                            <p className="max-w-md text-lg text-[#9B9689]">
+                            <p className="max-w-md text-lg text-[#C4C0B6]">
                                 Which Google Ads accounts do you want to manage?
                             </p>
                             <div className="w-full max-w-md space-y-3">
@@ -907,23 +907,23 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                             disabled={selecting}
                                             className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${isSelected
                                                     ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
-                                                    : 'border-[#3D3C36] bg-[#24231F] hover:border-[#9B9689]/40 hover:bg-[#2E2D28]'
+                                                    : 'border-[#3D3C36] bg-[#24231F] hover:border-[#C4C0B6]/40 hover:bg-[#2E2D28]'
                                                 }`}
                                         >
-                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#9B9689]/40'
+                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#C4C0B6]/40'
                                                 }`}>
                                                 {isSelected && <Check className="h-3 w-3 text-[#1A1917]" />}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-[#E8E4DD]">{account.name}</p>
-                                                <p className="mt-0.5 text-sm text-[#9B9689]">{account.id}</p>
+                                                <p className="mt-0.5 text-sm text-[#C4C0B6]">{account.id}</p>
                                             </div>
                                         </button>
                                     );
                                 })}
                             </div>
                             {selectedAccounts.length > 0 && (
-                                <p className="text-sm text-[#9B9689]">
+                                <p className="text-sm text-[#C4C0B6]">
                                     {selectedAccounts.length} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected.
                                 </p>
                             )}
@@ -939,7 +939,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     ) : !token ? (
                         <div className="flex flex-col items-center space-y-6 pt-12 text-center">
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect Google Ads</h2>
-                            <p className="max-w-md text-lg text-[#9B9689]">
+                            <p className="max-w-md text-lg text-[#C4C0B6]">
                                 Sign in with your Google Ads account. You&apos;ll get a setup prompt to paste into Claude Code.
                             </p>
                             <Button
@@ -949,7 +949,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                             >
                                 Sign in with Google <ExternalLink className="ml-2 h-5 w-5" />
                             </Button>
-                            <p className="text-xs text-[#9B9689]/60">OAuth 2.0 — we never see your password.</p>
+                            <p className="text-xs text-[#C4C0B6]/60">OAuth 2.0 — we never see your password.</p>
                         </div>
                     ) : (
                         <SetupTabs
@@ -974,13 +974,13 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
                     <div className="mx-4 w-full max-w-md rounded-xl border border-[#3D3C36] bg-[#24231F] p-6 shadow-2xl">
                         <h3 className="text-lg font-semibold text-[#E8E4DD]">Rotate API Key?</h3>
-                        <p className="mt-2 text-sm text-[#9B9689]">
+                        <p className="mt-2 text-sm text-[#C4C0B6]">
                             This will invalidate your current API key immediately. Any integrations using the old key will stop working until updated with the new one.
                         </p>
                         <div className="mt-6 flex items-center justify-end gap-3">
                             <button
                                 onClick={() => setShowRotateConfirm(false)}
-                                className="rounded-lg border border-[#3D3C36] px-4 py-2 text-sm text-[#9B9689] transition hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
+                                className="rounded-lg border border-[#3D3C36] px-4 py-2 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
                             >
                                 Cancel
                             </button>

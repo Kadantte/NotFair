@@ -19,7 +19,7 @@ function SectionContent({ section }: { section: BlogSection }) {
       );
     case "text":
       return (
-        <p className="mt-5 text-base leading-relaxed text-[#9B9689]">
+        <p className="mt-5 text-base leading-relaxed text-[#C4C0B6]">
           {section.content}
         </p>
       );
@@ -31,7 +31,7 @@ function SectionContent({ section }: { section: BlogSection }) {
             return (
               <li
                 key={i}
-                className="flex gap-3 text-base leading-relaxed text-[#9B9689]"
+                className="flex gap-3 text-base leading-relaxed text-[#C4C0B6]"
               >
                 <span className="mt-2 block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#4CAF6E]" />
                 <span>
@@ -61,7 +61,7 @@ function SectionContent({ section }: { section: BlogSection }) {
               className={`text-sm leading-relaxed ${
                 block.startsWith("You:")
                   ? "font-medium text-[#E8E4DD]"
-                  : "text-[#9B9689]"
+                  : "text-[#C4C0B6]"
               } ${i > 0 ? "mt-4" : ""}`}
             >
               {block}
@@ -71,7 +71,7 @@ function SectionContent({ section }: { section: BlogSection }) {
       );
     case "code":
       return (
-        <pre className="mt-6 overflow-x-auto rounded-lg bg-[#24231F] p-6 text-sm leading-relaxed text-[#9B9689]">
+        <pre className="mt-6 overflow-x-auto rounded-lg bg-[#24231F] p-6 text-sm leading-relaxed text-[#C4C0B6]">
           <code>{section.content}</code>
         </pre>
       );
@@ -88,7 +88,7 @@ export function BlogPostPage({ post }: { post: BlogPost }) {
           <div className="mb-8">
             <Link
               href="/blog"
-              className="text-sm font-medium text-[#9B9689] transition-colors hover:text-[#4CAF6E]"
+              className="text-sm font-medium text-[#C4C0B6] transition-colors hover:text-[#4CAF6E]"
             >
               &larr; Blog
             </Link>
@@ -101,10 +101,10 @@ export function BlogPostPage({ post }: { post: BlogPost }) {
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
               {post.title}
             </h1>
-            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+            <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
               {post.description}
             </p>
-            <div className="mt-4 flex items-center gap-3 text-sm text-[#9B9689]">
+            <div className="mt-4 flex items-center gap-3 text-sm text-[#C4C0B6]">
               <span>{post.author.name}</span>
               <span className="text-[#3D3C36]">|</span>
               <time dateTime={post.publishedAt}>
@@ -130,7 +130,7 @@ export function BlogPostPage({ post }: { post: BlogPost }) {
               <h2 className="text-lg font-semibold text-[#E8E4DD]">
                 Try MCP with Google Ads
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#9B9689]">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#C4C0B6]">
                 Connect your Google Ads account to AdsAgent in 30 seconds and
                 start querying campaigns from Claude.
               </p>

@@ -18,7 +18,7 @@ export function LandingLinksSection({
             {title}
           </h2>
           {intro ? (
-            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">{intro}</p>
+            <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">{intro}</p>
           ) : null}
         </div>
 
@@ -30,7 +30,7 @@ export function LandingLinksSection({
               className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-6 transition-colors hover:border-[#4CAF6E]/60"
             >
               <h3 className="text-lg font-semibold text-[#E8E4DD]">{link.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-[#9B9689]">
+              <p className="mt-3 text-sm leading-relaxed text-[#C4C0B6]">
                 {link.description}
               </p>
             </Link>

@@ -136,7 +136,7 @@ function ScoreBar({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-[#9B9689]">{name}</span>
+        <span className="text-xs text-[#C4C0B6]">{name}</span>
         <span
           className="font-mono-jb text-xs font-semibold"
           style={{ color }}
@@ -181,14 +181,14 @@ export function GoogleAdsAuditPage() {
                 <br />
                 <span className="text-[#4CAF6E]">where money leaks.</span>
               </h1>
-              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#9B9689]">
+              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
                 AI analyzes 7 dimensions of your account in 5 minutes. See your
                 score, find wasted spend, and get a prioritized fix list — free.
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3">
                 <AuditCTA session={session} page="google-ads-audit" size="lg" />
-                <p className="text-sm text-[#9B9689]">
+                <p className="text-sm text-[#C4C0B6]">
                   Just connect to Google — no forms, no credit card, nothing to fill in.
                 </p>
               </div>
@@ -203,14 +203,14 @@ export function GoogleAdsAuditPage() {
             >
               <div className="mb-1 flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#9B9689]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
                     Account Score
                   </p>
                   <div className="mt-1 flex items-baseline gap-2">
                     <span className="font-display text-5xl font-bold text-[#E8E4DD]">
                       62
                     </span>
-                    <span className="text-xl text-[#9B9689]">/100</span>
+                    <span className="text-xl text-[#C4C0B6]">/100</span>
                   </div>
                 </div>
                 <span className="rounded border border-[#D4882A]/30 bg-[#D4882A]/10 px-2.5 py-1 text-xs font-medium text-[#D4882A]">
@@ -218,7 +218,7 @@ export function GoogleAdsAuditPage() {
                 </span>
               </div>
 
-              <p className="mb-5 text-xs text-[#9B9689]">Sample audit result</p>
+              <p className="mb-5 text-xs text-[#C4C0B6]">Sample audit result</p>
 
               <div className="space-y-4">
                 {mockDimensions.map((d) => (
@@ -229,7 +229,7 @@ export function GoogleAdsAuditPage() {
               <div className="mt-6 border-t border-[#3D3C36] pt-5">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
-                  <span className="text-sm text-[#9B9689]">
+                  <span className="text-sm text-[#C4C0B6]">
                     <span className="font-semibold text-[#C45D4A]">
                       $4,047/mo
                     </span>{" "}
@@ -281,11 +281,11 @@ export function GoogleAdsAuditPage() {
                       <span className="text-sm font-medium text-[#E8E4DD]">
                         {dim.name}
                       </span>
-                      <span className="rounded-full border border-[#3D3C36] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9B9689]">
+                      <span className="rounded-full border border-[#3D3C36] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#C4C0B6]">
                         {dim.weight}
                       </span>
                     </div>
-                    <p className="mt-1.5 text-sm leading-relaxed text-[#9B9689]">
+                    <p className="mt-1.5 text-sm leading-relaxed text-[#C4C0B6]">
                       {dim.description}
                     </p>
                   </div>
@@ -309,7 +309,7 @@ export function GoogleAdsAuditPage() {
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
                 What a typical audit finds.
               </h2>
-              <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+              <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
                 Most accounts running Google Ads for 6+ months have accumulated
                 significant waste. Here&apos;s what we commonly uncover in the first
                 analysis.
@@ -328,7 +328,7 @@ export function GoogleAdsAuditPage() {
                   className="flex items-start justify-between border-b border-[#3D3C36] py-5 first:border-t"
                 >
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#9B9689]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
                       {f.label}
                     </p>
                     <p className="mt-1 text-sm font-medium text-[#E8E4DD]">
@@ -392,7 +392,7 @@ export function GoogleAdsAuditPage() {
                 <h3 className="mt-4 text-base font-semibold text-[#E8E4DD]">
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                   {step.desc}
                 </p>
               </motion.div>
@@ -415,7 +415,7 @@ export function GoogleAdsAuditPage() {
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
                 Get your free audit now.
               </h2>
-              <p className="mt-3 text-base text-[#9B9689]">
+              <p className="mt-3 text-base text-[#C4C0B6]">
                 Takes 5 minutes. No changes made to your account. No credit card
                 required.
               </p>
@@ -423,7 +423,7 @@ export function GoogleAdsAuditPage() {
 
             <div className="flex flex-col items-start gap-3">
               <AuditCTA session={session} page="google-ads-audit" size="lg" />
-              <p className="text-sm text-[#9B9689]">
+              <p className="text-sm text-[#C4C0B6]">
                 Just connect to Google — no forms, no credit card, nothing to fill in.
               </p>
             </div>

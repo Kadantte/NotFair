@@ -94,7 +94,7 @@ export function GoogleAdsClaudeConnectorPage() {
             <h1 className="font-display mx-auto mt-4 max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-[56px]">
               Google Ads Claude Connector
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#9B9689]">
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
               Add AdsAgent as a custom MCP connector inside Claude.ai Web or
               Claude Cowork in under 2 minutes. Once installed, Claude reads
               your Google Ads campaigns in real time and helps you audit,
@@ -110,7 +110,7 @@ export function GoogleAdsClaudeConnectorPage() {
                 Open Claude Connectors
                 <ExternalLink className="h-4 w-4" />
               </a>
-              <p className="text-sm text-[#9B9689]">
+              <p className="text-sm text-[#C4C0B6]">
                 Free · No credit card · 2-minute setup
               </p>
             </div>
@@ -146,7 +146,7 @@ export function GoogleAdsClaudeConnectorPage() {
                 </h3>
               </div>
               <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Go to{" "}
                   <a
                     href="https://claude.ai/customize/connectors"
@@ -176,13 +176,13 @@ export function GoogleAdsClaudeConnectorPage() {
                 </h3>
               </div>
               <div className="ml-11 space-y-4">
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Fill in the connector form:
                 </p>
                 <StaticField label="Name" value="AdsAgent" />
                 <StaticField label="Remote MCP Server URL" value={SERVER_URL} />
 
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Expand <strong className="text-[#E8E4DD]">Advanced Settings</strong>.
                   You&apos;ll need a <strong className="text-[#E8E4DD]">Client ID</strong>{" "}
                   and <strong className="text-[#E8E4DD]">Client Secret</strong> — sign in
@@ -200,7 +200,7 @@ export function GoogleAdsClaudeConnectorPage() {
                           ? "Get your Client ID & Secret"
                           : "Sign in to generate your Client ID & Secret"}
                       </p>
-                      <p className="mt-1 text-sm leading-relaxed text-[#9B9689]">
+                      <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
                         {session.connected
                           ? "Open your AdsAgent connector setup page to copy your credentials."
                           : "Sign in with Google. We'll redirect you to the connector setup page where you can generate and copy your credentials."}
@@ -212,7 +212,7 @@ export function GoogleAdsClaudeConnectorPage() {
                   </div>
                 </div>
 
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Paste the Client ID and Client Secret into Claude&apos;s
                   Advanced Settings fields.
                 </p>
@@ -233,7 +233,7 @@ export function GoogleAdsClaudeConnectorPage() {
                 </h3>
               </div>
               <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Click <strong className="text-[#E8E4DD]">Add</strong>. The{" "}
                   <strong className="text-[#E8E4DD]">AdsAgent</strong> connector will
                   appear in your Connectors list with all available tools.
@@ -254,7 +254,7 @@ export function GoogleAdsClaudeConnectorPage() {
                 </h3>
               </div>
               <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Open a new chat on{" "}
                   <strong className="text-[#E8E4DD]">claude.ai</strong>, click the{" "}
                   <strong className="text-[#E8E4DD]">+</strong> button, go to{" "}
@@ -277,7 +277,7 @@ export function GoogleAdsClaudeConnectorPage() {
                 </h3>
               </div>
               <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#9B9689]">
+                <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Try a prompt like{" "}
                   <em className="text-[#E8E4DD]">
                     &ldquo;Audit my connected Google Ads account and tell me
@@ -309,7 +309,7 @@ export function GoogleAdsClaudeConnectorPage() {
             <h2 className="font-display text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
               Ready to install the connector?
             </h2>
-            <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#9B9689]">
+            <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#C4C0B6]">
               Sign in with Google to grab your Client ID and Secret, then paste
               them into Claude. Setup takes under 2 minutes.
             </p>
@@ -317,7 +317,7 @@ export function GoogleAdsClaudeConnectorPage() {
               <ConnectButton connected={session.connected} large />
               <Link
                 href="/google-ads-claude"
-                className="flex items-center gap-1 text-sm text-[#9B9689] underline underline-offset-2 hover:text-[#E8E4DD]"
+                className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
               >
                 Or use Claude Code instead
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -357,7 +357,7 @@ function StepNumber({ n }: { n: number }) {
 function StaticField({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-[#9B9689]/80">
+      <p className="text-xs font-medium uppercase tracking-wide text-[#C4C0B6]/80">
         {label}
       </p>
       <div className="rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/90">

@@ -90,7 +90,7 @@ export default function AuditPage() {
       <div className="flex h-full items-center justify-center bg-[#1A1917]">
         <div className="flex items-center gap-3">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#4CAF6E] border-t-transparent" />
-          <span className="text-[13px] text-[#9B9689]">Running audit...</span>
+          <span className="text-[13px] text-[#C4C0B6]">Running audit...</span>
         </div>
       </div>
     );

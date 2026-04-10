@@ -131,7 +131,7 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
             <Button
                 variant={variant}
                 onClick={handleConnect}
-                className={className || "gap-2 bg-[#24231F] border-[#3D3C36] text-[#9B9689] hover:text-[#E8E4DD] hover:bg-[#2E2D28] backdrop-blur-sm"}
+                className={className || "gap-2 bg-[#24231F] border-[#3D3C36] text-[#C4C0B6] hover:text-[#E8E4DD] hover:bg-[#2E2D28] backdrop-blur-sm"}
                 size={size}
             >
                 <Settings className="w-3.5 h-3.5 mr-2" />
@@ -149,10 +149,10 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
                         <div className="flex flex-col leading-none gap-0.5 text-left">
                             <span className="text-xs text-[#E8E4DD] font-semibold max-w-[140px] truncate">{auth.customerName}</span>
                             {auth.customerId && (
-                                <span className="text-[10px] text-[#9B9689] font-mono">{auth.customerId}</span>
+                                <span className="text-[10px] text-[#C4C0B6] font-mono">{auth.customerId}</span>
                             )}
                         </div>
-                        <ChevronDown className="w-3 h-3 text-[#9B9689] ml-1 opacity-50 group-hover:opacity-100" />
+                        <ChevronDown className="w-3 h-3 text-[#C4C0B6] ml-1 opacity-50 group-hover:opacity-100" />
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="bg-[#24231F] border-[#3D3C36] text-[#E8E4DD] min-w-[200px]">

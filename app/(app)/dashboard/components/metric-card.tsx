@@ -19,16 +19,16 @@ export function MetricCard({
 }) {
   const formattedValue = formatValue(value, format);
   const changeColor = change === null || change === undefined
-    ? "#9B9689"
+    ? "#C4C0B6"
     : change > 0
       ? "#4CAF6E"
       : change < 0
         ? "#C45D4A"
-        : "#9B9689";
+        : "#C4C0B6";
 
   return (
     <div className="rounded-md border border-[#3D3C36] bg-[#24231F] p-4">
-      <div className="text-[12px] font-medium text-[#9B9689] uppercase tracking-wide">
+      <div className="text-[12px] font-medium text-[#C4C0B6] uppercase tracking-wide">
         {label}
       </div>
       <div className="mt-1 flex items-end justify-between gap-3">

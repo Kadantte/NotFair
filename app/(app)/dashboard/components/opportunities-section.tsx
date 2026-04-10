@@ -15,7 +15,7 @@ export function OpportunitiesSection({ opportunities }: { opportunities: Opportu
     return (
       <div className="rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
         <div className="text-[14px] font-medium text-[#E8E4DD]">Opportunities</div>
-        <div className="mt-3 text-[13px] text-[#9B9689]">
+        <div className="mt-3 text-[13px] text-[#C4C0B6]">
           No growth opportunities detected right now. Check back later.
         </div>
       </div>
@@ -38,7 +38,7 @@ export function OpportunitiesSection({ opportunities }: { opportunities: Opportu
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="w-full rounded-md border border-[#3D3C36] py-2 text-[12px] text-[#9B9689] hover:bg-[#E8E4DD]/5 hover:text-[#E8E4DD] transition-colors"
+          className="w-full rounded-md border border-[#3D3C36] py-2 text-[12px] text-[#C4C0B6] hover:bg-[#E8E4DD]/5 hover:text-[#E8E4DD] transition-colors"
         >
           Show {opportunities.length - MAX_VISIBLE} more opportunities
         </button>
@@ -92,7 +92,7 @@ function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
         <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E]" />
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-medium text-[#E8E4DD]">{opportunity.title}</div>
-          <div className="mt-0.5 text-[12px] text-[#9B9689]">{opportunity.description}</div>
+          <div className="mt-0.5 text-[12px] text-[#C4C0B6]">{opportunity.description}</div>
           <div className="mt-1 font-mono text-[12px] font-medium text-[#4CAF6E]">
             {opportunity.estimatedImpact}
           </div>
@@ -120,7 +120,7 @@ function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
                   variant="ghost"
                   onClick={() => setConfirming(false)}
                   disabled={loading}
-                  className="h-7 px-3 text-[12px] text-[#9B9689] hover:text-[#E8E4DD]"
+                  className="h-7 px-3 text-[12px] text-[#C4C0B6] hover:text-[#E8E4DD]"
                 >
                   Cancel
                 </Button>

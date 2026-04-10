@@ -18,5 +18,5 @@ export function formatValue(action: string, value: string): string {
 export const ENTITY_BADGE_COLORS: Record<string, string> = {
   keyword: 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20',
   campaign: 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20',
-  unknown: 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20',
+  unknown: 'bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20',
 };

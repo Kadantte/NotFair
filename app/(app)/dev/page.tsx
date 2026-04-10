@@ -246,14 +246,14 @@ export default function DevPage() {
                 <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
-                        <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">API usage and operations tracking</p>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <Button
                         onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false); fetchContacts(false); fetchCustomers(false); }}
                         disabled={loading}
                         variant="outline"
                         size="sm"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 shrink-0"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 shrink-0"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                         <span className="hidden sm:inline">Refresh</span>
@@ -267,7 +267,7 @@ export default function DevPage() {
                             className={`px-4 py-2.5 text-[13px] font-medium capitalize transition-colors border-b-2 -mb-px ${
                                 activeTab === tab
                                     ? 'border-[#4CAF6E] text-[#E8E4DD]'
-                                    : 'border-transparent text-[#9B9689] hover:text-[#E8E4DD]'
+                                    : 'border-transparent text-[#C4C0B6] hover:text-[#E8E4DD]'
                             }`}
                         >
                             {tab}
@@ -287,7 +287,7 @@ export default function DevPage() {
                 {activeTab === 'usage' && (loading && !stats ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#9B9689] animate-pulse text-sm">Loading dev stats...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading dev stats...</p>
                     </div>
                 ) : stats ? (
                     <>
@@ -298,7 +298,7 @@ export default function DevPage() {
                             {/* Mobile: card layout */}
                             <div className="sm:hidden space-y-2">
                                 {stats.dailyUsage.length === 0 ? (
-                                    <p className="text-sm text-[#9B9689] text-center py-8">No API usage in the last 30 days</p>
+                                    <p className="text-sm text-[#C4C0B6] text-center py-8">No API usage in the last 30 days</p>
                                 ) : stats.dailyUsage.map(day => (
                                     <div key={day.date} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
                                         <div className="flex items-center justify-between mb-2">
@@ -316,7 +316,7 @@ export default function DevPage() {
                                             />
                                         </div>
                                         <div className="flex items-center gap-4 text-xs">
-                                            <span className="text-[#9B9689]">
+                                            <span className="text-[#C4C0B6]">
                                                 <span className="inline-block w-2 h-2 rounded-sm bg-[#4CAF6E]/60 mr-1" />
                                                 {day.reads.toLocaleString()} reads
                                             </span>
@@ -335,7 +335,7 @@ export default function DevPage() {
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
                                             {['Date', 'Reads', 'Writes', 'Total', ''].map((h, i) => (
-                                                <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">
+                                                <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
                                                     {h}
                                                 </th>
                                             ))}
@@ -344,7 +344,7 @@ export default function DevPage() {
                                     <tbody>
                                         {stats.dailyUsage.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#9B9689]">
+                                                <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#C4C0B6]">
                                                     No API usage in the last 30 days
                                                 </td>
                                             </tr>
@@ -353,7 +353,7 @@ export default function DevPage() {
                                                 <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">
                                                     {day.date}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#9B9689] font-mono tabular-nums">
+                                                <td className="px-4 py-2.5 text-sm text-[#C4C0B6] font-mono tabular-nums">
                                                     {day.reads.toLocaleString()}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#D4882A] font-mono tabular-nums">
@@ -379,7 +379,7 @@ export default function DevPage() {
                                     </tbody>
                                 </table>
                                 {stats.dailyUsage.length > 0 && (
-                                    <div className="px-4 py-2 border-t border-[#3D3C36]/50 flex items-center gap-4 text-[10px] text-[#9B9689] uppercase tracking-widest">
+                                    <div className="px-4 py-2 border-t border-[#3D3C36]/50 flex items-center gap-4 text-[10px] text-[#C4C0B6] uppercase tracking-widest">
                                         <span className="flex items-center gap-1.5">
                                             <span className="w-2.5 h-2.5 rounded-sm bg-[#4CAF6E]/60" /> Reads
                                         </span>
@@ -398,7 +398,7 @@ export default function DevPage() {
                             {/* Mobile: card layout */}
                             <div className="sm:hidden space-y-2">
                                 {stats.accountOps.length === 0 ? (
-                                    <p className="text-sm text-[#9B9689] text-center py-8">No operations recorded</p>
+                                    <p className="text-sm text-[#C4C0B6] text-center py-8">No operations recorded</p>
                                 ) : stats.accountOps.map(acc => {
                                     const budget = stats.budgets?.[acc.accountId];
                                     return (
@@ -411,53 +411,53 @@ export default function DevPage() {
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="min-w-0">
                                                 {acc.accountName && <div className="text-sm text-[#E8E4DD] truncate">{acc.accountName}</div>}
-                                                {acc.email && <div className="text-xs text-[#9B9689] truncate">{acc.email}</div>}
-                                                <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
+                                                {acc.email && <div className="text-xs text-[#C4C0B6] truncate">{acc.email}</div>}
+                                                <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{acc.accountId}</div>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
                                                 <button
                                                     type="button"
                                                     onClick={(e) => handleViewAs(acc.accountId, e)}
                                                     disabled={impersonatingAccountId === acc.accountId}
-                                                    className="p-1.5 rounded-md text-[#9B9689] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
+                                                    className="p-1.5 rounded-md text-[#C4C0B6] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
                                                     title="View as this account"
                                                 >
                                                     {impersonatingAccountId === acc.accountId
                                                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                                         : <Eye className="w-3.5 h-3.5" />}
                                                 </button>
-                                                <ChevronRight className="w-4 h-4 text-[#9B9689]" />
+                                                <ChevronRight className="w-4 h-4 text-[#C4C0B6]" />
                                             </div>
                                         </div>
                                         {budget && (
                                             <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
                                                 <div className="flex-1">
-                                                    <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Daily Budget</div>
+                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Daily Budget</div>
                                                     <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
                                                         {formatBudget(budget)}
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Campaigns</div>
+                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Campaigns</div>
                                                     <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{budget.activeCampaigns}</div>
                                                 </div>
                                             </div>
                                         )}
                                         <div className="grid grid-cols-3 gap-3 text-center">
                                             <div>
-                                                <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Reads</div>
-                                                <div className="text-sm text-[#9B9689] font-mono tabular-nums">{acc.reads.toLocaleString()}</div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Reads</div>
+                                                <div className="text-sm text-[#C4C0B6] font-mono tabular-nums">{acc.reads.toLocaleString()}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Writes</div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Writes</div>
                                                 <div className="text-sm text-[#D4882A] font-mono tabular-nums">{acc.writes.toLocaleString()}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Total</div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Total</div>
                                                 <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{acc.total.toLocaleString()}</div>
                                             </div>
                                         </div>
-                                        <div className="mt-2 text-[10px] text-[#9B9689] font-mono">
+                                        <div className="mt-2 text-[10px] text-[#C4C0B6] font-mono">
                                             Last active: {acc.lastActive ? formatDateTime(acc.lastActive) : 'Never'}
                                         </div>
                                     </Link>
@@ -471,7 +471,7 @@ export default function DevPage() {
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
                                             {['Account', 'Daily Budget', 'Campaigns', 'Reads', 'Writes', 'Total', 'Last Active', ''].map((h, i) => (
-                                                <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">
+                                                <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
                                                     {h}
                                                 </th>
                                             ))}
@@ -480,7 +480,7 @@ export default function DevPage() {
                                     <tbody>
                                         {stats.accountOps.length === 0 ? (
                                             <tr>
-                                                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#9B9689]">
+                                                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#C4C0B6]">
                                                     No operations recorded
                                                 </td>
                                             </tr>
@@ -497,18 +497,18 @@ export default function DevPage() {
                                                             <div className="text-sm text-[#E8E4DD]">{acc.accountName}</div>
                                                         )}
                                                         {acc.email && (
-                                                            <div className="text-xs text-[#9B9689]">{acc.email}</div>
+                                                            <div className="text-xs text-[#C4C0B6]">{acc.email}</div>
                                                         )}
-                                                        <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{acc.accountId}</div>
+                                                        <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{acc.accountId}</div>
                                                     </Link>
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
-                                                    {budget ? formatBudget(budget) : <span className="text-[#9B9689]/40">—</span>}
+                                                    {budget ? formatBudget(budget) : <span className="text-[#C4C0B6]/40">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">
-                                                    {budget ? budget.activeCampaigns : <span className="text-[#9B9689]/40">—</span>}
+                                                    {budget ? budget.activeCampaigns : <span className="text-[#C4C0B6]/40">—</span>}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#9B9689] font-mono tabular-nums">
+                                                <td className="px-4 py-2.5 text-sm text-[#C4C0B6] font-mono tabular-nums">
                                                     {acc.reads.toLocaleString()}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm text-[#D4882A] font-mono tabular-nums">
@@ -517,7 +517,7 @@ export default function DevPage() {
                                                 <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">
                                                     {acc.total.toLocaleString()}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
+                                                <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">
                                                     {acc.lastActive ? formatDateTime(acc.lastActive) : 'Never'}
                                                 </td>
                                                 <td className="px-4 py-2.5">
@@ -525,7 +525,7 @@ export default function DevPage() {
                                                         type="button"
                                                         onClick={(e) => handleViewAs(acc.accountId, e)}
                                                         disabled={impersonatingAccountId === acc.accountId}
-                                                        className="p-1.5 rounded-md text-[#9B9689] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
+                                                        className="p-1.5 rounded-md text-[#C4C0B6] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
                                                         title="View as this account"
                                                     >
                                                         {impersonatingAccountId === acc.accountId
@@ -554,10 +554,10 @@ export default function DevPage() {
                                 { label: 'Total Leads', value: metrics.total, color: 'text-[#E8E4DD]' },
                                 { label: 'Sent', value: metrics.sent, color: 'text-[#E8E4DD]' },
                                 { label: 'Bounce Rate', value: `${(metrics.bounceRate * 100).toFixed(1)}%`, color: metrics.bounceRate > BOUNCE_RATE_WARN ? 'text-[#C45D4A]' : 'text-[#4CAF6E]' },
-                                { label: 'Reply Rate', value: `${(metrics.replyRate * 100).toFixed(1)}%`, color: metrics.replyRate > 0 ? 'text-[#4CAF6E]' : 'text-[#9B9689]' },
+                                { label: 'Reply Rate', value: `${(metrics.replyRate * 100).toFixed(1)}%`, color: metrics.replyRate > 0 ? 'text-[#4CAF6E]' : 'text-[#C4C0B6]' },
                             ].map((card) => (
                                 <div key={card.label} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3 sm:p-4">
-                                    <div className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest mb-1">{card.label}</div>
+                                    <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-1">{card.label}</div>
                                     <div className={`text-xl sm:text-2xl font-mono tabular-nums font-semibold ${card.color}`}>{card.value}</div>
                                 </div>
                             ))}
@@ -567,13 +567,13 @@ export default function DevPage() {
                         {metrics.domainBreakdown.length > 0 && (
                             <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
                                 <div className="px-4 py-3 border-b border-[#3D3C36]">
-                                    <span className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">Bounce Rate by Domain</span>
+                                    <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Bounce Rate by Domain</span>
                                 </div>
                                 <div className="divide-y divide-[#3D3C36]/50">
                                     {metrics.domainBreakdown.map((d) => (
                                         <div key={d.domain} className="flex items-center gap-3 px-4 py-2">
                                             <span className="text-[13px] font-mono text-[#E8E4DD] min-w-0 truncate flex-1">{d.domain}</span>
-                                            <span className="text-[12px] font-mono tabular-nums text-[#9B9689] shrink-0">{d.total} sent</span>
+                                            <span className="text-[12px] font-mono tabular-nums text-[#C4C0B6] shrink-0">{d.total} sent</span>
                                             <span className="text-[12px] font-mono tabular-nums text-[#C45D4A] shrink-0">{d.bounced} bounced</span>
                                             <span className={`text-[12px] font-mono tabular-nums shrink-0 w-14 text-right font-medium ${d.bounceRate > BOUNCE_RATE_WARN ? 'text-[#C45D4A]' : 'text-[#4CAF6E]'}`}>
                                                 {(d.bounceRate * 100).toFixed(0)}%
@@ -593,14 +593,14 @@ export default function DevPage() {
                         <div className="flex items-center gap-3">
                             <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD]">Leads</h2>
                             {!loadingContacts && (
-                                <span className="font-mono text-xs text-[#9B9689]">
+                                <span className="font-mono text-xs text-[#C4C0B6]">
                                     {statusFilter === 'all' ? contacts.length : `${filteredContacts.length}/${contacts.length}`}
                                 </span>
                             )}
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="relative">
-                                <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#9B9689] pointer-events-none" />
+                                <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#C4C0B6] pointer-events-none" />
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
@@ -611,11 +611,11 @@ export default function DevPage() {
                                         <option key={s.key} value={s.key}>{s.label}</option>
                                     ))}
                                 </select>
-                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#9B9689] pointer-events-none" />
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#C4C0B6] pointer-events-none" />
                             </div>
                             <label>
                                 <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
-                                <Button variant="outline" size="sm" disabled={importing} className="gap-1.5 border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD]" asChild>
+                                <Button variant="outline" size="sm" disabled={importing} className="gap-1.5 border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD]" asChild>
                                     <span>
                                         {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                                         <span className="hidden sm:inline">Import CSV</span>
@@ -627,12 +627,12 @@ export default function DevPage() {
 
                     {loadingContacts ? (
                         <div className="flex items-center justify-center py-12">
-                            <Loader2 className="h-5 w-5 animate-spin text-[#9B9689]" />
+                            <Loader2 className="h-5 w-5 animate-spin text-[#C4C0B6]" />
                         </div>
                     ) : filteredContacts.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-10 text-center">
-                            <Users className="mx-auto mb-3 h-8 w-8 text-[#9B9689]/30" />
-                            <p className="text-sm text-[#9B9689]">{contacts.length === 0 ? 'No leads yet. Import a CSV or add via script.' : 'No leads match this filter.'}</p>
+                            <Users className="mx-auto mb-3 h-8 w-8 text-[#C4C0B6]/30" />
+                            <p className="text-sm text-[#C4C0B6]">{contacts.length === 0 ? 'No leads yet. Import a CSV or add via script.' : 'No leads match this filter.'}</p>
                         </div>
                     ) : (
                         <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
@@ -648,7 +648,7 @@ export default function DevPage() {
                                     const sc = STATUS_CONFIG.find((s) => s.key === c.status);
                                     const badgeStyle = sc
                                         ? { backgroundColor: `${sc.color}26`, color: sc.color }
-                                        : { backgroundColor: '#9B968926', color: '#9B9689' };
+                                        : { backgroundColor: '#C4C0B626', color: '#C4C0B6' };
                                     const isExpanded = expandedId === c.id;
                                     const hasDraft = !!c.draftSubject;
                                     return (
@@ -665,8 +665,8 @@ export default function DevPage() {
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-[12px] text-[#9B9689]">{c.company || '—'}</span>
-                                                        {hasDraft && c.status === 'drafted' && <span className="text-[11px] text-[#9B9689]/60">· draft ready</span>}
+                                                        <span className="text-[12px] text-[#C4C0B6]">{c.company || '—'}</span>
+                                                        {hasDraft && c.status === 'drafted' && <span className="text-[11px] text-[#C4C0B6]/60">· draft ready</span>}
                                                         {c.status === 'scheduled' && c.scheduledAt && <span className="text-[11px] text-[#C084FC]/60">· sends {new Date(c.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
                                                     </div>
                                                 </div>
@@ -687,12 +687,12 @@ export default function DevPage() {
                                                         size="icon-sm"
                                                         disabled={deletingContactId === c.id}
                                                         onClick={(e) => { e.stopPropagation(); handleDeleteContact(c.id); }}
-                                                        className="text-[#9B9689] opacity-0 group-hover:opacity-100 hover:text-[#C45D4A] transition-opacity"
+                                                        className="text-[#C4C0B6] opacity-0 group-hover:opacity-100 hover:text-[#C45D4A] transition-opacity"
                                                     >
                                                         {deletingContactId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
                                                     </Button>
                                                     {hasDraft ? (
-                                                        isExpanded ? <ChevronUp className="w-4 h-4 text-[#9B9689]" /> : <ChevronDown className="w-4 h-4 text-[#9B9689]" />
+                                                        isExpanded ? <ChevronUp className="w-4 h-4 text-[#C4C0B6]" /> : <ChevronDown className="w-4 h-4 text-[#C4C0B6]" />
                                                     ) : null}
                                                 </div>
                                             </div>
@@ -700,16 +700,16 @@ export default function DevPage() {
                                             {isExpanded && hasDraft && (
                                                 <div className="px-4 pb-3 pt-1 border-t border-[#3D3C36]/30">
                                                     <div className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-4">
-                                                        <div className="text-[11px] text-[#9B9689] uppercase tracking-wider mb-1">Subject</div>
+                                                        <div className="text-[11px] text-[#C4C0B6] uppercase tracking-wider mb-1">Subject</div>
                                                         <div className="text-[14px] text-[#E8E4DD] font-medium mb-3">{c.draftSubject}</div>
-                                                        <div className="text-[11px] text-[#9B9689] uppercase tracking-wider mb-1">Body</div>
+                                                        <div className="text-[11px] text-[#C4C0B6] uppercase tracking-wider mb-1">Body</div>
                                                         <pre className="text-[13px] text-[#E8E4DD]/80 leading-relaxed whitespace-pre-wrap font-sans">{c.draftBody}</pre>
                                                     </div>
                                                 </div>
                                             )}
                                             {isExpanded && !hasDraft && (
                                                 <div className="px-4 pb-3 pt-1 border-t border-[#3D3C36]/30">
-                                                    <p className="text-[13px] text-[#9B9689] italic">No draft yet. Ask Claude Code to generate one.</p>
+                                                    <p className="text-[13px] text-[#C4C0B6] italic">No draft yet. Ask Claude Code to generate one.</p>
                                                 </div>
                                             )}
                                         </div>
@@ -725,18 +725,18 @@ export default function DevPage() {
                 {activeTab === 'customers' && (loadingCustomers ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#9B9689] animate-pulse text-sm">Loading customers...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading customers...</p>
                     </div>
                 ) : customers.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-10 text-center">
-                        <Users className="mx-auto mb-3 h-8 w-8 text-[#9B9689]/30" />
-                        <p className="text-sm text-[#9B9689]">No customers yet.</p>
+                        <Users className="mx-auto mb-3 h-8 w-8 text-[#C4C0B6]/30" />
+                        <p className="text-sm text-[#C4C0B6]">No customers yet.</p>
                     </div>
                 ) : (
                     <div>
                         <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">
                             Customers
-                            <span className="ml-2 font-mono text-xs text-[#9B9689] font-normal">{customers.length}</span>
+                            <span className="ml-2 font-mono text-xs text-[#C4C0B6] font-normal">{customers.length}</span>
                         </h2>
 
                         {/* Mobile: card layout */}
@@ -746,21 +746,21 @@ export default function DevPage() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="min-w-0">
                                             <div className="text-sm text-[#E8E4DD] truncate">{c.googleEmail || c.userId || 'Unknown'}</div>
-                                            <div className="text-xs text-[#9B9689]/60 font-mono">{c.primaryAccountId}</div>
+                                            <div className="text-xs text-[#C4C0B6]/60 font-mono">{c.primaryAccountId}</div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-3 text-center">
                                         <div>
-                                            <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Accounts</div>
+                                            <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Accounts</div>
                                             <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.accountCount}</div>
                                         </div>
                                         <div>
-                                            <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Sessions</div>
+                                            <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Sessions</div>
                                             <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</div>
                                         </div>
                                         <div>
-                                            <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Last Active</div>
-                                            <div className="text-[11px] text-[#9B9689] font-mono">
+                                            <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Last Active</div>
+                                            <div className="text-[11px] text-[#C4C0B6] font-mono">
                                                 {formatDateShort(c.lastActive)}
                                             </div>
                                         </div>
@@ -770,7 +770,7 @@ export default function DevPage() {
                                             {c.accounts.map((a) => {
                                                 const budget = formatAccountBudget(a);
                                                 return (
-                                                    <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#9B9689] font-mono">
+                                                    <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#C4C0B6] font-mono">
                                                         <span className="truncate mr-2">{a.name || a.id}</span>
                                                         {budget && (
                                                             <span className="text-[#4CAF6E] whitespace-nowrap">{budget}/d · {a.activeCampaigns ?? 0} campaigns</span>
@@ -790,7 +790,7 @@ export default function DevPage() {
                                 <thead>
                                     <tr className="border-b border-[#3D3C36]">
                                         {['Customer', 'Accounts', 'Daily Budget', 'Sessions', 'First Seen', 'Last Active'].map((h, i) => (
-                                            <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">{h}</th>
+                                            <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
@@ -805,14 +805,14 @@ export default function DevPage() {
                                         <tr key={c.userId ?? c.primaryAccountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
                                             <td className="px-4 py-2.5">
                                                 <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
-                                                <div className="text-xs text-[#9B9689]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
+                                                <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <div className="flex flex-wrap gap-1">
                                                     {c.accounts.length === 0 ? (
-                                                        <span className="text-sm text-[#9B9689]/40">—</span>
+                                                        <span className="text-sm text-[#C4C0B6]/40">—</span>
                                                     ) : c.accounts.map((a) => (
-                                                        <span key={a.id} className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#9B9689] font-mono">{a.name || a.id}</span>
+                                                        <span key={a.id} className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#C4C0B6] font-mono">{a.name || a.id}</span>
                                                     ))}
                                                 </div>
                                             </td>
@@ -822,17 +822,17 @@ export default function DevPage() {
                                                         <div className="text-sm text-[#4CAF6E] font-mono tabular-nums">
                                                             {formatCurrency(totalBudget, currency)}
                                                         </div>
-                                                        <div className="text-[10px] text-[#9B9689]/60">{totalCampaigns} campaign{totalCampaigns !== 1 ? 's' : ''}</div>
+                                                        <div className="text-[10px] text-[#C4C0B6]/60">{totalCampaigns} campaign{totalCampaigns !== 1 ? 's' : ''}</div>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-sm text-[#9B9689]/40">—</span>
+                                                    <span className="text-sm text-[#C4C0B6]/40">—</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</td>
-                                            <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
+                                            <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">
                                                 {formatDateShort(c.firstSeen, true)}
                                             </td>
-                                            <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
+                                            <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">
                                                 {formatDateTime(c.lastActive)}
                                             </td>
                                         </tr>

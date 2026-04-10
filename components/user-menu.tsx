@@ -121,7 +121,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
           type="button"
           suppressHydrationWarning
           title={email ?? "Account"}
-          className={`group flex h-12 items-center rounded-lg text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+          className={`group flex h-12 items-center rounded-lg text-[#C4C0B6] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
             isCollapsed ? "w-12 justify-center px-0" : "w-full justify-start gap-3 px-2"
           }`}
         >
@@ -150,7 +150,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
             {label}
           </span>
           <ChevronRight
-            className={`h-4 w-4 shrink-0 text-[#9B9689] transition-all duration-200 ease-out ${
+            className={`h-4 w-4 shrink-0 text-[#C4C0B6] transition-all duration-200 ease-out ${
               isCollapsed ? "max-w-0 opacity-0" : "opacity-100"
             }`}
           />
@@ -165,7 +165,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
       >
         {/* Profile header */}
         <div className="px-2 py-1.5">
-          <p className="truncate text-[11px] font-mono uppercase tracking-wider text-[#9B9689]">
+          <p className="truncate text-[11px] font-mono uppercase tracking-wider text-[#C4C0B6]">
             Signed in as
           </p>
           {displayName && (
@@ -174,7 +174,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
             </p>
           )}
           {email && (
-            <p className={`truncate text-[11px] text-[#9B9689] ${displayName ? "" : "mt-0.5"}`}>
+            <p className={`truncate text-[11px] text-[#C4C0B6] ${displayName ? "" : "mt-0.5"}`}>
               {email}
             </p>
           )}

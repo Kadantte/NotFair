@@ -106,7 +106,7 @@ function AskAIButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-[11px] font-medium text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#4CAF6E]"
+      className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-[11px] font-medium text-[#C4C0B6] transition hover:bg-[#2E2D28] hover:text-[#4CAF6E]"
     >
       <MessageCircle className="h-3 w-3" />
       Ask AI
@@ -132,7 +132,7 @@ function ConversionTrackingBanner({ score, finding }: { score: number; finding: 
         <div className="text-[13px] font-semibold" style={{ color: isCritical ? "#C45D4A" : "#D4882A" }}>
           {isCritical ? "Conversion tracking not set up" : "Conversion tracking issue detected"}
         </div>
-        <div className="mt-0.5 text-[12px] text-[#9B9689]">{finding} — audit scores below may be inaccurate.</div>
+        <div className="mt-0.5 text-[12px] text-[#C4C0B6]">{finding} — audit scores below may be inaccurate.</div>
       </div>
     </div>
   );
@@ -143,7 +143,7 @@ function ConversionTrackingBanner({ score, finding }: { score: number; finding: 
 function ScoreCircle({ score, category, loading }: { score: number | null; category: string | null; loading?: boolean }) {
   const circumference = 2 * Math.PI * 45;
   const progress = score !== null ? (score / 100) * circumference : 0;
-  const color = category ? CATEGORY_COLORS[category] ?? "#9B9689" : "#9B9689";
+  const color = category ? CATEGORY_COLORS[category] ?? "#C4C0B6" : "#C4C0B6";
 
   return (
     <div className="flex items-center gap-6">
@@ -186,7 +186,7 @@ function ScoreCircle({ score, category, loading }: { score: number | null; categ
 function MetricCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-4">
-      <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">{label}</div>
       <div className="mt-1 font-mono text-[20px] font-bold" style={{ color: color ?? "#E8E4DD" }}>
         {value}
       </div>
@@ -221,7 +221,7 @@ function ScorecardTable({ dimensions, loading, onDimensionClick }: { dimensions:
     <div className="overflow-x-auto rounded border border-[#3D3C36] bg-[#24231F]">
       <table className="w-full text-left text-[13px]">
         <thead>
-          <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#9B9689]">
+          <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#C4C0B6]">
             <th className="px-4 py-3">Dimension</th>
             <th className="px-4 py-3">Score</th>
             <th className="px-4 py-3">Status</th>
@@ -269,7 +269,7 @@ function ScorecardTable({ dimensions, loading, onDimensionClick }: { dimensions:
                       {STATUS_LABELS[d.status]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-[#9B9689]">{d.finding}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-[#C4C0B6]">{d.finding}</td>
                 </tr>
               );
             })
@@ -307,15 +307,15 @@ function WastedSpendSection({ result, onAskAI }: { result: AuditResult; onAskAI?
         <>
           <div className="mt-3 flex flex-wrap gap-6">
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">30-Day Waste</div>
+              <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">30-Day Waste</div>
               <div className="font-mono text-[20px] font-bold text-[#C45D4A]">{fmt$(wastedSpend.total)}</div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">% of Spend</div>
+              <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">% of Spend</div>
               <div className="font-mono text-[20px] font-bold text-[#C45D4A]">{fmtPct(wastedSpend.pct)}</div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Annualized</div>
+              <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">Annualized</div>
               <div className="font-mono text-[20px] font-bold text-[#D4882A]">~{fmt$(wastedSpend.annualized)}</div>
             </div>
           </div>
@@ -324,13 +324,13 @@ function WastedSpendSection({ result, onAskAI }: { result: AuditResult; onAskAI?
               {wastedSpend.categories.map((cat) => (
                 <div key={cat.label}>
                   <div className="flex items-center justify-between text-[12px]">
-                    <span className="text-[#9B9689]">{cat.label}</span>
+                    <span className="text-[#C4C0B6]">{cat.label}</span>
                     <span className="font-mono text-[#E8E4DD]">{fmt$(cat.amount)}</span>
                   </div>
                   {cat.items.length > 0 && (
                     <ul className="mt-1 space-y-0.5">
                       {cat.items.map((item) => (
-                        <li key={item} className="text-[11px] text-[#9B9689] pl-3">
+                        <li key={item} className="text-[11px] text-[#C4C0B6] pl-3">
                           {item}
                         </li>
                       ))}
@@ -350,11 +350,11 @@ function WastedSpendSection({ result, onAskAI }: { result: AuditResult; onAskAI?
           </div>
           <div className="mt-2 flex flex-wrap gap-6">
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Fixable Spend</div>
+              <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">Fixable Spend</div>
               <div className="font-mono text-[18px] font-bold text-[#D4882A]">{fmt$(wastedSpend.qualityIssues.total)}</div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">% of Spend</div>
+              <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">% of Spend</div>
               <div className="font-mono text-[18px] font-bold text-[#D4882A]">{fmtPct(wastedSpend.qualityIssues.pct)}</div>
             </div>
           </div>
@@ -363,14 +363,14 @@ function WastedSpendSection({ result, onAskAI }: { result: AuditResult; onAskAI?
               {wastedSpend.qualityIssues.categories.map((cat) => (
                 <div key={cat.label}>
                   <div className="flex items-center justify-between text-[12px]">
-                    <span className="text-[#9B9689]">{cat.label}</span>
+                    <span className="text-[#C4C0B6]">{cat.label}</span>
                     <span className="font-mono text-[#E8E4DD]">{fmt$(cat.amount)}</span>
                   </div>
                   <p className="mt-0.5 text-[11px] text-[#6B6760] italic">{cat.description}</p>
                   {cat.items.length > 0 && (
                     <ul className="mt-1 space-y-0.5">
                       {cat.items.map((item) => (
-                        <li key={item} className="text-[11px] text-[#9B9689] pl-3">{item}</li>
+                        <li key={item} className="text-[11px] text-[#C4C0B6] pl-3">{item}</li>
                       ))}
                     </ul>
                   )}
@@ -439,14 +439,14 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
       {/* Account-level summary */}
       <div className="mt-3 flex flex-wrap gap-6">
         <div>
-          <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Search IS</div>
+          <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">Search IS</div>
           <div className="font-mono text-[20px] font-bold" style={{ color: avgColor }}>
             {fmtPct(impressionShareDiagnosis.avgIS ?? 0)}
           </div>
         </div>
         {impressionShareDiagnosis.budgetLost !== null && (
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Budget-Lost</div>
+            <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">Budget-Lost</div>
             <div className="font-mono text-[20px] font-bold text-[#E8E4DD]">
               {fmtPct(impressionShareDiagnosis.budgetLost)}
             </div>
@@ -454,14 +454,14 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
         )}
         {impressionShareDiagnosis.rankLost !== null && (
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-[#9B9689]">Rank-Lost</div>
+            <div className="text-[11px] uppercase tracking-wider text-[#C4C0B6]">Rank-Lost</div>
             <div className="font-mono text-[20px] font-bold text-[#E8E4DD]">
               {fmtPct(impressionShareDiagnosis.rankLost)}
             </div>
           </div>
         )}
       </div>
-      <div className="mt-3 text-[13px] text-[#9B9689]">
+      <div className="mt-3 text-[13px] text-[#C4C0B6]">
         {impressionShareDiagnosis.diagnosis}
       </div>
 
@@ -481,7 +481,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
       {/* Per-campaign breakdown */}
       {campaignBreakdown.length > 0 && (
         <div className="mt-5 border-t border-[#3D3C36] pt-4">
-          <div className="text-[12px] font-medium uppercase tracking-wider text-[#9B9689] mb-3">
+          <div className="text-[12px] font-medium uppercase tracking-wider text-[#C4C0B6] mb-3">
             By Campaign
           </div>
           <div className="space-y-2">
@@ -500,8 +500,8 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {isExpanded
-                        ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#9B9689]" />
-                        : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#9B9689]" />}
+                        ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#C4C0B6]" />
+                        : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#C4C0B6]" />}
                       <span className="text-[13px] font-medium text-[#E8E4DD] truncate">{camp.campaignName}</span>
                       <span
                         className="shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium"
@@ -520,7 +520,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
                       {camp.budgetLostIS !== null && camp.budgetLostIS > 0 && (
                         <div className="text-right hidden sm:block">
                           <div className="text-[10px] uppercase text-[#6B6760]">Budget</div>
-                          <div className="font-mono text-[13px] text-[#9B9689]">
+                          <div className="font-mono text-[13px] text-[#C4C0B6]">
                             -{fmtPct(camp.budgetLostIS)}
                           </div>
                         </div>
@@ -528,7 +528,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
                       {camp.rankLostIS !== null && camp.rankLostIS > 0 && (
                         <div className="text-right hidden sm:block">
                           <div className="text-[10px] uppercase text-[#6B6760]">Rank</div>
-                          <div className="font-mono text-[13px] text-[#9B9689]">
+                          <div className="font-mono text-[13px] text-[#C4C0B6]">
                             -{fmtPct(camp.rankLostIS)}
                           </div>
                         </div>
@@ -540,7 +540,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
                     <div className="border-t border-[#3D3C36] px-4 py-3">
                       {/* Campaign-level recommendation */}
                       {hasIssue && (
-                        <div className="mb-3 rounded bg-[#24231F] px-3 py-2 text-[12px] text-[#9B9689]">
+                        <div className="mb-3 rounded bg-[#24231F] px-3 py-2 text-[12px] text-[#C4C0B6]">
                           {camp.diagnosis === "budget" && (
                             <>
                               <span className="font-medium text-[#D4882A]">Recommendation:</span> Your ads are competitive when shown — you&apos;re just running out of budget.
@@ -633,7 +633,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
                                       </span>
                                     </td>
                                     <td className="py-2 text-right font-mono text-[#E8E4DD]">{fmt$(kw.cost)}</td>
-                                    <td className="py-2 text-right font-mono text-[#9B9689] hidden sm:table-cell">{fmtN(kw.impressions)}</td>
+                                    <td className="py-2 text-right font-mono text-[#C4C0B6] hidden sm:table-cell">{fmtN(kw.impressions)}</td>
                                   </tr>
                                 );
                               })}
@@ -656,7 +656,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
                                   Fix These to Improve Rank
                                 </div>
                                 {hints.map((hint, i) => (
-                                  <div key={i} className="flex items-start gap-2 text-[11px] text-[#9B9689]">
+                                  <div key={i} className="flex items-start gap-2 text-[11px] text-[#C4C0B6]">
                                     <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#C45D4A]" />
                                     {hint}
                                   </div>
@@ -694,7 +694,7 @@ function CampaignPerformanceSection({
   return (
     <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
       <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD] mb-3">
-        <TrendingDown className="h-4 w-4 text-[#9B9689]" />
+        <TrendingDown className="h-4 w-4 text-[#C4C0B6]" />
         Campaign Performance
         <span className="text-[11px] text-[#6B6760] font-normal">Last 30 days</span>
       </div>
@@ -729,14 +729,14 @@ function CampaignPerformanceSection({
                     </div>
                   </td>
                   <td className="py-2.5 pr-3 text-right font-mono text-[#E8E4DD]">{fmt$(c.cost)}</td>
-                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden sm:table-cell">{fmtN(c.clicks)}</td>
-                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden sm:table-cell">{fmtN(c.impressions)}</td>
-                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden md:table-cell">{ctr !== null ? fmtPct(ctr) : "—"}</td>
-                  <td className="py-2.5 pr-3 text-right text-[#9B9689] hidden md:table-cell">{cpc !== null ? fmt$(cpc) : "—"}</td>
-                  <td className="py-2.5 pr-3 text-right font-mono" style={{ color: c.conversions > 0 ? "#4CAF6E" : "#9B9689" }}>
+                  <td className="py-2.5 pr-3 text-right text-[#C4C0B6] hidden sm:table-cell">{fmtN(c.clicks)}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#C4C0B6] hidden sm:table-cell">{fmtN(c.impressions)}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#C4C0B6] hidden md:table-cell">{ctr !== null ? fmtPct(ctr) : "—"}</td>
+                  <td className="py-2.5 pr-3 text-right text-[#C4C0B6] hidden md:table-cell">{cpc !== null ? fmt$(cpc) : "—"}</td>
+                  <td className="py-2.5 pr-3 text-right font-mono" style={{ color: c.conversions > 0 ? "#4CAF6E" : "#C4C0B6" }}>
                     {fmtN(c.conversions)}
                   </td>
-                  <td className="py-2.5 text-right text-[#9B9689] hidden sm:table-cell">{cpa !== null ? fmt$(cpa) : "—"}</td>
+                  <td className="py-2.5 text-right text-[#C4C0B6] hidden sm:table-cell">{cpa !== null ? fmt$(cpa) : "—"}</td>
                 </tr>
               );
             })}
@@ -761,13 +761,13 @@ function ZeroCvCampaignsSection({
         <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
         Campaigns spending without converting
       </div>
-      <p className="mt-1 text-[12px] text-[#9B9689]">
+      <p className="mt-1 text-[12px] text-[#C4C0B6]">
         These enabled campaigns have spent money in the last 30 days with zero conversions.
       </p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#9B9689]">
+            <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#C4C0B6]">
               <th className="pb-2 text-left">Campaign</th>
               <th className="pb-2 text-right">Spend</th>
               <th className="pb-2 text-right">Clicks</th>
@@ -779,7 +779,7 @@ function ZeroCvCampaignsSection({
               <tr key={c.id} className="border-b border-[#3D3C36] last:border-0">
                 <td className="py-2.5 pr-4 font-medium text-[#E8E4DD]">{c.name}</td>
                 <td className="py-2.5 pr-4 text-right font-mono text-[#C45D4A]">{fmt$(c.cost)}</td>
-                <td className="py-2.5 pr-4 text-right text-[#9B9689]">{fmtN(c.clicks)}</td>
+                <td className="py-2.5 pr-4 text-right text-[#C4C0B6]">{fmtN(c.clicks)}</td>
                 <td className="py-2.5 text-right">
                   <ActionButton
                     label="Pause"
@@ -822,14 +822,14 @@ function WastedSearchTermsSection({
           />
         )}
       </div>
-      <p className="mt-1 text-[12px] text-[#9B9689]">
+      <p className="mt-1 text-[12px] text-[#C4C0B6]">
         Queries that triggered your ads but are unlikely to convert — job seekers,
         researchers, and off-topic searches. Add as negatives to reclaim wasted budget.
       </p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#9B9689]">
+            <tr className="border-b border-[#3D3C36] text-[11px] uppercase tracking-wider text-[#C4C0B6]">
               <th className="pb-2 text-left">Search Term</th>
               <th className="pb-2 text-left pl-3 hidden md:table-cell">Why flagged</th>
               <th className="pb-2 text-right">Spend</th>
@@ -853,7 +853,7 @@ function WastedSearchTermsSection({
                   </span>
                 </td>
                 <td className="py-2.5 pr-3 text-right font-mono text-[#D4882A]">{fmt$(t.cost)}</td>
-                <td className="py-2.5 pr-3 text-right text-[#9B9689]">{fmtN(t.clicks)}</td>
+                <td className="py-2.5 pr-3 text-right text-[#C4C0B6]">{fmtN(t.clicks)}</td>
                 <td className="py-2.5 text-right">
                   {t.campaignId ? (
                     <ActionButton
@@ -970,8 +970,8 @@ function DetailedFindings({ dimensions, onAskAI, activeDimension }: { dimensions
           >
             <div className="flex items-center gap-3">
               {expanded.has(d.key)
-                ? <ChevronDown className="h-4 w-4 text-[#9B9689]" />
-                : <ChevronRight className="h-4 w-4 text-[#9B9689]" />}
+                ? <ChevronDown className="h-4 w-4 text-[#C4C0B6]" />
+                : <ChevronRight className="h-4 w-4 text-[#C4C0B6]" />}
               <span className="text-[13px] font-medium text-[#E8E4DD]">{d.label}</span>
               <span
                 className="rounded-sm px-2 py-0.5 text-[10px] font-medium"
@@ -984,8 +984,8 @@ function DetailedFindings({ dimensions, onAskAI, activeDimension }: { dimensions
           {expanded.has(d.key) && (
             <div className="border-t border-[#3D3C36] px-4 py-3 space-y-1.5">
               {d.details.map((detail, i) => (
-                <div key={i} className="flex items-start gap-2 text-[12px] text-[#9B9689]">
-                  <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#9B9689]" />
+                <div key={i} className="flex items-start gap-2 text-[12px] text-[#C4C0B6]">
+                  <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
                   {detail}
                 </div>
               ))}
@@ -1078,15 +1078,15 @@ export function AuditContent({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[20px] font-semibold text-[#E8E4DD]">{overview.accountName}</h1>
-            <p className="text-[13px] text-[#9B9689]">
+            <p className="text-[13px] text-[#C4C0B6]">
               Account Audit
               {lastAuditTime && (
-                <span className="ml-2 text-[#9B9689]/60">· {formatTimeAgo(lastAuditTime)}</span>
+                <span className="ml-2 text-[#C4C0B6]/60">· {formatTimeAgo(lastAuditTime)}</span>
               )}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#9B9689]">
+            <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#C4C0B6]">
               Last 30 days
             </span>
             {onRedoAudit && (

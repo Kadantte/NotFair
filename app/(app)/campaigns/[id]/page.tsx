@@ -125,7 +125,7 @@ const statusColors: Record<string, string> = {
     ENABLED: 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20',
     PAUSED: 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20',
     REMOVED: 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20',
-    UNKNOWN: 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20',
+    UNKNOWN: 'bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20',
 };
 
 type TimeRange = 'ALL' | '5Y' | '1Y' | '6M' | '3M' | '1M' | '1W' | 'YESTERDAY' | 'TODAY';
@@ -266,7 +266,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             <div className="bg-[#24231F] border border-[#3D3C36] p-3 rounded-lg shadow-xl">
                 <p className="text-[#E8E4DD] mb-2 font-medium">{label}</p>
                 {payload.map((entry, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm text-[#9B9689]">
+                    <div key={i} className="flex items-center gap-2 text-sm text-[#C4C0B6]">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                         <span>{entry.name}:</span>
                         <span className="font-mono text-[#E8E4DD]">
@@ -292,7 +292,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                     {campaignInfo.status}
                                 </span>
                             )}
-                            <span className="text-xs text-[#9B9689] font-mono">ID: {campaignId}</span>
+                            <span className="text-xs text-[#C4C0B6] font-mono">ID: {campaignId}</span>
                         </div>
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">
                             {campaignInfo?.name || 'Campaign Details'}
@@ -306,7 +306,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                 onClick={() => setTimeRange(range)}
                                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${timeRange === range
                                     ? 'bg-[#4CAF6E]/15 text-[#4CAF6E] border border-[#4CAF6E]/20'
-                                    : 'text-[#9B9689] hover:text-[#E8E4DD] hover:bg-[#2E2D28]'
+                                    : 'text-[#C4C0B6] hover:text-[#E8E4DD] hover:bg-[#2E2D28]'
                                 }`}
                             >
                                 {range === 'ALL' ? 'All Time' : range === 'YESTERDAY' ? 'Yesterday' : range === 'TODAY' ? 'Today' : range}
@@ -328,7 +328,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#9B9689] animate-pulse text-sm">Loading campaign data...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading campaign data...</p>
                     </div>
                 ) : (
                     <div className="space-y-6">
@@ -342,7 +342,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                     {isSmartCampaign && smartSetting?.businessName && (
                                         <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
                                             <Building2 className="w-3 h-3 text-[#4CAF6E]" />
-                                            <span className="text-[#9B9689]">Business</span>
+                                            <span className="text-[#C4C0B6]">Business</span>
                                             <span className="text-[#E8E4DD] font-medium">{smartSetting.businessName}</span>
                                         </div>
                                     )}
@@ -352,7 +352,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                         return domains.length > 0 ? (
                                             <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
                                                 <LinkIcon className="w-3 h-3 text-[#4CAF6E]" />
-                                                <span className="text-[#9B9689]">Website</span>
+                                                <span className="text-[#C4C0B6]">Website</span>
                                                 <span className="text-[#E8E4DD] font-medium font-mono">{domains.join(', ')}</span>
                                             </div>
                                         ) : null;
@@ -361,7 +361,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                     {isSmartCampaign && smartSetting?.finalUrl && (
                                         <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
                                             <LinkIcon className="w-3 h-3 text-[#4CAF6E]" />
-                                            <span className="text-[#9B9689]">URL</span>
+                                            <span className="text-[#C4C0B6]">URL</span>
                                             <span className="text-[#E8E4DD] font-medium font-mono">
                                                 {extractHostname(smartSetting.finalUrl)}
                                             </span>
@@ -370,14 +370,14 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                     {totals.conversions > 0 && (
                                         <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
                                             <Target className="w-3 h-3 text-[#4CAF6E]" />
-                                            <span className="text-[#9B9689]">Cost / Conv.</span>
+                                            <span className="text-[#C4C0B6]">Cost / Conv.</span>
                                             <span className="text-[#E8E4DD] font-medium font-mono">${(totals.cost / totals.conversions).toFixed(2)}</span>
                                         </div>
                                     )}
                                     {conversionActions.length > 0 && (
                                         <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                            <Target className="w-3 h-3 text-[#9B9689]" />
-                                            <span className="text-[#9B9689]">Tracking</span>
+                                            <Target className="w-3 h-3 text-[#C4C0B6]" />
+                                            <span className="text-[#C4C0B6]">Tracking</span>
                                             <span className="text-[#E8E4DD] font-medium">{conversionActions.map(ca => ca.name).join(', ')}</span>
                                         </div>
                                     )}
@@ -385,16 +385,16 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                 {/* Secondary info: campaign settings */}
                                 <div className="flex flex-wrap items-center gap-2">
                                     <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                        <span className="text-[#9B9689]">Type</span>
+                                        <span className="text-[#C4C0B6]">Type</span>
                                         <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.type.replace(/_/g, ' ').toLowerCase()}</span>
                                     </div>
                                     <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                        <span className="text-[#9B9689]">Bidding</span>
+                                        <span className="text-[#C4C0B6]">Bidding</span>
                                         <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.biddingStrategy.replace(/_/g, ' ').toLowerCase()}</span>
                                     </div>
                                     {!isSmartCampaign && (
                                         <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                            <span className="text-[#9B9689]">UTM</span>
+                                            <span className="text-[#C4C0B6]">UTM</span>
                                             <span className="text-[#E8E4DD] font-medium font-mono">{campaignInfo.trackingTemplate || 'Not set'}</span>
                                         </div>
                                     )}
@@ -425,7 +425,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                 { icon: Target, label: 'Conversions', value: totals.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
                             ].map(({ icon: Icon, label, value }) => (
                                 <div key={label} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
-                                    <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
+                                    <div className="flex items-center gap-1.5 text-[#C4C0B6] text-xs mb-2">
                                         <Icon className="w-3.5 h-3.5" />
                                         {label}
                                     </div>
@@ -437,7 +437,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                         {/* ── 3. Performance History ── */}
                         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-6">
                             <div className="flex items-center gap-2 mb-6">
-                                <History className="w-4 h-4 text-[#9B9689]" />
+                                <History className="w-4 h-4 text-[#C4C0B6]" />
                                 <h2 className="text-base font-semibold text-[#E8E4DD]">Performance History</h2>
                             </div>
                             <div className="h-[360px] w-full">
@@ -454,11 +454,11 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
-                                        <XAxis dataKey="date" stroke="#3D3C36" tick={{ fill: '#9B9689', fontSize: 11 }} tickLine={false} />
+                                        <XAxis dataKey="date" stroke="#3D3C36" tick={{ fill: '#C4C0B6', fontSize: 11 }} tickLine={false} />
                                         <YAxis yAxisId="left" stroke="#4CAF6E" tick={{ fill: '#4CAF6E', fontSize: 11 }} tickLine={false} axisLine={false} />
                                         <YAxis yAxisId="right" orientation="right" stroke="#D4882A" tick={{ fill: '#D4882A', fontSize: 11 }} tickLine={false} axisLine={false} />
                                         <Tooltip content={<CustomTooltip />} />
-                                        <Legend wrapperStyle={{ color: '#9B9689', fontSize: 12 }} />
+                                        <Legend wrapperStyle={{ color: '#C4C0B6', fontSize: 12 }} />
                                         <Area yAxisId="left" type="monotone" dataKey="impressions" name="Impressions" stroke="#4CAF6E" fillOpacity={1} fill="url(#colorImpressions)" strokeWidth={2} />
                                         <Area yAxisId="right" type="monotone" dataKey="clicks" name="Clicks" stroke="#D4882A" fillOpacity={1} fill="url(#colorClicks)" strokeWidth={2} />
                                     </AreaChart>
@@ -471,14 +471,14 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl overflow-hidden">
                                 <div className="px-6 py-4 border-b border-[#3D3C36]">
                                     <div className="flex items-center gap-2">
-                                        <FileText className="w-4 h-4 text-[#9B9689]" />
+                                        <FileText className="w-4 h-4 text-[#C4C0B6]" />
                                         <h2 className="text-base font-semibold text-[#E8E4DD]">Ad Copy</h2>
                                     </div>
                                 </div>
                                 <div className="divide-y divide-[#3D3C36]/50">
                                     {ads.map((ad) => (
                                         <div key={ad.adId} className="px-6 py-5 space-y-4">
-                                            <div className="flex items-center gap-2 text-xs text-[#9B9689]">
+                                            <div className="flex items-center gap-2 text-xs text-[#C4C0B6]">
                                                 <span className="font-mono">Ad {ad.adId}</span>
                                                 <span className="text-[#3D3C36]">|</span>
                                                 <span>{ad.adGroupName}</span>
@@ -492,7 +492,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             </div>
 
                                             <div>
-                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9B9689] mb-1.5">Headlines</p>
+                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#C4C0B6] mb-1.5">Headlines</p>
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {ad.headlines.map((h, i) => (
                                                         <span key={i} className="text-xs bg-[#1A1917] border border-[#3D3C36] rounded px-2.5 py-1 text-[#E8E4DD]">{h}</span>
@@ -501,10 +501,10 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             </div>
 
                                             <div>
-                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9B9689] mb-1.5">Descriptions</p>
+                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#C4C0B6] mb-1.5">Descriptions</p>
                                                 <div className="space-y-1">
                                                     {ad.descriptions.map((d, i) => (
-                                                        <p key={i} className="text-xs text-[#9B9689] bg-[#1A1917] border border-[#3D3C36] rounded px-2.5 py-1.5">{d}</p>
+                                                        <p key={i} className="text-xs text-[#C4C0B6] bg-[#1A1917] border border-[#3D3C36] rounded px-2.5 py-1.5">{d}</p>
                                                     ))}
                                                 </div>
                                             </div>
@@ -518,7 +518,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                                         { label: 'Conv.', value: ad.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
                                                     ].map(({ label, value }) => (
                                                         <div key={label} className="flex flex-col">
-                                                            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#9B9689]">{label}</span>
+                                                            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#C4C0B6]">{label}</span>
                                                             <span className="text-sm font-medium tabular-nums text-[#E8E4DD]">{value}</span>
                                                         </div>
                                                     ))}
@@ -535,15 +535,15 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl overflow-hidden">
                                 <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div className="flex items-center gap-2">
-                                        <Search className="w-4 h-4 text-[#9B9689]" />
+                                        <Search className="w-4 h-4 text-[#C4C0B6]" />
                                         <h2 className="text-base font-semibold text-[#E8E4DD]">Search Terms</h2>
                                     </div>
-                                    <div className="text-xs text-[#9B9689]">What people searched before clicking your ads</div>
+                                    <div className="text-xs text-[#C4C0B6]">What people searched before clicking your ads</div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm">
                                         <thead>
-                                            <tr className="border-b border-[#3D3C36] text-[#9B9689]">
+                                            <tr className="border-b border-[#3D3C36] text-[#C4C0B6]">
                                                 <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Search Term</th>
                                                 <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Impressions</th>
                                                 <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Clicks</th>
@@ -555,10 +555,10 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             {smartSearchTerms.map((term, i) => (
                                                 <tr key={i} className="hover:bg-[#2E2D28] transition-colors">
                                                     <td className="px-6 py-3 font-medium text-[#E8E4DD]">{term.searchTerm}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{term.impressions.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{term.clicks.toLocaleString()}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{term.impressions.toLocaleString()}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{term.clicks.toLocaleString()}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${term.cost.toFixed(2)}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{term.impressions > 0 ? ((term.clicks / term.impressions) * 100).toFixed(2) : '0.00'}%</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{term.impressions > 0 ? ((term.clicks / term.impressions) * 100).toFixed(2) : '0.00'}%</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -573,15 +573,15 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                 <>
                                     <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
-                                            <Search className="w-4 h-4 text-[#9B9689]" />
+                                            <Search className="w-4 h-4 text-[#C4C0B6]" />
                                             <h2 className="text-base font-semibold text-[#E8E4DD]">Keyword Themes</h2>
                                         </div>
-                                        <div className="text-xs text-[#9B9689]">Smart campaigns use keyword themes, not individual keywords</div>
+                                        <div className="text-xs text-[#C4C0B6]">Smart campaigns use keyword themes, not individual keywords</div>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm">
                                             <thead>
-                                                <tr className="border-b border-[#3D3C36] text-[#9B9689]">
+                                                <tr className="border-b border-[#3D3C36] text-[#C4C0B6]">
                                                     <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Theme</th>
                                                     <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Type</th>
                                                     <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Status</th>
@@ -590,7 +590,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             <tbody className="divide-y divide-[#3D3C36]/50">
                                                 {keywordThemes.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={3} className="px-6 py-8 text-center text-[#9B9689] text-sm">
+                                                        <td colSpan={3} className="px-6 py-8 text-center text-[#C4C0B6] text-sm">
                                                             No keyword themes configured for this campaign.
                                                         </td>
                                                     </tr>
@@ -598,14 +598,14 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                                     keywordThemes.map((theme) => (
                                                         <tr key={theme.criterionId} className="hover:bg-[#2E2D28] transition-colors">
                                                             <td className="px-6 py-3 font-medium text-[#E8E4DD]">{theme.text}</td>
-                                                            <td className="px-6 py-3 text-xs text-[#9B9689]">
+                                                            <td className="px-6 py-3 text-xs text-[#C4C0B6]">
                                                                 {theme.isFreeForm ? 'Custom' : 'Suggested'}
                                                             </td>
                                                             <td className="px-6 py-3 text-right">
                                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
                                                                     theme.status === 'ENABLED'
                                                                         ? 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20'
-                                                                        : 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20'
+                                                                        : 'bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20'
                                                                 }`}>
                                                                     {theme.status}
                                                                 </span>
@@ -621,15 +621,15 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                 <>
                                     <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
-                                            <Search className="w-4 h-4 text-[#9B9689]" />
+                                            <Search className="w-4 h-4 text-[#C4C0B6]" />
                                             <h2 className="text-base font-semibold text-[#E8E4DD]">Keywords</h2>
                                         </div>
-                                        <div className="text-xs text-[#9B9689]">Top keywords by impressions</div>
+                                        <div className="text-xs text-[#C4C0B6]">Top keywords by impressions</div>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm">
                                             <thead>
-                                                <tr className="border-b border-[#3D3C36] text-[#9B9689]">
+                                                <tr className="border-b border-[#3D3C36] text-[#C4C0B6]">
                                                     <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Keyword</th>
                                                     <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-center">Quality</th>
                                                     <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Impressions</th>
@@ -642,7 +642,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             <tbody className="divide-y divide-[#3D3C36]/50">
                                                 {keywords.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={7} className="px-6 py-8 text-center text-[#9B9689] text-sm">
+                                                        <td colSpan={7} className="px-6 py-8 text-center text-[#C4C0B6] text-sm">
                                                             No keyword data available for this campaign.
                                                         </td>
                                                     </tr>
@@ -662,13 +662,13 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                                                         {keyword.qualityScore}/10
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="text-[#9B9689]/30">—</span>
+                                                                    <span className="text-[#C4C0B6]/30">—</span>
                                                                 )}
                                                             </td>
-                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{keyword.impressions.toLocaleString()}</td>
-                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{keyword.clicks.toLocaleString()}</td>
-                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{(keyword.ctr * 100).toFixed(2)}%</td>
-                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">${keyword.averageCpc.toFixed(2)}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{keyword.impressions.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{keyword.clicks.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{(keyword.ctr * 100).toFixed(2)}%</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">${keyword.averageCpc.toFixed(2)}</td>
                                                             <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${keyword.cost.toFixed(2)}</td>
                                                         </tr>
                                                     ))
@@ -710,13 +710,13 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             )}
 
                             {!summary && !summaryLoading && !summaryError && (
-                                <p className="text-[#9B9689] text-sm">
+                                <p className="text-[#C4C0B6] text-sm">
                                     Click &quot;Generate Summary&quot; to get an AI-powered analysis of your campaign performance, trends, and recommendations.
                                 </p>
                             )}
 
                             {summary && (
-                                <div className="prose prose-sm max-w-none text-[#9B9689]
+                                <div className="prose prose-sm max-w-none text-[#C4C0B6]
                                     [&_strong]:text-[#E8E4DD] [&_h1]:text-[#4CAF6E] [&_h2]:text-[#4CAF6E] [&_h3]:text-[#4CAF6E]
                                     [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs">
                                     <div dangerouslySetInnerHTML={{ __html: summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />

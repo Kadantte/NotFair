@@ -67,7 +67,7 @@ export default function DashboardPage() {
       <div className="flex h-full items-center justify-center bg-[#1A1917]">
         <div className="flex items-center gap-3">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#4CAF6E] border-t-transparent" />
-          <span className="text-[13px] text-[#9B9689]">Loading dashboard...</span>
+          <span className="text-[13px] text-[#C4C0B6]">Loading dashboard...</span>
         </div>
       </div>
     );

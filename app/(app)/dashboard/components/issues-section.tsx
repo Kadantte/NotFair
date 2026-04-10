@@ -15,7 +15,7 @@ export function IssuesSection({ issues }: { issues: Issue[] }) {
     return (
       <div className="rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
         <div className="text-[14px] font-medium text-[#E8E4DD]">Issues</div>
-        <div className="mt-3 text-[13px] text-[#9B9689]">
+        <div className="mt-3 text-[13px] text-[#C4C0B6]">
           No issues found. Your ads are looking healthy.
         </div>
       </div>
@@ -38,7 +38,7 @@ export function IssuesSection({ issues }: { issues: Issue[] }) {
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="w-full rounded-md border border-[#3D3C36] py-2 text-[12px] text-[#9B9689] hover:bg-[#E8E4DD]/5 hover:text-[#E8E4DD] transition-colors"
+          className="w-full rounded-md border border-[#3D3C36] py-2 text-[12px] text-[#C4C0B6] hover:bg-[#E8E4DD]/5 hover:text-[#E8E4DD] transition-colors"
         >
           Show {issues.length - MAX_VISIBLE} more issues
         </button>
@@ -63,7 +63,7 @@ function IssueCard({ issue }: { issue: Issue }) {
   const severityColor = {
     high: "#C45D4A",
     medium: "#D4882A",
-    low: "#9B9689",
+    low: "#C4C0B6",
   }[issue.severity];
 
   function toggleTerm(term: string) {
@@ -146,11 +146,11 @@ function IssueCard({ issue }: { issue: Issue }) {
             <span className="text-[13px] font-medium text-[#E8E4DD]">{issue.title}</span>
             {isWastedTerms && (
               expanded
-                ? <ChevronUp className="h-3.5 w-3.5 text-[#9B9689]" />
-                : <ChevronDown className="h-3.5 w-3.5 text-[#9B9689]" />
+                ? <ChevronUp className="h-3.5 w-3.5 text-[#C4C0B6]" />
+                : <ChevronDown className="h-3.5 w-3.5 text-[#C4C0B6]" />
             )}
           </div>
-          <div className="mt-0.5 text-[12px] text-[#9B9689]">{issue.description}</div>
+          <div className="mt-0.5 text-[12px] text-[#C4C0B6]">{issue.description}</div>
           <div className="mt-1 font-mono text-[12px] font-medium" style={{ color: severityColor }}>
             -${issue.dailyImpact.toFixed(0)}/day
           </div>
@@ -216,10 +216,10 @@ function WastedTermsDetail({
 }) {
   return (
     <div className="border-t border-[#3D3C36] px-4 pb-4 pt-3">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-[#9B9689] mb-2">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-[#C4C0B6] mb-2">
         Non-converting search terms in {action.campaignName}
       </div>
-      <div className="text-[11px] text-[#9B9689]/70 mb-3">
+      <div className="text-[11px] text-[#C4C0B6]/70 mb-3">
         Uncheck terms that are still relevant to your business before blocking.
       </div>
 
@@ -247,13 +247,13 @@ function WastedTermsDetail({
                       ${t.cost.toFixed(2)}
                     </span>
                   </div>
-                  <div className="mt-1 flex gap-3 text-[11px] font-mono text-[#9B9689]">
+                  <div className="mt-1 flex gap-3 text-[11px] font-mono text-[#C4C0B6]">
                     <span>{t.clicks} clicks</span>
                     <span>{Number(ctr)}% CTR</span>
                     <span>${cpc}/click</span>
                     <span>{t.impressions.toLocaleString()} impr</span>
                   </div>
-                  <div className="mt-1.5 text-[11px] leading-relaxed text-[#9B9689]/80">
+                  <div className="mt-1.5 text-[11px] leading-relaxed text-[#C4C0B6]/80">
                     {t.insight}
                   </div>
                 </div>
@@ -269,14 +269,14 @@ function WastedTermsDetail({
           <button
             type="button"
             onClick={() => setSelectedTerms(new Set(action.termDetails.map((t) => t.searchTerm)))}
-            className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
+            className="text-[#C4C0B6] hover:text-[#E8E4DD] transition-colors"
           >
             Select all
           </button>
           <button
             type="button"
             onClick={() => setSelectedTerms(new Set())}
-            className="text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
+            className="text-[#C4C0B6] hover:text-[#E8E4DD] transition-colors"
           >
             Select none
           </button>

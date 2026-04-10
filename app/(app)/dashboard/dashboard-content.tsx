@@ -21,7 +21,7 @@ export function DashboardContent({
       <div className="flex h-full items-center justify-center bg-[#1A1917]">
         <div className="text-center max-w-sm">
           <div className="text-[16px] font-medium text-[#E8E4DD]">Welcome to AdsAgent</div>
-          <div className="mt-2 text-[13px] text-[#9B9689]">
+          <div className="mt-2 text-[13px] text-[#C4C0B6]">
             Connect your Google Ads account to see your dashboard. Data will appear once your campaigns are active.
           </div>
           <a
@@ -100,7 +100,7 @@ export function DashboardContent({
                 spent on search terms with zero conversions
               </span>
             </div>
-            <div className="mt-1 font-mono text-[11px] text-[#9B9689]">
+            <div className="mt-1 font-mono text-[11px] text-[#C4C0B6]">
               ${finalMetrics.wastedSpend.toFixed(0)} total over last 30 days
             </div>
           </div>
@@ -150,8 +150,8 @@ function LoadingSection({ label }: { label: string }) {
     <div className="rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
       <div className="text-[14px] font-medium text-[#E8E4DD]">{label}</div>
       <div className="mt-3 flex items-center gap-2">
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#9B9689]" />
-        <span className="text-[13px] text-[#9B9689]">Analyzing...</span>
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#C4C0B6]" />
+        <span className="text-[13px] text-[#C4C0B6]">Analyzing...</span>
       </div>
     </div>
   );
@@ -161,8 +161,8 @@ function ISBar({ label, value, warn }: { label: string; value: number | null; wa
   if (value === null) {
     return (
       <div className="flex items-center gap-2">
-        <span className="w-[80px] shrink-0 text-[11px] text-[#9B9689]">{label}</span>
-        <span className="font-mono text-[11px] text-[#9B9689]">--</span>
+        <span className="w-[80px] shrink-0 text-[11px] text-[#C4C0B6]">{label}</span>
+        <span className="font-mono text-[11px] text-[#C4C0B6]">--</span>
       </div>
     );
   }
@@ -170,12 +170,12 @@ function ISBar({ label, value, warn }: { label: string; value: number | null; wa
   const pct = Math.round(value * 100);
   const isHigh = warn && pct > 20;
   const color = warn
-    ? isHigh ? "#C45D4A" : "#9B9689"
+    ? isHigh ? "#C45D4A" : "#C4C0B6"
     : pct >= 70 ? "#4CAF6E" : pct >= 40 ? "#D4882A" : "#C45D4A";
 
   return (
     <div className="flex items-center gap-2">
-      <span className="w-[80px] shrink-0 text-[11px] text-[#9B9689]">{label}</span>
+      <span className="w-[80px] shrink-0 text-[11px] text-[#C4C0B6]">{label}</span>
       <div className="h-[4px] flex-1 rounded-full bg-[#3D3C36]">
         <div
           className="h-full rounded-full"

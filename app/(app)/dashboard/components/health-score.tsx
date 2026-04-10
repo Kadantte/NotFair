@@ -13,8 +13,8 @@ export function HealthScore({ data, preliminary }: { data: HealthResult | null; 
     return (
       <div className="flex items-center justify-center rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
         <div className="text-center">
-          <div className="font-mono text-[48px] font-bold text-[#9B9689]">--</div>
-          <div className="text-[12px] text-[#9B9689]">Collecting data...</div>
+          <div className="font-mono text-[48px] font-bold text-[#C4C0B6]">--</div>
+          <div className="text-[12px] text-[#C4C0B6]">Collecting data...</div>
         </div>
       </div>
     );
@@ -63,7 +63,7 @@ export function HealthScore({ data, preliminary }: { data: HealthResult | null; 
         <div className="mb-2 flex items-center gap-2">
           <span className="text-[14px] font-medium text-[#E8E4DD]">Account Health</span>
           {preliminary && (
-            <span className="rounded-sm bg-[#3D3C36] px-1.5 py-0.5 text-[10px] text-[#9B9689]">
+            <span className="rounded-sm bg-[#3D3C36] px-1.5 py-0.5 text-[10px] text-[#C4C0B6]">
               updating...
             </span>
           )}
@@ -82,14 +82,14 @@ function ComponentBar({ label, value }: { label: string; value: number }) {
   const color = value >= 70 ? "#4CAF6E" : value >= 40 ? "#D4882A" : "#C45D4A";
   return (
     <div className="flex items-center gap-2">
-      <span className="w-[110px] shrink-0 text-[11px] text-[#9B9689]">{label}</span>
+      <span className="w-[110px] shrink-0 text-[11px] text-[#C4C0B6]">{label}</span>
       <div className="h-[4px] flex-1 rounded-full bg-[#3D3C36]">
         <div
           className="h-full rounded-full transition-all duration-500 ease-out"
           style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color }}
         />
       </div>
-      <span className="w-[28px] shrink-0 text-right font-mono text-[11px] text-[#9B9689]">
+      <span className="w-[28px] shrink-0 text-right font-mono text-[11px] text-[#C4C0B6]">
         {value}
       </span>
     </div>

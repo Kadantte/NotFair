@@ -12,7 +12,7 @@ export default function ToolsPage() {
                 <header className="flex items-center justify-between mb-12">
                     <div className="flex items-center gap-4">
                         <Link href="/">
-                            <Button variant="ghost" size="icon" className="hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] rounded-md">
+                            <Button variant="ghost" size="icon" className="hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] rounded-md">
                                 <ArrowLeft className="w-5 h-5" />
                             </Button>
                         </Link>

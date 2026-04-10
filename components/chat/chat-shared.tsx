@@ -93,7 +93,7 @@ export function renderMarkdown(text: string): ReactNode[] {
           className="overflow-x-auto rounded border border-[#3D3C36] bg-[#24231F] p-4 text-sm leading-6 text-white"
         >
           {language ? (
-            <div className="mb-3 text-[11px] uppercase tracking-[0.16em] text-[#9B9689]">
+            <div className="mb-3 text-[11px] uppercase tracking-[0.16em] text-[#C4C0B6]">
               {language}
             </div>
           ) : null}

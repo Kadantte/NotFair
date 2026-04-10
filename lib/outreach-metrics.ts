@@ -6,7 +6,7 @@
 export const BOUNCE_RATE_WARN = 0.05;
 
 export const STATUS_CONFIG = [
-    { key: 'new', label: 'New', color: '#9B9689' },
+    { key: 'new', label: 'New', color: '#C4C0B6' },
     { key: 'drafted', label: 'Drafted', color: '#6B8AED' },
     { key: 'scheduled', label: 'Scheduled', color: '#C084FC' },
     { key: 'contacted', label: 'Contacted', color: '#D4882A' },

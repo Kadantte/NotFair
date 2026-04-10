@@ -76,14 +76,14 @@ export default function OperationsPage() {
                 <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Operations</h1>
-                        <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">Every change made by the MCP agent — with one-click revert</p>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">Every change made by the MCP agent — with one-click revert</p>
                     </div>
                     <Button
                         onClick={() => fetchChanges(page)}
                         disabled={loading}
                         variant="outline"
                         size="sm"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 shrink-0"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 shrink-0"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                         <span className="hidden sm:inline">Refresh</span>
@@ -102,13 +102,13 @@ export default function OperationsPage() {
                 {loading && changes.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#9B9689] animate-pulse text-sm">Loading operations...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading operations...</p>
                     </div>
                 ) : changes.length === 0 ? (
                     <div className="text-center py-20 border border-[#3D3C36] rounded-xl bg-[#24231F]/40">
-                        <Activity className="w-10 h-10 text-[#9B9689]/20 mx-auto mb-4" />
+                        <Activity className="w-10 h-10 text-[#C4C0B6]/20 mx-auto mb-4" />
                         <h3 className="text-base font-medium text-[#E8E4DD]/60">No operations yet</h3>
-                        <p className="text-[#9B9689] max-w-sm mx-auto mt-2 text-sm">
+                        <p className="text-[#C4C0B6] max-w-sm mx-auto mt-2 text-sm">
                             Connect AdsAgent via MCP and ask it to make changes. Every write operation will appear here.
                         </p>
                     </div>
@@ -126,19 +126,19 @@ export default function OperationsPage() {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 text-xs font-mono mb-2">
-                                            <span className="text-[#9B9689] tabular-nums">{formatValue(change.action, change.beforeValue)}</span>
+                                            <span className="text-[#C4C0B6] tabular-nums">{formatValue(change.action, change.beforeValue)}</span>
                                             <DeltaBadge before={change.beforeValue} after={change.afterValue} />
                                             <span className="text-[#E8E4DD] tabular-nums">{formatValue(change.action, change.afterValue)}</span>
                                         </div>
                                         {change.reasoning && (
-                                            <p className="text-xs text-[#9B9689] mb-2 line-clamp-2">{change.reasoning}</p>
+                                            <p className="text-xs text-[#C4C0B6] mb-2 line-clamp-2">{change.reasoning}</p>
                                         )}
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-[#9B9689] font-mono tabular-nums">
+                                            <span className="text-[10px] text-[#C4C0B6] font-mono tabular-nums">
                                                 {new Date(change.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                             {change.rolledBack ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-medium bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-medium bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20">
                                                     Reverted
                                                 </span>
                                             ) : canUndo(change) ? (
@@ -147,7 +147,7 @@ export default function OperationsPage() {
                                                     variant="outline"
                                                     disabled={undoing === change.id}
                                                     onClick={() => handleUndo(change.id)}
-                                                    className="h-6 px-2 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1 text-[10px]"
+                                                    className="h-6 px-2 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1 text-[10px]"
                                                 >
                                                     <RotateCcw className={`w-2.5 h-2.5 ${undoing === change.id ? 'animate-spin' : ''}`} />
                                                     {undoing === change.id ? 'Reverting…' : 'Revert'}
@@ -171,7 +171,7 @@ export default function OperationsPage() {
                                 <thead>
                                     <tr className="border-b border-[#3D3C36]">
                                         {['Time', 'Action', 'Type', 'Entity', 'Before', '', 'After', 'Reasoning', ''].map((h, i) => (
-                                            <th key={i} className="pb-3 pr-4 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">{h}</th>
+                                            <th key={i} className="pb-3 pr-4 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
@@ -179,7 +179,7 @@ export default function OperationsPage() {
                                     {changes.map(change => (
                                         <Fragment key={change.id}>
                                             <tr className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
-                                                <td className="py-3 pr-4 text-xs text-[#9B9689] whitespace-nowrap font-mono">
+                                                <td className="py-3 pr-4 text-xs text-[#C4C0B6] whitespace-nowrap font-mono">
                                                     {new Date(change.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                 </td>
                                                 <td className="py-3 pr-4">
@@ -194,10 +194,10 @@ export default function OperationsPage() {
                                                     {change.label ? (
                                                         <span className="text-[#E8E4DD]">{change.label}</span>
                                                     ) : (
-                                                        <span className="text-[#9B9689] font-mono">{change.entityId}</span>
+                                                        <span className="text-[#C4C0B6] font-mono">{change.entityId}</span>
                                                     )}
                                                 </td>
-                                                <td className="py-3 pr-4 text-sm text-[#9B9689] font-mono tabular-nums">
+                                                <td className="py-3 pr-4 text-sm text-[#C4C0B6] font-mono tabular-nums">
                                                     {formatValue(change.action, change.beforeValue)}
                                                 </td>
                                                 <td className="py-3 pr-2">
@@ -206,12 +206,12 @@ export default function OperationsPage() {
                                                 <td className="py-3 pr-4 text-sm font-mono text-[#E8E4DD] tabular-nums">
                                                     {formatValue(change.action, change.afterValue)}
                                                 </td>
-                                                <td className="py-3 pr-4 text-xs text-[#9B9689] max-w-[200px] truncate" title={change.reasoning ?? ''}>
-                                                    {change.reasoning ?? <span className="text-[#9B9689]/30">—</span>}
+                                                <td className="py-3 pr-4 text-xs text-[#C4C0B6] max-w-[200px] truncate" title={change.reasoning ?? ''}>
+                                                    {change.reasoning ?? <span className="text-[#C4C0B6]/30">—</span>}
                                                 </td>
                                                 <td className="py-3">
                                                     {change.rolledBack ? (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20">
                                                             Reverted
                                                         </span>
                                                     ) : canUndo(change) ? (
@@ -220,13 +220,13 @@ export default function OperationsPage() {
                                                             variant="outline"
                                                             disabled={undoing === change.id}
                                                             onClick={() => handleUndo(change.id)}
-                                                            className="h-7 px-2 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 text-xs"
+                                                            className="h-7 px-2 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 text-xs"
                                                         >
                                                             <RotateCcw className={`w-3 h-3 ${undoing === change.id ? 'animate-spin' : ''}`} />
                                                             {undoing === change.id ? 'Reverting…' : 'Revert'}
                                                         </Button>
                                                     ) : (
-                                                        <span className="text-xs text-[#9B9689]/30">—</span>
+                                                        <span className="text-xs text-[#C4C0B6]/30">—</span>
                                                     )}
                                                 </td>
                                             </tr>
@@ -250,7 +250,7 @@ export default function OperationsPage() {
 
                 {total > 0 && (
                     <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <p className="text-[10px] sm:text-xs text-[#9B9689]/40">
+                        <p className="text-[10px] sm:text-xs text-[#C4C0B6]/40">
                             Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}.
                             <span className="hidden sm:inline"> Revert available within 7 days.</span>
                         </p>
@@ -260,11 +260,11 @@ export default function OperationsPage() {
                                 variant="outline"
                                 disabled={page === 0 || loading}
                                 onClick={() => setPage(p => p - 1)}
-                                className="h-7 px-3 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] text-xs disabled:opacity-30"
+                                className="h-7 px-3 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] text-xs disabled:opacity-30"
                             >
                                 Previous
                             </Button>
-                            <span className="text-xs text-[#9B9689] tabular-nums font-mono">
+                            <span className="text-xs text-[#C4C0B6] tabular-nums font-mono">
                                 {page + 1} / {totalPages}
                             </span>
                             <Button
@@ -272,7 +272,7 @@ export default function OperationsPage() {
                                 variant="outline"
                                 disabled={page >= totalPages - 1 || loading}
                                 onClick={() => setPage(p => p + 1)}
-                                className="h-7 px-3 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] text-xs disabled:opacity-30"
+                                className="h-7 px-3 border-[#3D3C36] bg-transparent hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] text-xs disabled:opacity-30"
                             >
                                 Next
                             </Button>

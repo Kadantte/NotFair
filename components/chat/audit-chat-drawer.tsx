@@ -150,7 +150,7 @@ export function AuditChatDrawer({
             {messages.length > 0 && (
               <a
                 href={`/chat/${threadId.current}`}
-                className="rounded p-1 text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+                className="rounded p-1 text-[#C4C0B6] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
                 title="Open in full chat"
               >
                 <Expand className="h-4 w-4" />
@@ -159,7 +159,7 @@ export function AuditChatDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="rounded p-1 text-[#9B9689] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+              className="rounded p-1 text-[#C4C0B6] transition hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -174,7 +174,7 @@ export function AuditChatDrawer({
               <p className="text-[14px] font-medium text-[#E8E4DD]">
                 Ask about your audit
               </p>
-              <p className="mt-1 max-w-[280px] text-[12px] leading-5 text-[#9B9689]">
+              <p className="mt-1 max-w-[280px] text-[12px] leading-5 text-[#C4C0B6]">
                 Click &ldquo;Ask AI&rdquo; on any finding, or type a question
                 below.
               </p>
@@ -206,7 +206,7 @@ export function AuditChatDrawer({
               <button
                 type="button"
                 onClick={scrollToBottom}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-[#3D3C36] bg-[#24231F] text-[#9B9689] shadow-lg transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] shadow-lg transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
               >
                 <ArrowDown className="h-3.5 w-3.5" />
               </button>
@@ -236,7 +236,7 @@ export function AuditChatDrawer({
                 onChange={(e) => setInput(e.currentTarget.value)}
                 placeholder="Ask about this audit..."
                 disabled={isSending}
-                className="h-10 border-0 bg-transparent px-2 text-[14px] text-[#E8E4DD] shadow-none placeholder:text-[#9B9689] focus-visible:ring-0"
+                className="h-10 border-0 bg-transparent px-2 text-[14px] text-[#E8E4DD] shadow-none placeholder:text-[#C4C0B6] focus-visible:ring-0"
               />
               {isSending ? (
                 <Button

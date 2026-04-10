@@ -158,7 +158,7 @@ const verticals = [
     spend: "$5K–$30K/mo · CPCs: $50–$200+",
     pain: "A single wasted click on \"personal injury lawyer\" costs $150+. Most solo attorneys self-manage because agency fees eat into already-tight margins.",
     hook: "\"Your AI agent saved you $4,200 in wasted clicks this month.\"",
-    color: "#9B9689",
+    color: "#C4C0B6",
   },
   {
     icon: Home,
@@ -237,11 +237,11 @@ function FAQItem({ q, a }: { q: string; a: string }) {
       >
         <span className="text-base font-medium text-[#E8E4DD]">{q}</span>
         <ChevronDown
-          className={`h-5 w-5 shrink-0 text-[#9B9689] transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-5 w-5 shrink-0 text-[#C4C0B6] transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && (
-        <p className="pb-5 text-sm leading-relaxed text-[#9B9689]">{a}</p>
+        <p className="pb-5 text-sm leading-relaxed text-[#C4C0B6]">{a}</p>
       )}
     </div>
   );
@@ -313,7 +313,7 @@ export function HomePage({
                 <br />
                 <span className="text-[#4CAF6E]">manager.</span>
               </h1>
-              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#9B9689]">
+              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
                 Claude has no commissions, no incentive to overspend your budget.
                 AdsAgent gives Claude the tools to monitor your campaigns 24/7,
                 cut waste, and tirelessly surface opportunities —
@@ -324,7 +324,7 @@ export function HomePage({
                 <div className="flex flex-wrap items-center gap-3">
                   <ConnectClaudeCTA session={session} position="hero" />
                 </div>
-                <div className="flex items-center gap-5 text-sm text-[#9B9689]">
+                <div className="flex items-center gap-5 text-sm text-[#C4C0B6]">
                   <span>Free</span>
                   <span className="h-1 w-1 rounded-full bg-[#3D3C36]" />
                   <span>5 minutes</span>
@@ -343,7 +343,7 @@ export function HomePage({
                       requires_auth: false,
                     })
                   }
-                  className="text-sm text-[#9B9689] underline underline-offset-4 hover:text-[#E8E4DD] transition-colors"
+                  className="text-sm text-[#C4C0B6] underline underline-offset-4 hover:text-[#E8E4DD] transition-colors"
                 >
                   Free Google Ads Audit →
                 </Link>
@@ -367,7 +367,7 @@ export function HomePage({
                       <img src="/claude-icon.svg" alt="" className="h-2.5 w-2.5 brightness-0 invert" />
                     </span>
                     <span>Claude</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#9B9689]" />
+                    <ChevronDown className="h-3.5 w-3.5 text-[#C4C0B6]" />
                   </div>
                 </div>
 
@@ -405,7 +405,7 @@ export function HomePage({
                   {examplePrompts.map((prompt) => (
                     <button
                       key={prompt}
-                      className="shrink-0 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-xs whitespace-nowrap text-[#9B9689] transition-colors hover:border-[#4D4C46] hover:text-[#E8E4DD]"
+                      className="shrink-0 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-xs whitespace-nowrap text-[#C4C0B6] transition-colors hover:border-[#4D4C46] hover:text-[#E8E4DD]"
                     >
                       {prompt}
                     </button>
@@ -435,7 +435,7 @@ export function HomePage({
                 <div className="text-2xl font-bold text-[#E8E4DD] md:text-3xl">
                   {s.value}
                 </div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-[#9B9689]">
+                <div className="mt-1 text-xs uppercase tracking-wide text-[#C4C0B6]">
                   {s.label}
                 </div>
               </div>
@@ -468,7 +468,7 @@ export function HomePage({
                 <h3 className="mt-4 text-lg font-semibold text-[#E8E4DD]">
                   {s.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                   {s.desc}
                 </p>
               </div>
@@ -563,7 +563,7 @@ export function HomePage({
                       {item.title}
                     </h3>
                   </div>
-                  <p className="text-sm leading-relaxed text-[#9B9689] md:text-right">
+                  <p className="text-sm leading-relaxed text-[#C4C0B6] md:text-right">
                     {item.desc}
                   </p>
                   <span className="font-mono-jb text-2xl font-bold text-[#4CAF6E] md:w-20 md:text-right">
@@ -598,11 +598,11 @@ export function HomePage({
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-[#3D3C36] bg-[#24231F]">
-                  <th className="px-5 py-4 font-medium text-[#9B9689]" />
-                  <th className="px-5 py-4 font-medium text-[#9B9689]">
+                  <th className="px-5 py-4 font-medium text-[#C4C0B6]" />
+                  <th className="px-5 py-4 font-medium text-[#C4C0B6]">
                     Self-Manage
                   </th>
-                  <th className="px-5 py-4 font-medium text-[#9B9689]">
+                  <th className="px-5 py-4 font-medium text-[#C4C0B6]">
                     Agency
                   </th>
                   <th className="px-5 py-4 font-semibold text-[#4CAF6E]">
@@ -619,8 +619,8 @@ export function HomePage({
                     <td className="px-5 py-3.5 font-medium text-[#E8E4DD]">
                       {row.dim}
                     </td>
-                    <td className="px-5 py-3.5 text-[#9B9689]">{row.self}</td>
-                    <td className="px-5 py-3.5 text-[#9B9689]">
+                    <td className="px-5 py-3.5 text-[#C4C0B6]">{row.self}</td>
+                    <td className="px-5 py-3.5 text-[#C4C0B6]">
                       {row.agency}
                     </td>
                     <td className="px-5 py-3.5 font-medium text-[#4CAF6E]">
@@ -644,7 +644,7 @@ export function HomePage({
             <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
               High CPCs mean high waste. We find it.
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+            <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
               The higher your cost per click, the more money you lose on
               irrelevant searches. AdsAgent is built for industries where
               every wasted click hurts.
@@ -665,8 +665,8 @@ export function HomePage({
                       {v.title}
                     </h3>
                   </div>
-                  <p className="mt-1 text-xs text-[#9B9689]">{v.spend}</p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#9B9689]">
+                  <p className="mt-1 text-xs text-[#C4C0B6]">{v.spend}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-[#C4C0B6]">
                     {v.pain}
                   </p>
                   <p className="mt-3 text-sm font-medium italic text-[#4CAF6E]">
@@ -683,7 +683,7 @@ export function HomePage({
       <section className="px-4 pb-20">
         <div className="container mx-auto max-w-5xl">
           <PricingSection {...pricing} page="homepage" />
-          <p className="mt-6 text-sm text-[#9B9689]">
+          <p className="mt-6 text-sm text-[#C4C0B6]">
             Spending $50K+/mo?{" "}
             <Link
               href="mailto:tong@adsagent.org"
@@ -726,12 +726,12 @@ export function HomePage({
           <h2 className="font-display text-3xl font-bold tracking-tight text-[#E8E4DD] md:text-4xl">
             Let Claude manage your Google Ads.
           </h2>
-          <p className="mt-4 text-lg text-[#9B9689]">
+          <p className="mt-4 text-lg text-[#C4C0B6]">
             Connect in 5 minutes. No credit card required.
           </p>
           <div className="mt-8 flex flex-col items-start gap-4">
             <ConnectClaudeCTA session={session} position="final" />
-            <p className="max-w-md text-xs leading-relaxed text-[#9B9689]">
+            <p className="max-w-md text-xs leading-relaxed text-[#C4C0B6]">
               By connecting Google Ads, you agree to our{" "}
               <Link
                 href="/privacy"

@@ -22,7 +22,7 @@ export function CheckoutStatusBanner() {
   }
   if (status === "cancelled") {
     return (
-      <div className="mb-8 rounded-md border border-[#3D3C36] bg-[#24231F] px-4 py-3 text-sm text-[#9B9689]">
+      <div className="mb-8 rounded-md border border-[#3D3C36] bg-[#24231F] px-4 py-3 text-sm text-[#C4C0B6]">
         Checkout cancelled. Nothing was charged.
       </div>
     );
@@ -70,7 +70,7 @@ export function PricingSection(props: PricingSectionProps) {
     <div>
       <PricingHeader />
       <PricingCards {...props} />
-      <p className="mt-12 max-w-2xl text-sm text-[#9B9689]">
+      <p className="mt-12 max-w-2xl text-sm text-[#C4C0B6]">
         Prices in USD. Billed via Stripe. Cancel anytime from the billing portal — your access continues until the end of the current period.
       </p>
     </div>
@@ -86,7 +86,7 @@ export function PricingHeader() {
       <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
         A fraction of what agencies charge
       </h2>
-      <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+      <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
         Start with a free audit. Upgrade when you see the results. Cancel anytime — no contracts.
       </p>
     </div>
@@ -172,7 +172,7 @@ export function PricingCards({
           className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
             interval === "year"
               ? "bg-[#4CAF6E] text-[#1A1917]"
-              : "text-[#9B9689] hover:text-[#E8E4DD]"
+              : "text-[#C4C0B6] hover:text-[#E8E4DD]"
           }`}
         >
           Yearly
@@ -190,7 +190,7 @@ export function PricingCards({
           className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
             interval === "month"
               ? "bg-[#4CAF6E] text-[#1A1917]"
-              : "text-[#9B9689] hover:text-[#E8E4DD]"
+              : "text-[#C4C0B6] hover:text-[#E8E4DD]"
           }`}
         >
           Monthly
@@ -203,16 +203,16 @@ export function PricingCards({
         <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-8">
           <div className="flex items-baseline justify-between">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Free</h3>
-            <span className="font-mono text-xs uppercase tracking-wider text-[#9B9689]">
+            <span className="font-mono text-xs uppercase tracking-wider text-[#C4C0B6]">
               starter
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#9B9689]">Kick the tires risk-free.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">Kick the tires risk-free.</p>
           <div className="mt-6 flex items-baseline gap-1">
             <span className="font-display text-5xl font-bold text-[#E8E4DD]">
               {PRICING.freeMonthly}
             </span>
-            <span className="text-sm text-[#9B9689]">/forever</span>
+            <span className="text-sm text-[#C4C0B6]">/forever</span>
           </div>
           <ul className="mt-8 space-y-3">
             {FREE_FEATURES.map((f) => (
@@ -269,22 +269,22 @@ export function PricingCards({
               unlimited
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#9B9689]">For serious advertisers.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">For serious advertisers.</p>
           <div className="mt-6 flex items-baseline gap-1">
             {interval === "month" ? (
               <>
                 <span className="font-display text-5xl font-bold text-[#E8E4DD]">
                   {PRICING.growthMonthly}
                 </span>
-                <span className="text-sm text-[#9B9689]">/month</span>
+                <span className="text-sm text-[#C4C0B6]">/month</span>
               </>
             ) : (
               <>
                 <span className="font-display text-5xl font-bold text-[#E8E4DD]">
                   {PRICING.growthYearlyMonthlyEquivalent}
                 </span>
-                <span className="text-sm text-[#9B9689]">/month</span>
-                <span className="ml-2 text-sm text-[#9B9689]">
+                <span className="text-sm text-[#C4C0B6]">/month</span>
+                <span className="ml-2 text-sm text-[#C4C0B6]">
                   {PRICING.growthYearly}/year
                 </span>
               </>
@@ -340,7 +340,7 @@ export function PricingCards({
               </div>
             )}
             {isOnGrowth && !scheduledCancelAt && currentPeriodEnd && (
-              <p className="mt-3 text-center font-mono text-[11px] text-[#9B9689]">
+              <p className="mt-3 text-center font-mono text-[11px] text-[#C4C0B6]">
                 Renews {currentInterval ?? ""} on {new Date(currentPeriodEnd).toLocaleDateString()}
               </p>
             )}

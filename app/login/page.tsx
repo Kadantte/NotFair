@@ -77,7 +77,7 @@ function LoginForm() {
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-[#E8E4DD]">Sign in to AdsAgent</h1>
-        <p className="text-[#9B9689] text-sm">
+        <p className="text-[#C4C0B6] text-sm">
           Manage your Google Ads with AI
         </p>
       </div>
@@ -128,7 +128,7 @@ function LoginForm() {
 
       <div className="flex items-center gap-3">
         <div className="flex-1 h-px bg-[#3D3C36]" />
-        <span className="text-[#9B9689] text-xs uppercase">or</span>
+        <span className="text-[#C4C0B6] text-xs uppercase">or</span>
         <div className="flex-1 h-px bg-[#3D3C36]" />
       </div>
 
@@ -139,7 +139,7 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           required
-          className="w-full h-12 px-4 rounded-md bg-[#24231F] border border-[#3D3C36] text-[#E8E4DD] placeholder:text-[#9B9689] focus:outline-none focus:border-[#4CAF6E] transition-colors"
+          className="w-full h-12 px-4 rounded-md bg-[#24231F] border border-[#3D3C36] text-[#E8E4DD] placeholder:text-[#C4C0B6] focus:outline-none focus:border-[#4CAF6E] transition-colors"
         />
         <Button
           type="submit"
@@ -157,7 +157,7 @@ function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-[#9B9689] text-xs text-center">
+      <p className="text-[#C4C0B6] text-xs text-center">
         We'll send a sign-in link to your email. No password needed.
       </p>
     </div>

@@ -64,7 +64,7 @@ const statusColors = {
     ENABLED: 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20',
     PAUSED: 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20',
     REMOVED: 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20',
-    UNKNOWN: 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20',
+    UNKNOWN: 'bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20',
 };
 
 type CampaignStatusFilter = 'ALL' | 'ENABLED' | 'PAUSED';
@@ -177,14 +177,14 @@ export default function CampaignsPage() {
                 <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Campaigns</h1>
-                        <p className="mt-0.5 text-xs sm:text-sm text-[#9B9689] hidden sm:block">Manage and track your Google Ads performance</p>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">Manage and track your Google Ads performance</p>
                     </div>
                     <Button
                         onClick={() => { cachedCampaigns = null; fetchCampaigns(false, true); }}
                         disabled={loading}
                         variant="outline"
                         size="sm"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 shrink-0"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 shrink-0"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                         <span className="hidden sm:inline">Refresh</span>
@@ -201,11 +201,11 @@ export default function CampaignsPage() {
                 )}
 
                 <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-sm text-[#9B9689]">
+                    <div className="text-sm text-[#C4C0B6]">
                         Showing <span className="text-[#E8E4DD]">{filteredCampaigns.length}</span> of <span className="text-[#E8E4DD]">{campaigns.length}</span> campaigns
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className="text-sm text-[#9B9689]">Status</span>
+                        <span className="text-sm text-[#C4C0B6]">Status</span>
                         <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as CampaignStatusFilter)}>
                             <SelectTrigger className="w-[180px] border-[#3D3C36] bg-[#24231F] text-[#E8E4DD] hover:bg-[#2E2D28] focus:ring-[#4CAF6E]/20">
                                 <SelectValue placeholder="All statuses" />
@@ -222,17 +222,17 @@ export default function CampaignsPage() {
                 {loading && campaigns.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#9B9689] animate-pulse text-sm">Loading campaigns...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading campaigns...</p>
                     </div>
                 ) : (
                     <div className="grid gap-3">
                         {filteredCampaigns.length === 0 && !error ? (
                             <div className="text-center py-20 bg-[#24231F]/60 border border-[#3D3C36] rounded-xl">
-                                <BarChart3 className="w-10 h-10 text-[#9B9689]/30 mx-auto mb-4" />
+                                <BarChart3 className="w-10 h-10 text-[#C4C0B6]/30 mx-auto mb-4" />
                                 <h3 className="text-base font-medium text-[#E8E4DD]/60">
                                     {campaigns.length === 0 ? 'No campaigns found' : `No ${statusFilter.toLowerCase()} campaigns found`}
                                 </h3>
-                                <p className="text-[#9B9689] max-w-sm mx-auto mt-2 text-sm">
+                                <p className="text-[#C4C0B6] max-w-sm mx-auto mt-2 text-sm">
                                     {campaigns.length === 0
                                         ? 'Create your first campaign in Google Ads to see it here.'
                                         : 'Try a different status filter to see more campaigns.'}
@@ -263,15 +263,15 @@ export default function CampaignsPage() {
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-wide uppercase ${statusColors[campaign.status as keyof typeof statusColors] || statusColors.UNKNOWN}`}>
                                                         {campaign.status}
                                                     </span>
-                                                    <span className="text-xs text-[#9B9689] font-mono">ID: {campaign.id}</span>
+                                                    <span className="text-xs text-[#C4C0B6] font-mono">ID: {campaign.id}</span>
                                                 </div>
                                                 <h3 className="text-[15px] font-medium text-[#E8E4DD] truncate pr-4 group-hover:text-white transition-colors">
                                                     {campaign.name}
                                                 </h3>
-                                                <p className="text-xs text-[#9B9689] mt-1">
-                                                    <span className="capitalize"><span className="text-[#9B9689]/60">Ads Type</span> {String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</span>
+                                                <p className="text-xs text-[#C4C0B6] mt-1">
+                                                    <span className="capitalize"><span className="text-[#C4C0B6]/60">Ads Type</span> {String(campaign.type || '').replace(/_/g, ' ').toLowerCase()}</span>
                                                     <span className="mx-1.5 text-[#3D3C36]">|</span>
-                                                    <span className="capitalize"><span className="text-[#9B9689]/60">Bidding Strategy</span> {String(campaign.biddingStrategy || '').replace(/_/g, ' ').toLowerCase()}</span>
+                                                    <span className="capitalize"><span className="text-[#C4C0B6]/60">Bidding Strategy</span> {String(campaign.biddingStrategy || '').replace(/_/g, ' ').toLowerCase()}</span>
                                                 </p>
                                                 {(() => {
                                                     const warnings = getCampaignWarnings(campaign);
@@ -299,28 +299,28 @@ export default function CampaignsPage() {
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-8 border-t sm:border-t-0 sm:border-l border-[#3D3C36] pt-3 sm:pt-0 sm:pl-8">
                                                     <div>
-                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                        <div className="flex items-center gap-1.5 text-[#C4C0B6] text-xs mb-1">
                                                             <TrendingUp className="w-3 h-3" />
                                                             Impressions
                                                         </div>
                                                         <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.impressions || 0).toLocaleString()}</p>
                                                     </div>
                                                     <div>
-                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                        <div className="flex items-center gap-1.5 text-[#C4C0B6] text-xs mb-1">
                                                             <MousePointer2 className="w-3 h-3" />
                                                             Clicks
                                                         </div>
                                                         <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{(campaign.clicks || 0).toLocaleString()}</p>
                                                     </div>
                                                     <div>
-                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                        <div className="flex items-center gap-1.5 text-[#C4C0B6] text-xs mb-1">
                                                             <DollarSign className="w-3 h-3" />
                                                             Cost
                                                         </div>
                                                         <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                                     </div>
                                                     <div>
-                                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-1">
+                                                        <div className="flex items-center gap-1.5 text-[#C4C0B6] text-xs mb-1">
                                                             <Target className="w-3 h-3" />
                                                             Conversions
                                                         </div>
@@ -380,7 +380,7 @@ export default function CampaignsPage() {
                                                         </Button>
                                                     )}
                                                 </div>
-                                                <div className="hidden md:flex items-center text-[#9B9689]">
+                                                <div className="hidden md:flex items-center text-[#C4C0B6]">
                                                     {isActing
                                                         ? <Loader2 className="w-4 h-4 animate-spin text-[#4CAF6E]" />
                                                         : <ChevronRight className="w-4 h-4 group-hover:text-[#E8E4DD] transition-colors" />

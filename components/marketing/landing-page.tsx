@@ -15,7 +15,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
             <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#E8E4DD] md:text-6xl">
               {page.heroTitle}
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-[#9B9689]">
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
               {page.heroDescription}
             </p>
           </div>
@@ -24,7 +24,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
             {page.highlights.map((highlight) => (
               <div
                 key={highlight}
-                className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-6 text-sm leading-relaxed text-[#9B9689]"
+                className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-6 text-sm leading-relaxed text-[#C4C0B6]"
               >
                 {highlight}
               </div>
@@ -36,7 +36,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
               <h2 className="text-lg font-semibold text-[#E8E4DD]">
                 Ready to connect your Google Ads account?
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#9B9689]">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#C4C0B6]">
                 Start with the main product flow, then use your preferred AI client to
                 inspect campaigns and review optimization ideas.
               </p>
@@ -62,7 +62,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
                 <h2 className="text-xl font-semibold text-[#E8E4DD]">
                   {section.title}
                 </h2>
-                <p className="mt-4 text-sm leading-relaxed text-[#9B9689]">
+                <p className="mt-4 text-sm leading-relaxed text-[#C4C0B6]">
                   {section.body}
                 </p>
               </div>

@@ -85,7 +85,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 <br />
                 <span className="text-[#4CAF6E]">access.</span>
               </h1>
-              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#9B9689]">
+              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
                 AdsAgent is a production-ready Model Context Protocol server for
                 Google Ads. Drop it into Claude Desktop, Claude Code, or any
                 MCP-compatible client — and your AI gets live campaign data plus
@@ -93,7 +93,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
               </p>
               <div className="mt-8 flex flex-col items-start gap-3">
                 <AuditCTA session={session} page="google-ads-mcp-server" size="lg" />
-                <p className="text-sm text-[#9B9689]">
+                <p className="text-sm text-[#C4C0B6]">
                   Free to connect · 2-minute setup · No API key needed
                 </p>
               </div>
@@ -108,7 +108,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
             >
               <div className="flex items-center gap-2 border-b border-[#3D3C36] px-4 py-3">
                 <Terminal className="h-4 w-4 text-[#4CAF6E]" />
-                <span className="font-mono-jb text-xs text-[#9B9689]">
+                <span className="font-mono-jb text-xs text-[#C4C0B6]">
                   claude_desktop_config.json
                 </span>
               </div>
@@ -116,7 +116,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 <code className="font-mono-jb text-[#E8E4DD]">{MCP_CONFIG}</code>
               </pre>
               <div className="border-t border-[#3D3C36] px-5 py-4">
-                <p className="text-xs text-[#9B9689]">
+                <p className="text-xs text-[#C4C0B6]">
                   Compatible with:{" "}
                   {clients.map((c, i) => (
                     <span key={c}>
@@ -147,7 +147,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
               Everything your agent can do.
             </h2>
-            <p className="mt-4 max-w-xl text-base text-[#9B9689]">
+            <p className="mt-4 max-w-xl text-base text-[#C4C0B6]">
               Read tools return live data. Write tools stage a change for your
               review before anything touches your account.
             </p>
@@ -163,13 +163,13 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#3D3C36] bg-[#24231F]">
-                  <th className="px-5 py-3 text-left font-mono-jb text-xs font-semibold uppercase tracking-wide text-[#9B9689]">
+                  <th className="px-5 py-3 text-left font-mono-jb text-xs font-semibold uppercase tracking-wide text-[#C4C0B6]">
                     Tool
                   </th>
-                  <th className="px-5 py-3 text-left font-mono-jb text-xs font-semibold uppercase tracking-wide text-[#9B9689]">
+                  <th className="px-5 py-3 text-left font-mono-jb text-xs font-semibold uppercase tracking-wide text-[#C4C0B6]">
                     Type
                   </th>
-                  <th className="px-5 py-3 text-left font-mono-jb text-xs font-semibold uppercase tracking-wide text-[#9B9689]">
+                  <th className="px-5 py-3 text-left font-mono-jb text-xs font-semibold uppercase tracking-wide text-[#C4C0B6]">
                     What it does
                   </th>
                 </tr>
@@ -194,7 +194,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                         {tool.category}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-[#9B9689]">
+                    <td className="px-5 py-3.5 text-[#C4C0B6]">
                       {tool.description}
                     </td>
                   </tr>
@@ -248,7 +248,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 <h3 className="mt-4 text-base font-semibold text-[#E8E4DD]">
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                   {step.desc}
                 </p>
               </motion.div>
@@ -279,7 +279,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                   <Icon className="h-4 w-4 text-[#4CAF6E]" />
                 </div>
                 <h3 className="text-sm font-semibold text-[#E8E4DD]">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">{body}</p>
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">{body}</p>
               </motion.div>
             ))}
           </div>
@@ -302,7 +302,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
               <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD]">
                 Not a developer? Still works.
               </h2>
-              <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+              <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
                 The setup is editing a JSON file — copy, paste, save. After that
                 it&apos;s entirely natural language. Ask Claude questions about your
                 campaigns and let it do the analysis.
@@ -316,13 +316,13 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 ].map((prompt) => (
                   <li key={prompt} className="flex items-start gap-2.5">
                     <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E]" />
-                    <span className="font-mono-jb text-sm text-[#9B9689]">
+                    <span className="font-mono-jb text-sm text-[#C4C0B6]">
                       &ldquo;{prompt}&rdquo;
                     </span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-6 text-sm text-[#9B9689]">
+              <p className="mt-6 text-sm text-[#C4C0B6]">
                 For a step-by-step guide,{" "}
                 <Link
                   href="/google-ads-claude"
@@ -341,7 +341,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
               className="flex flex-col gap-4"
             >
               <div className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#9B9689]">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
                   What you ask
                 </p>
                 <p className="mt-2 text-sm text-[#E8E4DD]">
@@ -352,12 +352,12 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#4CAF6E]">
                   What Claude does
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                   Calls <span className="font-mono-jb text-[#E8E4DD]">getCampaignPerformance</span> with your date range, filters for cost &gt; $500 and conversions = 0, then returns a ranked list with spend breakdown and top wasted search terms for each.
                 </p>
               </div>
               <div className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#9B9689]">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
                   What you decide
                 </p>
                 <p className="mt-2 text-sm text-[#E8E4DD]">
@@ -389,14 +389,14 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
                 Connect the Google Ads MCP server.
               </h2>
-              <p className="mt-3 text-base text-[#9B9689]">
+              <p className="mt-3 text-base text-[#C4C0B6]">
                 Free. 2-minute setup. Your agent gets live access to every
                 campaign, keyword, and search term in your account.
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">
               <AuditCTA session={session} page="google-ads-mcp-server" size="lg" />
-              <p className="text-sm text-[#9B9689]">
+              <p className="text-sm text-[#C4C0B6]">
                 Read-only OAuth · changes require approval · no credit card
               </p>
             </div>

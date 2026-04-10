@@ -85,7 +85,7 @@ export default function DevAccountDetailPage() {
                 <div className="flex w-full items-center gap-3 px-4 py-3 sm:px-6 sm:py-4">
                     <Link
                         href="/dev"
-                        className="flex items-center justify-center rounded-lg p-1.5 text-[#9B9689] hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] transition-colors"
+                        className="flex items-center justify-center rounded-lg p-1.5 text-[#C4C0B6] hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
@@ -93,14 +93,14 @@ export default function DevAccountDetailPage() {
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD] truncate">
                             {data?.email ?? `Account ${accountId}`}
                         </h1>
-                        <p className="mt-0.5 text-xs text-[#9B9689] font-mono tabular-nums">{accountId}</p>
+                        <p className="mt-0.5 text-xs text-[#C4C0B6] font-mono tabular-nums">{accountId}</p>
                     </div>
                     <Button
                         onClick={() => { cachedDetail = null; fetchDetail(false); }}
                         disabled={loading}
                         variant="outline"
                         size="sm"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#9B9689] hover:text-[#E8E4DD] gap-1.5 shrink-0"
+                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 shrink-0"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                         <span className="hidden sm:inline">Refresh</span>
@@ -119,7 +119,7 @@ export default function DevAccountDetailPage() {
                 {loading && !data ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#9B9689] animate-pulse text-sm">Loading account details...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading account details...</p>
                     </div>
                 ) : data ? (
                     <>
@@ -158,7 +158,7 @@ export default function DevAccountDetailPage() {
                                 <div className="space-y-1.5">
                                     {data.dailyUsage.map(day => (
                                         <div key={day.date} className="flex items-center gap-3">
-                                            <span className="w-[72px] shrink-0 text-xs text-[#9B9689] font-mono tabular-nums">
+                                            <span className="w-[72px] shrink-0 text-xs text-[#C4C0B6] font-mono tabular-nums">
                                                 {day.date.slice(5)}
                                             </span>
                                             <div className="flex-1 flex items-center gap-0.5 h-4">
@@ -177,7 +177,7 @@ export default function DevAccountDetailPage() {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="flex items-center gap-4 mt-2 text-[10px] text-[#9B9689] uppercase tracking-widest">
+                                <div className="flex items-center gap-4 mt-2 text-[10px] text-[#C4C0B6] uppercase tracking-widest">
                                     <span className="flex items-center gap-1.5">
                                         <span className="w-2 h-2 rounded-sm bg-[#4CAF6E]/60" /> Reads
                                     </span>
@@ -198,19 +198,19 @@ export default function DevAccountDetailPage() {
                                             key={c.campaignId ?? 'null'}
                                             className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3"
                                         >
-                                            <div className="text-xs text-[#9B9689] font-mono tabular-nums truncate">
+                                            <div className="text-xs text-[#C4C0B6] font-mono tabular-nums truncate">
                                                 {c.campaignId ?? 'No campaign ID'}
                                             </div>
                                             <div className="flex items-center gap-4 mt-2">
                                                 <div>
-                                                    <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Ops</div>
+                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Ops</div>
                                                     <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.totalOps}</div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-[#9B9689] uppercase tracking-widest">Writes</div>
+                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Writes</div>
                                                     <div className="text-sm text-[#D4882A] font-mono tabular-nums">{c.writes}</div>
                                                 </div>
-                                                <div className="ml-auto text-[10px] text-[#9B9689] font-mono">
+                                                <div className="ml-auto text-[10px] text-[#C4C0B6] font-mono">
                                                     {new Date(c.lastOp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                 </div>
                                             </div>
@@ -225,7 +225,7 @@ export default function DevAccountDetailPage() {
                             <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Recent Operations</h2>
                             {data.recentOperations.length === 0 ? (
                                 <div className="text-center py-12 border border-[#3D3C36] rounded-lg bg-[#24231F]/40">
-                                    <p className="text-sm text-[#9B9689]">No write operations recorded</p>
+                                    <p className="text-sm text-[#C4C0B6]">No write operations recorded</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
@@ -240,28 +240,28 @@ export default function DevAccountDetailPage() {
                                                         {op.entityType}
                                                     </span>
                                                     {op.rolledBack && (
-                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-medium bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20">
+                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-medium bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20">
                                                             <RotateCcw className="w-2.5 h-2.5" />
                                                             Reverted
                                                         </span>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] text-[#9B9689] font-mono tabular-nums whitespace-nowrap shrink-0">
+                                                <span className="text-[10px] text-[#C4C0B6] font-mono tabular-nums whitespace-nowrap shrink-0">
                                                     {new Date(op.timestamp).toLocaleString(undefined, {
                                                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                                                     })}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs font-mono">
-                                                <span className="text-[#9B9689] tabular-nums">{formatValue(op.action, op.beforeValue)}</span>
+                                                <span className="text-[#C4C0B6] tabular-nums">{formatValue(op.action, op.beforeValue)}</span>
                                                 <DeltaBadge before={op.beforeValue} after={op.afterValue} />
                                                 <span className="text-[#E8E4DD] tabular-nums">{formatValue(op.action, op.afterValue)}</span>
                                             </div>
                                             {op.reasoning && (
-                                                <p className="text-xs text-[#9B9689] mt-1.5 line-clamp-2">{op.reasoning}</p>
+                                                <p className="text-xs text-[#C4C0B6] mt-1.5 line-clamp-2">{op.reasoning}</p>
                                             )}
                                             {op.campaignId && (
-                                                <p className="text-[10px] text-[#9B9689]/60 font-mono mt-1">Campaign {op.campaignId}</p>
+                                                <p className="text-[10px] text-[#C4C0B6]/60 font-mono mt-1">Campaign {op.campaignId}</p>
                                             )}
                                         </div>
                                     ))}
@@ -278,9 +278,9 @@ export default function DevAccountDetailPage() {
 function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
     return (
         <div className="bg-[#24231F] border border-[#3D3C36] rounded-lg p-3 sm:p-4">
-            <div className="text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest mb-1.5">{label}</div>
+            <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-1.5">{label}</div>
             <div className="text-xl sm:text-2xl font-semibold text-[#E8E4DD] tabular-nums font-mono">{value}</div>
-            <div className="text-[10px] text-[#9B9689] mt-0.5">{sub}</div>
+            <div className="text-[10px] text-[#C4C0B6] mt-0.5">{sub}</div>
         </div>
     );
 }

@@ -31,7 +31,7 @@ export default function BlogIndex() {
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-5xl">
             Guides and explainers
           </h1>
-          <p className="mt-4 text-base leading-relaxed text-[#9B9689]">
+          <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
             Practical content on MCP, Google Ads automation, and building
             AI-driven ad workflows.
           </p>
@@ -50,13 +50,13 @@ export default function BlogIndex() {
                   <h2 className="text-lg font-semibold text-[#E8E4DD] group-hover:text-[#4CAF6E] transition-colors">
                     {post.title}
                   </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                  <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                     {post.description}
                   </p>
                 </div>
                 <time
                   dateTime={post.publishedAt}
-                  className="flex-shrink-0 text-sm text-[#9B9689]"
+                  className="flex-shrink-0 text-sm text-[#C4C0B6]"
                 >
                   {new Date(post.publishedAt).toLocaleDateString("en-US", {
                     year: "numeric",

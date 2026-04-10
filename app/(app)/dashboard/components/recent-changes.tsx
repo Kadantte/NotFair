@@ -19,7 +19,7 @@ export function RecentChanges({ changes }: { changes: ChangeItem[] }) {
     return (
       <div className="rounded-md border border-[#3D3C36] bg-[#24231F] p-6">
         <div className="text-[14px] font-medium text-[#E8E4DD]">Recent Changes</div>
-        <div className="mt-3 text-[13px] text-[#9B9689]">
+        <div className="mt-3 text-[13px] text-[#C4C0B6]">
           No changes yet. Actions taken from this dashboard or the AI chat will appear here.
         </div>
       </div>
@@ -32,7 +32,7 @@ export function RecentChanges({ changes }: { changes: ChangeItem[] }) {
         <div className="text-[14px] font-medium text-[#E8E4DD]">Recent Changes</div>
         <a
           href="/operations"
-          className="text-[11px] text-[#9B9689] hover:text-[#E8E4DD] transition-colors"
+          className="text-[11px] text-[#C4C0B6] hover:text-[#E8E4DD] transition-colors"
         >
           View all
         </a>
@@ -58,25 +58,25 @@ function ChangeRow({ change }: { change: ChangeItem }) {
             {actionLabel}
           </span>
           {change.rolledBack && (
-            <span className="rounded-sm bg-[#9B9689]/20 px-1.5 py-0.5 text-[10px] text-[#9B9689]">
+            <span className="rounded-sm bg-[#C4C0B6]/20 px-1.5 py-0.5 text-[10px] text-[#C4C0B6]">
               Reverted
             </span>
           )}
         </div>
         {change.beforeValue && change.afterValue && (
-          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-[#9B9689]">
+          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-[#C4C0B6]">
             <span className="truncate max-w-[120px]">{formatValue(change.beforeValue)}</span>
             <ArrowRight className="h-3 w-3 shrink-0" />
             <span className="truncate max-w-[120px]">{formatValue(change.afterValue)}</span>
           </div>
         )}
         {change.reasoning && (
-          <div className="mt-0.5 truncate text-[11px] text-[#9B9689]/70">
+          <div className="mt-0.5 truncate text-[11px] text-[#C4C0B6]/70">
             {change.reasoning}
           </div>
         )}
       </div>
-      <span className="shrink-0 font-mono text-[10px] text-[#9B9689]">{timeAgo}</span>
+      <span className="shrink-0 font-mono text-[10px] text-[#C4C0B6]">{timeAgo}</span>
     </div>
   );
 }

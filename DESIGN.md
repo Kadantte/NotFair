@@ -48,17 +48,17 @@ Green = brand = growth = positive. The accent color IS the positive signal becau
 | Surface elevated | `#2E2D28` | Modals, popovers, hover states |
 | Border | `#3D3C36` | Dividers, table lines, card borders |
 | Text primary | `#E8E4DD` | Body text — warm white, never pure #FFF |
-| Text muted | `#9B9689` | Labels, captions, secondary text |
+| Text muted | `#C4C0B6` | Labels, captions, secondary text — AAA contrast (8.66:1 on surface, 9.67:1 on background) |
 | Accent | `#4CAF6E` | CTAs, active states, selected items, links, positive metrics |
 | Accent hover | `#3D9A5C` | Hover on accent elements |
 | Success (alerts) | `#5DBE82` | Success toasts/alerts — softer than accent to distinguish from interactive |
 | Danger | `#C45D4A` | Overspend alerts, errors, negative metrics, destructive actions |
 | Warning | `#D4882A` | Budget warnings, approaching limits |
-| Info | `#9B9689` | Informational alerts, neutral feedback |
+| Info | `#C4C0B6` | Informational alerts, neutral feedback |
 | Chart 1 | `#4CAF6E` | Primary chart color (accent) |
 | Chart 2 | `#D4882A` | Secondary chart color (warning/amber) |
 | Chart 3 | `#C45D4A` | Tertiary chart color (danger) |
-| Chart 4 | `#9B9689` | Quaternary chart color (muted) |
+| Chart 4 | `#C4C0B6` | Quaternary chart color (muted) |
 
 ### Light Mode (future, for reference)
 | Role | Hex |

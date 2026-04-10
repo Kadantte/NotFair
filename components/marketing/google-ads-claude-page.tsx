@@ -192,7 +192,7 @@ export function GoogleAdsClaudePage() {
                 <br />
                 <span className="text-[#4CAF6E]">live data, 2-minute setup.</span>
               </h1>
-              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#9B9689]">
+              <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
                 AdsAgent is a Google Ads MCP server for Claude. Connect once and
                 Claude gets live access to your campaigns, keywords, spend, and
                 ad copy — then helps you audit, optimize, and manage through
@@ -207,7 +207,7 @@ export function GoogleAdsClaudePage() {
                   disconnectedLabel="Connect Google Ads to Claude"
                   connectedLabel="Open Your Account"
                 />
-                <p className="text-sm text-[#9B9689]">
+                <p className="text-sm text-[#C4C0B6]">
                   Free audit included. No credit card required.
                 </p>
               </div>
@@ -222,10 +222,10 @@ export function GoogleAdsClaudePage() {
             >
               <div className="flex items-center gap-2 border-b border-[#3D3C36] px-5 py-3">
                 <Terminal className="h-4 w-4 text-[#4CAF6E]" />
-                <span className="font-mono text-xs text-[#9B9689]">
+                <span className="font-mono text-xs text-[#C4C0B6]">
                   claude_desktop_config.json
                 </span>
-                <span className="ml-auto rounded border border-[#3D3C36] px-1.5 py-0.5 font-mono text-[10px] text-[#9B9689]">
+                <span className="ml-auto rounded border border-[#3D3C36] px-1.5 py-0.5 font-mono text-[10px] text-[#C4C0B6]">
                   Step 1
                 </span>
               </div>
@@ -233,7 +233,7 @@ export function GoogleAdsClaudePage() {
                 <code>{MCP_CONFIG}</code>
               </pre>
               <div className="border-t border-[#3D3C36] px-5 py-3">
-                <p className="text-xs text-[#9B9689]">
+                <p className="text-xs text-[#C4C0B6]">
                   Works in{" "}
                   <span className="text-[#E8E4DD]">Claude Desktop</span>,{" "}
                   <span className="text-[#E8E4DD]">Claude Code</span>, and{" "}
@@ -296,7 +296,7 @@ export function GoogleAdsClaudePage() {
                 <h3 className="mt-4 text-base font-semibold text-[#E8E4DD]">
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                   {step.desc}
                 </p>
               </motion.div>
@@ -321,7 +321,7 @@ export function GoogleAdsClaudePage() {
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
               Claude AI for Google Ads — what it actually does.
             </h2>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#9B9689]">
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
               Once connected, Claude has live access to your account. No more
               exporting CSVs, copying tables into chat, or working from
               screenshots. Ask a question, get a specific answer backed by
@@ -348,7 +348,7 @@ export function GoogleAdsClaudePage() {
                   <h3 className="text-base font-semibold text-[#E8E4DD]">
                     {cap.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-[#9B9689]">
+                  <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
                     {cap.body}
                   </p>
                 </motion.div>
@@ -374,7 +374,7 @@ export function GoogleAdsClaudePage() {
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
               What Claude can read and change.
             </h2>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#9B9689]">
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
               AdsAgent exposes a focused set of MCP tools. Read tools give
               Claude live account context. Write tools let Claude propose
               changes — each requiring your explicit approval before execution.
@@ -391,13 +391,13 @@ export function GoogleAdsClaudePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#3D3C36] bg-[#24231F]">
-                  <th className="px-5 py-3.5 text-left font-medium text-[#9B9689]">
+                  <th className="px-5 py-3.5 text-left font-medium text-[#C4C0B6]">
                     Tool
                   </th>
-                  <th className="px-5 py-3.5 text-left font-medium text-[#9B9689]">
+                  <th className="px-5 py-3.5 text-left font-medium text-[#C4C0B6]">
                     Type
                   </th>
-                  <th className="hidden px-5 py-3.5 text-left font-medium text-[#9B9689] sm:table-cell">
+                  <th className="hidden px-5 py-3.5 text-left font-medium text-[#C4C0B6] sm:table-cell">
                     What it does
                   </th>
                 </tr>
@@ -426,7 +426,7 @@ export function GoogleAdsClaudePage() {
                         {tool.category}
                       </span>
                     </td>
-                    <td className="hidden px-5 py-3.5 text-[#9B9689] sm:table-cell">
+                    <td className="hidden px-5 py-3.5 text-[#C4C0B6] sm:table-cell">
                       {tool.description}
                     </td>
                   </tr>
@@ -440,7 +440,7 @@ export function GoogleAdsClaudePage() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-40px" }}
-            className="mt-4 text-sm text-[#9B9689]"
+            className="mt-4 text-sm text-[#C4C0B6]"
           >
             Full tool reference at{" "}
             <Link
@@ -471,7 +471,7 @@ export function GoogleAdsClaudePage() {
               <h2 className="font-display mt-2 text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
                 Free audit when you connect.
               </h2>
-              <p className="mt-3 text-base leading-relaxed text-[#9B9689]">
+              <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
                 Connect your Google Ads account and Claude immediately runs a
                 free audit — scoring your account across 7 dimensions and
                 surfacing exactly where you&apos;re losing money.
@@ -487,7 +487,7 @@ export function GoogleAdsClaudePage() {
               />
               <Link
                 href="/google-ads-audit"
-                className="flex items-center gap-1 text-sm text-[#9B9689] underline underline-offset-2 hover:text-[#E8E4DD]"
+                className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
               >
                 Learn about the audit
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -525,7 +525,7 @@ export function GoogleAdsClaudePage() {
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
                 Connect Google Ads to Claude — now.
               </h2>
-              <p className="mt-3 text-base text-[#9B9689]">
+              <p className="mt-3 text-base text-[#C4C0B6]">
                 2-minute setup. Free audit included. Human in control of every
                 change.
               </p>
@@ -538,7 +538,7 @@ export function GoogleAdsClaudePage() {
                 disconnectedLabel="Connect Google Ads to Claude"
                 connectedLabel="Open Your Account"
               />
-              <p className="text-sm text-[#9B9689]">
+              <p className="text-sm text-[#C4C0B6]">
                 Paste one config snippet. OAuth. Done.
               </p>
             </div>

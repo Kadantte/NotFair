@@ -63,7 +63,7 @@ function NavItem({
                 className={`h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
                     active
                         ? 'bg-[#4CAF6E]/12 text-[#4CAF6E] hover:bg-[#4CAF6E]/16 hover:text-[#4CAF6E]'
-                        : 'text-[#9B9689]'
+                        : 'text-[#C4C0B6]'
                 } ${collapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
             >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
@@ -95,7 +95,7 @@ function MobileNavItem({
             href={href}
             prefetch
             className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
-                active ? 'text-[#4CAF6E]' : 'text-[#9B9689]'
+                active ? 'text-[#4CAF6E]' : 'text-[#C4C0B6]'
             }`}
         >
             <Icon className="h-[18px] w-[18px]" />
@@ -204,7 +204,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         variant="ghost"
                         size="icon-sm"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="rounded-lg text-[#9B9689] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
+                        className="rounded-lg text-[#C4C0B6] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
                     >
                         <X className="h-4 w-4" />
                     </Button>
@@ -214,7 +214,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         variant="ghost"
                         size="icon-sm"
                         onClick={toggleCollapsed}
-                        className="rounded-lg text-[#9B9689] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
+                        className="rounded-lg text-[#C4C0B6] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
                     >
                         {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
                     </Button>
@@ -240,7 +240,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             type="button"
                             variant="ghost"
                             onClick={handleNewChat}
-                            className={`h-9 rounded-lg px-3 text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+                            className={`h-9 rounded-lg px-3 text-[#C4C0B6] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
                                 isCollapsed ? 'mx-auto w-10 justify-center gap-0 px-0' : 'w-full justify-start'
                             }`}
                         >
@@ -277,7 +277,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     <div className="truncate text-[13px] font-medium text-[#E8E4DD]/80">
                                         {thread.title}
                                     </div>
-                                    <div className="mt-0.5 text-[11px] text-[#9B9689]">
+                                    <div className="mt-0.5 text-[11px] text-[#C4C0B6]">
                                         {formatDate(thread.updatedAt)}
                                     </div>
                                 </button>
@@ -301,7 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                             })
                                             .catch(() => {});
                                     }}
-                                    className="mt-1.5 mr-1 shrink-0 rounded-lg text-[#9B9689] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] [div:hover>&]:opacity-100"
+                                    className="mt-1.5 mr-1 shrink-0 rounded-lg text-[#C4C0B6] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] [div:hover>&]:opacity-100"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -347,7 +347,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => setMobileMenuOpen(true)}
-                    className="rounded-lg text-[#9B9689] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
+                    className="rounded-lg text-[#C4C0B6] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
                 >
                     <Menu className="h-5 w-5" />
                 </Button>
