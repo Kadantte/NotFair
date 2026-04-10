@@ -36,6 +36,8 @@ import {
   createConversionAction,
   updateConversionAction,
   uploadClickConversions,
+  pausePmaxAssetGroup,
+  enablePmaxAssetGroup,
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
@@ -648,16 +650,16 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaign Bidding Strategy ──────────────────────────────────
 
   server.registerTool("updateCampaignBidding", {
-    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS, MANUAL_CPC. For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS, targetRoas is required (e.g. 2.0 = 200% ROAS). Returns a changeId for undo support.",
+    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), MAXIMIZE_CONVERSION_VALUE (maximize total conversion value, optionally with a target ROAS — required for PMAX value-based bidding), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS, MANUAL_CPC. For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS and MAXIMIZE_CONVERSION_VALUE, targetRoas is required/optional respectively (e.g. 2.0 = 200% ROAS). Returns a changeId for undo support.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
-      biddingStrategy: z.enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CLICKS", "MANUAL_CPC", "TARGET_CPA", "TARGET_ROAS"])
-        .describe("The bidding strategy to set"),
+      biddingStrategy: z.enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "MAXIMIZE_CLICKS", "MANUAL_CPC", "TARGET_CPA", "TARGET_ROAS"])
+        .describe("The bidding strategy to set. Use MAXIMIZE_CONVERSION_VALUE for Performance Max campaigns optimizing for revenue/value."),
       targetCpa: z.number().optional()
         .describe("Target CPA in dollars (e.g. 10.50 for $10.50). Required for TARGET_CPA, optional cap for MAXIMIZE_CONVERSIONS."),
       targetRoas: z.number().optional()
-        .describe("Target ROAS as a multiplier (e.g. 2.0 = 200% return). Required for TARGET_ROAS."),
+        .describe("Target ROAS as a multiplier (e.g. 2.0 = 200% return). Required for TARGET_ROAS, optional cap for MAXIMIZE_CONVERSION_VALUE."),
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, biddingStrategy, targetCpa, targetRoas }) => {
@@ -899,6 +901,36 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     });
   }));
 
+  // ─── Performance Max ─────────────────────────────────────────────
+
+  server.registerTool("pausePmaxAssetGroup", {
+    description: "Pause a Performance Max asset group. When paused, Google stops serving ads from this asset group while the campaign and other asset groups remain active. Use getPmaxAssetGroups to find asset group IDs. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Performance Max campaign ID"),
+      assetGroupId: z.string().describe("Asset group ID to pause (from getPmaxAssetGroups)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => pausePmaxAssetGroup(targetAuth, campaignId, assetGroupId));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("enablePmaxAssetGroup", {
+    description: "Re-enable a paused Performance Max asset group so it can serve ads again. Use getPmaxAssetGroups to find asset group IDs. Returns a changeId for undo support.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Performance Max campaign ID"),
+      assetGroupId: z.string().describe("Asset group ID to enable (from getPmaxAssetGroups)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => enablePmaxAssetGroup(targetAuth, campaignId, assetGroupId));
+    return jsonResult(result);
+  }));
+
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
@@ -1136,6 +1168,10 @@ export async function executeUndoForChange(
     }
     case "upload_click_conversions":
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Conversion uploads cannot be undone — uploaded conversions are permanent in Google Ads" };
+    case "pause_pmax_asset_group":
+      return enablePmaxAssetGroup(auth, change.campaignId ?? "", entityId);
+    case "enable_pmax_asset_group":
+      return pausePmaxAssetGroup(auth, change.campaignId ?? "", entityId);
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }

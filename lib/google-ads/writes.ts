@@ -664,6 +664,11 @@ export async function updateCampaignBidding(
         ? { target_cpa_micros: params.targetCpaMicros }
         : {};
       break;
+    case "MAXIMIZE_CONVERSION_VALUE":
+      resource.maximize_conversion_value = params.targetRoas
+        ? { target_roas: params.targetRoas }
+        : {};
+      break;
     case "TARGET_ROAS":
       resource.target_roas = { target_roas: params.targetRoas };
       break;

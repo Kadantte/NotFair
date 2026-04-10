@@ -10,3 +10,4 @@ export * from "./campaign-ops";
 export * from "./bulk";
 export * from "./settings";
 export * from "./sync-account";
+export * from "./pmax";
