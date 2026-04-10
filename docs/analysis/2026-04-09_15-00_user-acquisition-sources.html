@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdsAgent User Acquisition Sources</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      line-height: 1.55;
+      padding: 32px 40px 64px;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      margin-bottom: 28px;
+    }
+    .header-meta {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .header-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .header-question {
+      font-size: 14px;
+      color: #475569;
+      font-style: italic;
+    }
+
+    /* ---- Verdict card ---- */
+    .verdict-card {
+      background: #2563EB;
+      color: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .verdict-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+    .verdict-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ---- KPI grid ---- */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi-tile {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.1;
+    }
+    .kpi-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .card-accent-amber {
+      border-left: 3px solid #D97706;
+    }
+    .card-accent-red {
+      border-left: 3px solid #DC2626;
+    }
+    .body-text {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    /* ---- Findings ---- */
+    .findings-list {
+      list-style: none;
+    }
+    .finding-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .finding-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .finding-item:first-child { padding-top: 0; }
+    .finding-label {
+      font-size: 14px;
+      color: #0F172A;
+      flex: 1;
+      line-height: 1.5;
+    }
+    .finding-value {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      flex: 2;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* ---- Charts ---- */
+    .chart-header {
+      margin-bottom: 16px;
+    }
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    .chart-subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 3px;
+    }
+    .chart-insight {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+      font-style: italic;
+      border-left: 2px solid #2563EB;
+      padding-left: 8px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ---- Tables ---- */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      background: #F1F5F9;
+      font-weight: 600;
+      font-size: 11px;
+      color: #475569;
+      border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable-header:hover { background: #E2E8F0; }
+    .sort-icon { opacity: 0.4; font-size: 10px; margin-left: 4px; }
+    tbody tr:hover { background: #F8FAFC; }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody td:not(:first-child) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- So what ---- */
+    .action-list {
+      list-style: none;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .action-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .action-item:first-child { padding-top: 0; }
+    .action-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background: #2563EB;
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .action-text {
+      font-size: 14px;
+      color: #0F172A;
+      line-height: 1.5;
+    }
+    .action-reason {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      margin-top: 28px;
+      font-size: 11px;
+      color: #94A3B8;
+      text-align: center;
+      line-height: 1.7;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <div class="header-meta">Analysis · 2026-04-09 15:00 PDT</div>
+      <div class="header-title">AdsAgent User Acquisition Sources</div>
+      <div class="header-question">"Where are the most recent new users coming from?"</div>
+    </div>
+
+    <div class="verdict-card">
+      <div class="verdict-label">Bottom line</div>
+      <div class="verdict-text">Reddit is driving today's signup spike — 8+ visitors from Reddit since midnight, with GitHub as a new second channel; the Apr 4 spike was an email newsletter (IBM Acoustic) that sent 9 unique visitors in a single send.</div>
+    </div>
+
+    <div class="card card-accent-red">  <div class="section-label">Data quality notes</div>  <p class="body-text">UTM params are null for all users — no paid campaigns are running. The signup_referrer field captures the Google OAuth callback URL (always accounts.google.com), not the actual referral source. Referrer data comes from PostHog $pageview events. 'Direct' traffic (64 users) may include dark social (Slack, email, Discord) where referrer is stripped — true organic share is likely higher.</p></div>
+
+    <div class="section-label">Key metrics</div><div class="kpi-grid"><div class="kpi-tile">  <div class="kpi-label">New signups (30d)</div>  <div class="kpi-value">12</div>  <div class="kpi-change" style="color:#059669">↑ 5 today alone (3-5× daily avg)</div></div><div class="kpi-tile">  <div class="kpi-label">Reddit (30d)</div>  <div class="kpi-value">30 users</div>  <div class="kpi-change" style="color:#059669">↑ #1 identified source after direct</div></div><div class="kpi-tile">  <div class="kpi-label">GitHub (30d)</div>  <div class="kpi-value">11 users</div>  <div class="kpi-change" style="color:#059669">↑ 3 direct to /connect today</div></div><div class="kpi-tile">  <div class="kpi-label">Email newsletter (Apr 4)</div>  <div class="kpi-value">9 users</div>  <div class="kpi-change" style="color:#94A3B8">→ Single IBM Acoustic send</div></div></div>
+
+    <div class="card">
+      <div class="section-label">Why</div>
+      <ul class='findings-list'><li class="finding-item">  <div class="finding-label">Reddit is today's spike driver — 8 unique visitors from Reddit since midnight, 6 in the afternoon alone <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">30 Reddit users (30d) <span style="color:#059669;font-weight:600">↑ Referrer is https://www.reddit.com/ (homepage feed) — can't pinpoint the subreddit from referrer alone, but traffic started today ~midnight UTC and peaked 06–15 UTC</span></div></li><li class="finding-item">  <div class="finding-label">GitHub is a growing organic source — 11 users total, 4 new visitors today landing directly on /connect <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">11 GitHub users (30d) <span style="color:#059669;font-weight:600">↑ Users landing on /connect from GitHub are developer-intent: they read the README and came to connect immediately. No GitHub Readme UTM tags are in place.</span></div></li><li class="finding-item">  <div class="finding-label">An IBM Acoustic email newsletter drove 9 unique visitors on April 4 — larger than any single day's Reddit traffic <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">9 users from mq88x.r.ag.d.sendibm3.com <span style="color:#94A3B8;font-weight:600">→ IBM Acoustic (formerly Watson Campaign Automation) is a B2B email marketing tool. Someone included AdsAgent in a newsletter. Unknown who sent it or to which list.</span></div></li><li class="finding-item">  <div class="finding-label">Twitter/X sent 5 users total; Google organic search sent 10 — both underperforming given the product's fit <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">t.co: 5 users, google.com: 10 users <span style="color:#94A3B8;font-weight:600">→ Google search visitors landed on /audit and /connect — showing intent. The /audit page appears to be indexed and drawing search traffic.</span></div></li><li class="finding-item">  <div class="finding-label">Direct / dark social is the largest bucket at 64 users — likely Slack, Discord, or email shares where referrer is stripped <span class="confidence-badge" style="background:#FEE2E2;color:#7F1D1D;border-color:#FCA5A5">Low</span></div>  <div class="finding-value">64 users, $direct (30d) <span style="color:#94A3B8;font-weight:600">→ No referrer = link shared in an app that strips headers (Slack, iMessage, email client). This is structural — will never be fully attributed without UTM params on shared links.</span></div></li></ul>
+    </div>
+
+    
+
+    <div class="card">  <div class="chart-header">    <div class="chart-title">Reddit and GitHub are surging today — Apr 9 is the biggest traffic day in 30 days</div>    <div class="chart-subtitle">Daily unique visitors, last 10 days (PostHog $pageview)</div>    <div class="chart-insight">Apr 4 spike = email newsletter (9 users). Apr 9 spike = Reddit + GitHub.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_0"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Reddit (30 users) and GitHub (11) are the only repeatable organic channels — everything else is one-time or unattributed</div>    <div class="chart-subtitle">Unique users by referrer domain, last 30 days</div>    <div class="chart-insight">Direct/dark social (64) dominates but is unattributable without UTM links.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_1"></canvas>  </div></div>
+
+    <div class="card">  <div class="section-label">Last 12 signups — email domain signals (no UTM attribution available)</div>  <div class="table-wrapper">    <table id="table_0">      <thead><tr><th onclick="sortTable(this, 0)" class="sortable-header">Date <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Email <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Domain signal <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">First-page referrer <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>Apr 9</td><td>m.sanchez@schaefer-ag.ch</td><td>Swiss company (Schaefer AG)</td><td>GitHub</td></tr><tr><td>Apr 9</td><td>tim@creativeweb360.com</td><td>Web/digital agency</td><td>Direct</td></tr><tr><td>Apr 9</td><td>aryaman@getrilo.ai</td><td>AI startup (getrilo.ai)</td><td>Direct → /connect</td></tr><tr><td>Apr 9</td><td>izhongyuting@gmail.com</td><td>Personal Gmail</td><td>Direct</td></tr><tr><td>Apr 9</td><td>eric@hdas.biz</td><td>Business email</td><td>GitHub → /connect</td></tr><tr><td>Apr 8</td><td>arpit@goyalmarketing.com</td><td>Marketing agency</td><td>Direct → /audit</td></tr><tr><td>Apr 8</td><td>help@plumbingarmy.com</td><td>Local service business</td><td>Direct → /audit</td></tr><tr><td>Apr 7</td><td>rinitha.a@zoca.com</td><td>Tech company (zoca.com)</td><td>Unknown</td></tr><tr><td>Apr 4</td><td>fixfireplace@gmail.com</td><td>Local service business</td><td>Unknown</td></tr><tr><td>Apr 4</td><td>fatih@ucuztaxi.com</td><td>Turkish taxi company</td><td>Unknown</td></tr><tr><td>Apr 4</td><td>kosalanethmini8@gmail.com</td><td>Personal Gmail</td><td>Unknown</td></tr><tr><td>Mar 30</td><td>pauliina.fotiou@gmail.com</td><td>Personal Gmail (Finnish)</td><td>Unknown</td></tr></tbody>    </table>  </div></div>
+
+    <div class="card">
+      <div class="section-label">So what</div>
+      <ol class='action-list'><li class="action-item">  <span class="action-num">1</span>  <span class="action-text">Find the Reddit post driving today's traffic — search Reddit for 'adsagent' or 'adsagent.org' in r/PPC, r/googleads, r/marketing, r/entrepreneur, or r/SaaS. If you posted it, double down with a comment reply. If someone else posted it, thank them and engage. This is your highest-leverage action today because Reddit traffic is converting to signups.</span></li><li class="action-item">  <span class="action-num">2</span>  <span class="action-text">Tag the GitHub README with a UTM link (e.g. adsagent.org?utm_source=github&utm_medium=readme) — 11 users in 30 days from GitHub with no UTM is significant. Once tracked, you'll know which README section or star count milestone is converting readers to users.</span></li><li class="action-item">  <span class="action-num">3</span>  <span class="action-text">Find the IBM Acoustic email newsletter that sent 9 users on April 4 — this is a B2B newsletter that someone included AdsAgent in. Reach out to that newsletter author for a dedicated mention or sponsorship. A newsletter that sends 9 targeted users per send could send 50-100 with a full feature.</span></li><li class="action-item">  <span class="action-num">4</span>  <span class="action-text">Add UTM params to every link you share — Slack messages, emails, Reddit comments, Twitter posts. Right now 64 users (the largest bucket) show as 'direct' because links shared in apps strip referrers. A simple ?utm_source=slack&utm_medium=dm on shared links would immediately fix attribution for future shares.</span></li></ol>
+    </div>
+
+    <div class="footer">
+      Data sources: PostHog HogQL: $pageview (last 30d, project 368485) | Supabase auth.users (last 30d) | PostHog: user_signed_up events (last 30d)
+    </div>
+
+  </div>
+
+  <script>
+    // Register datalabels and annotation plugins globally
+    Chart.register(ChartDataLabels);
+    Chart.register(window['chartjs-plugin-annotation']?.default || {});
+
+    // Sort table by column
+    function sortTable(th, tableIdx) {
+      const table = document.getElementById('table_' + tableIdx);
+      const tbody = table.querySelector('tbody');
+      const headers = table.querySelectorAll('th');
+      const colIdx = Array.from(headers).indexOf(th);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.dataset.sortDir !== 'asc';
+      th.dataset.sortDir = asc ? 'asc' : 'desc';
+      headers.forEach(h => h.querySelector('.sort-icon').textContent = '↕');
+      th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+      rows.sort((a, b) => {
+        const aVal = a.cells[colIdx]?.textContent.trim() || '';
+        const bVal = b.cells[colIdx]?.textContent.trim() || '';
+        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Initialize charts
+    
+        new Chart(document.getElementById('chart_0'), {
+          type: 'bar',
+          data: {
+            labels: ["Mar 30", "Mar 31", "Apr 1", "Apr 2", "Apr 3", "Apr 4", "Apr 5", "Apr 6", "Apr 7", "Apr 8", "Apr 9"],
+            datasets: [{"label": "Unique visitors", "data": [0, 0, 0, 0, 0, 55, 6, 8, 21, 30, 28], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+              annotation: {
+                annotations: {
+                  refLine: {
+                    type: 'line',
+                    yMin: 15,
+                    yMax: 15,
+                    borderColor: '#D97706',
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    label: {
+                      display: true,
+                      content: "Daily avg (ex-spikes): 15",
+                      position: 'end',
+                      backgroundColor: '#D97706',
+                      color: '#fff',
+                      font: { size: 10, family: 'Inter, sans-serif' },
+                      padding: { x: 6, y: 3 },
+                      borderRadius: 3,
+                    }
+                  }
+                }
+              },
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_1'), {
+          type: 'bar',
+          data: {
+            labels: ["Direct / dark social", "Reddit (web + app)", "GitHub", "Google organic", "Email newsletter (Apr 4)", "Twitter / X"],
+            datasets: [{"label": "Unique users", "data": [64, 30, 11, 10, 9, 5], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+  </script>
+</body>
+</html>

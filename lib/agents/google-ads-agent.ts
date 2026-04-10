@@ -61,6 +61,7 @@ type AgentAuth = {
   refreshToken: string;
   customerId: string;
   userId?: string | null;
+  authMethod?: string | null;
 };
 
 const MAX_STEPS = 8;

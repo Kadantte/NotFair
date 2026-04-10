@@ -39,6 +39,12 @@ export type AuthContext = {
   realGoogleEmail?: string | null;
   /** Raw MCP clientInfo.name from the session. Null for chat/agent paths. */
   clientName?: string | null;
+  /** Raw MCP clientInfo.version from the session. */
+  clientVersion?: string | null;
+  /** "oauth" | "direct" | "chat" — how the caller authenticated. */
+  authMethod?: string | null;
+  /** User-Agent header from the HTTP request. */
+  userAgent?: string | null;
 };
 
 /**

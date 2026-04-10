@@ -13,6 +13,11 @@ export type ToolAuth = {
   customerId: string;
   userId?: string | null;
   clientName?: string | null;
+  clientVersion?: string | null;
+  /** "oauth" (Claude Connector) or "direct" (Bearer token) or "chat" (web UI agent) */
+  authMethod?: string | null;
+  /** User-Agent header from the HTTP request (usually mcp-remote's UA, not the end client) */
+  userAgent?: string | null;
 };
 
 /**
@@ -42,6 +47,10 @@ export async function execWrite(
     campaign_id: campaignId,
     before_value: result.beforeValue || null,
     after_value: result.afterValue || null,
+    client_name: auth.clientName ?? null,
+    client_version: auth.clientVersion ?? null,
+    auth_method: auth.authMethod ?? null,
+    user_agent: auth.userAgent ?? null,
   });
   return { ...result, changeId: change?.id ?? null };
 }
@@ -65,6 +74,10 @@ export async function execRead<T>(
     tool_name: toolName,
     account_id: accountId,
     campaign_id: campaignId ?? null,
+    client_name: auth.clientName ?? null,
+    client_version: auth.clientVersion ?? null,
+    auth_method: auth.authMethod ?? null,
+    user_agent: auth.userAgent ?? null,
   });
   return result;
 }

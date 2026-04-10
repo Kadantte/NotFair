@@ -18,6 +18,11 @@ type AuthContextWithSession = AuthContext & {
   sessionToken?: string;
   sessionId?: number;
   clientName?: string | null;
+  clientVersion?: string | null;
+  /** "oauth" (Claude Connector) or "direct" (Bearer token) */
+  authMethod?: string | null;
+  /** User-Agent header from the HTTP request */
+  userAgent?: string | null;
 };
 
 const authStore = new AsyncLocalStorage<AuthContextWithSession>();
@@ -37,6 +42,9 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
   if (!bearerToken) {
     throw new Error("No valid authentication. Sign in at /connect to get your MCP token.");
   }
+
+  const authMethod = bearerToken.startsWith("oat_") ? "oauth" : "direct";
+  const userAgent = request.headers.get("user-agent") ?? null;
 
   // Resolve bearer token to MCP session (one query either path)
   let session;
@@ -88,6 +96,9 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
     loginCustomerId: session.loginCustomerId ?? null,
     userId: session.userId ?? null,
     clientName: session.clientName ?? null,
+    clientVersion: session.clientVersion ?? null,
+    authMethod,
+    userAgent,
     sessionToken: bearerToken,
     sessionId: session.id,
   };

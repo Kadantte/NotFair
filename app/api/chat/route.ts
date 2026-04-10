@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     refreshToken,
     customerId,
     userId: session?.userId ?? null,
+    authMethod: "chat",
   });
 
   // Persist thread metadata (fire-and-forget, don't block streaming)
