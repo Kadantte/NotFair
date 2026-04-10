@@ -37,8 +37,8 @@
 **Phase:** 1
 **Category:** value_exchange (NSM event)
 **Platform:** PostHog (server)
-**Trigger:** Fires when an AI write operation completes successfully via MCP or chat agent.
-**Hypothesis:** We believe tracking this tells us core value delivery frequency, which drives all product decisions as the NSM event. The MCP client properties (`client_name`, `client_version`) let us slice usage by which AI client surface (Claude Code plugin, Claude.ai Web connector, Claude Cowork, etc.) is producing real changes — useful for prioritizing client-specific UX work.
+**Trigger:** Fires when an AI write operation completes successfully via MCP or the in-app chat agent. Both surfaces flow through the same `execWrite` path in `lib/tools/execute.ts`, so this event covers all agentic write traffic.
+**Hypothesis:** We believe tracking this tells us core value delivery frequency, which drives all product decisions as the NSM event. The client properties (`client_name`, `client_version`, `auth_method`) let us slice usage by which surface (Claude Code plugin, Claude.ai Web connector, Claude Cowork, in-app chat, etc.) is producing real changes — useful for prioritizing surface-specific UX work.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
@@ -48,10 +48,10 @@
 | `campaign_id` | string \| null | `"20345678"` | Campaign affected (null if not campaign-scoped) |
 | `before_value` | string \| null | `"ENABLED"` | State before the change |
 | `after_value` | string \| null | `"PAUSED"` | State after the change |
-| `client_name` | string \| null | `"claude-code"` | MCP client `name` field, when reported by the calling client |
-| `client_version` | string \| null | `"1.2.3"` | MCP client version string, when reported |
-| `auth_method` | string \| null | `"oauth"` | How the calling MCP session authenticated. Typical values: `oauth`, `api_key` |
-| `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the MCP request, useful as a fallback for unknown clients |
+| `client_name` | string \| null | `"adsagent-chat"` | Identifies the calling surface. For MCP this is the client's `clientInfo.name` from the MCP `initialize` handshake (e.g. `claude-code`, `claude-ai`, `mcp-remote`). For in-app chat this is the constant `adsagent-chat`. Null only for legacy MCP sessions whose handshake did not report a name. |
+| `client_version` | string \| null | `"1.2.3"` | MCP client version from the handshake. Null for in-app chat (no version concept) and legacy MCP sessions. |
+| `auth_method` | string \| null | `"chat"` | How the call authenticated. Values: `oauth` (Claude.ai connector / OAuth bearer), `direct` (raw MCP session token), `chat` (in-app chat agent). Always populated. Use this as the primary cut for "MCP vs chat". |
+| `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the inbound HTTP request. Often `mcp-remote/...` rather than the end client's UA, so prefer `client_name` / `auth_method` for client attribution. Null for in-app chat. |
 
 ```json
 { "event": "ai_change_executed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "PAUSED", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
@@ -87,18 +87,18 @@
 **Phase:** 1
 **Category:** ambient
 **Platform:** PostHog (server)
-**Trigger:** Fires when an AI read operation completes via MCP or chat agent.
-**Hypothesis:** We believe tracking this tells us which read tools are most used and which AI clients are producing the read traffic, which lets us prioritize tool development and understand user intent patterns per client.
+**Trigger:** Fires when an AI read operation completes via MCP or the in-app chat agent. Both surfaces flow through the same `execRead` path in `lib/tools/execute.ts`, so this event covers all agentic read traffic.
+**Hypothesis:** We believe tracking this tells us which read tools are most used and which surfaces are producing the read traffic, which lets us prioritize tool development and understand user intent patterns per surface.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
 | `tool_name` | string | `"getCampaignPerformance"` | Which read tool was executed |
 | `account_id` | string | `"1301265570"` | Google Ads account ID |
 | `campaign_id` | string \| null | `"20345678"` | Campaign queried (null if account-level) |
-| `client_name` | string \| null | `"claude-code"` | MCP client `name` field, when reported by the calling client |
-| `client_version` | string \| null | `"1.2.3"` | MCP client version string, when reported |
-| `auth_method` | string \| null | `"oauth"` | How the calling MCP session authenticated. Typical values: `oauth`, `api_key` |
-| `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the MCP request, useful as a fallback for unknown clients |
+| `client_name` | string \| null | `"adsagent-chat"` | Identifies the calling surface. For MCP this is the client's `clientInfo.name` from the MCP `initialize` handshake (e.g. `claude-code`, `claude-ai`, `mcp-remote`). For in-app chat this is the constant `adsagent-chat`. Null only for legacy MCP sessions whose handshake did not report a name. |
+| `client_version` | string \| null | `"1.2.3"` | MCP client version from the handshake. Null for in-app chat (no version concept) and legacy MCP sessions. |
+| `auth_method` | string \| null | `"chat"` | How the call authenticated. Values: `oauth` (Claude.ai connector / OAuth bearer), `direct` (raw MCP session token), `chat` (in-app chat agent). Always populated. Use this as the primary cut for "MCP vs chat". |
+| `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the inbound HTTP request. Often `mcp-remote/...` rather than the end client's UA, so prefer `client_name` / `auth_method` for client attribution. Null for in-app chat. |
 
 ```json
 { "event": "ai_read_executed", "properties": { "tool_name": "getCampaignPerformance", "account_id": "1301265570", "campaign_id": "20345678", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }

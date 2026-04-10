@@ -57,6 +57,7 @@ export function createGoogleAdsAgent(agentAuth: AgentAuth) {
     customerIds: [{ id: agentAuth.customerId, name: "" }],
     userId: agentAuth.userId ?? null,
     authMethod: agentAuth.authMethod ?? "chat",
+    clientName: "adsagent-chat",
   };
 
   const collected = collectAdsTools(() => authContext);
