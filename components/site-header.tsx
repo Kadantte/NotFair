@@ -52,6 +52,7 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
                     <NavLink href="/google-ads-audit" label="Free Google Ads Audit" />
+                    <NavLink href="/google-ads-claude-connector" label="Google Ads Claude Connector Setup Guide" />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"
