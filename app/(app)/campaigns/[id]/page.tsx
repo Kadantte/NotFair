@@ -156,7 +156,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const resolvedParams = use(params);
     const campaignId = resolvedParams.id;
 
-    const [timeRange, setTimeRange] = useState<TimeRange>('ALL');
+    const [timeRange, setTimeRange] = useState<TimeRange>('1M');
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<CampaignHistory[]>([]);
     const [keywords, setKeywords] = useState<CampaignKeyword[]>([]);
