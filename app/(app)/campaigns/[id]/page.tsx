@@ -221,7 +221,8 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             if (match) setCampaignInfo(match);
         } catch (err) {
             console.error(err);
-            setError('Failed to fetch campaign details. Please try again.');
+            const msg = err instanceof Error ? err.message : String(err);
+            setError(`Failed to fetch campaign details: ${msg}`);
         } finally {
             setLoading(false);
         }
@@ -498,6 +499,22 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                                     ))}
                                                 </div>
                                             </div>
+
+                                            {ad.type !== 'SMART_CAMPAIGN_AD' && (
+                                                <div className="flex flex-wrap gap-4 pt-1">
+                                                    {[
+                                                        { label: 'Impr.', value: ad.impressions.toLocaleString() },
+                                                        { label: 'Clicks', value: ad.clicks.toLocaleString() },
+                                                        { label: 'Cost', value: `$${ad.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+                                                        { label: 'Conv.', value: ad.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
+                                                    ].map(({ label, value }) => (
+                                                        <div key={label} className="flex flex-col">
+                                                            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#9B9689]">{label}</span>
+                                                            <span className="text-sm font-medium tabular-nums text-[#E8E4DD]">{value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
