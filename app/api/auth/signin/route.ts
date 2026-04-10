@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { UTM_KEYS } from "@/lib/utm";
+import { storeOAuthNonce } from "@/lib/oauth-nonce";
 
 function getSafeNext(next: string | null) {
   if (!next || !next.startsWith("/")) {
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
   // The nonce goes into both the OAuth state param and a short-lived cookie.
   // The callback verifies they match before proceeding.
   const nonce = randomBytes(16).toString("hex");
+  await storeOAuthNonce(nonce);
   const state = Buffer.from(JSON.stringify({
     nonce,
     next,

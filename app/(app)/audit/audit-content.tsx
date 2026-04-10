@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench, MessageCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronDown, ChevronRight, AlertTriangle, TrendingDown, Target, Zap, Loader2, Wrench, MessageCircle, RefreshCw } from "lucide-react";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, DimensionScore } from "@/lib/audit/scoring";
@@ -39,6 +39,13 @@ const STATUS_LABELS: Record<DimensionScore["status"], string> = {
   acceptable: "OK",
   good: "Good",
   excellent: "Excellent",
+};
+
+// These dimensions have dedicated deep-dive sections; others fall back to DetailedFindings
+const DIMENSION_DETAIL_SECTIONS: Record<string, string> = {
+  search_term_quality: "section-search-terms",
+  impression_share: "section-impression-share",
+  spend_efficiency: "section-wasted-spend",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -209,7 +216,7 @@ function ScoreDots({ score }: { score: number }) {
 
 // ─── Scorecard Table ─────────────────────────────────────────────────
 
-function ScorecardTable({ dimensions, loading }: { dimensions: DimensionScore[] | null; loading: boolean }) {
+function ScorecardTable({ dimensions, loading, onDimensionClick }: { dimensions: DimensionScore[] | null; loading: boolean; onDimensionClick?: (key: string) => void }) {
   return (
     <div className="overflow-x-auto rounded border border-[#3D3C36] bg-[#24231F]">
       <table className="w-full text-left text-[13px]">
@@ -234,26 +241,38 @@ function ScorecardTable({ dimensions, loading }: { dimensions: DimensionScore[] 
               </tr>
             ))
           ) : (
-            dimensions.map((d) => (
-              <tr key={d.key} className="border-b border-[#3D3C36] last:border-0">
-                <td className="px-4 py-3 font-medium text-[#E8E4DD]">{d.label}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[#E8E4DD]">{d.score}</span>
-                    <ScoreDots score={d.score} />
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className="inline-block rounded-sm px-2 py-0.5 text-[11px] font-medium"
-                    style={{ backgroundColor: `${STATUS_COLORS[d.status]}20`, color: STATUS_COLORS[d.status] }}
-                  >
-                    {STATUS_LABELS[d.status]}
-                  </span>
-                </td>
-                <td className="px-4 py-3 hidden sm:table-cell text-[#9B9689]">{d.finding}</td>
-              </tr>
-            ))
+            dimensions.map((d) => {
+              const hasTarget = d.score <= 3 && (DIMENSION_DETAIL_SECTIONS[d.key] || d.details.length > 0);
+              return (
+                <tr
+                  key={d.key}
+                  className={`border-b border-[#3D3C36] last:border-0${hasTarget ? " cursor-pointer transition-colors hover:bg-[#2E2D28]" : ""}`}
+                  onClick={hasTarget && onDimensionClick ? () => onDimensionClick(d.key) : undefined}
+                >
+                  <td className="px-4 py-3 font-medium text-[#E8E4DD]">
+                    <span className="flex items-center gap-1.5">
+                      {d.label}
+                      {hasTarget && <ChevronRight className="h-3 w-3 shrink-0 text-[#6B6760]" />}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[#E8E4DD]">{d.score}</span>
+                      <ScoreDots score={d.score} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="inline-block rounded-sm px-2 py-0.5 text-[11px] font-medium"
+                      style={{ backgroundColor: `${STATUS_COLORS[d.status]}20`, color: STATUS_COLORS[d.status] }}
+                    >
+                      {STATUS_LABELS[d.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-[#9B9689]">{d.finding}</td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
@@ -268,7 +287,7 @@ function WastedSpendSection({ result, onAskAI }: { result: AuditResult; onAskAI?
   if (wastedSpend.total === 0 && wastedSpend.qualityIssues.total === 0) return null;
 
   return (
-    <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
+    <div id="section-wasted-spend" className="scroll-mt-6 rounded border border-[#3D3C36] bg-[#24231F] p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
           <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
@@ -411,7 +430,7 @@ function ImpressionShareSection({ result, onAskAI }: { result: AuditResult; onAs
   const { campaignBreakdown } = impressionShareDiagnosis;
 
   return (
-    <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
+    <div id="section-impression-share" className="scroll-mt-6 rounded border border-[#3D3C36] bg-[#24231F] p-5">
       <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
         <TrendingDown className="h-4 w-4 text-[#D4882A]" />
         Impression Share Analysis
@@ -720,7 +739,7 @@ function WastedSearchTermsSection({
 }) {
   if (terms.length === 0) return null;
   return (
-    <div className="rounded border border-[#3D3C36] bg-[#24231F] p-5">
+    <div id="section-search-terms" className="scroll-mt-6 rounded border border-[#3D3C36] bg-[#24231F] p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[14px] font-medium text-[#E8E4DD]">
           <AlertTriangle className="h-4 w-4 text-[#D4882A]" />
@@ -844,9 +863,19 @@ function TopActionsSection({ result, onAskAI }: { result: AuditResult; onAskAI?:
 
 // ─── Detailed Findings (expandable) ─────────────────────────────────
 
-function DetailedFindings({ dimensions, onAskAI }: { dimensions: DimensionScore[]; onAskAI?: (prompt: string) => void }) {
+function DetailedFindings({ dimensions, onAskAI, activeDimension }: { dimensions: DimensionScore[]; onAskAI?: (prompt: string) => void; activeDimension?: { key: string; nonce: number } | null }) {
   const needsAttention = dimensions.filter((d) => d.score <= 3 && d.details.length > 0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (activeDimension) {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.add(activeDimension.key);
+        return next;
+      });
+    }
+  }, [activeDimension]);
 
   if (needsAttention.length === 0) return null;
 
@@ -866,7 +895,7 @@ function DetailedFindings({ dimensions, onAskAI }: { dimensions: DimensionScore[
         Detailed Findings
       </div>
       {needsAttention.map((d) => (
-        <div key={d.key} className="rounded border border-[#3D3C36] bg-[#24231F]">
+        <div key={d.key} id={`finding-${d.key}`} className="scroll-mt-6 rounded border border-[#3D3C36] bg-[#24231F]">
           <button
             type="button"
             onClick={() => toggle(d.key)}
@@ -914,14 +943,31 @@ function DetailedFindings({ dimensions, onAskAI }: { dimensions: DimensionScore[
 
 // ─── Main Component ──────────────────────────────────────────────────
 
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export function AuditContent({
   overview,
   details,
   onAskAI,
+  onRedoAudit,
+  redoLoading,
+  lastAuditTime,
 }: {
   overview: AuditOverview;
   details: AuditDetails | null;
   onAskAI?: (prompt: string) => void;
+  onRedoAudit?: () => void;
+  redoLoading?: boolean;
+  lastAuditTime?: Date | null;
 }) {
   const auditResult = details?.auditResult ?? null;
   const detailsLoading = details === null;
@@ -932,6 +978,32 @@ export function AuditContent({
       ? conversionDim.score <= 1
       : overview.conversionActions.filter((a) => a.includeInConversions).length === 0;
 
+  const [activeFinding, setActiveFinding] = useState<{ key: string; nonce: number } | null>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => clearTimeout(scrollTimerRef.current);
+  }, []);
+
+  function handleDimensionClick(key: string) {
+    const dedicatedSection = DIMENSION_DETAIL_SECTIONS[key];
+    if (dedicatedSection) {
+      const el = document.getElementById(dedicatedSection);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
+    clearTimeout(scrollTimerRef.current);
+    setActiveFinding({ key, nonce: Date.now() });
+    scrollTimerRef.current = setTimeout(() => {
+      const el = document.getElementById(`finding-${key}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
+  }
+
   return (
     <div className="min-h-full bg-[#1A1917] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -939,11 +1011,29 @@ export function AuditContent({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[20px] font-semibold text-[#E8E4DD]">{overview.accountName}</h1>
-            <p className="text-[13px] text-[#9B9689]">Account Audit</p>
+            <p className="text-[13px] text-[#9B9689]">
+              Account Audit
+              {lastAuditTime && (
+                <span className="ml-2 text-[#9B9689]/60">· {formatTimeAgo(lastAuditTime)}</span>
+              )}
+            </p>
           </div>
-          <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#9B9689]">
-            Last 30 days
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#9B9689]">
+              Last 30 days
+            </span>
+            {onRedoAudit && (
+              <button
+                type="button"
+                onClick={onRedoAudit}
+                disabled={redoLoading}
+                className="flex items-center gap-1.5 rounded-sm bg-[#3D3C36] px-2.5 py-1 text-[11px] font-medium text-[#E8E4DD] transition hover:bg-[#4D4C46] disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${redoLoading ? "animate-spin" : ""}`} />
+                Redo Audit
+              </button>
+            )}
+          </div>
         </div>
 
         {showConversionBanner && (
@@ -986,6 +1076,7 @@ export function AuditContent({
         <ScorecardTable
           dimensions={auditResult?.dimensions ?? null}
           loading={detailsLoading}
+          onDimensionClick={handleDimensionClick}
         />
 
         {/* Detail sections — only after Phase 2 */}
@@ -995,7 +1086,7 @@ export function AuditContent({
             <WastedSpendSection result={auditResult} onAskAI={onAskAI} />
             <ImpressionShareSection result={auditResult} onAskAI={onAskAI} />
             <TopActionsSection result={auditResult} onAskAI={onAskAI} />
-            <DetailedFindings dimensions={auditResult.dimensions} onAskAI={onAskAI} />
+            <DetailedFindings dimensions={auditResult.dimensions} onAskAI={onAskAI} activeDimension={activeFinding} />
           </>
         )}
       </div>

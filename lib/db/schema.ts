@@ -137,6 +137,14 @@ export const contacts = pgTable("contacts", {
   uniqueIndex("contacts_email_idx").on(table.email),
 ]);
 
+// ─── OAuth Nonces (server-side CSRF protection) ─────────────────────
+
+export const oauthNonces = pgTable("oauth_nonces", {
+  nonce: text("nonce").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ─── MCP Auth Sessions ───────────────────────────────────────────────
 
 export const mcpSessions = pgTable("mcp_sessions", {

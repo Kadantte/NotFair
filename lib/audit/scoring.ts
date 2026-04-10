@@ -19,6 +19,7 @@ import {
   type Recommendation,
 } from "@/lib/intelligence/heuristics";
 import { analyzeSearchTermWaste, type SearchTermWasteAnalysis } from "@/lib/audit/search-term-waste";
+import type { LandingPageAnalysis } from "@/lib/audit/landing-page";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ export type AuditInput = {
     type: number | string;
     headlines: string[];
     descriptions: string[];
+    finalUrls: string[];
     impressions: number;
     clicks: number;
     cost: number;
@@ -89,6 +91,7 @@ export type AuditInput = {
     adGroupName: string;
     status: number | string;
   }>;
+  landingPages: LandingPageAnalysis[];
   impressionShare: Array<{
     campaignName: string;
     impressionShare: number | null;
@@ -578,6 +581,131 @@ export function scoreImpressionShare(input: AuditInput): Omit<DimensionScore, "k
   };
 }
 
+// ─── Dimension 8: Landing Page Quality (weight 10%) ────────────────
+
+export function scoreLandingPageQuality(input: AuditInput): Omit<DimensionScore, "key" | "label" | "weight"> {
+  const { landingPages, ads } = input;
+  const details: string[] = [];
+
+  // No final URLs available at all
+  const allUrls = ads.flatMap((a) => a.finalUrls).filter(Boolean);
+  if (allUrls.length === 0) {
+    return { score: 2, status: "needs_work", finding: "No landing page URLs found in ads", details: ["Ads have no final URLs to analyze."] };
+  }
+
+  // Landing page fetch wasn't run (e.g. skipped or pre-enrichment data)
+  if (landingPages.length === 0) {
+    return { score: 2, status: "needs_work", finding: "Landing page analysis not available", details: ["Landing page data was not collected."] };
+  }
+
+  const total = landingPages.length;
+  const loaded = landingPages.filter((p) => p.ok);
+  const failed = landingPages.filter((p) => !p.ok);
+  const https = landingPages.filter((p) => p.https);
+  const withTitle = loaded.filter((p) => p.title);
+  const withMeta = loaded.filter((p) => p.metaDescription);
+  const withForm = loaded.filter((p) => p.hasForm);
+  const withMobile = loaded.filter((p) => p.hasMobileViewport);
+
+  details.push(`${total} unique landing page(s) analyzed`);
+
+  // ── Load success ────────────────────────────────────────
+  if (failed.length > 0) {
+    details.push(`${failed.length} page(s) failed to load: ${failed.map((p) => p.errorReason ?? "unknown").join("; ")}`);
+  }
+
+  // ── HTTPS ───────────────────────────────────────────────
+  if (https.length < total) {
+    details.push(`${total - https.length} page(s) not using HTTPS — hurts trust and Ad Rank`);
+  } else {
+    details.push("All pages use HTTPS");
+  }
+
+  // ── Mobile viewport ─────────────────────────────────────
+  if (loaded.length > 0 && withMobile.length < loaded.length) {
+    details.push(`${loaded.length - withMobile.length} page(s) missing mobile viewport meta — poor mobile experience`);
+  } else if (loaded.length > 0) {
+    details.push("All pages have mobile viewport configured");
+  }
+
+  // ── Title relevance ─────────────────────────────────────
+  if (withTitle.length > 0) {
+    // Check if page titles share any words with ad headlines (basic relevance)
+    const adHeadlineWords = new Set(
+      ads.flatMap((a) => a.headlines).flatMap((h) => h.toLowerCase().split(/\s+/)).filter((w) => w.length > 3),
+    );
+    const titlesWithOverlap = loaded.filter((p) => {
+      if (!p.title) return false;
+      const titleWords = p.title.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+      return titleWords.some((w) => adHeadlineWords.has(w));
+    });
+    if (adHeadlineWords.size > 0 && loaded.length > 0) {
+      const pct = titlesWithOverlap.length / loaded.length;
+      if (pct >= 0.5) {
+        details.push("Page titles align with ad headlines — good relevance signal");
+      } else {
+        details.push(`${loaded.length - titlesWithOverlap.length} page(s) have titles misaligned with ad copy — may hurt Quality Score`);
+      }
+    }
+  }
+
+  // ── Forms / CTAs ────────────────────────────────────────
+  if (withForm.length > 0) {
+    details.push(`${withForm.length} page(s) have forms/CTAs — good for conversions`);
+  } else if (loaded.length > 0) {
+    details.push("No forms detected on landing pages — may lack clear call-to-action");
+  }
+
+  // ── Meta descriptions ───────────────────────────────────
+  if (loaded.length > 0 && withMeta.length < loaded.length) {
+    details.push(`${loaded.length - withMeta.length} page(s) missing meta description`);
+  }
+
+  // ── Load time ───────────────────────────────────────────
+  const loadTimes = loaded.filter((p) => p.loadTimeMs !== null).map((p) => p.loadTimeMs!);
+  const avgLoadTimeMs = loadTimes.length > 0
+    ? loadTimes.reduce((s, t) => s + t, 0) / loadTimes.length
+    : null;
+  if (avgLoadTimeMs !== null) {
+    details.push(`Avg server response: ${Math.round(avgLoadTimeMs)}ms`);
+    if (avgLoadTimeMs > 3000) {
+      details.push("Slow server response — may hurt bounce rate and Quality Score");
+    }
+  }
+
+  // ── Scoring ─────────────────────────────────────────────
+  // Start with bonuses, then apply hard caps for critical issues
+  let score = 3; // baseline: pages exist and we can analyze
+
+  // Bonuses
+  if (loaded.length > 0 && withForm.length > 0) score += 1;
+  if (failed.length === 0 && https.length === total && withMobile.length === loaded.length && withForm.length > 0) {
+    score = Math.max(score, 4);
+    if (withTitle.length === loaded.length && withMeta.length === loaded.length) score = 5;
+  }
+
+  // Hard caps for critical issues (applied last so they can't be overridden)
+  const failPct = total > 0 ? failed.length / total : 0;
+  if (failPct >= 0.5) score = 0;
+  else if (failPct > 0) score = Math.min(score, 2);
+  if (https.length < total) score = Math.min(score, 2);
+  if (loaded.length > 0 && withMobile.length < loaded.length) score = Math.min(score, 2);
+  if (avgLoadTimeMs !== null) {
+    if (avgLoadTimeMs > 5000) score = Math.min(score, 1);
+    else if (avgLoadTimeMs > 3000) score = Math.min(score, 2);
+  }
+
+  const s = clamp05(score);
+  return {
+    score: s,
+    status: scoreToStatus(s),
+    finding: loaded.length > 0
+      ? `${loaded.length}/${total} pages loaded — ${https.length === total ? "HTTPS" : "mixed HTTP"}, ${withForm.length} with forms, ${withMobile.length} mobile-ready`
+      : `${failed.length} page(s) failed to load`,
+    details,
+  };
+}
+
 // ─── Shared account metrics ─────────────────────────────────────────
 
 const MIN_NOISE_SPEND_USD = 10;
@@ -935,13 +1063,14 @@ function computeTopActions(input: AuditInput): TopAction[] {
 // ─── Main Entry ─────────────────────────────────────────────────────
 
 const DIMENSIONS: Array<{ key: string; label: string; weight: number; scorer: (input: AuditInput) => Omit<DimensionScore, "key" | "label" | "weight"> }> = [
-  { key: "conversion_tracking", label: "Conversion Tracking", weight: 0.20, scorer: scoreConversionTracking },
-  { key: "campaign_structure", label: "Campaign Structure", weight: 0.15, scorer: scoreCampaignStructure },
-  { key: "keyword_health", label: "Keyword Health", weight: 0.20, scorer: scoreKeywordHealth },
-  { key: "search_term_quality", label: "Search Term Quality", weight: 0.15, scorer: scoreSearchTermQuality },
-  { key: "ad_copy", label: "Ad Copy", weight: 0.10, scorer: scoreAdCopy },
+  { key: "conversion_tracking", label: "Conversion Tracking", weight: 0.18, scorer: scoreConversionTracking },
+  { key: "campaign_structure", label: "Campaign Structure", weight: 0.12, scorer: scoreCampaignStructure },
+  { key: "keyword_health", label: "Keyword Health", weight: 0.18, scorer: scoreKeywordHealth },
+  { key: "search_term_quality", label: "Search Term Quality", weight: 0.14, scorer: scoreSearchTermQuality },
+  { key: "ad_copy", label: "Ad Copy", weight: 0.08, scorer: scoreAdCopy },
   { key: "impression_share", label: "Impression Share", weight: 0.10, scorer: scoreImpressionShare },
   { key: "spend_efficiency", label: "Spend Efficiency", weight: 0.10, scorer: scoreSpendEfficiency },
+  { key: "landing_page_quality", label: "Landing Page Quality", weight: 0.10, scorer: scoreLandingPageQuality },
 ];
 
 function overallCategory(score: number): AuditResult["category"] {

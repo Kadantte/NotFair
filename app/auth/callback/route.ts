@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
+import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -40,16 +41,33 @@ function getSafeNext(next: string | null | undefined) {
 }
 
 /**
- * Decode the OAuth state param and verify its nonce matches the cookie.
- * Returns null if the state is missing, malformed, or the nonce doesn't match.
+ * Decode the OAuth state param and verify it's legitimate.
+ * Primary check: nonce matches the cookie (standard CSRF protection).
+ * Fallback: if the cookie was lost (browser privacy settings), verify the
+ * nonce against the server-side store (single-use, auto-expiring).
  */
-function verifyState(stateParam: string | null, cookieNonce: string | undefined): AuthState | null {
-  if (!stateParam || !cookieNonce) return null;
+async function verifyState(stateParam: string | null, cookieNonce: string | undefined): Promise<AuthState | null> {
+  if (!stateParam) return null;
 
   try {
     const parsed = JSON.parse(Buffer.from(stateParam, "base64url").toString("utf8"));
-    if (!parsed || typeof parsed !== "object") return null;
-    if (parsed.nonce !== cookieNonce) return null;
+    if (!parsed || typeof parsed !== "object" || !parsed.nonce) return null;
+
+    // Primary: cookie nonce match
+    let verified = false;
+    if (cookieNonce && parsed.nonce === cookieNonce) {
+      verified = true;
+    }
+
+    // Fallback: server-side nonce verification (handles missing cookies)
+    if (!verified) {
+      verified = await verifyOAuthNonce(parsed.nonce);
+      if (verified) {
+        console.log("[auth/callback] State verified via server-side nonce (cookie was missing)");
+      }
+    }
+
+    if (!verified) return null;
 
     // Extract UTM params if present
     let utm: UtmParams | undefined;
@@ -436,18 +454,24 @@ export async function GET(request: Request) {
   // Verify the OAuth state nonce matches the cookie to prevent CSRF
   const cookieStore = await cookies();
   const cookieNonce = cookieStore.get("oauth_nonce")?.value;
-  const state = verifyState(stateParam, cookieNonce);
+  const state = await verifyState(stateParam, cookieNonce);
   if (!state) {
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+    const reason = !stateParam ? "missing_state" : !cookieNonce ? "missing_cookie" : "nonce_mismatch";
+    console.error(`[auth/callback] State verification failed: ${reason}`, {
+      hasState: !!stateParam,
+      hasCookie: !!cookieNonce,
+    });
+    return NextResponse.redirect(`${origin}/login?error=auth_failed&reason=${reason}`);
   }
 
   const popup = state.popup === true || searchParams.get("popup") === "1";
   const next = getSafeNext(state.next ?? explicitNext);
 
   if (!code) {
+    console.error("[auth/callback] Missing code param in callback URL");
     return popup
       ? popupErrorResponse(origin, "Authentication failed. Missing code.")
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=missing_code`);
   }
 
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
@@ -455,9 +479,10 @@ export async function GET(request: Request) {
   const redirectUri = `${getAppOrigin()}/auth/callback`;
 
   if (!clientId || !clientSecret) {
+    console.error("[auth/callback] Missing GOOGLE_ADS_CLIENT_ID or CLIENT_SECRET env vars");
     return popup
       ? popupErrorResponse(origin, "Server misconfiguration: missing Google OAuth credentials.")
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=server_config`);
   }
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -484,9 +509,16 @@ export async function GET(request: Request) {
       tokenData.error_description ||
       tokenData.error ||
       "Failed to complete Google authentication";
+    console.error("[auth/callback] Token exchange failed:", {
+      status: tokenResponse.status,
+      error: tokenData.error,
+      error_description: tokenData.error_description,
+      hasRefreshToken: !!tokenData.refresh_token,
+      hasIdToken: !!tokenData.id_token,
+    });
     return popup
       ? popupErrorResponse(origin, message)
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=token_exchange`);
   }
 
   // Verify the adwords scope was actually granted (Google granular permissions
@@ -522,7 +554,7 @@ export async function GET(request: Request) {
     console.error("[auth/callback] Supabase sign-in failed:", authError);
     return popup
       ? popupErrorResponse(origin, "Failed to establish app session.")
-      : NextResponse.redirect(`${origin}/login?error=auth_failed`);
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=supabase_auth`);
   }
 
   const user = authData.user ?? authData.session?.user ?? null;

@@ -8,6 +8,7 @@ import {
   scoreAdCopy,
   scoreImpressionShare,
   scoreSpendEfficiency,
+  scoreLandingPageQuality,
   type AuditInput,
 } from "../scoring";
 
@@ -21,6 +22,7 @@ function emptyInput(): AuditInput {
     keywords: [],
     searchTerms: [],
     ads: [],
+    landingPages: [],
     impressionShare: [],
     negativeKeywords: [],
     adGroupCount: 0,
@@ -48,8 +50,12 @@ function wellOptimizedInput(): AuditInput {
       { searchTerm: "brand name plumber", impressions: 200, clicks: 50, cost: 100, conversions: 15, campaignName: "Brand", campaignId: "1", adGroupName: "Brand" },
     ],
     ads: [
-      { adId: "1", type: 15, headlines: ["Best Plumber", "24/7 Service", "Free Estimates", "Licensed & Insured", "Call Now", "Same Day Service", "5-Star Rated", "Fast Response", "Local Experts", "Book Online"], descriptions: ["Professional plumbing services.", "Licensed, insured, 24/7."], impressions: 5000, clicks: 200, cost: 500, conversions: 20, adGroupId: "1", adGroupName: "Plumbing", status: 2 },
-      { adId: "2", type: 15, headlines: ["Emergency Plumber", "Open Now", "No Extra Charge", "Fast Arrival", "Trusted Since 2010", "Top Rated", "Licensed Pro", "Free Quote"], descriptions: ["Emergency plumbing repair.", "Arrive in 30 minutes."], impressions: 4000, clicks: 150, cost: 400, conversions: 10, adGroupId: "2", adGroupName: "Emergency", status: 2 },
+      { adId: "1", type: 15, headlines: ["Best Plumber", "24/7 Service", "Free Estimates", "Licensed & Insured", "Call Now", "Same Day Service", "5-Star Rated", "Fast Response", "Local Experts", "Book Online"], descriptions: ["Professional plumbing services.", "Licensed, insured, 24/7."], finalUrls: ["https://example.com/plumbing"], impressions: 5000, clicks: 200, cost: 500, conversions: 20, adGroupId: "1", adGroupName: "Plumbing", status: 2 },
+      { adId: "2", type: 15, headlines: ["Emergency Plumber", "Open Now", "No Extra Charge", "Fast Arrival", "Trusted Since 2010", "Top Rated", "Licensed Pro", "Free Quote"], descriptions: ["Emergency plumbing repair.", "Arrive in 30 minutes."], finalUrls: ["https://example.com/emergency"], impressions: 4000, clicks: 150, cost: 400, conversions: 10, adGroupId: "2", adGroupName: "Emergency", status: 2 },
+    ],
+    landingPages: [
+      { url: "https://example.com/plumbing", ok: true, https: true, statusCode: 200, title: "Best Plumber - Professional Services", metaDescription: "Licensed plumber available 24/7.", h1: "Professional Plumbing Services", hasForm: true, hasMobileViewport: true, loadTimeMs: 450, errorReason: null },
+      { url: "https://example.com/emergency", ok: true, https: true, statusCode: 200, title: "Emergency Plumber - Open Now", metaDescription: "Fast emergency plumbing repair.", h1: "Emergency Plumbing Repair", hasForm: true, hasMobileViewport: true, loadTimeMs: 520, errorReason: null },
     ],
     impressionShare: [
       { campaignName: "Brand", impressionShare: 0.95, budgetLostIS: 0.02, rankLostIS: 0.03, totalImpressions: 5000, totalCost: 500 },
@@ -83,7 +89,10 @@ function newAccountInput(): AuditInput {
       { searchTerm: "skillshop", impressions: 9, clicks: 0, cost: 0, conversions: 0, campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1" },
     ],
     ads: [
-      { adId: "1", type: 15, headlines: ["AI Google Ads Agent", "Google Ads MCP Server", "Free Setup", "Stop Wasting Ad Spend"], descriptions: ["Connect Google Ads to AI."], impressions: 22, clicks: 2, cost: 1.38, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 },
+      { adId: "1", type: 15, headlines: ["AI Google Ads Agent", "Google Ads MCP Server", "Free Setup", "Stop Wasting Ad Spend"], descriptions: ["Connect Google Ads to AI."], finalUrls: ["https://www.adsagent.org"], impressions: 22, clicks: 2, cost: 1.38, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 },
+    ],
+    landingPages: [
+      { url: "https://www.adsagent.org", ok: true, https: true, statusCode: 200, title: "AdsAgent - AI Google Ads", metaDescription: null, h1: "AI Google Ads Agent", hasForm: false, hasMobileViewport: true, loadTimeMs: 800, errorReason: null },
     ],
     impressionShare: [
       { campaignName: "Test Campaign", impressionShare: 0.33, budgetLostIS: 0.23, rankLostIS: 0.44, totalImpressions: 22, totalCost: 1.38 },
@@ -100,7 +109,7 @@ describe("computeAuditScore", () => {
     const result = computeAuditScore(emptyInput());
     expect(result.overallScore).toBeGreaterThanOrEqual(0);
     expect(result.overallScore).toBeLessThanOrEqual(100);
-    expect(result.dimensions).toHaveLength(7);
+    expect(result.dimensions).toHaveLength(8);
     expect(result.category).toBe("Critical");
   });
 
@@ -339,6 +348,49 @@ describe("wasted spend breakdown", () => {
     const wasteItems = result.wastedSpend.categories.flatMap(c => c.items);
     expect(wasteItems.some(item => item.includes("plumber jobs hiring"))).toBe(true);
     expect(result.wastedSpend.total).toBeGreaterThan(0);
+  });
+});
+
+describe("scoreLandingPageQuality", () => {
+  it("scores 2 with no ads or landing pages", () => {
+    const result = scoreLandingPageQuality(emptyInput());
+    expect(result.score).toBe(2);
+  });
+
+  it("scores high with healthy HTTPS pages that have forms and mobile viewport", () => {
+    const result = scoreLandingPageQuality(wellOptimizedInput());
+    expect(result.score).toBeGreaterThanOrEqual(4);
+  });
+
+  it("penalizes non-HTTPS pages", () => {
+    const input = emptyInput();
+    input.ads = [{ adId: "1", type: 15, headlines: ["Test"], descriptions: ["Test"], finalUrls: ["http://example.com"], impressions: 100, clicks: 10, cost: 50, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 }];
+    input.landingPages = [{ url: "http://example.com", ok: true, https: false, statusCode: 200, title: "Test", metaDescription: "Test", h1: "Test", hasForm: true, hasMobileViewport: true, loadTimeMs: 300, errorReason: null }];
+    const result = scoreLandingPageQuality(input);
+    expect(result.score).toBeLessThanOrEqual(2);
+  });
+
+  it("penalizes failed page loads", () => {
+    const input = emptyInput();
+    input.ads = [{ adId: "1", type: 15, headlines: ["Test"], descriptions: ["Test"], finalUrls: ["https://broken.example.com"], impressions: 100, clicks: 10, cost: 50, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 }];
+    input.landingPages = [{ url: "https://broken.example.com", ok: false, https: true, statusCode: 500, title: null, metaDescription: null, h1: null, hasForm: false, hasMobileViewport: false, loadTimeMs: 200, errorReason: "HTTP 500" }];
+    const result = scoreLandingPageQuality(input);
+    expect(result.score).toBe(0);
+  });
+
+  it("penalizes slow server response", () => {
+    const input = emptyInput();
+    input.ads = [{ adId: "1", type: 15, headlines: ["Test"], descriptions: ["Test"], finalUrls: ["https://slow.example.com"], impressions: 100, clicks: 10, cost: 50, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 }];
+    input.landingPages = [{ url: "https://slow.example.com", ok: true, https: true, statusCode: 200, title: "Test", metaDescription: "Test", h1: "Test", hasForm: true, hasMobileViewport: true, loadTimeMs: 6000, errorReason: null }];
+    const result = scoreLandingPageQuality(input);
+    expect(result.score).toBeLessThanOrEqual(1);
+  });
+
+  it("scores new account with missing form lower", () => {
+    const result = scoreLandingPageQuality(newAccountInput());
+    // newAccountInput has no form on landing page
+    expect(result.score).toBeLessThanOrEqual(4);
+    expect(result.score).toBeGreaterThanOrEqual(2);
   });
 });
 
