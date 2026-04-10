@@ -3,26 +3,32 @@
 > Source of truth for all analytics events. Last updated: 2026-04-10.
 > Platform: PostHog. Check here before adding a new event.
 
+
+
 ---
 
 ## account_connected
 
 **Phase:** 1
 **Category:** activation
-**Platform:** PostHog (client)
-**Trigger:** Fires when a user successfully connects Google Ads account(s) — either via single-account auto-connect or multi-account selection.
-**Hypothesis:** We believe tracking this tells us connect funnel completion rate, which lets us identify and fix drop-off in onboarding.
+**Platform:** PostHog (client, fired centrally from `PostHogProvider`)
+**Trigger:** Fires when a user successfully completes a Google Ads OAuth flow and a session is created. The server (auth callback or select-account route) sets a short-lived `gads_connect_event` cookie carrying `{count, first, destination}`. `PostHogProvider` reads and clears this cookie on its next mount, then captures the event with the user already identified.
+**Hypothesis:** We believe tracking this tells us the true connect-funnel completion rate across **all** entry points (header CTA → /audit, marketing-page CTA → /audit, connect-page → /connect, etc.), which lets us identify and fix drop-off in onboarding regardless of which CTA the user clicked.
+
+> **Why server-set cookie + client-read.** The previous implementation fired this event from `connect-page.tsx` only when the user landed on `/connect` after OAuth. That missed every auth flow whose `next` destination was not `/connect` — most importantly the header "Get started" button, which redirects to `/audit`. The cookie-relay pattern guarantees one fire per successful connect regardless of landing page, while still firing client-side so PostHog has the user identified before capture.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `account_count` | number | `2` | Number of Google Ads accounts connected |
+| `account_count` | number | `2` | Number of Google Ads accounts connected in this event (1 in single-account auto-connect, n in multi-account selection) |
 | `auth_method` | string | `"google"` | Authentication method used |
+| `is_first_connect` | boolean | `true` | Whether this is the user's first successful Google Ads connect ever (mirrors the existing `gads_new_signup` cookie semantics — `true` only for users with zero prior `mcpSessions` rows) |
+| `destination` | string \| null | `"/audit"` | The path the user was redirected to after auth — useful for attributing connects back to the originating CTA |
 
 ```json
-{ "event": "account_connected", "properties": { "account_count": 2, "auth_method": "google" } }
+{ "event": "account_connected", "properties": { "account_count": 1, "auth_method": "google", "is_first_connect": true, "destination": "/audit" } }
 ```
 
-**Files:** `components/connect-page.tsx`
+**Files:** `app/auth/callback/route.ts` (sets cookie, single-account paths), `app/api/auth/select-account/route.ts` (sets cookie, multi-account path), `components/posthog-provider.tsx` (reads cookie, fires event)
 
 ---
 
@@ -32,7 +38,7 @@
 **Category:** value_exchange (NSM event)
 **Platform:** PostHog (server)
 **Trigger:** Fires when an AI write operation completes successfully via MCP or chat agent.
-**Hypothesis:** We believe tracking this tells us core value delivery frequency, which drives all product decisions as the NSM event.
+**Hypothesis:** We believe tracking this tells us core value delivery frequency, which drives all product decisions as the NSM event. The MCP client properties (`client_name`, `client_version`) let us slice usage by which AI client surface (Claude Code plugin, Claude.ai Web connector, Claude Cowork, etc.) is producing real changes — useful for prioritizing client-specific UX work.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
@@ -42,9 +48,13 @@
 | `campaign_id` | string \| null | `"20345678"` | Campaign affected (null if not campaign-scoped) |
 | `before_value` | string \| null | `"ENABLED"` | State before the change |
 | `after_value` | string \| null | `"PAUSED"` | State after the change |
+| `client_name` | string \| null | `"claude-code"` | MCP client `name` field, when reported by the calling client |
+| `client_version` | string \| null | `"1.2.3"` | MCP client version string, when reported |
+| `auth_method` | string \| null | `"oauth"` | How the calling MCP session authenticated. Typical values: `oauth`, `api_key` |
+| `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the MCP request, useful as a fallback for unknown clients |
 
 ```json
-{ "event": "ai_change_executed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "PAUSED" } }
+{ "event": "ai_change_executed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "PAUSED", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
 ```
 
 **Files:** `lib/tools/execute.ts`
@@ -78,16 +88,20 @@
 **Category:** ambient
 **Platform:** PostHog (server)
 **Trigger:** Fires when an AI read operation completes via MCP or chat agent.
-**Hypothesis:** We believe tracking this tells us which read tools are most used, which lets us prioritize tool development and understand user intent patterns.
+**Hypothesis:** We believe tracking this tells us which read tools are most used and which AI clients are producing the read traffic, which lets us prioritize tool development and understand user intent patterns per client.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
 | `tool_name` | string | `"getCampaignPerformance"` | Which read tool was executed |
 | `account_id` | string | `"1301265570"` | Google Ads account ID |
 | `campaign_id` | string \| null | `"20345678"` | Campaign queried (null if account-level) |
+| `client_name` | string \| null | `"claude-code"` | MCP client `name` field, when reported by the calling client |
+| `client_version` | string \| null | `"1.2.3"` | MCP client version string, when reported |
+| `auth_method` | string \| null | `"oauth"` | How the calling MCP session authenticated. Typical values: `oauth`, `api_key` |
+| `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the MCP request, useful as a fallback for unknown clients |
 
 ```json
-{ "event": "ai_read_executed", "properties": { "tool_name": "getCampaignPerformance", "account_id": "1301265570", "campaign_id": "20345678" } }
+{ "event": "ai_read_executed", "properties": { "tool_name": "getCampaignPerformance", "account_id": "1301265570", "campaign_id": "20345678", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
 ```
 
 **Files:** `lib/tools/execute.ts`
@@ -234,16 +248,21 @@ No properties.
 **Phase:** 1
 **Category:** funnel_entry
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks a primary CTA button on a marketing page (`AuditCTA` component, the homepage Connect Claude button, or the public Claude Connector page Sign in / Open setup buttons).
-**Hypothesis:** We believe tracking this tells us click-through rate per landing page and per CTA variant, which lets us measure copy/design effectiveness and run A/B tests.
+**Trigger:** Fires when a user clicks a primary CTA button on a marketing page (`AuditCTA` component, the homepage Connect/Audit/high-spend buttons, or the public Claude Connector page Sign in / Open setup buttons).
+**Hypothesis:** We believe tracking this tells us click-through rate per landing page, per CTA variant, per placement, and **per destination**, which lets us measure copy/design effectiveness and answer "where does this CTA actually send users" without depending on the human-readable `cta` slug.
+
+> **Note on `cta` vs `destination`.** The `cta` slug is a stable label tag for the button (handy for joining with copy A/B tests). The `destination` property is the source of truth for *where the click sends the user* — important because some labels are ambiguous (e.g. the header "Get started" button has `cta: "audit_now"` and `destination: "/audit"`; the homepage "Connect Google Ads to Claude" hero button has `cta: "connect_claude"` and `destination: "/connect"`, **not** `/connect/claude-connector`). Prefer `destination` for funnel queries and `cta` for slicing copy variants.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
 | `page` | string | `"homepage"` | Which marketing page the CTA is on. Enum: `homepage`, `google-ads-audit`, `google-ads-claude`, `google-ads-claude-connector`, `google-ads-mcp-server`, `header` |
-| `cta` | string | `"audit_now"` | Which CTA variant was shown. Enum: `audit_now`, `view_audit`, `connect_claude`, `sign_in_with_google`, `open_connector_setup` |
+| `cta` | string | `"connect_claude"` | Stable label tag for the button copy. Enum: `audit_now`, `view_audit`, `connect_claude`, `free_audit_link`, `high_spend_lead`, `sign_in_with_google`, `open_connector_setup` |
+| `position` | string \| undefined | `"hero"` | Where on the page the CTA was placed (homepage only). Enum: `hero`, `final`. Omitted on pages with a single CTA placement. |
+| `destination` | string | `"/connect"` | The actual URL the click sends the user to (after any auth interstitial). Enum of current values: `/audit`, `/connect`, `/connect/claude-connector`, `/google-ads-audit`, `mailto:tong@adsagent.org` |
+| `requires_auth` | boolean | `true` | Whether the click triggered the Google OAuth flow before reaching `destination`. Lets us measure auth-friction drop-off per CTA. |
 
 ```json
-{ "event": "cta_clicked", "properties": { "page": "google-ads-claude-connector", "cta": "sign_in_with_google" } }
+{ "event": "cta_clicked", "properties": { "page": "homepage", "cta": "connect_claude", "position": "hero", "destination": "/connect", "requires_auth": true } }
 ```
 
 **Files:** `components/marketing/audit-cta.tsx`, `components/marketing/home-page.tsx`, `components/marketing/google-ads-claude-connector-page.tsx`
@@ -289,24 +308,77 @@ No properties.
 
 ---
 
-## page_viewed
+## user_signed_up
+
+**Phase:** 1
+**Category:** activation
+**Platform:** PostHog (server)
+**Trigger:** Fires once per user, the first time they complete the Google OAuth flow and create their initial Google Ads session. Detected via the `gads_new_signup` cookie set on the success response from the auth callback.
+**Hypothesis:** We believe tracking this tells us first-touch sign-up volume with full UTM attribution attached, which lets us measure paid/organic acquisition channels and tie them to long-term retention.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `signup_method` | string | `"google_oauth"` | Authentication mechanism used to sign up |
+| `signup_referrer` | string \| null | `"https://google.com"` | Value of the `Referer` header on the OAuth callback request |
+| `google_email` | string \| null | `"user@example.com"` | Email returned by Google OAuth |
+| `utm_source` | string \| undefined | `"google"` | UTM source captured at the start of the OAuth flow and threaded through state |
+| `utm_medium` | string \| undefined | `"cpc"` | UTM medium |
+| `utm_campaign` | string \| undefined | `"brand"` | UTM campaign |
+| `utm_term` | string \| undefined | `"adsagent"` | UTM term |
+| `utm_content` | string \| undefined | `"hero_button"` | UTM content |
+
+> **Note.** The UTM properties are only present when the originating click had UTM params; the spread `...utmProps` includes whichever ones existed.
+
+```json
+{ "event": "user_signed_up", "properties": { "signup_method": "google_oauth", "signup_referrer": "https://google.com", "google_email": "user@example.com", "utm_source": "google", "utm_medium": "cpc" } }
+```
+
+**Files:** `app/auth/callback/route.ts`
+
+---
+
+## $pageview
 
 **Phase:** 1
 **Category:** ambient
 **Platform:** PostHog (client)
-**Trigger:** Fires on every client-side route change via the PostHogProvider component. Uses PostHog's `$pageview` event.
+**Trigger:** Fires on every client-side route change via the `PostHogProvider` component. Uses PostHog's reserved `$pageview` event name (so PostHog's built-in path/session reporting works) — query for it as `$pageview` in PostHog, **not** `page_viewed`.
 **Hypothesis:** We believe tracking this tells us where users spend time and where they drop off, which lets us prioritize UX improvements.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `path` | string | `"/connect"` | The route path |
+| `$current_url` | string | `"https://adsagent.org/connect"` | Full URL at capture time (PostHog reserved property) |
+| `path` | string | `"/connect"` | Pathname without query/host |
 | `referrer` | string | `"https://google.com"` | Document referrer |
 
 ```json
-{ "event": "$pageview", "properties": { "path": "/connect", "referrer": "https://google.com" } }
+{ "event": "$pageview", "properties": { "$current_url": "https://adsagent.org/connect", "path": "/connect", "referrer": "https://google.com" } }
 ```
 
-**Files:** `components/posthog-provider.tsx`
+**Files:** `components/posthog-provider.tsx`, `lib/analytics.ts`
+
+---
+
+## pricing_cta_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks any CTA button inside the shared `PricingSection` component — Free plan "Get started" / "Get Started" (audit), Growth plan "Get Started" / "Upgrade to Growth" / "Switch interval", or Growth "Manage subscription" portal button. The same component is rendered on the homepage, the standalone `/pricing` page, and the in-app `/upgrade` page; the `page` property attributes the click.
+**Hypothesis:** We believe tracking this tells us paid-conversion funnel entry rate per surface (homepage pricing section vs standalone pricing page vs in-app upgrade page) and per interval (month vs year), which lets us decide where to invest paid-conversion effort and whether the homepage pricing section pulls its weight versus a dedicated `/pricing` page.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `page` | string | `"homepage"` | Which surface the pricing section was rendered on. Enum: `homepage`, `pricing`, `upgrade` |
+| `plan` | string | `"growth"` | Which plan the CTA belongs to. Enum: `free`, `growth` |
+| `interval` | string | `"year"` | Currently selected billing interval at click time. Enum: `month`, `year` |
+| `action` | string | `"upgrade"` | What the click is requesting. Enum: `signin` (free, logged out → Google OAuth), `open_audit` (free, logged in → /audit), `signin_then_upgrade` (growth, logged out → Google OAuth), `upgrade` (growth, logged in, not on growth → Stripe checkout), `switch_interval` (growth, already on growth, switching month/year), `manage` (growth, on growth → Stripe portal) |
+
+```json
+{ "event": "pricing_cta_clicked", "properties": { "page": "homepage", "plan": "growth", "interval": "year", "action": "upgrade" } }
+```
+
+**Files:** `components/marketing/pricing-cards.tsx`
 
 ---
 

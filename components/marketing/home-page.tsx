@@ -32,17 +32,25 @@ function ConnectClaudeCTA({
   session,
   label,
   returnTo = "/connect",
+  position,
 }: {
   session: { connected: boolean };
   label?: string;
   returnTo?: string;
+  position: "hero" | "final";
 }) {
   const [loading, setLoading] = useState(false);
 
   function handleClick() {
     if (loading) return;
     setLoading(true);
-    trackEvent("cta_clicked", { page: "homepage", cta: "connect_claude" });
+    trackEvent("cta_clicked", {
+      page: "homepage",
+      cta: "connect_claude",
+      position,
+      destination: returnTo,
+      requires_auth: !session.connected,
+    });
     if (session.connected) {
       window.location.assign(returnTo);
     } else {
@@ -246,7 +254,7 @@ export function HomePage({
   pricing,
 }: {
   githubStars?: number | null;
-  pricing: PricingSectionProps;
+  pricing: Omit<PricingSectionProps, "page">;
 }) {
   const session = useSession();
 
@@ -314,7 +322,7 @@ export function HomePage({
 
               <div className="mt-8 flex flex-col items-start gap-4">
                 <div className="flex flex-wrap items-center gap-3">
-                  <ConnectClaudeCTA session={session} />
+                  <ConnectClaudeCTA session={session} position="hero" />
                 </div>
                 <div className="flex items-center gap-5 text-sm text-[#9B9689]">
                   <span>Free</span>
@@ -326,6 +334,15 @@ export function HomePage({
                 <Link
                   href="/google-ads-audit"
                   prefetch
+                  onClick={() =>
+                    trackEvent("cta_clicked", {
+                      page: "homepage",
+                      cta: "free_audit_link",
+                      position: "hero",
+                      destination: "/google-ads-audit",
+                      requires_auth: false,
+                    })
+                  }
                   className="text-sm text-[#9B9689] underline underline-offset-4 hover:text-[#E8E4DD] transition-colors"
                 >
                   Free Google Ads Audit →
@@ -665,11 +682,19 @@ export function HomePage({
       {/* ── Pricing ── */}
       <section className="px-4 pb-20">
         <div className="container mx-auto max-w-5xl">
-          <PricingSection {...pricing} />
+          <PricingSection {...pricing} page="homepage" />
           <p className="mt-6 text-sm text-[#9B9689]">
             Spending $50K+/mo?{" "}
             <Link
               href="mailto:tong@adsagent.org"
+              onClick={() =>
+                trackEvent("cta_clicked", {
+                  page: "homepage",
+                  cta: "high_spend_lead",
+                  destination: "mailto:tong@adsagent.org",
+                  requires_auth: false,
+                })
+              }
               className="inline-block py-2 font-medium text-[#4CAF6E] underline underline-offset-4 hover:text-[#3D9A5C]"
             >
               Let&rsquo;s talk
@@ -705,7 +730,7 @@ export function HomePage({
             Connect in 5 minutes. No credit card required.
           </p>
           <div className="mt-8 flex flex-col items-start gap-4">
-            <ConnectClaudeCTA session={session} />
+            <ConnectClaudeCTA session={session} position="final" />
             <p className="max-w-md text-xs leading-relaxed text-[#9B9689]">
               By connecting Google Ads, you agree to our{" "}
               <Link

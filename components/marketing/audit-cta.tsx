@@ -32,6 +32,8 @@ export function AuditCTA({
     trackEvent("cta_clicked", {
       page,
       cta: session.connected ? "view_audit" : "audit_now",
+      destination: "/audit",
+      requires_auth: !session.connected,
     });
     if (session.connected) {
       window.location.assign("/audit");

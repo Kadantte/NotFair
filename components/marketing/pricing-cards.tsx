@@ -5,6 +5,9 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
 import { startGoogleConnect } from "@/lib/google-oauth";
+import { trackEvent } from "@/lib/analytics";
+
+export type PricingPage = "homepage" | "pricing" | "upgrade";
 
 export function CheckoutStatusBanner() {
   const searchParams = useSearchParams();
@@ -59,6 +62,7 @@ export interface PricingSectionProps {
   scheduledCancelAt: string | null;
   currentPeriodEnd: string | null;
   hasStripeCustomer: boolean;
+  page: PricingPage;
 }
 
 export function PricingSection(props: PricingSectionProps) {
@@ -96,6 +100,7 @@ export function PricingCards({
   scheduledCancelAt,
   currentPeriodEnd,
   hasStripeCustomer,
+  page,
 }: PricingSectionProps) {
   const [interval, setInterval] = useState<Interval>("year");
   const [loading, setLoading] = useState<null | "checkout" | "portal">(null);
@@ -105,6 +110,12 @@ export function PricingCards({
 
   async function handleCheckout() {
     setError(null);
+    trackEvent("pricing_cta_clicked", {
+      page,
+      plan: "growth",
+      interval,
+      action: connected ? (isOnGrowth ? "switch_interval" : "upgrade") : "signin_then_upgrade",
+    });
     if (!connected) {
       startGoogleConnect("/pricing");
       return;
@@ -127,6 +138,12 @@ export function PricingCards({
 
   async function handlePortal() {
     setError(null);
+    trackEvent("pricing_cta_clicked", {
+      page,
+      plan: "growth",
+      interval,
+      action: "manage",
+    });
     setLoading("portal");
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
@@ -209,6 +226,14 @@ export function PricingCards({
             {connected ? (
               <Link
                 href="/audit"
+                onClick={() =>
+                  trackEvent("pricing_cta_clicked", {
+                    page,
+                    plan: "free",
+                    interval,
+                    action: "open_audit",
+                  })
+                }
                 className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#3D3C36] bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#2E2D28]"
               >
                 Get Started
@@ -216,7 +241,15 @@ export function PricingCards({
             ) : (
               <button
                 type="button"
-                onClick={() => startGoogleConnect("/connect")}
+                onClick={() => {
+                  trackEvent("pricing_cta_clicked", {
+                    page,
+                    plan: "free",
+                    interval,
+                    action: "signin",
+                  });
+                  startGoogleConnect("/connect");
+                }}
                 className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#3D3C36] bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#2E2D28]"
               >
                 Get started free

@@ -2,9 +2,33 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { initPostHog, trackPageView, type BootstrapUser } from '@/lib/analytics';
+import { initPostHog, trackPageView, trackEvent, type BootstrapUser } from '@/lib/analytics';
 import posthog from 'posthog-js';
 import { UTM_KEYS, UTM_STORAGE_PREFIX } from '@/lib/utm';
+
+const CONNECT_EVENT_COOKIE = 'gads_connect_event';
+
+function consumeConnectEventCookie() {
+    if (typeof document === 'undefined') return;
+    const match = document.cookie.match(/(?:^|; )gads_connect_event=([^;]*)/);
+    if (!match) return;
+    document.cookie = `${CONNECT_EVENT_COOKIE}=; path=/; max-age=0`;
+    try {
+        const data = JSON.parse(decodeURIComponent(match[1])) as {
+            count?: number;
+            first?: boolean;
+            destination?: string;
+        };
+        trackEvent('account_connected', {
+            account_count: typeof data.count === 'number' ? data.count : 1,
+            auth_method: 'google',
+            is_first_connect: !!data.first,
+            destination: data.destination ?? null,
+        });
+    } catch {
+        /* malformed cookie — already cleared */
+    }
+}
 
 export function PostHogProvider({
     children,
@@ -18,6 +42,7 @@ export function PostHogProvider({
 
     useEffect(() => {
         initPostHog(bootstrapUser);
+        consumeConnectEventCookie();
 
         // Set UTM attribution as person properties from sessionStorage
         try {

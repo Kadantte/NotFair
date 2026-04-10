@@ -341,6 +341,11 @@ async function createOrRedirectGoogleAdsSession({
       if (isFirstSignup) {
         response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
       }
+      response.cookies.set(
+        "gads_connect_event",
+        JSON.stringify({ count: 1, first: isFirstSignup, destination: next }),
+        { path: "/", maxAge: 120 },
+      );
       return response;
     }
 
@@ -349,6 +354,11 @@ async function createOrRedirectGoogleAdsSession({
     if (isFirstSignup) {
       response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
     }
+    response.cookies.set(
+      "gads_connect_event",
+      JSON.stringify({ count: 1, first: isFirstSignup, destination: next }),
+      { path: "/", maxAge: 120 },
+    );
     return response;
   }
 

@@ -735,10 +735,8 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
     useEffect(() => {
         if (urlToken) {
-            trackEvent('account_connected', {
-                account_count: 1,
-                auth_method: 'google',
-            });
+            // account_connected is now fired centrally from PostHogProvider
+            // via the gads_connect_event cookie set by the auth callback.
             window.history.replaceState({}, '', '/connect/claude-code/manual');
             return;
         }
@@ -807,10 +805,8 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
             });
             const data = await res.json();
             if (data.redirectUrl) {
-                trackEvent('account_connected', {
-                    account_count: selected.length,
-                    auth_method: 'google',
-                });
+                // account_connected is now fired centrally from PostHogProvider
+                // via the gads_connect_event cookie set by select-account route.
                 window.location.assign(data.redirectUrl);
             } else if (data.error) {
                 router.push(`/connect?error=${encodeURIComponent(data.error)}`);

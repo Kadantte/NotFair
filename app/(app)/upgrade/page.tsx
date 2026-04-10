@@ -26,6 +26,7 @@ export default async function UpgradePage() {
           scheduledCancelAt={subscription?.scheduledCancelAt?.toISOString() ?? null}
           currentPeriodEnd={subscription?.currentPeriodEnd?.toISOString() ?? null}
           hasStripeCustomer={!!subscription?.stripeCustomerId}
+          page="upgrade"
         />
       </div>
     </section>

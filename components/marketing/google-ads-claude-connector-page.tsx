@@ -378,6 +378,8 @@ function ConnectButton({
     trackEvent("cta_clicked", {
       page: "google-ads-claude-connector",
       cta: connected ? "open_connector_setup" : "sign_in_with_google",
+      destination: "/connect/claude-connector",
+      requires_auth: !connected,
     });
     startGoogleConnect("/connect/claude-connector");
   }, [connected]);
