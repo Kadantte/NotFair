@@ -119,6 +119,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          suppressHydrationWarning
           title={email ?? "Account"}
           className={`group flex h-12 items-center rounded-lg text-[#9B9689] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
             isCollapsed ? "w-12 justify-center px-0" : "w-full justify-start gap-3 px-2"
