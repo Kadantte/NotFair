@@ -143,7 +143,7 @@ export function AuditChatDrawer({
           <div className="flex items-center gap-2">
             <MessageCircle className="h-4 w-4 text-[#4CAF6E]" />
             <span className="text-[14px] font-medium text-[#E8E4DD]">
-              Audit Help
+              AdsAgent Agentic AI
             </span>
           </div>
           <div className="flex items-center gap-1">

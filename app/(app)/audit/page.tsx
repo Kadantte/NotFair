@@ -6,9 +6,9 @@ import type { AuditOverview, AuditDetails } from "./actions";
 import { AuditContent } from "./audit-content";
 import {
   AuditChatDrawer,
-  AuditChatFab,
   type AuditChatContext,
 } from "@/components/chat/audit-chat-drawer";
+import { AuditHelpPanel } from "@/components/audit/audit-help-panel";
 
 // Module-level cache keyed by account ID
 let cachedAccountId: string | null = null;
@@ -144,7 +144,7 @@ export default function AuditPage() {
         redoLoading={redoLoading}
         lastAuditTime={lastAuditTime}
       />
-      {!drawerOpen && <AuditChatFab onClick={() => setDrawerOpen(true)} />}
+      {!drawerOpen && <AuditHelpPanel onChatClick={() => setDrawerOpen(true)} />}
       <AuditChatDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
