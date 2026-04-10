@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { clearSessionCookies, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
-import { deriveCustomerName, listAccessibleCustomers } from "@/lib/google-ads";
+import { deriveCustomerName, listAccessibleCustomers, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent } from "@/lib/analytics-server";
@@ -325,6 +325,11 @@ async function createOrRedirectGoogleAdsSession({
       expiresAt: expiresAt.toISOString(),
     });
 
+    // Fire-and-forget: snapshot account budget/info for dev dashboard
+    syncAccountSnapshots(refreshToken, [account.id]).catch((err) => {
+      console.error("[sync-account] Failed to snapshot on connect:", err);
+    });
+
     if (popup) {
       const response = popupPostMessage(origin, {
         type: "GOOGLE_ADS_AUTH_SUCCESS",
@@ -429,6 +434,14 @@ async function reuseExistingSession({
     .where(eq(schema.mcpSessions.id, existingSession.id));
 
   const customerName = deriveCustomerName(existingSession.customerIds);
+
+  // Fire-and-forget: re-sync account snapshots on returning login
+  const reusedIds = parseCustomerIds(existingSession.customerIds).map((a) => a.id);
+  if (reusedIds.length > 0) {
+    syncAccountSnapshots(refreshToken, reusedIds).catch((err) => {
+      console.error("[sync-account] Failed to snapshot on reuse:", err);
+    });
+  }
 
   if (popup) {
     const response = popupPostMessage(origin, {

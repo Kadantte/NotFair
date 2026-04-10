@@ -1,7 +1,8 @@
 import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
-import { sql, desc } from "drizzle-orm";
+import { sql, desc, inArray } from "drizzle-orm";
 import { DEV_EMAILS } from "@/lib/dev-access";
+import { parseCustomerIds } from "@/lib/google-ads";
 
 export async function GET() {
   let googleEmail: string | null = null;
@@ -33,26 +34,44 @@ export async function GET() {
     .groupBy(schema.mcpSessions.userId)
     .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`));
 
-  // Parse customerIds JSON and count connected accounts
-  const result = customers.map((c) => {
-    let accounts: { id: string; name: string }[] = [];
-    try {
-      const parsed = JSON.parse(c.customerIds || "[]");
-      if (Array.isArray(parsed)) accounts = parsed;
-    } catch {
-      // ignore
-    }
-    return {
-      userId: c.userId,
-      googleEmail: c.googleEmail,
-      primaryAccountId: c.customerId,
-      accounts,
-      accountCount: accounts.length,
-      sessions: c.sessions,
-      lastActive: c.lastActive,
-      firstSeen: c.firstSeen,
-    };
+  // Collect all unique account IDs across all customers
+  const allAccountIds = new Set<string>();
+  const parsed = customers.map((c) => {
+    const accounts = parseCustomerIds(c.customerIds);
+    for (const a of accounts) allAccountIds.add(a.id);
+    return { ...c, accounts };
   });
+
+  // Batch-fetch account snapshots from the accounts table
+  const snapshots = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
+  if (allAccountIds.size > 0) {
+    const rows = await db()
+      .select({
+        accountId: schema.accounts.accountId,
+        dailyBudget: schema.accounts.dailyBudget,
+        activeCampaigns: schema.accounts.activeCampaigns,
+        currencyCode: schema.accounts.currencyCode,
+      })
+      .from(schema.accounts)
+      .where(inArray(schema.accounts.accountId, [...allAccountIds]));
+    for (const { accountId, ...snap } of rows) {
+      snapshots.set(accountId, snap);
+    }
+  }
+
+  const result = parsed.map((c) => ({
+    userId: c.userId,
+    googleEmail: c.googleEmail,
+    primaryAccountId: c.customerId,
+    accounts: c.accounts.map((a) => ({
+      ...a,
+      ...(snapshots.get(a.id) ?? {}),
+    })),
+    accountCount: c.accounts.length,
+    sessions: c.sessions,
+    lastActive: c.lastActive,
+    firstSeen: c.firstSeen,
+  }));
 
   return Response.json({ customers: result });
 }

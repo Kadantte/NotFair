@@ -164,6 +164,20 @@ export const mcpSessions = pgTable("mcp_sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Account Snapshots ──────────────────────────────────────────────
+
+export const accounts = pgTable("accounts", {
+  accountId: text("account_id").primaryKey(),
+  name: text("name"),
+  currencyCode: text("currency_code"),
+  dailyBudget: doublePrecision("daily_budget"),
+  activeCampaigns: integer("active_campaigns"),
+  timeZone: text("time_zone"),
+  isTest: boolean("is_test").default(false).notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ─── Chat Threads ───────────────────────────────────────────────────
 
 export const chatThreads = pgTable("chat_threads", {

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
-import { listAccessibleCustomers, deriveCustomerName, parseCustomerIds } from "@/lib/google-ads";
+import { listAccessibleCustomers, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
 
 export async function POST(request: Request) {
@@ -166,6 +166,12 @@ export async function POST(request: Request) {
         ),
       );
   }
+
+  // Fire-and-forget: snapshot account budget/info for dev dashboard
+  const selectedIds = validAccounts.map((a) => a.id);
+  syncAccountSnapshots(session.refreshToken, selectedIds).catch((err) => {
+    console.error("[sync-account] Failed to snapshot on select:", err);
+  });
 
   const accountNames = deriveCustomerName(customerIds);
 

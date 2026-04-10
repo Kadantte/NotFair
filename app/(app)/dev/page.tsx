@@ -41,18 +41,21 @@ type DevStats = {
     budgets: Record<string, BudgetSummary>;
 };
 
-function formatBudget(budget: BudgetSummary): string {
-    if (budget.currencyCode) {
+function formatCurrency(amount: number, currencyCode?: string | null): string {
+    if (currencyCode) {
         try {
-            return new Intl.NumberFormat(undefined, {
-                style: 'currency',
-                currency: budget.currencyCode,
-            }).format(budget.totalDailyBudget);
-        } catch {
-            // invalid currency code fallback
-        }
+            return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amount);
+        } catch { /* invalid currency code fallback */ }
     }
-    return `$${budget.totalDailyBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatBudget(budget: BudgetSummary): string {
+    return formatCurrency(budget.totalDailyBudget, budget.currencyCode);
+}
+
+function formatAccountBudget(a: CustomerAccount): string | null {
+    return a.dailyBudget != null ? formatCurrency(a.dailyBudget, a.currencyCode) : null;
 }
 
 /** Parse a timestamp string (with or without trailing Z) into a Date */
@@ -72,7 +75,13 @@ function formatDateShort(iso: string, year = false): string {
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
 
-type CustomerAccount = { id: string; name: string };
+type CustomerAccount = {
+    id: string;
+    name: string;
+    dailyBudget?: number | null;
+    activeCampaigns?: number | null;
+    currencyCode?: string | null;
+};
 type Customer = {
     userId: string | null;
     googleEmail: string | null;
@@ -757,10 +766,18 @@ export default function DevPage() {
                                         </div>
                                     </div>
                                     {c.accounts.length > 0 && (
-                                        <div className="mt-2 flex flex-wrap gap-1">
-                                            {c.accounts.map((a) => (
-                                                <span key={a.id} className="text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#9B9689] font-mono">{a.name || a.id}</span>
-                                            ))}
+                                        <div className="mt-2 space-y-1">
+                                            {c.accounts.map((a) => {
+                                                const budget = formatAccountBudget(a);
+                                                return (
+                                                    <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#9B9689] font-mono">
+                                                        <span className="truncate mr-2">{a.name || a.id}</span>
+                                                        {budget && (
+                                                            <span className="text-[#4CAF6E] whitespace-nowrap">{budget}/d · {a.activeCampaigns ?? 0} campaigns</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -772,13 +789,19 @@ export default function DevPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-[#3D3C36]">
-                                        {['Customer', 'Accounts', 'Sessions', 'First Seen', 'Last Active'].map((h, i) => (
+                                        {['Customer', 'Accounts', 'Daily Budget', 'Sessions', 'First Seen', 'Last Active'].map((h, i) => (
                                             <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#9B9689] uppercase tracking-widest">{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {customers.map((c) => (
+                                    {customers.map((c) => {
+                                        // Sum daily budgets across all accounts for this customer
+                                        const totalBudget = c.accounts.reduce((sum, a) => sum + (a.dailyBudget ?? 0), 0);
+                                        const totalCampaigns = c.accounts.reduce((sum, a) => sum + (a.activeCampaigns ?? 0), 0);
+                                        const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
+                                        const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
+                                        return (
                                         <tr key={c.userId ?? c.primaryAccountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
                                             <td className="px-4 py-2.5">
                                                 <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
@@ -793,6 +816,18 @@ export default function DevPage() {
                                                     ))}
                                                 </div>
                                             </td>
+                                            <td className="px-4 py-2.5">
+                                                {hasBudget ? (
+                                                    <div>
+                                                        <div className="text-sm text-[#4CAF6E] font-mono tabular-nums">
+                                                            {formatCurrency(totalBudget, currency)}
+                                                        </div>
+                                                        <div className="text-[10px] text-[#9B9689]/60">{totalCampaigns} campaign{totalCampaigns !== 1 ? 's' : ''}</div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm text-[#9B9689]/40">—</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</td>
                                             <td className="px-4 py-2.5 text-xs text-[#9B9689] font-mono">
                                                 {formatDateShort(c.firstSeen, true)}
@@ -801,7 +836,8 @@ export default function DevPage() {
                                                 {formatDateTime(c.lastActive)}
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
