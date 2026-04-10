@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, LogOut, ChevronUp } from "lucide-react";
+import { CreditCard, LogOut, ChevronRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -14,6 +14,8 @@ import {
 interface SessionShape {
   connected: boolean;
   googleEmail?: string | null;
+  displayName?: string | null;
+  picture?: string | null;
   customerName?: string | null;
 }
 
@@ -21,19 +23,40 @@ interface SubscriptionShape {
   hasStripeCustomer: boolean;
 }
 
-function initialFromEmail(email: string | null | undefined): string {
-  if (!email) return "?";
-  const trimmed = email.trim();
-  if (!trimmed) return "?";
-  return trimmed[0].toUpperCase();
+function initial(name: string | null | undefined, email: string | null | undefined): string {
+  // Prefer initials from the user's display name (first letter of each word,
+  // up to 2). Fall back to the first letter of the email's local part.
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    if (parts.length === 1) {
+      return parts[0][0].toUpperCase();
+    }
+  }
+  if (email && email.trim()) {
+    return email.trim()[0].toUpperCase();
+  }
+  return "?";
 }
 
-function displayName(email: string | null | undefined): string {
-  if (!email) return "Account";
-  // Strip the @domain for the sidebar label — full email shown in the dropdown header.
-  const at = email.indexOf("@");
-  if (at <= 0) return email;
-  return email.slice(0, at);
+function titleCase(s: string): string {
+  return s
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function sidebarLabel(name: string | null | undefined, email: string | null | undefined): string {
+  if (name && name.trim()) return titleCase(name);
+  if (email) {
+    const at = email.indexOf("@");
+    return at > 0 ? email.slice(0, at) : email;
+  }
+  return "Account";
 }
 
 export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
@@ -83,9 +106,13 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
   }
 
   const email = session?.googleEmail ?? null;
-  const initial = initialFromEmail(email);
-  const label = displayName(email);
+  const rawDisplayName = session?.displayName ?? null;
+  const displayName = rawDisplayName ? titleCase(rawDisplayName) : null;
+  const picture = session?.picture ?? null;
+  const initialChar = initial(displayName, email);
+  const label = sidebarLabel(displayName, email);
   const canManage = !!sub?.hasStripeCustomer;
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <DropdownMenu>
@@ -97,12 +124,23 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
             isCollapsed ? "w-12 justify-center px-0" : "w-full justify-start gap-3 px-2"
           }`}
         >
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/15 text-[13px] font-semibold uppercase text-[#4CAF6E] ring-1 ring-[#4CAF6E]/30"
-          >
-            {initial}
-          </span>
+          {picture && !imgFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={picture}
+              alt=""
+              referrerPolicy="no-referrer"
+              onError={() => setImgFailed(true)}
+              className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-[#3D3C36]"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/15 text-[13px] font-semibold uppercase text-[#4CAF6E] ring-1 ring-[#4CAF6E]/30"
+            >
+              {initialChar}
+            </span>
+          )}
           <span
             className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-[13px] font-medium text-[#E8E4DD] transition-all duration-200 ease-out ${
               isCollapsed ? "max-w-0 opacity-0" : "max-w-32 opacity-100"
@@ -110,7 +148,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
           >
             {label}
           </span>
-          <ChevronUp
+          <ChevronRight
             className={`h-4 w-4 shrink-0 text-[#9B9689] transition-all duration-200 ease-out ${
               isCollapsed ? "max-w-0 opacity-0" : "opacity-100"
             }`}
@@ -119,19 +157,26 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        align="start"
-        side="top"
-        sideOffset={8}
-        className="w-[220px] border-[#3D3C36] bg-[#24231F] text-[#E8E4DD]"
+        align="end"
+        side="right"
+        sideOffset={14}
+        className="w-[240px] border-[#3D3C36] bg-[#24231F] text-[#E8E4DD]"
       >
-        {/* Email header */}
+        {/* Profile header */}
         <div className="px-2 py-1.5">
           <p className="truncate text-[11px] font-mono uppercase tracking-wider text-[#9B9689]">
             Signed in as
           </p>
-          <p className="mt-0.5 truncate text-[13px] font-medium text-[#E8E4DD]">
-            {email ?? "Account"}
-          </p>
+          {displayName && (
+            <p className="mt-0.5 truncate text-[13px] font-semibold text-[#E8E4DD]">
+              {displayName}
+            </p>
+          )}
+          {email && (
+            <p className={`truncate text-[11px] text-[#9B9689] ${displayName ? "" : "mt-0.5"}`}>
+              {email}
+            </p>
+          )}
         </div>
 
         <DropdownMenuSeparator className="bg-[#3D3C36]" />

@@ -15,6 +15,10 @@ export type Session = {
   customerName: string;
   customerIds: { id: string; name: string }[];
   googleEmail: string | null;
+  /** Display name from Supabase user_metadata.full_name (Google OAuth provides this) */
+  displayName: string | null;
+  /** Google profile picture, read live from Supabase user_metadata.avatar_url */
+  picture: string | null;
   isDev: boolean;
   impersonating?: boolean;
 } | {
@@ -100,12 +104,38 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
   return { token, row };
 }
 
+/**
+ * Read display name + avatar from the dedicated profile cookie set by
+ * /auth/callback. We can't query Supabase live here because the auth callback
+ * deletes all sb-* cookies after a successful sign-in (header-size mitigation),
+ * so the Supabase user object isn't available on subsequent requests.
+ */
+async function readProfileCookie(): Promise<{ displayName: string | null; picture: string | null }> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(COOKIE_NAMES.profile)?.value;
+    if (!raw) return { displayName: null, picture: null };
+    const parsed = JSON.parse(decodeURIComponent(raw)) as { name?: string | null; picture?: string | null };
+    return {
+      displayName: parsed.name ?? null,
+      picture: parsed.picture ?? null,
+    };
+  } catch {
+    return { displayName: null, picture: null };
+  }
+}
+
 export async function getSession(): Promise<Session> {
   const result = await loadSessionRow();
   if (!result) return { connected: false };
 
   // isDev is always based on the real user's email, not the impersonated one
   const devEmail = result.impersonating?.realEmail ?? result.row.googleEmail;
+  // Pull display name + avatar from the profile cookie. Skip when impersonating
+  // so the dev viewing someone else's account doesn't see their own profile.
+  const profile = result.impersonating
+    ? { displayName: null, picture: null }
+    : await readProfileCookie();
 
   return {
     connected: true,
@@ -115,6 +145,8 @@ export async function getSession(): Promise<Session> {
     customerName: deriveCustomerName(result.row.customerIds),
     customerIds: parseCustomerIds(result.row.customerIds),
     googleEmail: result.row.googleEmail,
+    displayName: profile.displayName,
+    picture: profile.picture,
     isDev: !!devEmail && DEV_EMAILS.includes(devEmail),
     ...(result.impersonating && { impersonating: true }),
   };

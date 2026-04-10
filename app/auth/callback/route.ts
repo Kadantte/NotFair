@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
-import { clearSessionCookies, setSessionCookies } from "@/lib/auth-cookies";
+import { clearSessionCookies, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
@@ -630,6 +630,20 @@ export async function GET(request: Request) {
 
   // Clear the one-time OAuth nonce cookie
   response.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
+
+  // Stash the user's display name + avatar in a small dedicated cookie BEFORE
+  // we wipe Supabase's sb-* cookies. The Supabase user object only exists for
+  // this request — once sb-* is cleared, supabase.auth.getUser() returns null
+  // on every subsequent request, so we can't read user_metadata later.
+  if (user) {
+    const meta = user.user_metadata as
+      | { full_name?: string; name?: string; avatar_url?: string; picture?: string }
+      | undefined;
+    setProfileCookie(response, {
+      name: meta?.full_name ?? meta?.name ?? null,
+      picture: meta?.avatar_url ?? meta?.picture ?? null,
+    });
+  }
 
   // Supabase SSR sets large JWT cookies we don't use — clear them to
   // avoid HTTP 431 (Request Header Fields Too Large) on subsequent requests.

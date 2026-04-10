@@ -19,8 +19,8 @@ export function AuditCTA({
   disconnectedLabel = "Audit Now",
 }: {
   session: { connected: boolean };
-  page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server";
-  size?: "default" | "lg";
+  page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server" | "header";
+  size?: "sm" | "default" | "lg";
   connectedLabel?: string;
   disconnectedLabel?: string;
 }) {
@@ -40,9 +40,15 @@ export function AuditCTA({
     }
   }
 
-  const sizeClasses = size === "lg"
-    ? "h-14 w-full px-10 text-lg md:w-auto"
-    : "h-12 px-8 text-base";
+  const sizeClasses =
+    size === "lg"
+      ? "h-14 w-full px-10 text-lg md:w-auto"
+      : size === "sm"
+      ? "h-9 px-4 text-[13px]"
+      : "h-12 px-8 text-base";
+
+  const spinnerSize = size === "sm" ? "h-3.5 w-3.5" : "h-5 w-5";
+  const arrowSize = size === "sm" ? "h-3.5 w-3.5 ml-1.5" : "h-5 w-5 ml-2";
 
   return (
     <Button
@@ -52,13 +58,13 @@ export function AuditCTA({
     >
       {loading ? (
         <span className="inline-flex items-center gap-2">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#1A1917] border-t-transparent" />
+          <span className={`${spinnerSize} animate-spin rounded-full border-2 border-[#1A1917] border-t-transparent`} />
           Connecting...
         </span>
       ) : (
         <>
           {session.connected ? connectedLabel : disconnectedLabel}
-          <ArrowRight className="ml-2 h-5 w-5" />
+          <ArrowRight className={arrowSize} />
         </>
       )}
     </Button>

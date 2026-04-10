@@ -1,10 +1,11 @@
-import Link from "next/link"
-import Image from "next/image"
-import { Star } from "lucide-react"
+import Link from "next/link";
+import Image from "next/image";
+import { Star } from "lucide-react";
+import { AuditCTA } from "@/components/marketing/audit-cta";
 
 function formatStars(count: number): string {
-    if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`
-    return String(count)
+    if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+    return String(count);
 }
 
 export function GitHubStarBadge({ stars }: { stars: number | null }) {
@@ -20,40 +21,57 @@ export function GitHubStarBadge({ stars }: { stars: number | null }) {
                 </>
             )}
         </span>
-    )
+    );
 }
 
-export function SiteHeader({ connected = false }: { connected?: boolean }) {
+function NavLink({ href, label }: { href: string; label: string }) {
+    return (
+        <Link
+            href={href}
+            className="text-[14px] font-medium text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
+        >
+            {label}
+        </Link>
+    );
+}
+
+export function SiteHeader({ connected = false }: { connected?: boolean } = {}) {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-[#3D3C36] bg-[#1A1917]/90 backdrop-blur-sm">
-            <div className="container flex h-14 items-center justify-between mx-auto px-4 md:px-6">
-                <Link href="/" className="flex items-center space-x-2">
-                    <Image src="/logo.svg" alt="AdsAgent Logo" width={28} height={28} className="w-7 h-7" />
-                    <span className="hidden font-bold sm:inline-block text-base text-[#E8E4DD]">AdsAgent</span>
-                </Link>
-                <div className="flex items-center gap-3">
-                    <Link
-                        href="/pricing"
-                        className="hidden sm:inline-flex h-9 items-center px-3 text-sm font-medium text-[#9B9689] transition-colors hover:text-[#E8E4DD]"
-                    >
-                        Pricing
+            <div className="container mx-auto flex h-14 items-center justify-between gap-6 px-4 md:px-6">
+                {/* Left: brand + nav */}
+                <div className="flex items-center gap-8">
+                    <Link href="/" className="flex items-center gap-2.5">
+                        <Image src="/logo.svg" alt="AdsAgent" width={26} height={26} className="h-[26px] w-[26px]" />
+                        <span className="font-display text-[15px] font-semibold tracking-tight text-[#E8E4DD]">
+                            AdsAgent
+                        </span>
                     </Link>
-                    <Link
-                        href="/google-ads-audit"
-                        className="inline-flex h-9 items-center rounded-full bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
-                    >
-                        Free Google Ads Audit
-                    </Link>
+                    <nav className="hidden items-center gap-7 md:flex">
+                        <NavLink href="/pricing" label="Pricing" />
+                        <NavLink href="/google-ads-audit" label="Free audit" />
+                    </nav>
+                </div>
+
+                {/* Right: secondary + primary CTA */}
+                <div className="flex items-center gap-5">
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hidden sm:inline-flex h-9 items-center rounded-full border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-4 text-sm font-medium text-[#4CAF6E] transition-colors hover:bg-[#4CAF6E]/20 hover:border-[#4CAF6E]/60"
+                        className="hidden h-9 items-center rounded-full border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-4 text-sm font-medium text-[#4CAF6E] transition-colors hover:border-[#4CAF6E]/60 hover:bg-[#4CAF6E]/20 sm:inline-flex"
                     >
                         Book a Demo
                     </a>
+                    <AuditCTA
+                        session={{ connected }}
+                        page="header"
+                        size="sm"
+                        connectedLabel="Get started"
+                        disconnectedLabel="Get started"
+                    />
                 </div>
             </div>
         </header>
-    )
+    );
 }
