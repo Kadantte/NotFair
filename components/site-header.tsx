@@ -47,14 +47,11 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                             AdsAgent
                         </span>
                     </Link>
-                    <nav className="hidden items-center gap-7 md:flex">
-                        <NavLink href="/pricing" label="Pricing" />
-                        <NavLink href="/google-ads-audit" label="Free audit" />
-                    </nav>
                 </div>
 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
+                    <NavLink href="/google-ads-audit" label="Free Google Ads Audit" />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"
