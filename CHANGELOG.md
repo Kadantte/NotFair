@@ -2,6 +2,22 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.16.1] - 2026-04-09
+
+### Fixed
+- Campaign detail page top-line metrics (impressions, clicks, cost, conversions) now sum from the same date-filtered history data as the performance chart — previously used lifetime/all-time values from `listCampaigns` which never matched the chart
+
+### Added
+- Smart campaign support on the campaign detail page: keyword themes table, business info (name, URL, phone), and Smart badge on the Ad Copy section
+- `getCampaignKeywordThemesAction` and `getSmartCampaignSettingAction` server actions for fetching Smart campaign-specific data
+- `getSmartCampaignKeywordThemes` and `getSmartCampaignSetting` reads in `lib/google-ads/reads.ts`
+- `smart_campaign_ad` fields in `listAds` query with RSA fallback logic (prefers RSA if populated, otherwise uses Smart ad fields)
+- `metrics.conversions` in campaign history query
+
+### Changed
+- Campaign detail page uses 2-phase fetch: core data always, Smart-specific data only when campaign type is SMART (avoids 2 unnecessary API calls for non-Smart campaigns)
+- `totals` now computed via single-pass `useMemo` reduce over history rows instead of 4 separate reduce passes
+
 ## [0.2.16.0] - 2026-04-08
 
 ### Added

@@ -1,10 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useState, use } from 'react';
+import { useCallback, useEffect, useState, use, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { History, Search, AlertCircle, Sparkles, Loader2, TrendingUp, MousePointer2, DollarSign, Target, FileText, Link as LinkIcon } from 'lucide-react';
+import { History, Search, AlertCircle, Sparkles, Loader2, TrendingUp, MousePointer2, DollarSign, Target, FileText, Link as LinkIcon, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCampaignHistoryAction, getCampaignKeywordsAction, getCampaignAdsAction, generateCampaignSummaryAction, listCampaignsAction, getConversionActionsAction } from '@/app/actions';
+import {
+    getCampaignHistoryAction,
+    getCampaignKeywordsAction,
+    getCampaignAdsAction,
+    generateCampaignSummaryAction,
+    listCampaignsAction,
+    getConversionActionsAction,
+    getCampaignKeywordThemesAction,
+    getSmartCampaignSettingAction,
+} from '@/app/actions';
 import {
     XAxis,
     YAxis,
@@ -25,6 +34,7 @@ interface CampaignHistory {
     cost: number;
     ctr: number;
     averageCpc: number;
+    conversions: number;
 }
 
 interface CampaignAd {
@@ -50,6 +60,19 @@ interface CampaignKeyword {
     ctr: number;
     cost: number;
     averageCpc: number;
+}
+
+interface KeywordTheme {
+    criterionId: string;
+    text: string;
+    isFreeForm: boolean;
+    status: string;
+}
+
+interface SmartCampaignSetting {
+    finalUrl: string | null;
+    businessName: string | null;
+    phoneNumber: string | null;
 }
 
 interface CampaignInfo {
@@ -101,6 +124,10 @@ function formatDate(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function extractHostname(url: string): string {
+    try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+}
+
 function getDateRange(range: TimeRange) {
     const today = new Date();
     const end = new Date(today);
@@ -133,13 +160,28 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<CampaignHistory[]>([]);
     const [keywords, setKeywords] = useState<CampaignKeyword[]>([]);
+    const [keywordThemes, setKeywordThemes] = useState<KeywordTheme[]>([]);
     const [ads, setAds] = useState<CampaignAd[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [campaignInfo, setCampaignInfo] = useState<CampaignInfo | null>(null);
+    const [smartSetting, setSmartSetting] = useState<SmartCampaignSetting | null>(null);
     const [conversionActions, setConversionActions] = useState<ConversionAction[]>([]);
     const [summary, setSummary] = useState<string | null>(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
+
+    // Sum history rows so top-line cards always match the chart for the selected time range
+    const totals = useMemo(() => history.reduce(
+        (acc, d) => ({
+            impressions: acc.impressions + d.impressions,
+            clicks: acc.clicks + d.clicks,
+            cost: acc.cost + d.cost,
+            conversions: acc.conversions + d.conversions,
+        }),
+        { impressions: 0, clicks: 0, cost: 0, conversions: 0 },
+    ), [history]);
+
+    const isSmartCampaign = campaignInfo?.type === 'SMART';
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -147,6 +189,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         const { startDate, endDate } = getDateRange(timeRange);
 
         try {
+            // Phase 1: core data always needed
             const [historyData, keywordsData, adsData, campaignsData, conversionActionsData] = await Promise.all([
                 getCampaignHistoryAction(campaignId, startDate, endDate),
                 getCampaignKeywordsAction(campaignId, startDate, endDate),
@@ -154,11 +197,23 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                 listCampaignsAction(),
                 getConversionActionsAction(),
             ]);
+
+            const match = campaignsData.find(c => c.id === campaignId);
+
+            // Phase 2: Smart-campaign-only data, skipped for standard campaigns
+            const [keywordThemesData, smartSettingData] = match?.type === 'SMART'
+                ? await Promise.all([
+                    getCampaignKeywordThemesAction(campaignId),
+                    getSmartCampaignSettingAction(campaignId),
+                ])
+                : [[], null];
+
             setHistory(historyData);
             setKeywords(keywordsData);
+            setKeywordThemes(keywordThemesData ?? []);
             setAds(adsData);
+            setSmartSetting(smartSettingData ?? null);
             setConversionActions((conversionActionsData ?? []).filter((ca: ConversionAction) => ca.includeInConversions));
-            const match = campaignsData.find(c => c.id === campaignId);
             if (match) setCampaignInfo(match);
         } catch (err) {
             console.error(err);
@@ -266,10 +321,17 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                                 {/* Primary info: website, CPA, conversions */}
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {(() => {
-                                        const domains = [...new Set(ads.flatMap(a => a.finalUrls).map(url => {
-                                            try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
-                                        }).filter(Boolean))];
+                                    {/* Smart campaign: show business name */}
+                                    {isSmartCampaign && smartSetting?.businessName && (
+                                        <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                            <Building2 className="w-3 h-3 text-[#4CAF6E]" />
+                                            <span className="text-[#9B9689]">Business</span>
+                                            <span className="text-[#E8E4DD] font-medium">{smartSetting.businessName}</span>
+                                        </div>
+                                    )}
+                                    {/* Standard campaign: show landing domain */}
+                                    {!isSmartCampaign && (() => {
+                                        const domains = [...new Set(ads.flatMap(a => a.finalUrls).map(extractHostname).filter(Boolean))];
                                         return domains.length > 0 ? (
                                             <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
                                                 <LinkIcon className="w-3 h-3 text-[#4CAF6E]" />
@@ -278,11 +340,21 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                             </div>
                                         ) : null;
                                     })()}
-                                    {campaignInfo.conversions > 0 && (
+                                    {/* Smart campaign: show final URL */}
+                                    {isSmartCampaign && smartSetting?.finalUrl && (
+                                        <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                            <LinkIcon className="w-3 h-3 text-[#4CAF6E]" />
+                                            <span className="text-[#9B9689]">URL</span>
+                                            <span className="text-[#E8E4DD] font-medium font-mono">
+                                                {extractHostname(smartSetting.finalUrl)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {totals.conversions > 0 && (
                                         <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
                                             <Target className="w-3 h-3 text-[#4CAF6E]" />
                                             <span className="text-[#9B9689]">Cost / Conv.</span>
-                                            <span className="text-[#E8E4DD] font-medium font-mono">${(campaignInfo.cost / campaignInfo.conversions).toFixed(2)}</span>
+                                            <span className="text-[#E8E4DD] font-medium font-mono">${(totals.cost / totals.conversions).toFixed(2)}</span>
                                         </div>
                                     )}
                                     {conversionActions.length > 0 && (
@@ -303,10 +375,12 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                         <span className="text-[#9B9689]">Bidding</span>
                                         <span className="text-[#E8E4DD] font-medium capitalize">{campaignInfo.biddingStrategy.replace(/_/g, ' ').toLowerCase()}</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
-                                        <span className="text-[#9B9689]">UTM</span>
-                                        <span className="text-[#E8E4DD] font-medium font-mono">{campaignInfo.trackingTemplate || 'Not set'}</span>
-                                    </div>
+                                    {!isSmartCampaign && (
+                                        <div className="flex items-center gap-1.5 text-xs bg-[#1A1917] border border-[#3D3C36] rounded-lg px-3 py-1.5">
+                                            <span className="text-[#9B9689]">UTM</span>
+                                            <span className="text-[#E8E4DD] font-medium font-mono">{campaignInfo.trackingTemplate || 'Not set'}</span>
+                                        </div>
+                                    )}
                                     {warnings.map((w, i) => (
                                         <span
                                             key={i}
@@ -325,24 +399,23 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                         )}
 
                         {/* ── 2. Metrics Overview ── */}
-                        {campaignInfo && (
-                            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {[
-                                    { icon: TrendingUp, label: 'Impressions', value: campaignInfo.impressions.toLocaleString() },
-                                    { icon: MousePointer2, label: 'Clicks', value: campaignInfo.clicks.toLocaleString() },
-                                    { icon: DollarSign, label: 'Cost', value: `$${campaignInfo.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-                                    { icon: Target, label: 'Conversions', value: campaignInfo.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
-                                ].map(({ icon: Icon, label, value }) => (
-                                    <div key={label} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
-                                        <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
-                                            <Icon className="w-3.5 h-3.5" />
-                                            {label}
-                                        </div>
-                                        <p className="text-xl font-semibold text-[#E8E4DD] tabular-nums">{value}</p>
+                        {/* Totals are computed by summing history rows, so they always match the chart for the selected time range */}
+                        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[
+                                { icon: TrendingUp, label: 'Impressions', value: totals.impressions.toLocaleString() },
+                                { icon: MousePointer2, label: 'Clicks', value: totals.clicks.toLocaleString() },
+                                { icon: DollarSign, label: 'Cost', value: `$${totals.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+                                { icon: Target, label: 'Conversions', value: totals.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
+                            ].map(({ icon: Icon, label, value }) => (
+                                <div key={label} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
+                                    <div className="flex items-center gap-1.5 text-[#9B9689] text-xs mb-2">
+                                        <Icon className="w-3.5 h-3.5" />
+                                        {label}
                                     </div>
-                                ))}
-                            </motion.div>
-                        )}
+                                    <p className="text-xl font-semibold text-[#E8E4DD] tabular-nums">{value}</p>
+                                </div>
+                            ))}
+                        </motion.div>
 
                         {/* ── 3. Performance History ── */}
                         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-6">
@@ -383,6 +456,9 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                     <div className="flex items-center gap-2">
                                         <FileText className="w-4 h-4 text-[#9B9689]" />
                                         <h2 className="text-base font-semibold text-[#E8E4DD]">Ad Copy</h2>
+                                        {isSmartCampaign && (
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20 uppercase tracking-wide">Smart</span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="divide-y divide-[#3D3C36]/50">
@@ -424,65 +500,117 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                             </motion.div>
                         )}
 
-                        {/* ── 5. Keywords ── */}
+                        {/* ── 5. Keywords / Keyword Themes ── */}
                         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl overflow-hidden">
-                            <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
-                                    <Search className="w-4 h-4 text-[#9B9689]" />
-                                    <h2 className="text-base font-semibold text-[#E8E4DD]">Keywords</h2>
-                                </div>
-                                <div className="text-xs text-[#9B9689]">Top keywords by impressions</div>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead>
-                                        <tr className="border-b border-[#3D3C36] text-[#9B9689]">
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Keyword</th>
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-center">Quality</th>
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Impressions</th>
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Clicks</th>
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">CTR</th>
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Avg. CPC</th>
-                                            <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Cost</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#3D3C36]/50">
-                                        {keywords.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={7} className="px-6 py-8 text-center text-[#9B9689] text-sm">
-                                                    No keyword data available for this campaign.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            keywords.map((keyword, i) => (
-                                                <tr key={i} className="hover:bg-[#2E2D28] transition-colors">
-                                                    <td className="px-6 py-3 font-medium text-[#E8E4DD]">{keyword.text}</td>
-                                                    <td className="px-6 py-3 text-center">
-                                                        {keyword.qualityScore > 0 ? (
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
-                                                                keyword.qualityScore >= 7
-                                                                    ? 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20'
-                                                                    : keyword.qualityScore >= 5
-                                                                        ? 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20'
-                                                                        : 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20'
-                                                            }`}>
-                                                                {keyword.qualityScore}/10
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[#9B9689]/30">—</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{keyword.impressions.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{keyword.clicks.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{(keyword.ctr * 100).toFixed(2)}%</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">${keyword.averageCpc.toFixed(2)}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${keyword.cost.toFixed(2)}</td>
+                            {isSmartCampaign ? (
+                                <>
+                                    <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <Search className="w-4 h-4 text-[#9B9689]" />
+                                            <h2 className="text-base font-semibold text-[#E8E4DD]">Keyword Themes</h2>
+                                        </div>
+                                        <div className="text-xs text-[#9B9689]">Smart campaigns use keyword themes, not individual keywords</div>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm">
+                                            <thead>
+                                                <tr className="border-b border-[#3D3C36] text-[#9B9689]">
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Theme</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Type</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Status</th>
                                                 </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#3D3C36]/50">
+                                                {keywordThemes.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={3} className="px-6 py-8 text-center text-[#9B9689] text-sm">
+                                                            No keyword themes configured for this campaign.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    keywordThemes.map((theme) => (
+                                                        <tr key={theme.criterionId} className="hover:bg-[#2E2D28] transition-colors">
+                                                            <td className="px-6 py-3 font-medium text-[#E8E4DD]">{theme.text}</td>
+                                                            <td className="px-6 py-3 text-xs text-[#9B9689]">
+                                                                {theme.isFreeForm ? 'Custom' : 'Suggested'}
+                                                            </td>
+                                                            <td className="px-6 py-3 text-right">
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                                                                    theme.status === 'ENABLED'
+                                                                        ? 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20'
+                                                                        : 'bg-[#9B9689]/10 text-[#9B9689] border-[#9B9689]/20'
+                                                                }`}>
+                                                                    {theme.status}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="px-6 py-4 border-b border-[#3D3C36] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <Search className="w-4 h-4 text-[#9B9689]" />
+                                            <h2 className="text-base font-semibold text-[#E8E4DD]">Keywords</h2>
+                                        </div>
+                                        <div className="text-xs text-[#9B9689]">Top keywords by impressions</div>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm">
+                                            <thead>
+                                                <tr className="border-b border-[#3D3C36] text-[#9B9689]">
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest">Keyword</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-center">Quality</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Impressions</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Clicks</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">CTR</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Avg. CPC</th>
+                                                    <th className="px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-right">Cost</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#3D3C36]/50">
+                                                {keywords.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={7} className="px-6 py-8 text-center text-[#9B9689] text-sm">
+                                                            No keyword data available for this campaign.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    keywords.map((keyword, i) => (
+                                                        <tr key={i} className="hover:bg-[#2E2D28] transition-colors">
+                                                            <td className="px-6 py-3 font-medium text-[#E8E4DD]">{keyword.text}</td>
+                                                            <td className="px-6 py-3 text-center">
+                                                                {keyword.qualityScore > 0 ? (
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                                                                        keyword.qualityScore >= 7
+                                                                            ? 'bg-[#4CAF6E]/10 text-[#4CAF6E] border-[#4CAF6E]/20'
+                                                                            : keyword.qualityScore >= 5
+                                                                                ? 'bg-[#D4882A]/10 text-[#D4882A] border-[#D4882A]/20'
+                                                                                : 'bg-[#C45D4A]/10 text-[#C45D4A] border-[#C45D4A]/20'
+                                                                    }`}>
+                                                                        {keyword.qualityScore}/10
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[#9B9689]/30">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{keyword.impressions.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{keyword.clicks.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">{(keyword.ctr * 100).toFixed(2)}%</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#9B9689]">${keyword.averageCpc.toFixed(2)}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${keyword.cost.toFixed(2)}</td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            )}
                         </motion.div>
 
                         {/* ── 6. AI Summary ── */}

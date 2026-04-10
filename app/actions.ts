@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, micros } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -19,6 +19,7 @@ type CampaignHistoryRow = {
         cost_micros?: number | null;
         ctr?: number | null;
         average_cpc?: number | null;
+        conversions?: number | null;
     };
 };
 
@@ -337,7 +338,8 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
                 metrics.clicks,
                 metrics.cost_micros,
                 metrics.ctr,
-                metrics.average_cpc
+                metrics.average_cpc,
+                metrics.conversions
             FROM campaign
             WHERE campaign.id = ${campaignId}
               AND segments.date BETWEEN '${effectiveStartDate}' AND '${effectiveEndDate}'
@@ -348,9 +350,10 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
             date: row.segments.date,
             impressions: row.metrics.impressions || 0,
             clicks: row.metrics.clicks || 0,
-            cost: row.metrics.cost_micros ? (row.metrics.cost_micros / 1000000) : 0,
+            cost: micros(row.metrics.cost_micros ?? undefined),
             ctr: row.metrics.ctr || 0,
-            averageCpc: row.metrics.average_cpc ? (row.metrics.average_cpc / 1000000) : 0
+            averageCpc: micros(row.metrics.average_cpc ?? undefined),
+            conversions: row.metrics.conversions || 0,
         }));
     } catch (error) {
         console.error("Get Campaign History Error:", error);
@@ -510,6 +513,34 @@ Keep it concise and data-driven. Use specific numbers from the data.`;
         console.error("Generate Campaign Summary Error:", error);
         throw new Error("Failed to generate AI summary.");
     }
+}
+
+// ─── Smart Campaign ──────────────────────────────────────────────────
+
+export async function getCampaignKeywordThemesAction(campaignId: string) {
+    return requireAuth(async () => {
+        try {
+            const { refreshToken, customerId, customerIds } = await getSessionAuth();
+            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            return await getSmartCampaignKeywordThemes(auth, campaignId);
+        } catch (error) {
+            console.error("Get Smart Campaign Keyword Themes Error:", error);
+            return [];
+        }
+    });
+}
+
+export async function getSmartCampaignSettingAction(campaignId: string) {
+    return requireAuth(async () => {
+        try {
+            const { refreshToken, customerId, customerIds } = await getSessionAuth();
+            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            return await getSmartCampaignSetting(auth, campaignId);
+        } catch (error) {
+            console.error("Get Smart Campaign Setting Error:", error);
+            return null;
+        }
+    });
 }
 
 // ─── Usage / Rate Limit ─────────────────────────────────────────────

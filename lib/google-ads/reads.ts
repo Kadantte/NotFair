@@ -567,6 +567,8 @@ export async function listAds(
       ad_group_ad.ad.final_urls,
       ad_group_ad.ad.responsive_search_ad.headlines,
       ad_group_ad.ad.responsive_search_ad.descriptions,
+      ad_group_ad.ad.smart_campaign_ad.headlines,
+      ad_group_ad.ad.smart_campaign_ad.descriptions,
       ad_group.id,
       ad_group.name,
       metrics.impressions,
@@ -588,6 +590,10 @@ export async function listAds(
     ads: (result as any[]).map((row) => {
       const ad = row.ad_group_ad?.ad ?? {};
       const rsa = ad.responsive_search_ad ?? {};
+      const smartAd = ad.smart_campaign_ad ?? {};
+      // Use RSA fields for standard campaigns, smart_campaign_ad fields for Smart campaigns
+      const headlineSource = (rsa.headlines ?? []).length > 0 ? rsa.headlines : (smartAd.headlines ?? []);
+      const descSource = (rsa.descriptions ?? []).length > 0 ? rsa.descriptions : (smartAd.descriptions ?? []);
       return {
         adId: String(ad.id ?? ""),
         adName: ad.name ?? null,
@@ -596,14 +602,79 @@ export async function listAds(
         adGroupId: String(row.ad_group?.id ?? ""),
         adGroupName: row.ad_group?.name ?? "",
         finalUrls: ad.final_urls ?? [],
-        headlines: (rsa.headlines ?? []).map((h: any) => h.text ?? ""),
-        descriptions: (rsa.descriptions ?? []).map((d: any) => d.text ?? ""),
+        headlines: headlineSource.map((h: any) => h.text ?? ""),
+        descriptions: descSource.map((d: any) => d.text ?? ""),
         impressions: row.metrics?.impressions ?? 0,
         clicks: row.metrics?.clicks ?? 0,
         cost: micros(row.metrics?.cost_micros),
         conversions: row.metrics?.conversions ?? 0,
       };
     }),
+  };
+}
+
+export async function getSmartCampaignKeywordThemes(
+  auth: AuthContext,
+  campaignId: string,
+) {
+  const customer = getCachedCustomer(auth);
+  const id = safeEntityId(campaignId);
+
+  const result = await customer.query(`
+    SELECT
+      campaign_criterion.criterion_id,
+      campaign_criterion.keyword_theme.free_form_keyword_theme,
+      campaign_criterion.keyword_theme.keyword_theme_constant,
+      campaign_criterion.status
+    FROM campaign_criterion
+    WHERE campaign.id = ${id}
+      AND campaign_criterion.type = 'KEYWORD_THEME'
+      AND campaign_criterion.status != 'REMOVED'
+    ORDER BY campaign_criterion.criterion_id ASC
+  `);
+
+  return (result as any[]).map((row) => {
+    const cc = row.campaign_criterion ?? {};
+    const theme = cc.keyword_theme ?? {};
+    // Prefer free-form text; fall back to the last segment of the constant resource name
+    const text = theme.free_form_keyword_theme
+      || (theme.keyword_theme_constant
+          ? String(theme.keyword_theme_constant).split("/").pop() ?? "Unknown theme"
+          : "Unknown theme");
+    return {
+      criterionId: String(cc.criterion_id ?? ""),
+      text,
+      isFreeForm: Boolean(theme.free_form_keyword_theme),
+      status: cc.status ?? "UNKNOWN",
+    };
+  });
+}
+
+export async function getSmartCampaignSetting(
+  auth: AuthContext,
+  campaignId: string,
+) {
+  const customer = getCachedCustomer(auth);
+  const id = safeEntityId(campaignId);
+
+  const result = await customer.query(`
+    SELECT
+      smart_campaign_setting.final_url,
+      smart_campaign_setting.business_name,
+      smart_campaign_setting.phone_number.phone_number,
+      smart_campaign_setting.phone_number.country_code
+    FROM smart_campaign_setting
+    WHERE campaign.id = ${id}
+    LIMIT 1
+  `);
+
+  const row = (result as any[])[0];
+  if (!row) return null;
+  const s = row.smart_campaign_setting ?? {};
+  return {
+    finalUrl: s.final_url ?? null,
+    businessName: s.business_name ?? null,
+    phoneNumber: s.phone_number?.phone_number ?? null,
   };
 }
 
