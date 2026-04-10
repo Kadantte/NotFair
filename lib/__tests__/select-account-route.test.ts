@@ -39,6 +39,7 @@ vi.mock("@/lib/google-ads", () => ({
       return [];
     }
   }),
+  syncAccountSnapshots: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/db", () => ({

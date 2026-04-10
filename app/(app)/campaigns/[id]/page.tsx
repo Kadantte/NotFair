@@ -500,7 +500,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                                 </div>
                                             </div>
 
-                                            {ad.type !== 'SMART_CAMPAIGN_AD' && (
+                                            {!isSmartCampaign && (
                                                 <div className="flex flex-wrap gap-4 pt-1">
                                                     {[
                                                         { label: 'Impr.', value: ad.impressions.toLocaleString() },

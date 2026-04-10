@@ -46,6 +46,15 @@ vi.mock("@/lib/google-ads", () => ({
     }
   }),
   listAccessibleCustomers: mockListAccessibleCustomers,
+  syncAccountSnapshots: vi.fn(async () => {}),
+  parseCustomerIds: vi.fn((raw: string | null | undefined) => {
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw) as Array<{ id: string; name: string }>;
+    } catch {
+      return [];
+    }
+  }),
 }));
 
 vi.mock("@/lib/oauth-nonce", () => ({
