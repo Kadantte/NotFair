@@ -607,16 +607,15 @@ export async function listAds(
   };
 }
 
-/** Fetch Smart campaign ad copy + metrics (separate query, only for SMART campaigns). */
+/** Fetch Smart campaign ad copy (separate query, only for SMART campaigns).
+ *  No date filter — Smart campaign ads don't segment by date in ad_group_ad,
+ *  so a segments.date WHERE clause returns zero rows even when the campaign has impressions. */
 export async function getSmartCampaignAds(
   auth: AuthContext,
   campaignId: string,
-  days = 30,
 ) {
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
-  const boundedDays = Math.min(Math.max(days, 1), 365);
-  const { start, end } = getDateRange(boundedDays);
 
   const result = await customer.query(`
     SELECT
@@ -627,16 +626,10 @@ export async function getSmartCampaignAds(
       ad_group_ad.ad.smart_campaign_ad.headlines,
       ad_group_ad.ad.smart_campaign_ad.descriptions,
       ad_group.id,
-      ad_group.name,
-      metrics.impressions,
-      metrics.clicks,
-      metrics.cost_micros,
-      metrics.conversions
+      ad_group.name
     FROM ad_group_ad
     WHERE campaign.id = ${id}
       AND ad_group_ad.status != 'REMOVED'
-      AND segments.date BETWEEN '${start}' AND '${end}'
-    ORDER BY metrics.impressions DESC
     LIMIT 50
   `);
 
@@ -653,10 +646,10 @@ export async function getSmartCampaignAds(
       finalUrls: ad.final_urls ?? [],
       headlines: (smartAd.headlines ?? []).map((h: any) => h.text ?? ""),
       descriptions: (smartAd.descriptions ?? []).map((d: any) => d.text ?? ""),
-      impressions: row.metrics?.impressions ?? 0,
-      clicks: row.metrics?.clicks ?? 0,
-      cost: micros(row.metrics?.cost_micros),
-      conversions: row.metrics?.conversions ?? 0,
+      impressions: 0,
+      clicks: 0,
+      cost: 0,
+      conversions: 0,
     };
   });
 }
