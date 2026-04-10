@@ -979,7 +979,7 @@ export function AuditContent({
       : overview.conversionActions.filter((a) => a.includeInConversions).length === 0;
 
   const [activeFinding, setActiveFinding] = useState<{ key: string; nonce: number } | null>(null);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     return () => clearTimeout(scrollTimerRef.current);
