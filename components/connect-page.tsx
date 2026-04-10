@@ -10,6 +10,11 @@ import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 
+function imageKeyFromSrc(src: string): string {
+    const file = src.split('/').pop() ?? src;
+    return file.replace(/\.[^.]+$/, '').replace(/-/g, '_');
+}
+
 function buildSetupPrompt(token: string): string {
     return `Set up AdsAgent for Claude Code:
 
@@ -92,13 +97,14 @@ function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: 
     );
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, onCopyTracked }: { text: string; onCopyTracked?: () => void }) {
     const [copied, setCopied] = useState(false);
     return (
         <button
             onClick={() => {
                 navigator.clipboard.writeText(text);
                 setCopied(true);
+                onCopyTracked?.();
                 setTimeout(() => setCopied(false), 2000);
             }}
             className="inline-flex shrink-0 rounded border border-[#3D3C36] bg-[#24231F] p-1 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
@@ -114,7 +120,7 @@ type OAuthCredentials = {
     mcp_server_url: string;
 };
 
-function CredentialField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function CredentialField({ label, value, mono, onCopyTracked }: { label: string; value: string; mono?: boolean; onCopyTracked?: () => void }) {
     const [copied, setCopied] = useState(false);
     return (
         <div className="space-y-1.5">
@@ -127,6 +133,7 @@ function CredentialField({ label, value, mono }: { label: string; value: string;
                     onClick={() => {
                         navigator.clipboard.writeText(value);
                         setCopied(true);
+                        onCopyTracked?.();
                         setTimeout(() => setCopied(false), 2000);
                     }}
                     className="shrink-0 rounded-lg border border-[#3D3C36] bg-[#24231F] p-2 text-[#9B9689] transition-colors hover:border-[#9B9689]/40 hover:text-[#E8E4DD]"
@@ -229,8 +236,16 @@ function ClaudeConnectorSection() {
                 </div>
                 <div className="ml-8 space-y-3">
                     <p className="text-sm text-[#9B9689]">Fill in the connector form:</p>
-                    <CredentialField label="Name" value="AdsAgent" />
-                    <CredentialField label="Remote MCP Server URL" value={serverUrl} />
+                    <CredentialField
+                        label="Name"
+                        value="AdsAgent"
+                        onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'name' })}
+                    />
+                    <CredentialField
+                        label="Remote MCP Server URL"
+                        value={serverUrl}
+                        onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'server_url' })}
+                    />
 
                     <p className="text-sm text-[#9B9689]">
                         Expand <strong className="text-[#E8E4DD]">Advanced Settings</strong> and enter:
@@ -268,7 +283,12 @@ function ClaudeConnectorSection() {
                                 </li>
                             </ul>
                             <div className="ml-4">
-                                <CredentialField label="" value={credentials.client_id} mono />
+                                <CredentialField
+                                    label=""
+                                    value={credentials.client_id}
+                                    mono
+                                    onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'client_id' })}
+                                />
                             </div>
 
                             <ul className="space-y-1.5 text-sm text-[#9B9689]">
@@ -279,7 +299,12 @@ function ClaudeConnectorSection() {
                             </ul>
 
                             <div className="ml-4">
-                                <CredentialField label="" value={credentials.client_secret} mono />
+                                <CredentialField
+                                    label=""
+                                    value={credentials.client_secret}
+                                    mono
+                                    onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'client_secret' })}
+                                />
                             </div>
 
                             <button
@@ -400,11 +425,19 @@ function SetupScreenshot({ src, alt }: { src: string; alt: string }) {
         };
     }, [expanded]);
 
+    function handleExpand() {
+        setExpanded(true);
+        trackEvent('connector_screenshot_expanded', {
+            image: imageKeyFromSrc(src),
+            surface: 'in_app',
+        });
+    }
+
     return (
         <>
             <button
                 type="button"
-                onClick={() => setExpanded(true)}
+                onClick={handleExpand}
                 className="group block w-full overflow-hidden rounded-lg border border-[#3D3C36] bg-[#1A1917] transition hover:border-[#4CAF6E]/60"
                 aria-label={`Expand image: ${alt}`}
             >
@@ -464,11 +497,17 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                             <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/plugin marketplace add nowork-studio/toprank</code>
-                            <CopyButton text="/plugin marketplace add nowork-studio/toprank" />
+                            <CopyButton
+                                text="/plugin marketplace add nowork-studio/toprank"
+                                onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'marketplace_add' })}
+                            />
                         </div>
                         <div className="flex items-center gap-2">
                             <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/plugin install toprank@nowork-studio</code>
-                            <CopyButton text="/plugin install toprank@nowork-studio" />
+                            <CopyButton
+                                text="/plugin install toprank@nowork-studio"
+                                onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'plugin_install' })}
+                            />
                         </div>
                     </div>
                 </div>
@@ -484,7 +523,10 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     <p className="text-sm text-[#9B9689]">Restart Claude Code and run:</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/ads</code>
-                        <CopyButton text="/ads" />
+                        <CopyButton
+                            text="/ads"
+                            onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'ads_command' })}
+                        />
                     </div>
                 </div>
             </div>
@@ -501,7 +543,10 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                     </p>
                     <div className="flex items-center gap-2">
                         <code className="min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">{token}</code>
-                        <CopyButton text={token} />
+                        <CopyButton
+                            text={token}
+                            onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'api_key' })}
+                        />
                     </div>
                     <p className="text-xs text-[#9B9689]/60">
                         This is your personal access token. Don&apos;t share it publicly.

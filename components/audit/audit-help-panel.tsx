@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sparkles, Mail, Calendar, MessageCircle, ArrowUpRight, X } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
+
+type HelpAction = "connect_claude" | "email_expert" | "book_demo" | "chat_agent";
+
+function trackHelpAction(action: HelpAction) {
+  trackEvent("audit_help_action_clicked", { action });
+}
 
 const EMAIL = "tong.chen@adsagent.org";
 const BOOK_DEMO_URL = "https://cal.com/tong-chen-uuovdl/30min";
@@ -14,14 +21,18 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    let initialCollapsed = false;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored !== null) setCollapsed(stored === "1");
-      else setCollapsed(false);
+      if (stored !== null) initialCollapsed = stored === "1";
     } catch {
-      setCollapsed(false);
+      /* ignore */
     }
+    setCollapsed(initialCollapsed);
     setHydrated(true);
+    trackEvent("audit_help_panel_shown", {
+      initial_state: initialCollapsed ? "collapsed" : "expanded",
+    });
   }, []);
 
   function toggle(next: boolean) {
@@ -31,6 +42,8 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
     } catch {
       /* ignore */
     }
+    if (next) trackEvent("audit_help_panel_dismissed");
+    else trackEvent("audit_help_panel_expanded");
   }
 
   if (!hydrated) return null;
@@ -84,6 +97,7 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
           title="Connect to Claude"
           description="Add AdsAgent to Claude.ai and let Claude fix issues directly."
           external={false}
+          onClick={() => trackHelpAction("connect_claude")}
         />
         <HelpItem
           href={`https://mail.google.com/mail/?view=cm&fs=1&to=${EMAIL}&su=${encodeURIComponent(
@@ -95,6 +109,7 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
           title="Email our expert"
           description={EMAIL}
           external
+          onClick={() => trackHelpAction("email_expert")}
         />
         <HelpItem
           href={BOOK_DEMO_URL}
@@ -102,10 +117,14 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
           title="Book a demo"
           description="30-min call to walk through your account."
           external
+          onClick={() => trackHelpAction("book_demo")}
         />
         <button
           type="button"
-          onClick={onChatClick}
+          onClick={() => {
+            trackHelpAction("chat_agent");
+            onChatClick();
+          }}
           className="group flex w-full items-start gap-3 rounded-md border border-[#3D3C36] bg-[#1A1917] p-3 text-left transition hover:border-[#4CAF6E]/50 hover:bg-[#2E2D28]"
         >
           <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#3D3C36] bg-[#24231F] group-hover:border-[#4CAF6E]/40">
@@ -132,6 +151,7 @@ function HelpItem({
   title,
   description,
   external,
+  onClick,
 }: {
   href: string;
   icon: React.ReactNode;
@@ -139,6 +159,7 @@ function HelpItem({
   title: string;
   description: string;
   external: boolean;
+  onClick?: () => void;
 }) {
   const className =
     "group flex w-full items-start gap-3 rounded-md border border-[#3D3C36] bg-[#1A1917] p-3 text-left transition hover:border-[#4CAF6E]/50 hover:bg-[#2E2D28]";
@@ -173,6 +194,7 @@ function HelpItem({
         target={href.startsWith("mailto:") ? undefined : "_blank"}
         rel={href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
         className={className}
+        onClick={onClick}
       >
         {inner}
       </a>
@@ -180,7 +202,7 @@ function HelpItem({
   }
 
   return (
-    <Link href={href} prefetch className={className}>
+    <Link href={href} prefetch className={className} onClick={onClick}>
       {inner}
     </Link>
   );

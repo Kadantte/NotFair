@@ -8,6 +8,7 @@ import { ArrowRight, ExternalLink, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session-provider";
 import { startGoogleConnect } from "@/lib/google-oauth";
+import { trackEvent } from "@/lib/analytics";
 import { fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
@@ -374,8 +375,12 @@ function ConnectButton({
   large?: boolean;
 }) {
   const handleClick = useCallback(() => {
+    trackEvent("cta_clicked", {
+      page: "google-ads-claude-connector",
+      cta: connected ? "open_connector_setup" : "sign_in_with_google",
+    });
     startGoogleConnect("/connect/claude-connector");
-  }, []);
+  }, [connected]);
 
   const sizeClass = large ? "h-12 px-6 text-base" : "h-11 px-5 text-sm";
 
@@ -406,11 +411,18 @@ function SetupScreenshot({ src, alt }: { src: string; alt: string }) {
     };
   }, [expanded]);
 
+  function handleExpand() {
+    setExpanded(true);
+    const file = src.split("/").pop() ?? src;
+    const image = file.replace(/\.[^.]+$/, "").replace(/-/g, "_");
+    trackEvent("connector_screenshot_expanded", { image, surface: "marketing" });
+  }
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setExpanded(true)}
+        onClick={handleExpand}
         className="group block w-full overflow-hidden rounded-lg border border-[#3D3C36] bg-[#1A1917] transition hover:border-[#4CAF6E]/60"
         aria-label={`Expand image: ${alt}`}
       >
