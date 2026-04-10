@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
@@ -211,8 +212,12 @@ function ClaudeConnectorSection() {
                         >
                             claude.ai/customize/connectors
                         </a>{' '}
-                        and click the <strong className="text-[#E8E4DD]">+</strong> icon to add a custom connector.
+                        and click the <strong className="text-[#E8E4DD]">+</strong> icon, then choose <strong className="text-[#E8E4DD]">Add custom connector</strong>.
                     </p>
+                    <SetupScreenshot
+                        src="/connector-setup/01-add.png"
+                        alt="Click the plus icon in Connectors and choose Add custom connector"
+                    />
                 </div>
             </div>
 
@@ -316,6 +321,11 @@ function ClaudeConnectorSection() {
                             )}
                         </div>
                     )}
+
+                    <SetupScreenshot
+                        src="/connector-setup/02-configure.png"
+                        alt="Add custom connector dialog with Name, Remote MCP Server URL, Client ID and Client Secret filled in under Advanced settings"
+                    />
                 </div>
             </div>
 
@@ -323,15 +333,117 @@ function ClaudeConnectorSection() {
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">3</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Save and start using</p>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Add the connector</p>
                 </div>
-                <div className="ml-8">
+                <div className="ml-8 space-y-3">
                     <p className="text-sm text-[#9B9689]">
-                        Click <strong className="text-[#E8E4DD]">Save</strong>. Claude will now have access to your Google Ads tools through AdsAgent.
+                        Click <strong className="text-[#E8E4DD]">Add</strong>. The <strong className="text-[#E8E4DD]">AdsAgent</strong> connector will appear in your Connectors list with all available tools.
                     </p>
+                    <SetupScreenshot
+                        src="/connector-setup/03-saved.png"
+                        alt="AdsAgent connector saved and listed under Connectors with its tool permissions"
+                    />
+                </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">4</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Enable AdsAgent in a chat</p>
+                </div>
+                <div className="ml-8 space-y-3">
+                    <p className="text-sm text-[#9B9689]">
+                        Open a new chat on <strong className="text-[#E8E4DD]">claude.ai</strong>, click the <strong className="text-[#E8E4DD]">+</strong> button, go to <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle <strong className="text-[#E8E4DD]">AdsAgent</strong> on.
+                    </p>
+                    <SetupScreenshot
+                        src="/connector-setup/04-enable-in-chat.png"
+                        alt="In a Claude chat, open the + menu and toggle the AdsAgent connector on"
+                    />
+                </div>
+            </div>
+
+            {/* Step 5 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">5</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Ask Claude about your ads</p>
+                </div>
+                <div className="ml-8 space-y-3">
+                    <p className="text-sm text-[#9B9689]">
+                        Try a prompt like <em className="text-[#E8E4DD]">&ldquo;Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.&rdquo;</em> Claude will call AdsAgent tools to read your account and respond with insights.
+                    </p>
+                    <SetupScreenshot
+                        src="/connector-setup/05-use-in-chat.png"
+                        alt="Claude using the AdsAgent connector to audit a Google Ads account in a chat"
+                    />
                 </div>
             </div>
         </div>
+    );
+}
+
+function SetupScreenshot({ src, alt }: { src: string; alt: string }) {
+    const [expanded, setExpanded] = useState(false);
+
+    useEffect(() => {
+        if (!expanded) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setExpanded(false);
+        };
+        window.addEventListener('keydown', onKey);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [expanded]);
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setExpanded(true)}
+                className="group block w-full overflow-hidden rounded-lg border border-[#3D3C36] bg-[#1A1917] transition hover:border-[#4CAF6E]/60"
+                aria-label={`Expand image: ${alt}`}
+            >
+                <Image
+                    src={src}
+                    alt={alt}
+                    width={1200}
+                    height={750}
+                    className="h-auto w-full transition-transform duration-200 group-hover:scale-[1.01]"
+                    unoptimized
+                />
+            </button>
+            {expanded && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 sm:p-8"
+                    onClick={() => setExpanded(false)}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={alt}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setExpanded(false)}
+                        className="absolute right-4 top-4 rounded-full bg-[#24231F] px-3 py-1.5 text-sm text-[#E8E4DD] shadow-md hover:bg-[#2E2D28]"
+                    >
+                        Close
+                    </button>
+                    <Image
+                        src={src}
+                        alt={alt}
+                        width={2400}
+                        height={1500}
+                        className="max-h-[90vh] w-auto max-w-[95vw] rounded-lg object-contain shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                        unoptimized
+                    />
+                </div>
+            )}
+        </>
     );
 }
 
@@ -427,12 +539,12 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                 <Link
                     href="/connect/claude-connector"
                     prefetch
-                    className={`flex-1 rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'connector'
+                    className={`flex-1 whitespace-nowrap rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'connector'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
                             : 'text-[#9B9689] hover:text-[#E8E4DD]'
                         }`}
                 >
-                    Claude Connector
+                    Claude Connector (Web / Cowork)
                 </Link>
             </div>
 
