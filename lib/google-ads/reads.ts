@@ -567,8 +567,6 @@ export async function listAds(
       ad_group_ad.ad.final_urls,
       ad_group_ad.ad.responsive_search_ad.headlines,
       ad_group_ad.ad.responsive_search_ad.descriptions,
-      ad_group_ad.ad.smart_campaign_ad.headlines,
-      ad_group_ad.ad.smart_campaign_ad.descriptions,
       ad_group.id,
       ad_group.name,
       metrics.impressions,
@@ -590,10 +588,6 @@ export async function listAds(
     ads: (result as any[]).map((row) => {
       const ad = row.ad_group_ad?.ad ?? {};
       const rsa = ad.responsive_search_ad ?? {};
-      const smartAd = ad.smart_campaign_ad ?? {};
-      // Use RSA fields for standard campaigns, smart_campaign_ad fields for Smart campaigns
-      const headlineSource = (rsa.headlines ?? []).length > 0 ? rsa.headlines : (smartAd.headlines ?? []);
-      const descSource = (rsa.descriptions ?? []).length > 0 ? rsa.descriptions : (smartAd.descriptions ?? []);
       return {
         adId: String(ad.id ?? ""),
         adName: ad.name ?? null,
@@ -602,8 +596,8 @@ export async function listAds(
         adGroupId: String(row.ad_group?.id ?? ""),
         adGroupName: row.ad_group?.name ?? "",
         finalUrls: ad.final_urls ?? [],
-        headlines: headlineSource.map((h: any) => h.text ?? ""),
-        descriptions: descSource.map((d: any) => d.text ?? ""),
+        headlines: (rsa.headlines ?? []).map((h: any) => h.text ?? ""),
+        descriptions: (rsa.descriptions ?? []).map((d: any) => d.text ?? ""),
         impressions: row.metrics?.impressions ?? 0,
         clicks: row.metrics?.clicks ?? 0,
         cost: micros(row.metrics?.cost_micros),
@@ -611,6 +605,52 @@ export async function listAds(
       };
     }),
   };
+}
+
+/** Fetch Smart campaign ad headlines + descriptions (separate query, only for SMART campaigns). */
+export async function getSmartCampaignAds(
+  auth: AuthContext,
+  campaignId: string,
+) {
+  const customer = getCachedCustomer(auth);
+  const id = safeEntityId(campaignId);
+
+  const result = await customer.query(`
+    SELECT
+      ad_group_ad.ad.id,
+      ad_group_ad.ad.name,
+      ad_group_ad.status,
+      ad_group_ad.ad.final_urls,
+      ad_group_ad.ad.smart_campaign_ad.headlines,
+      ad_group_ad.ad.smart_campaign_ad.descriptions,
+      ad_group.id,
+      ad_group.name
+    FROM ad_group_ad
+    WHERE campaign.id = ${id}
+      AND ad_group_ad.status != 'REMOVED'
+    ORDER BY ad_group_ad.ad.id ASC
+    LIMIT 10
+  `);
+
+  return (result as any[]).map((row) => {
+    const ad = row.ad_group_ad?.ad ?? {};
+    const smartAd = ad.smart_campaign_ad ?? {};
+    return {
+      adId: String(ad.id ?? ""),
+      adName: ad.name ?? null,
+      status: row.ad_group_ad?.status ?? "UNKNOWN",
+      type: "SMART_CAMPAIGN_AD",
+      adGroupId: String(row.ad_group?.id ?? ""),
+      adGroupName: row.ad_group?.name ?? "",
+      finalUrls: ad.final_urls ?? [],
+      headlines: (smartAd.headlines ?? []).map((h: any) => h.text ?? ""),
+      descriptions: (smartAd.descriptions ?? []).map((d: any) => d.text ?? ""),
+      impressions: 0,
+      clicks: 0,
+      cost: 0,
+      conversions: 0,
+    };
+  });
 }
 
 export async function getSmartCampaignKeywordThemes(

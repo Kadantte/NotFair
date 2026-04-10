@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, micros } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, micros } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -516,6 +516,19 @@ Keep it concise and data-driven. Use specific numbers from the data.`;
 }
 
 // ─── Smart Campaign ──────────────────────────────────────────────────
+
+export async function getSmartCampaignAdsAction(campaignId: string) {
+    return requireAuth(async () => {
+        try {
+            const { refreshToken, customerId, customerIds } = await getSessionAuth();
+            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            return await getSmartCampaignAds(auth, campaignId);
+        } catch (error) {
+            console.error("Get Smart Campaign Ads Error:", error);
+            return [];
+        }
+    });
+}
 
 export async function getCampaignKeywordThemesAction(campaignId: string) {
     return requireAuth(async () => {

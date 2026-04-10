@@ -13,6 +13,7 @@ import {
     getConversionActionsAction,
     getCampaignKeywordThemesAction,
     getSmartCampaignSettingAction,
+    getSmartCampaignAdsAction,
 } from '@/app/actions';
 import {
     XAxis,
@@ -201,17 +202,20 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
             const match = campaignsData.find(c => c.id === campaignId);
 
             // Phase 2: Smart-campaign-only data, skipped for standard campaigns
-            const [keywordThemesData, smartSettingData] = match?.type === 'SMART'
+            const [keywordThemesData, smartSettingData, smartAdsData] = match?.type === 'SMART'
                 ? await Promise.all([
                     getCampaignKeywordThemesAction(campaignId),
                     getSmartCampaignSettingAction(campaignId),
+                    getSmartCampaignAdsAction(campaignId),
                 ])
-                : [[], null];
+                : [[], null, null];
 
             setHistory(historyData);
             setKeywords(keywordsData);
             setKeywordThemes(keywordThemesData ?? []);
-            setAds(adsData);
+            // For Smart campaigns, Phase 2 fetches the actual ad content (smart_campaign_ad fields
+            // can't be mixed with RSA fields in Phase 1 without breaking non-Smart accounts)
+            setAds(smartAdsData ?? adsData);
             setSmartSetting(smartSettingData ?? null);
             setConversionActions((conversionActionsData ?? []).filter((ca: ConversionAction) => ca.includeInConversions));
             if (match) setCampaignInfo(match);
