@@ -649,6 +649,43 @@ export async function updateCampaignBidding(
     };
   }
 
+  // For non-conversion strategies, auto-clear campaign-specific goals
+  // (otherwise Google silently ignores the bidding change)
+  const isNonConversionStrategy =
+    params.biddingStrategy === "MAXIMIZE_CLICKS" ||
+    params.biddingStrategy === "MANUAL_CPC";
+
+  let goalConfigCleared = false;
+  if (isNonConversionStrategy) {
+    try {
+      const goalResult = await customer.query(`
+        SELECT conversion_goal_campaign_config.goal_config_level
+        FROM conversion_goal_campaign_config
+        WHERE campaign.id = ${cid}
+        LIMIT 1
+      `);
+      const goalRow = (goalResult as any[])[0];
+      const currentGoalLevel = goalRow?.conversion_goal_campaign_config?.goal_config_level;
+      // 3 = CAMPAIGN (campaign-specific goals set)
+      // Handle both numeric (3) and string ("CAMPAIGN") enum representations
+      if (currentGoalLevel === 3 || currentGoalLevel === "CAMPAIGN") {
+        await customer.mutateResources([
+          {
+            entity: "conversion_goal_campaign_config" as any,
+            operation: "update",
+            resource: {
+              resource_name: `customers/${customerId}/conversionGoalCampaignConfigs/${cid}`,
+              goal_config_level: 2, // CUSTOMER — revert to account-level goals
+            },
+          },
+        ]);
+        goalConfigCleared = true;
+      }
+    } catch {
+      // Goal config query/mutation failed — proceed with bidding change anyway
+    }
+  }
+
   // Build the campaign resource with the new bidding strategy
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const resource: Record<string, any> = {
@@ -684,6 +721,7 @@ export async function updateCampaignBidding(
     strategy: params.biddingStrategy,
     targetCpaMicros: params.targetCpaMicros ?? null,
     targetRoas: params.targetRoas ?? null,
+    ...(goalConfigCleared && { goalConfigCleared: true }),
   });
 
   try {
@@ -694,6 +732,40 @@ export async function updateCampaignBidding(
         resource,
       },
     ]);
+
+    // Post-mutation verification: ensure the change actually stuck
+    const verifyResult = await customer.query(`
+      SELECT campaign.bidding_strategy_type
+      FROM campaign
+      WHERE campaign.id = ${cid}
+      LIMIT 1
+    `);
+    const verifyRow = (verifyResult as any[])[0];
+    const actualStrategy = verifyRow?.campaign?.bidding_strategy_type;
+
+    // Map strategy names to expected enum values (numeric) and internal names (string)
+    // The google-ads-api library returns numeric enums, but we handle strings defensively
+    const expectedStrategyMap: Record<string, { num: number; str: string }> = {
+      TARGET_CPA: { num: 6, str: "TARGET_CPA" },
+      MAXIMIZE_CONVERSIONS: { num: 10, str: "MAXIMIZE_CONVERSIONS" },
+      MAXIMIZE_CONVERSION_VALUE: { num: 11, str: "MAXIMIZE_CONVERSION_VALUE" },
+      TARGET_ROAS: { num: 8, str: "TARGET_ROAS" },       // 7 is deprecated TARGET_OUTRANK_SHARE
+      MAXIMIZE_CLICKS: { num: 9, str: "TARGET_SPEND" },  // API internal name
+      MANUAL_CPC: { num: 3, str: "MANUAL_CPC" },
+    };
+    const expected = expectedStrategyMap[params.biddingStrategy];
+
+    if (expected != null && actualStrategy != null &&
+        actualStrategy !== expected.num && actualStrategy !== expected.str) {
+      return {
+        success: false,
+        action: "update_bidding",
+        entityId: campaignId,
+        beforeValue,
+        afterValue,
+        error: `Bidding change was accepted by the API but did not take effect (strategy is still ${actualStrategy}). This may be caused by campaign-level constraints (e.g. campaign-specific conversion goals or marketing objective). Try changing the campaign's conversion goal settings first.`,
+      };
+    }
 
     return {
       success: true,
@@ -709,6 +781,93 @@ export async function updateCampaignBidding(
       entityId: campaignId,
       beforeValue,
       afterValue,
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
+// ─── Campaign Goal Config ─────────────────────────────────────────
+
+/** GoalConfigLevel enum: CUSTOMER = 2, CAMPAIGN = 3 */
+const GOAL_CONFIG_LEVEL = { CUSTOMER: 2, CAMPAIGN: 3 } as const;
+const GOAL_CONFIG_LABEL: Record<number, string> = { 2: "CUSTOMER", 3: "CAMPAIGN" };
+
+export type GoalConfigLevel = "CUSTOMER" | "CAMPAIGN";
+
+/**
+ * Update a campaign's conversion goal config level.
+ * CUSTOMER = use account-level conversion goals.
+ * CAMPAIGN = use campaign-specific conversion goals.
+ */
+export async function updateCampaignGoalConfig(
+  auth: AuthContext,
+  campaignId: string,
+  level: GoalConfigLevel,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = safeEntityId(campaignId);
+  const customerId = normalizeCustomerId(auth.customerId);
+
+  // Query current goal config level
+  let currentLevel = "UNKNOWN";
+  try {
+    const result = await customer.query(`
+      SELECT conversion_goal_campaign_config.goal_config_level
+      FROM conversion_goal_campaign_config
+      WHERE campaign.id = ${cid}
+      LIMIT 1
+    `);
+    const row = (result as any[])[0];
+    if (row) {
+      const rawLevel = row.conversion_goal_campaign_config?.goal_config_level;
+      currentLevel = GOAL_CONFIG_LABEL[rawLevel] ?? String(rawLevel);
+    } else {
+      // No config row = campaign uses account-level goals (CUSTOMER)
+      currentLevel = "CUSTOMER";
+    }
+  } catch {
+    // If query fails, proceed anyway — the mutation will surface any real error
+  }
+
+  // Skip if already at the desired level
+  if (currentLevel === level) {
+    return {
+      success: true,
+      action: "update_goal_config",
+      entityId: campaignId,
+      beforeValue: currentLevel,
+      afterValue: level,
+    };
+  }
+
+  const resourceName = `customers/${customerId}/conversionGoalCampaignConfigs/${cid}`;
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "conversion_goal_campaign_config" as any,
+        operation: "update",
+        resource: {
+          resource_name: resourceName,
+          goal_config_level: GOAL_CONFIG_LEVEL[level],
+        },
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "update_goal_config",
+      entityId: campaignId,
+      beforeValue: currentLevel,
+      afterValue: level,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "update_goal_config",
+      entityId: campaignId,
+      beforeValue: currentLevel,
+      afterValue: level,
       error: extractErrorMessage(error),
     };
   }

@@ -33,13 +33,14 @@ import {
   renameAdGroup,
   updateCampaignSettings,
   updateCampaignBidding,
+  updateCampaignGoalConfig,
   createConversionAction,
   updateConversionAction,
   uploadClickConversions,
   pausePmaxAssetGroup,
   enablePmaxAssetGroup,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
 import { enforceRateLimit } from "@/lib/mcp/rate-limit";
@@ -676,6 +677,25 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     return jsonResult(logged);
   });
+
+  // ─── Campaign Goal Config ───────────────────────────────────────
+
+  server.registerTool("updateCampaignGoals", {
+    description: "Switch a campaign between campaign-specific and account-level conversion goals. Set to CUSTOMER to use account-level goals (required before switching to non-conversion bidding strategies like MAXIMIZE_CLICKS or MANUAL_CPC). Set to CAMPAIGN for campaign-specific goals. Note: updateCampaignBidding auto-handles this when switching to MAXIMIZE_CLICKS or MANUAL_CPC, so this tool is only needed for manual goal config changes.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      goalConfigLevel: z.enum(["CUSTOMER", "CAMPAIGN"])
+        .describe("CUSTOMER = use account-level conversion goals. CAMPAIGN = use campaign-specific conversion goals."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, goalConfigLevel }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () =>
+      updateCampaignGoalConfig(targetAuth, campaignId, goalConfigLevel as GoalConfigLevel),
+    );
+    return jsonResult(result);
+  }));
 
   // ─── Campaign Settings ──────────────────────────────────────────
 

@@ -77,6 +77,13 @@ export async function saveDraftAction(
     .where(eq(schema.contacts.id, contactId));
 }
 
+export async function scheduleContactAction(contactId: number, scheduledAt: Date) {
+  await db()
+    .update(schema.contacts)
+    .set({ status: "scheduled", scheduledAt })
+    .where(eq(schema.contacts.id, contactId));
+}
+
 export async function sendOutreachAction(contactId: number) {
   const [contact] = await db()
     .select()

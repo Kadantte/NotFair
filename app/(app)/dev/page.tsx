@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
     importContactsAction,
     deleteContactAction,
     sendOutreachAction,
+    scheduleContactAction,
 } from '../outreach/actions';
 import { deriveMetrics, STATUS_CONFIG, BOUNCE_RATE_WARN } from '@/lib/outreach-metrics';
 
@@ -112,6 +113,7 @@ export default function DevPage() {
     const [deletingContactId, setDeletingContactId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [sendingId, setSendingId] = useState<number | null>(null);
+    const [schedulingId, setSchedulingId] = useState<number | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
     const [impersonatingAccountId, setImpersonatingAccountId] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -235,6 +237,36 @@ export default function DevPage() {
             setSendError(err instanceof Error ? err.message : 'Send failed');
         } finally {
             setSendingId(null);
+        }
+    }
+
+    async function handleSchedule(id: number) {
+        setSchedulingId(id);
+        setSendError(null);
+        try {
+            // Match schedule-sends.ts logic: Mon=12pm PT, Tue-Fri=9am PT (UTC-7 PDT)
+            const ptOffsetMs = 7 * 60 * 60 * 1000;
+            const nowPT = new Date(Date.now() - ptOffsetMs);
+            const next = new Date(nowPT);
+            // Mon (1) starts at 12pm; all other weekdays at 9am
+            const startHour = next.getDay() === 1 ? 12 : 9;
+            next.setHours(startHour, 0, 0, 0);
+            // If already past the window today, advance to next day
+            if (next <= nowPT) {
+                next.setDate(next.getDate() + 1);
+                next.setHours(next.getDay() === 1 ? 12 : 9, 0, 0, 0);
+            }
+            // Skip weekends
+            while (next.getDay() === 0 || next.getDay() === 6) {
+                next.setDate(next.getDate() + 1);
+                next.setHours(next.getDay() === 1 ? 12 : 9, 0, 0, 0);
+            }
+            await scheduleContactAction(id, new Date(next.getTime() + ptOffsetMs));
+            await fetchContacts(true);
+        } catch (err) {
+            setSendError(err instanceof Error ? err.message : 'Schedule failed');
+        } finally {
+            setSchedulingId(null);
         }
     }
 
@@ -672,14 +704,36 @@ export default function DevPage() {
                                                 </div>
                                                 <div className="flex items-center gap-1 shrink-0">
                                                     {hasDraft && c.status === 'drafted' && (
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                disabled={schedulingId === c.id || sendingId === c.id}
+                                                                onClick={(e) => { e.stopPropagation(); handleSchedule(c.id); }}
+                                                                className="gap-1.5 bg-[#C084FC]/20 text-[#C084FC] hover:bg-[#C084FC]/30 border border-[#C084FC]/40 h-7 text-[12px] px-2.5"
+                                                            >
+                                                                {schedulingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Clock className="h-3 w-3" />}
+                                                                Schedule
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                disabled={sendingId === c.id || schedulingId === c.id}
+                                                                onClick={(e) => { e.stopPropagation(); handleSend(c.id); }}
+                                                                className="gap-1.5 bg-[#4CAF6E] text-[#E8E4DD] hover:bg-[#3D9A5C] h-7 text-[12px] px-2.5"
+                                                            >
+                                                                {sendingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                                                                Send
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                    {hasDraft && c.status === 'scheduled' && (
                                                         <Button
                                                             size="sm"
                                                             disabled={sendingId === c.id}
                                                             onClick={(e) => { e.stopPropagation(); handleSend(c.id); }}
-                                                            className="gap-1.5 bg-[#4CAF6E] text-[#E8E4DD] hover:bg-[#3D9A5C] h-7 text-[12px] px-2.5"
+                                                            className="gap-1.5 bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD] border border-[#3D3C36] h-7 text-[12px] px-2.5"
                                                         >
                                                             {sendingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                                                            Send
+                                                            Send now
                                                         </Button>
                                                     )}
                                                     <Button

@@ -35,6 +35,8 @@ export const TOOL_CODE = {
   remove_campaign_location: 38,
   rename_campaign: 39,
   rename_ad_group: 40,
+  update_bidding: 41,
+  update_goal_config: 42,
   // Reads (20+)
   get_account_info: 20,
   list_campaigns: 21,
@@ -78,7 +80,7 @@ export function toolNameToCode(name: string): ToolCode | undefined {
 
 function getEntityCode(action: string): number {
   if (action.includes("keyword") || action.includes("bid")) return ENTITY_CODE.keyword;
-  if (action.includes("campaign") || action.includes("budget")) return ENTITY_CODE.campaign;
+  if (action.includes("campaign") || action.includes("budget") || action.includes("goal_config")) return ENTITY_CODE.campaign;
   return ENTITY_CODE.unknown;
 }
 
