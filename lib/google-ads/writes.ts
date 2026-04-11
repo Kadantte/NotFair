@@ -697,20 +697,21 @@ export async function updateCampaignBidding(
       resource.target_cpa = { target_cpa_micros: params.targetCpaMicros };
       break;
     case "MAXIMIZE_CONVERSIONS":
-      resource.maximize_conversions = params.targetCpaMicros
-        ? { target_cpa_micros: params.targetCpaMicros }
-        : {};
+      // target_cpa_micros: 0 = no CPA cap. Must set a field explicitly so the
+      // library includes it in the update mask (empty {} gets no mask paths).
+      resource.maximize_conversions = { target_cpa_micros: params.targetCpaMicros ?? 0 };
       break;
     case "MAXIMIZE_CONVERSION_VALUE":
-      resource.maximize_conversion_value = params.targetRoas
-        ? { target_roas: params.targetRoas }
-        : {};
+      // target_roas: 0 = no ROAS target. Same update-mask issue as above.
+      resource.maximize_conversion_value = { target_roas: params.targetRoas ?? 0 };
       break;
     case "TARGET_ROAS":
       resource.target_roas = { target_roas: params.targetRoas };
       break;
     case "MAXIMIZE_CLICKS":
-      resource.target_spend = {};
+      // cpc_bid_ceiling_micros: 0 = no max CPC cap (default Maximize Clicks behavior).
+      // An empty {} may be skipped by the update mask computation, so we set a field explicitly.
+      resource.target_spend = { cpc_bid_ceiling_micros: 0 };
       break;
     case "MANUAL_CPC":
       resource.manual_cpc = { enhanced_cpc_enabled: false };
