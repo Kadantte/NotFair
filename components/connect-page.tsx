@@ -276,36 +276,25 @@ function ClaudeConnectorSection() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <ul className="space-y-1.5 text-sm text-[#C4C0B6]">
-                                <li className="flex gap-2">
-                                    <span className="shrink-0 text-[#C4C0B6]/60">&#8226;</span>
-                                    <span><strong className="text-[#E8E4DD]">Client ID:</strong></span>
-                                </li>
-                            </ul>
-                            <div className="ml-4">
-                                <CredentialField
-                                    label=""
-                                    value={credentials.client_id}
-                                    mono
-                                    onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'client_id' })}
-                                />
-                            </div>
+                            <p className="text-sm text-[#C4C0B6]">
+                                <strong className="text-[#E8E4DD]">Client ID:</strong>
+                            </p>
+                            <CredentialField
+                                label=""
+                                value={credentials.client_id}
+                                mono
+                                onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'client_id' })}
+                            />
 
-                            <ul className="space-y-1.5 text-sm text-[#C4C0B6]">
-                                <li className="flex gap-2">
-                                    <span className="shrink-0 text-[#C4C0B6]/60">&#8226;</span>
-                                    <span><strong className="text-[#E8E4DD]">Client Secret:</strong></span>
-                                </li>
-                            </ul>
-
-                            <div className="ml-4">
-                                <CredentialField
-                                    label=""
-                                    value={credentials.client_secret}
-                                    mono
-                                    onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'client_secret' })}
-                                />
-                            </div>
+                            <p className="text-sm text-[#C4C0B6]">
+                                <strong className="text-[#E8E4DD]">Client Secret:</strong>
+                            </p>
+                            <CredentialField
+                                label=""
+                                value={credentials.client_secret}
+                                mono
+                                onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'client_secret' })}
+                            />
 
                             <button
                                 onClick={() => setShowRegenConfirm(true)}
