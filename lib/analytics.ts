@@ -18,6 +18,7 @@ export function initPostHog(bootstrapUser?: BootstrapUser) {
     person_profiles: "always",
     capture_pageview: false, // we handle this manually for SPA routes
     capture_pageleave: true,
+    capture_exceptions: true,
     disable_session_recording: false,
     session_recording: {
       maskAllInputs: false,
