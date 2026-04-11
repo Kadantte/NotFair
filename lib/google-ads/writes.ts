@@ -709,9 +709,10 @@ export async function updateCampaignBidding(
       resource.target_roas = { target_roas: params.targetRoas };
       break;
     case "MAXIMIZE_CLICKS":
-      // cpc_bid_ceiling_micros: 0 = no max CPC cap (default Maximize Clicks behavior).
-      // An empty {} may be skipped by the update mask computation, so we set a field explicitly.
-      resource.target_spend = { cpc_bid_ceiling_micros: 0 };
+      // An empty {} is skipped by the library's update mask computation (no field mask paths
+      // generated for empty objects), so we must set an explicit field value.
+      // 10_000_000_000 micros = $10,000 ceiling — effectively uncapped.
+      resource.target_spend = { cpc_bid_ceiling_micros: 10_000_000_000 };
       break;
     case "MANUAL_CPC":
       resource.manual_cpc = { enhanced_cpc_enabled: false };
