@@ -19,7 +19,7 @@ export async function GET() {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Get unique customers from mcp_sessions, with last active from operations (more accurate than session creation)
+  // Get unique customers from mcp_sessions
   const customers = await db()
     .select({
       userId: schema.mcpSessions.userId,
@@ -27,12 +27,12 @@ export async function GET() {
       customerId: sql<string>`max(${schema.mcpSessions.customerId})`.as("customer_id"),
       customerIds: sql<string>`max(${schema.mcpSessions.customerIds})`.as("customer_ids"),
       sessions: sql<number>`count(*)`.as("sessions"),
-      lastActive: sql<string>`greatest(max(${schema.mcpSessions.createdAt}), (select max(${schema.operations.createdAt}) from ${schema.operations} where ${schema.operations.userId} = ${schema.mcpSessions.userId}))`.as("last_active"),
+      lastSessionAt: sql<string>`max(${schema.mcpSessions.createdAt})`.as("last_session_at"),
       firstSeen: sql<string>`min(${schema.mcpSessions.createdAt})`.as("first_seen"),
     })
     .from(schema.mcpSessions)
     .groupBy(schema.mcpSessions.userId)
-    .orderBy(desc(sql`greatest(max(${schema.mcpSessions.createdAt}), (select max(${schema.operations.createdAt}) from ${schema.operations} where ${schema.operations.userId} = ${schema.mcpSessions.userId}))`));
+    .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`));
 
   // Collect all unique account IDs across all customers
   const allAccountIds = new Set<string>();
@@ -65,19 +65,20 @@ export async function GET() {
     })(),
     // Operations counts per account
     (async () => {
-      const map = new Map<string, { reads: number; writes: number }>();
+      const map = new Map<string, { reads: number; writes: number; lastOp: string | null }>();
       if (allAccountIds.size > 0) {
         const rows = await db()
           .select({
             accountId: schema.operations.accountId,
             reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
             writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
+            lastOp: sql<string | null>`max(${schema.operations.createdAt})`.as("last_op"),
           })
           .from(schema.operations)
           .where(inArray(schema.operations.accountId, [...allAccountIds]))
           .groupBy(schema.operations.accountId);
-        for (const { accountId, reads, writes } of rows) {
-          map.set(accountId, { reads: Number(reads), writes: Number(writes) });
+        for (const { accountId, reads, writes, lastOp } of rows) {
+          map.set(accountId, { reads: Number(reads), writes: Number(writes), lastOp });
         }
       }
       return map;
@@ -88,17 +89,22 @@ export async function GET() {
     // Aggregate operations across all accounts for this customer
     let totalReads = 0;
     let totalWrites = 0;
+    let lastOp: string | null = null;
     const accounts = c.accounts.map((a) => {
       const ops = opsCounts.get(a.id);
       if (ops) {
         totalReads += ops.reads;
         totalWrites += ops.writes;
+        if (ops.lastOp && (!lastOp || ops.lastOp > lastOp)) lastOp = ops.lastOp;
       }
       return {
         ...a,
         ...(snapshots.get(a.id) ?? {}),
       };
     });
+
+    // lastActive = most recent of session creation or any operation on their accounts
+    const lastActive = lastOp && lastOp > c.lastSessionAt ? lastOp : c.lastSessionAt;
 
     return {
       userId: c.userId,
@@ -107,13 +113,16 @@ export async function GET() {
       accounts,
       accountCount: c.accounts.length,
       sessions: Number(c.sessions),
-      lastActive: c.lastActive,
+      lastActive,
       firstSeen: c.firstSeen,
       reads: totalReads,
       writes: totalWrites,
       totalOps: totalReads + totalWrites,
     };
   });
+
+  // Re-sort by lastActive (SQL only sorted by session time, JS computed the true lastActive)
+  result.sort((a, b) => (b.lastActive ?? "").localeCompare(a.lastActive ?? ""));
 
   return Response.json({ customers: result });
 }
