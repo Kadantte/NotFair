@@ -23,6 +23,7 @@ import {
   createAd,
   pauseAd,
   enableAd,
+  removeAd,
   updateAdFinalUrl,
   updateAdAssets,
   bulkUpdateBids,
@@ -400,6 +401,21 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enableAd(targetAuth, adGroupId, adId));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("removeAd", {
+    description: "Permanently remove an ad from an ad group. This cannot be undone. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging)"),
+      adGroupId: z.string(),
+      adId: z.string(),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => removeAd(targetAuth, adGroupId, adId));
     return jsonResult(result);
   }));
 
@@ -1104,6 +1120,8 @@ export async function executeUndoForChange(
       return enableAd(auth, beforeValue, entityId);
     case "enable_ad":
       return pauseAd(auth, beforeValue, entityId);
+    case "remove_ad":
+      return { success: false, action: "remove_ad", entityId, beforeValue, afterValue: beforeValue, error: "Ad removal is permanent in Google Ads and cannot be undone." };
     case "update_ad_final_url": {
       const [adGroupIdPart, adIdPart] = entityId.split("~");
       if (!adGroupIdPart || !adIdPart) {

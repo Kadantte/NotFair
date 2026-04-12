@@ -600,6 +600,44 @@ export async function enableAd(auth: AuthContext, adGroupId: string, adId: strin
   return setAdStatus(auth, adGroupId, adId, false);
 }
 
+export async function removeAd(
+  auth: AuthContext,
+  adGroupId: string,
+  adId: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const normalizedAdGroupId = safeEntityId(adGroupId);
+  const normalizedAdId = safeEntityId(adId);
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "ad_group_ad" as any,
+        operation: "remove",
+        resource: `customers/${cid}/adGroupAds/${normalizedAdGroupId}~${normalizedAdId}` as any,
+      },
+    ]);
+
+    return {
+      success: true,
+      action: "remove_ad",
+      entityId: adId,
+      beforeValue: adGroupId,
+      afterValue: "REMOVED",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "remove_ad",
+      entityId: adId,
+      beforeValue: adGroupId,
+      afterValue: "PAUSED",
+      error: extractErrorMessage(error),
+    };
+  }
+}
+
 // ─── Conversion Action Management ──────────────────────────────────
 
 // Shared enum maps — values from google-ads-api protobuf (enums.js).

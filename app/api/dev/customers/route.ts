@@ -77,7 +77,7 @@ export async function GET() {
           .where(inArray(schema.operations.accountId, [...allAccountIds]))
           .groupBy(schema.operations.accountId);
         for (const { accountId, reads, writes } of rows) {
-          map.set(accountId, { reads, writes });
+          map.set(accountId, { reads: Number(reads), writes: Number(writes) });
         }
       }
       return map;
@@ -106,7 +106,7 @@ export async function GET() {
       primaryAccountId: c.customerId,
       accounts,
       accountCount: c.accounts.length,
-      sessions: c.sessions,
+      sessions: Number(c.sessions),
       lastActive: c.lastActive,
       firstSeen: c.firstSeen,
       reads: totalReads,
