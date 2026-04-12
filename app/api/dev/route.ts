@@ -25,21 +25,45 @@ export async function GET(request: Request) {
     return Response.json({ error: "Invalid timezone" }, { status: 400 });
   }
 
+  const source = url.searchParams.get("source"); // optional: "claude-code", "claude-desktop", "chat"
+
   // tz is already sanitized above via regex — safe to use sql.raw
   const tzLiteral = sql.raw(`'${tz}'`);
   const localDate = sql`date((${schema.operations.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral})`;
 
-  const dailyUsage = await db()
-    .select({
-      date: sql<string>`${localDate}`.as("date"),
-      reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
-      writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
-      total: sql<number>`count(*)`.as("total"),
-    })
-    .from(schema.operations)
-    .where(sql`${schema.operations.createdAt} >= now() - interval '30 days'`)
-    .groupBy(localDate)
-    .orderBy(desc(localDate));
+  const timeFilter = sql`${schema.operations.createdAt} >= now() - interval '30 days'`;
+  const sourceFilter = source === "chat"
+    ? sql`${schema.operations.clientSource} is null`
+    : source
+      ? sql`${schema.operations.clientSource} = ${source}`
+      : undefined;
+  const whereClause = sourceFilter
+    ? sql`${timeFilter} and ${sourceFilter}`
+    : timeFilter;
 
-  return Response.json({ dailyUsage });
+  const [dailyUsage, sources] = await Promise.all([
+    db()
+      .select({
+        date: sql<string>`${localDate}`.as("date"),
+        reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
+        writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
+        total: sql<number>`count(*)`.as("total"),
+      })
+      .from(schema.operations)
+      .where(whereClause)
+      .groupBy(localDate)
+      .orderBy(desc(localDate)),
+    // Distinct sources with counts (cheap — no JOIN needed)
+    db()
+      .select({
+        source: sql<string>`coalesce(${schema.operations.clientSource}, 'chat')`.as("source"),
+        ops: sql<number>`count(*)`.as("ops"),
+      })
+      .from(schema.operations)
+      .where(timeFilter)
+      .groupBy(sql`coalesce(${schema.operations.clientSource}, 'chat')`)
+      .orderBy(desc(sql`count(*)`)),
+  ]);
+
+  return Response.json({ dailyUsage, sources });
 }

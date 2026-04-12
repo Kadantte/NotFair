@@ -13,14 +13,11 @@ import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 
 export type AuditChatContext = {
   accountName: string;
-  overallScore: number | null;
-  category: string | null;
-  dimensions: Array<{
-    label: string;
-    score: number;
-    status: string;
-    finding: string;
-  }>;
+  pulseMetrics: {
+    wasteRate: number;
+    demandCaptured: number | null;
+    cpa: number | null;
+  } | null;
 };
 
 // ── Drawer Component ────────────────────────────────────────────────
@@ -66,15 +63,12 @@ export function AuditChatDrawer({
     if (!context) return "";
     const lines = [
       `I'm looking at the audit report for "${context.accountName}".`,
-      context.overallScore !== null
-        ? `Overall score: ${context.overallScore}/100 (${context.category}).`
-        : "",
-      "Dimension scores:",
-      ...context.dimensions.map(
-        (d) => `- ${d.label}: ${d.score}/5 (${d.status}) — ${d.finding}`,
-      ),
-      "",
     ];
+    if (context.pulseMetrics) {
+      const pm = context.pulseMetrics;
+      lines.push(`Pulse metrics: Waste Rate ${pm.wasteRate.toFixed(0)}%, Demand Captured ${pm.demandCaptured !== null ? `${pm.demandCaptured.toFixed(0)}%` : "N/A"}, CPA ${pm.cpa !== null ? `$${pm.cpa.toFixed(2)}` : "N/A"}.`);
+    }
+    lines.push("");
     return lines.filter(Boolean).join("\n");
   }, [context]);
 

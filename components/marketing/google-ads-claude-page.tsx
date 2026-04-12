@@ -147,7 +147,7 @@ const RELATED_LINKS = [
     href: "/google-ads-audit",
     title: "Free Google Ads Audit",
     description:
-      "Get a free AI audit of your Google Ads account — scores 7 dimensions and pinpoints wasted spend.",
+      "Get a free AI audit of your Google Ads account — finds wasted spend and gives you a prioritized fix list.",
   },
   {
     href: "/google-ads-mcp-server",
@@ -473,8 +473,8 @@ export function GoogleAdsClaudePage() {
               </h2>
               <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
                 Connect your Google Ads account and Claude immediately runs a
-                free audit — scoring your account across 7 dimensions and
-                surfacing exactly where you&apos;re losing money.
+                free audit — surfacing wasted spend, missed opportunities, and
+                structural issues with a prioritized fix list.
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">

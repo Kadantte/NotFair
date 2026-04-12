@@ -85,7 +85,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         href: "/google-ads-audit",
         title: "Free Google Ads Audit",
-        description: "Score your account across 7 dimensions and find wasted spend in 5 minutes.",
+        description: "Find wasted spend and get a prioritized fix list in 5 minutes.",
       },
       {
         href: "/google-ads-mcp",

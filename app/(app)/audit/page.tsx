@@ -117,15 +117,7 @@ export default function AuditPage() {
     overview
       ? {
           accountName: overview.accountName,
-          overallScore: details?.auditResult?.overallScore ?? null,
-          category: details?.auditResult?.category ?? null,
-          dimensions:
-            details?.auditResult?.dimensions.map((d) => ({
-              label: d.label,
-              score: d.score,
-              status: d.finding,
-              finding: d.finding,
-            })) ?? [],
+          pulseMetrics: details?.auditResult?.pulseMetrics ?? null,
         }
       : null;
 

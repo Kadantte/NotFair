@@ -1,7 +1,9 @@
 /**
  * Google Ads Account Audit — Scoring Engine
  *
- * 7 dimensions scored 0-5, weighted to a 0-100 overall score.
+ * Scoring engine with 3 pulse metrics (waste rate, demand captured, CPA)
+ * and 3-pass action classification (Stop Wasting, Capture More, Fix Fundamentals).
+ * Internal dimension scoring (0-5) is retained for pass classification logic.
  * Pure functions, no API calls — fully testable in isolation.
  *
  * Reuses heuristic rules from lib/intelligence/heuristics.ts
@@ -183,6 +185,29 @@ export type TopAction = {
   adGroupId?: string;
 };
 
+// ─── Pulse Metrics & 3-Pass Types (matches /ads-audit skill) ────────
+
+export type PulseMetrics = {
+  wasteRate: number;           // percentage (0-100)
+  demandCaptured: number | null; // percentage (0-100), null if no IS data
+  cpa: number | null;          // dollars
+};
+
+export type PassItem = {
+  action: string;
+  impact: string;
+  actionType?: "pause_campaign" | "add_negative" | "pause_keyword";
+  targetId?: string;
+  campaignId?: string;
+  adGroupId?: string;
+};
+
+export type AuditPasses = {
+  stopWasting: PassItem[];     // max 3
+  captureMore: PassItem[];     // max 3
+  fixFundamentals: PassItem[]; // max 3
+};
+
 export type AuditResult = {
   overallScore: number;
   category: "Critical" | "Needs Work" | "OK" | "Strong" | "Excellent";
@@ -204,6 +229,10 @@ export type AuditResult = {
     cost: number;
     clicks: number;
   }>;
+  // New: 3-pass structure matching /ads-audit skill
+  pulseMetrics: PulseMetrics;
+  passes: AuditPasses;
+  verdict: string;
 };
 
 // ─── Status helpers ──────────────────────────────────────────────────
@@ -1177,6 +1206,202 @@ function computeTopActions(input: AuditInput): TopAction[] {
   });
 }
 
+// ─── Pulse Metrics ──────────────────────────────────────────────────
+
+function computePulseMetrics(
+  input: AuditInput,
+  wastedSpend: WastedSpendBreakdown,
+  totalSpend: number,
+  totalConversions: number,
+): PulseMetrics {
+  const wasteRate = wastedSpend.pct * 100;
+
+  const campaignsByName = new Map(input.campaigns.map((c) => [c.name, c]));
+  const profitableIS = input.impressionShare.filter((is) => {
+    const camp = campaignsByName.get(is.campaignName);
+    return camp && camp.conversions > 0 && is.impressionShare !== null;
+  });
+
+  let demandCaptured: number | null = null;
+  if (profitableIS.length > 0) {
+    const totalCost = profitableIS.reduce((s, is) => s + is.totalCost, 0);
+    if (totalCost > 0) {
+      demandCaptured =
+        (profitableIS.reduce((s, is) => s + (is.impressionShare ?? 0) * is.totalCost, 0) / totalCost) * 100;
+    }
+  }
+
+  const cpa = totalConversions > 0 ? totalSpend / totalConversions : null;
+
+  return { wasteRate, demandCaptured, cpa };
+}
+
+const MAX_ITEMS_PER_PASS = 3;
+
+// ─── 3-Pass Classification ─────────────────────────────────────────
+
+function computePasses(
+  input: AuditInput,
+  topActions: TopAction[],
+  isDiagnosis: ImpressionShareDiagnosis,
+  dimensions: DimensionScore[],
+): AuditPasses {
+  const stopWasting: PassItem[] = [];
+  const captureMore: PassItem[] = [];
+  const fixFundamentals: PassItem[] = [];
+  const campaignsByName = new Map(input.campaigns.map((c) => [c.name, c]));
+
+  // Pass 1: Zero-CV campaigns first (highest dollar waste, most actionable)
+  const zeroCvCampaigns = input.campaigns
+    .filter((c) => isEnabled(c.status) && c.cost > 20 && c.clicks > 20 && c.conversions === 0)
+    .sort((a, b) => b.cost - a.cost);
+
+  for (const camp of zeroCvCampaigns) {
+    if (stopWasting.length >= MAX_ITEMS_PER_PASS) break;
+    stopWasting.push({
+      action: `Pause "${camp.name}" — $${camp.cost.toFixed(2)} spent, ${camp.clicks} clicks, 0 conversions`,
+      impact: `Save ~$${camp.cost.toFixed(2)}/month`,
+      actionType: "pause_campaign",
+      targetId: camp.id,
+    });
+  }
+
+  // Pass 1: Waste-related actions from topActions (pause keywords, add negatives)
+  for (const action of topActions) {
+    if (stopWasting.length >= MAX_ITEMS_PER_PASS) break;
+    if (action.category === "pause_keyword" || action.category === "add_negative_keyword") {
+      stopWasting.push({
+        action: action.action,
+        impact: action.impact,
+        actionType: action.actionType,
+        targetId: action.targetId,
+        campaignId: action.campaignId,
+        adGroupId: action.adGroupId,
+      });
+    }
+  }
+
+  // Pass 2: Budget-constrained profitable campaigns
+  for (const camp of isDiagnosis.campaignBreakdown) {
+    if (captureMore.length >= MAX_ITEMS_PER_PASS) break;
+    if (camp.diagnosis === "budget" && (camp.budgetLostIS ?? 0) > 0.15) {
+      const campaign = campaignsByName.get(camp.campaignName);
+      if (campaign && campaign.conversions > 0) {
+        const cpa = campaign.cost / campaign.conversions;
+        const lostPct = ((camp.budgetLostIS ?? 0) * 100).toFixed(0);
+        const estExtra = Math.round(campaign.conversions * (camp.budgetLostIS ?? 0));
+        captureMore.push({
+          action: `Increase budget on "${camp.campaignName}" — ${lostPct}% budget-lost IS at $${cpa.toFixed(2)} CPA`,
+          impact: estExtra > 0 ? `Est. +${estExtra} conv/month` : "Capture more demand",
+        });
+      }
+    }
+  }
+
+  // Pass 2: Converting search terms not yet added as keywords
+  const kwTexts = new Set(input.keywords.map((k) => k.text.toLowerCase()));
+  const convertingSTs = input.searchTerms
+    .filter((t) => t.conversions >= 2 && !kwTexts.has(t.searchTerm.toLowerCase()))
+    .sort((a, b) => b.conversions - a.conversions);
+
+  for (const st of convertingSTs) {
+    if (captureMore.length >= MAX_ITEMS_PER_PASS) break;
+    const stCpa = st.conversions > 0 ? st.cost / st.conversions : 0;
+    captureMore.push({
+      action: `Add "${st.searchTerm}" as exact match keyword — ${st.conversions} conversions in 30 days`,
+      impact: `At $${stCpa.toFixed(2)} CPA`,
+    });
+  }
+
+  // Pass 3: From low-scoring dimensions (structural/foundational issues)
+  const dimActions: Array<{ action: string; impact: string; priority: number }> = [];
+
+  for (const dim of dimensions) {
+    if (dim.score > 2) continue;
+    switch (dim.key) {
+      case "conversion_tracking":
+        dimActions.push({
+          action: `Fix conversion tracking — ${dim.finding}`,
+          impact: dim.score === 0 ? "Critical — fix before spending another dollar" : "Improve data accuracy",
+          priority: dim.score === 0 ? 0 : 1,
+        });
+        break;
+      case "campaign_structure":
+        dimActions.push({ action: `Restructure campaigns — ${dim.finding}`, impact: "Better relevance and QS", priority: 2 });
+        break;
+      case "ad_copy":
+        dimActions.push({ action: `Improve ad copy — ${dim.finding}`, impact: "Higher CTR and Ad Rank", priority: 3 });
+        break;
+      case "bidding_strategy":
+        dimActions.push({ action: `Update bidding strategy — ${dim.finding}`, impact: "Better bid optimization", priority: 3 });
+        break;
+      case "landing_page_quality":
+        dimActions.push({ action: `Fix landing pages — ${dim.finding}`, impact: "Better QS and conversion rate", priority: 2 });
+        break;
+    }
+  }
+
+  // Also add QS/review actions from topActions that didn't go to Pass 1
+  for (const action of topActions) {
+    if (fixFundamentals.length >= MAX_ITEMS_PER_PASS) break;
+    if (action.category !== "pause_keyword" && action.category !== "add_negative_keyword") {
+      fixFundamentals.push({
+        action: action.action,
+        impact: action.impact,
+        actionType: action.actionType,
+        targetId: action.targetId,
+        campaignId: action.campaignId,
+        adGroupId: action.adGroupId,
+      });
+    }
+  }
+
+  // Fill remaining Pass 3 slots from dimension issues
+  dimActions.sort((a, b) => a.priority - b.priority);
+  for (const da of dimActions) {
+    if (fixFundamentals.length >= MAX_ITEMS_PER_PASS) break;
+    fixFundamentals.push({ action: da.action, impact: da.impact });
+  }
+
+  return { stopWasting, captureMore, fixFundamentals };
+}
+
+// ─── Verdict ────────────────────────────────────────────────────────
+
+function computeVerdict(pulseMetrics: PulseMetrics, passes: AuditPasses, wastedSpend: WastedSpendBreakdown): string {
+  const parts: string[] = [];
+
+  // Waste assessment
+  if (pulseMetrics.wasteRate > 20) {
+    parts.push(`${pulseMetrics.wasteRate.toFixed(0)}% of spend is going to waste — this is the top priority.`);
+  } else if (pulseMetrics.wasteRate > 10) {
+    parts.push(`${pulseMetrics.wasteRate.toFixed(0)}% waste rate — meaningful savings available by cutting non-converting keywords and search terms.`);
+  } else if (pulseMetrics.wasteRate > 5) {
+    parts.push(`Waste rate is a manageable ${pulseMetrics.wasteRate.toFixed(0)}%.`);
+  } else {
+    parts.push(`Spend is efficient with only ${pulseMetrics.wasteRate.toFixed(0)}% waste.`);
+  }
+
+  // Demand captured
+  if (pulseMetrics.demandCaptured !== null) {
+    if (pulseMetrics.demandCaptured < 40) {
+      parts.push(`Only capturing ${pulseMetrics.demandCaptured.toFixed(0)}% of available demand — significant room to scale.`);
+    } else if (pulseMetrics.demandCaptured < 60) {
+      parts.push(`Capturing ${pulseMetrics.demandCaptured.toFixed(0)}% of demand — room to grow with more budget or better Ad Rank.`);
+    } else {
+      parts.push(`Strong market coverage at ${pulseMetrics.demandCaptured.toFixed(0)}% demand captured.`);
+    }
+  }
+
+  // Biggest opportunity — pick from first non-empty pass
+  const biggestItem = passes.stopWasting[0] ?? passes.captureMore[0] ?? passes.fixFundamentals[0];
+  if (biggestItem && wastedSpend.total > 0) {
+    parts.push(`Biggest opportunity: ~$${wastedSpend.annualized.toFixed(0)}/year in recoverable spend.`);
+  }
+
+  return parts.join(" ");
+}
+
 // ─── Main Entry ─────────────────────────────────────────────────────
 
 const DIMENSIONS: Array<{ key: string; label: string; weight: number; scorer: (input: AuditInput) => Omit<DimensionScore, "key" | "label" | "weight"> }> = [
@@ -1233,13 +1458,19 @@ export function computeAuditScore(input: AuditInput): AuditResult {
     .slice(0, 5)
     .map((c) => ({ id: c.id, name: c.name, cost: c.cost, clicks: c.clicks }));
 
+  const impressionShareDiagnosis = computeISDiagnosis(input);
+  const topActions = computeTopActions(input);
+  const pulseMetrics = computePulseMetrics(input, wastedSpend, totalSpend, totalConversions);
+  const passes = computePasses(input, topActions, impressionShareDiagnosis, dimensions);
+  const verdict = computeVerdict(pulseMetrics, passes, wastedSpend);
+
   return {
     overallScore: clampedScore,
     category: overallCategory(clampedScore),
     dimensions,
     wastedSpend,
-    impressionShareDiagnosis: computeISDiagnosis(input),
-    topActions: computeTopActions(input),
+    impressionShareDiagnosis,
+    topActions,
     keyNumbers: {
       totalSpend,
       conversions: totalConversions,
@@ -1249,5 +1480,8 @@ export function computeAuditScore(input: AuditInput): AuditResult {
     },
     wastedSearchTerms,
     zeroCvCampaigns,
+    pulseMetrics,
+    passes,
+    verdict,
   };
 }

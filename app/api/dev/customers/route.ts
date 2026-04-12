@@ -19,7 +19,7 @@ export async function GET() {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Get unique customers from mcp_sessions, ordered by most recent session creation
+  // Get unique customers from mcp_sessions, with last active from operations (more accurate than session creation)
   const customers = await db()
     .select({
       userId: schema.mcpSessions.userId,
@@ -27,12 +27,12 @@ export async function GET() {
       customerId: sql<string>`max(${schema.mcpSessions.customerId})`.as("customer_id"),
       customerIds: sql<string>`max(${schema.mcpSessions.customerIds})`.as("customer_ids"),
       sessions: sql<number>`count(*)`.as("sessions"),
-      lastActive: sql<string>`max(${schema.mcpSessions.createdAt})`.as("last_active"),
+      lastActive: sql<string>`greatest(max(${schema.mcpSessions.createdAt}), (select max(${schema.operations.createdAt}) from ${schema.operations} where ${schema.operations.userId} = ${schema.mcpSessions.userId}))`.as("last_active"),
       firstSeen: sql<string>`min(${schema.mcpSessions.createdAt})`.as("first_seen"),
     })
     .from(schema.mcpSessions)
     .groupBy(schema.mcpSessions.userId)
-    .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`));
+    .orderBy(desc(sql`greatest(max(${schema.mcpSessions.createdAt}), (select max(${schema.operations.createdAt}) from ${schema.operations} where ${schema.operations.userId} = ${schema.mcpSessions.userId}))`));
 
   // Collect all unique account IDs across all customers
   const allAccountIds = new Set<string>();

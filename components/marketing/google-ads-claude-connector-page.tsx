@@ -71,7 +71,7 @@ const RELATED_LINKS = [
     href: "/google-ads-audit",
     title: "Free Google Ads Audit",
     description:
-      "Get a free AI audit of your Google Ads account — scores 7 dimensions and pinpoints wasted spend in minutes.",
+      "Get a free AI audit of your Google Ads account — finds wasted spend and gives you a prioritized fix list in minutes.",
   },
 ];
 

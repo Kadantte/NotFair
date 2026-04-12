@@ -3,9 +3,7 @@
 import { motion } from "framer-motion";
 import {
   Target,
-  Search,
   Layers,
-  FileText,
   TrendingUp,
   BarChart3,
   DollarSign,
@@ -16,55 +14,48 @@ import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
 
 /* ─────────────────────────────────────────────────────── Data ──────────── */
 
-const dimensions = [
+const auditPasses = [
   {
-    icon: Target,
-    name: "Conversion Tracking",
-    weight: "20% of score",
+    icon: AlertTriangle,
+    name: "Stop Wasting",
+    tag: "Pass 1",
     description:
-      "Verifies your conversion actions fire correctly and cover all key events — purchases, calls, form fills.",
-  },
-  {
-    icon: Search,
-    name: "Keyword Health",
-    weight: "20% of score",
-    description:
-      "Flags low Quality Scores, zero-impression keywords, and outlier CPCs draining budget with no returns.",
-  },
-  {
-    icon: Layers,
-    name: "Campaign Structure",
-    weight: "15% of score",
-    description:
-      "Reviews ad group counts, theme separation, and campaign organization for efficiency and manageability.",
-  },
-  {
-    icon: FileText,
-    name: "Search Term Quality",
-    weight: "15% of score",
-    description:
-      "Identifies irrelevant queries your ads are showing for — the single biggest source of wasted spend.",
-  },
-  {
-    icon: BarChart3,
-    name: "Ad Copy",
-    weight: "10% of score",
-    description:
-      "Evaluates RSA asset strength, headline variety, and whether you're leveraging all available ad slots.",
+      "Identifies non-converting keywords, irrelevant search terms, and structural waste — with exact dollar amounts so you know what to cut first.",
   },
   {
     icon: TrendingUp,
-    name: "Impression Share",
-    weight: "10% of score",
+    name: "Capture More",
+    tag: "Pass 2",
     description:
-      "Measures budget-lost and rank-lost impression share so you know whether you're hitting your growth ceiling.",
+      "Finds budget-constrained campaigns that are winning auctions but running out of gas, plus converting search terms you haven't added as keywords yet.",
   },
   {
-    icon: DollarSign,
-    name: "Spend Efficiency",
-    weight: "10% of score",
+    icon: Layers,
+    name: "Fix Fundamentals",
+    tag: "Pass 3",
     description:
-      "Analyzes CPA trends, cost per click outliers, and spend distribution across campaigns and keywords.",
+      "Surfaces structural issues — conversion tracking gaps, campaign organization, ad copy quality, and bidding strategy fit — that compound over time.",
+  },
+];
+
+const pulseMetrics = [
+  {
+    icon: DollarSign,
+    name: "Waste Rate",
+    description:
+      "What percentage of your spend goes to keywords and search terms with zero conversions. Lower is better.",
+  },
+  {
+    icon: BarChart3,
+    name: "Demand Captured",
+    description:
+      "How much of the available search demand you're actually showing up for on profitable campaigns. Higher is better.",
+  },
+  {
+    icon: Target,
+    name: "CPA",
+    description:
+      "Your cost per conversion. The audit tracks this over time so you can see the impact of changes.",
   },
 ];
 
@@ -104,55 +95,22 @@ const howItWorks = [
   {
     num: "2",
     title: "AI runs the analysis",
-    desc: "Our engine checks all 7 dimensions across your campaigns, keywords, search terms, and conversion setup.",
+    desc: "Our engine analyzes your campaigns, keywords, search terms, impression share, and conversion setup.",
   },
   {
     num: "3",
-    title: "Get your score + fix list",
-    desc: "You receive an overall score, a breakdown by dimension, and a prioritized list of exactly what to fix first.",
+    title: "Get your fix list",
+    desc: "You get 3 pulse metrics, a prioritized 3-pass action plan, and the exact dollar impact of each fix.",
   },
 ];
 
-const mockDimensions = [
-  { name: "Conversion Tracking", score: 2, max: 5, color: "#C45D4A" },
-  { name: "Keyword Health", score: 3, max: 5, color: "#D4882A" },
-  { name: "Search Term Quality", score: 2, max: 5, color: "#C45D4A" },
-  { name: "Ad Copy", score: 4, max: 5, color: "#4CAF6E" },
+const mockPulse = [
+  { label: "Waste Rate", value: "18%", color: "#D4882A" },
+  { label: "Demand Captured", value: "42%", color: "#D4882A" },
+  { label: "CPA", value: "$34.20", color: "#E8E4DD" },
 ];
 
 /* ─────────────────────────────────────────────── Sub-components ────────── */
-
-function ScoreBar({
-  name,
-  score,
-  max,
-  color,
-}: {
-  name: string;
-  score: number;
-  max: number;
-  color: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[#C4C0B6]">{name}</span>
-        <span
-          className="font-mono-jb text-xs font-semibold"
-          style={{ color }}
-        >
-          {score}/{max}
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-[#3D3C36]">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${(score / max) * 100}%`, backgroundColor: color }}
-        />
-      </div>
-    </div>
-  );
-}
 
 /* ─────────────────────────────────────────────────── Page ────────── */
 
@@ -182,8 +140,8 @@ export function GoogleAdsAuditPage() {
                 <span className="text-[#4CAF6E]">where money leaks.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                AI analyzes 7 dimensions of your account in 5 minutes. See your
-                score, find wasted spend, and get a prioritized fix list — free.
+                AI audits your account in 5 minutes. See your waste rate, find
+                where money leaks, and get a 3-step fix list — free.
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3">
@@ -201,30 +159,20 @@ export function GoogleAdsAuditPage() {
               transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
               className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 md:p-8"
             >
-              <div className="mb-1 flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
-                    Account Score
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="font-display text-5xl font-bold text-[#E8E4DD]">
-                      62
-                    </span>
-                    <span className="text-xl text-[#C4C0B6]">/100</span>
+              <p className="mb-5 text-xs font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
+                Pulse Metrics
+              </p>
+
+              <div className="grid grid-cols-3 gap-3">
+                {mockPulse.map((m) => (
+                  <div key={m.label} className="rounded border border-[#3D3C36] bg-[#1A1917] p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-[#C4C0B6]">{m.label}</p>
+                    <p className="mt-1 font-mono-jb text-xl font-bold" style={{ color: m.color }}>{m.value}</p>
                   </div>
-                </div>
-                <span className="rounded border border-[#D4882A]/30 bg-[#D4882A]/10 px-2.5 py-1 text-xs font-medium text-[#D4882A]">
-                  Needs Work
-                </span>
-              </div>
-
-              <p className="mb-5 text-xs text-[#C4C0B6]">Sample audit result</p>
-
-              <div className="space-y-4">
-                {mockDimensions.map((d) => (
-                  <ScoreBar key={d.name} {...d} />
                 ))}
               </div>
+
+              <p className="mt-4 text-xs text-[#C4C0B6]">Sample audit result</p>
 
               <div className="mt-6 border-t border-[#3D3C36] pt-5">
                 <div className="flex items-center gap-2">
@@ -242,7 +190,7 @@ export function GoogleAdsAuditPage() {
         </div>
       </section>
 
-      {/* ── 7 Dimensions ── */}
+      {/* ── What You Get ── */}
       <section className="border-t border-[#3D3C36] px-4 py-20">
         <div className="mx-auto max-w-6xl">
           <motion.div
@@ -253,41 +201,77 @@ export function GoogleAdsAuditPage() {
             className="mb-12"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              7 dimensions
+              3 action passes
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              A complete picture of your account&apos;s health.
+              A prioritized fix list, not just a score.
             </h2>
           </motion.div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {dimensions.map((dim, i) => {
-              const Icon = dim.icon;
+          <div className="grid gap-4 md:grid-cols-3">
+            {auditPasses.map((pass, i) => {
+              const Icon = pass.icon;
               return (
                 <motion.div
-                  key={dim.name}
+                  key={pass.name}
                   variants={fadeInUp}
                   initial="hidden"
                   whileInView="visible"
                   viewport={{ once: true, margin: "-40px" }}
                   transition={{ delay: i * 0.05 }}
-                  className="flex gap-4 rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 transition-colors hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
+                  className="flex flex-col gap-4 rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 transition-colors hover:border-[#4CAF6E]/30 hover:bg-[#2E2D28]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-[#3D3C36] bg-[#2E2D28]">
+                      <Icon className="h-4 w-4 text-[#4CAF6E]" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-[#E8E4DD]">{pass.name}</span>
+                      <span className="ml-2 rounded-full border border-[#3D3C36] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#C4C0B6]">
+                        {pass.tag}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-relaxed text-[#C4C0B6]">{pass.description}</p>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            className="mt-12"
+          >
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              3 pulse metrics
+            </p>
+            <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
+              Track progress over time.
+            </h2>
+          </motion.div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {pulseMetrics.map((pm, i) => {
+              const Icon = pm.icon;
+              return (
+                <motion.div
+                  key={pm.name}
+                  variants={fadeInUp}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex gap-4 rounded-lg border border-[#3D3C36] bg-[#24231F] p-5"
                 >
                   <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded border border-[#3D3C36] bg-[#2E2D28]">
                     <Icon className="h-4 w-4 text-[#4CAF6E]" />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-[#E8E4DD]">
-                        {dim.name}
-                      </span>
-                      <span className="rounded-full border border-[#3D3C36] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#C4C0B6]">
-                        {dim.weight}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 text-sm leading-relaxed text-[#C4C0B6]">
-                      {dim.description}
-                    </p>
+                    <span className="text-sm font-medium text-[#E8E4DD]">{pm.name}</span>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[#C4C0B6]">{pm.description}</p>
                   </div>
                 </motion.div>
               );

@@ -20,8 +20,28 @@ type DailyUsage = {
     total: number;
 };
 
+type UsageSource = {
+    source: string;
+    ops: number;
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+    'claude-code': 'Claude Code',
+    'claude-desktop': 'Claude Desktop',
+    'anthropic/toolbox': 'Toolbox',
+    'claude-ai': 'Claude.ai',
+    'mcp-remote': 'MCP Remote',
+    'adsagent-chat': 'Chat',
+    'chat': 'Chat (web)',
+};
+
+function sourceLabel(source: string): string {
+    return SOURCE_LABELS[source] ?? source;
+}
+
 type DevStats = {
     dailyUsage: DailyUsage[];
+    sources: UsageSource[];
 };
 
 function formatCurrency(amount: number, currencyCode?: string | null): string {
@@ -103,6 +123,7 @@ export default function DevPage() {
     const [sendError, setSendError] = useState<string | null>(null);
     const [impersonatingAccountId, setImpersonatingAccountId] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [usageSource, setUsageSource] = useState<string>('all');
 
     const metrics = useMemo(() => contacts.length > 0 ? deriveMetrics(contacts) : null, [contacts]);
     const filteredContacts = useMemo(() => statusFilter === 'all' ? contacts : contacts.filter((c) => c.status === statusFilter), [contacts, statusFilter]);
@@ -184,12 +205,14 @@ export default function DevPage() {
         }
     }, []);
 
-    const fetchStats = useCallback(async (background = false) => {
+    const fetchStats = useCallback(async (background = false, source = 'all') => {
         if (!background) setLoading(true);
         setError(null);
         try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const res = await fetch(`/api/dev?tz=${encodeURIComponent(tz)}`, { credentials: 'include' });
+            const params = new URLSearchParams({ tz });
+            if (source !== 'all') params.set('source', source);
+            const res = await fetch(`/api/dev?${params}`, { credentials: 'include' });
             if (res.status === 403) {
                 setError('Access denied');
                 return;
@@ -221,10 +244,10 @@ export default function DevPage() {
     }, []);
 
     useEffect(() => {
-        fetchStats(!!cachedStats);
+        fetchStats(!!cachedStats, usageSource);
         fetchContacts(!!cachedContacts);
         fetchCustomers(!!cachedCustomers);
-    }, [fetchStats, fetchContacts, fetchCustomers]);
+    }, [fetchStats, fetchContacts, fetchCustomers, usageSource]);
 
     async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -308,7 +331,7 @@ export default function DevPage() {
                         <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <Button
-                        onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false); fetchContacts(false); fetchCustomers(false); }}
+                        onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false, usageSource); fetchContacts(false); fetchCustomers(false); }}
                         disabled={loading}
                         variant="outline"
                         size="sm"
@@ -352,7 +375,29 @@ export default function DevPage() {
                     <>
                         {/* Daily API Usage */}
                         <div>
-                            <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">API Usage by Day</h2>
+                            <div className="flex items-center justify-between mb-3 sm:mb-4">
+                                <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD]">API Usage by Day</h2>
+                                {stats.sources.length > 1 && (
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="w-3.5 h-3.5 text-[#C4C0B6]" />
+                                        <select
+                                            value={usageSource}
+                                            onChange={(e) => {
+                                                setUsageSource(e.target.value);
+                                                cachedStats = null;
+                                            }}
+                                            className="text-sm bg-[#24231F] border border-[#3D3C36] rounded-lg px-3 py-1.5 text-[#E8E4DD] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]"
+                                        >
+                                            <option value="all">All sources</option>
+                                            {stats.sources.map((s) => (
+                                                <option key={s.source} value={s.source}>
+                                                    {sourceLabel(s.source)} ({s.ops.toLocaleString()})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Mobile: card layout */}
                             <div className="sm:hidden space-y-2">
