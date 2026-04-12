@@ -104,7 +104,7 @@ export async function GET() {
     });
 
     // lastActive = most recent of session creation or any operation on their accounts
-    const lastActive = lastOp && lastOp > c.lastSessionAt ? lastOp : c.lastSessionAt;
+    const lastActive = lastOp && (lastOp as string) > c.lastSessionAt ? lastOp : c.lastSessionAt;
 
     return {
       userId: c.userId,
