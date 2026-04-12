@@ -20,9 +20,12 @@ import {
   searchGeoTargets,
   getPmaxAssetGroups,
   getPmaxAssets,
+  getKeywordIdeas,
+  type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges } from "@/lib/db/tracking";
 import { execRead } from "@/lib/tools/execute";
+import { getEnv } from "@/lib/env";
 import { jsonResult, safeHandler, accountIdParam, READ_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 import { resolveToolAuth } from "./helpers";
@@ -414,6 +417,38 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, assetGroupId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_pmax_assets", () => getPmaxAssets(targetAuth, assetGroupId, limit));
+    return jsonResult(result);
+  }));
+
+  // ─── Keyword Research ───────────────────────────────────────────
+
+  server.registerTool("getKeywordIdeas", {
+    description:
+      "Get keyword ideas with real search volume, competition, and CPC data from Google Ads Keyword Planner. " +
+      "Provide seed keywords and/or a URL to discover new keyword opportunities. " +
+      "Returns avg monthly searches, competition level, average CPC, and top-of-page bid estimates. " +
+      "No Google Ads account connection required — works for all users. " +
+      "Use searchGeoTargets first to find geo target IDs for location targeting.",
+    inputSchema: {
+      keywords: z.array(z.string()).min(1).describe("Seed keywords to generate ideas from"),
+      url: z.string().optional().describe("Page URL to generate ideas from (combines with keywords if both provided)"),
+      language: z.string().optional().describe("Language constant ID (default: 1000 for English). Example: 1000=English, 1003=Spanish, 1001=French"),
+      geoTargetIds: z.array(z.string()).optional().describe("Geo target constant IDs for location targeting (e.g. ['2840'] for US). Use searchGeoTargets to find IDs."),
+      pageSize: z.number().int().min(1).max(50).default(20).describe("Number of keyword ideas to return (max 50)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ keywords, url, language, geoTargetIds, pageSize }) => {
+    const refreshToken = getEnv("KEYWORD_API_REFRESH_TOKEN");
+    const customerId = getEnv("KEYWORD_API_CUSTOMER_ID");
+    if (!refreshToken || !customerId) {
+      throw new Error("Keyword research is not configured. Platform credentials missing.");
+    }
+    const platformAuth: AuthContext = { refreshToken, customerId };
+    // Use caller's auth for rate limiting and logging, platform auth for the API call
+    const callerAuth = currentAuth();
+    const result = await execRead(callerAuth, callerAuth.customerId, "get_keyword_ideas", () =>
+      getKeywordIdeas(platformAuth, keywords, url, language, geoTargetIds, pageSize),
+    );
     return jsonResult(result);
   }));
 };

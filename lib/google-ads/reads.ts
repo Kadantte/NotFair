@@ -1196,3 +1196,80 @@ export async function searchGeoTargets(
     throw new Error(`Geo target search failed for "${query}": ${extractErrorMessage(error)}`);
   }
 }
+
+// ─── Keyword Ideas (KeywordPlanIdeaService) ───────────────────────
+
+const COMPETITION_NAMES: Record<number, string> = {
+  0: "UNSPECIFIED",
+  1: "UNKNOWN",
+  2: "LOW",
+  3: "MEDIUM",
+  4: "HIGH",
+};
+
+export async function getKeywordIdeas(
+  auth: AuthContext,
+  keywords: string[],
+  url?: string,
+  language?: string,
+  geoTargetIds?: string[],
+  pageSize?: number,
+) {
+  const customer = getCustomer(auth) as any;
+  const service = customer.keywordPlanIdeas as {
+    generateKeywordIdeas: (req: any) => Promise<any>;
+  };
+
+  // Build language resource name — accept bare ID or full resource name
+  const langResource = language
+    ? language.startsWith("languageConstants/") ? language : `languageConstants/${language}`
+    : "languageConstants/1000"; // English
+
+  // Build geo target resource names
+  const geoConstants = geoTargetIds?.map((id) =>
+    id.startsWith("geoTargetConstants/") ? id : `geoTargetConstants/${id}`,
+  );
+
+  // Build the seed — keyword_and_url_seed if both provided, else keyword_seed or url_seed
+  const seed: Record<string, any> = {};
+  if (keywords.length > 0 && url) {
+    seed.keyword_and_url_seed = { keywords, url };
+  } else if (keywords.length > 0) {
+    seed.keyword_seed = { keywords };
+  } else if (url) {
+    seed.url_seed = { url };
+  }
+
+  const effectivePageSize = Math.min(pageSize ?? 20, 50);
+
+  try {
+    const response = await service.generateKeywordIdeas({
+      customer_id: normalizeCustomerId(auth.customerId),
+      language: langResource,
+      ...(geoConstants && { geo_target_constants: geoConstants }),
+      page_size: effectivePageSize,
+      keyword_plan_network: 2, // GOOGLE_SEARCH
+      ...seed,
+    });
+
+    const results = response?.results ?? [];
+
+    return {
+      keywords: results.map((r: any) => {
+        const m = r.keyword_idea_metrics ?? r.keywordIdeaMetrics ?? {};
+        return {
+          keyword: r.text ?? null,
+          avgMonthlySearches: m.avg_monthly_searches ?? m.avgMonthlySearches ?? null,
+          competition: COMPETITION_NAMES[m.competition ?? 0] ?? "UNKNOWN",
+          competitionIndex: m.competition_index ?? m.competitionIndex ?? null,
+          averageCpc: micros(m.average_cpc_micros ?? m.averageCpcMicros),
+          lowTopOfPageBid: micros(m.low_top_of_page_bid_micros ?? m.lowTopOfPageBidMicros),
+          highTopOfPageBid: micros(m.high_top_of_page_bid_micros ?? m.highTopOfPageBidMicros),
+        };
+      }),
+      totalSize: response?.total_size ?? response?.totalSize ?? results.length,
+    };
+  } catch (error) {
+    throw new Error(`Keyword ideas failed: ${extractErrorMessage(error)}`);
+  }
+}
