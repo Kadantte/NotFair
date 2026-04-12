@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Clients Drive 84% of Operations — Chat is Mostly Read-Only Exploration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      line-height: 1.55;
+      padding: 32px 40px 64px;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      margin-bottom: 28px;
+    }
+    .header-meta {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .header-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .header-question {
+      font-size: 14px;
+      color: #475569;
+      font-style: italic;
+    }
+
+    /* ---- Verdict card ---- */
+    .verdict-card {
+      background: #2563EB;
+      color: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .verdict-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+    .verdict-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ---- KPI grid ---- */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi-tile {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.1;
+    }
+    .kpi-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .card-accent-amber {
+      border-left: 3px solid #D97706;
+    }
+    .card-accent-red {
+      border-left: 3px solid #DC2626;
+    }
+    .body-text {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    /* ---- Findings ---- */
+    .findings-list {
+      list-style: none;
+    }
+    .finding-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .finding-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .finding-item:first-child { padding-top: 0; }
+    .finding-label {
+      font-size: 14px;
+      color: #0F172A;
+      flex: 1;
+      line-height: 1.5;
+    }
+    .finding-value {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      flex: 2;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* ---- Charts ---- */
+    .chart-header {
+      margin-bottom: 16px;
+    }
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    .chart-subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 3px;
+    }
+    .chart-insight {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+      font-style: italic;
+      border-left: 2px solid #2563EB;
+      padding-left: 8px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ---- Tables ---- */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      background: #F1F5F9;
+      font-weight: 600;
+      font-size: 11px;
+      color: #475569;
+      border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable-header:hover { background: #E2E8F0; }
+    .sort-icon { opacity: 0.4; font-size: 10px; margin-left: 4px; }
+    tbody tr:hover { background: #F8FAFC; }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody td:not(:first-child) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- So what ---- */
+    .action-list {
+      list-style: none;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .action-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .action-item:first-child { padding-top: 0; }
+    .action-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background: #2563EB;
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .action-text {
+      font-size: 14px;
+      color: #0F172A;
+      line-height: 1.5;
+    }
+    .action-reason {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      margin-top: 28px;
+      font-size: 11px;
+      color: #94A3B8;
+      text-align: center;
+      line-height: 1.7;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <div class="header-meta">Analysis · 2026-04-11 23:30 PDT</div>
+      <div class="header-title">MCP Clients Drive 84% of Operations — Chat is Mostly Read-Only Exploration</div>
+      <div class="header-question">"What operations did users from Apr 10-11 perform? Broken down by channel: internal chat (adsagent-chat) vs external MCP clients (Claude Desktop/Code). Did anyone return, and what type comes back?"</div>
+    </div>
+
+    <div class="verdict-card">
+      <div class="verdict-label">Bottom line</div>
+      <div class="verdict-text">Of 556 external user operations in 48 hours, only 16% (87 ops) came from the internal chat — and chat writes were almost zero (20 writes, mostly one user enabling keywords). The real action happens through MCP clients: 84% of operations and 92% of all writes. 2 of 7 returnable users came back (29% D1), both business-domain MCP-heavy users.</div>
+    </div>
+
+    <div class="card card-accent-red">  <div class="section-label">Data quality notes</div>  <p class="body-text">Small sample (n=13 active, n=7 returnable). 'mcp-remote-fallback-test' is the generic MCP client name for Claude Desktop/Code. 'Anthropic/Toolbox' is the Toolbox web connector. 'test' appears to be a custom integration. 3 ops had null client_source.</p></div>
+
+    <div class="section-label">Key metrics</div><div class="kpi-grid"><div class="kpi-tile">  <div class="kpi-label">Total operations</div>  <div class="kpi-value">556</div>  <div class="kpi-change" style="color:#059669">↑ Apr 10-11 (external)</div></div><div class="kpi-tile">  <div class="kpi-label">MCP operations</div>  <div class="kpi-value">469 (84%)</div>  <div class="kpi-change" style="color:#059669">↑ 237 writes, 232 reads</div></div><div class="kpi-tile">  <div class="kpi-label">Chat operations</div>  <div class="kpi-value">87 (16%)</div>  <div class="kpi-change" style="color:#94A3B8">→ 20 writes, 67 reads</div></div><div class="kpi-tile">  <div class="kpi-label">Chat users</div>  <div class="kpi-value">4 / 13</div>  <div class="kpi-change" style="color:#94A3B8">→ 31% used chat</div></div></div>
+
+    <div class="card">
+      <div class="section-label">Why</div>
+      <ul class='findings-list'><li class="finding-item">  <div class="finding-label">MCP dominates writes — 92% of all write operations <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">237 MCP writes vs 20 chat writes <span style="color:#059669;font-weight:600">↑ Chat is used for exploration; users switch to MCP clients when they want to make changes</span></div></li><li class="finding-item">  <div class="finding-label">Chat is read-heavy — 77% of chat ops are reads <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">67 reads vs 20 writes <span style="color:#94A3B8;font-weight:600">→ 17 of 20 chat writes were enable_keyword by a single user (anatgotfried). Without that user, chat write rate is 3/70 = 4%</span></div></li><li class="finding-item">  <div class="finding-label">3 users used BOTH chat and MCP <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">anatgotfried, circart-urnen, alexandrtaraban <span style="color:#94A3B8;font-weight:600">→ They explored via chat first, then shifted to MCP for bulk operations</span></div></li><li class="finding-item">  <div class="finding-label">MCP top write: add_negative_keyword (94 ops, 5 users) <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">40% of all MCP writes <span style="color:#059669;font-weight:600">↑ Zero negative keywords added via chat — this is a power-user workflow done through MCP</span></div></li><li class="finding-item">  <div class="finding-label">Chat top read: get_keywords (13 ops, 4 users) <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">Chat users explore keywords and search terms most <span style="color:#94A3B8;font-weight:600">→ get_search_term_report is 2x more popular in chat than MCP (8 vs 6)</span></div></li><li class="finding-item">  <div class="finding-label">2 chat-only users: webrakes, not counted elsewhere <span class="confidence-badge" style="background:#FEF9C3;color:#713F12;border-color:#FDE047">Medium</span></div>  <div class="finding-value">webrakes used ONLY chat (16 read ops) <span style="color:#DC2626;font-weight:600">↓ Chat-only users exist but stay read-only — never write</span></div></li></ul>
+    </div>
+
+    
+
+    <div class="card">  <div class="chart-header">    <div class="chart-title">MCP clients generate 12x more writes than chat</div>    <div class="chart-subtitle">Operations by channel, Apr 10-11 (external users)</div>    <div class="chart-insight">Chat is a discovery tool; MCP is the action tool</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_0"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">MCP write actions are dominated by keyword management — chat barely writes</div>    <div class="chart-subtitle">Top write operations by channel, Apr 10-11</div>    <div class="chart-insight">add_negative_keyword (94) and add_keyword (71) are MCP-only workflows</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_1"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Users who use both channels shift heavy work to MCP</div>    <div class="chart-subtitle">Per-user operations split by channel, Apr 10-11</div>    <div class="chart-insight">circart-urnen: 22 chat ops (1 write) vs 63 MCP ops (51 writes) — chat for exploring, MCP for executing</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_2"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">MCP-only users are the majority — 62% never touched chat</div>    <div class="chart-subtitle">User channel distribution, Apr 10-11 (n=13)</div>      </div>  <div class="chart-wrapper">    <canvas id="chart_3"></canvas>  </div></div>
+
+    <div class="card">  <div class="section-label">Per-User Channel Breakdown — Apr 10-11</div>  <div class="table-wrapper">    <table id="table_0">      <thead><tr><th onclick="sortTable(this, 0)" class="sortable-header">User <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Chat Ops <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Chat Writes <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">MCP Ops <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">MCP Writes <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Chat Msgs <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Primary Channel <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>manu@mbdigital.co.za</td><td>0</td><td>0</td><td>107</td><td>52</td><td>5</td><td>MCP (Toolbox)</td></tr><tr><td>anatgotfried@gmail.com</td><td>35</td><td>19</td><td>63</td><td>52</td><td>10</td><td>Both — chat explore + MCP execute</td></tr><tr><td>info@circart-urnen.de</td><td>22</td><td>1</td><td>63</td><td>51</td><td>7</td><td>Both — chat explore + MCP execute</td></tr><tr><td>claygatepharmacy@gmail.com</td><td>0</td><td>0</td><td>86</td><td>55</td><td>0</td><td>MCP only</td></tr><tr><td>d.sheikh1996@gmail.com</td><td>0</td><td>0</td><td>37</td><td>19</td><td>0</td><td>MCP only</td></tr><tr><td>google@easyvending.at</td><td>0</td><td>0</td><td>25</td><td>0</td><td>0</td><td>MCP only (read-only)</td></tr><tr><td>alexandrtaraban@gmail.com</td><td>14</td><td>0</td><td>9</td><td>0</td><td>4</td><td>Both — all reads</td></tr><tr><td>m.sanchez@schaefer-ag.ch</td><td>0</td><td>0</td><td>19</td><td>2</td><td>0</td><td>MCP only (returning)</td></tr><tr><td>grxgabriel@gmail.com</td><td>0</td><td>0</td><td>18</td><td>3</td><td>0</td><td>MCP only</td></tr><tr><td>maxwvdw@gmail.com</td><td>0</td><td>0</td><td>16</td><td>0</td><td>0</td><td>MCP only (read-only)</td></tr><tr><td>team@webrakes.com</td><td>16</td><td>0</td><td>0</td><td>0</td><td>2</td><td>Chat only (read-only)</td></tr><tr><td>gimlowlab@gmail.com</td><td>0</td><td>0</td><td>13</td><td>0</td><td>0</td><td>MCP only (read-only)</td></tr><tr><td>tim@creativeweb360.com</td><td>0</td><td>0</td><td>10</td><td>2</td><td>0</td><td>MCP only (returning)</td></tr></tbody>    </table>  </div></div>
+<div class="card">  <div class="section-label">Channel Comparison: Chat vs MCP Behavior</div>  <div class="table-wrapper">    <table id="table_1">      <thead><tr><th onclick="sortTable(this, 1)" class="sortable-header">Metric <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Chat <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">MCP <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Ratio <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>Total operations</td><td>87</td><td>469</td><td>1:5.4</td></tr><tr><td>Write operations</td><td>20</td><td>237</td><td>1:11.9</td></tr><tr><td>Read operations</td><td>67</td><td>232</td><td>1:3.5</td></tr><tr><td>Write rate</td><td>23%</td><td>51%</td><td>MCP 2.2x higher</td></tr><tr><td>Unique users</td><td>4</td><td>12</td><td>1:3</td></tr><tr><td>Avg ops/user</td><td>22</td><td>39</td><td>MCP 1.8x higher</td></tr><tr><td>add_negative_keyword</td><td>0</td><td>94</td><td>MCP only</td></tr><tr><td>add_keyword</td><td>0</td><td>71</td><td>MCP only</td></tr></tbody>    </table>  </div></div>
+
+    <div class="card">
+      <div class="section-label">So what</div>
+      <ol class='action-list'><li class="action-item">  <span class="action-num">1</span>  <span class="action-text">Chat is a discovery/onboarding funnel, not an action tool — 77% reads, and the 2 chat-only users (webrakes, alexandr via chat) stayed read-only. Optimize chat to nudge users toward their first write action: after 3+ reads, suggest a specific write (e.g., 'I found 5 irrelevant search terms — want me to add them as negatives?').</span></li><li class="action-item">  <span class="action-num">2</span>  <span class="action-text">The chat-to-MCP handoff is where activation happens — 3 users explored via chat then shifted to MCP for bulk work. Make this transition smoother: after chat exploration, offer a 'copy MCP setup command' or 'continue in Claude Desktop' CTA.</span></li><li class="action-item">  <span class="action-num">3</span>  <span class="action-text">Keyword management (add/pause negatives) is entirely an MCP workflow — 0 negative keywords added via chat. Consider making the chat agent more proactive about suggesting negative keywords after showing search term reports.</span></li><li class="action-item">  <span class="action-num">4</span>  <span class="action-text">Both returning users (tim, m.sanchez) are MCP-only — no returner used chat. MCP users who write are the retention core. Focus retention efforts on getting MCP users to their first write, not on chat engagement.</span></li></ol>
+    </div>
+
+    <div class="footer">
+      Data sources: Supabase: operations (client_source), mcp_sessions, chat_threads, chat_messages | Apr 10-11 2026 | 13 external active users
+    </div>
+
+  </div>
+
+  <script>
+    // Register datalabels and annotation plugins globally
+    Chart.register(ChartDataLabels);
+    Chart.register(window['chartjs-plugin-annotation']?.default || {});
+
+    // Sort table by column
+    function sortTable(th, tableIdx) {
+      const table = document.getElementById('table_' + tableIdx);
+      const tbody = table.querySelector('tbody');
+      const headers = table.querySelectorAll('th');
+      const colIdx = Array.from(headers).indexOf(th);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.dataset.sortDir !== 'asc';
+      th.dataset.sortDir = asc ? 'asc' : 'desc';
+      headers.forEach(h => h.querySelector('.sort-icon').textContent = '↕');
+      th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+      rows.sort((a, b) => {
+        const aVal = a.cells[colIdx]?.textContent.trim() || '';
+        const bVal = b.cells[colIdx]?.textContent.trim() || '';
+        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Initialize charts
+    
+        new Chart(document.getElementById('chart_0'), {
+          type: 'bar',
+          data: {
+            labels: ["MCP Clients", "Chat (adsagent-chat)"],
+            datasets: [{"label": "Reads", "data": [232, 67], "borderColor": "#10B981", "borderWidth": 2, "backgroundColor": "#10B981", "borderRadius": 3, "borderSkipped": false}, {"label": "Writes", "data": [237, 20], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_1'), {
+          type: 'bar',
+          data: {
+            labels: ["add_negative_kw (MCP)", "add_keyword (MCP)", "pause_keyword (MCP)", "enable_keyword (chat)", "create_ad (MCP)", "update_networks (MCP)", "create_ad_group (MCP)", "enable_campaign (MCP)", "set_tracking (MCP)", "create_campaign (MCP)"],
+            datasets: [{"label": "Operations", "data": [94, 71, 19, 17, 7, 6, 6, 5, 5, 4], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_2'), {
+          type: 'bar',
+          data: {
+            labels: ["manu@mb...", "anatgot...", "circart...", "claygate...", "d.sheikh...", "easyvend...", "alexandr...", "m.sanch...", "grxgabr...", "maxwvdw...", "webrakes", "gimlow...", "tim@cre..."],
+            datasets: [{"label": "Chat ops", "data": [0, 35, 22, 0, 0, 0, 14, 0, 0, 0, 16, 0, 0], "borderColor": "#F59E0B", "borderWidth": 2, "backgroundColor": "#F59E0B", "borderRadius": 3, "borderSkipped": false}, {"label": "MCP ops", "data": [107, 63, 63, 86, 37, 25, 9, 19, 18, 16, 0, 13, 10], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_3'), {
+          type: 'doughnut',
+          data: {
+            labels: ["MCP only", "Both chat + MCP", "Chat only"],
+            datasets: [{"label": "Users", "data": [8, 3, 2], "borderColor": "#FFFFFF", "borderWidth": 2, "backgroundColor": "#2563EB"}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              datalabels: { display: false },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+  </script>
+</body>
+</html>

@@ -46,3 +46,6 @@ toprank/
 .gstack-screenshots/
 .mcp.json
 .playwright-mcp/
+
+# analysis reports
+docs/analysis/

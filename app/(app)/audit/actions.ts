@@ -20,6 +20,7 @@ import {
 import { getAuthContext } from "@/lib/session";
 import { computeAuditScore, type AuditInput, type AuditResult } from "@/lib/audit/scoring";
 import { analyzeAdLandingPages } from "@/lib/audit/landing-page";
+import { saveAuditSnapshot } from "@/lib/audit/persist";
 
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
@@ -310,6 +311,11 @@ export async function getAuditDetails() {
     };
 
     const auditResult = computeAuditScore(auditInput);
+
+    // Fire-and-forget: persist snapshot for dev dashboard
+    saveAuditSnapshot(session.customerId, session.userId ?? null, auditResult, auditInput).catch((e) => {
+      console.error("audit snapshot save failed", e);
+    });
 
     return { auditResult };
   });

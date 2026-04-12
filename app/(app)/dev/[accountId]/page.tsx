@@ -10,6 +10,7 @@ import { formatAction, formatValue, ENTITY_BADGE_COLORS } from '@/lib/operations
 
 type Operation = {
     id: number;
+    opType: 'read' | 'write';
     action: string;
     entityType: string;
     entityId: string;
@@ -18,6 +19,7 @@ type Operation = {
     afterValue: string;
     reasoning: string | null;
     rolledBack: boolean;
+    source: string | null;
     timestamp: string;
 };
 
@@ -35,6 +37,20 @@ type DailyUsage = {
     total: number;
 };
 
+type AuditSnapshot = {
+    id: number;
+    overallScore: number;
+    category: string;
+    wasteRate: number;
+    demandCaptured: number | null;
+    cpa: number | null;
+    wastedSpend: number;
+    totalSpend: number;
+    campaignCount: number;
+    topActions: Array<{ action: string; impact: string }>;
+    createdAt: string;
+};
+
 type AccountDetail = {
     accountId: string;
     email: string | null;
@@ -43,6 +59,7 @@ type AccountDetail = {
     recentOperations: Operation[];
     dailyUsage: DailyUsage[];
     campaigns: CampaignStat[];
+    auditHistory: AuditSnapshot[];
 };
 
 let cachedDetail: { accountId: string; data: AccountDetail } | null = null;
@@ -151,6 +168,18 @@ export default function DevAccountDetailPage() {
                             />
                         </div>
 
+                        {/* Audit History */}
+                        {data.auditHistory.length > 0 && (
+                            <div>
+                                <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Audit History</h2>
+                                <div className="space-y-2">
+                                    {data.auditHistory.map(audit => (
+                                        <AuditRow key={audit.id} audit={audit} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Daily usage (14d) */}
                         {data.dailyUsage.length > 0 && (
                             <div>
@@ -225,7 +254,7 @@ export default function DevAccountDetailPage() {
                             <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Recent Operations</h2>
                             {data.recentOperations.length === 0 ? (
                                 <div className="text-center py-12 border border-[#3D3C36] rounded-lg bg-[#24231F]/40">
-                                    <p className="text-sm text-[#C4C0B6]">No write operations recorded</p>
+                                    <p className="text-sm text-[#C4C0B6]">No operations recorded</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
@@ -233,6 +262,9 @@ export default function DevAccountDetailPage() {
                                         <div key={op.id} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
                                             <div className="flex items-center justify-between gap-2 mb-1.5">
                                                 <div className="flex items-center gap-2 min-w-0">
+                                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${op.opType === 'write' ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
+                                                        {op.opType}
+                                                    </span>
                                                     <span className="text-sm font-medium text-[#E8E4DD]">
                                                         {formatAction(op.action)}
                                                     </span>
@@ -243,6 +275,11 @@ export default function DevAccountDetailPage() {
                                                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-medium bg-[#C4C0B6]/10 text-[#C4C0B6] border-[#C4C0B6]/20">
                                                             <RotateCcw className="w-2.5 h-2.5" />
                                                             Reverted
+                                                        </span>
+                                                    )}
+                                                    {op.source && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium bg-[#4A90D9]/10 text-[#4A90D9] border-[#4A90D9]/20">
+                                                            {op.source}
                                                         </span>
                                                     )}
                                                 </div>
@@ -281,6 +318,77 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub:
             <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-1.5">{label}</div>
             <div className="text-xl sm:text-2xl font-semibold text-[#E8E4DD] tabular-nums font-mono">{value}</div>
             <div className="text-[10px] text-[#C4C0B6] mt-0.5">{sub}</div>
+        </div>
+    );
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+    Critical: 'text-[#C45D4A]',
+    'Needs Work': 'text-[#D4882A]',
+    OK: 'text-[#C4C0B6]',
+    Strong: 'text-[#4CAF6E]',
+    Excellent: 'text-[#4CAF6E]',
+};
+
+function scoreColor(score: number) {
+    if (score >= 80) return 'text-[#4CAF6E]';
+    if (score >= 60) return 'text-[#C4C0B6]';
+    if (score >= 40) return 'text-[#D4882A]';
+    return 'text-[#C45D4A]';
+}
+
+function AuditRow({ audit }: { audit: AuditSnapshot }) {
+    const [expanded, setExpanded] = useState(false);
+    return (
+        <div className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40">
+            <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="w-full p-3 flex items-center gap-3 text-left hover:bg-[#E8E4DD]/5 transition-colors rounded-lg"
+            >
+                {/* Score */}
+                <span className={`text-lg font-semibold font-mono tabular-nums w-10 shrink-0 ${scoreColor(audit.overallScore)}`}>
+                    {audit.overallScore}
+                </span>
+                {/* Category badge */}
+                <span className={`text-xs font-medium ${CATEGORY_COLORS[audit.category] ?? 'text-[#C4C0B6]'}`}>
+                    {audit.category}
+                </span>
+                {/* Key metrics */}
+                <span className="hidden sm:flex items-center gap-3 text-xs text-[#C4C0B6] ml-auto mr-2">
+                    <span>Waste: {audit.wasteRate.toFixed(0)}%</span>
+                    {audit.cpa !== null && <span>CPA: ${audit.cpa.toFixed(2)}</span>}
+                    <span>${audit.totalSpend.toFixed(0)} spend</span>
+                    <span>{audit.campaignCount} campaigns</span>
+                </span>
+                {/* Date */}
+                <span className="text-[10px] text-[#C4C0B6] font-mono tabular-nums whitespace-nowrap shrink-0 ml-auto sm:ml-0">
+                    {new Date(audit.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {' '}
+                    {new Date(audit.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {/* Expand indicator */}
+                <span className={`text-[#C4C0B6] text-xs transition-transform ${expanded ? 'rotate-90' : ''}`}>
+                    &#9654;
+                </span>
+            </button>
+            {expanded && audit.topActions.length > 0 && (
+                <div className="px-3 pb-3 pt-0 border-t border-[#3D3C36]">
+                    <div className="pt-2 space-y-1.5">
+                        {audit.topActions.map((item, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                                <span className="text-[#D4882A] shrink-0 mt-0.5">&#8226;</span>
+                                <div>
+                                    <span className="text-[#E8E4DD]">{item.action}</span>
+                                    {item.impact && (
+                                        <span className="text-[#C4C0B6] ml-1.5">— {item.impact}</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

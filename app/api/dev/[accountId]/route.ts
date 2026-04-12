@@ -19,7 +19,7 @@ export async function GET(
     return Response.json({ error: "Invalid timezone" }, { status: 400 });
   }
 
-  const [accountInfo, recentOps, dailyUsage, campaignStats] = await Promise.all([
+  const [accountInfo, recentOps, dailyUsage, campaignStats, auditHistory] = await Promise.all([
     // Account info from most recent session
     db()
       .select({
@@ -33,18 +33,13 @@ export async function GET(
       .orderBy(desc(schema.mcpSessions.createdAt))
       .limit(1),
 
-    // Recent write operations (last 50)
+    // Recent operations (last 100, reads + writes)
     db()
       .select()
       .from(schema.operations)
-      .where(
-        and(
-          eq(schema.operations.accountId, accountId),
-          eq(schema.operations.opType, OP_TYPE.WRITE),
-        ),
-      )
+      .where(eq(schema.operations.accountId, accountId))
       .orderBy(desc(schema.operations.createdAt))
-      .limit(50),
+      .limit(100),
 
     // Daily usage for last 14 days
     (() => {
@@ -87,6 +82,26 @@ export async function GET(
       .groupBy(schema.operations.campaignId)
       .orderBy(desc(sql`count(*)`))
       .limit(50),
+
+    // Audit snapshots (most recent 20)
+    db()
+      .select({
+        id: schema.auditSnapshots.id,
+        overallScore: schema.auditSnapshots.overallScore,
+        category: schema.auditSnapshots.category,
+        wasteRate: schema.auditSnapshots.wasteRate,
+        demandCaptured: schema.auditSnapshots.demandCaptured,
+        cpa: schema.auditSnapshots.cpa,
+        wastedSpend: schema.auditSnapshots.wastedSpend,
+        totalSpend: schema.auditSnapshots.totalSpend,
+        campaignCount: schema.auditSnapshots.campaignCount,
+        topActions: schema.auditSnapshots.topActions,
+        createdAt: schema.auditSnapshots.createdAt,
+      })
+      .from(schema.auditSnapshots)
+      .where(eq(schema.auditSnapshots.accountId, accountId))
+      .orderBy(desc(schema.auditSnapshots.createdAt))
+      .limit(20),
   ]);
 
   const info = accountInfo[0] ?? null;
@@ -106,6 +121,7 @@ export async function GET(
     lastLogin: info?.lastLogin ?? null,
     recentOperations: recentOps.map((op) => ({
       id: op.id,
+      opType: op.opType === OP_TYPE.WRITE ? "write" : "read",
       action: CODE_TO_TOOL[op.toolCode] ?? `unknown_${op.toolCode}`,
       entityType: CODE_TO_ENTITY[op.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
       entityId: op.entityId ?? "",
@@ -114,6 +130,7 @@ export async function GET(
       afterValue: op.afterValue ?? "",
       reasoning: op.reasoning,
       rolledBack: op.rolledBack === 1,
+      source: op.clientSource ?? null,
       timestamp: op.createdAt,
     })),
     dailyUsage,
@@ -123,5 +140,6 @@ export async function GET(
       writes: Number(c.writes),
       lastOp: c.lastOp,
     })),
+    auditHistory,
   });
 }

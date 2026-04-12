@@ -226,6 +226,26 @@ export const chatThreads = pgTable("chat_threads", {
   index("chat_threads_user_account_idx").on(table.userId, table.accountId, table.updatedAt),
 ]);
 
+// ─── Audit Snapshots ────────────────────────────────────────────────
+
+export const auditSnapshots = pgTable("audit_snapshots", {
+  id: serial("id").primaryKey(),
+  accountId: text("account_id").notNull(),
+  userId: text("user_id"),
+  overallScore: smallint("overall_score").notNull(),
+  category: text("category").notNull(),
+  wasteRate: doublePrecision("waste_rate").notNull().default(0),
+  demandCaptured: doublePrecision("demand_captured"),
+  cpa: doublePrecision("cpa"),
+  wastedSpend: doublePrecision("wasted_spend").notNull().default(0),
+  totalSpend: doublePrecision("total_spend").notNull().default(0),
+  campaignCount: smallint("campaign_count").notNull().default(0),
+  topActions: jsonb("top_actions").notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("audit_snapshots_account_idx").on(table.accountId, table.createdAt),
+]);
+
 // ─── Chat Messages ──────────────────────────────────────────────────
 
 export const chatMessages = pgTable("chat_messages", {
