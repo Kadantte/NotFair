@@ -10,14 +10,17 @@ import type { AuthContext } from "./types";
 export async function syncAccountSnapshot(auth: AuthContext) {
   const [info, budget] = await Promise.all([
     getAccountInfo(auth),
-    getAccountBudgetSummary(auth),
+    getAccountBudgetSummary(auth).catch((err) => {
+      console.warn(`[sync-account] Budget query failed for ${auth.customerId}, saving account info only:`, err);
+      return null;
+    }),
   ]);
 
   const snapshot = {
     name: info.name,
-    currencyCode: budget.currencyCode ?? info.currencyCode,
-    dailyBudget: budget.totalDailyBudget,
-    activeCampaigns: budget.activeCampaigns,
+    currencyCode: budget?.currencyCode ?? info.currencyCode,
+    dailyBudget: budget?.totalDailyBudget ?? null,
+    activeCampaigns: budget?.activeCampaigns ?? null,
     timeZone: info.timeZone,
     isTest: info.isTestAccount,
     lastSyncedAt: new Date(),

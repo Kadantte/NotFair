@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { clearSessionCookies, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
@@ -10,6 +11,7 @@ import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
+import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -30,6 +32,7 @@ type AuthState = {
   next?: string;
   popup?: boolean;
   utm?: UtmParams;
+  scope_retry?: boolean;
 };
 
 function getSafeNext(next: string | null | undefined) {
@@ -83,6 +86,7 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
     return {
       next: typeof parsed.next === "string" ? parsed.next : undefined,
       popup: typeof parsed.popup === "boolean" ? parsed.popup : undefined,
+      scope_retry: parsed.scope_retry === true ? true : undefined,
       utm,
     };
   } catch {
@@ -325,9 +329,11 @@ async function createOrRedirectGoogleAdsSession({
       expiresAt: expiresAt.toISOString(),
     });
 
-    // Fire-and-forget: snapshot account budget/info for dev dashboard
-    syncAccountSnapshots(refreshToken, [account.id]).catch((err) => {
-      console.error("[sync-account] Failed to snapshot on connect:", err);
+    // Snapshot account budget/info for dev dashboard (runs after response is sent)
+    after(async () => {
+      syncAccountSnapshots(refreshToken, [account.id]).catch((err) => {
+        console.error("[sync-account] Failed to snapshot on connect:", err);
+      });
     });
 
     if (popup) {
@@ -445,11 +451,13 @@ async function reuseExistingSession({
 
   const customerName = deriveCustomerName(existingSession.customerIds);
 
-  // Fire-and-forget: re-sync account snapshots on returning login
+  // Re-sync account snapshots on returning login (runs after response is sent)
   const reusedIds = parseCustomerIds(existingSession.customerIds).map((a) => a.id);
   if (reusedIds.length > 0) {
-    syncAccountSnapshots(refreshToken, reusedIds).catch((err) => {
-      console.error("[sync-account] Failed to snapshot on reuse:", err);
+    after(async () => {
+      syncAccountSnapshots(refreshToken, reusedIds).catch((err) => {
+        console.error("[sync-account] Failed to snapshot on reuse:", err);
+      });
     });
   }
 
@@ -484,14 +492,27 @@ export async function GET(request: Request) {
       hasState: !!stateParam,
       hasCookie: !!cookieNonce,
     });
+    trackServerEvent(null, "auth_error", { reason, step: AUTH_ERROR_STEP.STATE_VERIFICATION });
     return NextResponse.redirect(`${origin}/login?error=auth_failed&reason=${reason}`);
   }
 
   const popup = state.popup === true || searchParams.get("popup") === "1";
   const next = getSafeNext(state.next ?? explicitNext);
 
+  // Check if Google returned an error (e.g. user clicked Cancel on consent screen)
+  const googleError = searchParams.get("error");
+  if (googleError) {
+    const reason = classifyGoogleError(googleError);
+    console.error(`[auth/callback] Google OAuth error: ${googleError}`);
+    trackServerEvent(null, "auth_error", { reason, step: AUTH_ERROR_STEP.GOOGLE_CONSENT, google_error: googleError });
+    return popup
+      ? popupErrorResponse(origin, AUTH_ERROR_MESSAGES.CONSENT_DENIED)
+      : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=${reason}`);
+  }
+
   if (!code) {
     console.error("[auth/callback] Missing code param in callback URL");
+    trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.MISSING_CODE, step: AUTH_ERROR_STEP.CODE_CHECK });
     return popup
       ? popupErrorResponse(origin, "Authentication failed. Missing code.")
       : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=missing_code`);
@@ -539,6 +560,7 @@ export async function GET(request: Request) {
       hasRefreshToken: !!tokenData.refresh_token,
       hasIdToken: !!tokenData.id_token,
     });
+    trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.TOKEN_EXCHANGE, step: AUTH_ERROR_STEP.TOKEN_EXCHANGE, error: tokenData.error });
     return popup
       ? popupErrorResponse(origin, message)
       : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=token_exchange`);
@@ -550,7 +572,21 @@ export async function GET(request: Request) {
   if (typeof tokenData.scope === "string") {
     const grantedScopes = tokenData.scope.split(" ");
     if (!grantedScopes.includes("https://www.googleapis.com/auth/adwords")) {
-      const msg = "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.";
+      // Auto-retry once: if this is the first scope denial, silently redirect
+      // back to OAuth. Users may have unchecked the scope accidentally.
+      if (!state.scope_retry) {
+        console.log("[auth/callback] Ads scope denied — auto-retrying once");
+        trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED_RETRY, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: false });
+        const retryUrl = `${origin}/api/auth/signin?next=${encodeURIComponent(next)}&scope_retry=1${popup ? "&popup=1" : ""}`;
+        const retryResponse = NextResponse.redirect(retryUrl);
+        retryResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
+        return retryResponse;
+      }
+
+      // Second denial — user deliberately unchecked it. Show the error.
+      console.error("[auth/callback] Ads scope denied after retry");
+      trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: true });
+      const msg = AUTH_ERROR_MESSAGES.SCOPE_DENIED;
       const scopeResponse = popup
         ? popupErrorResponse(origin, msg)
         : redirectWithError(origin, msg);
@@ -575,6 +611,7 @@ export async function GET(request: Request) {
 
   if (authError) {
     console.error("[auth/callback] Supabase sign-in failed:", authError);
+    trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SUPABASE_AUTH, step: AUTH_ERROR_STEP.SUPABASE_SIGNIN, error: authError.message });
     return popup
       ? popupErrorResponse(origin, "Failed to establish app session.")
       : NextResponse.redirect(`${origin}/login?error=auth_failed&reason=supabase_auth`);

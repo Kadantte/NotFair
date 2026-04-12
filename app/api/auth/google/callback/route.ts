@@ -6,6 +6,8 @@ import { listAccessibleCustomers, listClientAccountsUnderManager } from "@/lib/g
 import { randomBytes } from "crypto";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { setSessionCookies } from "@/lib/auth-cookies";
+import { trackServerEvent } from "@/lib/analytics-server";
+import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
 
 function redirectWithError(message: string) {
   return NextResponse.redirect(
@@ -188,9 +190,18 @@ export async function GET(request: Request) {
   const error = searchParams.get("error");
   const isPopup = searchParams.get("state") === "popup";
 
-  if (error || !code) {
-    const msg = error || "Missing authorization code";
+  if (error) {
+    const reason = classifyGoogleError(error);
+    console.error(`[auth/google/callback] Google OAuth error: ${error}`);
+    trackServerEvent(null, "auth_error", { reason, step: AUTH_ERROR_STEP.GOOGLE_CONSENT, google_error: error });
+    const msg = error === "access_denied" ? AUTH_ERROR_MESSAGES.CONSENT_DENIED : error;
     return errorResponse(msg, isPopup);
+  }
+
+  if (!code) {
+    console.error("[auth/google/callback] Missing code param in callback URL");
+    trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.MISSING_CODE, step: AUTH_ERROR_STEP.CODE_CHECK });
+    return errorResponse("Missing authorization code", isPopup);
   }
 
   const clientId = getEnv("GOOGLE_ADS_CLIENT_ID");
@@ -235,10 +246,8 @@ export async function GET(request: Request) {
     if (typeof tokenData.scope === "string") {
       const grantedScopes = tokenData.scope.split(" ");
       if (!grantedScopes.includes("https://www.googleapis.com/auth/adwords")) {
-        return errorResponse(
-          "Google Ads permission was not granted. Please try again and make sure the Google Ads checkbox is enabled on the consent screen.",
-          isPopup,
-        );
+        trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: false });
+        return errorResponse(AUTH_ERROR_MESSAGES.SCOPE_DENIED, isPopup);
       }
     }
 
@@ -266,6 +275,7 @@ export async function GET(request: Request) {
       const msg = raw.includes("PERMISSION_DENIED") || raw.includes("insufficient authentication scopes")
         ? "Google Ads access was not granted. Please try again and make sure to approve all permissions on the Google consent screen."
         : "Failed to load Google Ads accounts. Please try again.";
+      trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.LOAD_ACCOUNTS_FAILED, step: AUTH_ERROR_STEP.LIST_ACCOUNTS, error: raw });
       return errorResponse(msg, isPopup);
     }
 

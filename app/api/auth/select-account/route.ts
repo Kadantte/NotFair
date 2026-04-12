@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
@@ -167,10 +167,12 @@ export async function POST(request: Request) {
       );
   }
 
-  // Fire-and-forget: snapshot account budget/info for dev dashboard
+  // Snapshot account budget/info for dev dashboard (runs after response is sent)
   const selectedIds = validAccounts.map((a) => a.id);
-  syncAccountSnapshots(session.refreshToken, selectedIds).catch((err) => {
-    console.error("[sync-account] Failed to snapshot on select:", err);
+  after(async () => {
+    syncAccountSnapshots(session.refreshToken, selectedIds).catch((err) => {
+      console.error("[sync-account] Failed to snapshot on select:", err);
+    });
   });
 
   const accountNames = deriveCustomerName(customerIds);

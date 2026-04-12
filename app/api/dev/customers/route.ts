@@ -42,36 +42,78 @@ export async function GET() {
     return { ...c, accounts };
   });
 
-  // Batch-fetch account snapshots from the accounts table
-  const snapshots = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
-  if (allAccountIds.size > 0) {
-    const rows = await db()
-      .select({
-        accountId: schema.accounts.accountId,
-        dailyBudget: schema.accounts.dailyBudget,
-        activeCampaigns: schema.accounts.activeCampaigns,
-        currencyCode: schema.accounts.currencyCode,
-      })
-      .from(schema.accounts)
-      .where(inArray(schema.accounts.accountId, [...allAccountIds]));
-    for (const { accountId, ...snap } of rows) {
-      snapshots.set(accountId, snap);
-    }
-  }
+  // Batch-fetch account snapshots and operation counts in parallel
+  const [snapshots, opsCounts] = await Promise.all([
+    // Account snapshots (budgets, campaigns)
+    (async () => {
+      const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
+      if (allAccountIds.size > 0) {
+        const rows = await db()
+          .select({
+            accountId: schema.accounts.accountId,
+            dailyBudget: schema.accounts.dailyBudget,
+            activeCampaigns: schema.accounts.activeCampaigns,
+            currencyCode: schema.accounts.currencyCode,
+          })
+          .from(schema.accounts)
+          .where(inArray(schema.accounts.accountId, [...allAccountIds]));
+        for (const { accountId, ...snap } of rows) {
+          map.set(accountId, snap);
+        }
+      }
+      return map;
+    })(),
+    // Operations counts per account
+    (async () => {
+      const map = new Map<string, { reads: number; writes: number }>();
+      if (allAccountIds.size > 0) {
+        const rows = await db()
+          .select({
+            accountId: schema.operations.accountId,
+            reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
+            writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
+          })
+          .from(schema.operations)
+          .where(inArray(schema.operations.accountId, [...allAccountIds]))
+          .groupBy(schema.operations.accountId);
+        for (const { accountId, reads, writes } of rows) {
+          map.set(accountId, { reads, writes });
+        }
+      }
+      return map;
+    })(),
+  ]);
 
-  const result = parsed.map((c) => ({
-    userId: c.userId,
-    googleEmail: c.googleEmail,
-    primaryAccountId: c.customerId,
-    accounts: c.accounts.map((a) => ({
-      ...a,
-      ...(snapshots.get(a.id) ?? {}),
-    })),
-    accountCount: c.accounts.length,
-    sessions: c.sessions,
-    lastActive: c.lastActive,
-    firstSeen: c.firstSeen,
-  }));
+  const result = parsed.map((c) => {
+    // Aggregate operations across all accounts for this customer
+    let totalReads = 0;
+    let totalWrites = 0;
+    const accounts = c.accounts.map((a) => {
+      const ops = opsCounts.get(a.id);
+      if (ops) {
+        totalReads += ops.reads;
+        totalWrites += ops.writes;
+      }
+      return {
+        ...a,
+        ...(snapshots.get(a.id) ?? {}),
+      };
+    });
+
+    return {
+      userId: c.userId,
+      googleEmail: c.googleEmail,
+      primaryAccountId: c.customerId,
+      accounts,
+      accountCount: c.accounts.length,
+      sessions: c.sessions,
+      lastActive: c.lastActive,
+      firstSeen: c.firstSeen,
+      reads: totalReads,
+      writes: totalWrites,
+      totalOps: totalReads + totalWrites,
+    };
+  });
 
   return Response.json({ customers: result });
 }

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail } from "lucide-react";
 import { startGoogleConnect } from "@/lib/google-oauth";
+import { AUTH_ERROR_REASON } from "@/lib/auth-errors";
 
 export default function LoginPage() {
   return (
@@ -32,7 +33,26 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState(errorParam === "auth_failed" ? "Authentication failed. Please try again." : "");
+  const reasonParam = searchParams.get("reason");
+  const [error, setError] = useState(() => {
+    if (errorParam !== "auth_failed") return "";
+    switch (reasonParam) {
+      case AUTH_ERROR_REASON.CONSENT_DENIED:
+        return "You cancelled the sign-in. Please try again and click \"Allow\" to grant access.";
+      case AUTH_ERROR_REASON.SCOPE_DENIED:
+        return "Google Ads permission was not granted. Please try again and keep the \"Google Ads\" checkbox checked on the consent screen.";
+      case AUTH_ERROR_REASON.MISSING_CODE:
+        return "Authentication was interrupted. Please try signing in again.";
+      case AUTH_ERROR_REASON.NONCE_MISMATCH:
+      case AUTH_ERROR_REASON.MISSING_COOKIE:
+      case AUTH_ERROR_REASON.MISSING_STATE:
+        return "Your sign-in session expired. Please try again.";
+      case AUTH_ERROR_REASON.TOKEN_EXCHANGE:
+        return "Google authentication failed. Please try again in a moment.";
+      default:
+        return "Authentication failed. Please try again.";
+    }
+  });
 
   async function signInWithGoogle() {
     setGoogleLoading(true);

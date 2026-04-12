@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter, Clock } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -20,26 +20,8 @@ type DailyUsage = {
     total: number;
 };
 
-type AccountOps = {
-    accountId: string;
-    accountName: string | null;
-    email: string | null;
-    reads: number;
-    writes: number;
-    total: number;
-    lastActive: string | null;
-};
-
-type BudgetSummary = {
-    totalDailyBudget: number;
-    activeCampaigns: number;
-    currencyCode: string | null;
-};
-
 type DevStats = {
     dailyUsage: DailyUsage[];
-    accountOps: AccountOps[];
-    budgets: Record<string, BudgetSummary>;
 };
 
 function formatCurrency(amount: number, currencyCode?: string | null): string {
@@ -49,10 +31,6 @@ function formatCurrency(amount: number, currencyCode?: string | null): string {
         } catch { /* invalid currency code fallback */ }
     }
     return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatBudget(budget: BudgetSummary): string {
-    return formatCurrency(budget.totalDailyBudget, budget.currencyCode);
 }
 
 function formatAccountBudget(a: CustomerAccount): string | null {
@@ -92,16 +70,22 @@ type Customer = {
     sessions: number;
     lastActive: string;
     firstSeen: string;
+    reads: number;
+    writes: number;
+    totalOps: number;
 };
 
-type Tab = 'usage' | 'outreach' | 'customers';
+type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive';
+type SortDir = 'asc' | 'desc';
+
+type Tab = 'customers' | 'usage' | 'outreach';
 
 let cachedStats: DevStats | null = null;
 let cachedContacts: Contact[] | null = null;
 let cachedCustomers: Customer[] | null = null;
 
 export default function DevPage() {
-    const [activeTab, setActiveTab] = useState<Tab>('usage');
+    const [activeTab, setActiveTab] = useState<Tab>('customers');
     const [stats, setStats] = useState<DevStats | null>(cachedStats);
     const [loading, setLoading] = useState(!cachedStats);
     const [error, setError] = useState<string | null>(null);
@@ -109,6 +93,8 @@ export default function DevPage() {
     const [loadingContacts, setLoadingContacts] = useState(!cachedContacts);
     const [customers, setCustomers] = useState<Customer[]>(cachedCustomers ?? []);
     const [loadingCustomers, setLoadingCustomers] = useState(!cachedCustomers);
+    const [sortKey, setSortKey] = useState<CustomerSortKey>('firstSeen');
+    const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [importing, setImporting] = useState(false);
     const [deletingContactId, setDeletingContactId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -120,6 +106,47 @@ export default function DevPage() {
 
     const metrics = useMemo(() => contacts.length > 0 ? deriveMetrics(contacts) : null, [contacts]);
     const filteredContacts = useMemo(() => statusFilter === 'all' ? contacts : contacts.filter((c) => c.status === statusFilter), [contacts, statusFilter]);
+
+    const sortedCustomers = useMemo(() => {
+        const sorted = [...customers];
+        sorted.sort((a, b) => {
+            let cmp = 0;
+            switch (sortKey) {
+                case 'email':
+                    cmp = (a.googleEmail ?? '').localeCompare(b.googleEmail ?? '');
+                    break;
+                case 'accounts':
+                    cmp = a.accountCount - b.accountCount;
+                    break;
+                case 'operations':
+                    cmp = a.totalOps - b.totalOps;
+                    break;
+                case 'budget': {
+                    const aBudget = a.accounts.reduce((s, acc) => s + (acc.dailyBudget ?? 0), 0);
+                    const bBudget = b.accounts.reduce((s, acc) => s + (acc.dailyBudget ?? 0), 0);
+                    cmp = aBudget - bBudget;
+                    break;
+                }
+                case 'firstSeen':
+                    cmp = new Date(a.firstSeen).getTime() - new Date(b.firstSeen).getTime();
+                    break;
+                case 'lastActive':
+                    cmp = new Date(a.lastActive).getTime() - new Date(b.lastActive).getTime();
+                    break;
+            }
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return sorted;
+    }, [customers, sortKey, sortDir]);
+
+    function toggleSort(key: CustomerSortKey) {
+        if (sortKey === key) {
+            setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir(key === 'email' ? 'asc' : 'desc');
+        }
+    }
 
     async function handleViewAs(accountId: string, e: React.MouseEvent) {
         e.preventDefault();
@@ -292,7 +319,7 @@ export default function DevPage() {
                     </Button>
                 </div>
                 <div className="flex gap-0 px-4 sm:px-6 border-t border-[#3D3C36]/50">
-                    {(['usage', 'outreach', 'customers'] as const).map((tab) => (
+                    {(['customers', 'usage', 'outreach'] as const).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -423,76 +450,102 @@ export default function DevPage() {
                             </div>
                         </div>
 
-                        {/* Operations by Account */}
-                        <div>
-                            <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">Operations by Account</h2>
+                    </>
+                ) : null)}
 
-                            {/* Mobile: card layout */}
+                {/* ── Customers Tab ── */}
+                {activeTab === 'customers' && (loadingCustomers && customers.length === 0 ? (
+                    <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-5 w-5 animate-spin text-[#C4C0B6]" />
+                    </div>
+                ) : customers.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-10 text-center">
+                        <Users className="mx-auto mb-3 h-8 w-8 text-[#C4C0B6]/30" />
+                        <p className="text-sm text-[#C4C0B6]">No customers yet.</p>
+                    </div>
+                ) : (
+                    <div>
+                        <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">
+                            Customers
+                            <span className="ml-2 font-mono text-xs text-[#C4C0B6] font-normal">{customers.length}</span>
+                        </h2>
+                        <>
+                        {/* Mobile: card layout */}
                             <div className="sm:hidden space-y-2">
-                                {stats.accountOps.length === 0 ? (
-                                    <p className="text-sm text-[#C4C0B6] text-center py-8">No operations recorded</p>
-                                ) : stats.accountOps.map(acc => {
-                                    const budget = stats.budgets?.[acc.accountId];
+                                {sortedCustomers.map((c) => {
+                                    const totalBudget = c.accounts.reduce((s, a) => s + (a.dailyBudget ?? 0), 0);
+                                    const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
+                                    const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
                                     return (
-                                    <Link
-                                        key={acc.accountId}
-                                        href={`/dev/${acc.accountId}`}
-                                        prefetch
-                                        className="block border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3 hover:bg-[#2E2D28] hover:border-[#4CAF6E]/20 transition-all"
-                                    >
+                                    <div key={c.userId ?? c.primaryAccountId} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="min-w-0">
-                                                {acc.accountName && <div className="text-sm text-[#E8E4DD] truncate">{acc.accountName}</div>}
-                                                {acc.email && <div className="text-xs text-[#C4C0B6] truncate">{acc.email}</div>}
-                                                <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{acc.accountId}</div>
+                                                <div className="text-sm text-[#E8E4DD] truncate">{c.googleEmail || c.userId || 'Unknown'}</div>
+                                                <div className="text-xs text-[#C4C0B6]/60 font-mono">{c.primaryAccountId}</div>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
                                                 <button
                                                     type="button"
-                                                    onClick={(e) => handleViewAs(acc.accountId, e)}
-                                                    disabled={impersonatingAccountId === acc.accountId}
+                                                    onClick={(e) => handleViewAs(c.primaryAccountId, e)}
+                                                    disabled={impersonatingAccountId === c.primaryAccountId}
                                                     className="p-1.5 rounded-md text-[#C4C0B6] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
                                                     title="View as this account"
                                                 >
-                                                    {impersonatingAccountId === acc.accountId
+                                                    {impersonatingAccountId === c.primaryAccountId
                                                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                                         : <Eye className="w-3.5 h-3.5" />}
                                                 </button>
-                                                <ChevronRight className="w-4 h-4 text-[#C4C0B6]" />
                                             </div>
                                         </div>
-                                        {budget && (
-                                            <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
+                                        <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
+                                            {hasBudget && (
                                                 <div className="flex-1">
                                                     <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Daily Budget</div>
-                                                    <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
-                                                        {formatBudget(budget)}
-                                                    </div>
+                                                    <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">{formatCurrency(totalBudget, currency)}</div>
                                                 </div>
-                                                <div>
-                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Campaigns</div>
-                                                    <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{budget.activeCampaigns}</div>
-                                                </div>
+                                            )}
+                                            <div className={hasBudget ? '' : 'flex-1'}>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Operations</div>
+                                                {c.totalOps > 0 ? (
+                                                    <>
+                                                        <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{c.totalOps.toLocaleString()}</div>
+                                                        <div className="text-[10px] text-[#C4C0B6]/60 font-mono">{c.reads.toLocaleString()}r · {c.writes.toLocaleString()}w</div>
+                                                    </>
+                                                ) : (
+                                                    <div className="text-sm text-[#C4C0B6]/40">—</div>
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
                                         <div className="grid grid-cols-3 gap-3 text-center">
                                             <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Reads</div>
-                                                <div className="text-sm text-[#C4C0B6] font-mono tabular-nums">{acc.reads.toLocaleString()}</div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Accounts</div>
+                                                <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.accountCount}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Writes</div>
-                                                <div className="text-sm text-[#D4882A] font-mono tabular-nums">{acc.writes.toLocaleString()}</div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">First Seen</div>
+                                                <div className="text-[11px] text-[#C4C0B6] font-mono">{formatDateShort(c.firstSeen, true)}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Total</div>
-                                                <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{acc.total.toLocaleString()}</div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Last Active</div>
+                                                <div className="text-[11px] text-[#C4C0B6] font-mono">{formatDateShort(c.lastActive)}</div>
                                             </div>
                                         </div>
-                                        <div className="mt-2 text-[10px] text-[#C4C0B6] font-mono">
-                                            Last active: {acc.lastActive ? formatDateTime(acc.lastActive) : 'Never'}
-                                        </div>
-                                    </Link>
+                                        {c.accounts.length > 0 && (
+                                            <div className="mt-2 space-y-1">
+                                                {c.accounts.map((a) => {
+                                                    const budget = formatAccountBudget(a);
+                                                    return (
+                                                        <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#C4C0B6] font-mono">
+                                                            <span className="truncate mr-2">{a.name || a.id}</span>
+                                                            {budget && (
+                                                                <span className="text-[#4CAF6E] whitespace-nowrap">{budget}/d · {a.activeCampaigns ?? 0} campaigns</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
                                     );
                                 })}
                             </div>
@@ -502,65 +555,84 @@ export default function DevPage() {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[#3D3C36]">
-                                            {['Account', 'Daily Budget', 'Campaigns', 'Reads', 'Writes', 'Total', 'Last Active', ''].map((h, i) => (
-                                                <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
-                                                    {h}
+                                            {([
+                                                { key: 'email' as const, label: 'Customer' },
+                                                { key: 'accounts' as const, label: 'Accounts' },
+                                                { key: 'operations' as const, label: 'Operations' },
+                                                { key: 'budget' as const, label: 'Daily Budget' },
+                                                { key: 'firstSeen' as const, label: 'First Seen' },
+                                                { key: 'lastActive' as const, label: 'Last Active' },
+                                            ]).map((col) => (
+                                                <th key={col.key} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleSort(col.key)}
+                                                        className="inline-flex items-center gap-1 hover:text-[#E8E4DD] transition-colors"
+                                                    >
+                                                        {col.label}
+                                                        {sortKey === col.key ? (
+                                                            sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                                                        ) : (
+                                                            <ArrowUpDown className="w-3 h-3 opacity-30" />
+                                                        )}
+                                                    </button>
                                                 </th>
                                             ))}
+                                            <th className="px-4 py-3" />
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {stats.accountOps.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#C4C0B6]">
-                                                    No operations recorded
-                                                </td>
-                                            </tr>
-                                        ) : stats.accountOps.map(acc => {
-                                            const budget = stats.budgets?.[acc.accountId];
+                                        {sortedCustomers.map((c) => {
+                                            const totalBudget = c.accounts.reduce((s, a) => s + (a.dailyBudget ?? 0), 0);
+                                            const totalCampaigns = c.accounts.reduce((s, a) => s + (a.activeCampaigns ?? 0), 0);
+                                            const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
+                                            const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
                                             return (
-                                            <tr
-                                                key={acc.accountId}
-                                                className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors"
-                                            >
+                                            <tr key={c.userId ?? c.primaryAccountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
                                                 <td className="px-4 py-2.5">
-                                                    <Link href={`/dev/${acc.accountId}`} prefetch className="block">
-                                                        {acc.accountName && (
-                                                            <div className="text-sm text-[#E8E4DD]">{acc.accountName}</div>
-                                                        )}
-                                                        {acc.email && (
-                                                            <div className="text-xs text-[#C4C0B6]">{acc.email}</div>
-                                                        )}
-                                                        <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{acc.accountId}</div>
-                                                    </Link>
+                                                    <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
+                                                    <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
                                                 </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
-                                                    {budget ? formatBudget(budget) : <span className="text-[#C4C0B6]/40">—</span>}
+                                                <td className="px-4 py-2.5">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {c.accounts.length === 0 ? (
+                                                            <span className="text-sm text-[#C4C0B6]/40">—</span>
+                                                        ) : c.accounts.map((a) => (
+                                                            <Link key={a.id} href={`/dev/${a.id}`} prefetch className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#C4C0B6] font-mono hover:border-[#4CAF6E]/30 hover:text-[#E8E4DD] transition-colors">{a.name || a.id}</Link>
+                                                        ))}
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">
-                                                    {budget ? budget.activeCampaigns : <span className="text-[#C4C0B6]/40">—</span>}
+                                                <td className="px-4 py-2.5">
+                                                    {c.totalOps > 0 ? (
+                                                        <div>
+                                                            <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{c.totalOps.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-[#C4C0B6]/60 font-mono">{c.reads.toLocaleString()}r · {c.writes.toLocaleString()}w</div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm text-[#C4C0B6]/40">—</span>
+                                                    )}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#C4C0B6] font-mono tabular-nums">
-                                                    {acc.reads.toLocaleString()}
+                                                <td className="px-4 py-2.5">
+                                                    {hasBudget ? (
+                                                        <div>
+                                                            <div className="text-sm text-[#4CAF6E] font-mono tabular-nums">{formatCurrency(totalBudget, currency)}</div>
+                                                            <div className="text-[10px] text-[#C4C0B6]/60">{totalCampaigns} campaign{totalCampaigns !== 1 ? 's' : ''}</div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm text-[#C4C0B6]/40">—</span>
+                                                    )}
                                                 </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#D4882A] font-mono tabular-nums">
-                                                    {acc.writes.toLocaleString()}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">
-                                                    {acc.total.toLocaleString()}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">
-                                                    {acc.lastActive ? formatDateTime(acc.lastActive) : 'Never'}
-                                                </td>
+                                                <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">{formatDateShort(c.firstSeen, true)}</td>
+                                                <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">{formatDateTime(c.lastActive)}</td>
                                                 <td className="px-4 py-2.5">
                                                     <button
                                                         type="button"
-                                                        onClick={(e) => handleViewAs(acc.accountId, e)}
-                                                        disabled={impersonatingAccountId === acc.accountId}
+                                                        onClick={(e) => handleViewAs(c.primaryAccountId, e)}
+                                                        disabled={impersonatingAccountId === c.primaryAccountId}
                                                         className="p-1.5 rounded-md text-[#C4C0B6] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
                                                         title="View as this account"
                                                     >
-                                                        {impersonatingAccountId === acc.accountId
+                                                        {impersonatingAccountId === c.primaryAccountId
                                                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                                             : <Eye className="w-3.5 h-3.5" />}
                                                     </button>
@@ -571,9 +643,9 @@ export default function DevPage() {
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    </>
-                ) : null)}
+                        </>
+                    </div>
+                ))}
 
                 {/* ── Outreach Tab ── */}
                 {activeTab === 'outreach' && metrics && metrics.sent > 0 && (
@@ -775,128 +847,6 @@ export default function DevPage() {
                 </div>
                 )}
 
-                {/* ── Customers Tab ── */}
-                {activeTab === 'customers' && (loadingCustomers ? (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading customers...</p>
-                    </div>
-                ) : customers.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-10 text-center">
-                        <Users className="mx-auto mb-3 h-8 w-8 text-[#C4C0B6]/30" />
-                        <p className="text-sm text-[#C4C0B6]">No customers yet.</p>
-                    </div>
-                ) : (
-                    <div>
-                        <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">
-                            Customers
-                            <span className="ml-2 font-mono text-xs text-[#C4C0B6] font-normal">{customers.length}</span>
-                        </h2>
-
-                        {/* Mobile: card layout */}
-                        <div className="sm:hidden space-y-2">
-                            {customers.map((c) => (
-                                <div key={c.userId ?? c.primaryAccountId} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="min-w-0">
-                                            <div className="text-sm text-[#E8E4DD] truncate">{c.googleEmail || c.userId || 'Unknown'}</div>
-                                            <div className="text-xs text-[#C4C0B6]/60 font-mono">{c.primaryAccountId}</div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-3 text-center">
-                                        <div>
-                                            <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Accounts</div>
-                                            <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.accountCount}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Sessions</div>
-                                            <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Last Active</div>
-                                            <div className="text-[11px] text-[#C4C0B6] font-mono">
-                                                {formatDateShort(c.lastActive)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {c.accounts.length > 0 && (
-                                        <div className="mt-2 space-y-1">
-                                            {c.accounts.map((a) => {
-                                                const budget = formatAccountBudget(a);
-                                                return (
-                                                    <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#C4C0B6] font-mono">
-                                                        <span className="truncate mr-2">{a.name || a.id}</span>
-                                                        {budget && (
-                                                            <span className="text-[#4CAF6E] whitespace-nowrap">{budget}/d · {a.activeCampaigns ?? 0} campaigns</span>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Desktop: table layout */}
-                        <div className="hidden sm:block border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-[#3D3C36]">
-                                        {['Customer', 'Accounts', 'Daily Budget', 'Sessions', 'First Seen', 'Last Active'].map((h, i) => (
-                                            <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">{h}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {customers.map((c) => {
-                                        // Sum daily budgets across all accounts for this customer
-                                        const totalBudget = c.accounts.reduce((sum, a) => sum + (a.dailyBudget ?? 0), 0);
-                                        const totalCampaigns = c.accounts.reduce((sum, a) => sum + (a.activeCampaigns ?? 0), 0);
-                                        const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
-                                        const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
-                                        return (
-                                        <tr key={c.userId ?? c.primaryAccountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
-                                            <td className="px-4 py-2.5">
-                                                <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
-                                                <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {c.accounts.length === 0 ? (
-                                                        <span className="text-sm text-[#C4C0B6]/40">—</span>
-                                                    ) : c.accounts.map((a) => (
-                                                        <span key={a.id} className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#C4C0B6] font-mono">{a.name || a.id}</span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                {hasBudget ? (
-                                                    <div>
-                                                        <div className="text-sm text-[#4CAF6E] font-mono tabular-nums">
-                                                            {formatCurrency(totalBudget, currency)}
-                                                        </div>
-                                                        <div className="text-[10px] text-[#C4C0B6]/60">{totalCampaigns} campaign{totalCampaigns !== 1 ? 's' : ''}</div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-sm text-[#C4C0B6]/40">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">{c.sessions}</td>
-                                            <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">
-                                                {formatDateShort(c.firstSeen, true)}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">
-                                                {formatDateTime(c.lastActive)}
-                                            </td>
-                                        </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                ))}
             </div>
         </section>
     );

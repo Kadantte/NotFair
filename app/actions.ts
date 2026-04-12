@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, micros } from "@/lib/google-ads";
+import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
@@ -239,6 +239,41 @@ export async function getConversionActionsAction() {
         return await getConversionActions(auth);
     } catch (error) {
         console.error("Get Conversion Actions Error:", error);
+        return [];
+    }
+    });
+}
+
+export async function getImpressionShareAction(campaignId: string) {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+        return await getImpressionShare(auth, campaignId, 30);
+    } catch (error) {
+        console.error("Get Impression Share Error:", error);
+        return null;
+    }
+    });
+}
+
+export async function getSearchTermReportAction(campaignId: string) {
+    return requireAuth(async () => {
+    try {
+        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const auth = {
+            refreshToken,
+            customerId,
+            customerIds: parseCustomerIds(customerIds),
+        };
+        const result = await getSearchTermReport(auth, campaignId, 30, 20);
+        return result.searchTerms;
+    } catch (error) {
+        console.error("Get Search Term Report Error:", error);
         return [];
     }
     });

@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New User Journey Analysis — Apr 10-11 (Internal Users Excluded)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      line-height: 1.55;
+      padding: 32px 40px 64px;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      margin-bottom: 28px;
+    }
+    .header-meta {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .header-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .header-question {
+      font-size: 14px;
+      color: #475569;
+      font-style: italic;
+    }
+
+    /* ---- Verdict card ---- */
+    .verdict-card {
+      background: #2563EB;
+      color: white;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .verdict-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+    .verdict-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ---- KPI grid ---- */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi-tile {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.1;
+    }
+    .kpi-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .card-accent-amber {
+      border-left: 3px solid #D97706;
+    }
+    .card-accent-red {
+      border-left: 3px solid #DC2626;
+    }
+    .body-text {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    /* ---- Findings ---- */
+    .findings-list {
+      list-style: none;
+    }
+    .finding-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .finding-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .finding-item:first-child { padding-top: 0; }
+    .finding-label {
+      font-size: 14px;
+      color: #0F172A;
+      flex: 1;
+      line-height: 1.5;
+    }
+    .finding-value {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      flex: 2;
+    }
+    .confidence-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* ---- Charts ---- */
+    .chart-header {
+      margin-bottom: 16px;
+    }
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    .chart-subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 3px;
+    }
+    .chart-insight {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+      font-style: italic;
+      border-left: 2px solid #2563EB;
+      padding-left: 8px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+    }
+
+    /* ---- Tables ---- */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      background: #F1F5F9;
+      font-weight: 600;
+      font-size: 11px;
+      color: #475569;
+      border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .sortable-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .sortable-header:hover { background: #E2E8F0; }
+    .sort-icon { opacity: 0.4; font-size: 10px; margin-left: 4px; }
+    tbody tr:hover { background: #F8FAFC; }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      color: #0F172A;
+      line-height: 1.4;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody td:not(:first-child) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- So what ---- */
+    .action-list {
+      list-style: none;
+    }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .action-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .action-item:first-child { padding-top: 0; }
+    .action-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background: #2563EB;
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .action-text {
+      font-size: 14px;
+      color: #0F172A;
+      line-height: 1.5;
+    }
+    .action-reason {
+      font-size: 13px;
+      color: #475569;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ---- Footer ---- */
+    .footer {
+      margin-top: 28px;
+      font-size: 11px;
+      color: #94A3B8;
+      text-align: center;
+      line-height: 1.7;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <div class="header-meta">Analysis · 2026-04-11 17:00 PDT</div>
+      <div class="header-title">New User Journey Analysis — Apr 10-11 (Internal Users Excluded)</div>
+      <div class="header-question">"What are the distinct new user journeys, friction points, and opportunities to increase usage and retention? (Apr 10-11 data, excluding izhongyuting and tongchen92)"</div>
+    </div>
+
+    <div class="verdict-card">
+      <div class="verdict-label">Bottom line</div>
+      <div class="verdict-text">Auth errors blocked nearly as many users as successfully signed up in the last 2 days — 12 error encounters vs 13 signups. Of the 13 who signed up, only 5 (38%) reached the product's core value of making an AI-driven change. 31% became read-only Explorers who never took action, and 23% stalled at setup.</div>
+    </div>
+
+    <div class="card card-accent-red">  <div class="section-label">Data quality notes</div>  <p class="body-text">2 internal users (izhongyuting, tongchen92) excluded from all metrics. user_signed_up event live since ~Apr 8. Apr 11 data as of 5pm PDT. Neither internal user signed up in this window, so the 13 new user journeys are unaffected — only DAU and tool usage counts changed slightly.</p></div>
+
+    <div class="section-label">Key metrics</div><div class="kpi-grid"><div class="kpi-tile">  <div class="kpi-label">Signups (Apr 10-11)</div>  <div class="kpi-value">13</div>  <div class="kpi-change" style="color:#059669">↑ 1 yesterday + 12 today</div></div><div class="kpi-tile">  <div class="kpi-label">Auth errors (2d)</div>  <div class="kpi-value">12 encounters</div>  <div class="kpi-change" style="color:#DC2626">↓ 8 permission denied + 3 missing_code + 1 load failure</div></div><div class="kpi-tile">  <div class="kpi-label">Reached core value (AI write)</div>  <div class="kpi-value">38%</div>  <div class="kpi-change" style="color:#DC2626">↓ 5 of 13 new signups made a write</div></div><div class="kpi-tile">  <div class="kpi-label">DAU (external only)</div>  <div class="kpi-value">56 → 75</div>  <div class="kpi-change" style="color:#059669">↑ +34% day-over-day</div></div></div>
+
+    <div class="card">
+      <div class="section-label">Why</div>
+      <ul class='findings-list'><li class="finding-item">  <div class="finding-label">Auth errors nearly match signup volume <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">12 error encounters vs 13 signups in 2 days <span style="color:#DC2626;font-weight:600">↓ 8 users hit 'Google Ads permission not granted', 3 hit 'missing_code' auth failure, 1 hit 'failed to load accounts'. All are real external users, not internal.</span></div></li><li class="finding-item">  <div class="finding-label">5 distinct journey types among 13 new signups <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">Power 23%, Active 15%, Explorer 31%, Stalled 23%, Bounced 8% <span style="color:#475569">Power users averaged 114 AI actions; Explorers averaged 19 reads with zero writes; Stalled users browsed and copied credentials but never ran AI.</span></div></li><li class="finding-item">  <div class="finding-label">31% are read-only Explorers — biggest untapped cohort <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">4 users did 13-30 reads each, zero writes <span style="color:#94A3B8;font-weight:600">→ They actively queried campaigns, keywords, and performance but never took action. They've proven intent but haven't hit the activation moment.</span></div></li><li class="finding-item">  <div class="finding-label">23% stalled at setup — connected but never used AI <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">3 users connected + browsed/copied credentials, zero AI tool executions <span style="color:#DC2626;font-weight:600">↓ One user browsed 12 pages and generated OAuth creds but never ran a single AI action. They clearly wanted to use the product.</span></div></li><li class="finding-item">  <div class="finding-label">Claude Code auto-install is the preferred setup path <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">9 users copied auto-install (16 copies total) <span style="color:#059669;font-weight:600">↑ 4-5 users also tried manual steps. 5 generated OAuth connector credentials. 3 opened in-app chat. Most users try the easy path first.</span></div></li><li class="finding-item">  <div class="finding-label">MCP direct is the primary AI surface — 284 actions from 8 external users <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">vs OAuth/Toolbox: 188, 3 users; in-app chat: 89, 5 users <span style="color:#475569">MCP power users generate 3x the action volume per user compared to chat users. 1 new client 'craft-agent' appeared.</span></div></li><li class="finding-item">  <div class="finding-label">add_negative_keyword is the top tool by volume (94 uses, 5 users) <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">Followed by run_gaql_query (89, 9 users) and add_keyword (71, 3 users) <span style="color:#475569">Keyword management (add + pause + negative) is the dominant write workflow. list_campaigns (27 uses, 14 users) is the universal first action.</span></div></li><li class="finding-item">  <div class="finding-label">Homepage 'Connect Claude' CTA dominates entry — 17 unique clickers <span class="confidence-badge" style="background:#DCFCE7;color:#14532D;border-color:#86EFAC">High</span></div>  <div class="finding-value">74 total clicks, all driving to /connect <span style="color:#475569">audit_now from header had 6 unique clickers. The hero CTA is the primary acquisition funnel.</span></div></li></ul>
+    </div>
+
+    
+
+    <div class="card">  <div class="chart-header">    <div class="chart-title">DAU grew 34% overnight — 75 external users on Apr 11 vs 56 on Apr 10</div>    <div class="chart-subtitle">Daily active users + AI actions (external only), Apr 10-11</div>      </div>  <div class="chart-wrapper">    <canvas id="chart_0"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Auth errors nearly match signup volume — 12 error encounters vs 13 signups in 2 days</div>    <div class="chart-subtitle">Unique external users hitting each error type, Apr 10-11</div>    <div class="chart-insight">'Permission not granted' alone blocked 8 users. Fixing this single error could increase successful signups by ~60%.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_1"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Only 38% of new signups reached core value (AI write) — biggest drop is after connecting</div>    <div class="chart-subtitle">Activation funnel for 13 new signups, Apr 10-11 (external only)</div>    <div class="chart-insight">12 of 13 connected an account, but only 5 made an AI write. The gap between 'connected' and 'first write' is where 54% of potential power users are lost.</div>  </div>  <div class="chart-wrapper">    <canvas id="chart_2"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Explorers (31%) and Stalled (23%) together are 54% of signups — biggest conversion opportunity</div>    <div class="chart-subtitle">New user journey types, Apr 10-11 signups (n=13, external only)</div>      </div>  <div class="chart-wrapper">    <canvas id="chart_3"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Keyword management dominates write usage — add_negative_keyword is the #1 tool by volume</div>    <div class="chart-subtitle">Top 12 AI tools by usage, Apr 10-11 (external only)</div>      </div>  <div class="chart-wrapper">    <canvas id="chart_4"></canvas>  </div></div>
+<div class="card">  <div class="chart-header">    <div class="chart-title">Claude Code auto-install is the preferred setup path — 9 of 13 new users chose it</div>    <div class="chart-subtitle">Setup method by unique external users, Apr 10-11</div>      </div>  <div class="chart-wrapper">    <canvas id="chart_5"></canvas>  </div></div>
+
+    <div class="card">  <div class="section-label">All 13 New External User Journeys — Apr 10-11</div>  <div class="table-wrapper">    <table id="table_0">      <thead><tr><th onclick="sortTable(this, 0)" class="sortable-header">User <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Type <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Events <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Reads <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Writes <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Setup Path <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 0)" class="sortable-header">Key Observation <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>User 1</td><td>Power</td><td>119</td><td>34</td><td>53</td><td>Connector + Claude Code</td><td>Copied 4 connector creds, 4 install commands. Tried everything.</td></tr><tr><td>User 2</td><td>Power</td><td>119</td><td>27</td><td>71</td><td>Chat + Claude Code</td><td>Highest write count. Opened chat, copied 7 install commands.</td></tr><tr><td>User 3</td><td>Power</td><td>105</td><td>38</td><td>55</td><td>Claude Code</td><td>Clean journey — connected, 4 commands, straight to heavy use.</td></tr><tr><td>User 4</td><td>Active</td><td>44</td><td>22</td><td>21</td><td>Direct (no setup events)</td><td>No setup events tracked — may have connected via MCP directly.</td></tr><tr><td>User 5</td><td>Active</td><td>43</td><td>15</td><td>3</td><td>Claude Code</td><td>20 pageviews, browsed audit help. Mostly exploring, light writes.</td></tr><tr><td>User 6</td><td>Explorer</td><td>42</td><td>30</td><td>0</td><td>Connector + Claude Code</td><td>30 reads, zero writes. Fully set up but never took action.</td></tr><tr><td>User 7</td><td>Explorer</td><td>30</td><td>16</td><td>0</td><td>Chat + Claude Code</td><td>Opened chat, copied 3 commands. Reading data but not acting.</td></tr><tr><td>User 8</td><td>Explorer</td><td>21</td><td>13</td><td>0</td><td>Claude Code</td><td>Copied 4 install commands. 13 reads. Setup complete, no writes.</td></tr><tr><td>User 9</td><td>Explorer</td><td>19</td><td>16</td><td>0</td><td>None tracked</td><td>Connected, 16 reads, no writes. No setup events visible.</td></tr><tr><td>User 10</td><td>Stalled</td><td>19</td><td>0</td><td>0</td><td>Connector</td><td>12 pageviews, generated OAuth creds, copied 3 fields. Zero AI use.</td></tr><tr><td>User 11</td><td>Stalled</td><td>8</td><td>0</td><td>0</td><td>CTA only</td><td>5 pageviews, 1 CTA click, connected. Then nothing.</td></tr><tr><td>User 12</td><td>Stalled</td><td>5</td><td>0</td><td>0</td><td>Claude Code</td><td>2 pageviews, copied 1 install command. Then nothing.</td></tr><tr><td>User 13</td><td>Bounced</td><td>1</td><td>0</td><td>0</td><td>None</td><td>Signed up and never came back.</td></tr></tbody>    </table>  </div></div>
+<div class="card">  <div class="section-label">Auth Error Inventory — Apr 10-11 (All External Users)</div>  <div class="table-wrapper">    <table id="table_1">      <thead><tr><th onclick="sortTable(this, 1)" class="sortable-header">Error <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Users Affected <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Severity <span class="sort-icon">↕</span></th><th onclick="sortTable(this, 1)" class="sortable-header">Recommended Fix <span class="sort-icon">↕</span></th></tr></thead>      <tbody><tr><td>Google Ads permission not granted</td><td>8</td><td>Critical</td><td>Pre-check Google Ads checkbox on consent screen; add visual callout</td></tr><tr><td>Auth failed — missing_code</td><td>3</td><td>High</td><td>OAuth callback race condition — investigate server-side; add retry</td></tr><tr><td>Failed to load Google Ads accounts</td><td>1</td><td>Medium</td><td>Add retry with backoff; show specific error message</td></tr></tbody>    </table>  </div></div>
+
+    <div class="card">
+      <div class="section-label">So what</div>
+      <ol class='action-list'><li class="action-item">  <span class="action-num">1</span>  <span class="action-text">FIX 'PERMISSION NOT GRANTED' ERROR (critical, this week) — 8 external users in 2 days hit this single error, equaling 62% of successful signup volume. The Google OAuth consent screen isn't pre-checking the Google Ads checkbox. Add a visual callout and a retry button on the error page. This alone could increase activation by 50%+.</span></li><li class="action-item">  <span class="action-num">2</span>  <span class="action-text">CONVERT EXPLORERS WITH CONTEXTUAL SUGGESTIONS (biggest opportunity, ~2 weeks) — 4 of 13 new users (31%) queried data extensively but made zero changes. After 3+ read-only queries, surface: 'Based on your search terms, you could add 5 negative keywords to save ~$X/day. Want me to do it?' Push them past the activation threshold.</span></li><li class="action-item">  <span class="action-num">3</span>  <span class="action-text">RESCUE STALLED USERS WITH TRIGGERED EMAIL (quick win, ~3 days) — 3 users connected and copied credentials but never ran an AI tool. User 10 browsed 12 pages and generated OAuth creds — they clearly want to use the product. Send a 'finish setup' email 24h after last activity with the auto-install command and a 2-min video.</span></li><li class="action-item">  <span class="action-num">4</span>  <span class="action-text">FIX 'MISSING_CODE' AUTH FAILURE (3 users in 2d) — Likely an OAuth callback race condition. 3 external users hit it. Investigate the server-side callback handler and add automatic retry.</span></li><li class="action-item">  <span class="action-num">5</span>  <span class="action-text">SEND WELCOME EMAIL WITH AUDIT RESULTS (catch bouncers, ~2 days) — 1 user signed up and vanished. Send within 1 hour: 'Your Google Ads account audit found 3 issues.' Give immediate value without requiring setup.</span></li></ol>
+    </div>
+
+    <div class="footer">
+      Data sources: PostHog HogQL: $pageview, user_signed_up, account_connected, ai_read_executed, ai_change_executed, cta_clicked, install_command_copied, connector_credential_copied, oauth_credentials_generated, chat_opened_from_connect, audit_help_action_clicked (Apr 10-11 2026, project 368485). Excluded: izhongyuting@gmail.com, tongchen92@gmail.com (internal developers).
+    </div>
+
+  </div>
+
+  <script>
+    // Register datalabels and annotation plugins globally
+    Chart.register(ChartDataLabels);
+    Chart.register(window['chartjs-plugin-annotation']?.default || {});
+
+    // Sort table by column
+    function sortTable(th, tableIdx) {
+      const table = document.getElementById('table_' + tableIdx);
+      const tbody = table.querySelector('tbody');
+      const headers = table.querySelectorAll('th');
+      const colIdx = Array.from(headers).indexOf(th);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.dataset.sortDir !== 'asc';
+      th.dataset.sortDir = asc ? 'asc' : 'desc';
+      headers.forEach(h => h.querySelector('.sort-icon').textContent = '↕');
+      th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+      rows.sort((a, b) => {
+        const aVal = a.cells[colIdx]?.textContent.trim() || '';
+        const bVal = b.cells[colIdx]?.textContent.trim() || '';
+        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Initialize charts
+    
+        new Chart(document.getElementById('chart_0'), {
+          type: 'bar',
+          data: {
+            labels: ["Apr 10", "Apr 11"],
+            datasets: [{"label": "DAU", "data": [56, 75], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}, {"label": "AI actions", "data": [114, 473], "borderColor": "#7C3AED", "borderWidth": 2, "backgroundColor": "#7C3AED", "borderRadius": 3, "borderSkipped": false}, {"label": "Signups", "data": [1, 12], "borderColor": "#059669", "borderWidth": 2, "backgroundColor": "#059669", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_1'), {
+          type: 'bar',
+          data: {
+            labels: ["Google Ads permission not granted", "Auth failed (missing code)", "Failed to load accounts"],
+            datasets: [{"label": "Unique users", "data": [8, 3, 1], "borderColor": "#DC2626", "borderWidth": 2, "backgroundColor": "#DC2626", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_2'), {
+          type: 'bar',
+          data: {
+            labels: ["Signed Up", "Connected Account", "First AI Read", "First AI Write"],
+            datasets: [{"label": "Users", "data": [13, 12, 10, 5], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "end",
+                align: "top",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_3'), {
+          type: 'doughnut',
+          data: {
+            labels: ["Power Users (100+ actions)", "Active Users (20-43 actions)", "Explorers (reads only)", "Stalled (no AI use)", "Bounced (signup only)"],
+            datasets: [{"label": "Users", "data": [3, 2, 4, 3, 1], "borderColor": "#FFFFFF", "borderWidth": 2, "backgroundColor": "#2563EB"}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "x",
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              datalabels: { display: false },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_4'), {
+          type: 'bar',
+          data: {
+            labels: ["add_negative_keyword", "run_gaql_query", "add_keyword", "get_campaign_settings", "get_keywords", "list_campaigns", "get_campaign_performance", "pause_keyword", "enable_keyword", "get_recommendations", "get_conversion_actions", "list_ads"],
+            datasets: [{"label": "Uses", "data": [94, 89, 71, 40, 28, 27, 23, 19, 17, 17, 16, 16], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+
+        new Chart(document.getElementById('chart_5'), {
+          type: 'bar',
+          data: {
+            labels: ["Claude Code auto-install", "Connector creds copied", "OAuth creds generated", "Manual: api_key", "Manual: marketplace_add", "Manual: plugin_install", "Chat from connect page"],
+            datasets: [{"label": "Unique users", "data": [9, 5, 5, 5, 4, 4, 3], "borderColor": "#2563EB", "borderWidth": 2, "backgroundColor": "#2563EB", "borderRadius": 3, "borderSkipped": false}]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            layout: { padding: { top: 20, right: 8, bottom: 0, left: 0 } },
+            plugins: {
+              legend: {
+                display: false,
+                position: 'bottom',
+                labels: {
+                  font: { size: 12, family: 'Inter, sans-serif' },
+                  color: '#475569',
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 16,
+                  usePointStyle: true,
+                }
+              },
+              tooltip: {
+                backgroundColor: '#0F172A',
+                titleFont: { size: 12, family: 'Inter, sans-serif', weight: '600' },
+                bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                padding: 12,
+                cornerRadius: 6,
+                callbacks: {
+                  label: function(ctx) {
+                    var v = ctx.parsed.y !== undefined ? ctx.parsed.y : ctx.parsed.x;
+                    if (v === null || v === undefined) return ctx.dataset.label;
+                    var abs = Math.abs(v);
+                    var fmt = abs >= 1000000 ? (v/1000000).toFixed(2)+'M' :
+                              abs >= 1000    ? (v/1000).toFixed(1)+'K'    : v.toLocaleString();
+                    return ctx.dataset.label ? ctx.dataset.label + ': ' + fmt : fmt;
+                  }
+                }
+              },
+              
+              datalabels: {
+                display: true,
+                anchor: "start",
+                align: "right",
+                color: '#475569',
+                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                formatter: function(value) {
+        if (value === null || value === undefined) return '';
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+        if (abs >= 1000) return (value / 1000).toFixed(1) + 'K';
+        if (Number.isInteger(value)) return value.toString();
+        return value.toFixed(1);
+    },
+                clamp: true,
+              },
+              
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: true,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                  maxRotation: 0,
+                }
+              },
+              y: {
+                grid: {
+                  color: '#E2E8F0',
+                  drawBorder: false,
+                  display: false,
+                },
+                border: { display: false },
+                ticks: {
+                  font: { size: 11, family: 'Inter, sans-serif' },
+                  color: '#94A3B8',
+                }
+              }
+            }
+          }
+        });
+
+  </script>
+</body>
+</html>

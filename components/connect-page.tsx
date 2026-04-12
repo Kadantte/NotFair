@@ -862,17 +862,25 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
                 <div className="mx-auto max-w-2xl">
                     {error && (
-                        <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-4">
+                        <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-5">
                             <div className="flex items-start gap-3">
                                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#C45D4A]" />
-                                <p className="text-sm text-[#C45D4A]">{error}</p>
+                                <div className="space-y-2">
+                                    <p className="text-sm font-medium text-[#C45D4A]">{error}</p>
+                                    {error.toLowerCase().includes("permission") && (
+                                        <p className="text-xs text-[#C45D4A]/80">
+                                            AdsAgent needs Google Ads access to manage your campaigns. On the Google consent screen, make sure the &quot;Google Ads&quot; checkbox stays checked.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                            <button
+                            <Button
                                 onClick={beginGoogleSignIn}
-                                className="mt-3 ml-8 text-sm font-medium text-[#C45D4A] underline underline-offset-2 hover:text-[#E8E4DD]"
+                                className="mt-4 ml-8 bg-[#C45D4A] text-white hover:bg-[#B04D3A] font-medium"
+                                size="sm"
                             >
-                                Try again
-                            </button>
+                                Try again with Google
+                            </Button>
                         </div>
                     )}
 

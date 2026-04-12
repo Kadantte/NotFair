@@ -38,12 +38,15 @@ export async function GET(request: Request) {
   // Generate a random nonce for CSRF protection.
   // The nonce goes into both the OAuth state param and a short-lived cookie.
   // The callback verifies they match before proceeding.
+  const scopeRetry = searchParams.get("scope_retry") === "1";
+
   const nonce = randomBytes(16).toString("hex");
   await storeOAuthNonce(nonce);
   const state = Buffer.from(JSON.stringify({
     nonce,
     next,
     popup,
+    ...(scopeRetry ? { scope_retry: true } : {}),
     ...(Object.keys(utm).length > 0 ? { utm } : {}),
   })).toString("base64url");
 

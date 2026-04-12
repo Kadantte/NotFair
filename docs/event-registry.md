@@ -382,6 +382,30 @@ No properties.
 
 ---
 
+## auth_error
+
+**Phase:** 1
+**Category:** activation
+**Platform:** PostHog (server)
+**Trigger:** Fires on every auth failure in the OAuth callback — consent denial, scope denial, missing code, state verification failure, token exchange failure, Supabase auth failure, and account loading failure. Covers both primary (`/auth/callback`) and legacy (`/api/auth/google/callback`) flows.
+**Hypothesis:** We believe tracking this tells us the volume and distribution of auth failures by type, which lets us prioritize fixes to the biggest drop-off points in the signup funnel. Prior analysis (Apr 11 2026) showed ~12 auth error encounters vs 13 signups — nearly 1:1 — but we had zero server-side tracking to diagnose them.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `reason` | string | `"scope_denied"` | Error classification. Enum: `consent_denied` (user clicked Cancel), `scope_denied` (user unchecked Ads scope after retry), `scope_denied_retry` (first scope denial, auto-retrying), `missing_code` (no code param), `missing_state`, `missing_cookie`, `nonce_mismatch` (CSRF failures), `token_exchange` (Google token endpoint error), `supabase_auth` (Supabase sign-in failed), `load_accounts_failed` (Google Ads API call failed), `google_*` (other Google errors) |
+| `step` | string | `"scope_check"` | Which step in the auth flow failed. Enum: `google_consent`, `state_verification`, `code_check`, `token_exchange`, `scope_check`, `supabase_signin`, `list_accounts` |
+| `is_retry` | boolean \| undefined | `true` | Only present on scope_denied events. `false` = first attempt (auto-retrying), `true` = second attempt (showing error). |
+| `google_error` | string \| undefined | `"access_denied"` | Raw error param from Google's redirect, if present |
+| `error` | string \| undefined | `"PERMISSION_DENIED"` | Raw error message from the failing step, if available |
+
+```json
+{ "event": "auth_error", "properties": { "reason": "scope_denied", "step": "scope_check", "is_retry": true } }
+```
+
+**Files:** `app/auth/callback/route.ts`, `app/api/auth/google/callback/route.ts`
+
+---
+
 ## Phase 2 backlog
 
 Valid candidates that don't yet meet the "what would we do differently?" bar — defer until we have a concrete hypothesis or a question we can't answer with Phase 1 events.
