@@ -988,6 +988,9 @@ export function AuditContent({
             <SearchTermsDetail terms={auditResult.wastedSearchTerms} onAskAI={onAskAI} />
           </div>
         )}
+
+        {/* Bottom spacer for floating help panel */}
+        <div aria-hidden="true" style={{ height: '6rem' }} />
       </div>
     </div>
   );
