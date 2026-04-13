@@ -209,9 +209,23 @@ For each user, compose the email with:
 **What NOT to do:**
 - Don't stack multiple findings. Pick the ONE biggest opportunity.
 - Don't use marketing language ("revolutionary", "game-changing", "unlock")
+- Don't use "wasted spend" or "waste" — it sounds negative and off-putting. Frame things positively (e.g. "room to capture more demand" not "you're wasting money").
 - Don't send the same email template with names swapped
 - Don't include screenshots unless the finding truly benefits from one
 - Don't oversell — if their account is a mess, say so gently. If it's great, say so honestly.
+- For strong accounts, use percentile language: "top 10%" or "top 25% of accounts we've audited" — this is more compelling than listing specific metrics. Use overall_score to calibrate: 70+ is top 10%, 60+ is top 25%, 50+ is top 50%.
+- Don't pitch AdsAgent features in a salesy way. The CTA should feel like a genuine offer to help, not a product demo. The formula: [specific value you already delivered] + [soft availability] + [single ask].
+
+**Good CTAs (pick one, don't stack):**
+- "Happy to show you how to use the AdsAgent plugin in Claude to optimize further and set up automated reporting if that's useful."
+- "Happy to walk through it if useful."
+- "Let me know if you'd like me to walk you through it."
+- "Worth a look?"
+- "Let me know your thoughts."
+- "Open to a 15-min call to map out what's fixable?" (+ cal.com link)
+- "Which of these would be most impactful to address first?"
+
+**Why this matters:** You've already delivered value (the audit finding). That creates natural reciprocity — the reader wants to engage because you gave them something real. A feature list kills that momentum by switching from "helpful expert" to "salesperson." One soft ask keeps you in advisor mode.
 
 ## Step 5: Create Gmail Draft
 
