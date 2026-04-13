@@ -114,6 +114,23 @@ function formatDateShort(iso: string, year = false): string {
     return parseTs(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(year && { year: 'numeric' }) });
 }
 
+/** Format a YYYY-MM-DD local-date string for chart labels (no tz math). */
+function formatChartDate(isoDate: string, full = false): string {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString(undefined, full
+        ? { weekday: 'short', month: 'short', day: 'numeric' }
+        : { month: 'short', day: 'numeric' });
+}
+
+function localDateKey(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
 
 type CustomerAccount = {
@@ -363,6 +380,38 @@ export default function DevPage() {
         }
     }
 
+    const usageChart = useMemo(() => {
+        if (!stats) return null;
+        const byDate = new Map(stats.dailyUsage.map(d => [d.date, d]));
+        const days: DailyUsage[] = [];
+        const now = new Date();
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const key = localDateKey(d);
+            const existing = byDate.get(key);
+            days.push({
+                date: formatChartDate(key),
+                reads: existing?.reads ?? 0,
+                writes: existing?.writes ?? 0,
+                total: existing?.total ?? 0,
+            });
+        }
+        const totalOps = days.reduce((s, d) => s + d.total, 0);
+        const totalReads = days.reduce((s, d) => s + d.reads, 0);
+        const totalWrites = days.reduce((s, d) => s + d.writes, 0);
+        const activeDays = days.filter(d => d.total > 0).length;
+        const avgPerActive = activeDays > 0 ? Math.round(totalOps / activeDays) : 0;
+        const peak = days.reduce((m, d) => d.total > m.total ? d : m, days[0]);
+        const summaryCards = totalOps === 0 ? [] : [
+            { label: 'Total (30d)', value: totalOps.toLocaleString(), sub: `${activeDays} active day${activeDays === 1 ? '' : 's'}`, color: '#E8E4DD' },
+            { label: 'Reads', value: totalReads.toLocaleString(), sub: `${Math.round((totalReads / totalOps) * 100)}%`, color: '#4CAF6E' },
+            { label: 'Writes', value: totalWrites.toLocaleString(), sub: `${Math.round((totalWrites / totalOps) * 100)}%`, color: '#D4882A' },
+            { label: 'Avg / active day', value: avgPerActive.toLocaleString(), sub: 'ops', color: '#E8E4DD' },
+            { label: 'Peak day', value: peak.total.toLocaleString(), sub: peak.date, color: '#E8E4DD' },
+        ];
+        return { days, totalOps, summaryCards };
+    }, [stats]);
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
@@ -440,41 +489,54 @@ export default function DevPage() {
                                 )}
                             </div>
 
-                            {stats.dailyUsage.length === 0 ? (
+                            {!usageChart || usageChart.totalOps === 0 ? (
                                 <p className="text-sm text-[#C4C0B6] text-center py-8">No API usage in the last 30 days</p>
                             ) : (
-                                <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 p-4">
-                                    <ResponsiveContainer width="100%" height={320}>
-                                        <BarChart
-                                            data={stats.dailyUsage}
-                                            margin={CHART_MARGIN}
-                                            barCategoryGap="30%"
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
-                                            <XAxis
-                                                dataKey="date"
-                                                stroke="#3D3C36"
-                                                tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                                                tickLine={false}
-                                                angle={-45}
-                                                textAnchor="end"
-                                                interval="preserveStartEnd"
-                                            />
-                                            <YAxis
-                                                stroke="#3D3C36"
-                                                tick={{ fill: '#C4C0B6', fontSize: 11 }}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                tickFormatter={formatYTick}
-                                                width={40}
-                                            />
-                                            <Tooltip cursor={CHART_CURSOR} content={<UsageTooltip />} />
-                                            <Legend wrapperStyle={LEGEND_STYLE} />
-                                            <Bar dataKey="reads" name="Reads" stackId="a" fill="#4CAF6E" fillOpacity={0.75} />
-                                            <Bar dataKey="writes" name="Writes" stackId="a" fill="#D4882A" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
+                                <>
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
+                                        {usageChart.summaryCards.map(s => (
+                                            <div key={s.label} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 px-3 py-2.5">
+                                                <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">{s.label}</div>
+                                                <div className="mt-1 text-lg sm:text-xl font-semibold font-mono tabular-nums" style={{ color: s.color }}>{s.value}</div>
+                                                <div className="text-[11px] text-[#C4C0B6] mt-0.5 truncate">{s.sub}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 p-4">
+                                        <ResponsiveContainer width="100%" height={320}>
+                                            <BarChart
+                                                data={usageChart.days}
+                                                margin={CHART_MARGIN}
+                                                barCategoryGap="30%"
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
+                                                <XAxis
+                                                    dataKey="date"
+                                                    stroke="#3D3C36"
+                                                    tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                                                    tickLine={false}
+                                                    angle={-45}
+                                                    textAnchor="end"
+                                                    interval="preserveStartEnd"
+                                                    minTickGap={20}
+                                                />
+                                                <YAxis
+                                                    stroke="#3D3C36"
+                                                    tick={{ fill: '#C4C0B6', fontSize: 11 }}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                    tickFormatter={formatYTick}
+                                                    width={40}
+                                                />
+                                                <Tooltip cursor={CHART_CURSOR} content={<UsageTooltip />} />
+                                                <Legend wrapperStyle={LEGEND_STYLE} />
+                                                <Bar dataKey="reads" name="Reads" stackId="a" fill="#4CAF6E" fillOpacity={0.75} />
+                                                <Bar dataKey="writes" name="Writes" stackId="a" fill="#D4882A" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </>
                             )}
                         </div>
 

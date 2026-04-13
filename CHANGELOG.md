@@ -2,6 +2,12 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.17.0] - 2026-04-13
+
+### Changed
+- Dev page "API Usage by Day" chart now renders in chronological order (oldest → newest) and fills missing days with zeros, so gaps in activity are visible instead of being silently collapsed
+- Added summary stat cards above the chart: 30-day total (with active-day count), reads share, writes share, average per active day, and peak day
+
 ## [0.2.16.1] - 2026-04-09
 
 ### Fixed
