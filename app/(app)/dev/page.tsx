@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -177,7 +177,6 @@ export default function DevPage() {
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [importing, setImporting] = useState(false);
     const [deletingContactId, setDeletingContactId] = useState<number | null>(null);
-    const [expandedId, setExpandedId] = useState<number | null>(null);
     const [sendingId, setSendingId] = useState<number | null>(null);
     const [schedulingId, setSchedulingId] = useState<number | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
@@ -848,14 +847,14 @@ export default function DevPage() {
                                     const badgeStyle = sc
                                         ? { backgroundColor: `${sc.color}26`, color: sc.color }
                                         : { backgroundColor: '#C4C0B626', color: '#C4C0B6' };
-                                    const isExpanded = expandedId === c.id;
                                     const hasDraft = !!c.draftSubject;
                                     return (
-                                        <div key={c.id}>
-                                            <div
-                                                className="group flex items-center gap-2 px-4 py-2.5 hover:bg-[#24231F]/60 transition-colors cursor-pointer"
-                                                onClick={() => setExpandedId(isExpanded ? null : c.id)}
-                                            >
+                                        <Link
+                                            key={c.id}
+                                            href={`/dev/contacts/${c.id}`}
+                                            prefetch
+                                            className="group flex items-center gap-2 px-4 py-2.5 hover:bg-[#24231F]/60 transition-colors cursor-pointer"
+                                        >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="truncate text-[13px] text-[#E8E4DD] font-mono">{c.email}</span>
@@ -875,7 +874,7 @@ export default function DevPage() {
                                                             <Button
                                                                 size="sm"
                                                                 disabled={schedulingId === c.id || sendingId === c.id}
-                                                                onClick={(e) => { e.stopPropagation(); handleSchedule(c.id); }}
+                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSchedule(c.id); }}
                                                                 className="gap-1.5 bg-[#C084FC]/20 text-[#C084FC] hover:bg-[#C084FC]/30 border border-[#C084FC]/40 h-7 text-[12px] px-2.5"
                                                             >
                                                                 {schedulingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Clock className="h-3 w-3" />}
@@ -884,7 +883,7 @@ export default function DevPage() {
                                                             <Button
                                                                 size="sm"
                                                                 disabled={sendingId === c.id || schedulingId === c.id}
-                                                                onClick={(e) => { e.stopPropagation(); handleSend(c.id); }}
+                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSend(c.id); }}
                                                                 className="gap-1.5 bg-[#4CAF6E] text-[#E8E4DD] hover:bg-[#3D9A5C] h-7 text-[12px] px-2.5"
                                                             >
                                                                 {sendingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
@@ -896,7 +895,7 @@ export default function DevPage() {
                                                         <Button
                                                             size="sm"
                                                             disabled={sendingId === c.id}
-                                                            onClick={(e) => { e.stopPropagation(); handleSend(c.id); }}
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSend(c.id); }}
                                                             className="gap-1.5 bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD] border border-[#3D3C36] h-7 text-[12px] px-2.5"
                                                         >
                                                             {sendingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
@@ -907,33 +906,14 @@ export default function DevPage() {
                                                         variant="ghost"
                                                         size="icon-sm"
                                                         disabled={deletingContactId === c.id}
-                                                        onClick={(e) => { e.stopPropagation(); handleDeleteContact(c.id); }}
+                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteContact(c.id); }}
                                                         className="text-[#C4C0B6] opacity-0 group-hover:opacity-100 hover:text-[#C45D4A] transition-opacity"
                                                     >
                                                         {deletingContactId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
                                                     </Button>
-                                                    {hasDraft ? (
-                                                        isExpanded ? <ChevronUp className="w-4 h-4 text-[#C4C0B6]" /> : <ChevronDown className="w-4 h-4 text-[#C4C0B6]" />
-                                                    ) : null}
+                                                    <ChevronRight className="w-4 h-4 text-[#C4C0B6]" />
                                                 </div>
-                                            </div>
-                                            {/* Expanded draft preview */}
-                                            {isExpanded && hasDraft && (
-                                                <div className="px-4 pb-3 pt-1 border-t border-[#3D3C36]/30">
-                                                    <div className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-4">
-                                                        <div className="text-[11px] text-[#C4C0B6] uppercase tracking-wider mb-1">Subject</div>
-                                                        <div className="text-[14px] text-[#E8E4DD] font-medium mb-3">{c.draftSubject}</div>
-                                                        <div className="text-[11px] text-[#C4C0B6] uppercase tracking-wider mb-1">Body</div>
-                                                        <pre className="text-[13px] text-[#E8E4DD]/80 leading-relaxed whitespace-pre-wrap font-sans">{c.draftBody}</pre>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {isExpanded && !hasDraft && (
-                                                <div className="px-4 pb-3 pt-1 border-t border-[#3D3C36]/30">
-                                                    <p className="text-[13px] text-[#C4C0B6] italic">No draft yet. Ask Claude Code to generate one.</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        </Link>
                                     );
                                 })}
                             </div>

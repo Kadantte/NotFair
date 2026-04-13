@@ -129,6 +129,7 @@ export const contacts = pgTable("contacts", {
   bounceCount: integer("bounce_count").default(0).notNull(),
   draftSubject: text("draft_subject"),
   draftBody: text("draft_body"),
+  gmailDraftId: text("gmail_draft_id"),
   scheduledAt: timestamp("scheduled_at"),
   lastContactedAt: timestamp("last_contacted_at"),
   unsubscribed: boolean("unsubscribed").default(false).notNull(),

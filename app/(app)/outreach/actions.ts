@@ -3,10 +3,35 @@
 import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import { validateEmails } from "@/lib/email-validation";
+import { getSession } from "@/lib/session";
+import {
+  isGmailConfigured,
+  upsertDraft,
+  sendDraft,
+  invalidateThreadCache,
+} from "@/lib/gmail";
+
+async function requireDev() {
+  const session = await getSession();
+  if (!session.connected || !session.isDev) {
+    throw new Error("Forbidden");
+  }
+}
+
+async function loadContact(contactId: number) {
+  const [contact] = await db()
+    .select()
+    .from(schema.contacts)
+    .where(eq(schema.contacts.id, contactId))
+    .limit(1);
+  if (!contact) throw new Error("Contact not found");
+  return contact;
+}
 
 // ─── Contacts (Leads) ──────────────────────────────────────────────
 
 export async function getContactsAction() {
+  await requireDev();
   return db()
     .select()
     .from(schema.contacts)
@@ -16,6 +41,7 @@ export async function getContactsAction() {
 export async function importContactsAction(
   rows: { email: string; firstName?: string; lastName?: string; company?: string }[]
 ) {
+  await requireDev();
   if (rows.length === 0) return { imported: 0, skipped: 0 };
 
   const seen = new Set<string>();
@@ -61,23 +87,92 @@ export async function importContactsAction(
 }
 
 export async function deleteContactAction(contactId: number) {
+  await requireDev();
   await db()
     .delete(schema.contacts)
     .where(eq(schema.contacts.id, contactId));
 }
 
-export async function saveDraftAction(
+/**
+ * Save a draft and mirror it to Gmail so it appears in the Gmail Drafts folder.
+ * Uses the contact's stored gmailDraftId to update the same draft on subsequent saves.
+ * Falls back to local-only save if Gmail isn't configured.
+ */
+export async function saveDraftAndSyncGmailAction(
   contactId: number,
   subject: string,
-  body: string
-) {
+  body: string,
+): Promise<{ gmailDraftId: string | null; gmailSynced: boolean; syncError: string | null }> {
+  await requireDev();
+  const contact = await loadContact(contactId);
+
+  let gmailDraftId: string | null = contact.gmailDraftId ?? null;
+  let gmailSynced = false;
+  let syncError: string | null = null;
+  if (isGmailConfigured()) {
+    try {
+      gmailDraftId = await upsertDraft({
+        to: contact.email,
+        subject,
+        body,
+        draftId: gmailDraftId,
+      });
+      gmailSynced = true;
+      invalidateThreadCache(contact.email);
+    } catch (err) {
+      syncError = err instanceof Error ? err.message : String(err);
+      console.error("Gmail draft sync failed:", err);
+    }
+  }
+
   await db()
     .update(schema.contacts)
-    .set({ draftSubject: subject, draftBody: body, status: "drafted" })
+    .set({
+      draftSubject: subject,
+      draftBody: body,
+      status: "drafted",
+      gmailDraftId,
+    })
+    .where(eq(schema.contacts.id, contactId));
+
+  return { gmailDraftId, gmailSynced, syncError };
+}
+
+/**
+ * Send the contact's draft via Gmail (not Resend) so the full thread stays in
+ * tong's Gmail — drafts → Sent → replies all in one place. Mirrors status.
+ */
+export async function sendDraftViaGmailAction(contactId: number) {
+  await requireDev();
+  const contact = await loadContact(contactId);
+  if (!contact.draftSubject || !contact.draftBody) throw new Error("No draft to send");
+  if (contact.unsubscribed || contact.status === "bounced") {
+    throw new Error("Contact is unsubscribed or previously bounced");
+  }
+
+  const draftId =
+    contact.gmailDraftId ??
+    (await upsertDraft({
+      to: contact.email,
+      subject: contact.draftSubject,
+      body: contact.draftBody,
+      draftId: null,
+    }));
+  await sendDraft(draftId);
+  invalidateThreadCache(contact.email);
+
+  await db()
+    .update(schema.contacts)
+    .set({
+      status: "contacted",
+      lastContactedAt: new Date(),
+      gmailDraftId: null,
+    })
     .where(eq(schema.contacts.id, contactId));
 }
 
 export async function scheduleContactAction(contactId: number, scheduledAt: Date) {
+  await requireDev();
   await db()
     .update(schema.contacts)
     .set({ status: "scheduled", scheduledAt })
@@ -85,13 +180,9 @@ export async function scheduleContactAction(contactId: number, scheduledAt: Date
 }
 
 export async function sendOutreachAction(contactId: number) {
-  const [contact] = await db()
-    .select()
-    .from(schema.contacts)
-    .where(eq(schema.contacts.id, contactId))
-    .limit(1);
-
-  if (!contact || !contact.draftSubject || !contact.draftBody) {
+  await requireDev();
+  const contact = await loadContact(contactId);
+  if (!contact.draftSubject || !contact.draftBody) {
     throw new Error("No draft to send");
   }
 

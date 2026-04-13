@@ -2,6 +2,23 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.18.0] - 2026-04-13
+
+### Added
+- Internal mini-CRM on each contact's profile page at `/dev/contacts/[id]` — see the full Gmail thread history with a contact, edit drafts inline, and send directly via Gmail so sent mail and replies land in your own inbox
+- Contact rows on `/dev` now link straight to the profile with prefetch, so opening a contact feels instant
+- New migration `0017_add_gmail_draft_id.sql` adds `contacts.gmail_draft_id` so saved drafts stay in sync with Gmail Drafts across sessions
+
+### Changed
+- All outreach server actions (`getContactsAction`, `importContactsAction`, `deleteContactAction`, `scheduleContactAction`, `sendOutreachAction`, and the new Gmail actions) now require a dev session — previously unauthenticated callers could hit the RPC endpoints directly and dump/mutate contacts
+- `sendDraftViaGmailAction` skips a redundant Gmail API call when a draft is already synced, shaving one round trip off every send
+- Gmail thread lookup caches results for 45 seconds per contact email and invalidates on save/send, cutting ~16 Gmail API calls per profile page navigation
+- `saveDraftAndSyncGmailAction` surfaces Gmail sync failures to the editor instead of silently swallowing them
+
+### Removed
+- Dead code: `saveDraftAction` (zero callers anywhere in the repo)
+- Inline draft expand panel on `/dev` — replaced by the dedicated profile page
+
 ## [0.2.17.0] - 2026-04-13
 
 ### Changed
