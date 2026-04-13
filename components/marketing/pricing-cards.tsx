@@ -51,7 +51,7 @@ export const MANAGED_FEATURES = [
   "Dedicated growth manager",
   "Google & Meta Ads management",
   "SEO — on-page & technical",
-  "Website hosting included",
+  "Website hosting & management included",
   "Content & conversion optimization",
   "Monthly strategy calls",
 ];
@@ -95,10 +95,10 @@ export function PricingHeader() {
         Pricing
       </p>
       <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-        From self-serve to fully managed
+        We don&apos;t manage ads. We build growth engines.
       </h2>
       <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-        Start with a free audit. Upgrade when you see the results. Or let us run your entire growth engine — ads, SEO, and website — end to end.
+        Website, ad creative, and Claude — wired together into one system.
       </p>
     </div>
   );
@@ -379,6 +379,9 @@ export function PricingCards({
             </div>
             <p className="mt-1 font-mono text-[11px] text-[#C4C0B6]">
               or 2.5% of ad budget — whichever is more
+            </p>
+            <p className="mt-0.5 font-mono text-[11px] text-[#C4C0B6]">
+              includes website hosting &amp; management
             </p>
           </div>
           <div className="mt-4 rounded-md border border-[#4CAF6E]/25 bg-[#4CAF6E]/10 px-3 py-2">
