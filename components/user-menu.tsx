@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, LogOut, ChevronRight } from "lucide-react";
+import { CreditCard, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -121,9 +121,7 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
           type="button"
           suppressHydrationWarning
           title={email ?? "Account"}
-          className={`group flex h-12 items-center rounded-lg text-[#C4C0B6] transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
-            isCollapsed ? "w-12 justify-center px-0" : "w-full justify-start gap-3 px-2"
-          }`}
+          className="flex h-9 w-9 items-center justify-center rounded-full text-[#C4C0B6] transition-all duration-200 ease-out hover:ring-2 hover:ring-[#E8E4DD]/15"
         >
           {picture && !imgFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -132,35 +130,23 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
               alt=""
               referrerPolicy="no-referrer"
               onError={() => setImgFailed(true)}
-              className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-[#3D3C36]"
+              className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-[#3D3C36]"
             />
           ) : (
             <span
               aria-hidden="true"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/15 text-[13px] font-semibold uppercase text-[#4CAF6E] ring-1 ring-[#4CAF6E]/30"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/15 text-[13px] font-semibold uppercase text-[#4CAF6E] ring-1 ring-[#4CAF6E]/30"
             >
               {initialChar}
             </span>
           )}
-          <span
-            className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-[13px] font-medium text-[#E8E4DD] transition-all duration-200 ease-out ${
-              isCollapsed ? "max-w-0 opacity-0" : "max-w-32 opacity-100"
-            }`}
-          >
-            {label}
-          </span>
-          <ChevronRight
-            className={`h-4 w-4 shrink-0 text-[#C4C0B6] transition-all duration-200 ease-out ${
-              isCollapsed ? "max-w-0 opacity-0" : "opacity-100"
-            }`}
-          />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="end"
-        side="right"
-        sideOffset={14}
+        side="bottom"
+        sideOffset={4}
         className="w-[240px] border-[#3D3C36] bg-[#24231F] text-[#E8E4DD]"
       >
         {/* Profile header */}

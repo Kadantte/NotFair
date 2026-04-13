@@ -617,3 +617,17 @@ export async function getUsageAction() {
     ]);
     return { ...info, hourly };
 }
+
+const SLACK_FEEDBACK_WEBHOOK =
+    'https://hooks.slack.com/services/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';
+
+export async function submitFeedback(message: string) {
+    const auth = await getSessionAuth();
+    const email = auth?.googleEmail ?? 'anonymous';
+    const text = `*${email}*\n${message}`;
+    await fetch(SLACK_FEEDBACK_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+    });
+}

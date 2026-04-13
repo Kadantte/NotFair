@@ -129,22 +129,22 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
     }
 
     return (
-        <div ref={ref} className="relative px-2 pb-2">
+        <div ref={ref} className="relative">
             <button
                 type="button"
                 onClick={() => canSwitch && setOpen(!open)}
-                className={`flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left transition hover:bg-[#E8E4DD]/6 ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
+                className={`flex h-9 items-center gap-2.5 rounded-md text-left transition hover:bg-[#E8E4DD]/6 ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
             >
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-[#4CAF6E]/15 text-[11px] font-semibold text-[#4CAF6E]">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#4CAF6E]/15 text-[12px] font-semibold text-[#4CAF6E]">
                     {(active?.name || 'A')[0].toUpperCase()}
                 </div>
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#E8E4DD]">
+                <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#E8E4DD]">
                     {displayName}
                 </span>
-                <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[#C4C0B6] transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-[#C4C0B6] transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && (
-                <div className="absolute left-2 right-2 top-11 z-50 rounded-lg border border-[#3D3C36] bg-[#24231F] py-1 shadow-xl">
+                <div className="absolute left-0 top-10 z-50 min-w-[220px] rounded-lg border border-[#3D3C36] bg-[#24231F] py-1 shadow-xl">
                     {data.customerIds.map((account) => (
                         <button
                             key={account.id}
