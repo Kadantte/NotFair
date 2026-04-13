@@ -263,18 +263,18 @@ export function PricingCards({
       </div>
 
       {/* Plan cards */}
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
+      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {/* Free */}
-        <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-8">
-          <div className="flex items-baseline justify-between">
+        <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 sm:p-7 lg:p-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Free</h3>
             <span className="font-mono text-xs uppercase tracking-wider text-[#C4C0B6]">
               starter
             </span>
           </div>
           <p className="mt-2 text-sm text-[#C4C0B6]">Kick the tires risk-free.</p>
-          <div className="mt-6 flex items-baseline gap-1">
-            <span className="font-display text-5xl font-bold text-[#E8E4DD]">
+          <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
+            <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
               {PRICING.freeMonthly}
             </span>
             <span className="text-sm text-[#C4C0B6]">/forever</span>
@@ -324,28 +324,28 @@ export function PricingCards({
         </div>
 
         {/* Growth */}
-        <div className="relative flex flex-col rounded-lg border border-[#4CAF6E] bg-gradient-to-b from-[#24231F] to-[#1F1E1A] p-8 shadow-[0_0_0_1px_rgba(76,175,110,0.15)]">
-          <div className="absolute -top-3 left-8 rounded-full bg-[#4CAF6E] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#1A1917]">
+        <div className="relative flex flex-col rounded-lg border border-[#4CAF6E] bg-gradient-to-b from-[#24231F] to-[#1F1E1A] p-6 sm:p-7 lg:p-8 shadow-[0_0_0_1px_rgba(76,175,110,0.15)]">
+          <div className="absolute -top-3 left-6 rounded-full bg-[#4CAF6E] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#1A1917] sm:left-7 lg:left-8">
             Most popular
           </div>
-          <div className="flex items-baseline justify-between">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Growth</h3>
             <span className="font-mono text-xs uppercase tracking-wider text-[#4CAF6E]">
               unlimited
             </span>
           </div>
           <p className="mt-2 text-sm text-[#C4C0B6]">For serious advertisers.</p>
-          <div className="mt-6 flex items-baseline gap-1">
+          <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
             {interval === "month" ? (
               <>
-                <span className="font-display text-5xl font-bold text-[#E8E4DD]">
+                <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
                   {PRICING.growthMonthly}
                 </span>
                 <span className="text-sm text-[#C4C0B6]">/month</span>
               </>
             ) : (
               <>
-                <span className="font-display text-5xl font-bold text-[#E8E4DD]">
+                <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
                   {PRICING.growthYearlyMonthlyEquivalent}
                 </span>
                 <span className="text-sm text-[#C4C0B6]">/month</span>
@@ -413,33 +413,31 @@ export function PricingCards({
         </div>
 
         {/* Managed */}
-        <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-8">
-          <div className="flex items-baseline justify-between">
+        <div className="relative flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 sm:p-7 lg:p-8">
+          <div className="absolute -top-3 right-6 rounded-full bg-[#C45D4A] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_2px_8px_rgba(196,93,74,0.4)] sm:right-7 lg:right-8">
+            Limited time · 50% off
+          </div>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Managed</h3>
             <span className="font-mono text-xs uppercase tracking-wider text-[#D4882A]">
               done-for-you
             </span>
           </div>
           <p className="mt-2 text-sm text-[#C4C0B6]">We run your ads. You run your business.</p>
-          <div className="mt-3 flex items-start gap-2">
-            <span className="shrink-0 rounded-full bg-[#C45D4A] px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white whitespace-nowrap">
-              50% off
-            </span>
-            <span className="text-xs leading-snug text-[#C4C0B6]">
-              <span className="font-bold text-[#D4882A]">50 spots</span> left — price doubles after
-            </span>
+          <div className="mt-3 rounded-md border border-[#D4882A]/30 bg-[#D4882A]/10 px-3 py-2 text-sm font-medium text-[#D4882A]">
+            <span className="font-bold">50 spots</span> left — price doubles after
           </div>
           <div className="mt-6">
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className="text-2xl font-medium text-[#C4C0B6] line-through">5%</span>
-              <span className="font-display text-5xl font-bold text-[#E8E4DD]">
+              <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
                 2.5%
               </span>
               <span className="text-sm text-[#C4C0B6]">of ad spend</span>
             </div>
-            <p className="mt-2 text-xs text-[#C4C0B6]">
-              Starting from <span className="text-[#C4C0B6] line-through">$999</span>{" "}
-              <span className="font-medium text-[#E8E4DD]">{PRICING.managedMonthly}/mo</span>
+            <p className="mt-2 text-sm text-[#C4C0B6]">
+              Starting from <span className="text-base text-[#C4C0B6] line-through">$999</span>{" "}
+              <span className="text-base font-semibold text-[#E8E4DD]">{PRICING.managedMonthly}/mo</span>
             </p>
             <div className="mt-3 rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-3 py-2">
               <p className="font-mono text-[10px] uppercase tracking-wider text-[#4CAF6E]">
