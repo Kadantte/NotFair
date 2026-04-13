@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star } from "lucide-react";
 import { AuditCTA } from "@/components/marketing/audit-cta";
+import { DiscordLink } from "@/components/discord-link";
 
 function formatStars(count: number): string {
     if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -53,6 +54,10 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                 <div className="flex items-center gap-5">
                     <NavLink href="/google-ads-audit" label="Free Google Ads Audit" className="hidden sm:inline" />
                     <NavLink href="/google-ads-claude-connector" label="Google Ads Claude Connector Setup Guide" className="hidden lg:inline" />
+                    <DiscordLink
+                        location="header"
+                        className="hidden items-center gap-1.5 text-[14px] font-medium text-[#8B9FF5] transition-colors hover:text-[#B0BFF9] sm:inline-flex"
+                    />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"

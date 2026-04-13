@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { allLandingPages } from "@/lib/marketing-pages";
+import { DiscordLink } from "@/components/discord-link";
 
 export function SiteFooter() {
     const articleLinks = allLandingPages.map((page) => ({
@@ -55,6 +56,10 @@ export function SiteFooter() {
                             >
                                 Terms of Service
                             </Link>
+                            <DiscordLink
+                                location="footer"
+                                className="inline-flex items-center gap-1.5 py-1.5 text-sm text-[#8B9FF5] transition-colors hover:text-[#B0BFF9]"
+                            />
                         </div>
                     </div>
                 </div>

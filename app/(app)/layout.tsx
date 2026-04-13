@@ -10,6 +10,7 @@ import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { ImpersonationBanner } from '@/components/impersonation-banner';
 import { onThreadEvent } from '@/lib/thread-events';
+import { DiscordLink } from '@/components/discord-link';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -327,6 +328,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     collapsed={isCollapsed}
                 />
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} />}
+                <DiscordLink
+                    location="sidebar"
+                    className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
+                    iconClassName="h-[18px] w-[18px] shrink-0 fill-current"
+                >
+                    <span
+                        className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
+                            isCollapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
+                        }`}
+                    >
+                        Join Discord
+                    </span>
+                </DiscordLink>
                 <div className="pt-1">
                     <UserMenu isCollapsed={isCollapsed} />
                 </div>
