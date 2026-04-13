@@ -32,7 +32,7 @@ function formatYTick(v: number): string {
     return v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v);
 }
 
-function UsageTooltip({ active, payload, label }: TooltipProps<number, string>) {
+function UsageTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey?: string; value?: number; color?: string }>; label?: string }) {
     if (!active || !payload?.length) return null;
     const reads = (payload.find((p) => p.dataKey === 'reads')?.value ?? 0) as number;
     const writes = (payload.find((p) => p.dataKey === 'writes')?.value ?? 0) as number;
