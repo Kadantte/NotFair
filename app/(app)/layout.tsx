@@ -117,8 +117,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [sidebarThreads, setSidebarThreads] = useState<{ id: string; title: string; updatedAt: string }[]>([]);
     const isOnChat = pathname.startsWith('/chat');
     const [isDev, setIsDev] = useState(false);
-    const [plan, setPlan] = useState<string>('free');
+    const [plan, setPlan] = useState<string | null>(null);
     const isFree = plan === 'free';
+    const planLoaded = plan !== null;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const refreshThreads = useCallback(() => {
@@ -168,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         fetch('/api/subscription', { credentials: 'include' })
             .then(r => (r.ok ? r.json() : null))
-            .then(sub => { if (sub?.plan) setPlan(sub.plan); })
+            .then(sub => setPlan(sub?.plan ?? 'free'))
             .catch(() => {});
     }, []);
 
@@ -395,17 +396,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F] px-5">
                     <div className="flex items-center gap-2.5">
                         <AccountSwitcher collapsed={false} />
-                        <span className={`inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold tracking-wide ${
-                            isFree
-                                ? 'bg-[#E8E4DD]/8 text-[#C4C0B6]'
-                                : 'bg-[#4CAF6E]/15 text-[#4CAF6E]'
-                        }`}>
-                            {plan.charAt(0).toUpperCase() + plan.slice(1)}
-                        </span>
+                        {planLoaded && (
+                            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold tracking-wide ${
+                                isFree
+                                    ? 'bg-[#E8E4DD]/8 text-[#C4C0B6]'
+                                    : 'bg-[#4CAF6E]/15 text-[#4CAF6E]'
+                            }`}>
+                                {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <FeedbackButton />
-                        {isFree && (
+                        {planLoaded && isFree && (
                             <Link href="/upgrade" prefetch onClick={() => trackEvent('upgrade_clicked', { location: 'header', page: pathname })}>
                                 <Button
                                     type="button"
