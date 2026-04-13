@@ -46,11 +46,22 @@ export const GROWTH_FEATURES = [
   "Cancel any time — no contracts",
 ];
 
+export const MANAGED_FEATURES = [
+  "Everything in Growth",
+  "Dedicated growth manager",
+  "Google & Meta Ads management",
+  "SEO — on-page & technical",
+  "Website hosting included",
+  "Content & conversion optimization",
+  "Monthly strategy calls",
+];
+
 export const PRICING = {
   freeMonthly: "$0",
   growthMonthly: "$99",
   growthYearly: "$950",
   growthYearlyMonthlyEquivalent: "$79",
+  managedMonthly: "$499",
 };
 
 type Interval = "month" | "year";
@@ -84,10 +95,10 @@ export function PricingHeader() {
         Pricing
       </p>
       <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-        A fraction of what agencies charge
+        From self-serve to fully managed
       </h2>
       <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-        Start with a free audit. Upgrade when you see the results. Cancel anytime — no contracts.
+        Start with a free audit. Upgrade when you see the results. Or let us run your entire growth engine — ads, SEO, and website — end to end.
       </p>
     </div>
   );
@@ -198,7 +209,7 @@ export function PricingCards({
       </div>
 
       {/* Plan cards */}
-      <div className="mt-10 grid gap-6 md:grid-cols-2">
+      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Free */}
         <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-8">
           <div className="flex items-baseline justify-between">
@@ -344,6 +355,64 @@ export function PricingCards({
                 Renews {currentInterval ?? ""} on {new Date(currentPeriodEnd).toLocaleDateString()}
               </p>
             )}
+          </div>
+        </div>
+
+        {/* Managed */}
+        <div className="relative flex flex-col rounded-lg border border-[#C4C0B6]/30 bg-gradient-to-b from-[#2E2D28] to-[#24231F] p-8">
+          <div className="absolute -top-3 left-8 rounded-full border border-[#C4C0B6]/30 bg-[#2E2D28] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#C4C0B6]">
+            Done for you
+          </div>
+          <div className="flex items-baseline justify-between">
+            <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Managed</h3>
+            <span className="font-mono text-xs uppercase tracking-wider text-[#C4C0B6]">
+              per account
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-[#C4C0B6]">We run your growth engine.</p>
+          <div className="mt-6">
+            <div className="flex items-baseline gap-1">
+              <span className="font-display text-5xl font-bold text-[#E8E4DD]">
+                {PRICING.managedMonthly}
+              </span>
+              <span className="text-sm text-[#C4C0B6]">/month</span>
+            </div>
+            <p className="mt-1 font-mono text-[11px] text-[#C4C0B6]">
+              or 2.5% of ad budget — whichever is more
+            </p>
+          </div>
+          <div className="mt-4 rounded-md border border-[#4CAF6E]/25 bg-[#4CAF6E]/10 px-3 py-2">
+            <p className="font-mono text-[11px] uppercase tracking-wider text-[#5DBE82]">
+              Guaranteed
+            </p>
+            <p className="mt-0.5 text-sm text-[#C4C0B6]">
+              5% improvement to your ads ROI — or you don&apos;t pay.
+            </p>
+          </div>
+          <ul className="mt-8 space-y-3">
+            {MANAGED_FEATURES.map((f) => (
+              <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
+                <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-auto pt-8">
+            <a
+              href="mailto:tong@adsagent.org?subject=Managed%20Plan"
+              onClick={() =>
+                trackEvent("pricing_cta_clicked", {
+                  page,
+                  plan: "managed",
+                  interval,
+                  action: "contact",
+                })
+              }
+              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#C4C0B6]/40 bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#3D3C36]/40 hover:border-[#E8E4DD]/60"
+            >
+              Talk to us
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </a>
           </div>
         </div>
       </div>
