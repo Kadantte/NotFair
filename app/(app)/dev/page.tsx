@@ -12,6 +12,47 @@ import {
     scheduleContactAction,
 } from '../outreach/actions';
 import { deriveMetrics, STATUS_CONFIG, BOUNCE_RATE_WARN } from '@/lib/outreach-metrics';
+import {
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+} from 'recharts';
+import type { TooltipProps } from 'recharts';
+
+const CHART_MARGIN = { top: 4, right: 8, left: 0, bottom: 32 };
+const CHART_CURSOR = { fill: '#3D3C36', opacity: 0.4 };
+const LEGEND_STYLE = { color: '#C4C0B6', fontSize: 12, paddingTop: 8 };
+
+function formatYTick(v: number): string {
+    return v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v);
+}
+
+function UsageTooltip({ active, payload, label }: TooltipProps<number, string>) {
+    if (!active || !payload?.length) return null;
+    const reads = (payload.find((p) => p.dataKey === 'reads')?.value ?? 0) as number;
+    const writes = (payload.find((p) => p.dataKey === 'writes')?.value ?? 0) as number;
+    return (
+        <div className="bg-[#2E2D28] border border-[#3D3C36] rounded-lg px-3 py-2 shadow-lg text-xs font-mono">
+            <div className="text-[#C4C0B6] mb-1.5">{label}</div>
+            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                <span className="w-2 h-2 rounded-sm bg-[#4CAF6E] inline-block" />
+                {reads.toLocaleString()} reads
+            </div>
+            <div className="flex items-center gap-2 text-[#D4882A] mt-0.5">
+                <span className="w-2 h-2 rounded-sm bg-[#D4882A] inline-block" />
+                {writes.toLocaleString()} writes
+            </div>
+            <div className="text-[#E8E4DD] mt-1 pt-1 border-t border-[#3D3C36]">
+                {(reads + writes).toLocaleString()} total
+            </div>
+        </div>
+    );
+}
 
 type DailyUsage = {
     date: string;
@@ -320,8 +361,6 @@ export default function DevPage() {
         }
     }
 
-    const maxTotal = Math.max(stats?.dailyUsage.reduce((max, d) => Math.max(max, d.total), 0) ?? 0, 1);
-
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
@@ -399,100 +438,42 @@ export default function DevPage() {
                                 )}
                             </div>
 
-                            {/* Mobile: card layout */}
-                            <div className="sm:hidden space-y-2">
-                                {stats.dailyUsage.length === 0 ? (
-                                    <p className="text-sm text-[#C4C0B6] text-center py-8">No API usage in the last 30 days</p>
-                                ) : stats.dailyUsage.map(day => (
-                                    <div key={day.date} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm text-[#E8E4DD] font-mono tabular-nums">{day.date}</span>
-                                            <span className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{day.total.toLocaleString()} total</span>
-                                        </div>
-                                        <div className="flex items-center gap-1 h-3 mb-2">
-                                            <div
-                                                className="h-full rounded-sm bg-[#4CAF6E]/60"
-                                                style={{ width: `${(day.reads / maxTotal) * 100}%` }}
+                            {stats.dailyUsage.length === 0 ? (
+                                <p className="text-sm text-[#C4C0B6] text-center py-8">No API usage in the last 30 days</p>
+                            ) : (
+                                <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 p-4">
+                                    <ResponsiveContainer width="100%" height={320}>
+                                        <BarChart
+                                            data={stats.dailyUsage}
+                                            margin={CHART_MARGIN}
+                                            barCategoryGap="30%"
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                                                tickLine={false}
+                                                angle={-45}
+                                                textAnchor="end"
+                                                interval="preserveStartEnd"
                                             />
-                                            <div
-                                                className="h-full rounded-sm bg-[#D4882A]/60"
-                                                style={{ width: `${(day.writes / maxTotal) * 100}%` }}
+                                            <YAxis
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickFormatter={formatYTick}
+                                                width={40}
                                             />
-                                        </div>
-                                        <div className="flex items-center gap-4 text-xs">
-                                            <span className="text-[#C4C0B6]">
-                                                <span className="inline-block w-2 h-2 rounded-sm bg-[#4CAF6E]/60 mr-1" />
-                                                {day.reads.toLocaleString()} reads
-                                            </span>
-                                            <span className="text-[#D4882A]">
-                                                <span className="inline-block w-2 h-2 rounded-sm bg-[#D4882A]/60 mr-1" />
-                                                {day.writes.toLocaleString()} writes
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Desktop: table layout */}
-                            <div className="hidden sm:block border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-[#3D3C36]">
-                                            {['Date', 'Reads', 'Writes', 'Total', ''].map((h, i) => (
-                                                <th key={i} className="px-4 py-3 text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
-                                                    {h}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stats.dailyUsage.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#C4C0B6]">
-                                                    No API usage in the last 30 days
-                                                </td>
-                                            </tr>
-                                        ) : stats.dailyUsage.map(day => (
-                                            <tr key={day.date} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
-                                                <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums">
-                                                    {day.date}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#C4C0B6] font-mono tabular-nums">
-                                                    {day.reads.toLocaleString()}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#D4882A] font-mono tabular-nums">
-                                                    {day.writes.toLocaleString()}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">
-                                                    {day.total.toLocaleString()}
-                                                </td>
-                                                <td className="px-4 py-2.5 w-[40%]">
-                                                    <div className="flex items-center gap-1 h-4">
-                                                        <div
-                                                            className="h-3 rounded-sm bg-[#4CAF6E]/60"
-                                                            style={{ width: `${(day.reads / maxTotal) * 100}%` }}
-                                                        />
-                                                        <div
-                                                            className="h-3 rounded-sm bg-[#D4882A]/60"
-                                                            style={{ width: `${(day.writes / maxTotal) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {stats.dailyUsage.length > 0 && (
-                                    <div className="px-4 py-2 border-t border-[#3D3C36]/50 flex items-center gap-4 text-[10px] text-[#C4C0B6] uppercase tracking-widest">
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-sm bg-[#4CAF6E]/60" /> Reads
-                                        </span>
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-sm bg-[#D4882A]/60" /> Writes
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
+                                            <Tooltip cursor={CHART_CURSOR} content={<UsageTooltip />} />
+                                            <Legend wrapperStyle={LEGEND_STYLE} />
+                                            <Bar dataKey="reads" name="Reads" stackId="a" fill="#4CAF6E" fillOpacity={0.75} />
+                                            <Bar dataKey="writes" name="Writes" stackId="a" fill="#D4882A" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
                         </div>
 
                     </>
