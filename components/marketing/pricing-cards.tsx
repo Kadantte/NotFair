@@ -4,8 +4,16 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
+import { submitManagedInquiry } from "@/app/actions";
 
 export type PricingPage = "homepage" | "pricing" | "upgrade";
 
@@ -48,12 +56,12 @@ export const GROWTH_FEATURES = [
 
 export const MANAGED_FEATURES = [
   "Everything in Growth",
-  "Dedicated growth manager",
-  "Google & Meta Ads management",
-  "SEO — on-page & technical",
-  "Website hosting & management included",
-  "Content & conversion optimization",
-  "Monthly strategy calls",
+  "Dedicated ads strategist",
+  "Weekly & monthly performance reports",
+  "Campaign strategy & optimization",
+  "Custom audience & keyword research",
+  "Priority Slack/email support",
+  "Cancel any time — no contracts",
 ];
 
 export const PRICING = {
@@ -68,6 +76,7 @@ type Interval = "month" | "year";
 
 export interface PricingSectionProps {
   connected: boolean;
+  email?: string | null;
   currentPlan: string;
   currentInterval: "month" | "year" | null;
   scheduledCancelAt: string | null;
@@ -106,6 +115,7 @@ export function PricingHeader() {
 
 export function PricingCards({
   connected,
+  email,
   currentPlan,
   currentInterval,
   scheduledCancelAt,
@@ -117,7 +127,51 @@ export function PricingCards({
   const [loading, setLoading] = useState<null | "checkout" | "portal">(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Managed plan modal state
+  const [managedOpen, setManagedOpen] = useState(false);
+  const [managedName, setManagedName] = useState("");
+  const [managedEmail, setManagedEmail] = useState("");
+  const [managedMessage, setManagedMessage] = useState("");
+  const [managedSending, setManagedSending] = useState(false);
+  const [managedSent, setManagedSent] = useState(false);
+
   const isOnGrowth = currentPlan === "growth";
+
+  function openManagedModal() {
+    trackEvent("pricing_cta_clicked", {
+      page,
+      plan: "managed",
+      interval,
+      action: "claim_spot",
+    });
+    setManagedOpen(true);
+  }
+
+  async function handleManagedSubmit() {
+    const submitEmail = connected && email ? email : managedEmail;
+    if (!submitEmail.trim() || managedSending) return;
+    setManagedSending(true);
+    try {
+      await submitManagedInquiry({
+        name: managedName.trim() || undefined,
+        email: submitEmail.trim(),
+        message: managedMessage.trim() || undefined,
+      });
+      trackEvent("managed_inquiry_submitted", { email: submitEmail.trim() });
+      setManagedSent(true);
+      setTimeout(() => {
+        setManagedOpen(false);
+        setManagedSent(false);
+        setManagedName("");
+        setManagedEmail("");
+        setManagedMessage("");
+      }, 2000);
+    } catch {
+      // close gracefully
+    } finally {
+      setManagedSending(false);
+    }
+  }
 
   async function handleCheckout() {
     setError(null);
@@ -209,7 +263,7 @@ export function PricingCards({
       </div>
 
       {/* Plan cards */}
-      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid gap-6 md:grid-cols-3">
         {/* Free */}
         <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-8">
           <div className="flex items-baseline justify-between">
@@ -359,66 +413,150 @@ export function PricingCards({
         </div>
 
         {/* Managed */}
-        <div className="relative flex flex-col rounded-lg border border-[#C4C0B6]/30 bg-gradient-to-b from-[#2E2D28] to-[#24231F] p-8">
-          <div className="absolute -top-3 left-8 rounded-full border border-[#C4C0B6]/30 bg-[#2E2D28] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#C4C0B6]">
-            Done for you
-          </div>
+        <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-8">
           <div className="flex items-baseline justify-between">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Managed</h3>
-            <span className="font-mono text-xs uppercase tracking-wider text-[#C4C0B6]">
-              per account
+            <span className="font-mono text-xs uppercase tracking-wider text-[#D4882A]">
+              done-for-you
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">We run your growth engine.</p>
-          <div className="mt-6">
-            <div className="flex items-baseline gap-1">
-              <span className="font-display text-5xl font-bold text-[#E8E4DD]">
-                {PRICING.managedMonthly}
-              </span>
-              <span className="text-sm text-[#C4C0B6]">/month</span>
-            </div>
-            <p className="mt-1 font-mono text-[11px] text-[#C4C0B6]">
-              or 2.5% of ad budget — whichever is more
-            </p>
-            <p className="mt-0.5 font-mono text-[11px] text-[#C4C0B6]">
-              includes website hosting &amp; management
-            </p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">We run your ads. You run your business.</p>
+          <div className="mt-3 flex items-start gap-2">
+            <span className="shrink-0 rounded-full bg-[#C45D4A] px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white whitespace-nowrap">
+              50% off
+            </span>
+            <span className="text-xs leading-snug text-[#C4C0B6]">
+              <span className="font-bold text-[#D4882A]">50 spots</span> left — price doubles after
+            </span>
           </div>
-          <div className="mt-4 rounded-md border border-[#4CAF6E]/25 bg-[#4CAF6E]/10 px-3 py-2">
-            <p className="font-mono text-[11px] uppercase tracking-wider text-[#5DBE82]">
-              Guaranteed
+          <div className="mt-6">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-medium text-[#C4C0B6] line-through">5%</span>
+              <span className="font-display text-5xl font-bold text-[#E8E4DD]">
+                2.5%
+              </span>
+              <span className="text-sm text-[#C4C0B6]">of ad spend</span>
+            </div>
+            <p className="mt-2 text-xs text-[#C4C0B6]">
+              Starting from <span className="text-[#C4C0B6] line-through">$999</span>{" "}
+              <span className="font-medium text-[#E8E4DD]">{PRICING.managedMonthly}/mo</span>
             </p>
-            <p className="mt-0.5 text-sm text-[#C4C0B6]">
-              5% improvement to your ads ROI — or you don&apos;t pay.
-            </p>
+            <div className="mt-3 rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-3 py-2">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-[#4CAF6E]">
+                Guaranteed
+              </p>
+              <p className="mt-1 text-xs font-medium text-[#5DBE82]">
+                5% improvement to your ads ROI — or you don&apos;t pay.
+              </p>
+            </div>
           </div>
           <ul className="mt-8 space-y-3">
             {MANAGED_FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
-                <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
+                <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#D4882A]" />
                 <span>{f}</span>
               </li>
             ))}
           </ul>
           <div className="mt-auto pt-8">
-            <a
-              href="mailto:tong@adsagent.org?subject=Managed%20Plan"
-              onClick={() =>
-                trackEvent("pricing_cta_clicked", {
-                  page,
-                  plan: "managed",
-                  interval,
-                  action: "contact",
-                })
-              }
-              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#C4C0B6]/40 bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#3D3C36]/40 hover:border-[#E8E4DD]/60"
+            <button
+              type="button"
+              onClick={openManagedModal}
+              className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#D4882A] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#C07A22]"
             >
-              Talk to us
+              Claim your spot
               <ArrowRight className="ml-2 h-4 w-4" />
-            </a>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Managed plan inquiry modal */}
+      <Dialog
+        open={managedOpen}
+        onOpenChange={(v) => {
+          setManagedOpen(v);
+          if (!v) {
+            setManagedSent(false);
+            setManagedName("");
+            setManagedEmail("");
+            setManagedMessage("");
+          }
+        }}
+      >
+        <DialogContent className="border-[#3D3C36] bg-[#24231F] text-[#E8E4DD] sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="text-[16px] font-semibold text-[#E8E4DD]">
+              Claim your managed spot
+            </DialogTitle>
+            <DialogDescription className="text-[13px] text-[#C4C0B6]">
+              {connected && email
+                ? `Our ads expert will reach out to you at ${email}.`
+                : "Leave your details and our ads expert will reach out."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {managedSent ? (
+            <div className="flex flex-col items-center gap-2 py-6">
+              <span className="text-[14px] font-medium text-[#4CAF6E]">
+                We&apos;ll be in touch soon!
+              </span>
+            </div>
+          ) : connected && email ? (
+            <div className="space-y-4">
+              <textarea
+                value={managedMessage}
+                onChange={(e) => setManagedMessage(e.target.value)}
+                placeholder="Anything you'd like us to know? (optional)"
+                rows={3}
+                className="w-full resize-none rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleManagedSubmit}
+                disabled={managedSending}
+                className="inline-flex h-10 w-full items-center justify-center rounded-full bg-[#D4882A] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#C07A22] disabled:opacity-60"
+              >
+                {managedSending ? "Sending..." : "Submit"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={managedName}
+                onChange={(e) => setManagedName(e.target.value)}
+                placeholder="Your name"
+                className="w-full rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
+                autoFocus
+              />
+              <input
+                type="email"
+                value={managedEmail}
+                onChange={(e) => setManagedEmail(e.target.value)}
+                placeholder="Your email"
+                className="w-full rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
+              />
+              <textarea
+                value={managedMessage}
+                onChange={(e) => setManagedMessage(e.target.value)}
+                placeholder="Tell us about your ads (optional)"
+                rows={3}
+                className="w-full resize-none rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
+              />
+              <button
+                type="button"
+                onClick={handleManagedSubmit}
+                disabled={!managedEmail.trim() || managedSending}
+                className="inline-flex h-10 w-full items-center justify-center rounded-full bg-[#D4882A] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#C07A22] disabled:opacity-60"
+              >
+                {managedSending ? "Sending..." : "Submit"}
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

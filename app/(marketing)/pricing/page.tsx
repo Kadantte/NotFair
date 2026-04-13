@@ -16,6 +16,7 @@ export default async function Pricing() {
   return (
     <PricingPage
       connected={session.connected}
+      email={session.connected ? session.googleEmail : null}
       currentPlan={subscription?.plan ?? "free"}
       currentInterval={subscription?.interval ?? null}
       scheduledCancelAt={subscription?.scheduledCancelAt?.toISOString() ?? null}

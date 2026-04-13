@@ -631,3 +631,23 @@ export async function submitFeedback(message: string) {
         body: JSON.stringify({ text }),
     });
 }
+
+export async function submitManagedInquiry(data: {
+    name?: string;
+    email: string;
+    message?: string;
+}) {
+    const text = [
+        ':star2: *New Managed Plan Inquiry*',
+        `*Name:* ${data.name ?? '—'}`,
+        `*Email:* ${data.email}`,
+        data.message ? `*Message:* ${data.message}` : '',
+    ]
+        .filter(Boolean)
+        .join('\n');
+    await fetch(SLACK_FEEDBACK_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+    });
+}
