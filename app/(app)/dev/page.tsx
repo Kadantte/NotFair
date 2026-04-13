@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, ChevronUp, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -105,6 +106,7 @@ let cachedContacts: Contact[] | null = null;
 let cachedCustomers: Customer[] | null = null;
 
 export default function DevPage() {
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<Tab>('customers');
     const [stats, setStats] = useState<DevStats | null>(cachedStats);
     const [loading, setLoading] = useState(!cachedStats);
@@ -633,7 +635,12 @@ export default function DevPage() {
                                             const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
                                             const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
                                             return (
-                                            <tr key={c.userId ?? c.primaryAccountId} className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors">
+                                            <tr
+                                                key={c.userId ?? c.primaryAccountId}
+                                                onClick={() => router.push(`/dev/${c.primaryAccountId}`)}
+                                                onMouseEnter={() => router.prefetch(`/dev/${c.primaryAccountId}`)}
+                                                className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors cursor-pointer"
+                                            >
                                                 <td className="px-4 py-2.5">
                                                     <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
                                                     <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
@@ -643,7 +650,7 @@ export default function DevPage() {
                                                         {c.accounts.length === 0 ? (
                                                             <span className="text-sm text-[#C4C0B6]/40">—</span>
                                                         ) : c.accounts.map((a) => (
-                                                            <Link key={a.id} href={`/dev/${a.id}`} prefetch className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#C4C0B6] font-mono hover:border-[#4CAF6E]/30 hover:text-[#E8E4DD] transition-colors">{a.name || a.id}</Link>
+                                                            <Link key={a.id} href={`/dev/${a.id}`} prefetch onClick={(e) => e.stopPropagation()} className="text-[11px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-0.5 text-[#C4C0B6] font-mono hover:border-[#4CAF6E]/30 hover:text-[#E8E4DD] transition-colors">{a.name || a.id}</Link>
                                                         ))}
                                                     </div>
                                                 </td>
