@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-12.
+> Source of truth for all analytics events. Last updated: 2026-04-13.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -290,6 +290,28 @@ No properties.
 
 ---
 
+## managed_inquiry_submitted
+
+**Phase:** 1
+**Category:** value_exchange
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user successfully submits the Managed plan inquiry modal (the Slack webhook POST resolves). The modal is opened by clicking "Claim your spot" on the Managed pricing card. Signed-in users submit with only an optional message (email is pre-filled from session). Not signed-in users submit with name + email + optional message.
+**Hypothesis:** We believe tracking this tells us actual Managed tier lead volume and completion rate from modal-open (`pricing_cta_clicked` with `action: "claim_spot"`) to submission, which lets us judge whether the Managed tier is producing inbound leads worth operationalizing and whether auth-gating the modal would raise or lower lead quality. Pair with `pricing_cta_clicked` to compute modal conversion rate.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `email` | string | `"founder@acme.com"` | The submitter's email — pulled from the Supabase session for signed-in users, or from the modal form for anonymous users. Used as the join key to the Slack inquiry notification. |
+
+```json
+{ "event": "managed_inquiry_submitted", "properties": { "email": "founder@acme.com" } }
+```
+
+**Notes:** Email is PII but is intentionally captured here because the lead *is* the email — same pattern as `user_signed_up.google_email`. The inquiry is also sent to the feedback Slack webhook (`submitManagedInquiry` in `app/actions.ts`) with name + message; only email is sent to PostHog.
+
+**Files:** `components/marketing/pricing-cards.tsx`, `app/actions.ts`
+
+---
+
 ## oauth_credentials_generated
 
 **Phase:** 1
@@ -364,18 +386,18 @@ No properties.
 **Phase:** 1
 **Category:** funnel_entry
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks any CTA button inside the shared `PricingSection` component — Free plan "Get started" / "Get Started" (audit), Growth plan "Get Started" / "Upgrade to Growth" / "Switch interval", or Growth "Manage subscription" portal button. The same component is rendered on the homepage, the standalone `/pricing` page, and the in-app `/upgrade` page; the `page` property attributes the click.
-**Hypothesis:** We believe tracking this tells us paid-conversion funnel entry rate per surface (homepage pricing section vs standalone pricing page vs in-app upgrade page) and per interval (month vs year), which lets us decide where to invest paid-conversion effort and whether the homepage pricing section pulls its weight versus a dedicated `/pricing` page.
+**Trigger:** Fires when a user clicks any CTA button inside the shared `PricingSection` component — Free plan "Get started" / "Get Started" (audit), Growth plan "Get Started" / "Upgrade to Growth" / "Switch interval", Growth "Manage subscription" portal button, or Managed plan "Claim your spot" (opens inquiry modal). The same component is rendered on the homepage, the standalone `/pricing` page, and the in-app `/upgrade` page; the `page` property attributes the click.
+**Hypothesis:** We believe tracking this tells us paid-conversion funnel entry rate per surface (homepage pricing section vs standalone pricing page vs in-app upgrade page), per plan (free / growth / managed), and per interval (month vs year), which lets us decide where to invest paid-conversion effort, whether the homepage pricing section pulls its weight versus a dedicated `/pricing` page, and whether the Managed tier scarcity framing drives interest.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
 | `page` | string | `"homepage"` | Which surface the pricing section was rendered on. Enum: `homepage`, `pricing`, `upgrade` |
-| `plan` | string | `"growth"` | Which plan the CTA belongs to. Enum: `free`, `growth` |
-| `interval` | string | `"year"` | Currently selected billing interval at click time. Enum: `month`, `year` |
-| `action` | string | `"upgrade"` | What the click is requesting. Enum: `signin` (free, logged out → Google OAuth), `open_audit` (free, logged in → /audit), `signin_then_upgrade` (growth, logged out → Google OAuth), `upgrade` (growth, logged in, not on growth → Stripe checkout), `switch_interval` (growth, already on growth, switching month/year), `manage` (growth, on growth → Stripe portal) |
+| `plan` | string | `"growth"` | Which plan the CTA belongs to. Enum: `free`, `growth`, `managed` |
+| `interval` | string | `"year"` | Currently selected billing interval at click time. Enum: `month`, `year`. For `plan: "managed"`, this is the toggle state at click time — pricing does not actually vary by interval for Managed, but the property is still captured. |
+| `action` | string | `"upgrade"` | What the click is requesting. Enum: `signin` (free, logged out → Google OAuth), `open_audit` (free, logged in → /audit), `signin_then_upgrade` (growth, logged out → Google OAuth), `upgrade` (growth, logged in, not on growth → Stripe checkout), `switch_interval` (growth, already on growth, switching month/year), `manage` (growth, on growth → Stripe portal), `claim_spot` (managed, any state → opens inquiry modal) |
 
 ```json
-{ "event": "pricing_cta_clicked", "properties": { "page": "homepage", "plan": "growth", "interval": "year", "action": "upgrade" } }
+{ "event": "pricing_cta_clicked", "properties": { "page": "homepage", "plan": "managed", "interval": "year", "action": "claim_spot" } }
 ```
 
 **Files:** `components/marketing/pricing-cards.tsx`
