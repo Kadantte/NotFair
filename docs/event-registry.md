@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-10.
+> Source of truth for all analytics events. Last updated: 2026-04-12.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -403,6 +403,66 @@ No properties.
 ```
 
 **Files:** `app/auth/callback/route.ts`, `app/api/auth/google/callback/route.ts`
+
+---
+
+## feedback_opened
+
+**Phase:** 1
+**Category:** ambient
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the "Feedback" text button in the app header, opening the feedback modal.
+**Hypothesis:** We believe tracking this tells us how many users consider giving feedback vs actually submitting, which lets us measure the feedback funnel (opened → submitted) and decide if the modal UX has friction.
+
+No properties.
+
+```json
+{ "event": "feedback_opened" }
+```
+
+**Files:** `components/feedback-modal.tsx`
+
+---
+
+## feedback_submitted
+
+**Phase:** 1
+**Category:** value_exchange
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user successfully sends feedback via the modal (Slack webhook POST completes).
+**Hypothesis:** We believe tracking this tells us feedback volume and message length distribution, which lets us gauge user engagement and whether the feedback channel is being used.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `message` | string | `"Add bulk keyword editor"` | The full feedback text submitted by the user |
+| `length` | number | `142` | Character count of the submitted feedback message |
+
+```json
+{ "event": "feedback_submitted", "properties": { "message": "Add bulk keyword editor", "length": 23 } }
+```
+
+**Files:** `components/feedback-modal.tsx`
+
+---
+
+## upgrade_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks either Upgrade button in the app — the green CTA in the top header bar or the nav item in the sidebar footer. Both buttons navigate to `/upgrade`; the `location` property distinguishes them.
+**Hypothesis:** We believe tracking this tells us which placement (persistent header vs sidebar nav) drives more upgrade intent, which lets us decide whether to keep both or consolidate, and informs future placement of conversion CTAs.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `location` | string | `"header"` | Where the button was clicked. Enum: `header` (top bar green CTA), `sidebar` (sidebar footer nav item) |
+| `page` | string | `"/campaigns"` | Current page pathname at click time — shows which page context drives upgrade clicks |
+
+```json
+{ "event": "upgrade_clicked", "properties": { "location": "header", "page": "/campaigns" } }
+```
+
+**Files:** `app/(app)/layout.tsx`
 
 ---
 

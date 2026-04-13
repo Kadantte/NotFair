@@ -31,7 +31,7 @@ export function CheckoutStatusBanner() {
 }
 
 export const FREE_FEATURES = [
-  "300 AI operations per day",
+  "300 Google Ads operations per day",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Read campaign performance, search terms, and recommendations",
   "Make bid and budget edits with guardrails",
@@ -39,7 +39,7 @@ export const FREE_FEATURES = [
 ];
 
 export const GROWTH_FEATURES = [
-  "Unlimited AI operations",
+  "Unlimited Google Ads operations",
   "Everything in Free",
   "Priority support",
   "Early access to new features",

@@ -10,6 +10,9 @@ import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { ImpersonationBanner } from '@/components/impersonation-banner';
 import { onThreadEvent } from '@/lib/thread-events';
+import { DiscordLink } from '@/components/discord-link';
+import { FeedbackButton } from '@/components/feedback-modal';
+import { trackEvent } from '@/lib/analytics';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -48,15 +51,17 @@ function NavItem({
     label,
     active,
     collapsed,
+    onClick,
 }: {
     href: string;
     icon: React.ElementType;
     label: string;
     active: boolean;
     collapsed: boolean;
+    onClick?: () => void;
 }) {
     return (
-        <Link href={href} prefetch>
+        <Link href={href} prefetch onClick={onClick}>
             <Button
                 type="button"
                 variant="ghost"
@@ -112,7 +117,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [sidebarThreads, setSidebarThreads] = useState<{ id: string; title: string; updatedAt: string }[]>([]);
     const isOnChat = pathname.startsWith('/chat');
     const [isDev, setIsDev] = useState(false);
-    const [isOnGrowth, setIsOnGrowth] = useState(false);
+    const [plan, setPlan] = useState<string | null>(null);
+    const isFree = plan === 'free';
+    const planLoaded = plan !== null;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const refreshThreads = useCallback(() => {
@@ -162,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         fetch('/api/subscription', { credentials: 'include' })
             .then(r => (r.ok ? r.json() : null))
-            .then(sub => { if (sub?.plan === 'growth') setIsOnGrowth(true); })
+            .then(sub => setPlan(sub?.plan ?? 'free'))
             .catch(() => {});
     }, []);
 
@@ -220,9 +227,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </Button>
                 )}
             </div>
-
-            {/* Account switcher */}
-            <AccountSwitcher collapsed={isCollapsed} />
 
             {/* Nav items */}
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
@@ -322,14 +326,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <NavItem
                     href="/upgrade"
                     icon={Rocket}
-                    label={isOnGrowth ? 'Pricing' : 'Upgrade'}
+                    label={isFree ? 'Upgrade' : 'Pricing'}
                     active={pathname === '/upgrade'}
                     collapsed={isCollapsed}
+                    onClick={() => trackEvent('upgrade_clicked', { location: 'sidebar', page: pathname })}
                 />
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} />}
-                <div className="pt-1">
-                    <UserMenu isCollapsed={isCollapsed} />
-                </div>
+                <DiscordLink
+                    location="sidebar"
+                    className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
+                    iconClassName="h-[18px] w-[18px] shrink-0 fill-current"
+                >
+                    <span
+                        className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
+                            isCollapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
+                        }`}
+                    >
+                        Join Discord
+                    </span>
+                </DiscordLink>
             </div>
         </>
     ); }
@@ -376,9 +391,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </aside>
 
             {/* Content */}
-            <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-y-auto">
-                <ImpersonationBanner />
-                {children}
+            <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+                {/* Top header bar — fixed, does not scroll */}
+                <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F] px-5">
+                    <div className="flex items-center gap-2.5">
+                        <AccountSwitcher collapsed={false} />
+                        {planLoaded && (
+                            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold tracking-wide ${
+                                isFree
+                                    ? 'bg-[#E8E4DD]/8 text-[#C4C0B6]'
+                                    : 'bg-[#4CAF6E]/15 text-[#4CAF6E]'
+                            }`}>
+                                {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <FeedbackButton />
+                        {planLoaded && isFree && (
+                            <Link href="/upgrade" prefetch onClick={() => trackEvent('upgrade_clicked', { location: 'header', page: pathname })}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-8 rounded-md px-4 text-[13px] font-semibold text-[#1A1917] bg-[#4CAF6E] hover:bg-[#3D9A5C] hover:text-[#1A1917]"
+                                >
+                                    Upgrade
+                                </Button>
+                            </Link>
+                        )}
+                        <UserMenu isCollapsed={false} />
+                    </div>
+                </div>
+                {/* Scrollable content area */}
+                <div className="flex-1 overflow-y-auto">
+                    <ImpersonationBanner />
+                    {children}
+                </div>
             </div>
 
             {/* Mobile bottom navigation */}
