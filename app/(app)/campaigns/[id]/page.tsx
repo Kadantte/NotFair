@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useState, use, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { History, Search, AlertCircle, Sparkles, Loader2, TrendingUp, TrendingDown, MousePointer2, DollarSign, Target, FileText, Link as LinkIcon, Building2, ShieldAlert, ArrowRight } from 'lucide-react';
+import { History, Search, AlertCircle, TrendingUp, TrendingDown, MousePointer2, DollarSign, Target, FileText, Link as LinkIcon, Building2, ShieldAlert, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getCampaignHistoryAction,
     getCampaignKeywordsAction,
     getCampaignAdsAction,
-    generateCampaignSummaryAction,
     listCampaignsAction,
     getConversionActionsAction,
     getCampaignKeywordThemesAction,
@@ -360,9 +359,6 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const [conversionActions, setConversionActions] = useState<ConversionAction[]>([]);
     const [impressionShare, setImpressionShare] = useState<ImpressionShareData | null>(null);
     const [searchTerms, setSearchTerms] = useState<SearchTermRow[]>([]);
-    const [summary, setSummary] = useState<string | null>(null);
-    const [summaryLoading, setSummaryLoading] = useState(false);
-    const [summaryError, setSummaryError] = useState<string | null>(null);
 
     const totals = useMemo(() => history.reduce(
         (acc, d) => ({
@@ -456,21 +452,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const handleGenerateSummary = async () => {
-        setSummaryLoading(true);
-        setSummaryError(null);
-        try {
-            const result = await generateCampaignSummaryAction(history, keywords, campaignId);
-            setSummary(result);
-        } catch (err) {
-            console.error(err);
-            setSummaryError('Failed to generate AI summary. Please try again.');
-        } finally {
-            setSummaryLoading(false);
-        }
-    };
-
-    const CustomTooltip = ({ active, payload, label }: {
+const CustomTooltip = ({ active, payload, label }: {
         active?: boolean;
         payload?: Array<{ color: string; name: string; value: number }>;
         label?: string;
@@ -973,50 +955,6 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
                                         </table>
                                     </div>
                                 </>
-                            )}
-                        </motion.div>
-
-                        {/* ── 7. AI Summary ── */}
-                        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-[#4CAF6E]" />
-                                    <h2 className="text-base font-semibold text-[#E8E4DD]">AI Summary</h2>
-                                </div>
-                                <Button
-                                    onClick={handleGenerateSummary}
-                                    disabled={summaryLoading || history.length === 0}
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-[#3D3C36] bg-[#4CAF6E]/10 text-[#4CAF6E] hover:bg-[#4CAF6E]/20 border-[#4CAF6E]/20 disabled:opacity-50"
-                                >
-                                    {summaryLoading ? (
-                                        <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />Analyzing...</>
-                                    ) : (
-                                        <><Sparkles className="w-3.5 h-3.5 mr-2" />{summary ? 'Regenerate' : 'Generate Summary'}</>
-                                    )}
-                                </Button>
-                            </div>
-
-                            {summaryError && (
-                                <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-lg p-3 flex items-center gap-2 text-[#C45D4A] text-sm">
-                                    <AlertCircle className="w-4 h-4 shrink-0" />
-                                    <p>{summaryError}</p>
-                                </div>
-                            )}
-
-                            {!summary && !summaryLoading && !summaryError && (
-                                <p className="text-[#C4C0B6] text-sm">
-                                    Click &quot;Generate Summary&quot; to get an AI-powered analysis of your campaign performance, trends, and recommendations.
-                                </p>
-                            )}
-
-                            {summary && (
-                                <div className="prose prose-sm max-w-none text-[#C4C0B6]
-                                    [&_strong]:text-[#E8E4DD] [&_h1]:text-[#4CAF6E] [&_h2]:text-[#4CAF6E] [&_h3]:text-[#4CAF6E]
-                                    [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs">
-                                    <div dangerouslySetInnerHTML={{ __html: summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
-                                </div>
                             )}
                         </motion.div>
 
