@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, AlertCircle, ArrowLeft, RotateCcw } from 'lucide-react';
+import { RefreshCw, AlertCircle, ArrowLeft, RotateCcw, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DeltaBadge } from '@/components/delta-badge';
 import { formatAction, formatValue, ENTITY_BADGE_COLORS } from '@/lib/operations-format';
@@ -38,6 +38,24 @@ type DailyUsage = {
     total: number;
 };
 
+type CampaignISBreakdown = {
+    campaignName: string;
+    impressionShare: number | null;
+    budgetLostIS: number | null;
+    rankLostIS: number | null;
+    totalImpressions: number;
+    totalCost: number;
+    diagnosis: 'budget' | 'rank' | 'structural' | 'healthy';
+};
+
+type ImpressionShareDiagnosis = {
+    avgIS: number | null;
+    budgetLost: number | null;
+    rankLost: number | null;
+    diagnosis: string;
+    campaignBreakdown: CampaignISBreakdown[];
+};
+
 type AuditSnapshot = {
     id: number;
     overallScore: number;
@@ -49,6 +67,7 @@ type AuditSnapshot = {
     totalSpend: number;
     campaignCount: number;
     topActions: Array<{ action: string; impact: string }>;
+    impressionShareDiagnosis: ImpressionShareDiagnosis | null;
     createdAt: string;
 };
 
@@ -97,21 +116,43 @@ export default function DevAccountDetailPage() {
 
     const maxDaily = Math.max(data?.dailyUsage.reduce((max, d) => Math.max(max, d.total), 0) ?? 0, 1);
 
+    const websiteUrl = data?.email ? deriveWebsiteUrl(data.email) : null;
+    const businessName = data?.connectedAccounts[0]?.name ?? null;
+
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-                <div className="flex w-full items-center gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                <div className="flex w-full items-center gap-3 px-4 py-3 sm:px-6">
                     <Link
                         href="/dev"
-                        className="flex items-center justify-center rounded-lg p-1.5 text-[#C4C0B6] hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] transition-colors"
+                        className="flex items-center justify-center rounded-lg p-1.5 text-[#C4C0B6] hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] transition-colors shrink-0"
                     >
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
-                    <div className="min-w-0 flex-1">
-                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD] truncate">
-                            {data?.email ?? `Account ${accountId}`}
+                    <div className="min-w-0 flex-1 flex items-baseline gap-3 flex-wrap">
+                        <h1 className="text-base sm:text-lg font-semibold tracking-tight text-[#E8E4DD] truncate">
+                            {businessName ?? data?.email ?? `Account ${accountId}`}
                         </h1>
-                        <p className="mt-0.5 text-xs text-[#C4C0B6] font-mono tabular-nums">{accountId}</p>
+                        {data?.email && (
+                            <span className="text-xs text-[#C4C0B6] font-mono truncate">{data.email}</span>
+                        )}
+                        <span className="text-[10px] text-[#C4C0B6]/70 font-mono tabular-nums">{accountId}</span>
+                        {websiteUrl && (
+                            <a
+                                href={websiteUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-[#4CAF6E] hover:underline"
+                            >
+                                {websiteUrl.replace(/^https?:\/\//, '')}
+                                <ExternalLink className="w-3 h-3" />
+                            </a>
+                        )}
+                        {data?.lastLogin && (
+                            <span className="text-[10px] text-[#C4C0B6]/70">
+                                last login {new Date(data.lastLogin).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </span>
+                        )}
                     </div>
                     <Button
                         onClick={() => { cachedDetail = null; fetchDetail(false); }}
@@ -141,53 +182,54 @@ export default function DevAccountDetailPage() {
                     </div>
                 ) : data ? (
                     <>
-                        {/* Summary cards */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <SummaryCard
-                                label="Campaigns"
-                                value={String(data.campaigns.length)}
-                                sub="with operations"
-                            />
-                            <SummaryCard
-                                label="Total Ops"
-                                value={String(data.recentOperations.length)}
-                                sub="recent writes"
-                            />
-                            <SummaryCard
-                                label="Connected"
-                                value={String(data.connectedAccounts.length)}
-                                sub="accounts"
-                            />
-                            <SummaryCard
-                                label="Last Login"
-                                value={data.lastLogin
-                                    ? new Date(data.lastLogin).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                                    : '--'}
-                                sub={data.lastLogin
-                                    ? new Date(data.lastLogin).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-                                    : ''}
-                            />
+                        {/* Two-column command center: audit (left) + reach out (right) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
+                            {/* LEFT: audit (60%) */}
+                            <div className="lg:col-span-3 space-y-4">
+                                {data.auditHistory.length > 0 ? (
+                                    <LatestAuditCard audit={data.auditHistory[0]} />
+                                ) : (
+                                    <div className="rounded-xl border border-[#3D3C36] bg-[#24231F]/40 p-8 text-center text-sm text-[#C4C0B6]">
+                                        No audit yet for this account.
+                                    </div>
+                                )}
+                                {data.auditHistory[0]?.impressionShareDiagnosis && (
+                                    <ImpressionAnalysisCard diagnosis={data.auditHistory[0].impressionShareDiagnosis} />
+                                )}
+                            </div>
+
+                            {/* RIGHT: reach out (40%, sticky on desktop) */}
+                            <div className="lg:col-span-2">
+                                {data.email && (
+                                    <div className="lg:sticky lg:top-0">
+                                        <OutreachPanel email={data.email} alwaysOpen />
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Outreach (Gmail drafts + thread history with this customer) */}
-                        {data.email && <OutreachPanel email={data.email} />}
-
-                        {/* Audit History */}
-                        {data.auditHistory.length > 0 && (
-                            <div>
-                                <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Audit History</h2>
-                                <div className="space-y-2">
-                                    {data.auditHistory.map(audit => (
+                        {/* Past audits (collapsed by default for context) */}
+                        {data.auditHistory.length > 1 && (
+                            <details className="group">
+                                <summary className="cursor-pointer list-none flex items-center gap-2 text-xs text-[#C4C0B6] uppercase tracking-widest hover:text-[#E8E4DD] transition-colors">
+                                    <span className="group-open:rotate-90 transition-transform">&#9654;</span>
+                                    Past audits ({data.auditHistory.length - 1})
+                                </summary>
+                                <div className="mt-3 space-y-2">
+                                    {data.auditHistory.slice(1).map(audit => (
                                         <AuditRow key={audit.id} audit={audit} />
                                     ))}
                                 </div>
-                            </div>
+                            </details>
                         )}
 
                         {/* Daily usage (14d) */}
                         {data.dailyUsage.length > 0 && (
-                            <div>
-                                <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Usage (14d)</h2>
+                            <details className="group">
+                                <summary className="cursor-pointer list-none flex items-center gap-2 text-xs text-[#C4C0B6] uppercase tracking-widest hover:text-[#E8E4DD] transition-colors mb-3">
+                                    <span className="group-open:rotate-90 transition-transform">&#9654;</span>
+                                    Usage (14d) · {data.dailyUsage.reduce((s, d) => s + d.total, 0)} ops
+                                </summary>
                                 <div className="space-y-1.5">
                                     {data.dailyUsage.map(day => (
                                         <div key={day.date} className="flex items-center gap-3">
@@ -218,13 +260,16 @@ export default function DevAccountDetailPage() {
                                         <span className="w-2 h-2 rounded-sm bg-[#D4882A]/60" /> Writes
                                     </span>
                                 </div>
-                            </div>
+                            </details>
                         )}
 
                         {/* Campaigns touched */}
                         {data.campaigns.length > 0 && (
-                            <div>
-                                <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Campaigns</h2>
+                            <details className="group">
+                                <summary className="cursor-pointer list-none flex items-center gap-2 text-xs text-[#C4C0B6] uppercase tracking-widest hover:text-[#E8E4DD] transition-colors mb-3">
+                                    <span className="group-open:rotate-90 transition-transform">&#9654;</span>
+                                    Campaigns touched ({data.campaigns.length})
+                                </summary>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                     {data.campaigns.map(c => (
                                         <div
@@ -250,12 +295,15 @@ export default function DevAccountDetailPage() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </details>
                         )}
 
                         {/* Recent operations */}
-                        <div>
-                            <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3">Recent Operations</h2>
+                        <details className="group">
+                            <summary className="cursor-pointer list-none flex items-center gap-2 text-xs text-[#C4C0B6] uppercase tracking-widest hover:text-[#E8E4DD] transition-colors mb-3">
+                                <span className="group-open:rotate-90 transition-transform">&#9654;</span>
+                                Recent operations ({data.recentOperations.length})
+                            </summary>
                             {data.recentOperations.length === 0 ? (
                                 <div className="text-center py-12 border border-[#3D3C36] rounded-lg bg-[#24231F]/40">
                                     <p className="text-sm text-[#C4C0B6]">No operations recorded</p>
@@ -308,7 +356,7 @@ export default function DevAccountDetailPage() {
                                     ))}
                                 </div>
                             )}
-                        </div>
+                        </details>
                     </>
                 ) : null}
             </div>
@@ -316,14 +364,17 @@ export default function DevAccountDetailPage() {
     );
 }
 
-function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
-    return (
-        <div className="bg-[#24231F] border border-[#3D3C36] rounded-lg p-3 sm:p-4">
-            <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-1.5">{label}</div>
-            <div className="text-xl sm:text-2xl font-semibold text-[#E8E4DD] tabular-nums font-mono">{value}</div>
-            <div className="text-[10px] text-[#C4C0B6] mt-0.5">{sub}</div>
-        </div>
-    );
+const PERSONAL_EMAIL_DOMAINS = new Set([
+    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com',
+    'aol.com', 'protonmail.com', 'proton.me', 'live.com', 'me.com', 'msn.com',
+]);
+
+function deriveWebsiteUrl(email: string): string | null {
+    const at = email.lastIndexOf('@');
+    if (at < 0) return null;
+    const domain = email.slice(at + 1).toLowerCase().trim();
+    if (!domain || PERSONAL_EMAIL_DOMAINS.has(domain)) return null;
+    return `https://${domain}`;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -339,6 +390,117 @@ function scoreColor(score: number) {
     if (score >= 60) return 'text-[#C4C0B6]';
     if (score >= 40) return 'text-[#D4882A]';
     return 'text-[#C45D4A]';
+}
+
+function LatestAuditCard({ audit }: { audit: AuditSnapshot }) {
+    const created = new Date(audit.createdAt);
+    return (
+        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/60 overflow-hidden">
+            <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-[#3D3C36]/60 flex items-center gap-4 flex-wrap">
+                <div className="flex items-baseline gap-2">
+                    <span className={`text-3xl sm:text-4xl font-semibold font-mono tabular-nums ${scoreColor(audit.overallScore)}`}>
+                        {audit.overallScore}
+                    </span>
+                    <span className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">/ 100</span>
+                </div>
+                <span className={`text-sm font-medium ${CATEGORY_COLORS[audit.category] ?? 'text-[#C4C0B6]'}`}>
+                    {audit.category}
+                </span>
+                <div className="ml-auto flex items-center gap-3 sm:gap-4 text-xs text-[#C4C0B6] flex-wrap">
+                    <span>${audit.totalSpend.toFixed(0)} spend</span>
+                    {audit.cpa !== null && <span>CPA ${audit.cpa.toFixed(2)}</span>}
+                    {audit.demandCaptured !== null && <span>{audit.demandCaptured.toFixed(0)}% demand</span>}
+                    <span>{audit.campaignCount} campaign{audit.campaignCount === 1 ? '' : 's'}</span>
+                    <span className="font-mono tabular-nums text-[#C4C0B6]/70">
+                        {created.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                </div>
+            </div>
+            {audit.topActions.length > 0 && (
+                <div className="px-4 py-3 sm:px-5 sm:py-4 space-y-2">
+                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest mb-1">Top actions</div>
+                    {audit.topActions.map((item, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[13px]">
+                            <span className="text-[#D4882A] shrink-0 mt-0.5">&#8226;</span>
+                            <div className="min-w-0">
+                                <span className="text-[#E8E4DD]">{item.action}</span>
+                                {item.impact && (
+                                    <span className="text-[#C4C0B6] ml-1.5">— {item.impact}</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function pct(value: number | null): string {
+    if (value === null || Number.isNaN(value)) return '--';
+    return `${(value * 100).toFixed(0)}%`;
+}
+
+const DIAGNOSIS_BADGE: Record<CampaignISBreakdown['diagnosis'], { label: string; cls: string }> = {
+    healthy: { label: 'Healthy', cls: 'bg-[#4CAF6E]/15 text-[#4CAF6E]' },
+    budget: { label: 'Budget-limited', cls: 'bg-[#D4882A]/15 text-[#D4882A]' },
+    rank: { label: 'Rank-limited', cls: 'bg-[#C45D4A]/15 text-[#C45D4A]' },
+    structural: { label: 'Structural', cls: 'bg-[#C45D4A]/20 text-[#C45D4A]' },
+};
+
+function ImpressionAnalysisCard({ diagnosis }: { diagnosis: ImpressionShareDiagnosis }) {
+    const sorted = [...diagnosis.campaignBreakdown].sort(
+        (a, b) => b.totalImpressions - a.totalImpressions,
+    );
+    return (
+        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/60 overflow-hidden">
+            <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-[#3D3C36]/60">
+                <div className="flex items-baseline justify-between gap-3 mb-1">
+                    <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD]">Impression analysis</h2>
+                    <div className="flex items-baseline gap-3 text-xs text-[#C4C0B6]">
+                        <span><span className="text-[#E8E4DD] font-mono tabular-nums">{pct(diagnosis.avgIS)}</span> captured</span>
+                        <span><span className="text-[#D4882A] font-mono tabular-nums">{pct(diagnosis.budgetLost)}</span> lost to budget</span>
+                        <span><span className="text-[#C45D4A] font-mono tabular-nums">{pct(diagnosis.rankLost)}</span> lost to rank</span>
+                    </div>
+                </div>
+                {/* Stacked bar */}
+                <div className="mt-2 h-2 w-full rounded-full bg-[#1A1917] overflow-hidden flex">
+                    <div className="h-full bg-[#4CAF6E]" style={{ width: `${(diagnosis.avgIS ?? 0) * 100}%` }} />
+                    <div className="h-full bg-[#D4882A]" style={{ width: `${(diagnosis.budgetLost ?? 0) * 100}%` }} />
+                    <div className="h-full bg-[#C45D4A]" style={{ width: `${(diagnosis.rankLost ?? 0) * 100}%` }} />
+                </div>
+                <p className="text-[12px] text-[#C4C0B6] mt-2 leading-relaxed">{diagnosis.diagnosis}</p>
+            </div>
+            {sorted.length > 0 && (
+                <div className="divide-y divide-[#3D3C36]/40">
+                    {sorted.map((c) => {
+                        const badge = DIAGNOSIS_BADGE[c.diagnosis];
+                        return (
+                            <div key={c.campaignName} className="px-4 py-3 sm:px-5">
+                                <div className="flex items-center justify-between gap-3 mb-1.5">
+                                    <span className="text-[13px] text-[#E8E4DD] font-medium truncate">{c.campaignName}</span>
+                                    <span className={`shrink-0 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${badge.cls}`}>
+                                        {badge.label}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[11px] text-[#C4C0B6] font-mono tabular-nums">
+                                    <span>IS {pct(c.impressionShare)}</span>
+                                    <span className="text-[#D4882A]">budget {pct(c.budgetLostIS)}</span>
+                                    <span className="text-[#C45D4A]">rank {pct(c.rankLostIS)}</span>
+                                    <span className="ml-auto text-[#C4C0B6]/70">{c.totalImpressions.toLocaleString()} impr · ${c.totalCost.toFixed(0)}</span>
+                                </div>
+                                <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#1A1917] overflow-hidden flex">
+                                    <div className="h-full bg-[#4CAF6E]" style={{ width: `${(c.impressionShare ?? 0) * 100}%` }} />
+                                    <div className="h-full bg-[#D4882A]" style={{ width: `${(c.budgetLostIS ?? 0) * 100}%` }} />
+                                    <div className="h-full bg-[#C45D4A]" style={{ width: `${(c.rankLostIS ?? 0) * 100}%` }} />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
 }
 
 function AuditRow({ audit }: { audit: AuditSnapshot }) {

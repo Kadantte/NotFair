@@ -245,6 +245,7 @@ export const auditSnapshots = pgTable("audit_snapshots", {
   totalSpend: doublePrecision("total_spend").notNull().default(0),
   campaignCount: smallint("campaign_count").notNull().default(0),
   topActions: jsonb("top_actions").notNull().default([]),
+  impressionShareDiagnosis: jsonb("impression_share_diagnosis"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("audit_snapshots_account_idx").on(table.accountId, table.createdAt),

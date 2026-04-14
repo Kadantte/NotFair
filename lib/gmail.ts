@@ -200,6 +200,96 @@ export async function upsertDraft(args: {
   return data.id ?? "";
 }
 
+export type GmailDraftLookup = {
+  draftId: string;
+  subject: string;
+  body: string;
+};
+
+/**
+ * Find the most recent Gmail draft addressed to `email`, if any. Used so the
+ * Reach out panel surfaces drafts created out-of-band (e.g., via the Gmail MCP
+ * directly) instead of showing an empty editor.
+ */
+export async function findDraftForEmail(email: string): Promise<GmailDraftLookup | null> {
+  const gmail = getClient();
+  const safe = email.replace(/"/g, "");
+  const { data } = await gmail.users.drafts.list({
+    userId: USER_ID,
+    q: `to:"${safe}"`,
+    maxResults: 10,
+  });
+  const drafts = data.drafts ?? [];
+  if (drafts.length === 0) return null;
+  // Drafts list doesn't include headers — fetch each and pick the newest by
+  // internalDate. 10 fetches is fine for the rare lookup path.
+  const full = await Promise.all(
+    drafts
+      .filter((d) => d.id)
+      .map((d) =>
+        gmail.users.drafts.get({ userId: USER_ID, id: d.id!, format: "full" }),
+      ),
+  );
+  let newest: { draftId: string; msg: gmail_v1.Schema$Message; ts: number } | null = null;
+  for (const r of full) {
+    const draftId = r.data.id;
+    const msg = r.data.message;
+    if (!draftId || !msg) continue;
+    const ts = Number(msg.internalDate ?? 0);
+    if (!newest || ts > newest.ts) newest = { draftId, msg, ts };
+  }
+  if (!newest) return null;
+  const subject = header(newest.msg.payload?.headers ?? undefined, "Subject");
+  const body = decodeBody(newest.msg.payload ?? undefined);
+  return { draftId: newest.draftId, subject, body };
+}
+
+/**
+ * List the lowercased recipient emails of every Gmail draft in the mailbox.
+ * Used by the dev customers page to tag rows that already have an outreach
+ * draft prepared (including ones created out-of-band via the Gmail MCP, which
+ * never touch our contacts table). Caps at 500 drafts which is well above
+ * anything we'd realistically have queued.
+ */
+export async function listDraftRecipientEmails(): Promise<Set<string>> {
+  const gmail = getClient();
+  const out = new Set<string>();
+  let pageToken: string | undefined = undefined;
+  let pages = 0;
+  do {
+    const listResp: { data: gmail_v1.Schema$ListDraftsResponse } =
+      await gmail.users.drafts.list({
+        userId: USER_ID,
+        maxResults: 100,
+        pageToken,
+      });
+    const drafts: gmail_v1.Schema$Draft[] = listResp.data.drafts ?? [];
+    if (drafts.length === 0) break;
+    const headers = await Promise.all(
+      drafts
+        .filter((d) => !!d.id)
+        .map((d) =>
+          gmail.users.drafts.get({
+            userId: USER_ID,
+            id: d.id as string,
+            format: "metadata",
+          }),
+        ),
+    );
+    for (const r of headers) {
+      const to = header(r.data.message?.payload?.headers ?? undefined, "To");
+      if (!to) continue;
+      // "Name <email>" or bare "email" — extract the email portion
+      const match = to.match(/<([^>]+)>/);
+      const email = (match ? match[1] : to).trim().toLowerCase();
+      if (email.includes("@")) out.add(email);
+    }
+    pageToken = listResp.data.nextPageToken ?? undefined;
+    pages += 1;
+  } while (pageToken && pages < 5);
+  return out;
+}
+
 export async function sendDraft(draftId: string): Promise<void> {
   const gmail = getClient();
   await gmail.users.drafts.send({ userId: USER_ID, requestBody: { id: draftId } });

@@ -49,9 +49,9 @@ export async function GET(
       return db()
         .select({
           date: sql<string>`${localDate}`.as("date"),
-          reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
-          writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
-          total: sql<number>`count(*)`.as("total"),
+          reads: sql<number>`(count(*) filter (where ${schema.operations.opType} = 0))::int`.as("reads"),
+          writes: sql<number>`(count(*) filter (where ${schema.operations.opType} = 1))::int`.as("writes"),
+          total: sql<number>`count(*)::int`.as("total"),
         })
         .from(schema.operations)
         .where(
@@ -68,8 +68,8 @@ export async function GET(
     db()
       .select({
         campaignId: schema.operations.campaignId,
-        ops: sql<number>`count(*)`.as("ops"),
-        writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
+        ops: sql<number>`count(*)::int`.as("ops"),
+        writes: sql<number>`(count(*) filter (where ${schema.operations.opType} = 1))::int`.as("writes"),
         lastOp: sql<string>`max(${schema.operations.createdAt})`.as("last_op"),
       })
       .from(schema.operations)
@@ -96,6 +96,7 @@ export async function GET(
         totalSpend: schema.auditSnapshots.totalSpend,
         campaignCount: schema.auditSnapshots.campaignCount,
         topActions: schema.auditSnapshots.topActions,
+        impressionShareDiagnosis: schema.auditSnapshots.impressionShareDiagnosis,
         createdAt: schema.auditSnapshots.createdAt,
       })
       .from(schema.auditSnapshots)

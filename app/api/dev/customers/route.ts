@@ -1,8 +1,9 @@
 import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
-import { sql, desc, inArray } from "drizzle-orm";
+import { sql, desc, inArray, isNotNull } from "drizzle-orm";
 import { DEV_EMAILS } from "@/lib/dev-access";
 import { parseCustomerIds } from "@/lib/google-ads";
+import { isGmailConfigured, listDraftRecipientEmails } from "@/lib/gmail";
 
 export async function GET() {
   let googleEmail: string | null = null;
@@ -26,7 +27,7 @@ export async function GET() {
       googleEmail: sql<string | null>`max(${schema.mcpSessions.googleEmail})`.as("google_email"),
       customerId: sql<string>`max(${schema.mcpSessions.customerId})`.as("customer_id"),
       customerIds: sql<string>`max(${schema.mcpSessions.customerIds})`.as("customer_ids"),
-      sessions: sql<number>`count(*)`.as("sessions"),
+      sessions: sql<number>`count(*)::int`.as("sessions"),
       lastSessionAt: sql<string>`max(${schema.mcpSessions.createdAt})`.as("last_session_at"),
       firstSeen: sql<string>`min(${schema.mcpSessions.createdAt})`.as("first_seen"),
     })
@@ -42,8 +43,10 @@ export async function GET() {
     return { ...c, accounts };
   });
 
-  // Batch-fetch account snapshots and operation counts in parallel
-  const [snapshots, opsCounts] = await Promise.all([
+  // Batch-fetch account snapshots, operation counts, contacts (for outreach
+  // status), and Gmail draft recipients in parallel. Gmail is best-effort: if
+  // it fails we just don't show draft pills for out-of-band drafts.
+  const [snapshots, opsCounts, contactsByEmail, draftRecipients] = await Promise.all([
     // Account snapshots (budgets, campaigns)
     (async () => {
       const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
@@ -83,6 +86,39 @@ export async function GET() {
       }
       return map;
     })(),
+    // Contacts keyed by email — surfaces drafted/contacted state from the
+    // outreach panel writes.
+    (async () => {
+      const map = new Map<string, { status: string; hasDraft: boolean; lastContactedAt: string | null }>();
+      const rows = await db()
+        .select({
+          email: schema.contacts.email,
+          status: schema.contacts.status,
+          draftBody: schema.contacts.draftBody,
+          lastContactedAt: schema.contacts.lastContactedAt,
+        })
+        .from(schema.contacts)
+        .where(isNotNull(schema.contacts.email));
+      for (const r of rows) {
+        map.set(r.email.toLowerCase(), {
+          status: r.status,
+          hasDraft: !!r.draftBody,
+          lastContactedAt: r.lastContactedAt ? r.lastContactedAt.toISOString() : null,
+        });
+      }
+      return map;
+    })(),
+    // Gmail draft recipients — best-effort. Catches drafts created via the
+    // Gmail MCP that never touched the contacts table.
+    (async () => {
+      if (!isGmailConfigured()) return new Set<string>();
+      try {
+        return await listDraftRecipientEmails();
+      } catch (err) {
+        console.error("listDraftRecipientEmails failed:", err);
+        return new Set<string>();
+      }
+    })(),
   ]);
 
   const result = parsed.map((c) => {
@@ -106,6 +142,15 @@ export async function GET() {
     // lastActive = most recent of session creation or any operation on their accounts
     const lastActive = lastOp && (lastOp as string) > c.lastSessionAt ? lastOp : c.lastSessionAt;
 
+    // Outreach status: contacted (already sent) wins over drafted. "Drafted"
+    // covers both contacts.draftBody and any out-of-band Gmail draft.
+    const emailKey = c.googleEmail?.toLowerCase() ?? null;
+    const contact = emailKey ? contactsByEmail.get(emailKey) : undefined;
+    const hasGmailDraft = emailKey ? draftRecipients.has(emailKey) : false;
+    let outreachStatus: "contacted" | "drafted" | "none" = "none";
+    if (contact?.status === "contacted") outreachStatus = "contacted";
+    else if (contact?.hasDraft || hasGmailDraft) outreachStatus = "drafted";
+
     return {
       userId: c.userId,
       googleEmail: c.googleEmail,
@@ -118,6 +163,8 @@ export async function GET() {
       reads: totalReads,
       writes: totalWrites,
       totalOps: totalReads + totalWrites,
+      outreachStatus,
+      lastContactedAt: contact?.lastContactedAt ?? null,
     };
   });
 

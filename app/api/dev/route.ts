@@ -45,9 +45,9 @@ export async function GET(request: Request) {
     db()
       .select({
         date: sql<string>`${localDate}`.as("date"),
-        reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
-        writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
-        total: sql<number>`count(*)`.as("total"),
+        reads: sql<number>`(count(*) filter (where ${schema.operations.opType} = 0))::int`.as("reads"),
+        writes: sql<number>`(count(*) filter (where ${schema.operations.opType} = 1))::int`.as("writes"),
+        total: sql<number>`count(*)::int`.as("total"),
       })
       .from(schema.operations)
       .where(whereClause)
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     db()
       .select({
         source: sql<string>`coalesce(${schema.operations.clientSource}, 'chat')`.as("source"),
-        ops: sql<number>`count(*)`.as("ops"),
+        ops: sql<number>`count(*)::int`.as("ops"),
       })
       .from(schema.operations)
       .where(timeFilter)

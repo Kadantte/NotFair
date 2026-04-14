@@ -10,6 +10,7 @@ import {
   sendDraft,
   invalidateThreadCache,
   listThreadsForEmail,
+  findDraftForEmail,
   type GmailThreadSummary,
 } from "@/lib/gmail";
 
@@ -226,13 +227,35 @@ export async function getCustomerOutreachAction(
     }
   }
 
+  // Local DB is the source of truth for drafts the app created. If it's empty
+  // (e.g., draft was created out-of-band via the Gmail MCP), fall back to the
+  // newest matching Gmail draft so the editor isn't blank.
+  const localSubject = contact?.draftSubject ?? "";
+  const localBody = contact?.draftBody ?? "";
+  const hasLocalDraft = !!(localSubject || localBody);
+  let fallbackSubject = "";
+  let fallbackBody = "";
+  let fallbackDraftId: string | null = null;
+  if (gmailConfigured && !gmailError && !hasLocalDraft) {
+    try {
+      const found = await findDraftForEmail(email);
+      if (found) {
+        fallbackSubject = found.subject;
+        fallbackBody = found.body;
+        fallbackDraftId = found.draftId;
+      }
+    } catch (err) {
+      gmailError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
   if (!contact) {
     return {
       contactId: null,
       email,
-      draftSubject: "",
-      draftBody: "",
-      hasGmailDraftId: false,
+      draftSubject: fallbackSubject,
+      draftBody: fallbackBody,
+      hasGmailDraftId: !!fallbackDraftId,
       canSend: true,
       status: "new",
       lastContactedAt: null,
@@ -245,9 +268,9 @@ export async function getCustomerOutreachAction(
   return {
     contactId: contact.id,
     email: contact.email,
-    draftSubject: contact.draftSubject ?? "",
-    draftBody: contact.draftBody ?? "",
-    hasGmailDraftId: !!contact.gmailDraftId,
+    draftSubject: hasLocalDraft ? localSubject : fallbackSubject,
+    draftBody: hasLocalDraft ? localBody : fallbackBody,
+    hasGmailDraftId: !!contact.gmailDraftId || !!fallbackDraftId,
     canSend: !contact.unsubscribed && contact.status !== "bounced",
     status: contact.status,
     lastContactedAt: contact.lastContactedAt
@@ -340,31 +363,39 @@ export async function saveDraftForCustomerAction(
 export async function sendDraftForCustomerAction(rawEmail: string): Promise<void> {
   await requireDev();
   const email = normalizeEmail(rawEmail);
-  const [contact] = await db()
-    .select()
-    .from(schema.contacts)
-    .where(eq(schema.contacts.email, email))
-    .limit(1);
-  if (!contact) throw new Error("No draft found for this customer");
-  if (!contact.draftSubject || !contact.draftBody) throw new Error("No draft to send");
+
+  // Mirror the read path's graceful fallback: a draft created out-of-band
+  // via the Gmail MCP has no contacts row yet, but the editor still shows it
+  // because getCustomerOutreachAction falls back to findDraftForEmail. The
+  // send path needs the same fallback or send-from-editor breaks.
+  const contact = await upsertCustomerContactByEmail(email);
   if (contact.unsubscribed || contact.status === "bounced") {
     throw new Error("Contact is unsubscribed or previously bounced");
   }
 
-  const draftId =
-    contact.gmailDraftId ??
-    (await upsertDraft({
-      to: contact.email,
-      subject: contact.draftSubject,
-      body: contact.draftBody,
-      draftId: null,
-    }));
+  let subject = contact.draftSubject;
+  let body = contact.draftBody;
+  let draftId: string | null = contact.gmailDraftId ?? null;
+
+  if (!subject || !body) {
+    const found = await findDraftForEmail(email);
+    if (!found) throw new Error("No draft found for this customer");
+    subject = found.subject;
+    body = found.body;
+    draftId = found.draftId;
+  }
+
+  if (!draftId) {
+    draftId = await upsertDraft({ to: email, subject, body, draftId: null });
+  }
   await sendDraft(draftId);
-  invalidateThreadCache(contact.email);
+  invalidateThreadCache(email);
 
   await db()
     .update(schema.contacts)
     .set({
+      draftSubject: subject,
+      draftBody: body,
       status: "contacted",
       lastContactedAt: new Date(),
       gmailDraftId: null,

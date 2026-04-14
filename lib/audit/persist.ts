@@ -52,5 +52,6 @@ export async function saveAuditSnapshot(
       action: item.action,
       impact: item.impact,
     })),
+    impressionShareDiagnosis: result.impressionShareDiagnosis,
   });
 }

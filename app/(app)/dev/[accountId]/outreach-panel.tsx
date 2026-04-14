@@ -42,9 +42,13 @@ function writeExpanded(email: string, expanded: boolean): void {
  * so browsing customers does zero DB writes and zero Gmail API calls; opens
  * on click, lazy-loads state, and remembers the open state per-customer in
  * localStorage so repeated visits feel instant.
+ *
+ * Set `alwaysOpen` for a layout where the panel is the primary surface (e.g.,
+ * the two-column command center). In that mode the toggle button is hidden,
+ * state is loaded immediately, and localStorage is bypassed.
  */
-export function OutreachPanel({ email }: { email: string }) {
-  const [expanded, setExpanded] = useState(false);
+export function OutreachPanel({ email, alwaysOpen = false }: { email: string; alwaysOpen?: boolean }) {
+  const [expanded, setExpanded] = useState(alwaysOpen);
   const [state, setState] = useState<CustomerOutreachState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,17 +69,23 @@ export function OutreachPanel({ email }: { email: string }) {
     [email],
   );
 
-  // On mount / email change, restore expand state for this customer. If it
-  // was open before, lazy-load immediately so the return visit is seamless.
+  // On mount / email change: load immediately if alwaysOpen, otherwise restore
+  // collapse state for this customer.
   useEffect(() => {
-    const wasOpen = readExpanded(email);
-    setExpanded(wasOpen);
     setState(null);
     setError(null);
+    if (alwaysOpen) {
+      setExpanded(true);
+      load();
+      return;
+    }
+    const wasOpen = readExpanded(email);
+    setExpanded(wasOpen);
     if (wasOpen) load();
-  }, [email, load]);
+  }, [email, load, alwaysOpen]);
 
   const toggle = useCallback(() => {
+    if (alwaysOpen) return;
     setExpanded((prev) => {
       const next = !prev;
       writeExpanded(email, next);
@@ -85,7 +95,7 @@ export function OutreachPanel({ email }: { email: string }) {
       }
       return next;
     });
-  }, [email, load, loading, state]);
+  }, [email, load, loading, state, alwaysOpen]);
 
   const handleSave = useCallback(
     async (subject: string, body: string) => {
@@ -99,37 +109,47 @@ export function OutreachPanel({ email }: { email: string }) {
     await sendDraftForCustomerAction(email);
   }, [email]);
 
+  const HeaderInner = (
+    <>
+      <span className="shrink-0 rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 p-1.5">
+        <Mail className="w-4 h-4 text-[#4CAF6E]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[14px] font-semibold text-[#E8E4DD]">Reach out</div>
+        <div className="text-[11px] text-[#C4C0B6] font-mono truncate">{email}</div>
+      </div>
+      {state && state.lastContactedAt && (
+        <span className="hidden sm:inline text-[11px] text-[#C4C0B6]/70">
+          last contact {formatDateTime(new Date(state.lastContactedAt))}
+        </span>
+      )}
+      {state && state.threads.length > 0 && (
+        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-[#C4C0B6] bg-[#3D3C36]">
+          {state.threads.length} thread{state.threads.length === 1 ? "" : "s"}
+        </span>
+      )}
+      {!alwaysOpen && (expanded ? (
+        <ChevronDown className="w-4 h-4 text-[#C4C0B6] shrink-0" />
+      ) : (
+        <ChevronRight className="w-4 h-4 text-[#C4C0B6] shrink-0" />
+      ))}
+    </>
+  );
+
   return (
     <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
-      <button
-        type="button"
-        onClick={toggle}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#24231F]/70 transition-colors text-left"
-        aria-expanded={expanded}
-      >
-        <span className="shrink-0 rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 p-1.5">
-          <Mail className="w-4 h-4 text-[#4CAF6E]" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold text-[#E8E4DD]">Reach out</div>
-          <div className="text-[11px] text-[#C4C0B6] font-mono truncate">{email}</div>
-        </div>
-        {state && state.lastContactedAt && (
-          <span className="hidden sm:inline text-[11px] text-[#C4C0B6]/70">
-            last contact {formatDateTime(new Date(state.lastContactedAt))}
-          </span>
-        )}
-        {state && state.threads.length > 0 && (
-          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-[#C4C0B6] bg-[#3D3C36]">
-            {state.threads.length} thread{state.threads.length === 1 ? "" : "s"}
-          </span>
-        )}
-        {expanded ? (
-          <ChevronDown className="w-4 h-4 text-[#C4C0B6] shrink-0" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-[#C4C0B6] shrink-0" />
-        )}
-      </button>
+      {alwaysOpen ? (
+        <div className="w-full flex items-center gap-3 px-4 py-3">{HeaderInner}</div>
+      ) : (
+        <button
+          type="button"
+          onClick={toggle}
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#24231F]/70 transition-colors text-left"
+          aria-expanded={expanded}
+        >
+          {HeaderInner}
+        </button>
+      )}
 
       {expanded && (
         <div className="border-t border-[#3D3C36] p-4 space-y-4">

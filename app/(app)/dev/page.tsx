@@ -152,6 +152,8 @@ type Customer = {
     reads: number;
     writes: number;
     totalOps: number;
+    outreachStatus: 'contacted' | 'drafted' | 'none';
+    lastContactedAt: string | null;
 };
 
 type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive';
@@ -384,9 +386,12 @@ export default function DevPage() {
         const byDate = new Map(stats.dailyUsage.map(d => [d.date, d]));
         const days: DailyUsage[] = [];
         const now = new Date();
-        for (let i = 29; i >= 0; i--) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
+        const start = new Date(2026, 2, 25); // March 25, 2026
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const spanDays = Math.max(1, Math.floor((now.getTime() - start.getTime()) / msPerDay) + 1);
+        for (let i = 0; i < spanDays; i++) {
+            const d = new Date(start);
+            d.setDate(d.getDate() + i);
             const key = localDateKey(d);
             const existing = byDate.get(key);
             days.push({
@@ -684,7 +689,19 @@ export default function DevPage() {
                                                 className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors cursor-pointer"
                                             >
                                                 <td className="px-4 py-2.5">
-                                                    <div className="text-sm text-[#E8E4DD]">{c.googleEmail || c.userId || 'Unknown'}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="text-sm text-[#E8E4DD] truncate">{c.googleEmail || c.userId || 'Unknown'}</div>
+                                                        {c.outreachStatus === 'drafted' && (
+                                                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#D4882A] bg-[#D4882A]/15 border border-[#D4882A]/30" title="Outreach draft ready to review">
+                                                                Draft
+                                                            </span>
+                                                        )}
+                                                        {c.outreachStatus === 'contacted' && (
+                                                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#4CAF6E] bg-[#4CAF6E]/15 border border-[#4CAF6E]/30" title={c.lastContactedAt ? `Sent ${formatDateTime(c.lastContactedAt)}` : 'Sent'}>
+                                                                Sent
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
                                                 </td>
                                                 <td className="px-4 py-2.5">
