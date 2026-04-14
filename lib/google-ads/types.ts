@@ -121,4 +121,21 @@ export interface UpdateCampaignSettingsParams {
     add?: string[];
     remove?: string[];
   };
+  adSchedule?: {
+    /** Replace the entire ad schedule with these slots. Pass [] to clear (run all hours, all days). */
+    set: AdScheduleSlot[];
+  };
+}
+
+export interface AdScheduleSlot {
+  /** Day of week, or "ALL" to expand to all 7 days */
+  dayOfWeek: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY" | "ALL";
+  /** 0-23 */
+  startHour: number;
+  /** 1-24 */
+  endHour: number;
+  /** Defaults to "ZERO" */
+  startMinute?: "ZERO" | "FIFTEEN" | "THIRTY" | "FORTY_FIVE";
+  /** Defaults to "ZERO" */
+  endMinute?: "ZERO" | "FIFTEEN" | "THIRTY" | "FORTY_FIVE";
 }

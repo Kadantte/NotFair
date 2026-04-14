@@ -452,6 +452,38 @@ describe("protobuf validation: updateCampaignSettings", () => {
     });
     assertAllCapturedOpsEncode();
   });
+
+  it("ad schedule set — replaces existing", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign_criterion: {
+          resource_name: "customers/1234567890/campaignCriteria/100~3003",
+          ad_schedule: { day_of_week: 2, start_hour: 0, start_minute: 2, end_hour: 24, end_minute: 2 },
+        },
+      },
+    ]);
+    await updateCampaignSettings(AUTH, "100", {
+      adSchedule: {
+        set: [{ dayOfWeek: "ALL", startHour: 7, endHour: 23 }],
+      },
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("ad schedule set — clears schedule with empty array", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign_criterion: {
+          resource_name: "customers/1234567890/campaignCriteria/100~3004",
+          ad_schedule: { day_of_week: 6, start_hour: 9, start_minute: 3, end_hour: 17, end_minute: 4 },
+        },
+      },
+    ]);
+    await updateCampaignSettings(AUTH, "100", {
+      adSchedule: { set: [] },
+    });
+    assertAllCapturedOpsEncode();
+  });
 });
 
 describe("protobuf validation: tracking templates", () => {

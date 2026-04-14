@@ -734,7 +734,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaign Settings ──────────────────────────────────────────
 
   server.registerTool("updateCampaignSettings", {
-    description: "Update campaign network targeting and/or location targeting. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Returns a changeId per mutation.",
+    description: "Update campaign network targeting, location targeting, and/or ad schedule. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Ad schedule: replace the entire schedule with a list of slots (use dayOfWeek 'ALL' as a shortcut for all 7 days; pass an empty array to clear the schedule and run 24/7). Returns a changeId per mutation.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -760,9 +760,27 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         })
         .optional()
         .describe("Negative location targeting — where ads should NOT show"),
+      adSchedule: z
+        .object({
+          set: z
+            .array(
+              z.object({
+                dayOfWeek: z
+                  .enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY", "ALL"])
+                  .describe("Day of week, or 'ALL' to apply to all 7 days"),
+                startHour: z.number().int().min(0).max(23).describe("Start hour (0-23)"),
+                endHour: z.number().int().min(1).max(24).describe("End hour (1-24, exclusive)"),
+                startMinute: z.enum(["ZERO", "FIFTEEN", "THIRTY", "FORTY_FIVE"]).optional().describe("Defaults to ZERO"),
+                endMinute: z.enum(["ZERO", "FIFTEEN", "THIRTY", "FORTY_FIVE"]).optional().describe("Defaults to ZERO"),
+              }),
+            )
+            .describe("Replace the entire ad schedule with these slots. Pass [] to clear (run 24/7)."),
+        })
+        .optional()
+        .describe("Ad schedule (dayparting) — REPLACES the entire current schedule"),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting }) => {
+  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting, adSchedule }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
@@ -770,6 +788,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     if (networks) params.networks = networks;
     if (locationTargeting) params.locationTargeting = locationTargeting;
     if (negativeLocationTargeting) params.negativeLocationTargeting = negativeLocationTargeting;
+    if (adSchedule) params.adSchedule = adSchedule;
 
     const result = await updateCampaignSettings(authForAccount(auth, accountId), campaignId, params);
 
