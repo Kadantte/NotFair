@@ -94,7 +94,7 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${dmSans.variable} ${jetbrainsMono.variable} antialiased h-full`}
+        className={`${dmSans.variable} ${jetbrainsMono.variable} antialiased h-full bg-[#1A1917]`}
       >
         <Script id="utm-persist" strategy="beforeInteractive">
           {`(function(){try{var u=new URLSearchParams(location.search),k=${JSON.stringify(UTM_KEYS)},s=sessionStorage,p="${UTM_STORAGE_PREFIX}";if(k.some(function(x){return u.has(x)})){k.forEach(function(x){var v=u.get(x);if(v)s.setItem(p+x,v);else s.removeItem(p+x)})}if(document.referrer&&!s.getItem(p+"referrer")){try{var r=new URL(document.referrer);if(r.hostname!==location.hostname)s.setItem(p+"referrer",document.referrer)}catch(e){}}}catch(e){}})()`}
