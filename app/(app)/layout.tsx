@@ -289,21 +289,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     type="button"
                                     variant="ghost"
                                     size="icon-sm"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const deletedId = thread.id;
+                                        const wasViewing = pathname === `/chat/${deletedId}`;
+
+                                        // 1. Optimistic removal + snapshot for rollback
+                                        let snapshot: typeof sidebarThreads = [];
+                                        let deletedIndex = -1;
+                                        setSidebarThreads(prev => {
+                                            snapshot = prev;
+                                            deletedIndex = prev.findIndex(t => t.id === deletedId);
+                                            return prev.filter(t => t.id !== deletedId);
+                                        });
+
+                                        // 2. Navigate to neighbor synchronously if viewing the deleted thread
+                                        if (wasViewing) {
+                                            const remaining = snapshot.filter(t => t.id !== deletedId);
+                                            const nextThread = remaining[deletedIndex] ?? remaining[deletedIndex - 1];
+                                            router.push(nextThread ? `/chat/${nextThread.id}` : '/chat');
+                                        }
+
+                                        // 3. Fire DELETE; on failure, re-insert at original position
                                         fetch('/api/chat/threads', {
                                             method: 'DELETE',
                                             credentials: 'include',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ threadId: thread.id }),
+                                            body: JSON.stringify({ threadId: deletedId }),
                                         })
-                                            .then(() => {
-                                                refreshThreads();
-                                                // If we're viewing the deleted thread, navigate away
-                                                if (pathname === `/chat/${thread.id}`) {
-                                                    router.push('/chat');
-                                                }
+                                            .then(r => {
+                                                if (!r.ok) throw new Error(`delete failed: ${r.status}`);
                                             })
-                                            .catch(() => {});
+                                            .catch(err => {
+                                                console.error('Failed to delete thread', err);
+                                                setSidebarThreads(snapshot);
+                                            });
                                     }}
                                     className="mt-1.5 mr-1 shrink-0 rounded-lg text-[#C4C0B6] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] [div:hover>&]:opacity-100"
                                 >
