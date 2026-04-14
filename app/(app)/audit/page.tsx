@@ -9,6 +9,7 @@ import {
   type AuditChatContext,
 } from "@/components/chat/audit-chat-drawer";
 import { AuditHelpPanel } from "@/components/audit/audit-help-panel";
+import { PanelRightOpen } from "lucide-react";
 
 // Module-level cache keyed by accountId + days
 type CacheKey = string;
@@ -144,25 +145,53 @@ export default function AuditPage() {
   }
 
   return (
-    <>
-      <AuditContent
-        overview={overview}
-        details={details}
-        onAskAI={handleAskAI}
-        onRedoAudit={redoAudit}
-        redoLoading={redoLoading}
-        lastAuditTime={lastAuditTime}
-        timeRange={timeRange}
-        onTimeRangeChange={handleTimeRangeChange}
-      />
-      {!drawerOpen && <AuditHelpPanel onChatClick={() => setDrawerOpen(true)} />}
-      <AuditChatDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        pendingPrompt={pendingPrompt}
-        onPromptConsumed={() => setPendingPrompt(null)}
-        context={chatContext}
-      />
-    </>
+    <div className="flex h-full min-h-0">
+      <div
+        className={`h-full min-w-0 overflow-y-auto transition-[width] duration-300 ease-in-out ${
+          drawerOpen ? "w-1/2" : "w-full"
+        }`}
+      >
+        <AuditContent
+          overview={overview}
+          details={details}
+          onAskAI={handleAskAI}
+          onRedoAudit={redoAudit}
+          redoLoading={redoLoading}
+          lastAuditTime={lastAuditTime}
+          timeRange={timeRange}
+          onTimeRangeChange={handleTimeRangeChange}
+        />
+      </div>
+      <div
+        className={`h-full shrink-0 overflow-hidden border-l border-[#3D3C36] transition-[width] duration-300 ease-in-out ${
+          drawerOpen ? "w-1/2" : "w-0 border-l-0"
+        }`}
+      >
+        {drawerOpen && (
+          <AuditChatDrawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            pendingPrompt={pendingPrompt}
+            onPromptConsumed={() => setPendingPrompt(null)}
+            context={chatContext}
+          />
+        )}
+      </div>
+      {!drawerOpen && (
+        <>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="group fixed right-4 top-[72px] z-30 flex items-center justify-end gap-2 overflow-hidden rounded-md p-0 text-[13px] font-medium text-[#C4C0B6] transition-all duration-200 ease-out hover:text-[#4CAF6E] md:right-6 lg:right-8"
+          >
+            <span className="max-w-0 whitespace-nowrap opacity-0 transition-all duration-200 ease-out group-hover:max-w-[140px] group-hover:opacity-100">
+              Show AI panel
+            </span>
+            <PanelRightOpen className="h-5 w-5 shrink-0" />
+          </button>
+          <AuditHelpPanel onChatClick={() => setDrawerOpen(true)} />
+        </>
+      )}
+    </div>
   );
 }

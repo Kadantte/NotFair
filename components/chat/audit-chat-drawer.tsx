@@ -131,20 +131,7 @@ export function AuditChatDrawer({
 
   return (
     <>
-      {/* Backdrop on mobile */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Drawer */}
-      <div
-        className={`fixed bottom-0 right-0 top-0 z-50 flex w-full flex-col border-l border-[#3D3C36] bg-[#1A1917] transition-transform duration-300 ease-in-out sm:w-[440px] ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
+      <div className="flex h-full w-full flex-col bg-[#1A1917]">
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between bg-[#1A1917] px-4 py-3">
           <div className="flex items-center gap-2">

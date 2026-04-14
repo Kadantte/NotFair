@@ -902,10 +902,10 @@ export function AuditContent({
       : overview.conversionActions.filter((a) => a.includeInConversions).length === 0;
 
   return (
-    <div className="min-h-full bg-[#1A1917] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-full bg-[#1A1917] px-4 py-3 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-[20px] font-semibold text-[#E8E4DD]">{overview.accountName}</h1>
             <p className="text-[13px] text-[#C4C0B6]">
