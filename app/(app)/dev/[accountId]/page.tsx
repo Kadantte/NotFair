@@ -7,6 +7,7 @@ import { RefreshCw, AlertCircle, ArrowLeft, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DeltaBadge } from '@/components/delta-badge';
 import { formatAction, formatValue, ENTITY_BADGE_COLORS } from '@/lib/operations-format';
+import { OutreachPanel } from './outreach-panel';
 
 type Operation = {
     id: number;
@@ -167,6 +168,9 @@ export default function DevAccountDetailPage() {
                                     : ''}
                             />
                         </div>
+
+                        {/* Outreach (Gmail drafts + thread history with this customer) */}
+                        {data.email && <OutreachPanel email={data.email} />}
 
                         {/* Audit History */}
                         {data.auditHistory.length > 0 && (

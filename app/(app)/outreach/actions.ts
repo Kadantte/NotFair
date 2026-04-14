@@ -9,6 +9,8 @@ import {
   upsertDraft,
   sendDraft,
   invalidateThreadCache,
+  listThreadsForEmail,
+  type GmailThreadSummary,
 } from "@/lib/gmail";
 
 async function requireDev() {
@@ -32,9 +34,12 @@ async function loadContact(contactId: number) {
 
 export async function getContactsAction() {
   await requireDev();
+  // Leads tab is cold prospects only — customer re-engagement uses its own
+  // surface on /dev/[accountId] via getCustomerOutreachAction.
   return db()
     .select()
     .from(schema.contacts)
+    .where(eq(schema.contacts.kind, "lead"))
     .orderBy(desc(schema.contacts.createdAt));
 }
 
@@ -169,6 +174,202 @@ export async function sendDraftViaGmailAction(contactId: number) {
       gmailDraftId: null,
     })
     .where(eq(schema.contacts.id, contactId));
+}
+
+export type CustomerOutreachState = {
+  /** null when no contact row exists yet (first visit, never saved a draft) */
+  contactId: number | null;
+  email: string;
+  draftSubject: string;
+  draftBody: string;
+  hasGmailDraftId: boolean;
+  canSend: boolean;
+  status: string;
+  lastContactedAt: string | null;
+  gmailConfigured: boolean;
+  gmailError: string | null;
+  threads: GmailThreadSummary[];
+};
+
+function normalizeEmail(raw: string): string {
+  const email = raw.toLowerCase().trim();
+  if (!email || !email.includes("@")) throw new Error("Invalid email");
+  return email;
+}
+
+/**
+ * Read-only outreach state for a connected customer, keyed by email. Never
+ * writes — browsing customer pages must not pollute the contacts table. If no
+ * contact row exists, returns an empty draft with contactId=null; the row is
+ * created lazily on the first save via upsertCustomerContactByEmail.
+ */
+export async function getCustomerOutreachAction(
+  rawEmail: string,
+): Promise<CustomerOutreachState> {
+  await requireDev();
+  const email = normalizeEmail(rawEmail);
+
+  const [contact] = await db()
+    .select()
+    .from(schema.contacts)
+    .where(eq(schema.contacts.email, email))
+    .limit(1);
+
+  const gmailConfigured = isGmailConfigured();
+  let threads: GmailThreadSummary[] = [];
+  let gmailError: string | null = null;
+  if (gmailConfigured) {
+    try {
+      threads = await listThreadsForEmail(email, 15);
+    } catch (err) {
+      gmailError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  if (!contact) {
+    return {
+      contactId: null,
+      email,
+      draftSubject: "",
+      draftBody: "",
+      hasGmailDraftId: false,
+      canSend: true,
+      status: "new",
+      lastContactedAt: null,
+      gmailConfigured,
+      gmailError,
+      threads,
+    };
+  }
+
+  return {
+    contactId: contact.id,
+    email: contact.email,
+    draftSubject: contact.draftSubject ?? "",
+    draftBody: contact.draftBody ?? "",
+    hasGmailDraftId: !!contact.gmailDraftId,
+    canSend: !contact.unsubscribed && contact.status !== "bounced",
+    status: contact.status,
+    lastContactedAt: contact.lastContactedAt
+      ? contact.lastContactedAt.toISOString()
+      : null,
+    gmailConfigured,
+    gmailError,
+    threads,
+  };
+}
+
+/**
+ * Upsert a contact row for a connected customer. Only called from the customer
+ * save/send paths — never from reads. Idempotent: if the row already exists we
+ * return it untouched (including its existing kind, so a row that started as a
+ * 'lead' and is now a 'customer' we're re-engaging keeps its history).
+ */
+async function upsertCustomerContactByEmail(email: string) {
+  const existing = await db()
+    .select()
+    .from(schema.contacts)
+    .where(eq(schema.contacts.email, email))
+    .limit(1);
+  if (existing.length > 0) return existing[0];
+
+  await db()
+    .insert(schema.contacts)
+    .values({ email, status: "new", kind: "customer" })
+    .onConflictDoNothing();
+
+  const [row] = await db()
+    .select()
+    .from(schema.contacts)
+    .where(eq(schema.contacts.email, email))
+    .limit(1);
+  if (!row) throw new Error("Failed to upsert contact");
+  return row;
+}
+
+/**
+ * Save a draft for a connected customer keyed by their email. Creates the
+ * contact row on first save (kind='customer'), then delegates to the same
+ * Gmail sync path used by the lead flow so behavior stays identical.
+ */
+export async function saveDraftForCustomerAction(
+  rawEmail: string,
+  subject: string,
+  body: string,
+): Promise<{ contactId: number; gmailSynced: boolean; syncError: string | null }> {
+  await requireDev();
+  const email = normalizeEmail(rawEmail);
+  const contact = await upsertCustomerContactByEmail(email);
+
+  let gmailDraftId: string | null = contact.gmailDraftId ?? null;
+  let gmailSynced = false;
+  let syncError: string | null = null;
+  if (isGmailConfigured()) {
+    try {
+      gmailDraftId = await upsertDraft({
+        to: contact.email,
+        subject,
+        body,
+        draftId: gmailDraftId,
+      });
+      gmailSynced = true;
+      invalidateThreadCache(contact.email);
+    } catch (err) {
+      syncError = err instanceof Error ? err.message : String(err);
+      console.error("Gmail draft sync failed:", err);
+    }
+  }
+
+  await db()
+    .update(schema.contacts)
+    .set({
+      draftSubject: subject,
+      draftBody: body,
+      status: "drafted",
+      gmailDraftId,
+    })
+    .where(eq(schema.contacts.id, contact.id));
+
+  return { contactId: contact.id, gmailSynced, syncError };
+}
+
+/**
+ * Send a customer's draft via Gmail. Looks up by email so callers don't need
+ * to thread a contactId through the UI.
+ */
+export async function sendDraftForCustomerAction(rawEmail: string): Promise<void> {
+  await requireDev();
+  const email = normalizeEmail(rawEmail);
+  const [contact] = await db()
+    .select()
+    .from(schema.contacts)
+    .where(eq(schema.contacts.email, email))
+    .limit(1);
+  if (!contact) throw new Error("No draft found for this customer");
+  if (!contact.draftSubject || !contact.draftBody) throw new Error("No draft to send");
+  if (contact.unsubscribed || contact.status === "bounced") {
+    throw new Error("Contact is unsubscribed or previously bounced");
+  }
+
+  const draftId =
+    contact.gmailDraftId ??
+    (await upsertDraft({
+      to: contact.email,
+      subject: contact.draftSubject,
+      body: contact.draftBody,
+      draftId: null,
+    }));
+  await sendDraft(draftId);
+  invalidateThreadCache(contact.email);
+
+  await db()
+    .update(schema.contacts)
+    .set({
+      status: "contacted",
+      lastContactedAt: new Date(),
+      gmailDraftId: null,
+    })
+    .where(eq(schema.contacts.id, contact.id));
 }
 
 export async function scheduleContactAction(contactId: number, scheduledAt: Date) {

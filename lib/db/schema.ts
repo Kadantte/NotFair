@@ -124,6 +124,8 @@ export const contacts = pgTable("contacts", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   company: text("company"),
+  /** 'lead' = cold prospect, 'customer' = already-connected user we're re-engaging */
+  kind: text("kind").notNull().default("lead"),
   /** new, drafted, scheduled, contacted, delivered, opened, clicked, replied, bounced */
   status: text("status").notNull().default("new"),
   bounceCount: integer("bounce_count").default(0).notNull(),
@@ -136,6 +138,7 @@ export const contacts = pgTable("contacts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("contacts_email_idx").on(table.email),
+  index("contacts_kind_idx").on(table.kind),
 ]);
 
 // ─── OAuth Nonces (server-side CSRF protection) ─────────────────────

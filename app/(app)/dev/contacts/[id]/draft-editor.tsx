@@ -1,37 +1,52 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, Save, Send, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  saveDraftAndSyncGmailAction,
-  sendDraftViaGmailAction,
-} from "../../../outreach/actions";
+
+export type DraftSaveResult = {
+  gmailSynced: boolean;
+  syncError: string | null;
+};
 
 export function DraftEditor({
-  contactId,
   initialSubject,
   initialBody,
   hasGmailDraftId,
   canSend,
+  onSave,
+  onSend,
+  onChanged,
 }: {
-  contactId: number;
   initialSubject: string;
   initialBody: string;
   hasGmailDraftId: boolean;
   canSend: boolean;
+  onSave: (subject: string, body: string) => Promise<DraftSaveResult>;
+  onSend: () => Promise<void>;
+  onChanged?: () => void;
 }) {
-  const router = useRouter();
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
-  const [savedSnapshot, setSavedSnapshot] = useState({ subject: initialSubject, body: initialBody });
+  const [savedSnapshot, setSavedSnapshot] = useState({
+    subject: initialSubject,
+    body: initialBody,
+  });
   const [saving, startSave] = useTransition();
   const [sending, startSend] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const [syncedToGmail, setSyncedToGmail] = useState(hasGmailDraftId);
   const justSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Re-sync local state when parent hands us a new initial draft (e.g., after
+  // expanding the panel for a different customer or after background reload).
+  useEffect(() => {
+    setSubject(initialSubject);
+    setBody(initialBody);
+    setSavedSnapshot({ subject: initialSubject, body: initialBody });
+    setSyncedToGmail(hasGmailDraftId);
+  }, [initialSubject, initialBody, hasGmailDraftId]);
 
   useEffect(() => {
     return () => {
@@ -45,7 +60,7 @@ export function DraftEditor({
     setError(null);
     startSave(async () => {
       try {
-        const result = await saveDraftAndSyncGmailAction(contactId, subject, body);
+        const result = await onSave(subject, body);
         setSavedSnapshot({ subject, body });
         setJustSaved(true);
         setSyncedToGmail(result.gmailSynced);
@@ -54,7 +69,7 @@ export function DraftEditor({
         }
         if (justSavedTimer.current) clearTimeout(justSavedTimer.current);
         justSavedTimer.current = setTimeout(() => setJustSaved(false), 2000);
-        router.refresh();
+        onChanged?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
@@ -75,8 +90,8 @@ export function DraftEditor({
     setError(null);
     startSend(async () => {
       try {
-        await sendDraftViaGmailAction(contactId);
-        router.refresh();
+        await onSend();
+        onChanged?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
@@ -122,7 +137,13 @@ export function DraftEditor({
           disabled={busy || !dirty}
           className="gap-1.5 bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD] border border-[#3D3C36] h-8 text-[12px] px-3"
         >
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : justSaved ? <Check className="h-3.5 w-3.5 text-[#4CAF6E]" /> : <Save className="h-3.5 w-3.5" />}
+          {saving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : justSaved ? (
+            <Check className="h-3.5 w-3.5 text-[#4CAF6E]" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
           {saving ? "Saving" : justSaved ? "Saved" : "Save draft"}
         </Button>
         <Button

@@ -2,6 +2,21 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.19.0] - 2026-04-13
+
+### Added
+- Inline "Reach out" panel on every customer detail page (`/dev/[accountId]`) — for connected customers who went dormant, compose a personalized email, save it as a Gmail draft, and send via Gmail so the full thread stays in your inbox. Shows last 15 Gmail threads with that customer and the date you last contacted them
+- Panel is collapsible, remembers open/closed state per customer in `localStorage`, and loads Gmail threads lazily only on expand — browsing customer detail pages triggers zero Gmail API calls until you actually reach out
+- New migration `0018_add_contact_kind.sql` adds a `kind` column (`lead` | `customer`) to the `contacts` table so the `/dev` Leads tab stays cleanly scoped to cold prospects while customer re-engagement drafts live in the same schema
+
+### Changed
+- `DraftEditor` now takes `onSave` / `onSend` callbacks instead of reaching for server actions directly, so the lead profile and customer detail pages can share the same editor without coupling to a single identifier type
+- `getContactsAction` filters the Leads tab to `kind='lead'`, so customer outreach drafts never pollute the cold-prospect pipeline
+- `ThreadCard` extracted to `components/outreach/thread-card.tsx` and shared between the lead profile page and the new customer outreach panel
+
+### Fixed
+- Customer outreach state is now read-only on load — visiting a customer detail page never creates a contacts row. Rows are created lazily on first draft save via `upsertCustomerContactByEmail`, preserving existing `kind` if the email was already tracked as a lead
+
 ## [0.2.18.0] - 2026-04-13
 
 ### Added
