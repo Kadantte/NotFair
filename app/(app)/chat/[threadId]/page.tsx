@@ -61,7 +61,11 @@ export default function ChatPage() {
   const [account, setAccount] = useState<StoredAccount>(emptyAccount);
   const [isHydrated, setIsHydrated] = useState(false);
   const [modelId, setModelId] = useState<ModelId>("gpt-5-mini");
+  useEffect(() => {
+    modelIdRef.current = modelId;
+  }, [modelId]);
 
+  const modelIdRef = useRef<ModelId>("gpt-5-mini");
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -72,6 +76,7 @@ export default function ChatPage() {
             messageId,
             trigger,
             messages,
+            modelId: modelIdRef.current,
           },
         }),
       }),

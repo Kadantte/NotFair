@@ -40,6 +40,10 @@ export function AuditChatDrawer({
 }) {
   const [input, setInput] = useState("");
   const [modelId, setModelId] = useState<ModelId>("gpt-5-mini");
+  const modelIdRef = useRef<ModelId>("gpt-5-mini");
+  useEffect(() => {
+    modelIdRef.current = modelId;
+  }, [modelId]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const threadId = useRef(crypto.randomUUID());
 
@@ -48,7 +52,7 @@ export function AuditChatDrawer({
       new DefaultChatTransport({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
-          body: { id, messageId, trigger, messages },
+          body: { id, messageId, trigger, messages, modelId: modelIdRef.current },
         }),
       }),
     [],

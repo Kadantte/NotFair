@@ -1,8 +1,12 @@
 import { createAgentUIStream, createUIMessageStreamResponse } from "ai";
-import { createGoogleAdsAgent } from "@/lib/agents/google-ads-agent";
+import { createGoogleAdsAgent, type ChatModelId } from "@/lib/agents/google-ads-agent";
 import { getSessionAuth } from "@/lib/session";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
+import { getUserSubscription, isPlanEntitled } from "@/lib/subscription";
+
+const PAID_MODELS = new Set<ChatModelId>(["gpt-5.4", "claude-opus-4.6"]);
+const ALL_MODELS = new Set<ChatModelId>(["gpt-5-mini", "gpt-5.4", "claude-opus-4.6"]);
 
 export async function POST(request: Request) {
   const payload = await request.json();
@@ -19,12 +23,26 @@ export async function POST(request: Request) {
     ? await getToolPermissions(session.userId).catch(() => ({}))
     : {};
 
+  const requestedModel = payload.modelId as ChatModelId | undefined;
+  let modelId: ChatModelId = "gpt-5-mini";
+  if (requestedModel && ALL_MODELS.has(requestedModel)) {
+    if (PAID_MODELS.has(requestedModel)) {
+      const sub = session?.userId ? await getUserSubscription(session.userId).catch(() => null) : null;
+      if (sub && sub.plan !== "free" && isPlanEntitled(sub.status)) {
+        modelId = requestedModel;
+      }
+    } else {
+      modelId = requestedModel;
+    }
+  }
+
   const agent = createGoogleAdsAgent({
     refreshToken,
     customerId,
     userId: session?.userId ?? null,
     authMethod: "chat",
     toolPermissions,
+    modelId,
   });
 
   // Persist thread metadata (fire-and-forget, don't block streaming)
