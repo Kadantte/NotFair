@@ -187,6 +187,96 @@ export function renderMarkdown(text: string): ReactNode[] {
       continue;
     }
 
+    // GFM-style tables: header row | separator row (---) | body rows
+    if (
+      line.includes("|") &&
+      index + 1 < lines.length &&
+      /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[index + 1])
+    ) {
+      const splitRow = (row: string): string[] => {
+        const trimmed = row.trim().replace(/^\|/, "").replace(/\|$/, "");
+        return trimmed.split("|").map(cell => cell.trim());
+      };
+
+      const parseAlignments = (sep: string): ("left" | "right" | "center" | null)[] =>
+        splitRow(sep).map(cell => {
+          const startsWithColon = cell.startsWith(":");
+          const endsWithColon = cell.endsWith(":");
+          if (startsWithColon && endsWithColon) return "center";
+          if (endsWithColon) return "right";
+          if (startsWithColon) return "left";
+          return null;
+        });
+
+      const headerCells = splitRow(line);
+      const alignments = parseAlignments(lines[index + 1]);
+      index += 2;
+      const bodyRows: string[][] = [];
+      while (
+        index < lines.length &&
+        lines[index].trim() &&
+        lines[index].includes("|")
+      ) {
+        bodyRows.push(splitRow(lines[index]));
+        index += 1;
+      }
+
+      const alignClass = (i: number) => {
+        const a = alignments[i];
+        if (a === "right") return "text-right";
+        if (a === "center") return "text-center";
+        return "text-left";
+      };
+
+      nodes.push(
+        <div
+          key={`table-${nodes.length}`}
+          className="my-2 overflow-x-auto rounded-lg border border-[#3D3C36]"
+        >
+          <table className="w-full border-collapse text-sm text-white">
+            <thead className="bg-[#24231F]">
+              <tr>
+                {headerCells.map((cell, i) => (
+                  <th
+                    key={`th-${i}`}
+                    className={`border-b border-[#3D3C36] px-3 py-2 font-semibold ${alignClass(i)}`}
+                  >
+                    {renderInlineMarkdown(cell, `th-${nodes.length}-${i}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bodyRows.map((row, rowIdx) => (
+                <tr
+                  key={`tr-${rowIdx}`}
+                  className={rowIdx % 2 === 1 ? "bg-[#1E1D1A]" : ""}
+                >
+                  {headerCells.map((_, colIdx) => (
+                    <td
+                      key={`td-${rowIdx}-${colIdx}`}
+                      className={`border-t border-[#3D3C36]/60 px-3 py-2 align-top ${alignClass(colIdx)}`}
+                    >
+                      {renderInlineMarkdown(
+                        row[colIdx] ?? "",
+                        `td-${nodes.length}-${rowIdx}-${colIdx}`,
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+
+    const isTableStart = (i: number) =>
+      i + 1 < lines.length &&
+      lines[i].includes("|") &&
+      /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[i + 1]);
+
     const paragraphLines: string[] = [];
     while (
       index < lines.length &&
@@ -196,7 +286,8 @@ export function renderMarkdown(text: string): ReactNode[] {
       !/^>\s?/.test(lines[index]) &&
       !/^[-*+]\s+/.test(lines[index]) &&
       !/^\d+\.\s+/.test(lines[index]) &&
-      !/^([-*_]){3,}\s*$/.test(lines[index].trim())
+      !/^([-*_]){3,}\s*$/.test(lines[index].trim()) &&
+      !isTableStart(index)
     ) {
       paragraphLines.push(lines[index]);
       index += 1;
