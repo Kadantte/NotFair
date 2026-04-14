@@ -225,3 +225,137 @@ export async function updateCampaignSettings(
     results,
   };
 }
+
+// ─── Language Targeting (C.30 / M.10) ───────────────────────────────
+
+/** Normalize a language input to a full resource name. Accepts "1000", "languageConstants/1000", etc. */
+function toLanguageConstant(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.startsWith("languageConstants/")) return trimmed;
+  return `languageConstants/${trimmed}`;
+}
+
+/** Add and/or remove language targeting criteria on a campaign. */
+export async function updateCampaignLanguages(
+  auth: AuthContext,
+  campaignId: string,
+  params: { add?: string[]; remove?: string[] },
+): Promise<CampaignSettingsResult> {
+  const customer = getCustomer(auth);
+  const cid = safeEntityId(campaignId);
+  const customerId = normalizeCustomerId(auth.customerId);
+  const campaignResourceName = `customers/${customerId}/campaigns/${cid}`;
+  const results: WriteResult[] = [];
+
+  const addIds = params.add ?? [];
+  const removeIds = params.remove ?? [];
+
+  if (addIds.length > 0) {
+    try {
+      const operations = addIds.map((lang) => ({
+        entity: "campaign_criterion" as any,
+        operation: "create" as const,
+        resource: {
+          campaign: campaignResourceName,
+          language: {
+            language_constant: toLanguageConstant(lang),
+          },
+        },
+      }));
+
+      await customer.mutateResources(operations as any);
+
+      results.push({
+        success: true,
+        action: "add_campaign_language",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: JSON.stringify(addIds.map(toLanguageConstant)),
+      });
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "add_campaign_language",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: JSON.stringify(addIds),
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  if (removeIds.length > 0) {
+    try {
+      const criteriaResult = await customer.query(`
+        SELECT
+          campaign_criterion.resource_name,
+          campaign_criterion.language.language_constant
+        FROM campaign_criterion
+        WHERE campaign.id = ${cid}
+          AND campaign_criterion.type = 'LANGUAGE'
+        LIMIT 200
+      `);
+
+      const toRemove = removeIds
+        .map((lang) => {
+          const full = toLanguageConstant(lang);
+          const match = (criteriaResult as any[]).find((r) => {
+            return r.campaign_criterion?.language?.language_constant === full;
+          });
+          return match ? { resourceName: match.campaign_criterion.resource_name as string, lang: full } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+      if (toRemove.length > 0) {
+        const operations = toRemove.map(({ resourceName }) => ({
+          entity: "campaign_criterion" as any,
+          operation: "remove" as const,
+          resource: resourceName as any,
+        }));
+
+        await customer.mutateResources(operations as any);
+
+        results.push({
+          success: true,
+          action: "remove_campaign_language",
+          entityId: campaignId,
+          beforeValue: JSON.stringify(toRemove.map((t) => t.lang)),
+          afterValue: "",
+        });
+      }
+
+      const notFound = removeIds.filter((lang) => {
+        const full = toLanguageConstant(lang);
+        return !toRemove.some((t) => t.lang === full);
+      });
+      if (notFound.length > 0) {
+        results.push({
+          success: false,
+          action: "remove_campaign_language",
+          entityId: campaignId,
+          beforeValue: "",
+          afterValue: "",
+          error: `Language criteria not found for: ${notFound.join(", ")}`,
+        });
+      }
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "remove_campaign_language",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: "",
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  if (results.length === 0) {
+    return { success: false, results: [], error: "No languages to add or remove" };
+  }
+
+  return {
+    success: results.every((r) => r.success),
+    results,
+  };
+}

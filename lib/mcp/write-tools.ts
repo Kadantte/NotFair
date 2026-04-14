@@ -40,8 +40,16 @@ import {
   uploadClickConversions,
   pausePmaxAssetGroup,
   enablePmaxAssetGroup,
+  updateCampaignLanguages,
+  createCalloutAsset,
+  linkCalloutToAccount,
+  removeCalloutFromAccount,
+  createBiddingStrategy,
+  updateBiddingStrategy,
+  removeBiddingStrategy,
+  linkCampaignToBiddingStrategy,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
 import { enforceRateLimit } from "@/lib/mcp/rate-limit";
@@ -203,9 +211,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       keywordMatchType: z
         .enum(["BROAD", "PHRASE", "EXACT"])
         .default("BROAD"),
+      geoTargetIds: z
+        .array(z.string())
+        .optional()
+        .describe("Geo target constant IDs (e.g. ['2840'] for United States). Use searchGeoTargets to find IDs."),
+      languageIds: z
+        .array(z.string())
+        .optional()
+        .describe("Language constant IDs (e.g. ['1000'] for English, ['1003'] for Spanish). Defaults to no language restriction (all languages) if omitted."),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType }) => {
+  }, safeHandler(async ({ accountId, campaignName, dailyBudgetDollars, keywords, headlines, descriptions, finalUrl, biddingStrategy, keywordMatchType, geoTargetIds, languageIds }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     await enforceRateLimit(auth.userId); // Check before API call (not deferred to execWrite)
@@ -219,6 +235,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       finalUrl,
       biddingStrategy,
       keywordMatchType,
+      geoTargetIds,
+      languageIds,
     });
 
     const writeResult: WriteResult = {
@@ -964,6 +982,140 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enablePmaxAssetGroup(targetAuth, campaignId, assetGroupId));
+    return jsonResult(result);
+  }));
+
+  // ─── Language Targeting (RMF C.30 / M.10) ────────────────────────
+
+  server.registerTool("updateCampaignLanguages", {
+    description: "Add or remove language targeting criteria on a campaign. Pass language constant IDs (e.g. '1000' for English, '1003' for Spanish). Returns a changeId per mutation.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      add: z.array(z.string()).optional().describe("Language constant IDs to add (e.g. ['1000'] for English)"),
+      remove: z.array(z.string()).optional().describe("Language constant IDs to remove"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, add, remove }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const result = await updateCampaignLanguages(authForAccount(auth, accountId), campaignId, { add, remove });
+    const logged = await Promise.all(
+      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r)),
+    );
+    return jsonResult({ success: result.success, error: result.error, results: logged });
+  }));
+
+  // ─── Callout Extensions (RMF C.75) ───────────────────────────────
+
+  server.registerTool("createCalloutAsset", {
+    description: "Create a callout extension (≤25 char snippet shown under text ads, e.g. 'Free shipping'). Set linkToAccount=true to link it at the customer (account) level in the same call, which is what RMF C.75 requires. Returns changeId + assetId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
+      linkToAccount: z.boolean().default(true).describe("Also link the new asset at the customer/account level"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, text, linkToAccount }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => createCalloutAsset(targetAuth, { text, linkToAccount }));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("linkCalloutToAccount", {
+    description: "Link an existing callout asset to the customer (account) level so it can serve across all campaigns. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Callout asset ID (from listCalloutAssets)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => linkCalloutToAccount(targetAuth, assetId));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("removeCalloutFromAccount", {
+    description: "Remove a callout's account-level link. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Callout asset ID (from listCalloutAssets)"),
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => removeCalloutFromAccount(targetAuth, assetId));
+    return jsonResult(result);
+  }));
+
+  // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97) ─────────
+
+  server.registerTool("createBiddingStrategy", {
+    description: "Create a portfolio bidding strategy — a shared bidding configuration that multiple campaigns can reference. Supports TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, and MAXIMIZE_CONVERSION_VALUE. For TARGET_CPA, targetCpa (in dollars) is required. For TARGET_ROAS, targetRoas (e.g. 2.0 = 200%) is required. Returns changeId + biddingStrategyId. Use linkCampaignToBiddingStrategy to attach to campaigns.",
+    inputSchema: {
+      accountId: accountIdParam,
+      name: z.string().min(1).describe("Strategy name, e.g. 'Lead Gen Target CPA'"),
+      type: z.enum(["TARGET_CPA", "TARGET_ROAS", "MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE"]),
+      targetCpa: z.number().optional().describe("Target CPA in dollars. Required for TARGET_CPA; optional cap for MAXIMIZE_CONVERSIONS."),
+      targetRoas: z.number().optional().describe("Target ROAS multiplier (e.g. 2.0 = 200% return). Required for TARGET_ROAS; optional cap for MAXIMIZE_CONVERSION_VALUE."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, name, type, targetCpa, targetRoas }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => createBiddingStrategy(targetAuth, {
+      name,
+      type: type as PortfolioStrategyType,
+      targetCpaMicros: targetCpa != null ? toMicros(targetCpa) : undefined,
+      targetRoas,
+    }));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("updateBiddingStrategy", {
+    description: "Edit a portfolio bidding strategy's name and/or target value. You can change targetCpa on TARGET_CPA/MAXIMIZE_CONVERSIONS strategies, and targetRoas on TARGET_ROAS/MAXIMIZE_CONVERSION_VALUE strategies. The strategy type itself cannot be changed. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      biddingStrategyId: z.string(),
+      name: z.string().min(1).optional(),
+      targetCpa: z.number().optional().describe("New target CPA in dollars"),
+      targetRoas: z.number().optional().describe("New target ROAS multiplier"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, biddingStrategyId, name, targetCpa, targetRoas }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => updateBiddingStrategy(targetAuth, {
+      biddingStrategyId,
+      name,
+      targetCpaMicros: targetCpa != null ? toMicros(targetCpa) : undefined,
+      targetRoas,
+    }));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("removeBiddingStrategy", {
+    description: "Remove a portfolio bidding strategy. All campaigns currently linked to it must be unlinked first (Google Ads will reject otherwise). Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      biddingStrategyId: z.string(),
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, biddingStrategyId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => removeBiddingStrategy(targetAuth, biddingStrategyId));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("linkCampaignToBiddingStrategy", {
+    description: "Link a campaign to a portfolio bidding strategy — the campaign will use the shared strategy's configuration. This replaces any standard (campaign-level) bidding config. Use listBiddingStrategies to find strategy IDs. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      biddingStrategyId: z.string(),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, biddingStrategyId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => linkCampaignToBiddingStrategy(targetAuth, campaignId, biddingStrategyId));
     return jsonResult(result);
   }));
 

@@ -13,7 +13,25 @@ export type CreateCampaignParams = {
   finalUrl: string;
   biddingStrategy?: "MAXIMIZE_CONVERSIONS" | "MAXIMIZE_CLICKS" | "MANUAL_CPC";
   keywordMatchType?: "BROAD" | "PHRASE" | "EXACT";
+  /** Geo target constant IDs (e.g. "2840" for US). Pass bare IDs or full resource names. */
+  geoTargetIds?: string[];
+  /** Language constant IDs (e.g. "1000" for English). Pass bare IDs or full resource names. */
+  languageIds?: string[];
 };
+
+/** Normalize a geo target input to a full resource name. Accepts "2840", "geoTargetConstants/2840", etc. */
+function toGeoTargetConstant(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.startsWith("geoTargetConstants/")) return trimmed;
+  return `geoTargetConstants/${trimmed}`;
+}
+
+/** Normalize a language input to a full resource name. Accepts "1000", "languageConstants/1000", etc. */
+function toLanguageConstant(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.startsWith("languageConstants/")) return trimmed;
+  return `languageConstants/${trimmed}`;
+}
 
 export type CreateCampaignResult = {
   success: boolean;
@@ -151,6 +169,29 @@ export async function createSearchCampaign(
         },
       },
     },
+    // 6. Geo targeting criteria (C.20) — campaign_criterion.location
+    ...(params.geoTargetIds ?? []).map((geo) => ({
+      entity: "campaign_criterion",
+      operation: "create",
+      resource: {
+        campaign: campaignTemp,
+        negative: false,
+        location: {
+          geo_target_constant: toGeoTargetConstant(geo),
+        },
+      } as Record<string, unknown>,
+    })),
+    // 7. Language targeting criteria (C.30) — campaign_criterion.language
+    ...(params.languageIds ?? []).map((lang) => ({
+      entity: "campaign_criterion",
+      operation: "create",
+      resource: {
+        campaign: campaignTemp,
+        language: {
+          language_constant: toLanguageConstant(lang),
+        },
+      } as Record<string, unknown>,
+    })),
   ];
 
   try {

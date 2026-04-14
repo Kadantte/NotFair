@@ -21,6 +21,9 @@ import {
   getPmaxAssetGroups,
   getPmaxAssets,
   getKeywordIdeas,
+  listCalloutAssets,
+  listBiddingStrategies,
+  getBiddingStrategyPerformance,
   type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges } from "@/lib/db/tracking";
@@ -448,6 +451,50 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const callerAuth = currentAuth();
     const result = await execRead(callerAuth, callerAuth.customerId, "get_keyword_ideas", () =>
       getKeywordIdeas(platformAuth, keywords, url, language, geoTargetIds, pageSize),
+    );
+    return jsonResult(result);
+  }));
+
+  // ─── Callout Extensions (RMF C.75) ───────────────────────────────
+
+  server.registerTool("listCalloutAssets", {
+    description: "List all callout extension assets on the account, with whether each one is linked at the customer (account) level. Returns assetId, text, and link state.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "list_callout_assets", () => listCalloutAssets(targetAuth));
+    return jsonResult(result);
+  }));
+
+  // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97, R.130) ──
+
+  server.registerTool("listBiddingStrategies", {
+    description: "List all portfolio (shared) bidding strategies on the account. Returns id, name, type, status, target CPA / ROAS, and how many campaigns link to each.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "list_bidding_strategies", () => listBiddingStrategies(targetAuth));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("getBiddingStrategyPerformance", {
+    description: "Performance report for portfolio bidding strategies (RMF R.130). Returns clicks, cost_micros, impressions, average_cpc, conversions, and cost_per_conversion aggregated over the selected date range, plus strategy type and status.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z.number().int().min(1).max(365).default(30).describe("Lookback days"),
+      includeRemoved: z.boolean().default(false).describe("Include REMOVED strategies in the report"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days, includeRemoved }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_bidding_strategy_performance", () =>
+      getBiddingStrategyPerformance(targetAuth, { days, includeRemoved }),
     );
     return jsonResult(result);
   }));
