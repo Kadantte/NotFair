@@ -123,7 +123,10 @@ export async function listThreadsForEmail(email: string, limit = 10): Promise<Gm
 
   const gmail = getClient();
   const safe = email.replace(/"/g, "");
-  const q = `(from:"${safe}" OR to:"${safe}")`;
+  // -in:drafts so unsent drafts (which we render in the editor above) don't
+  // also appear in thread history. Drafts carry the DRAFT label and lack SENT,
+  // which would otherwise render them as "Received".
+  const q = `(from:"${safe}" OR to:"${safe}") -in:drafts`;
   const { data } = await gmail.users.threads.list({
     userId: USER_ID,
     q,
@@ -137,7 +140,9 @@ export async function listThreadsForEmail(email: string, limit = 10): Promise<Gm
   );
   const result = full
     .map((r) => {
-      const messages = (r.data.messages ?? []).map(parseMessage);
+      const messages = (r.data.messages ?? [])
+        .filter((m) => !(m.labelIds ?? []).includes("DRAFT"))
+        .map(parseMessage);
       const last = messages[messages.length - 1];
       return {
         id: r.data.id ?? "",
@@ -148,6 +153,7 @@ export async function listThreadsForEmail(email: string, limit = 10): Promise<Gm
         messages,
       };
     })
+    .filter((t) => t.messageCount > 0)
     .sort((a, b) => b.lastDate.getTime() - a.lastDate.getTime());
 
   threadCache.set(key, { at: Date.now(), threads: result });
