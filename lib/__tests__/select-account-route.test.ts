@@ -20,6 +20,16 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
+// `after()` only works inside a real Next.js request scope. In unit tests we
+// stub it to a no-op — we don't care about the post-response snapshot work here.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: vi.fn(() => {}),
+  };
+});
+
 vi.mock("@/lib/google-ads", () => ({
   listAccessibleCustomers: mockListAccessibleCustomers,
   deriveCustomerName: vi.fn((raw: string | null | undefined) => {

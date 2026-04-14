@@ -446,14 +446,17 @@ describe("updateCampaignBidding", () => {
     expect(op.resource.target_cpa).toEqual({ target_cpa_micros: 5_000_000 });
   });
 
-  it("MAXIMIZE_CONVERSIONS without cap sets empty object", async () => {
+  it("MAXIMIZE_CONVERSIONS without cap sets target_cpa_micros: 0", async () => {
+    // target_cpa_micros: 0 = no CPA cap. We must set an explicit field so the
+    // library emits a non-empty update_mask — otherwise the API silently ignores
+    // the bidding change (see lib/google-ads/writes.ts for the full comment).
     mockCurrentBidding();
     const result = await updateCampaignBidding(AUTH, "100", {
       biddingStrategy: "MAXIMIZE_CONVERSIONS",
     });
     expect(result.success).toBe(true);
     const op = mockMutateResources.mock.calls[0][0][0];
-    expect(op.resource.maximize_conversions).toEqual({});
+    expect(op.resource.maximize_conversions).toEqual({ target_cpa_micros: 0 });
   });
 
   it("MAXIMIZE_CONVERSIONS with cap sets target_cpa_micros", async () => {
@@ -480,14 +483,17 @@ describe("updateCampaignBidding", () => {
     expect(op.resource.target_roas).toEqual({ target_roas: 2.5 });
   });
 
-  it("MAXIMIZE_CLICKS sets target_spend field", async () => {
+  it("MAXIMIZE_CLICKS sets target_spend with an effectively-uncapped ceiling", async () => {
+    // cpc_bid_ceiling_micros = 10_000_000_000 ($10,000) = effectively uncapped.
+    // We must set an explicit field so the update_mask is non-empty; see
+    // lib/google-ads/writes.ts for the full rationale (commit 1e88de0).
     mockCurrentBidding();
     const result = await updateCampaignBidding(AUTH, "100", {
       biddingStrategy: "MAXIMIZE_CLICKS",
     });
     expect(result.success).toBe(true);
     const op = mockMutateResources.mock.calls[0][0][0];
-    expect(op.resource.target_spend).toEqual({});
+    expect(op.resource.target_spend).toEqual({ cpc_bid_ceiling_micros: 10_000_000_000 });
   });
 
   it("MANUAL_CPC sets manual_cpc field", async () => {

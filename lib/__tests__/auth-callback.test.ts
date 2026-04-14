@@ -27,6 +27,16 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
+// `after()` only works inside a real Next.js request scope. Stub it so the
+// post-response snapshot + analytics work doesn't throw in unit tests.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: vi.fn(() => {}),
+  };
+});
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
