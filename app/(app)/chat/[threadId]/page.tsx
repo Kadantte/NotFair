@@ -4,7 +4,7 @@ import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowDown, Check, Copy, Link2, Send, Square, X } from "lucide-react";
+import { ArrowDown, Check, Copy, Link2, Send, Square, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
@@ -36,6 +36,52 @@ async function readServerSession(): Promise<Session> {
     credentials: "include",
   });
   return response.json();
+}
+
+type McpToolSummary = {
+  name: string;
+  description: string;
+  readOnly: boolean;
+  destructive: boolean;
+};
+
+// Cache the tool list across client-side navigations so reopening the modal is instant.
+let cachedMcpTools: McpToolSummary[] | null = null;
+
+async function fetchMcpTools(): Promise<McpToolSummary[]> {
+  if (cachedMcpTools) return cachedMcpTools;
+  const res = await fetch("/api/mcp", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // MCP streamable-HTTP transport requires the client to accept SSE
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+      params: {},
+    }),
+  });
+  if (!res.ok) throw new Error(`tools/list failed (${res.status})`);
+  // Response is an SSE stream with a single `event: message` / `data: {...}` pair
+  const raw = await res.text();
+  const dataLine = raw
+    .split("\n")
+    .map(l => l.trim())
+    .find(l => l.startsWith("data: "));
+  if (!dataLine) throw new Error("Empty MCP response");
+  const payload = JSON.parse(dataLine.slice(6));
+  const tools = payload?.result?.tools;
+  if (!Array.isArray(tools)) throw new Error("Malformed MCP response");
+  cachedMcpTools = tools.map((t: { name: string; description?: string; annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean } }) => ({
+    name: t.name,
+    description: t.description ?? "",
+    readOnly: Boolean(t.annotations?.readOnlyHint),
+    destructive: Boolean(t.annotations?.destructiveHint),
+  }));
+  return cachedMcpTools;
 }
 
 async function fetchMessages(threadId: string): Promise<GoogleAdsAgentUIMessage[]> {
@@ -149,6 +195,27 @@ export default function ChatPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // ── MCP tools modal ──
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [tools, setTools] = useState<McpToolSummary[] | null>(null);
+  const [toolsLoading, setToolsLoading] = useState(false);
+  const [toolsError, setToolsError] = useState<string | null>(null);
+
+  const openTools = useCallback(async () => {
+    setToolsOpen(true);
+    if (tools || toolsLoading) return;
+    setToolsLoading(true);
+    setToolsError(null);
+    try {
+      const fetched = await fetchMcpTools();
+      setTools(fetched);
+    } catch (e) {
+      setToolsError(e instanceof Error ? e.message : "Failed to load tools");
+    } finally {
+      setToolsLoading(false);
+    }
+  }, [tools, toolsLoading]);
 
   const isReady = isHydrated && account.connected;
   const isSending = status === "submitted" || status === "streaming";
@@ -266,14 +333,22 @@ export default function ChatPage() {
             }}
             className="rounded-2xl border border-[#4a4a48] bg-[#2c2c2b] p-3"
           >
-            <div className="flex items-end gap-3">
-              <Input
-                value={input}
-                onChange={event => setInput(event.currentTarget.value)}
-                placeholder={isReady ? "Reply..." : "Connect Google Ads first..."}
-                disabled={!isReady || isSending}
-                className="h-11 border-0 bg-transparent px-2 text-base text-white shadow-none placeholder:text-[#8b8b89] focus-visible:ring-0"
-              />
+            <Input
+              value={input}
+              onChange={event => setInput(event.currentTarget.value)}
+              placeholder={isReady ? "Reply..." : "Connect Google Ads first..."}
+              disabled={!isReady || isSending}
+              className="h-11 border-0 bg-transparent px-2 text-base text-white shadow-none placeholder:text-[#8b8b89] focus-visible:ring-0"
+            />
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={openTools}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#4a4a48] bg-[#222221] px-3 py-1.5 text-xs text-[#b0b0ae] transition-colors hover:border-[#6a6a68] hover:bg-[#3a3a39] hover:text-white"
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                Google Ads MCP tools
+              </button>
               {isSending ? (
                 <Button
                   type="button"
@@ -296,6 +371,80 @@ export default function ChatPage() {
           </form>
         </div>
       </div>
+      {/* MCP tools modal */}
+      {toolsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setToolsOpen(false)}
+        >
+          <div
+            className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-[#2c2c2b] shadow-2xl"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[#4a4a48] px-6 py-4">
+              <div>
+                <h2 className="text-lg font-medium text-white">Google Ads MCP tools</h2>
+                <p className="mt-0.5 text-xs text-[#8b8b89]">
+                  {tools
+                    ? `${tools.length} tools available · ${tools.filter(t => t.readOnly).length} read · ${tools.filter(t => !t.readOnly).length} write`
+                    : toolsLoading
+                      ? "Loading…"
+                      : "Tools exposed by the AdsAgent MCP server"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToolsOpen(false)}
+                className="rounded-lg p-1.5 text-[#8b8b89] hover:bg-[#3a3a39] hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              {toolsError && (
+                <div className="rounded-lg bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
+                  {toolsError}
+                </div>
+              )}
+              {toolsLoading && !tools && (
+                <div className="flex items-center justify-center py-12 text-sm text-[#8b8b89]">
+                  Loading tools…
+                </div>
+              )}
+              {tools && tools.length > 0 && (
+                <div className="space-y-5">
+                  {[
+                    { key: "read", label: "Read", tools: tools.filter(t => t.readOnly) },
+                    { key: "write", label: "Write", tools: tools.filter(t => !t.readOnly && !t.destructive) },
+                    { key: "destructive", label: "Destructive", tools: tools.filter(t => !t.readOnly && t.destructive) },
+                  ]
+                    .filter(g => g.tools.length > 0)
+                    .map(group => (
+                      <div key={group.key}>
+                        <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-[#8b8b89]">
+                          {group.label} · {group.tools.length}
+                        </h3>
+                        <div className="divide-y divide-[#3a3a39] rounded-lg border border-[#3a3a39] bg-[#222221]">
+                          {group.tools.map(tool => (
+                            <div key={tool.name} className="px-4 py-3">
+                              <div className="font-mono text-sm text-white">{tool.name}</div>
+                              {tool.description && (
+                                <div className="mt-1 text-xs leading-relaxed text-[#b0b0ae]">
+                                  {tool.description}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Share modal */}
       {shareOpen && shareUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
