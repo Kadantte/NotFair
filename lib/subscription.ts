@@ -2,8 +2,8 @@ import "server-only";
 
 import type Stripe from "stripe";
 import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { resolvePrice } from "@/lib/stripe/config";
+import { and, eq } from "drizzle-orm";
+import { resolvePrice, stripeMode } from "@/lib/stripe/config";
 
 // ─── Plan registry ────────────────────────────────────────────────────
 //
@@ -159,7 +159,12 @@ export async function getUserSubscription(userId: string | null | undefined): Pr
   const [row] = await db()
     .select()
     .from(schema.subscriptions)
-    .where(eq(schema.subscriptions.userId, userId))
+    .where(
+      and(
+        eq(schema.subscriptions.userId, userId),
+        eq(schema.subscriptions.env, stripeMode()),
+      ),
+    )
     .limit(1);
 
   if (!row) return FREE_SUBSCRIPTION;

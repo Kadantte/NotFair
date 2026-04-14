@@ -49,6 +49,7 @@ vi.mock("@/lib/stripe/client", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col: unknown, val: unknown) => ["eq", col, val]),
+  and: vi.fn((...args: unknown[]) => ["and", ...args]),
 }));
 
 import {
@@ -108,7 +109,9 @@ function makeFakeDb(initial: { subs?: FakeRow[]; events?: string[] } = {}) {
       set: (set: Partial<FakeRow>) => ({
         where: (clause: unknown[]) => ({
           returning: () => {
-            const value = (clause as unknown[])[2] as string;
+            // clause is either ["eq", col, val] or ["and", ["eq", col, val], ...]
+            const firstEq = (clause[0] === "and" ? clause[1] : clause) as unknown[];
+            const value = firstEq[2] as string;
             const matched: { userId: string }[] = [];
             for (let i = 0; i < rows.length; i++) {
               if (

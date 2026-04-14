@@ -194,17 +194,22 @@ export const accounts = pgTable("accounts", {
 export const subscriptions = pgTable("subscriptions", {
   id: serial("id").primaryKey(),
   /** Our app's stable user id (matches mcp_sessions.user_id). */
-  userId: text("user_id").notNull().unique(),
+  userId: text("user_id").notNull(),
+  /** Stripe environment: "test" (dev) or "live" (prod). Scopes every row so
+   * the same user can have separate subscription state per env. */
+  env: text("env").notNull().default("live"),
   /** Email on file at Stripe — kept flat for support/ops queries. */
   email: text("email"),
-  /** Webhook lookup key — flat with a unique index for indexed lookups. */
-  stripeCustomerId: text("stripe_customer_id").unique(),
+  /** Webhook lookup key. */
+  stripeCustomerId: text("stripe_customer_id"),
   /** Full Stripe Subscription object, or null if the customer has none. */
   data: jsonb("data"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("subscriptions_stripe_customer_idx").on(table.stripeCustomerId),
+  uniqueIndex("subscriptions_user_env_uq").on(table.userId, table.env),
+  uniqueIndex("subscriptions_customer_env_uq").on(table.stripeCustomerId, table.env),
 ]);
 
 // ─── Processed Stripe webhook events (idempotency) ───────────────────

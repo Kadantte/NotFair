@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { stripe } from "@/lib/stripe/client";
-import { getGrowthMonthlyPriceId, getGrowthYearlyPriceId } from "@/lib/stripe/config";
+import { getGrowthMonthlyPriceId, getGrowthYearlyPriceId, stripeMode } from "@/lib/stripe/config";
 import { getUserSubscription } from "@/lib/subscription";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
@@ -40,10 +40,12 @@ export async function POST(request: Request) {
     customerId = customer.id;
 
     const now = new Date();
+    const env = stripeMode();
     await db()
       .insert(schema.subscriptions)
       .values({
         userId: session.userId,
+        env,
         email,
         stripeCustomerId: customerId,
         data: null,
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
         updatedAt: now,
       })
       .onConflictDoUpdate({
-        target: schema.subscriptions.userId,
+        target: [schema.subscriptions.userId, schema.subscriptions.env],
         set: { email, stripeCustomerId: customerId, updatedAt: now },
       });
   }

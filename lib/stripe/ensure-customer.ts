@@ -2,6 +2,7 @@ import "server-only";
 
 import { db, schema } from "@/lib/db";
 import { stripe } from "@/lib/stripe/client";
+import { stripeMode } from "@/lib/stripe/config";
 
 /**
  * Create a Stripe customer and persist it to `subscriptions`. Call sites must
@@ -9,9 +10,10 @@ import { stripe } from "@/lib/stripe/client";
  * precheck. Idempotent on Stripe's side via the `signup:${userId}` key.
  */
 export async function createStripeCustomerForUser(userId: string, email: string | null): Promise<void> {
+  const env = stripeMode();
   const customer = await stripe().customers.create(
     { email: email ?? undefined, metadata: { userId } },
-    { idempotencyKey: `signup:${userId}` },
+    { idempotencyKey: `signup:${env}:${userId}` },
   );
 
   const now = new Date();
@@ -19,6 +21,7 @@ export async function createStripeCustomerForUser(userId: string, email: string 
     .insert(schema.subscriptions)
     .values({
       userId,
+      env,
       email,
       stripeCustomerId: customer.id,
       data: null,
@@ -26,7 +29,7 @@ export async function createStripeCustomerForUser(userId: string, email: string 
       updatedAt: now,
     })
     .onConflictDoUpdate({
-      target: schema.subscriptions.userId,
+      target: [schema.subscriptions.userId, schema.subscriptions.env],
       set: { email, stripeCustomerId: customer.id, updatedAt: now },
     });
 }

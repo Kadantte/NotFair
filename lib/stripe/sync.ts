@@ -2,8 +2,9 @@ import "server-only";
 
 import type Stripe from "stripe";
 import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { stripe as stripeClient } from "./client";
+import { stripeMode } from "./config";
 
 /**
  * Stripe → DB sync layer.
@@ -86,11 +87,17 @@ export async function syncStripeSubscription(
 
   // Case A: customer has no subscription on file. Demote any matching row to free
   // by clearing `data` (the resolver returns FREE_SUBSCRIPTION when data is null).
+  const env = stripeMode();
   if (subs.data.length === 0) {
     const updated = await database(deps)
       .update(schema.subscriptions)
       .set({ data: null, email, updatedAt: new Date() })
-      .where(eq(schema.subscriptions.stripeCustomerId, customerId))
+      .where(
+        and(
+          eq(schema.subscriptions.stripeCustomerId, customerId),
+          eq(schema.subscriptions.env, env),
+        ),
+      )
       .returning({ userId: schema.subscriptions.userId });
     if (updated.length === 0) {
       return { action: "skipped", reason: "no local row for customer with no subscription" };
@@ -111,6 +118,7 @@ export async function syncStripeSubscription(
   const now = new Date();
   const row = {
     userId,
+    env,
     email,
     stripeCustomerId,
     data: sub as unknown as Record<string, unknown>,
@@ -121,7 +129,7 @@ export async function syncStripeSubscription(
     .insert(schema.subscriptions)
     .values({ ...row, createdAt: now })
     .onConflictDoUpdate({
-      target: schema.subscriptions.userId,
+      target: [schema.subscriptions.userId, schema.subscriptions.env],
       set: row,
     });
 

@@ -46,6 +46,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ["eq", ...args]),
+  and: vi.fn((...args: unknown[]) => ["and", ...args]),
 }));
 
 import {
