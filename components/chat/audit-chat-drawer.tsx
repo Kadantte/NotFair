@@ -3,11 +3,13 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, Expand, MessageCircle, Send, Square, X } from "lucide-react";
+import { ArrowDown, Expand, MessageCircle, Send, Square, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
+import { McpToolsSheet } from "@/components/chat/mcp-tools-sheet";
+import { useMcpTools } from "@/components/chat/use-mcp-tools";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -55,6 +57,17 @@ export function AuditChatDrawer({
       id: threadId.current,
       transport,
     });
+
+  const {
+    toolsOpen,
+    setToolsOpen,
+    tools,
+    permissions,
+    toolsLoading,
+    toolsError,
+    openTools,
+    updatePermissions,
+  } = useMcpTools();
 
   const isSending = status === "submitted" || status === "streaming";
 
@@ -224,14 +237,22 @@ export function AuditChatDrawer({
             }}
             className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-2"
           >
-            <div className="flex items-end gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.currentTarget.value)}
-                placeholder="Ask about this audit..."
-                disabled={isSending}
-                className="h-10 border-0 bg-transparent px-2 text-[14px] text-[#E8E4DD] shadow-none placeholder:text-[#C4C0B6] focus-visible:ring-0"
-              />
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.currentTarget.value)}
+              placeholder="Ask about this audit..."
+              disabled={isSending}
+              className="h-10 border-0 bg-transparent px-2 text-[14px] text-[#E8E4DD] shadow-none placeholder:text-[#C4C0B6] focus-visible:ring-0"
+            />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={openTools}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#3D3C36] bg-[#1A1917] px-3 py-1.5 text-[11px] text-[#C4C0B6] transition-colors hover:border-[#5a5955] hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                Google Ads MCP tools
+              </button>
               {isSending ? (
                 <Button
                   type="button"
@@ -254,6 +275,16 @@ export function AuditChatDrawer({
           </form>
         </div>
       </div>
+
+      <McpToolsSheet
+        open={toolsOpen}
+        onClose={() => setToolsOpen(false)}
+        tools={tools}
+        permissions={permissions}
+        loading={toolsLoading}
+        error={toolsError}
+        onUpdate={updatePermissions}
+      />
     </>
   );
 }

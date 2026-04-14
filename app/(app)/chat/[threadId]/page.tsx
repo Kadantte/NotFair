@@ -11,8 +11,8 @@ import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { dispatchThreadEvent } from "@/lib/thread-events";
 import type { Session } from "@/lib/session";
 import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
-import { McpToolsSheet, type McpToolSummary } from "@/components/chat/mcp-tools-sheet";
-import type { ToolPermissionMode } from "@/lib/tool-permissions";
+import { McpToolsSheet } from "@/components/chat/mcp-tools-sheet";
+import { useMcpTools } from "@/components/chat/use-mcp-tools";
 
 type StoredAccount = {
   connected: boolean;
@@ -38,46 +38,6 @@ async function readServerSession(): Promise<Session> {
     credentials: "include",
   });
   return response.json();
-}
-
-// Cache the tool list across client-side navigations so reopening the modal is instant.
-let cachedMcpTools: McpToolSummary[] | null = null;
-let cachedPermissions: Record<string, ToolPermissionMode> | null = null;
-
-async function fetchMcpTools(): Promise<McpToolSummary[]> {
-  if (cachedMcpTools) return cachedMcpTools;
-  const res = await fetch("/api/mcp", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      // MCP streamable-HTTP transport requires the client to accept SSE
-      Accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/list",
-      params: {},
-    }),
-  });
-  if (!res.ok) throw new Error(`tools/list failed (${res.status})`);
-  // Response is an SSE stream with a single `event: message` / `data: {...}` pair
-  const raw = await res.text();
-  const dataLine = raw
-    .split("\n")
-    .map(l => l.trim())
-    .find(l => l.startsWith("data: "));
-  if (!dataLine) throw new Error("Empty MCP response");
-  const payload = JSON.parse(dataLine.slice(6));
-  const tools = payload?.result?.tools;
-  if (!Array.isArray(tools)) throw new Error("Malformed MCP response");
-  cachedMcpTools = tools.map((t: { name: string; description?: string; annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean } }) => ({
-    name: t.name,
-    description: t.description ?? "",
-    readOnly: Boolean(t.annotations?.readOnlyHint),
-    destructive: Boolean(t.annotations?.destructiveHint),
-  }));
-  return cachedMcpTools;
 }
 
 async function fetchMessages(threadId: string): Promise<GoogleAdsAgentUIMessage[]> {
@@ -193,79 +153,16 @@ export default function ChatPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // ── MCP tools sheet ──
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const [tools, setTools] = useState<McpToolSummary[] | null>(cachedMcpTools);
-  const [permissions, setPermissions] = useState<Record<string, ToolPermissionMode>>(
-    cachedPermissions ?? {},
-  );
-  const [toolsLoading, setToolsLoading] = useState(false);
-  const [toolsError, setToolsError] = useState<string | null>(null);
-
-  const openTools = useCallback(async () => {
-    setToolsOpen(true);
-    if ((tools && cachedPermissions) || toolsLoading) return;
-    setToolsLoading(true);
-    setToolsError(null);
-    try {
-      const [fetched, permsRes] = await Promise.all([
-        fetchMcpTools(),
-        fetch("/api/chat/tool-permissions", { credentials: "include" }).then(r => r.json()),
-      ]);
-      setTools(fetched);
-      const perms = (permsRes?.permissions ?? {}) as Record<string, ToolPermissionMode>;
-      cachedPermissions = perms;
-      setPermissions(perms);
-    } catch (e) {
-      setToolsError(e instanceof Error ? e.message : "Failed to load tools");
-    } finally {
-      setToolsLoading(false);
-    }
-  }, [tools, toolsLoading]);
-
-  // Listen for inline "Always allow" decisions made via the approval card.
-  useEffect(() => {
-    const onChanged = (e: Event) => {
-      const detail = (e as CustomEvent<{ toolName: string; mode: ToolPermissionMode }>).detail;
-      if (!detail) return;
-      setPermissions(prev => {
-        const next = { ...prev, [detail.toolName]: detail.mode };
-        cachedPermissions = next;
-        return next;
-      });
-    };
-    window.addEventListener("tool-permissions-changed", onChanged);
-    return () => window.removeEventListener("tool-permissions-changed", onChanged);
-  }, []);
-
-  const updatePermissions = useCallback(
-    async (updates: Array<{ toolName: string; mode: ToolPermissionMode }>) => {
-      // Optimistic update
-      setPermissions(prev => {
-        const next = { ...prev };
-        for (const u of updates) next[u.toolName] = u.mode;
-        cachedPermissions = next;
-        return next;
-      });
-      try {
-        const res = await fetch("/api/chat/tool-permissions", {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ updates }),
-        });
-        if (res.ok) {
-          const body = await res.json();
-          const perms = (body?.permissions ?? {}) as Record<string, ToolPermissionMode>;
-          cachedPermissions = perms;
-          setPermissions(perms);
-        }
-      } catch {
-        // swallow — the UI already reflects the optimistic state
-      }
-    },
-    [],
-  );
+  const {
+    toolsOpen,
+    setToolsOpen,
+    tools,
+    permissions,
+    toolsLoading,
+    toolsError,
+    openTools,
+    updatePermissions,
+  } = useMcpTools();
 
   const isReady = isHydrated && account.connected;
   const isSending = status === "submitted" || status === "streaming";
