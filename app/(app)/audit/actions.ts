@@ -38,7 +38,7 @@ export type AuditDetails = Awaited<ReturnType<typeof getAuditDetails>>;
 
 // ─── Phase 1: Fast overview (~4 parallel API calls) ─────────────────
 
-export async function getAuditOverview() {
+export async function getAuditOverview(days: number = 30) {
   return requireAuth(async () => {
     const { auth, session } = await getAuthContext();
 
@@ -46,7 +46,7 @@ export async function getAuditOverview() {
       await Promise.all([
         getAccountInfo(auth),
         getAccountSettings(auth),
-        listCampaigns(auth, { limit: 50, days: 30 }),
+        listCampaigns(auth, { limit: 50, days }),
         getConversionActions(auth),
       ]);
 
@@ -93,11 +93,11 @@ export async function getAuditOverview() {
 
 // ─── Phase 2: Detailed analysis (parallel per-campaign) ─────────────
 
-export async function getAuditDetails() {
+export async function getAuditDetails(days: number = 30) {
   return requireAuth(async () => {
     const { auth, session } = await getAuthContext();
 
-    const campaigns = await listCampaigns(auth, { limit: 50, days: 30 });
+    const campaigns = await listCampaigns(auth, { limit: 50, days });
     const enabledCampaigns = campaigns.filter(
       (c) => c.status === "ENABLED" || c.status === 2,
     );
@@ -125,7 +125,7 @@ export async function getAuditDetails() {
       Promise.all(
         campaignIds.map(async (id) => {
           try {
-            const r = await getKeywords(auth, id, 30, 100);
+            const r = await getKeywords(auth, id, days, 100);
             return r.keywords;
           } catch {
             return [];
@@ -135,7 +135,7 @@ export async function getAuditDetails() {
       Promise.all(
         campaignIds.map(async (id) => {
           try {
-            const r = await getSearchTermReport(auth, id, 30, 100);
+            const r = await getSearchTermReport(auth, id, days, 100);
             return r.searchTerms;
           } catch {
             return [];
@@ -145,7 +145,7 @@ export async function getAuditDetails() {
       Promise.all(
         campaignIds.map(async (id, idx) => {
           try {
-            const r = await getImpressionShare(auth, id, 30);
+            const r = await getImpressionShare(auth, id, days);
             return {
               campaignName: topCampaigns[idx].name,
               impressionShare: r.impressionShare,
@@ -169,7 +169,7 @@ export async function getAuditDetails() {
       Promise.all(
         campaignIds.map(async (id) => {
           try {
-            const r = await listAds(auth, id, undefined, 30, 50);
+            const r = await listAds(auth, id, undefined, days, 50);
             return r.ads;
           } catch {
             return [];

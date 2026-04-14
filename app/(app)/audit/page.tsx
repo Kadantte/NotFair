@@ -3,87 +3,104 @@
 import { useState, useEffect, useCallback } from "react";
 import { getAuditOverview, getAuditDetails, clearAuditCache } from "./actions";
 import type { AuditOverview, AuditDetails } from "./actions";
-import { AuditContent } from "./audit-content";
+import { AuditContent, type TimeRangeOption, TIME_RANGE_OPTIONS } from "./audit-content";
 import {
   AuditChatDrawer,
   type AuditChatContext,
 } from "@/components/chat/audit-chat-drawer";
 import { AuditHelpPanel } from "@/components/audit/audit-help-panel";
 
-// Module-level cache keyed by account ID
-let cachedAccountId: string | null = null;
-let cachedOverview: AuditOverview | null = null;
-let cachedDetails: AuditDetails | null = null;
+// Module-level cache keyed by accountId + days
+type CacheKey = string;
+const overviewCache = new Map<CacheKey, AuditOverview>();
+const detailsCache = new Map<CacheKey, AuditDetails>();
 
-function getCacheForAccount(accountId: string) {
-  if (cachedAccountId !== accountId) {
-    cachedOverview = null;
-    cachedDetails = null;
-    cachedAccountId = accountId;
-  }
-  return { overview: cachedOverview, details: cachedDetails };
+function makeKey(accountId: string, days: number): CacheKey {
+  return `${accountId}:${days}`;
 }
 
+const DEFAULT_RANGE: TimeRangeOption = TIME_RANGE_OPTIONS[0];
+
 export default function AuditPage() {
-  const [overview, setOverview] = useState<AuditOverview | null>(cachedOverview);
-  const [details, setDetails] = useState<AuditDetails | null>(cachedDetails);
-  const [loading, setLoading] = useState(!cachedOverview);
+  const [timeRange, setTimeRange] = useState<TimeRangeOption>(DEFAULT_RANGE);
+  const [overview, setOverview] = useState<AuditOverview | null>(null);
+  const [details, setDetails] = useState<AuditDetails | null>(null);
+  const [loading, setLoading] = useState(true);
   const [redoLoading, setRedoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastAuditTime, setLastAuditTime] = useState<Date | null>(cachedOverview ? new Date() : null);
+  const [lastAuditTime, setLastAuditTime] = useState<Date | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
-  const fetchData = useCallback(async (background: boolean) => {
-    if (!background) setLoading(true);
-    try {
-      // Phase 1: Fast overview
-      const ov = await getAuditOverview();
+  const fetchData = useCallback(
+    async (days: number, background: boolean) => {
+      if (!background) setLoading(true);
+      try {
+        const ov = await getAuditOverview(days);
+        const key = makeKey(ov.accountId, days);
+        overviewCache.set(key, ov);
+        setOverview(ov);
+        const cachedDet = detailsCache.get(key);
+        if (cachedDet) setDetails(cachedDet);
+        else setDetails(null);
+        setLoading(false);
+        setLastAuditTime(new Date());
 
-      const cache = getCacheForAccount(ov.accountId);
-      setOverview(ov);
-      cachedOverview = ov;
-      if (!cache.overview) {
-        setDetails(null);
-        cachedDetails = null;
-      }
-      setLoading(false);
-      setLastAuditTime(new Date());
-
-      // Phase 2: Detailed analysis
-      if (!ov.isEmpty) {
-        try {
-          const det = await getAuditDetails();
-          setDetails(det);
-          cachedDetails = det;
-        } catch {
-          // Phase 2 failure — overview still shows
+        if (!ov.isEmpty) {
+          try {
+            const det = await getAuditDetails(days);
+            detailsCache.set(key, det);
+            setDetails(det);
+          } catch {
+            // Phase 2 failure — overview still shows
+          }
+        }
+      } catch (err) {
+        if (!background) {
+          setError(err instanceof Error ? err.message : "Failed to load audit");
+          setLoading(false);
         }
       }
-    } catch (err) {
-      if (!background) {
-        setError(err instanceof Error ? err.message : "Failed to load audit");
-        setLoading(false);
-      }
-    }
-  }, []);
+    },
+    [],
+  );
 
   const redoAudit = useCallback(async () => {
     setRedoLoading(true);
     try {
       await clearAuditCache();
-      cachedOverview = null;
-      cachedDetails = null;
-      cachedAccountId = null;
-      await fetchData(true);
+      overviewCache.clear();
+      detailsCache.clear();
+      await fetchData(timeRange.days, true);
     } finally {
       setRedoLoading(false);
     }
-  }, [fetchData]);
+  }, [fetchData, timeRange]);
+
+  const handleTimeRangeChange = useCallback(
+    (next: TimeRangeOption) => {
+      setTimeRange(next);
+      if (!overview) return;
+      const key = makeKey(overview.accountId, next.days);
+      const cachedOv = overviewCache.get(key);
+      const cachedDet = detailsCache.get(key);
+      if (cachedOv) {
+        setOverview(cachedOv);
+        setDetails(cachedDet ?? null);
+        fetchData(next.days, true);
+      } else {
+        setOverview(null);
+        setDetails(null);
+        fetchData(next.days, false);
+      }
+    },
+    [fetchData, overview],
+  );
 
   useEffect(() => {
-    fetchData(!!cachedOverview);
-  }, [fetchData]);
+    fetchData(DEFAULT_RANGE.days, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
@@ -103,7 +120,7 @@ export default function AuditPage() {
           <div className="text-[14px] text-[#C45D4A]">{error ?? "Unable to load audit"}</div>
           <button
             type="button"
-            onClick={() => { setError(null); fetchData(false); }}
+            onClick={() => { setError(null); fetchData(timeRange.days, false); }}
             className="mt-3 text-[13px] text-[#4CAF6E] hover:underline"
           >
             Retry
@@ -135,6 +152,8 @@ export default function AuditPage() {
         onRedoAudit={redoAudit}
         redoLoading={redoLoading}
         lastAuditTime={lastAuditTime}
+        timeRange={timeRange}
+        onTimeRangeChange={handleTimeRangeChange}
       />
       {!drawerOpen && <AuditHelpPanel onChatClick={() => setDrawerOpen(true)} />}
       <AuditChatDrawer

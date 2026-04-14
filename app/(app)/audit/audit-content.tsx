@@ -19,6 +19,19 @@ import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, PassItem, QsSubLabel } from "@/lib/audit/scoring";
 
+// ─── Time Range ──────────────────────────────────────────────────────
+
+export type TimeRangeOption = { label: string; days: number };
+
+export const TIME_RANGE_OPTIONS: readonly TimeRangeOption[] = [
+  { label: "Last 30 days", days: 30 },
+  { label: "Last 3 months", days: 90 },
+  { label: "Last 6 months", days: 180 },
+  { label: "Last 1 year", days: 365 },
+  { label: "Last 2 years", days: 730 },
+  { label: "All time", days: 3650 },
+] as const;
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 function fmt$(n: number): string {
@@ -867,6 +880,8 @@ export function AuditContent({
   onRedoAudit,
   redoLoading,
   lastAuditTime,
+  timeRange,
+  onTimeRangeChange,
 }: {
   overview: AuditOverview;
   details: AuditDetails | null;
@@ -874,6 +889,8 @@ export function AuditContent({
   onRedoAudit?: () => void;
   redoLoading?: boolean;
   lastAuditTime?: Date | null;
+  timeRange?: TimeRangeOption;
+  onTimeRangeChange?: (range: TimeRangeOption) => void;
 }) {
   const auditResult = details?.auditResult ?? null;
   const detailsLoading = details === null;
@@ -900,9 +917,31 @@ export function AuditContent({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#C4C0B6]">
-              Last 30 days
-            </span>
+            {timeRange && onTimeRangeChange ? (
+              <div className="relative">
+                <select
+                  value={timeRange.days}
+                  onChange={(e) => {
+                    const next = TIME_RANGE_OPTIONS.find(
+                      (opt) => opt.days === Number(e.target.value),
+                    );
+                    if (next) onTimeRangeChange(next);
+                  }}
+                  className="cursor-pointer appearance-none rounded-sm bg-[#3D3C36] py-1 pl-2 pr-6 text-[11px] text-[#C4C0B6] transition hover:bg-[#4D4C46] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]"
+                >
+                  {TIME_RANGE_OPTIONS.map((opt) => (
+                    <option key={opt.days} value={opt.days}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#C4C0B6]" />
+              </div>
+            ) : (
+              <span className="rounded-sm bg-[#3D3C36] px-2 py-1 text-[11px] text-[#C4C0B6]">
+                Last 30 days
+              </span>
+            )}
             {onRedoAudit && (
               <button
                 type="button"
