@@ -10,6 +10,7 @@ import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 import { McpToolsSheet } from "@/components/chat/mcp-tools-sheet";
 import { useMcpTools } from "@/components/chat/use-mcp-tools";
+import { ModelSelector, type ModelId } from "@/components/chat/model-selector";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export function AuditChatDrawer({
   context: AuditChatContext | null;
 }) {
   const [input, setInput] = useState("");
+  const [modelId, setModelId] = useState<ModelId>("gpt-5-mini");
   const scrollRef = useRef<HTMLDivElement>(null);
   const threadId = useRef(crypto.randomUUID());
 
@@ -240,6 +242,8 @@ export function AuditChatDrawer({
                 <Wrench className="h-3.5 w-3.5" />
                 Google Ads MCP tools
               </button>
+              <div className="flex items-center gap-1">
+                <ModelSelector value={modelId} onChange={setModelId} surface="audit_drawer" />
               {isSending ? (
                 <Button
                   type="button"
@@ -258,6 +262,7 @@ export function AuditChatDrawer({
                   <Send className="h-3.5 w-3.5" />
                 </Button>
               )}
+              </div>
             </div>
           </form>
         </div>
