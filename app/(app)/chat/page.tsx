@@ -1,15 +1,18 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getSessionAuth } from "@/lib/session";
+import { loadThreadsForUser } from "@/lib/db/chat";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+export const dynamic = "force-dynamic";
 
-export default function ChatRedirect() {
-  const router = useRouter();
+export default async function ChatRedirect() {
+  const session = await getSessionAuth().catch(() => null);
 
-  useEffect(() => {
-    const newId = crypto.randomUUID();
-    router.replace(`/chat/${newId}`);
-  }, [router]);
+  if (session?.userId) {
+    const threads = await loadThreadsForUser(session.userId, session.customerId);
+    if (threads.length > 0) {
+      redirect(`/chat/${threads[0].id}`);
+    }
+  }
 
-  return null;
+  redirect(`/chat/${crypto.randomUUID()}`);
 }
