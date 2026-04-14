@@ -288,7 +288,7 @@ export function McpToolsSheet({
       onClick={onClose}
     >
       <div
-        className="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#3D3C36] bg-[#24231F] shadow-2xl"
+        className="mx-4 flex h-[85vh] max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#3D3C36] bg-[#24231F] shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-6 border-b border-[#3D3C36] px-6 pt-5 pb-4">
