@@ -250,6 +250,19 @@ export const auditSnapshots = pgTable("audit_snapshots", {
   index("audit_snapshots_account_idx").on(table.accountId, table.createdAt),
 ]);
 
+// ─── Tool Permissions (per-user MCP tool approval policy) ──────────
+
+export const toolPermissions = pgTable("tool_permissions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  toolName: text("tool_name").notNull(),
+  /** 'always_allow' | 'needs_approval' | 'blocked' */
+  mode: text("mode").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tool_permissions_user_tool_idx").on(table.userId, table.toolName),
+]);
+
 // ─── Chat Messages ──────────────────────────────────────────────────
 
 export const chatMessages = pgTable("chat_messages", {
