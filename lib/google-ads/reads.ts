@@ -160,7 +160,8 @@ export async function listCampaigns(
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
-      metrics.conversions
+      metrics.conversions,
+      metrics.all_conversions
     FROM campaign
     ${whereClause}
     ORDER BY metrics.impressions DESC
@@ -179,6 +180,7 @@ export async function listCampaigns(
     clicks: row.metrics.clicks ?? 0,
     cost: micros(row.metrics.cost_micros),
     conversions: row.metrics.conversions ?? 0,
+    allConversions: row.metrics.all_conversions ?? 0,
   }));
 }
 
@@ -187,6 +189,7 @@ type PerfTotals = {
   clicks: number;
   cost: number;
   conversions: number;
+  allConversions: number;
   conversionValue: number;
 };
 
@@ -214,9 +217,10 @@ function sumTotals(rows: PerfTotals[]): PerfTotals {
       clicks: acc.clicks + row.clicks,
       cost: acc.cost + row.cost,
       conversions: acc.conversions + row.conversions,
+      allConversions: acc.allConversions + row.allConversions,
       conversionValue: acc.conversionValue + row.conversionValue,
     }),
-    { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversionValue: 0 },
+    { impressions: 0, clicks: 0, cost: 0, conversions: 0, allConversions: 0, conversionValue: 0 },
   );
 }
 
@@ -236,7 +240,7 @@ async function queryPerformanceRows(
       campaign.id, campaign.name,
       segments.date,
       metrics.impressions, metrics.clicks, metrics.cost_micros,
-      metrics.conversions, metrics.conversions_value,
+      metrics.conversions, metrics.all_conversions, metrics.conversions_value,
       metrics.ctr, metrics.average_cpc
     FROM campaign
     WHERE campaign.id = ${campaignId}
@@ -252,6 +256,7 @@ async function queryPerformanceRows(
       clicks: row.metrics.clicks ?? 0,
       cost: micros(row.metrics.cost_micros),
       conversions: row.metrics.conversions ?? 0,
+      allConversions: row.metrics.all_conversions ?? 0,
       conversionValue: row.metrics.conversions_value ?? 0,
       ctr: row.metrics.ctr ?? 0,
       averageCpc: micros(row.metrics.average_cpc),
@@ -382,24 +387,32 @@ export async function getKeywords(
     LIMIT ${boundedLimit}
   `);
 
-  // Query 2: ad_group_criterion for full quality_info (no date range needed)
+  // Query 2: ad_group_criterion for quality_info + position_estimates
+  // position_estimates (first_page / first_position CPC) is required by RMF R.50.
+  // Queried here rather than in keyword_view because keyword_view doesn't expose it.
   const qualityResult = await customer.query(`
     SELECT
       ad_group_criterion.criterion_id,
       ad_group_criterion.quality_info.quality_score,
       ad_group_criterion.quality_info.creative_quality_score,
       ad_group_criterion.quality_info.post_click_quality_score,
-      ad_group_criterion.quality_info.search_predicted_ctr
+      ad_group_criterion.quality_info.search_predicted_ctr,
+      ad_group_criterion.position_estimates.first_page_cpc_micros,
+      ad_group_criterion.position_estimates.first_position_cpc_micros
     FROM ad_group_criterion
     WHERE campaign.id = ${id}
       AND ad_group_criterion.type = 'KEYWORD'
       AND ad_group_criterion.status != 'REMOVED'
   `);
 
-  // Index quality data by criterion ID for fast lookup
-  const qualityMap = new Map<string, any>();
+  // Index quality + position data by criterion ID for fast lookup
+  const detailsByCriterion = new Map<string, { quality: any; positionEstimates: any }>();
   for (const row of qualityResult as any[]) {
-    qualityMap.set(String(row.ad_group_criterion.criterion_id), row.ad_group_criterion.quality_info);
+    const criterion = row.ad_group_criterion;
+    detailsByCriterion.set(String(criterion.criterion_id), {
+      quality: criterion.quality_info,
+      positionEstimates: criterion.position_estimates,
+    });
   }
 
   return {
@@ -408,7 +421,9 @@ export async function getKeywords(
     keywords: (metricsResult as any[]).map((row) => {
       const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
       const criterionId = String(row.ad_group_criterion.criterion_id);
-      const quality = qualityMap.get(criterionId);
+      const details = detailsByCriterion.get(criterionId);
+      const quality = details?.quality;
+      const positionEstimates = details?.positionEstimates;
       return {
         criterionId,
         adGroupId: String(row.ad_group?.id ?? ""),
@@ -420,6 +435,12 @@ export async function getKeywords(
         creativeQuality: quality?.creative_quality_score ?? null,
         postClickQuality: quality?.post_click_quality_score ?? null,
         searchPredictedCtr: quality?.search_predicted_ctr ?? null,
+        firstPageCpc: positionEstimates?.first_page_cpc_micros != null
+          ? micros(Number(positionEstimates.first_page_cpc_micros))
+          : null,
+        firstPositionCpc: positionEstimates?.first_position_cpc_micros != null
+          ? micros(Number(positionEstimates.first_position_cpc_micros))
+          : null,
         impressions: row.metrics.impressions ?? 0,
         clicks: row.metrics.clicks ?? 0,
         ctr: row.metrics.ctr ?? 0,
@@ -447,6 +468,7 @@ export async function getSearchTermReport(
     SELECT
       search_term_view.search_term,
       search_term_view.status,
+      segments.search_term_match_type,
       campaign.name,
       ad_group.name,
       metrics.impressions, metrics.clicks, metrics.ctr,
@@ -461,17 +483,21 @@ export async function getSearchTermReport(
   return {
     campaignId,
     dateRange: { start, end, days: boundedDays },
-    searchTerms: (result as any[]).map((row) => ({
-      searchTerm: row.search_term_view.search_term ?? "",
-      status: row.search_term_view.status ?? "UNKNOWN",
-      campaignName: row.campaign?.name ?? "Unknown",
-      adGroupName: row.ad_group?.name ?? "Unknown",
-      impressions: row.metrics.impressions ?? 0,
-      clicks: row.metrics.clicks ?? 0,
-      ctr: row.metrics.ctr ?? 0,
-      cost: micros(row.metrics.cost_micros),
-      conversions: row.metrics.conversions ?? 0,
-    })),
+    searchTerms: (result as any[]).map((row) => {
+      const rawMatchType = row.segments?.search_term_match_type;
+      return {
+        searchTerm: row.search_term_view.search_term ?? "",
+        status: row.search_term_view.status ?? "UNKNOWN",
+        matchType: (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "UNKNOWN",
+        campaignName: row.campaign?.name ?? "Unknown",
+        adGroupName: row.ad_group?.name ?? "Unknown",
+        impressions: row.metrics.impressions ?? 0,
+        clicks: row.metrics.clicks ?? 0,
+        ctr: row.metrics.ctr ?? 0,
+        cost: micros(row.metrics.cost_micros),
+        conversions: row.metrics.conversions ?? 0,
+      };
+    }),
   };
 }
 
