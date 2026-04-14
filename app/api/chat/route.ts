@@ -2,6 +2,7 @@ import { createAgentUIStream, createUIMessageStreamResponse } from "ai";
 import { createGoogleAdsAgent } from "@/lib/agents/google-ads-agent";
 import { getSessionAuth } from "@/lib/session";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
+import { getToolPermissions } from "@/lib/tool-permissions";
 
 export async function POST(request: Request) {
   const payload = await request.json();
@@ -14,11 +15,16 @@ export async function POST(request: Request) {
     return new Response("Missing Google Ads auth context.", { status: 400 });
   }
 
+  const toolPermissions = session?.userId
+    ? await getToolPermissions(session.userId).catch(() => ({}))
+    : {};
+
   const agent = createGoogleAdsAgent({
     refreshToken,
     customerId,
     userId: session?.userId ?? null,
     authMethod: "chat",
+    toolPermissions,
   });
 
   // Persist thread metadata (fire-and-forget, don't block streaming)

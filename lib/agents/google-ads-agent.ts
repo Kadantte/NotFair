@@ -3,12 +3,18 @@ import { openai } from "@ai-sdk/openai";
 import { z, type ZodTypeAny } from "zod";
 import type { AuthContext } from "@/lib/google-ads";
 import { collectAdsTools, type CollectedTool } from "@/lib/mcp/collect";
+import {
+  defaultModeFor,
+  type ToolPermissionMode,
+} from "@/lib/tool-permissions";
 
 type AgentAuth = {
   refreshToken: string;
   customerId: string;
   userId?: string | null;
   authMethod?: string | null;
+  /** Map of toolName -> mode overrides. Unset tools fall back to defaultModeFor(readOnly). */
+  toolPermissions?: Record<string, ToolPermissionMode>;
 };
 
 const MAX_STEPS = 8;
@@ -29,7 +35,7 @@ function unwrapMcpResult(result: McpToolResult): unknown {
   }
 }
 
-function adaptCollectedTool(collected: CollectedTool): Tool {
+function adaptCollectedTool(collected: CollectedTool, mode: ToolPermissionMode): Tool {
   // Strip `accountId` — chat is single-account, so the MCP handler
   // resolves to the session's default customer when accountId is undefined.
   const { accountId: _accountId, ...inputShape } = collected.inputShape as Record<
@@ -40,6 +46,7 @@ function adaptCollectedTool(collected: CollectedTool): Tool {
   return tool({
     description: collected.description,
     inputSchema: z.object(inputShape),
+    needsApproval: mode === "needs_approval",
     execute: async (args) => {
       const result = await collected.handler({
         ...(args as Record<string, unknown>),
@@ -61,9 +68,14 @@ export function createGoogleAdsAgent(agentAuth: AgentAuth) {
   };
 
   const collected = collectAdsTools(() => authContext);
+  const overrides = agentAuth.toolPermissions ?? {};
   const tools: Record<string, Tool> = {};
   for (const t of collected) {
-    tools[t.name] = adaptCollectedTool(t);
+    const readOnly = Boolean((t.annotations as { readOnlyHint?: boolean } | undefined)?.readOnlyHint);
+    const mode = overrides[t.name] ?? defaultModeFor(readOnly);
+    // Blocked tools are omitted entirely so the model never sees or calls them.
+    if (mode === "blocked") continue;
+    tools[t.name] = adaptCollectedTool(t, mode);
   }
 
   return new ToolLoopAgent({

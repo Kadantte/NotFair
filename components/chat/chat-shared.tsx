@@ -225,18 +225,124 @@ function formatToolName(name: string): string {
 
 type ToolPart = Extract<GoogleAdsAgentUIMessage["parts"][number], { type: string }>;
 
+type ApprovalHandler = (response: { id: string; approved: boolean; reason?: string }) => void;
+
+async function persistAlwaysAllow(toolName: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/chat/tool-permissions", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toolName, mode: "always_allow" }),
+    });
+    if (!res.ok) return false;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("tool-permissions-changed", {
+          detail: { toolName, mode: "always_allow" },
+        }),
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ApprovalRequest({
+  part,
+  onApproval,
+}: {
+  part: ToolPart;
+  onApproval: ApprovalHandler;
+}) {
+  const rawToolName = part.type.replace("tool-", "");
+  const displayName = formatToolName(rawToolName);
+  const approvalId = (part as unknown as { approval?: { id?: string } }).approval?.id;
+  const input = (part as unknown as { input?: unknown }).input;
+  if (!approvalId) return null;
+  return (
+    <div className="my-1 rounded-xl border border-[#D4882A]/40 bg-[#D4882A]/5 p-4">
+      <div className="flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#D4882A]" />
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[#D4882A]">
+          Approval requested
+        </span>
+      </div>
+      <div className="mt-2 font-mono text-sm text-white">{displayName}</div>
+      {input !== undefined && input !== null && (
+        <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-[#1A1917] p-3 text-xs leading-5 text-[#C4C0B6]">
+          {JSON.stringify(input, null, 2)}
+        </pre>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onApproval({ id: approvalId, approved: true })}
+          className="rounded-lg bg-[#4CAF6E] px-3 py-1.5 text-xs font-medium text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
+        >
+          Approve
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await persistAlwaysAllow(rawToolName);
+            onApproval({ id: approvalId, approved: true });
+          }}
+          className="rounded-lg border border-[#4CAF6E]/40 bg-transparent px-3 py-1.5 text-xs font-medium text-[#4CAF6E] transition-colors hover:bg-[#4CAF6E]/10"
+          title="Approve this call and stop asking for this tool"
+        >
+          Always allow
+        </button>
+        <button
+          type="button"
+          onClick={() => onApproval({ id: approvalId, approved: false })}
+          className="rounded-lg border border-[#3D3C36] bg-transparent px-3 py-1.5 text-xs font-medium text-[#C4C0B6] transition-colors hover:border-[#C45D4A]/40 hover:text-[#C45D4A]"
+        >
+          Deny
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ToolGroupBlock({
   parts,
   messageId,
+  onApproval,
 }: {
   parts: ToolPart[];
   messageId: string;
+  onApproval?: ApprovalHandler;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedTool, setExpandedTool] = useState<number | null>(null);
 
   const DONE_STATES = new Set(["output-available", "output-error", "output-denied"]);
   const isDone = (p: ToolPart) => "state" in p && DONE_STATES.has(p.state as string);
+  const isAwaitingApproval = (p: ToolPart) =>
+    "state" in p && (p.state as string) === "approval-requested";
+
+  // Render any approval-pending tools as interactive cards at the top of the group.
+  const pending = parts.filter(isAwaitingApproval);
+  const others = parts.filter(p => !isAwaitingApproval(p));
+
+  if (pending.length > 0 && onApproval) {
+    return (
+      <div className="space-y-2">
+        {pending.map((p, i) => (
+          <ApprovalRequest
+            key={`${messageId}-approval-${i}`}
+            part={p}
+            onApproval={onApproval}
+          />
+        ))}
+        {others.length > 0 && (
+          <ToolGroupBlock parts={others} messageId={messageId} onApproval={onApproval} />
+        )}
+      </div>
+    );
+  }
 
   const allDone = parts.every(isDone);
   const toolNames = parts.map(p => formatToolName(p.type.replace("tool-", "")));
@@ -373,9 +479,11 @@ export function ThinkingIndicator() {
 export function Message({
   message,
   isActivelyStreaming = false,
+  onApproval,
 }: {
   message: GoogleAdsAgentUIMessage;
   isActivelyStreaming?: boolean;
+  onApproval?: ApprovalHandler;
 }) {
   const isUser = message.role === "user";
   const groups = groupMessageParts(message.parts);
@@ -429,6 +537,7 @@ export function Message({
               key={`${message.id}-tools-${group.startIndex}`}
               parts={group.parts}
               messageId={message.id}
+              onApproval={onApproval}
             />
           );
         })}

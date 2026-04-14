@@ -1,6 +1,6 @@
 "use client";
 
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
@@ -11,6 +11,8 @@ import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { dispatchThreadEvent } from "@/lib/thread-events";
 import type { Session } from "@/lib/session";
 import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
+import { McpToolsSheet, type McpToolSummary } from "@/components/chat/mcp-tools-sheet";
+import type { ToolPermissionMode } from "@/lib/tool-permissions";
 
 type StoredAccount = {
   connected: boolean;
@@ -38,15 +40,9 @@ async function readServerSession(): Promise<Session> {
   return response.json();
 }
 
-type McpToolSummary = {
-  name: string;
-  description: string;
-  readOnly: boolean;
-  destructive: boolean;
-};
-
 // Cache the tool list across client-side navigations so reopening the modal is instant.
 let cachedMcpTools: McpToolSummary[] | null = null;
+let cachedPermissions: Record<string, ToolPermissionMode> | null = null;
 
 async function fetchMcpTools(): Promise<McpToolSummary[]> {
   if (cachedMcpTools) return cachedMcpTools;
@@ -120,10 +116,11 @@ export default function ChatPage() {
     [],
   );
 
-  const { messages, sendMessage, setMessages, status, error, stop } =
+  const { messages, sendMessage, setMessages, status, error, stop, addToolApprovalResponse } =
     useChat<GoogleAdsAgentUIMessage>({
       id: threadId,
       transport,
+      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     });
 
   // ── Hydration: fetch session + load this thread's messages ──
@@ -196,26 +193,79 @@ export default function ChatPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // ── MCP tools modal ──
+  // ── MCP tools sheet ──
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [tools, setTools] = useState<McpToolSummary[] | null>(null);
+  const [tools, setTools] = useState<McpToolSummary[] | null>(cachedMcpTools);
+  const [permissions, setPermissions] = useState<Record<string, ToolPermissionMode>>(
+    cachedPermissions ?? {},
+  );
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState<string | null>(null);
 
   const openTools = useCallback(async () => {
     setToolsOpen(true);
-    if (tools || toolsLoading) return;
+    if ((tools && cachedPermissions) || toolsLoading) return;
     setToolsLoading(true);
     setToolsError(null);
     try {
-      const fetched = await fetchMcpTools();
+      const [fetched, permsRes] = await Promise.all([
+        fetchMcpTools(),
+        fetch("/api/chat/tool-permissions", { credentials: "include" }).then(r => r.json()),
+      ]);
       setTools(fetched);
+      const perms = (permsRes?.permissions ?? {}) as Record<string, ToolPermissionMode>;
+      cachedPermissions = perms;
+      setPermissions(perms);
     } catch (e) {
       setToolsError(e instanceof Error ? e.message : "Failed to load tools");
     } finally {
       setToolsLoading(false);
     }
   }, [tools, toolsLoading]);
+
+  // Listen for inline "Always allow" decisions made via the approval card.
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const detail = (e as CustomEvent<{ toolName: string; mode: ToolPermissionMode }>).detail;
+      if (!detail) return;
+      setPermissions(prev => {
+        const next = { ...prev, [detail.toolName]: detail.mode };
+        cachedPermissions = next;
+        return next;
+      });
+    };
+    window.addEventListener("tool-permissions-changed", onChanged);
+    return () => window.removeEventListener("tool-permissions-changed", onChanged);
+  }, []);
+
+  const updatePermissions = useCallback(
+    async (updates: Array<{ toolName: string; mode: ToolPermissionMode }>) => {
+      // Optimistic update
+      setPermissions(prev => {
+        const next = { ...prev };
+        for (const u of updates) next[u.toolName] = u.mode;
+        cachedPermissions = next;
+        return next;
+      });
+      try {
+        const res = await fetch("/api/chat/tool-permissions", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates }),
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const perms = (body?.permissions ?? {}) as Record<string, ToolPermissionMode>;
+          cachedPermissions = perms;
+          setPermissions(perms);
+        }
+      } catch {
+        // swallow — the UI already reflects the optimistic state
+      }
+    },
+    [],
+  );
 
   const isReady = isHydrated && account.connected;
   const isSending = status === "submitted" || status === "streaming";
@@ -294,6 +344,7 @@ export default function ChatPage() {
                 isActivelyStreaming={
                   isSending && index === messages.length - 1 && message.role === "assistant"
                 }
+                onApproval={addToolApprovalResponse}
               />
             ))}
             {isSending && (messages.length === 0 || messages[messages.length - 1].role === "user") && (
@@ -371,79 +422,16 @@ export default function ChatPage() {
           </form>
         </div>
       </div>
-      {/* MCP tools modal */}
-      {toolsOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={() => setToolsOpen(false)}
-        >
-          <div
-            className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-[#2c2c2b] shadow-2xl"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="flex shrink-0 items-center justify-between border-b border-[#4a4a48] px-6 py-4">
-              <div>
-                <h2 className="text-lg font-medium text-white">Google Ads MCP tools</h2>
-                <p className="mt-0.5 text-xs text-[#8b8b89]">
-                  {tools
-                    ? `${tools.length} tools available · ${tools.filter(t => t.readOnly).length} read · ${tools.filter(t => !t.readOnly).length} write`
-                    : toolsLoading
-                      ? "Loading…"
-                      : "Tools exposed by the AdsAgent MCP server"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setToolsOpen(false)}
-                className="rounded-lg p-1.5 text-[#8b8b89] hover:bg-[#3a3a39] hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              {toolsError && (
-                <div className="rounded-lg bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
-                  {toolsError}
-                </div>
-              )}
-              {toolsLoading && !tools && (
-                <div className="flex items-center justify-center py-12 text-sm text-[#8b8b89]">
-                  Loading tools…
-                </div>
-              )}
-              {tools && tools.length > 0 && (
-                <div className="space-y-5">
-                  {[
-                    { key: "read", label: "Read", tools: tools.filter(t => t.readOnly) },
-                    { key: "write", label: "Write", tools: tools.filter(t => !t.readOnly && !t.destructive) },
-                    { key: "destructive", label: "Destructive", tools: tools.filter(t => !t.readOnly && t.destructive) },
-                  ]
-                    .filter(g => g.tools.length > 0)
-                    .map(group => (
-                      <div key={group.key}>
-                        <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-[#8b8b89]">
-                          {group.label} · {group.tools.length}
-                        </h3>
-                        <div className="divide-y divide-[#3a3a39] rounded-lg border border-[#3a3a39] bg-[#222221]">
-                          {group.tools.map(tool => (
-                            <div key={tool.name} className="px-4 py-3">
-                              <div className="font-mono text-sm text-white">{tool.name}</div>
-                              {tool.description && (
-                                <div className="mt-1 text-xs leading-relaxed text-[#b0b0ae]">
-                                  {tool.description}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MCP tools sheet */}
+      <McpToolsSheet
+        open={toolsOpen}
+        onClose={() => setToolsOpen(false)}
+        tools={tools}
+        permissions={permissions}
+        loading={toolsLoading}
+        error={toolsError}
+        onUpdate={updatePermissions}
+      />
 
       {/* Share modal */}
       {shareOpen && shareUrl && (
