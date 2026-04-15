@@ -152,23 +152,6 @@ function ClaudeConnectorSection() {
     const [error, setError] = useState<string | null>(null);
     const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
-    // Check for existing credentials on mount
-    useEffect(() => {
-        fetch('/api/oauth/clients', { credentials: 'include' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.exists) {
-                    setCredentials({
-                        client_id: data.client_id,
-                        client_secret: data.client_secret,
-                        mcp_server_url: data.mcp_server_url,
-                    });
-                }
-            })
-            .catch(() => { })
-            .finally(() => setLoading(false));
-    }, []);
-
     const generateCredentials = useCallback(async () => {
         setGenerating(true);
         setError(null);
@@ -190,6 +173,32 @@ function ClaudeConnectorSection() {
             setGenerating(false);
         }
     }, []);
+
+    // Check for existing credentials on mount; auto-generate if none exist
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/oauth/clients', { credentials: 'include' });
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.exists) {
+                    setCredentials({
+                        client_id: data.client_id,
+                        client_secret: data.client_secret,
+                        mcp_server_url: data.mcp_server_url,
+                    });
+                    setLoading(false);
+                } else {
+                    setLoading(false);
+                    generateCredentials();
+                }
+            } catch {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [generateCredentials]);
 
     const serverUrl = credentials?.mcp_server_url ?? 'https://adsagent.org/api/mcp';
 
@@ -251,28 +260,10 @@ function ClaudeConnectorSection() {
                         Expand <strong className="text-[#E8E4DD]">Advanced Settings</strong> and enter:
                     </p>
 
-                    {loading ? (
+                    {loading || generating || !credentials ? (
                         <div className="flex items-center gap-2 py-2">
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#3D3C36] border-t-[#4CAF6E]" />
-                            <span className="text-sm text-[#C4C0B6]">Loading credentials...</span>
-                        </div>
-                    ) : !credentials ? (
-                        <div className="space-y-3">
-                            <p className="text-sm text-[#C4C0B6]">Generate credentials to get your Client ID and Client Secret.</p>
-                            <Button
-                                onClick={generateCredentials}
-                                disabled={generating}
-                                className="h-10 rounded-lg bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C] disabled:opacity-50"
-                            >
-                                {generating ? (
-                                    <>
-                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    'Generate Credentials'
-                                )}
-                            </Button>
+                            <span className="text-sm text-[#C4C0B6]">Preparing credentials...</span>
                         </div>
                     ) : (
                         <div className="space-y-3">
