@@ -355,6 +355,41 @@ function ClaudeConnectorSection() {
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">4</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Install the toprank plugin</p>
+                </div>
+                <div className="ml-8 space-y-3">
+                    <p className="text-sm text-[#C4C0B6]">
+                        In the same <strong className="text-[#E8E4DD]">Customize</strong> panel, find <strong className="text-[#E8E4DD]">Personal plugins</strong>, click <strong className="text-[#E8E4DD]">+</strong>, then choose <strong className="text-[#E8E4DD]">Browse plugins</strong>. Paste the{' '}
+                        <a
+                            href="https://github.com/nowork-studio/toprank"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
+                        >
+                            toprank
+                        </a>{' '}
+                        repo URL into the <strong className="text-[#E8E4DD]">Add marketplace</strong> dialog and click <strong className="text-[#E8E4DD]">Sync</strong>. Toprank ships with pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage your campaigns alongside the AdsAgent connector.
+                    </p>
+                    <CredentialField
+                        label="Marketplace URL"
+                        value="https://github.com/nowork-studio/toprank"
+                        onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'plugin_marketplace_url' })}
+                    />
+                    <SetupScreenshot
+                        src="/connector-setup/04a-browse-plugins.png"
+                        alt="Customize panel with Personal plugins, click the plus icon and choose Browse plugins"
+                    />
+                    <SetupScreenshot
+                        src="/connector-setup/04b-add-marketplace.png"
+                        alt="Add marketplace dialog with the toprank GitHub URL pasted, then click Sync"
+                    />
+                </div>
+            </div>
+
+            {/* Step 5 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">5</span>
                     <p className="text-sm font-medium text-[#E8E4DD]">Enable AdsAgent in a chat</p>
                 </div>
                 <div className="ml-8 space-y-3">
@@ -368,10 +403,10 @@ function ClaudeConnectorSection() {
                 </div>
             </div>
 
-            {/* Step 5 */}
+            {/* Step 6 */}
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">5</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">6</span>
                     <p className="text-sm font-medium text-[#E8E4DD]">Ask Claude about your ads</p>
                 </div>
                 <div className="ml-8 space-y-3">
@@ -648,13 +683,13 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
 }
 
 function parseSlug(slug?: string[]): { activeTab: SetupTab; codeSubTab: ClaudeCodeSubTab } {
-    if (!slug || slug.length === 0) return { activeTab: 'claude-code', codeSubTab: 'manual' };
+    if (!slug || slug.length === 0) return { activeTab: 'connector', codeSubTab: 'manual' };
     if (slug[0] === 'claude-connector') return { activeTab: 'connector', codeSubTab: 'manual' };
     if (slug[0] === 'claude-code') {
         const sub = slug[1] === 'auto' ? 'auto' : 'manual';
         return { activeTab: 'claude-code', codeSubTab: sub };
     }
-    return { activeTab: 'claude-code', codeSubTab: 'manual' };
+    return { activeTab: 'connector', codeSubTab: 'manual' };
 }
 
 function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
