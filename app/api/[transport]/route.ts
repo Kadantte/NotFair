@@ -87,6 +87,10 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
   }
 
   const customerIds = parseCustomerIds(session.customerIds);
+  const storedClientName = session.clientName ?? null;
+  const normalizedClientName = storedClientName
+    ? normalizeClientName(storedClientName, authMethod, userAgent)
+    : null;
   return {
     refreshToken: session.refreshToken,
     customerId: session.customerId,
@@ -95,7 +99,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
       : [{ id: session.customerId, name: "" }],
     loginCustomerId: session.loginCustomerId ?? null,
     userId: session.userId ?? null,
-    clientName: session.clientName ?? null,
+    clientName: normalizedClientName,
     clientVersion: session.clientVersion ?? null,
     authMethod,
     userAgent,
@@ -158,16 +162,43 @@ async function isSchemaRequest(request: Request): Promise<{ schemaOnly: boolean;
 // ─── Client identity capture ─────────────────────────────────────────
 
 /**
- * On the first `initialize` request for a session, extract clientInfo.name/version
- * and persist them raw on the session row. Fire-and-forget — never blocks.
+ * The `mcp-remote` wrapper (used by the Claude Code plugin) does not forward
+ * the downstream client's clientInfo.name through the MCP handshake — every
+ * such request arrives tagged `mcp-remote-fallback-test`. Without this
+ * normalization, ~100% of Claude Code traffic is mis-attributed and surface
+ * analyses are broken. See docs/analysis/2026-04-15_11-32_claude-code-vs-connector-onboarding.md.
  */
-async function captureClientInfo(cloned: Request, sessionId: number): Promise<void> {
+function normalizeClientName(
+  rawName: string,
+  authMethod: string | null | undefined,
+  userAgent: string | null | undefined,
+): string {
+  if (rawName !== "mcp-remote-fallback-test") return rawName;
+  // mcp-remote wrapper — infer the downstream client.
+  // Claude Code is the only client we document using direct-auth (Bearer mcp session token) via mcp-remote.
+  if (authMethod === "direct") return "claude-code";
+  const ua = userAgent?.toLowerCase() ?? "";
+  if (ua.includes("claude-code")) return "claude-code";
+  return rawName;
+}
+
+/**
+ * On the first `initialize` request for a session, extract clientInfo.name/version
+ * and persist them on the session row. Fire-and-forget — never blocks.
+ */
+async function captureClientInfo(
+  cloned: Request,
+  sessionId: number,
+  authMethod: string | null | undefined,
+  userAgent: string | null | undefined,
+): Promise<void> {
   try {
     const body = await cloned.json();
     if (body?.method !== "initialize") return;
-    const clientName = body?.params?.clientInfo?.name;
+    const rawName = body?.params?.clientInfo?.name;
     const clientVersion = body?.params?.clientInfo?.version;
-    if (typeof clientName !== "string" || !clientName) return;
+    if (typeof rawName !== "string" || !rawName) return;
+    const clientName = normalizeClientName(rawName, authMethod, userAgent);
     await db()
       .update(schema.mcpSessions)
       .set({
@@ -198,9 +229,11 @@ async function handler(request: Request): Promise<Response> {
     );
   }
 
-  // Capture client identity once per session — skip if already known
+  // Capture client identity once per session — skip if already known.
+  // We normalize in-memory in resolveAuth, so auth.clientName is never the
+  // raw fallback sentinel here; re-capture only when truly unknown.
   if (request.method === "POST" && auth.sessionId != null && !auth.clientName) {
-    void captureClientInfo(request.clone(), auth.sessionId);
+    void captureClientInfo(request.clone(), auth.sessionId, auth.authMethod, auth.userAgent);
   }
 
   return authStore.run(auth, () => mcpHandler(request));

@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.19.1] - 2026-04-15
+
+### Fixed
+- MCP `client_name` telemetry now correctly attributes Claude Code plugin traffic instead of the `mcp-remote-fallback-test` sentinel. The `mcp-remote` wrapper the Claude Code install instructions use does not forward the downstream client's `clientInfo.name`, so 100% of Claude Code sessions were mis-tagged. `app/api/[transport]/route.ts` now normalizes the fallback to `claude-code` based on auth method and user-agent, both on first-initialize capture and on every subsequent request. Existing sessions in Supabase were backfilled.
+
 ## [0.2.19.0] - 2026-04-13
 
 ### Added
