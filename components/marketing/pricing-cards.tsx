@@ -49,7 +49,7 @@ export const FREE_FEATURES = [
 export const GROWTH_FEATURES = [
   "Unlimited Google Ads operations",
   "Everything in Free",
-  "Latest OpenAI and Anthropic model support in chat (GPT-5.4, Claude Opus 4.6)",
+  "Latest OpenAI and Anthropic model support in chat (GPT-5.4, Claude Opus 4.7)",
   "Priority support",
   "Early access to new features",
   "Cancel any time — no contracts",

@@ -194,13 +194,13 @@ No properties.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `model_id` | string | `"gpt-5.4"` | Which row was clicked. Enum: `gpt-5-mini`, `gpt-5.4`, `claude-opus-4.6`, `connect_claude` |
+| `model_id` | string | `"gpt-5.4"` | Which row was clicked. Enum: `gpt-5-mini`, `gpt-5.4`, `claude-opus-4.7`, `connect_claude` |
 | `action` | string | `"upgrade_redirect"` | What the click triggered. Enum: `selected` (free user or default model set active), `paid_switched` (paid user switched to a previously-locked model), `upgrade_redirect` (free user clicked a locked model → `/upgrade`), `connect_claude_redirect` (Claude Connect row → `/connect/claude-connector`) |
 | `surface` | string | `"chat_page"` | Where the selector lives. Enum: `chat_page`, `audit_drawer` |
 | `is_paid` | boolean | `false` | Whether the user's subscription plan is non-free at click time |
 
 ```json
-{ "event": "chat_model_option_clicked", "properties": { "model_id": "claude-opus-4.6", "action": "upgrade_redirect", "surface": "chat_page", "is_paid": false } }
+{ "event": "chat_model_option_clicked", "properties": { "model_id": "claude-opus-4.7", "action": "upgrade_redirect", "surface": "chat_page", "is_paid": false } }
 ```
 
 **Notes:** The selector currently does not wire `model_id` through to the chat API — the server still routes to `gpt-5-mini`. This event captures UI intent only. When the model is wired, pair with a server-side property on `ai_change_executed` / `ai_read_executed`.

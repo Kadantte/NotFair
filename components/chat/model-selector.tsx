@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 
-export type ModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.6";
+export type ModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.7";
 
 export const MODELS: { id: ModelId; label: string; sublabel: string; locked: boolean }[] = [
   { id: "gpt-5-mini", label: "GPT-5 mini", sublabel: "Fast · Free", locked: false },
   { id: "gpt-5.4", label: "GPT-5.4", sublabel: "OpenAI frontier", locked: true },
-  { id: "claude-opus-4.6", label: "Claude Opus 4.6", sublabel: "Anthropic frontier", locked: true },
+  { id: "claude-opus-4.7", label: "Claude Opus 4.7", sublabel: "Anthropic frontier", locked: true },
 ];
 
 const STORAGE_KEY = "adsagent:selected-model";

@@ -5,8 +5,8 @@ import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
 import { getUserSubscription, isPlanEntitled } from "@/lib/subscription";
 
-const PAID_MODELS = new Set<ChatModelId>(["gpt-5.4", "claude-opus-4.6"]);
-const ALL_MODELS = new Set<ChatModelId>(["gpt-5-mini", "gpt-5.4", "claude-opus-4.6"]);
+const PAID_MODELS = new Set<ChatModelId>(["gpt-5.4", "claude-opus-4.7"]);
+const ALL_MODELS = new Set<ChatModelId>(["gpt-5-mini", "gpt-5.4", "claude-opus-4.7"]);
 
 export async function POST(request: Request) {
   const payload = await request.json();

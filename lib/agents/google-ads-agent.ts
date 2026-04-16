@@ -9,7 +9,7 @@ import {
   type ToolPermissionMode,
 } from "@/lib/tool-permissions";
 
-export type ChatModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.6";
+export type ChatModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.7";
 
 type AgentAuth = {
   refreshToken: string;
@@ -25,8 +25,8 @@ function resolveModel(modelId: ChatModelId | undefined) {
   switch (modelId) {
     case "gpt-5.4":
       return openai("gpt-5");
-    case "claude-opus-4.6":
-      return anthropic("claude-opus-4-6");
+    case "claude-opus-4.7":
+      return anthropic("claude-opus-4-7");
     case "gpt-5-mini":
     default:
       return openai("gpt-5-mini");
