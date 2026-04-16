@@ -13,3 +13,4 @@ export * from "./sync-account";
 export * from "./pmax";
 export * from "./callouts";
 export * from "./bidding-strategies";
+export * from "./negative-keyword-lists";

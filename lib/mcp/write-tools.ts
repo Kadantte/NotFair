@@ -48,6 +48,12 @@ import {
   updateBiddingStrategy,
   removeBiddingStrategy,
   linkCampaignToBiddingStrategy,
+  createNegativeKeywordList,
+  removeNegativeKeywordList,
+  addKeywordToNegativeList,
+  removeKeywordFromNegativeList,
+  linkNegativeListToCampaign,
+  unlinkNegativeListFromCampaign,
 } from "@/lib/google-ads";
 import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
@@ -1138,6 +1144,92 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return jsonResult(result);
   }));
 
+  // ─── Negative Keyword Lists (Shared Sets) ──────────────────────────
+
+  server.registerTool("createNegativeKeywordList", {
+    description: "Create a shared negative keyword list. After creating, add keywords with addKeywordToNegativeList and link to campaigns with linkNegativeListToCampaign. Returns changeId + sharedSetId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      name: z.string().min(1).max(255).describe("List name, e.g. 'Brand Negatives' or 'Competitor Terms'"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, name }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => createNegativeKeywordList(targetAuth, name));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("removeNegativeKeywordList", {
+    description: "Delete a shared negative keyword list. This also unlinks it from all campaigns. Permanent — cannot be undone. Use listNegativeKeywordLists to find the sharedSetId. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, sharedSetId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => removeNegativeKeywordList(targetAuth, sharedSetId));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("addKeywordToNegativeList", {
+    description: "Add a keyword to a shared negative keyword list. The keyword will be blocked across all campaigns linked to this list. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      keyword: z.string().min(1).describe("Keyword text to block"),
+      matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("PHRASE").describe("Match type (default: PHRASE)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, sharedSetId, keyword, matchType }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => addKeywordToNegativeList(targetAuth, sharedSetId, keyword, matchType));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("removeKeywordFromNegativeList", {
+    description: "Remove a keyword from a shared negative keyword list. If the same keyword text exists under multiple match types, specify matchType to remove the correct one. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      keyword: z.string().min(1).describe("Exact keyword text to remove"),
+      matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).optional().describe("Match type to disambiguate"),
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, sharedSetId, keyword, matchType }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => removeKeywordFromNegativeList(targetAuth, sharedSetId, keyword, matchType));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("linkNegativeListToCampaign", {
+    description: "Link a shared negative keyword list to a campaign. All keywords in the list will be blocked for this campaign. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => linkNegativeListToCampaign(targetAuth, campaignId, sharedSetId));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("unlinkNegativeListFromCampaign", {
+    description: "Unlink a shared negative keyword list from a campaign. The list's keywords will no longer be blocked for this campaign. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string(),
+      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId, () => unlinkNegativeListFromCampaign(targetAuth, campaignId, sharedSetId));
+    return jsonResult(result);
+  }));
+
   // ─── Undo ───────────────────────────────────────────────────────
 
   server.registerTool("undoChange", {
@@ -1381,6 +1473,35 @@ export async function executeUndoForChange(
       return enablePmaxAssetGroup(auth, change.campaignId ?? "", entityId);
     case "enable_pmax_asset_group":
       return pausePmaxAssetGroup(auth, change.campaignId ?? "", entityId);
+    case "create_negative_keyword_list":
+      return removeNegativeKeywordList(auth, entityId);
+    case "remove_negative_keyword_list":
+      return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Negative keyword list removal is permanent and cannot be undone." };
+    case "add_keyword_to_negative_list": {
+      const [undoSetId, ...rest] = entityId.split(":");
+      const undoKeyword = rest.join(":");
+      const afterVal = change.afterValue ?? "";
+      const pipeIdx = afterVal.lastIndexOf("|");
+      const undoMatchType = pipeIdx > 0 ? afterVal.slice(pipeIdx + 1) as "BROAD" | "PHRASE" | "EXACT" : undefined;
+      return removeKeywordFromNegativeList(auth, undoSetId, undoKeyword, undoMatchType);
+    }
+    case "remove_keyword_from_negative_list": {
+      const [undoSetId, ...rest] = entityId.split(":");
+      const undoKeyword = rest.join(":");
+      const bv = change.beforeValue ?? "";
+      const pipeIdx = bv.lastIndexOf("|");
+      const undoMatchType = pipeIdx > 0 ? bv.slice(pipeIdx + 1) as "BROAD" | "PHRASE" | "EXACT" : "PHRASE";
+      const undoText = pipeIdx > 0 ? bv.slice(0, pipeIdx) : undoKeyword;
+      return addKeywordToNegativeList(auth, undoSetId, undoText, undoMatchType);
+    }
+    case "link_negative_list_to_campaign": {
+      const [undoCampaignId, undoSetId] = entityId.split("~");
+      return unlinkNegativeListFromCampaign(auth, undoCampaignId, undoSetId);
+    }
+    case "unlink_negative_list_from_campaign": {
+      const [undoCampaignId, undoSetId] = entityId.split("~");
+      return linkNegativeListToCampaign(auth, undoCampaignId, undoSetId);
+    }
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }

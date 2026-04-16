@@ -24,6 +24,8 @@ import {
   listCalloutAssets,
   listBiddingStrategies,
   getBiddingStrategyPerformance,
+  listNegativeKeywordLists,
+  getNegativeKeywordListItems,
   type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges } from "@/lib/db/tracking";
@@ -496,6 +498,34 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(auth, targetId, "get_bidding_strategy_performance", () =>
       getBiddingStrategyPerformance(targetAuth, { days, includeRemoved }),
     );
+    return jsonResult(result);
+  }));
+
+  // ─── Negative Keyword Lists (Shared Sets) ──────────────────────────
+
+  server.registerTool("listNegativeKeywordLists", {
+    description: "List all shared negative keyword lists in the account. Shows list name, keyword count, and which campaigns each list is linked to. Use these lists to manage negatives across multiple campaigns at once.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "list_negative_keyword_lists", () => listNegativeKeywordLists(targetAuth));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("getNegativeKeywordListItems", {
+    description: "List all keywords inside a shared negative keyword list. Use listNegativeKeywordLists first to get the sharedSetId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      limit: z.number().int().min(1).max(1000).default(200),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, sharedSetId, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_negative_keyword_list_items", () => getNegativeKeywordListItems(targetAuth, sharedSetId, limit), null);
     return jsonResult(result);
   }));
 };
