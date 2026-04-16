@@ -28,6 +28,7 @@ import {
   getNegativeKeywordListItems,
   type AuthContext,
 } from "@/lib/google-ads";
+import { runAudit } from "@/lib/google-ads/audit";
 import { getChanges } from "@/lib/db/tracking";
 import { execRead } from "@/lib/tools/execute";
 import { getEnv } from "@/lib/env";
@@ -526,6 +527,21 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, sharedSetId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_negative_keyword_list_items", () => getNegativeKeywordListItems(targetAuth, sharedSetId, limit), null);
+    return jsonResult(result);
+  }));
+
+  // ─── Account Audit ────────────────────────────────────────────────
+
+  server.registerTool("audit", {
+    description: "Full account audit: collects all campaign data in parallel and returns pre-computed findings (waste rate, QS issues, impression share matrix, brand leakage, budget-constrained winners). One call replaces 20+ individual tool calls.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90 for impression share)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "audit", () => runAudit(targetAuth, days));
     return jsonResult(result);
   }));
 };
