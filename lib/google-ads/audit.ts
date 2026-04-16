@@ -1,10 +1,20 @@
 import { getCachedCustomer, MATCH_TYPE_NAME } from "./client";
-import { getDateRange, micros, normalizeCustomerId } from "./helpers";
+import { getDateRange, micros } from "./helpers";
 import type { AuthContext } from "./types";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
 type ISMatrix = "healthy" | "relevance_problem" | "capital_problem" | "structural_problem";
+
+interface DeviceMetrics {
+  spend: number;
+  clicks: number;
+  impressions: number;
+  conversions: number;
+  cpa: number | null;
+  ctr: number;
+  conversionRate: number;
+}
 
 interface AuditCampaign {
   id: string;
@@ -13,9 +23,14 @@ interface AuditCampaign {
   status: number;
   spend: number;
   conversions: number;
+  conversionValue: number;
+  allConversions: number;
   clicks: number;
   impressions: number;
   cpa: number | null;
+  ctr: number;
+  conversionRate: number;
+  roas: number | null;
   dailyBudget: number | null;
   impressionShare: number | null;
   budgetLostIS: number | null;
@@ -28,6 +43,7 @@ interface AuditCampaign {
   geoTargetType: number | null;
   weightedQS: number | null;
   lowQSSpendPct: number;
+  negativeKeywordCount: number;
   adGroups: { id: string; name: string; spend: number; conversions: number }[];
   topAds: {
     adGroupName: string;
@@ -38,6 +54,17 @@ interface AuditCampaign {
     spend: number;
     conversions: number;
   }[];
+  topKeywords: {
+    text: string;
+    matchType: string;
+    qualityScore: number | null;
+    spend: number;
+    conversions: number;
+    clicks: number;
+    cpa: number | null;
+  }[];
+  deviceBreakdown: Record<string, DeviceMetrics>;
+  searchPartnersMetrics: { spend: number; clicks: number; conversions: number } | null;
 }
 
 interface WastedItem {
@@ -76,6 +103,41 @@ interface ConversionActionSummary {
   defaultValue: number | null;
 }
 
+interface LandingPage {
+  url: string;
+  spend: number;
+  clicks: number;
+  conversions: number;
+  cpa: number | null;
+  conversionRate: number;
+}
+
+interface NegativeConflict {
+  negativeText: string;
+  negativeMatchType: string;
+  campaignName: string;
+  blockedTerm: string;
+  blockedTermConversions: number;
+  blockedTermSpend: number;
+}
+
+interface MatchTypeBreakdown {
+  matchType: string;
+  spend: number;
+  clicks: number;
+  conversions: number;
+  keywordCount: number;
+}
+
+interface AssetCoverage {
+  campaignName: string;
+  sitelinks: number;
+  callouts: number;
+  structuredSnippets: number;
+  images: number;
+  total: number;
+}
+
 export interface AuditResult {
   account: {
     name: string;
@@ -88,8 +150,13 @@ export interface AuditResult {
   summary: {
     totalSpend: number;
     totalConversions: number;
+    totalConversionValue: number;
     totalClicks: number;
+    totalImpressions: number;
     cpa: number | null;
+    ctr: number;
+    conversionRate: number;
+    roas: number | null;
     activeCampaigns: number;
   };
   pulse: {
@@ -110,8 +177,12 @@ export interface AuditResult {
       cpa: number;
       dailyBudget: number | null;
     }[];
+    negativeConflicts: NegativeConflict[];
     hasAudienceSegments: boolean;
     conversionActions: ConversionActionSummary[];
+    matchTypeDistribution: MatchTypeBreakdown[];
+    assetCoverage: AssetCoverage[];
+    landingPages: LandingPage[];
   };
   errors?: string[];
 }
@@ -139,7 +210,7 @@ function generateBrandVariants(businessName: string): string[] {
     if (name.endsWith(suffix)) variants.add(name.slice(0, -suffix.length).trim());
   }
 
-  // Split camelCase: "PawsVIP" → ["paws", "vip"] → "paws vip"
+  // Split camelCase: "PawsVIP" → "paws vip"
   const camelSplit = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
   if (camelSplit !== name) variants.add(camelSplit);
 
@@ -147,7 +218,6 @@ function generateBrandVariants(businessName: string): string[] {
   const noSpaces = name.replace(/\s+/g, "");
   if (noSpaces !== name) variants.add(noSpaces);
 
-  // Also add spaceless version of camelSplit
   const camelNoSpaces = camelSplit.replace(/\s+/g, "");
   if (camelNoSpaces !== name) variants.add(camelNoSpaces);
 
@@ -159,6 +229,35 @@ function isBrandTerm(term: string, variants: string[]): boolean {
   const lower = term.toLowerCase();
   return variants.some((v) => lower.includes(v));
 }
+
+/** Check if a search term would be blocked by a negative keyword */
+function negativeBlocks(termLower: string, negText: string, negMatchType: number): boolean {
+  const neg = negText.toLowerCase();
+  // Exact match (2): blocks only that exact query
+  if (negMatchType === 2) return termLower === neg;
+  // Phrase match (3): blocks queries containing the exact phrase
+  if (negMatchType === 3) return termLower.includes(neg);
+  // Broad match (4): blocks queries containing all words (any order)
+  const negWords = neg.split(/\s+/);
+  return negWords.every((w) => termLower.includes(w));
+}
+
+// Device enum → human name
+const DEVICE_NAME: Record<number, string> = {
+  2: "MOBILE",
+  3: "TABLET",
+  4: "DESKTOP",
+  6: "CONNECTED_TV",
+};
+
+// Asset field type → category
+const ASSET_CATEGORY: Record<number, string> = {
+  2: "sitelinks",    // HEADLINE → used for sitelinks
+  3: "sitelinks",    // SITELINK
+  7: "callouts",     // CALLOUT
+  8: "structuredSnippets", // STRUCTURED_SNIPPET
+  20: "images",      // IMAGE (various sub-types)
+};
 
 // ─── Main Audit Function ────────────────────────────────────────────
 
@@ -172,21 +271,8 @@ export async function runAudit(
   const errors: string[] = [];
 
   // ── All queries in parallel ────────────────────────────────────────
-  const [
-    accountResult,
-    campaignResult,
-    geoResult,
-    keywordMetricsResult,
-    keywordQSResult,
-    searchTermResult,
-    convertingTermsResult,
-    zeroConvKeywordsResult,
-    adResult,
-    adGroupResult,
-    conversionResult,
-    audienceResult,
-  ] = await Promise.allSettled([
-    // 1. Account info + settings
+  const results = await Promise.allSettled([
+    // 0. Account info + settings
     customer.query(`
       SELECT
         customer.id, customer.descriptive_name, customer.currency_code,
@@ -195,7 +281,7 @@ export async function runAudit(
       FROM customer LIMIT 1
     `),
 
-    // 2. All campaigns with IS, budget, network settings, bid strategy
+    // 1. All campaigns with IS, budget, network settings, bid strategy, values
     customer.query(`
       SELECT
         campaign.id, campaign.name, campaign.status,
@@ -206,7 +292,7 @@ export async function runAudit(
         campaign.geo_target_type_setting.positive_geo_target_type,
         campaign_budget.amount_micros,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions,
+        metrics.conversions, metrics.conversions_value, metrics.all_conversions,
         metrics.search_impression_share,
         metrics.search_budget_lost_impression_share,
         metrics.search_rank_lost_impression_share
@@ -216,7 +302,7 @@ export async function runAudit(
       ORDER BY metrics.cost_micros DESC
     `),
 
-    // 3. Geo targeting criteria
+    // 2. Geo targeting criteria
     customer.query(`
       SELECT
         campaign.id, campaign.name,
@@ -229,7 +315,7 @@ export async function runAudit(
         AND campaign_criterion.type IN ('LOCATION', 'PROXIMITY')
     `),
 
-    // 4. Top keywords by spend (with metrics)
+    // 3. Top keywords by spend (with metrics)
     customer.query(`
       SELECT
         campaign.id, campaign.name,
@@ -247,7 +333,7 @@ export async function runAudit(
       LIMIT 200
     `),
 
-    // 5. Quality scores for all active keywords (lookup table, no metrics)
+    // 4. Quality scores for all active keywords (lookup table)
     customer.query(`
       SELECT
         ad_group_criterion.criterion_id,
@@ -261,7 +347,7 @@ export async function runAudit(
         AND ad_group_criterion.status != 'REMOVED'
     `),
 
-    // 6. Top search terms by spend
+    // 5. Top search terms by spend
     customer.query(`
       SELECT
         campaign.id, campaign.name, ad_group.name,
@@ -275,7 +361,7 @@ export async function runAudit(
       LIMIT 200
     `),
 
-    // 7. Converting search terms (for mining opportunities)
+    // 6. Converting search terms (mining)
     customer.query(`
       SELECT
         campaign.name, ad_group.name,
@@ -289,7 +375,7 @@ export async function runAudit(
       LIMIT 50
     `),
 
-    // 8. Zero-conversion keywords by spend (waste detection)
+    // 7. Zero-conversion keywords (waste)
     customer.query(`
       SELECT
         campaign.name, ad_group.name,
@@ -305,16 +391,14 @@ export async function runAudit(
       LIMIT 50
     `),
 
-    // 9. Ad copy + strength
+    // 8. Ad copy + strength
     customer.query(`
       SELECT
-        campaign.id,
-        ad_group.name,
+        campaign.id, ad_group.name,
         ad_group_ad.ad.final_urls,
         ad_group_ad.ad.responsive_search_ad.headlines,
         ad_group_ad.ad.responsive_search_ad.descriptions,
-        ad_group_ad.ad_strength,
-        ad_group_ad.status,
+        ad_group_ad.ad_strength, ad_group_ad.status,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
       FROM ad_group_ad
@@ -325,7 +409,7 @@ export async function runAudit(
       LIMIT 100
     `),
 
-    // 10. Ad groups
+    // 9. Ad groups
     customer.query(`
       SELECT
         campaign.id,
@@ -339,7 +423,7 @@ export async function runAudit(
       LIMIT 100
     `),
 
-    // 11. Conversion actions
+    // 10. Conversion actions
     customer.query(`
       SELECT
         conversion_action.name, conversion_action.type,
@@ -352,38 +436,98 @@ export async function runAudit(
       ORDER BY conversion_action.name ASC
     `),
 
-    // 12. Audience segments
+    // 11. Audience segments (existence check)
     customer.query(`
-      SELECT
-        campaign.id, ad_group.id,
-        ad_group_criterion.type
+      SELECT campaign.id, ad_group.id, ad_group_criterion.type
       FROM ad_group_criterion
       WHERE campaign.status = 'ENABLED'
         AND ad_group_criterion.type IN ('USER_LIST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE')
       LIMIT 1
     `),
+
+    // 12. Device performance segmentation
+    customer.query(`
+      SELECT
+        campaign.id, segments.device,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions, metrics.conversions_value
+      FROM campaign
+      WHERE campaign.status = 'ENABLED'
+        AND segments.date BETWEEN '${start}' AND '${end}'
+      ORDER BY metrics.cost_micros DESC
+    `),
+
+    // 13. Negative keywords per campaign
+    customer.query(`
+      SELECT
+        campaign.id, campaign.name,
+        campaign_criterion.keyword.text,
+        campaign_criterion.keyword.match_type
+      FROM campaign_criterion
+      WHERE campaign.status = 'ENABLED'
+        AND campaign_criterion.type = 'KEYWORD'
+        AND campaign_criterion.negative = TRUE
+    `),
+
+    // 14. Network type segmentation (Search vs Search Partners)
+    customer.query(`
+      SELECT
+        campaign.id, segments.ad_network_type,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions
+      FROM campaign
+      WHERE campaign.status = 'ENABLED'
+        AND segments.date BETWEEN '${start}' AND '${end}'
+    `),
+
+    // 15. Campaign assets / extensions
+    customer.query(`
+      SELECT
+        campaign.id, campaign.name,
+        campaign_asset.field_type
+      FROM campaign_asset
+      WHERE campaign.status = 'ENABLED'
+    `),
+
+    // 16. Landing page performance
+    customer.query(`
+      SELECT
+        landing_page_view.unexpanded_final_url,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions
+      FROM landing_page_view
+      WHERE segments.date BETWEEN '${start}' AND '${end}'
+        AND campaign.status = 'ENABLED'
+      ORDER BY metrics.cost_micros DESC
+      LIMIT 20
+    `),
   ]);
 
   // ── Extract results with graceful degradation ─────────────────────
 
-  function unwrap<T>(result: PromiseSettledResult<T>, label: string): T | null {
-    if (result.status === "fulfilled") return result.value;
-    errors.push(`${label}: ${result.reason?.message ?? result.reason ?? "Unknown error"}`);
+  function unwrap(result: PromiseSettledResult<unknown>, label: string): any[] | null {
+    if (result.status === "fulfilled") return result.value as any[];
+    errors.push(`${label}: ${(result.reason as any)?.message ?? result.reason ?? "Unknown error"}`);
     return null;
   }
 
-  const accountRows = unwrap(accountResult, "account") as any[] | null;
-  const campaignRows = unwrap(campaignResult, "campaigns") as any[] | null;
-  const geoRows = unwrap(geoResult, "geo_targeting") as any[] | null;
-  const keywordRows = unwrap(keywordMetricsResult, "keywords") as any[] | null;
-  const qsRows = unwrap(keywordQSResult, "quality_scores") as any[] | null;
-  const searchTermRows = unwrap(searchTermResult, "search_terms") as any[] | null;
-  const convertingRows = unwrap(convertingTermsResult, "converting_terms") as any[] | null;
-  const zeroConvRows = unwrap(zeroConvKeywordsResult, "zero_conv_keywords") as any[] | null;
-  const adRows = unwrap(adResult, "ads") as any[] | null;
-  const adGroupRows = unwrap(adGroupResult, "ad_groups") as any[] | null;
-  const conversionRows = unwrap(conversionResult, "conversions") as any[] | null;
-  const audienceRows = unwrap(audienceResult, "audiences") as any[] | null;
+  const accountRows = unwrap(results[0], "account");
+  const campaignRows = unwrap(results[1], "campaigns");
+  const _geoRows = unwrap(results[2], "geo_targeting"); // consumed by campaign settings
+  const keywordRows = unwrap(results[3], "keywords");
+  const qsRows = unwrap(results[4], "quality_scores");
+  const searchTermRows = unwrap(results[5], "search_terms");
+  const convertingRows = unwrap(results[6], "converting_terms");
+  const zeroConvRows = unwrap(results[7], "zero_conv_keywords");
+  const adRows = unwrap(results[8], "ads");
+  const adGroupRows = unwrap(results[9], "ad_groups");
+  const conversionRows = unwrap(results[10], "conversions");
+  const audienceRows = unwrap(results[11], "audiences");
+  const deviceRows = unwrap(results[12], "device_performance");
+  const negativeRows = unwrap(results[13], "negative_keywords");
+  const networkRows = unwrap(results[14], "network_segmentation");
+  const assetRows = unwrap(results[15], "campaign_assets");
+  const landingPageRows = unwrap(results[16], "landing_pages");
 
   // ── Account info ──────────────────────────────────────────────────
 
@@ -409,11 +553,24 @@ export async function runAudit(
     });
   }
 
+  // ── Build negative keyword lookup per campaign ────────────────────
+
+  const negativesByCampaign = new Map<string, { text: string; matchType: number }[]>();
+  for (const row of negativeRows ?? []) {
+    const campId = String(row.campaign?.id);
+    if (!negativesByCampaign.has(campId)) negativesByCampaign.set(campId, []);
+    negativesByCampaign.get(campId)!.push({
+      text: row.campaign_criterion?.keyword?.text ?? "",
+      matchType: row.campaign_criterion?.keyword?.match_type ?? 4,
+    });
+  }
+
   // ── Build campaign-level data ─────────────────────────────────────
 
   const campaignMap = new Map<string, AuditCampaign>();
   let totalSpend = 0;
   let totalConversions = 0;
+  let totalConversionValue = 0;
   let totalClicks = 0;
   let totalImpressions = 0;
 
@@ -423,16 +580,20 @@ export async function runAudit(
     const id = String(c.id);
     const spend = micros(m.cost_micros);
     const conv = m.conversions ?? 0;
+    const convValue = m.conversions_value ?? 0;
+    const allConv = m.all_conversions ?? 0;
     const clicks = m.clicks ?? 0;
     const impr = m.impressions ?? 0;
 
     totalSpend += spend;
     totalConversions += conv;
+    totalConversionValue += convValue;
     totalClicks += clicks;
     totalImpressions += impr;
 
     const budgetLost = m.search_budget_lost_impression_share ?? null;
     const rankLost = m.search_rank_lost_impression_share ?? null;
+    const negs = negativesByCampaign.get(id) ?? [];
 
     campaignMap.set(id, {
       id,
@@ -441,9 +602,14 @@ export async function runAudit(
       status: c.status ?? 0,
       spend,
       conversions: conv,
+      conversionValue: convValue,
+      allConversions: allConv,
       clicks,
       impressions: impr,
       cpa: conv > 0 ? spend / conv : null,
+      ctr: impr > 0 ? clicks / impr : 0,
+      conversionRate: clicks > 0 ? conv / clicks : 0,
+      roas: spend > 0 && convValue > 0 ? convValue / spend : null,
       dailyBudget: row.campaign_budget?.amount_micros
         ? micros(row.campaign_budget.amount_micros)
         : null,
@@ -458,18 +624,21 @@ export async function runAudit(
       searchPartners: c.network_settings?.target_search_network ?? false,
       displayNetwork: c.network_settings?.target_content_network ?? false,
       geoTargetType: c.geo_target_type_setting?.positive_geo_target_type ?? null,
-      weightedQS: null, // computed below
-      lowQSSpendPct: 0, // computed below
+      weightedQS: null,
+      lowQSSpendPct: 0,
+      negativeKeywordCount: negs.length,
       adGroups: [],
       topAds: [],
+      topKeywords: [],
+      deviceBreakdown: {},
+      searchPartnersMetrics: null,
     });
   }
 
   // ── Attach ad groups ──────────────────────────────────────────────
 
   for (const row of adGroupRows ?? []) {
-    const campId = String(row.campaign?.id);
-    const camp = campaignMap.get(campId);
+    const camp = campaignMap.get(String(row.campaign?.id));
     if (!camp) continue;
     camp.adGroups.push({
       id: String(row.ad_group?.id ?? ""),
@@ -482,8 +651,7 @@ export async function runAudit(
   // ── Attach ads ────────────────────────────────────────────────────
 
   for (const row of adRows ?? []) {
-    const campId = String(row.campaign?.id);
-    const camp = campaignMap.get(campId);
+    const camp = campaignMap.get(String(row.campaign?.id));
     if (!camp) continue;
     const rsa = row.ad_group_ad?.ad?.responsive_search_ad ?? {};
     camp.topAds.push({
@@ -497,50 +665,175 @@ export async function runAudit(
     });
   }
 
-  // ── Compute per-campaign QS ───────────────────────────────────────
+  // ── Device breakdown per campaign ─────────────────────────────────
 
-  // Group keywords by campaign, compute spend-weighted QS
-  const kwByCampaign = new Map<string, { spend: number; qs: number | null }[]>();
+  for (const row of deviceRows ?? []) {
+    const camp = campaignMap.get(String(row.campaign?.id));
+    if (!camp) continue;
+    const device = DEVICE_NAME[row.segments?.device] ?? "OTHER";
+    const spend = micros(row.metrics?.cost_micros);
+    const clicks = row.metrics?.clicks ?? 0;
+    const impr = row.metrics?.impressions ?? 0;
+    const conv = row.metrics?.conversions ?? 0;
+    camp.deviceBreakdown[device] = {
+      spend,
+      clicks,
+      impressions: impr,
+      conversions: conv,
+      cpa: conv > 0 ? spend / conv : null,
+      ctr: impr > 0 ? clicks / impr : 0,
+      conversionRate: clicks > 0 ? conv / clicks : 0,
+    };
+  }
+
+  // ── Search Partners performance per campaign ──────────────────────
+
+  // ad_network_type: 2 = SEARCH, 3 = SEARCH_PARTNERS, 6 = YOUTUBE, 10 = DISPLAY
+  for (const row of networkRows ?? []) {
+    const camp = campaignMap.get(String(row.campaign?.id));
+    if (!camp) continue;
+    if (row.segments?.ad_network_type === 3) {
+      camp.searchPartnersMetrics = {
+        spend: micros(row.metrics?.cost_micros),
+        clicks: row.metrics?.clicks ?? 0,
+        conversions: row.metrics?.conversions ?? 0,
+      };
+    }
+  }
+
+  // ── Compute per-campaign QS + top keywords ────────────────────────
+
+  const kwByCampaign = new Map<string, {
+    text: string; matchType: number; spend: number; clicks: number;
+    conversions: number; criterionId: string;
+  }[]>();
+
   for (const row of keywordRows ?? []) {
     const campId = String(row.campaign?.id);
-    const criterionId = String(row.ad_group_criterion?.criterion_id);
-    const qs = qsMap.get(criterionId)?.qualityScore ?? null;
-    const spend = micros(row.metrics?.cost_micros);
     if (!kwByCampaign.has(campId)) kwByCampaign.set(campId, []);
-    kwByCampaign.get(campId)!.push({ spend, qs });
+    kwByCampaign.get(campId)!.push({
+      text: row.ad_group_criterion?.keyword?.text ?? "",
+      matchType: row.ad_group_criterion?.keyword?.match_type ?? 0,
+      spend: micros(row.metrics?.cost_micros),
+      clicks: row.metrics?.clicks ?? 0,
+      conversions: row.metrics?.conversions ?? 0,
+      criterionId: String(row.ad_group_criterion?.criterion_id),
+    });
   }
 
   for (const [campId, kws] of Array.from(kwByCampaign.entries())) {
     const camp = campaignMap.get(campId);
     if (!camp) continue;
 
-    const withQS = kws.filter((k) => k.qs != null && k.qs > 0);
+    // QS computation
+    const withQS = kws
+      .map((k) => ({ ...k, qs: qsMap.get(k.criterionId)?.qualityScore ?? null }))
+      .filter((k) => k.qs != null && k.qs > 0);
+
     if (withQS.length > 0) {
       const totalQSSpend = withQS.reduce((s, k) => s + k.spend, 0);
       camp.weightedQS = totalQSSpend > 0
         ? withQS.reduce((s, k) => s + k.qs! * k.spend, 0) / totalQSSpend
         : null;
-
       const lowQSSpend = withQS.filter((k) => k.qs! < 5).reduce((s, k) => s + k.spend, 0);
       const totalKWSpend = kws.reduce((s, k) => s + k.spend, 0);
       camp.lowQSSpendPct = totalKWSpend > 0 ? (lowQSSpend / totalKWSpend) * 100 : 0;
     }
+
+    // Top 10 keywords per campaign
+    camp.topKeywords = kws
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 10)
+      .map((k) => ({
+        text: k.text,
+        matchType: (typeof k.matchType === "number" ? MATCH_TYPE_NAME[k.matchType] : k.matchType) ?? "UNKNOWN",
+        qualityScore: qsMap.get(k.criterionId)?.qualityScore ?? null,
+        spend: k.spend,
+        conversions: k.conversions,
+        clicks: k.clicks,
+        cpa: k.conversions > 0 ? k.spend / k.conversions : null,
+      }));
   }
+
+  // ── Match type distribution ───────────────────────────────────────
+
+  const matchTypeMap = new Map<string, { spend: number; clicks: number; conversions: number; count: number }>();
+  for (const row of keywordRows ?? []) {
+    const rawMT = row.ad_group_criterion?.keyword?.match_type;
+    const mt = (typeof rawMT === "number" ? MATCH_TYPE_NAME[rawMT] : rawMT) ?? "UNKNOWN";
+    const existing = matchTypeMap.get(mt) ?? { spend: 0, clicks: 0, conversions: 0, count: 0 };
+    existing.spend += micros(row.metrics?.cost_micros);
+    existing.clicks += row.metrics?.clicks ?? 0;
+    existing.conversions += row.metrics?.conversions ?? 0;
+    existing.count++;
+    matchTypeMap.set(mt, existing);
+  }
+  const matchTypeDistribution: MatchTypeBreakdown[] = Array.from(matchTypeMap.entries())
+    .map(([mt, data]) => ({
+      matchType: mt,
+      spend: data.spend,
+      clicks: data.clicks,
+      conversions: data.conversions,
+      keywordCount: data.count,
+    }))
+    .sort((a, b) => b.spend - a.spend);
+
+  // ── Asset / extension coverage ────────────────────────────────────
+
+  const assetsByCampaign = new Map<string, { sitelinks: number; callouts: number; structuredSnippets: number; images: number }>();
+  for (const row of assetRows ?? []) {
+    const campId = String(row.campaign?.id);
+    if (!assetsByCampaign.has(campId)) {
+      assetsByCampaign.set(campId, { sitelinks: 0, callouts: 0, structuredSnippets: 0, images: 0 });
+    }
+    const a = assetsByCampaign.get(campId)!;
+    const fieldType = row.campaign_asset?.field_type;
+    // field_type: 2=HEADLINE, 3=DESCRIPTION, 5=SITELINK, 7=CALLOUT,
+    // 8=STRUCTURED_SNIPPET, 16=LOGO, 20=LANDSCAPE_LOGO, 19=SQUARE_MARKETING_IMAGE
+    if (fieldType === 5) a.sitelinks++;
+    else if (fieldType === 7) a.callouts++;
+    else if (fieldType === 8) a.structuredSnippets++;
+    else if (fieldType >= 16 && fieldType <= 25) a.images++; // Various image types
+  }
+
+  const assetCoverage: AssetCoverage[] = [];
+  for (const [campId, assets] of Array.from(assetsByCampaign.entries())) {
+    const camp = campaignMap.get(campId);
+    if (!camp) continue;
+    assetCoverage.push({
+      campaignName: camp.name,
+      ...assets,
+      total: assets.sitelinks + assets.callouts + assets.structuredSnippets + assets.images,
+    });
+  }
+
+  // ── Landing pages ─────────────────────────────────────────────────
+
+  const landingPages: LandingPage[] = (landingPageRows ?? []).map((row: any) => {
+    const spend = micros(row.metrics?.cost_micros);
+    const clicks = row.metrics?.clicks ?? 0;
+    const conv = row.metrics?.conversions ?? 0;
+    return {
+      url: row.landing_page_view?.unexpanded_final_url ?? "",
+      spend,
+      clicks,
+      conversions: conv,
+      cpa: conv > 0 ? spend / conv : null,
+      conversionRate: clicks > 0 ? conv / clicks : 0,
+    };
+  });
 
   // ── Compute waste ─────────────────────────────────────────────────
 
   const accountCPA = totalConversions > 0 ? totalSpend / totalConversions : null;
   const wasteThreshold = accountCPA != null ? accountCPA * 2 : Infinity;
 
-  // Wasted keywords: 0 conversions AND spend > 2x CPA
   const wastedKeywords: WastedItem[] = [];
-  const wastedKWCriterionIds = new Set<string>();
   for (const row of zeroConvRows ?? []) {
     const spend = micros(row.metrics?.cost_micros);
     if (spend <= wasteThreshold) continue;
     const criterionId = String(row.ad_group_criterion?.criterion_id);
     const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
-    wastedKWCriterionIds.add(criterionId);
     wastedKeywords.push({
       text: row.ad_group_criterion?.keyword?.text ?? "",
       matchType: (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "UNKNOWN",
@@ -554,7 +847,6 @@ export async function runAudit(
   wastedKeywords.sort((a, b) => b.spend - a.spend);
   const keywordWaste = wastedKeywords.reduce((s, k) => s + k.spend, 0);
 
-  // Wasted search terms: 10+ clicks AND 0 conversions
   const wastedSearchTerms: SearchTermItem[] = [];
   let searchTermWaste = 0;
   for (const row of searchTermRows ?? []) {
@@ -577,9 +869,8 @@ export async function runAudit(
   const totalWaste = keywordWaste + searchTermWaste;
   const wasteRate = totalSpend > 0 ? (totalWaste / totalSpend) * 100 : 0;
 
-  // ── Brand leakage detection ───────────────────────────────────────
+  // ── Brand leakage ─────────────────────────────────────────────────
 
-  // Also check if any campaign has "brand" in the name (confirms brand awareness)
   const hasBrandCampaign = Array.from(campaignMap.values()).some(
     (c) => c.name.toLowerCase().includes("brand"),
   );
@@ -590,7 +881,6 @@ export async function runAudit(
     for (const row of searchTermRows ?? []) {
       const term = row.search_term_view?.search_term ?? "";
       if (!isBrandTerm(term, brandVariants)) continue;
-      // Only flag brand terms in non-brand campaigns
       const campName = row.campaign?.name ?? "";
       if (campName.toLowerCase().includes("brand")) continue;
       const spend = micros(row.metrics?.cost_micros);
@@ -609,11 +899,10 @@ export async function runAudit(
 
   // ── Mining opportunities ──────────────────────────────────────────
 
-  // Converting search terms that could be added as keywords
   const miningOpportunities: SearchTermItem[] = [];
   for (const row of convertingRows ?? []) {
     const conv = row.metrics?.conversions ?? 0;
-    if (conv < 2) continue; // Only flag terms with 2+ conversions
+    if (conv < 2) continue;
     miningOpportunities.push({
       term: row.search_term_view?.search_term ?? "",
       campaignName: row.campaign?.name ?? "",
@@ -623,6 +912,36 @@ export async function runAudit(
       conversions: conv,
     });
   }
+
+  // ── Negative keyword conflicts ────────────────────────────────────
+  // Cross-reference converting search terms against negative keywords
+
+  const negativeConflicts: NegativeConflict[] = [];
+  for (const row of convertingRows ?? []) {
+    const term = row.search_term_view?.search_term ?? "";
+    const termLower = term.toLowerCase();
+    const conv = row.metrics?.conversions ?? 0;
+    if (conv < 1) continue;
+
+    // Check all campaigns' negatives (not just the campaign the term appeared in)
+    for (const [campId, negs] of Array.from(negativesByCampaign.entries())) {
+      const camp = campaignMap.get(campId);
+      if (!camp) continue;
+      for (const neg of negs) {
+        if (negativeBlocks(termLower, neg.text, neg.matchType)) {
+          negativeConflicts.push({
+            negativeText: neg.text,
+            negativeMatchType: (typeof neg.matchType === "number" ? MATCH_TYPE_NAME[neg.matchType] : String(neg.matchType)) ?? "UNKNOWN",
+            campaignName: camp.name,
+            blockedTerm: term,
+            blockedTermConversions: conv,
+            blockedTermSpend: micros(row.metrics?.cost_micros),
+          });
+        }
+      }
+    }
+  }
+  negativeConflicts.sort((a, b) => b.blockedTermConversions - a.blockedTermConversions);
 
   // ── Budget-constrained winners ────────────────────────────────────
 
@@ -644,7 +963,6 @@ export async function runAudit(
 
   // ── Demand captured ───────────────────────────────────────────────
 
-  // Weighted average IS across campaigns with conversions, weighted by spend
   const profitableCampaigns = enabledCampaigns.filter((c) => c.conversions > 0 && c.impressionShare != null);
   const profitableSpend = profitableCampaigns.reduce((s, c) => s + c.spend, 0);
   const demandCaptured = profitableSpend > 0
@@ -669,7 +987,6 @@ export async function runAudit(
 
   const campaigns = Array.from(campaignMap.values()).sort((a, b) => b.spend - a.spend);
 
-  // Cap arrays for compact response
   const result: AuditResult = {
     account: {
       name: businessName,
@@ -682,14 +999,19 @@ export async function runAudit(
     summary: {
       totalSpend,
       totalConversions,
+      totalConversionValue,
       totalClicks,
+      totalImpressions,
       cpa: accountCPA,
+      ctr: totalImpressions > 0 ? totalClicks / totalImpressions : 0,
+      conversionRate: totalClicks > 0 ? totalConversions / totalClicks : 0,
+      roas: totalSpend > 0 && totalConversionValue > 0 ? totalConversionValue / totalSpend : null,
       activeCampaigns: enabledCampaigns.length,
     },
     pulse: {
       wasteRate,
       wasteUsd: totalWaste,
-      demandCaptured: demandCaptured * 100, // as percentage
+      demandCaptured: demandCaptured * 100,
       cpa: accountCPA,
     },
     campaigns,
@@ -705,8 +1027,12 @@ export async function runAudit(
       },
       miningOpportunities: miningOpportunities.slice(0, 10),
       budgetConstrainedWinners,
+      negativeConflicts: negativeConflicts.slice(0, 10),
       hasAudienceSegments: (audienceRows ?? []).length > 0,
       conversionActions,
+      matchTypeDistribution,
+      assetCoverage,
+      landingPages: landingPages.slice(0, 15),
     },
   };
 
