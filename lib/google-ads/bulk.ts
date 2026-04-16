@@ -211,7 +211,7 @@ export async function bulkPauseKeywords(
         }
       }
     } catch (error) {
-      // Full batch failure (network error, auth, etc.) — mark all in chunk as failed
+      // Full batch failure (network error, auth, etc.) — mark all in chunk as failed.
       const msg = extractErrorMessage(error);
       for (const k of chunk) {
         results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: msg, input: k });

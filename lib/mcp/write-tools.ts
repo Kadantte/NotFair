@@ -632,13 +632,15 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     const result = await moveKeywords(authForAccount(auth, accountId), campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
 
+    // Route every result (success or failure) through execWrite so failures count toward the daily
+    // limit — same overcount-preferred policy as every other write path.
     const addChangeIds = await Promise.all(
-      result.added.filter((r) => r.success).map((r) =>
+      result.added.map((r) =>
         execWrite(auth, targetId, campaignId, async () => r),
       ),
     );
     const pauseChangeIds = await Promise.all(
-      result.paused.filter((r) => r.success).map((r) =>
+      result.paused.map((r) =>
         execWrite(auth, targetId, campaignId, async () => r),
       ),
     );

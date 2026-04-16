@@ -116,6 +116,8 @@ export async function logChange(
         afterValue: writeResult.afterValue,
         reasoning: reasoning ?? null,
         clientSource: clientSource ?? null,
+        success: writeResult.success ? 1 : 0,
+        errorMessage: writeResult.success ? null : writeResult.error ?? null,
       })
       .returning();
 
@@ -168,6 +170,8 @@ export async function getChanges(
   const conditions = [
     eq(schema.operations.accountId, accountId),
     eq(schema.operations.opType, OP_TYPE.WRITE),
+    // Exclude bulk API failures — those count toward rate limits but are not "changes".
+    eq(schema.operations.success, 1),
   ];
   if (options.campaignId) {
     conditions.push(eq(schema.operations.campaignId, options.campaignId));
@@ -210,7 +214,7 @@ export async function getImpact(
   accountId: string,
   changeId: number,
 ) {
-  // Get the change record
+  // Get the change record — only real (successful) changes have impact.
   const [change] = await db()
     .select()
     .from(schema.operations)
@@ -219,6 +223,7 @@ export async function getImpact(
         eq(schema.operations.id, changeId),
         eq(schema.operations.accountId, accountId),
         eq(schema.operations.opType, OP_TYPE.WRITE),
+        eq(schema.operations.success, 1),
       ),
     )
     .limit(1);
@@ -336,6 +341,7 @@ const REVERSIBLE_ACTIONS: Record<number, number> = {
 };
 
 export async function getUndoableChange(accountId: string, changeId: number) {
+  // Only successful writes are undoable — failed bulk attempts never changed anything.
   const [change] = await db()
     .select()
     .from(schema.operations)
@@ -344,6 +350,7 @@ export async function getUndoableChange(accountId: string, changeId: number) {
         eq(schema.operations.id, changeId),
         eq(schema.operations.accountId, accountId),
         eq(schema.operations.opType, OP_TYPE.WRITE),
+        eq(schema.operations.success, 1),
       ),
     )
     .limit(1);
@@ -364,11 +371,13 @@ export async function getUndoableChange(accountId: string, changeId: number) {
     return { error: `Action "${toolName}" is not reversible` };
   }
 
-  // Check if entity was modified after this change (stale undo guard)
+  // Check if entity was modified after this change (stale undo guard) — only successful
+  // writes count as modifications.
   const staleConditions = [
     gt(schema.operations.id, changeId),
     eq(schema.operations.accountId, accountId),
     eq(schema.operations.opType, OP_TYPE.WRITE),
+    eq(schema.operations.success, 1),
   ];
   if (change.entityCode !== null && change.entityCode !== undefined) {
     staleConditions.push(eq(schema.operations.entityCode, change.entityCode));

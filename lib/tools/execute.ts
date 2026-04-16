@@ -35,18 +35,23 @@ export async function execWrite(
 ): Promise<WriteResult & { changeId: number | null }> {
   await enforceRateLimit(auth.userId);
   const result = await fn();
-  if (!result.success) return { ...result, changeId: null };
 
-  invalidateCache(accountId);
+  // Log + count every returned WriteResult, success or failure. Rationale: Google counts every
+  // attempted mutate op toward its quota, and we err on the side of over-counting so the user's
+  // daily limit can't be under-reported. Pre-validation rejections count too — trivial over-count
+  // vs Google but simpler and safer than tracking per-call reached-api state. Throws from fn()
+  // still propagate uncounted (network outages shouldn't charge the user).
+  if (result.success) invalidateCache(accountId);
   const change = await logChange(accountId, auth.userId, campaignId, result, reasoning, auth.clientName);
   recordOperation(auth.userId);
-  trackServerEvent(auth.userId, "ai_change_executed", {
+  trackServerEvent(auth.userId, result.success ? "ai_change_executed" : "ai_change_failed", {
     tool_name: result.action,
     entity_type: result.action.includes("keyword") || result.action.includes("bid") ? "keyword" : "campaign",
     account_id: accountId,
     campaign_id: campaignId,
     before_value: result.beforeValue || null,
     after_value: result.afterValue || null,
+    error: result.success ? null : result.error ?? null,
     client_name: auth.clientName ?? null,
     client_version: auth.clientVersion ?? null,
     auth_method: auth.authMethod ?? null,

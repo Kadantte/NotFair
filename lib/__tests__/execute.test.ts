@@ -98,14 +98,14 @@ describe("execWrite", () => {
     expect(result.changeId).toBe(42);
   });
 
-  it("failure path (fn returns success:false): no cache invalidation, no logging, changeId is null", async () => {
+  it("failure path (success:false): logs + records op (overcount policy), does NOT invalidate cache", async () => {
     const failResult: WriteResult = {
       success: false,
-      action: "pause_campaign",
-      entityId: "camp-1",
+      action: "pause_keyword",
+      entityId: "kw-1",
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
-      error: "Something went wrong",
+      error: "Google rejected: invalid criterion",
     };
     const fn = vi.fn().mockResolvedValue(failResult);
 
@@ -113,15 +113,35 @@ describe("execWrite", () => {
 
     expect(mockEnforceRateLimit).toHaveBeenCalledWith("user-1");
     expect(fn).toHaveBeenCalled();
+    // Cache NOT invalidated — nothing actually changed.
+    expect(mockInvalidateCache).not.toHaveBeenCalled();
+    // But operation IS logged and counted — err on the side of overcount vs Google's quota.
+    expect(mockLogChange).toHaveBeenCalledWith(
+      "acct-1", "user-1", "camp-1", failResult, undefined, "test-client",
+    );
+    expect(mockRecordOperation).toHaveBeenCalledWith("user-1");
+    expect(mockTrackServerEvent).toHaveBeenCalledWith(
+      "user-1", "ai_change_failed",
+      expect.objectContaining({
+        tool_name: "pause_keyword",
+        error: "Google rejected: invalid criterion",
+      }),
+    );
 
-    // Should NOT invalidate cache or log change
+    expect(result.success).toBe(false);
+    expect(result.changeId).toBe(42);
+  });
+
+  it("throws from fn() propagate without logging or counting", async () => {
+    const fn = vi.fn().mockRejectedValue(new Error("network dropped"));
+
+    await expect(execWrite(auth, "acct-1", "camp-1", fn)).rejects.toThrow("network dropped");
+
+    expect(mockEnforceRateLimit).toHaveBeenCalledWith("user-1");
     expect(mockInvalidateCache).not.toHaveBeenCalled();
     expect(mockLogChange).not.toHaveBeenCalled();
     expect(mockRecordOperation).not.toHaveBeenCalled();
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
-
-    expect(result.success).toBe(false);
-    expect(result.changeId).toBeNull();
   });
 
   it("rate limit exceeded: throws before calling fn", async () => {

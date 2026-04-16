@@ -61,6 +61,36 @@
 
 ---
 
+## ai_change_failed
+
+**Phase:** 1
+**Category:** quality_signal
+**Platform:** PostHog (server)
+**Trigger:** Fires whenever a write operation returns `success: false` through the `execWrite` chokepoint in `lib/tools/execute.ts`. Covers single-op and bulk tools, whether the failure came from our pre-validation (guardrail violation, malformed input) or from Google's API (partial_failure, rejected mutate). Thrown errors (network outages, auth crashes) do NOT fire this event — they propagate unlogged so outages don't burn user quota.
+**Hypothesis:** We believe tracking this tells us the real per-tool failure rate and lets us distinguish "our guardrails blocked a bad agent request" from "Google rejected a valid-looking mutate." Pairs with `ai_change_executed` to compute per-tool success rates and with `error` string patterns to classify failure mode.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `tool_name` | string | `"pause_keyword"` | Which write tool was attempted |
+| `entity_type` | string | `"keyword"` | Entity type attempted (keyword or campaign) |
+| `account_id` | string | `"1301265570"` | Google Ads account ID |
+| `campaign_id` | string \| null | `"20345678"` | Campaign scope (null if not campaign-scoped) |
+| `before_value` | string \| null | `"ENABLED"` | State before the attempt (unchanged by the failure) |
+| `after_value` | string \| null | `"ENABLED"` | Same as `before_value` for failures — no state change occurred |
+| `error` | string \| null | `"INVALID_ARGUMENT: criterion not found"` | Google's error message, or null if absent |
+| `client_name` | string \| null | `"claude-code"` | See `ai_change_executed` |
+| `client_version` | string \| null | `"1.2.3"` | See `ai_change_executed` |
+| `auth_method` | string \| null | `"oauth"` | See `ai_change_executed` |
+| `user_agent` | string \| null | `"claude-code/1.2.3"` | See `ai_change_executed` |
+
+```json
+{ "event": "ai_change_failed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "ENABLED", "error": "INVALID_ARGUMENT: criterion not found", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
+```
+
+**Files:** `lib/tools/execute.ts`, `lib/google-ads/bulk.ts`
+
+---
+
 ## ai_change_undone
 
 **Phase:** 1

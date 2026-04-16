@@ -2,6 +2,16 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.19.2] - 2026-04-16
+
+### Changed
+- MCP write operation counting now matches Google Ads API mutate-quota accounting more closely. Every returned `WriteResult` is logged and counted — including failed attempts that were previously silently dropped. Bulk tools (`bulkUpdateBids`, `bulkPauseKeywords`, `bulkAddKeywords`, `moveKeywords`) count each keyword in the batch, whether Google accepted or rejected it. Single-op writes (`pauseKeyword`, `updateBid`, etc.) now count their failures too, where they used to only count successes. The daily limit on `/usage` can no longer under-report relative to Google's mutate quota; it may over-count slightly when our pre-validation rejects an input Google never sees, which is the intended direction.
+- Change history (`getChanges`), impact analysis (`getImpact`), and undo (`getUndoableChange`) filter to real changes only, so the user-facing history shows successes only as before.
+- New `ai_change_failed` PostHog event fires on every failed write through `execWrite`. Pairs with `ai_change_executed` to compute per-tool failure rates.
+
+### Fixed
+- `/usage` chart hourly count now reflects true daily API pressure, not just successful changes. A misbehaving bulk call that Google rejects is now visible as usage instead of invisible.
+
 ## [0.2.19.1] - 2026-04-15
 
 ### Fixed

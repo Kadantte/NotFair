@@ -56,6 +56,15 @@ export const operations = pgTable("operations", {
   afterValue: text("after_value"),
   reasoning: text("reasoning"),
   rolledBack: smallint("rolled_back").default(0),
+  /**
+   * 1 = successful change OR read. 0 = write attempt that reached Google's API and returned an error
+   * (still counted against the user's daily limit so our op count matches Google's mutate quota).
+   * Change history / undo / impact queries filter success=1. Pre-validation rejections are never
+   * logged, so every row is either a true change or a billable-by-Google attempt.
+   */
+  success: smallint("success").notNull().default(1),
+  /** Error message for reached-but-failed writes (success=0). Null for successful rows. */
+  errorMessage: text("error_message"),
   /** Raw MCP clientInfo.name — e.g. "claude-code", "claude-desktop". Null for chat/agent. */
   clientSource: text("client_source"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

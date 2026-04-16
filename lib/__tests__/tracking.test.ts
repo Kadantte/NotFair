@@ -70,4 +70,36 @@ describe("tracking userId propagation", () => {
       }),
     );
   });
+
+  it("writes success=1 and no errorMessage for successful changes", async () => {
+    await logChange("acct-1", "user-1", "camp-1", {
+      success: true,
+      action: "pause_campaign",
+      entityId: "entity-1",
+      beforeValue: "ENABLED",
+      afterValue: "PAUSED",
+    });
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ success: 1, errorMessage: null }),
+    );
+  });
+
+  it("writes success=0 and errorMessage for failed writes", async () => {
+    await logChange("acct-1", "user-1", "camp-1", {
+      success: false,
+      action: "pause_keyword",
+      entityId: "kw-1",
+      beforeValue: "ENABLED",
+      afterValue: "ENABLED",
+      error: "INVALID_ARGUMENT: criterion not found",
+    });
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: 0,
+        errorMessage: "INVALID_ARGUMENT: criterion not found",
+      }),
+    );
+  });
 });
