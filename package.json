@@ -16,7 +16,7 @@
     "db:backfill-operation-user-ids": "npx tsx scripts/backfill-operation-user-ids.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.69",
+    "@ai-sdk/anthropic": "^3.0.71",
     "@ai-sdk/google": "^3.0.29",
     "@ai-sdk/openai": "^3.0.48",
     "@ai-sdk/react": "^3.0.140",
