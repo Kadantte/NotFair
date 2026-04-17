@@ -33,6 +33,7 @@ type AuthState = {
   popup?: boolean;
   utm?: UtmParams;
   scope_retry?: boolean;
+  signup_referrer?: string;
 };
 
 function getSafeNext(next: string | null | undefined) {
@@ -87,6 +88,7 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
       next: typeof parsed.next === "string" ? parsed.next : undefined,
       popup: typeof parsed.popup === "boolean" ? parsed.popup : undefined,
       scope_retry: parsed.scope_retry === true ? true : undefined,
+      signup_referrer: typeof parsed.signup_referrer === "string" ? parsed.signup_referrer : undefined,
       utm,
     };
   } catch {
@@ -620,14 +622,14 @@ export async function GET(request: Request) {
   const user = authData.user ?? authData.session?.user ?? null;
 
   // Save UTM attribution data to user metadata on first sign-up
-  if (user && state.utm) {
+  if (user && (state.utm || state.signup_referrer)) {
     const existingMeta = user.user_metadata ?? {};
     // Only write UTMs if not already set (don't overwrite on re-auth)
     if (!existingMeta.utm_source) {
       await supabase.auth.updateUser({
         data: {
-          ...state.utm,
-          signup_referrer: request.headers.get("referer") ?? undefined,
+          ...(state.utm ?? {}),
+          signup_referrer: state.signup_referrer ?? undefined,
         },
       });
     }
@@ -667,11 +669,18 @@ export async function GET(request: Request) {
   const isNewSignup = response.cookies.get("gads_new_signup")?.value === "1";
   if (isNewSignup && user?.id) {
     const utmProps = state.utm ?? {};
+    // Extract the originating client IP so PostHog can geoip the server event.
+    // request.headers.get("referer") is useless here (always accounts.google.com
+    // because OAuth redirected through it) — state.signup_referrer carries the
+    // real marketing referrer captured before the OAuth bounce.
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const clientIp = forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || undefined;
     trackServerEvent(user.id, "user_signed_up", {
       ...utmProps,
-      signup_referrer: request.headers.get("referer") ?? undefined,
+      signup_referrer: state.signup_referrer ?? undefined,
       google_email: user.email,
       signup_method: "google_oauth",
+      ...(clientIp ? { $ip: clientIp } : {}),
     });
   }
 
