@@ -27,3 +27,18 @@ export function trackServerEvent(
     properties,
   });
 }
+
+/**
+ * Flush queued PostHog events. Call from `after(flushServerEvents)` in route
+ * handlers so the Vercel Lambda stays alive long enough for the async POST to
+ * complete — without this, posthog-node's flush races the Lambda freezing and
+ * drops events (verified Apr 2026: 43% of user_signed_up events missing vs DB).
+ */
+export async function flushServerEvents() {
+  if (!client) return;
+  try {
+    await client.flush();
+  } catch (err) {
+    console.error("[analytics-server] flush failed:", err);
+  }
+}

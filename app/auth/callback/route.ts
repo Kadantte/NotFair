@@ -8,7 +8,7 @@ import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listAccessibleCustomers, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
-import { trackServerEvent } from "@/lib/analytics-server";
+import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
@@ -479,6 +479,11 @@ async function reuseExistingSession({
 }
 
 export async function GET(request: Request) {
+  // Flush PostHog events after the response ships — keeps the Lambda alive
+  // long enough for trackServerEvent()'s async POST to complete. Fires for
+  // every return path including the early auth_error redirects.
+  after(flushServerEvents);
+
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const explicitNext = searchParams.get("next");
