@@ -91,7 +91,42 @@ interface BrandLeakage {
   businessName: string;
   variants: string[];
   totalSpend: number;
-  terms: SearchTermItem[];
+  terms: FindingList<SearchTermItem>;
+}
+
+/** Self-describing envelope for a finding list. `total` is the underlying
+ *  population size (before `shown` was sliced out); `totalSpend` is the sum of
+ *  the spend-impact metric across the *full* population so callers can act on
+ *  totals even when only a preview is returned. For full drill-down, use
+ *  `runGaqlQuery` with a focused filter. */
+export interface FindingList<T> {
+  shown: number;
+  total: number;
+  totalSpend: number;
+  items: T[];
+}
+
+/** Per-list preview limits. Audit always returns a compact summary; callers
+ *  that need the full population should use `runGaqlQuery` with filters. */
+const PREVIEW_LIMITS = {
+  wastedKeywords: 10,
+  wastedSearchTerms: 10,
+  brandTerms: 10,
+  miningOpportunities: 10,
+  negativeConflicts: 10,
+  landingPages: 15,
+  budgetConstrainedWinners: 5,
+} as const;
+
+export function toFindingList<T>(
+  all: T[],
+  limit: number,
+  getSpend: (item: T) => number,
+): FindingList<T> {
+  let totalSpend = 0;
+  for (const item of all) totalSpend += getSpend(item) || 0;
+  const items = limit >= all.length ? all : all.slice(0, limit);
+  return { shown: items.length, total: all.length, totalSpend, items };
 }
 
 interface ConversionActionSummary {
@@ -167,22 +202,23 @@ export interface AuditResult {
   };
   campaigns: AuditCampaign[];
   findings: {
-    wastedKeywords: WastedItem[];
-    wastedSearchTerms: SearchTermItem[];
+    wastedKeywords: FindingList<WastedItem>;
+    wastedSearchTerms: FindingList<SearchTermItem>;
     brandLeakage: BrandLeakage;
-    miningOpportunities: SearchTermItem[];
-    budgetConstrainedWinners: {
+    miningOpportunities: FindingList<SearchTermItem>;
+    budgetConstrainedWinners: FindingList<{
       campaignName: string;
       budgetLostIS: number;
       cpa: number;
       dailyBudget: number | null;
-    }[];
-    negativeConflicts: NegativeConflict[];
+      spend: number;
+    }>;
+    negativeConflicts: FindingList<NegativeConflict>;
     hasAudienceSegments: boolean;
     conversionActions: ConversionActionSummary[];
     matchTypeDistribution: MatchTypeBreakdown[];
     assetCoverage: AssetCoverage[];
-    landingPages: LandingPage[];
+    landingPages: FindingList<LandingPage>;
   };
   errors?: string[];
 }
@@ -330,7 +366,7 @@ export async function runAudit(
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
       ORDER BY metrics.cost_micros DESC
-      LIMIT 200
+      LIMIT 2000
     `),
 
     // 4. Quality scores for all active keywords (lookup table)
@@ -358,7 +394,7 @@ export async function runAudit(
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
       ORDER BY metrics.cost_micros DESC
-      LIMIT 200
+      LIMIT 2000
     `),
 
     // 6. Converting search terms (mining)
@@ -372,7 +408,7 @@ export async function runAudit(
         AND campaign.status = 'ENABLED'
         AND metrics.conversions > 0
       ORDER BY metrics.conversions DESC
-      LIMIT 50
+      LIMIT 500
     `),
 
     // 7. Zero-conversion keywords (waste)
@@ -388,7 +424,7 @@ export async function runAudit(
         AND campaign.status = 'ENABLED'
         AND metrics.conversions = 0
       ORDER BY metrics.cost_micros DESC
-      LIMIT 50
+      LIMIT 500
     `),
 
     // 8. Ad copy + strength
@@ -406,7 +442,7 @@ export async function runAudit(
         AND ad_group_ad.status != 'REMOVED'
         AND segments.date BETWEEN '${start}' AND '${end}'
       ORDER BY metrics.cost_micros DESC
-      LIMIT 100
+      LIMIT 1000
     `),
 
     // 9. Ad groups
@@ -420,7 +456,7 @@ export async function runAudit(
       WHERE campaign.status = 'ENABLED'
         AND ad_group.status != 'REMOVED'
       ORDER BY metrics.cost_micros DESC
-      LIMIT 100
+      LIMIT 1000
     `),
 
     // 10. Conversion actions
@@ -499,7 +535,7 @@ export async function runAudit(
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
       ORDER BY metrics.cost_micros DESC
-      LIMIT 20
+      LIMIT 200
     `),
   ]);
 
@@ -946,19 +982,19 @@ export async function runAudit(
   // ── Budget-constrained winners ────────────────────────────────────
 
   const enabledCampaigns = Array.from(campaignMap.values()).filter((c) => c.status === 2);
-  const budgetConstrainedWinners = enabledCampaigns
+  const budgetConstrainedWinnersAll = enabledCampaigns
     .filter((c) =>
       (c.budgetLostIS ?? 0) > 0.15 &&
       c.cpa != null &&
       (accountCPA == null || c.cpa <= accountCPA * 1.5),
     )
     .sort((a, b) => (b.budgetLostIS ?? 0) - (a.budgetLostIS ?? 0))
-    .slice(0, 5)
     .map((c) => ({
       campaignName: c.name,
       budgetLostIS: c.budgetLostIS!,
       cpa: c.cpa!,
       dailyBudget: c.dailyBudget,
+      spend: c.spend,
     }));
 
   // ── Demand captured ───────────────────────────────────────────────
@@ -1016,23 +1052,51 @@ export async function runAudit(
     },
     campaigns,
     findings: {
-      wastedKeywords: wastedKeywords.slice(0, 10),
-      wastedSearchTerms: wastedSearchTerms.slice(0, 10),
+      wastedKeywords: toFindingList(
+        wastedKeywords,
+        PREVIEW_LIMITS.wastedKeywords,
+        (k) => k.spend,
+      ),
+      wastedSearchTerms: toFindingList(
+        wastedSearchTerms,
+        PREVIEW_LIMITS.wastedSearchTerms,
+        (t) => t.spend,
+      ),
       brandLeakage: {
         detected: brandTerms.length > 0 || hasBrandCampaign,
         businessName,
         variants: brandVariants,
         totalSpend: brandTotalSpend,
-        terms: brandTerms.slice(0, 10),
+        terms: toFindingList(
+          brandTerms,
+          PREVIEW_LIMITS.brandTerms,
+          (t) => t.spend,
+        ),
       },
-      miningOpportunities: miningOpportunities.slice(0, 10),
-      budgetConstrainedWinners,
-      negativeConflicts: negativeConflicts.slice(0, 10),
+      miningOpportunities: toFindingList(
+        miningOpportunities,
+        PREVIEW_LIMITS.miningOpportunities,
+        (t) => t.spend,
+      ),
+      budgetConstrainedWinners: toFindingList(
+        budgetConstrainedWinnersAll,
+        PREVIEW_LIMITS.budgetConstrainedWinners,
+        (w) => w.spend,
+      ),
+      negativeConflicts: toFindingList(
+        negativeConflicts,
+        PREVIEW_LIMITS.negativeConflicts,
+        (c) => c.blockedTermSpend,
+      ),
       hasAudienceSegments: (audienceRows ?? []).length > 0,
       conversionActions,
       matchTypeDistribution,
       assetCoverage,
-      landingPages: landingPages.slice(0, 15),
+      landingPages: toFindingList(
+        landingPages,
+        PREVIEW_LIMITS.landingPages,
+        (p) => p.spend,
+      ),
     },
   };
 

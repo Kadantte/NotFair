@@ -545,7 +545,14 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Account Audit ────────────────────────────────────────────────
 
   server.registerTool("audit", {
-    description: "Full account audit: collects all campaign data in parallel and returns pre-computed findings (waste rate, QS issues, impression share matrix, brand leakage, budget-constrained winners). One call replaces 20+ individual tool calls.",
+    description:
+      "Full account audit: collects all campaign data in parallel and returns pre-computed findings " +
+      "(waste rate, QS issues, impression share matrix, brand leakage, budget-constrained winners). " +
+      "One call replaces 20+ individual tool calls. " +
+      "Finding lists (wastedKeywords, wastedSearchTerms, brandLeakage.terms, miningOpportunities, " +
+      "negativeConflicts, landingPages, budgetConstrainedWinners) are envelopes: `{shown, total, totalSpend, items}`. " +
+      "Use `total` and `totalSpend` for account-wide decisions — don't assume `items` is complete. " +
+      "For full drill-down (all items, not just the top-N preview), call `runGaqlQuery` with a focused filter.",
     inputSchema: {
       accountId: accountIdParam,
       days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90 for impression share)"),
