@@ -3,6 +3,7 @@ import {
   text,
   smallint,
   integer,
+  bigint,
   boolean,
   doublePrecision,
   serial,
@@ -105,7 +106,11 @@ export const performanceSnapshots = pgTable(
     snapshotDate: text("snapshot_date").notNull(),
     impressions: integer("impressions").default(0),
     clicks: integer("clicks").default(0),
-    costMicros: integer("cost_micros").default(0),
+    // bigint (signed 64-bit): int caps at ~$2,147/day/campaign in micros
+    // and silently drops snapshots for high-spend campaigns when the cron
+    // insert throws. mode: "number" keeps the JS type as `number`, which
+    // is safe up to ~$9B/day in micros (2^53 safe-integer bound).
+    costMicros: bigint("cost_micros", { mode: "number" }).default(0),
     conversions: doublePrecision("conversions").default(0),
     cpa: doublePrecision("cpa"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

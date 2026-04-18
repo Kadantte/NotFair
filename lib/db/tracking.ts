@@ -1,6 +1,16 @@
 import { db, schema } from "./index";
-import { eq, and, gt, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gt, gte, lt, lte, desc, inArray, sql } from "drizzle-orm";
 import type { WriteResult } from "@/lib/google-ads";
+import {
+  IMPACT_CORRELATION_DISCLAIMER,
+  IMPACT_WINDOW_DAYS,
+  MIN_AFTER_DAYS_FOR_DIRECTION,
+  computeChangeImpactReview,
+  computeSnapshotImpact,
+  type ChangeRow,
+  type ReviewChangeImpact,
+  type SnapshotRow,
+} from "./impact";
 
 // ─── Compact Code Maps ──────────────────────────────────────────────
 
@@ -54,6 +64,7 @@ export const TOOL_CODE = {
   get_account_settings: 33,
   get_campaign_settings: 34,
   get_recommendations: 35,
+  review_change_impact: 43,
 } as const;
 
 type ToolCode = (typeof TOOL_CODE)[keyof typeof TOOL_CODE];
@@ -296,13 +307,26 @@ export async function getImpact(
   if (!change) return null;
   if (!change.campaignId) return { change, impact: null, reason: "No campaign associated" };
 
+  // Window math matches `computeChangeImpactReview` exactly so agents can
+  // stitch per-change (`getImpact`) and batch (`reviewChangeImpact`) calls
+  // without getting contradictory numbers for the same change.
+  // Before: [changeDate - 7d, changeDate)     — 7 days strictly pre-change.
+  // After:  [changeDate + 1d, changeDate + 8d) — 7 days strictly post-change.
+  // Change day is excluded on both sides: a full-day snapshot dated the
+  // change day mixes pre- and post-change hours.
   const changeDate = change.createdAt;
   const changeDateStr = changeDate.toISOString().slice(0, 10);
 
-  // Get 7-day average BEFORE the change
-  const sevenDaysBefore = new Date(changeDate);
-  sevenDaysBefore.setDate(sevenDaysBefore.getDate() - 7);
-  const beforeDateStr = sevenDaysBefore.toISOString().slice(0, 10);
+  const beforeCutoff = new Date(changeDate);
+  beforeCutoff.setUTCDate(beforeCutoff.getUTCDate() - IMPACT_WINDOW_DAYS);
+  const beforeCutoffStr = beforeCutoff.toISOString().slice(0, 10);
+
+  const afterStart = new Date(changeDate);
+  afterStart.setUTCDate(afterStart.getUTCDate() + 1);
+  const afterStartStr = afterStart.toISOString().slice(0, 10);
+  const afterEnd = new Date(changeDate);
+  afterEnd.setUTCDate(afterEnd.getUTCDate() + IMPACT_WINDOW_DAYS + 1);
+  const afterEndStr = afterEnd.toISOString().slice(0, 10);
 
   const beforeSnapshots = await db()
     .select()
@@ -311,15 +335,10 @@ export async function getImpact(
       and(
         eq(schema.performanceSnapshots.accountId, accountId),
         eq(schema.performanceSnapshots.campaignId, change.campaignId),
-        gte(schema.performanceSnapshots.snapshotDate, beforeDateStr),
-        lte(schema.performanceSnapshots.snapshotDate, changeDateStr),
+        gte(schema.performanceSnapshots.snapshotDate, beforeCutoffStr),
+        lt(schema.performanceSnapshots.snapshotDate, changeDateStr),
       ),
     );
-
-  // Get 7-day average AFTER the change
-  const sevenDaysAfter = new Date(changeDate);
-  sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
-  const afterDateStr = sevenDaysAfter.toISOString().slice(0, 10);
 
   const afterSnapshots = await db()
     .select()
@@ -328,21 +347,23 @@ export async function getImpact(
       and(
         eq(schema.performanceSnapshots.accountId, accountId),
         eq(schema.performanceSnapshots.campaignId, change.campaignId),
-        gte(schema.performanceSnapshots.snapshotDate, changeDateStr),
-        lte(schema.performanceSnapshots.snapshotDate, afterDateStr),
+        gte(schema.performanceSnapshots.snapshotDate, afterStartStr),
+        lt(schema.performanceSnapshots.snapshotDate, afterEndStr),
       ),
     );
 
-  if (beforeSnapshots.length === 0 || afterSnapshots.length === 0) {
+  // Same maturity gate as `reviewChangeImpact` so the two surfaces don't
+  // contradict each other on the same change: a change 1-2 days old stays
+  // `tooNew` everywhere, not "no impact" here but "impact present" there.
+  if (beforeSnapshots.length === 0 || afterSnapshots.length < MIN_AFTER_DAYS_FOR_DIRECTION) {
     return {
       change,
       impact: null,
-      reason: "Insufficient snapshot data for comparison (need at least 7 days before and after)",
+      reason: `Insufficient snapshot data for comparison (have ${beforeSnapshots.length} before / ${afterSnapshots.length} after; need at least 1 before and ${MIN_AFTER_DAYS_FOR_DIRECTION} after).`,
     };
   }
 
-  const avgBefore = average(beforeSnapshots);
-  const avgAfter = average(afterSnapshots);
+  const base = computeSnapshotImpact(beforeSnapshots, afterSnapshots);
 
   return {
     change: {
@@ -352,30 +373,123 @@ export async function getImpact(
       timestamp: change.createdAt,
     },
     impact: {
-      before: avgBefore,
-      after: avgAfter,
-      cpaDelta: avgAfter.cpa !== null && avgBefore.cpa !== null
-        ? avgAfter.cpa - avgBefore.cpa
-        : null,
-      costDelta: avgAfter.dailyCost - avgBefore.dailyCost,
-      conversionsDelta: avgAfter.dailyConversions - avgBefore.dailyConversions,
-      disclaimer: "These changes are correlated with the action taken. Other factors (seasonality, competitor bids, Google's algorithm) may have contributed.",
+      before: base.before,
+      after: base.after,
+      cpaDelta: base.cpaDelta,
+      costDelta: base.costDelta,
+      conversionsDelta: base.conversionsDelta,
+      disclaimer: IMPACT_CORRELATION_DISCLAIMER,
     },
   };
 }
 
-function average(snapshots: typeof schema.performanceSnapshots.$inferSelect[]) {
-  const n = snapshots.length;
-  if (n === 0) return { dailyCost: 0, dailyConversions: 0, cpa: null };
+// ─── Batch Impact Review ────────────────────────────────────────────
 
-  const totalCost = snapshots.reduce((sum, s) => sum + (s.costMicros ?? 0), 0) / 1_000_000;
-  const totalConversions = snapshots.reduce((sum, s) => sum + (s.conversions ?? 0), 0);
+/**
+ * Summarize the impact of every successful change in the last `days`.
+ * Designed for weekly/ad-hoc reviews by Claude Coworker: one round-trip
+ * returns per-change attribution + per-action counts + a campaign-deduped
+ * aggregate sum, instead of forcing the agent to stitch getChanges +
+ * getCampaignPerformance by hand.
+ */
+export async function reviewChangeImpact(
+  accountId: string,
+  options: { days?: number; limit?: number; now?: Date } = {},
+): Promise<ReviewChangeImpact> {
+  const days = Math.min(Math.max(options.days ?? 7, 1), 90);
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+  const now = options.now ?? new Date();
 
-  return {
-    dailyCost: totalCost / n,
-    dailyConversions: totalConversions / n,
-    cpa: totalConversions > 0 ? totalCost / totalConversions : null,
+  const windowStart = new Date(now);
+  windowStart.setUTCDate(windowStart.getUTCDate() - days);
+
+  const windowConditions = and(
+    eq(schema.operations.accountId, accountId),
+    eq(schema.operations.opType, OP_TYPE.WRITE),
+    eq(schema.operations.success, 1),
+    gte(schema.operations.createdAt, windowStart),
+  );
+
+  const [rows, totalResult] = await Promise.all([
+    db()
+      .select()
+      .from(schema.operations)
+      .where(windowConditions)
+      .orderBy(desc(schema.operations.createdAt))
+      .limit(limit),
+    db()
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.operations)
+      .where(windowConditions),
+  ]);
+  const totalPopulation = Number(totalResult[0]?.count ?? 0);
+
+  // Prefer the canonical snake_case form via toolCode when available so
+  // byAction buckets don't split "pauseKeyword" (post-telemetry-migration
+  // rows carrying `tool_name`) and "pause_keyword" (older rows with only
+  // `tool_code`) for the SAME logical action.
+  const canonicalAction = (row: { toolName: string | null; toolCode: number | null }): string => {
+    if (row.toolCode != null && CODE_TO_TOOL[row.toolCode]) return CODE_TO_TOOL[row.toolCode];
+    return row.toolName ?? `unknown_${row.toolCode ?? "null"}`;
   };
+
+  const changes: ChangeRow[] = rows.map((row) => ({
+    id: row.id,
+    action: canonicalAction(row),
+    entityType: CODE_TO_ENTITY[row.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
+    entityId: row.entityId ?? "",
+    label: row.label,
+    campaignId: row.campaignId,
+    reasoning: row.reasoning,
+    rolledBack: row.rolledBack === 1,
+    timestamp: row.createdAt,
+  }));
+
+  // Collect unique campaign IDs — one query to grab every snapshot we
+  // might need, instead of N+1 per change.
+  const campaignIds = Array.from(
+    new Set(changes.map((c) => c.campaignId).filter((id): id is string => !!id)),
+  );
+
+  let snapshotsByCampaign = new Map<string, SnapshotRow[]>();
+  if (campaignIds.length > 0) {
+    // Before windows need snapshots up to 7 days before the oldest change;
+    // after windows can't exceed `now` because the cron only stores
+    // yesterday's data — no point asking the DB for rows that can't exist.
+    const snapshotRangeStart = new Date(windowStart);
+    snapshotRangeStart.setUTCDate(snapshotRangeStart.getUTCDate() - IMPACT_WINDOW_DAYS);
+
+    const snapshots = await db()
+      .select({
+        campaignId: schema.performanceSnapshots.campaignId,
+        snapshotDate: schema.performanceSnapshots.snapshotDate,
+        costMicros: schema.performanceSnapshots.costMicros,
+        conversions: schema.performanceSnapshots.conversions,
+      })
+      .from(schema.performanceSnapshots)
+      .where(
+        and(
+          eq(schema.performanceSnapshots.accountId, accountId),
+          inArray(schema.performanceSnapshots.campaignId, campaignIds),
+          gte(schema.performanceSnapshots.snapshotDate, snapshotRangeStart.toISOString().slice(0, 10)),
+          lte(schema.performanceSnapshots.snapshotDate, now.toISOString().slice(0, 10)),
+        ),
+      );
+
+    snapshotsByCampaign = snapshots.reduce((map, s) => {
+      const arr = map.get(s.campaignId) ?? [];
+      arr.push({
+        campaignId: s.campaignId,
+        snapshotDate: s.snapshotDate,
+        costMicros: s.costMicros,
+        conversions: s.conversions,
+      });
+      map.set(s.campaignId, arr);
+      return map;
+    }, new Map<string, SnapshotRow[]>());
+  }
+
+  return computeChangeImpactReview(changes, snapshotsByCampaign, now, days, totalPopulation);
 }
 
 // ─── Undo ───────────────────────────────────────────────────────────

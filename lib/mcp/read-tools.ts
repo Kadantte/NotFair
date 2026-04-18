@@ -29,7 +29,8 @@ import {
   type AuthContext,
 } from "@/lib/google-ads";
 import { runAudit } from "@/lib/google-ads/audit";
-import { getChanges } from "@/lib/db/tracking";
+import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
+import { MIN_AFTER_DAYS_FOR_DIRECTION } from "@/lib/db/impact";
 import { execRead } from "@/lib/tools/execute";
 import { getEnv } from "@/lib/env";
 import { jsonResult, safeHandler, accountIdParam, READ_ANNOTATIONS } from "./types";
@@ -371,6 +372,35 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_changes", () => getChanges(targetId, { limit, campaignId }));
+    return jsonResult(result);
+  }));
+
+  server.registerTool("reviewChangeImpact", {
+    description:
+      `Estimate correlational impact of every successful change in the last \`days\` using daily campaign snapshots (captured by cron). For each change: compares 7-day daily averages BEFORE vs AFTER the change date on the affected campaign, classifies direction (improved/worsened/neutral/unknown), and returns cost/conversion/CPA deltas plus \`otherChangesInWindow\` so you can spot confounders (other writes in the 14-day envelope). Response includes per-action counts and a campaign-deduped aggregate sum — use this instead of stitching getChanges + getCampaignPerformance by hand. Ideal for weekly or ad-hoc impact reviews. Caveats: impact is correlational (seasonality, competitor bids, Google's algorithm also move numbers); changes <${MIN_AFTER_DAYS_FOR_DIRECTION} days old are typically 'tooNew' because the snapshot cron lags a day; keyword/ad changes attribute to the containing campaign (campaign-level granularity only); window boundaries are UTC.`,
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .default(7)
+        .describe("Lookback window in days. Default 7 (weekly review); max 90."),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .default(50)
+        .describe("Max changes to attribute. Default 50; max 200."),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days, limit }) => {
+    const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "review_change_impact", () =>
+      reviewChangeImpact(targetId, { days, limit }),
+    );
     return jsonResult(result);
   }));
 
