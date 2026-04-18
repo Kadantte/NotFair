@@ -155,10 +155,15 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
 
   server.registerTool("runGaqlQuery", {
     description:
-      "Run a read-only GAQL SELECT query against the Google Ads API. Returns up to 50 rows. " +
-      "GAQL tips: (1) Use getResourceMetadata to discover valid fields before querying — never guess field names. " +
-      "(2) Dates must be literal YYYY-MM-DD strings (e.g. segments.date >= '2024-01-01'), no date functions or relative dates. " +
-      "(3) The change_event resource requires LIMIT <= 10000. " +
+      "Run a read-only GAQL SELECT query against the Google Ads API. " +
+      "Returns up to `limit` rows (default 200, max 2000) plus truncation metadata: " +
+      "`truncated`, `truncationReason` (\"row_limit\" or \"byte_budget\"), `fetchedRowCount`, and — when truncated — " +
+      "a `summary` with SUM of metric columns + top/bottom 5 by cost computed over the full fetched set, " +
+      "plus a `continuationHint` suggesting how to narrow the query. " +
+      "Use the summary for decision-making when raw rows are truncated — don't assume the returned rows are complete. " +
+      "GAQL tips: (1) Use getResourceMetadata to discover valid fields — never guess field names. " +
+      "(2) Dates must be literal YYYY-MM-DD strings (e.g. segments.date >= '2024-01-01') or range macros (DURING LAST_30_DAYS). " +
+      "(3) An explicit `LIMIT N` in the query overrides the `limit` param (capped at 2000 regardless). " +
       "(4) Customer IDs are plain numbers without hyphens. " +
       "(5) Use listQueryableResources to see all available resources.",
     inputSchema: {
@@ -167,15 +172,22 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .string()
         .min(1)
         .describe("GAQL SELECT query (e.g. 'SELECT campaign.id, campaign.name FROM campaign WHERE campaign.status = 'ENABLED'')"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(2000)
+        .default(200)
+        .describe("Max rows returned (1-2000, default 200). Overridden by an explicit `LIMIT N` in the query."),
     },
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: true,
     },
-  }, safeHandler(async ({ accountId, query }) => {
+  }, safeHandler(async ({ accountId, query, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "run_gaql_query", () => runSafeGaqlReport(targetAuth, query));
+    const result = await execRead(auth, targetId, "run_gaql_query", () => runSafeGaqlReport(targetAuth, query, limit));
     return jsonResult(result);
   }));
 

@@ -1,0 +1,409 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockCustomerFactory, mockQuery } = vi.hoisted(() => ({
+  mockCustomerFactory: vi.fn(),
+  mockQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/env", () => ({
+  getRequiredEnv: vi.fn((name: string) => `${name.toLowerCase()}-value`),
+  getEnv: vi.fn((name: string) => `${name.toLowerCase()}-value`),
+}));
+
+vi.mock("google-ads-api", () => ({
+  GoogleAdsApi: class {
+    Customer = mockCustomerFactory;
+  },
+}));
+
+import {
+  runSafeGaqlReport,
+  extractGaqlLimit,
+  rewriteGaqlLimit,
+  extractSelectFields,
+  buildGaqlSummary,
+  buildContinuationHint,
+  DEFAULT_GAQL_LIMIT,
+  MAX_GAQL_LIMIT,
+} from "@/lib/google-ads/reads";
+import { clearCache } from "@/lib/google-ads/client";
+
+const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  clearCache();
+  mockCustomerFactory.mockReturnValue({ query: mockQuery });
+});
+
+// ─── Pure helpers ─────────────────────────────────────────────────────
+
+describe("extractGaqlLimit", () => {
+  it("returns null when no LIMIT clause", () => {
+    expect(extractGaqlLimit("SELECT campaign.id FROM campaign")).toBeNull();
+  });
+
+  it("extracts numeric LIMIT at end of query", () => {
+    expect(extractGaqlLimit("SELECT campaign.id FROM campaign LIMIT 75")).toBe(75);
+  });
+
+  it("extracts LIMIT with surrounding whitespace", () => {
+    expect(extractGaqlLimit("SELECT campaign.id FROM campaign   LIMIT   10   ")).toBe(10);
+  });
+
+  it("extracts LIMIT before PARAMETERS clause", () => {
+    expect(
+      extractGaqlLimit(
+        "SELECT campaign.id FROM campaign LIMIT 50 PARAMETERS omit_unselected_resource_names=true",
+      ),
+    ).toBe(50);
+  });
+
+  it("does not match LIMIT inside a string literal in WHERE", () => {
+    // GAQL doesn't allow LIMIT mid-clause; regex only matches trailing.
+    expect(
+      extractGaqlLimit(
+        "SELECT campaign.name FROM campaign WHERE campaign.name = 'LIMIT 99 test'",
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("rewriteGaqlLimit", () => {
+  it("appends LIMIT when absent", () => {
+    expect(rewriteGaqlLimit("SELECT campaign.id FROM campaign", 300)).toBe(
+      "SELECT campaign.id FROM campaign LIMIT 300",
+    );
+  });
+
+  it("replaces existing LIMIT value", () => {
+    expect(
+      rewriteGaqlLimit("SELECT campaign.id FROM campaign LIMIT 50", 2001),
+    ).toBe("SELECT campaign.id FROM campaign LIMIT 2001");
+  });
+
+  it("inserts LIMIT before PARAMETERS clause", () => {
+    expect(
+      rewriteGaqlLimit(
+        "SELECT campaign.id FROM campaign PARAMETERS omit_unselected_resource_names=true",
+        500,
+      ),
+    ).toBe(
+      "SELECT campaign.id FROM campaign LIMIT 500 PARAMETERS omit_unselected_resource_names=true",
+    );
+  });
+
+  it("replaces LIMIT when PARAMETERS clause follows", () => {
+    expect(
+      rewriteGaqlLimit(
+        "SELECT campaign.id FROM campaign LIMIT 10 PARAMETERS omit_unselected_resource_names=true",
+        200,
+      ),
+    ).toBe(
+      "SELECT campaign.id FROM campaign LIMIT 200 PARAMETERS omit_unselected_resource_names=true",
+    );
+  });
+});
+
+describe("extractSelectFields", () => {
+  it("splits single-line SELECT into trimmed fields", () => {
+    expect(
+      extractSelectFields("SELECT campaign.id, campaign.name, metrics.clicks FROM campaign"),
+    ).toEqual(["campaign.id", "campaign.name", "metrics.clicks"]);
+  });
+
+  it("handles multi-line SELECT clauses", () => {
+    expect(
+      extractSelectFields(
+        `SELECT
+           campaign.id,
+           metrics.clicks,
+           metrics.cost_micros
+         FROM campaign`,
+      ),
+    ).toEqual(["campaign.id", "metrics.clicks", "metrics.cost_micros"]);
+  });
+
+  it("returns empty array when pattern does not match", () => {
+    expect(extractSelectFields("not a query")).toEqual([]);
+  });
+});
+
+describe("buildGaqlSummary", () => {
+  const rowsWithMetrics = [
+    { campaign: { id: "1" }, metrics: { clicks: 10, cost_micros: 3_000_000 } },
+    { campaign: { id: "2" }, metrics: { clicks: 20, cost_micros: 1_000_000 } },
+    { campaign: { id: "3" }, metrics: { clicks: 5, cost_micros: 5_000_000 } },
+  ];
+
+  it("returns null when no metric columns are selected", () => {
+    expect(buildGaqlSummary(rowsWithMetrics, ["campaign.id"])).toBeNull();
+  });
+
+  it("returns null when there are zero rows", () => {
+    expect(buildGaqlSummary([], ["metrics.clicks"])).toBeNull();
+  });
+
+  it("sums each metric column across all rows", () => {
+    const summary = buildGaqlSummary(rowsWithMetrics, ["metrics.clicks", "metrics.cost_micros"]);
+    expect(summary?.sums).toEqual({
+      "metrics.clicks": 35,
+      "metrics.cost_micros": 9_000_000,
+    });
+    expect(summary?.computedOverRowCount).toBe(3);
+  });
+
+  it("includes top/bottom by cost when cost_micros is selected and no cost ordering", () => {
+    const summary = buildGaqlSummary(rowsWithMetrics, ["metrics.cost_micros"], "SELECT metrics.cost_micros FROM keyword_view");
+    expect(summary?.topByCost?.[0]).toEqual(rowsWithMetrics[2]); // 5M
+    expect(summary?.bottomByCost?.[0]).toEqual(rowsWithMetrics[1]); // 1M
+  });
+
+  it("skips top/bottom when cost_micros is not selected", () => {
+    const summary = buildGaqlSummary(rowsWithMetrics, ["metrics.clicks"]);
+    expect(summary?.topByCost).toBeUndefined();
+    expect(summary?.bottomByCost).toBeUndefined();
+  });
+
+  it("skips top/bottom when query already orders by cost (avoids misleading bottom)", () => {
+    const summary = buildGaqlSummary(
+      rowsWithMetrics,
+      ["metrics.cost_micros"],
+      "SELECT metrics.cost_micros FROM keyword_view ORDER BY metrics.cost_micros DESC",
+    );
+    expect(summary?.sums).toEqual({ "metrics.cost_micros": 9_000_000 });
+    expect(summary?.topByCost).toBeUndefined();
+    expect(summary?.bottomByCost).toBeUndefined();
+  });
+
+  it("ignores non-finite values when summing", () => {
+    const rows = [
+      { metrics: { clicks: 10 } },
+      { metrics: { clicks: null } },
+      { metrics: { clicks: "not a number" } },
+      { metrics: { clicks: 5 } },
+    ];
+    const summary = buildGaqlSummary(rows, ["metrics.clicks"]);
+    expect(summary?.sums).toEqual({ "metrics.clicks": 15 });
+  });
+});
+
+describe("buildContinuationHint", () => {
+  it("suggests date + campaign filter + raising limit for row_limit truncation", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign",
+      200,
+      200,
+      { rowTruncated: true, byteTruncated: false },
+    );
+    expect(hint).toContain("segments.date");
+    expect(hint).toContain("campaign.id IN");
+    expect(hint).toContain("2000");
+    expect(hint).toContain("hit row limit");
+  });
+
+  it("omits 'raise limit' suggestion when already at max", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign",
+      2000,
+      MAX_GAQL_LIMIT,
+      { rowTruncated: true, byteTruncated: false },
+    );
+    expect(hint).not.toContain("raise");
+  });
+
+  it("recommends fewer columns for byte_budget truncation", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign WHERE segments.date DURING LAST_7_DAYS",
+      50,
+      200,
+      { rowTruncated: false, byteTruncated: true },
+    );
+    expect(hint).toContain("fewer columns");
+    expect(hint).toContain("byte budget");
+  });
+
+  it("skips date suggestion when query already has a date filter", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign WHERE segments.date DURING LAST_7_DAYS",
+      200,
+      200,
+      { rowTruncated: true, byteTruncated: false },
+    );
+    expect(hint).not.toContain("segments.date");
+  });
+
+  it("skips campaign filter suggestion when query uses `campaign.id IN(` without space", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign WHERE campaign.id IN(123,456)",
+      200,
+      200,
+      { rowTruncated: true, byteTruncated: false },
+    );
+    expect(hint).not.toContain("campaign.id IN");
+  });
+
+  it("skips campaign filter suggestion when query uses `campaign.id=`", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign WHERE campaign.id=123",
+      200,
+      200,
+      { rowTruncated: true, byteTruncated: false },
+    );
+    expect(hint).not.toContain("filter to specific campaigns");
+  });
+
+  it("reports both causes when row_limit and byte_budget both trigger", () => {
+    const hint = buildContinuationHint(
+      "SELECT campaign.id FROM campaign",
+      500,
+      2000,
+      { rowTruncated: true, byteTruncated: true },
+    );
+    expect(hint).toContain("hit row limit");
+    expect(hint).toContain("byte budget");
+    expect(hint).toContain("fewer columns");
+  });
+});
+
+// ─── End-to-end runSafeGaqlReport ─────────────────────────────────────
+
+describe("runSafeGaqlReport validation", () => {
+  it("rejects non-SELECT queries", async () => {
+    await expect(runSafeGaqlReport(auth, "UPDATE campaign SET x = 1")).rejects.toThrow(
+      /read-only SELECT/,
+    );
+  });
+
+  it("rejects queries with semicolons", async () => {
+    await expect(
+      runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign;"),
+    ).rejects.toThrow(/Semicolons/);
+  });
+
+  it("rejects queries with forbidden keywords", async () => {
+    await expect(
+      runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign DROP TABLE x"),
+    ).rejects.toThrow(/forbidden/);
+  });
+});
+
+describe("runSafeGaqlReport limit + truncation", () => {
+  it("uses default limit when none provided", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign");
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining(`LIMIT ${DEFAULT_GAQL_LIMIT + 1}`),
+    );
+  });
+
+  it("respects explicit LIMIT in query when larger than param", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign LIMIT 500", 200);
+    // GAQL LIMIT wins over param; probes LIMIT+1 = 501
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("LIMIT 501"));
+  });
+
+  it("caps explicit LIMIT at MAX_GAQL_LIMIT", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign LIMIT 10000");
+    // 10000 capped to 2000; probe = 2001
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining(`LIMIT ${MAX_GAQL_LIMIT + 1}`),
+    );
+  });
+
+  it("clamps param limit to [1, MAX_GAQL_LIMIT]", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign", 99999);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining(`LIMIT ${MAX_GAQL_LIMIT + 1}`),
+    );
+  });
+
+  it("reports non-truncated when fetched <= limit", async () => {
+    mockQuery.mockResolvedValueOnce([
+      { campaign: { id: "1" } },
+      { campaign: { id: "2" } },
+    ]);
+    const result = await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign",
+      10,
+    );
+    expect(result.rowCount).toBe(2);
+    expect(result.truncated).toBe(false);
+    expect(result.truncationReason).toBeNull();
+    expect(result.summary).toBeUndefined();
+    expect(result.continuationHint).toBeUndefined();
+  });
+
+  it("marks truncated and slices rows when fetched > limit", async () => {
+    const rows = Array.from({ length: 11 }, (_, i) => ({
+      campaign: { id: String(i) },
+      metrics: { cost_micros: (11 - i) * 1_000_000, clicks: i + 1 },
+    }));
+    mockQuery.mockResolvedValueOnce(rows);
+
+    const result = await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id, metrics.clicks, metrics.cost_micros FROM campaign",
+      10,
+    );
+
+    expect(result.rowCount).toBe(10);
+    expect(result.fetchedRowCount).toBe(11);
+    expect(result.truncated).toBe(true);
+    expect(result.truncationReason).toBe("row_limit");
+    expect(result.summary?.computedOverRowCount).toBe(11);
+    expect(result.summary?.sums["metrics.clicks"]).toBe(
+      rows.reduce((s, r) => s + r.metrics.clicks, 0),
+    );
+    expect(result.continuationHint).toMatch(/row limit/i);
+  });
+
+  it("does not mark truncated when fetched exactly equals limit", async () => {
+    // Probe is limit+1; if Google returns exactly `limit` rows, there's no more.
+    const rows = Array.from({ length: 10 }, (_, i) => ({ campaign: { id: String(i) } }));
+    mockQuery.mockResolvedValueOnce(rows);
+
+    const result = await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign",
+      10,
+    );
+
+    expect(result.truncated).toBe(false);
+    expect(result.rowCount).toBe(10);
+  });
+
+  it("truncates by byte budget when rows are too large", async () => {
+    // 300 rows × fat payload each → exceeds 40KB response budget
+    const bigText = "x".repeat(500);
+    const rows = Array.from({ length: 300 }, (_, i) => ({
+      campaign: { id: String(i), name: bigText },
+      metrics: { cost_micros: i * 1000, clicks: i },
+    }));
+    mockQuery.mockResolvedValueOnce(rows);
+
+    const result = await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id, campaign.name, metrics.clicks, metrics.cost_micros FROM campaign",
+      2000,
+    );
+
+    expect(result.truncated).toBe(true);
+    expect(result.truncationReason).toBe("byte_budget");
+    expect(result.rowCount).toBeLessThan(300);
+    expect(result.summary).toBeDefined();
+    expect(result.summary?.computedOverRowCount).toBe(300);
+    expect(result.continuationHint).toMatch(/byte budget/i);
+  });
+
+  it("surfaces GAQL errors with context", async () => {
+    mockQuery.mockRejectedValueOnce(new Error("invalid field"));
+    await expect(
+      runSafeGaqlReport(auth, "SELECT bogus FROM campaign"),
+    ).rejects.toThrow(/GAQL query failed.*invalid field/);
+  });
+});

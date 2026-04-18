@@ -1063,7 +1063,169 @@ export async function getRecommendations(
 
 // ─── Safe GAQL Query ─────────────────────────────────────────────────
 
-export async function runSafeGaqlReport(auth: AuthContext, rawQuery: string) {
+export const MAX_GAQL_LIMIT = 2000;
+export const DEFAULT_GAQL_LIMIT = 200;
+const GAQL_BYTE_BUDGET = 40 * 1024; // 40KB — keep responses agent-digestible.
+
+const GAQL_LIMIT_RE = /\bLIMIT\s+(\d+)(?=\s*(?:PARAMETERS\b|$))/i;
+
+/** Extract trailing `LIMIT N` from a GAQL query (LIMIT is always the last clause
+ *  before optional PARAMETERS). Returns null when absent. */
+export function extractGaqlLimit(query: string): number | null {
+  const m = query.match(GAQL_LIMIT_RE);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** Rewrite (or append) `LIMIT N` in a GAQL query. Preserves a trailing
+ *  PARAMETERS clause if present. */
+export function rewriteGaqlLimit(query: string, newLimit: number): string {
+  const trimmed = query.trim();
+  if (GAQL_LIMIT_RE.test(trimmed)) {
+    return trimmed.replace(GAQL_LIMIT_RE, `LIMIT ${newLimit}`);
+  }
+  const paramIdx = trimmed.search(/\bPARAMETERS\b/i);
+  if (paramIdx !== -1) {
+    return `${trimmed.slice(0, paramIdx).trimEnd()} LIMIT ${newLimit} ${trimmed.slice(paramIdx)}`;
+  }
+  return `${trimmed} LIMIT ${newLimit}`;
+}
+
+/** Parse `SELECT a, b, c FROM ...` into ["a", "b", "c"]. */
+export function extractSelectFields(query: string): string[] {
+  const m = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i);
+  if (!m) return [];
+  return m[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function getNestedValue(row: any, fieldPath: string): unknown {
+  const parts = fieldPath.split(".");
+  let v: any = row;
+  for (const p of parts) {
+    if (v == null) return null;
+    v = v[p];
+  }
+  return v ?? null;
+}
+
+function toFiniteNumber(v: unknown): number | null {
+  if (v == null) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+const COST_MICROS_RE = /metrics\.cost_micros$/i;
+
+type GaqlSummary = {
+  computedOverRowCount: number;
+  sums: Record<string, number>;
+  topByCost?: unknown[];
+  bottomByCost?: unknown[];
+};
+
+const ORDER_BY_COST_RE = /\bORDER\s+BY\s+metrics\.cost_micros\b/i;
+
+/** Aggregate numeric metric columns across the full fetched row set so callers
+ *  can make decisions without reading every row.
+ *  Skips top/bottom-by-cost when the query already orders by cost — in that
+ *  case the rows slice IS the top and "bottom" would just mean "rank ≈ limit",
+ *  not actual low-spenders in the population. */
+export function buildGaqlSummary(
+  rows: any[],
+  selectFields: string[],
+  query: string = "",
+): GaqlSummary | null {
+  if (rows.length === 0) return null;
+  const metricFields = selectFields.filter((f) => /^metrics\./i.test(f));
+  if (metricFields.length === 0) return null;
+
+  const sums: Record<string, number> = {};
+  for (const field of metricFields) {
+    let sum = 0;
+    let hasAny = false;
+    for (const row of rows) {
+      const n = toFiniteNumber(getNestedValue(row, field));
+      if (n != null) {
+        sum += n;
+        hasAny = true;
+      }
+    }
+    if (hasAny) sums[field] = sum;
+  }
+
+  const summary: GaqlSummary = { computedOverRowCount: rows.length, sums };
+
+  const costField = metricFields.find((f) => COST_MICROS_RE.test(f));
+  const alreadyOrderedByCost = ORDER_BY_COST_RE.test(query);
+  if (costField && rows.length > 1 && !alreadyOrderedByCost) {
+    const sorted = [...rows].sort((a, b) => {
+      const av = toFiniteNumber(getNestedValue(a, costField)) ?? 0;
+      const bv = toFiniteNumber(getNestedValue(b, costField)) ?? 0;
+      return bv - av;
+    });
+    const sliceSize = Math.min(5, Math.floor(sorted.length / 2));
+    if (sliceSize > 0) {
+      summary.topByCost = sorted.slice(0, sliceSize);
+      summary.bottomByCost = sorted.slice(-sliceSize).reverse();
+    }
+  }
+
+  return summary;
+}
+
+/** Suggest follow-up actions when a query is truncated. Both flags can be true
+ *  when byte-budget trimming kicks in on top of an already row-truncated set —
+ *  the hint reflects both conditions so the agent sees the full picture. */
+export function buildContinuationHint(
+  query: string,
+  returnedRowCount: number,
+  effectiveLimit: number,
+  flags: { rowTruncated: boolean; byteTruncated: boolean },
+): string {
+  const { rowTruncated, byteTruncated } = flags;
+  const suggestions: string[] = [];
+  if (!/\bsegments\.date\b/i.test(query)) {
+    suggestions.push("add a date filter (e.g. `WHERE segments.date DURING LAST_7_DAYS`)");
+  }
+  if (!/\bcampaign\.id\s*(?:IN\s*\(|=)/i.test(query)) {
+    suggestions.push("filter to specific campaigns (`WHERE campaign.id IN (...)`)");
+  }
+  if (rowTruncated && effectiveLimit < MAX_GAQL_LIMIT) {
+    suggestions.push(`raise \`limit\` up to ${MAX_GAQL_LIMIT}`);
+  }
+  if (byteTruncated) {
+    suggestions.push("select fewer columns to shrink row size");
+  }
+  const causes: string[] = [];
+  if (rowTruncated) causes.push(`hit row limit of ${effectiveLimit}`);
+  if (byteTruncated) causes.push(`exceeded byte budget (trimmed to ${returnedRowCount} rows)`);
+  const cause = causes.length > 0
+    ? `Truncated: ${causes.join(" and ")}.`
+    : "Truncated.";
+  const tail = suggestions.length > 0
+    ? ` To see more: ${suggestions.join("; ")}.`
+    : "";
+  return `${cause}${tail}`;
+}
+
+export type GaqlReport = {
+  rowCount: number;
+  requestedLimit: number;
+  fetchedRowCount: number;
+  truncated: boolean;
+  truncationReason: "row_limit" | "byte_budget" | null;
+  summary?: GaqlSummary;
+  continuationHint?: string;
+  rows: unknown[];
+};
+
+export async function runSafeGaqlReport(
+  auth: AuthContext,
+  rawQuery: string,
+  limit: number = DEFAULT_GAQL_LIMIT,
+): Promise<GaqlReport> {
   const query = rawQuery.trim();
   const normalized = query.toUpperCase();
 
@@ -1079,13 +1241,83 @@ export async function runSafeGaqlReport(auth: AuthContext, rawQuery: string) {
     throw new Error("The query contains forbidden keywords.");
   }
 
+  // Resolve effective limit: an explicit GAQL `LIMIT N` wins over the param
+  // (users who wrote it meant it), but both are capped at MAX_GAQL_LIMIT.
+  const paramLimit = Math.min(Math.max(1, Math.floor(limit)), MAX_GAQL_LIMIT);
+  const gaqlLimit = extractGaqlLimit(query);
+  const effectiveLimit = gaqlLimit != null
+    ? Math.min(gaqlLimit, MAX_GAQL_LIMIT)
+    : paramLimit;
+
+  // Fetch one extra row so we can honestly detect `hasMore` without a second
+  // round trip. Even when the user wrote an explicit `LIMIT N`, we probe with
+  // N+1 — they still get N rows back, plus an honest `truncated` signal telling
+  // them more exist. Bounded at MAX_GAQL_LIMIT + 1 regardless.
+  const probeLimit = Math.min(effectiveLimit + 1, MAX_GAQL_LIMIT + 1);
+  const queryToRun = rewriteGaqlLimit(query, probeLimit);
+
+  let fetched: any[];
   try {
     const customer = getCachedCustomer(auth);
-    const rows = await customer.query(query);
-    return { rowCount: rows.length, rows: rows.slice(0, 50) };
+    fetched = (await customer.query(queryToRun)) as any[];
   } catch (error) {
     throw new Error(`GAQL query failed: ${extractErrorMessage(error)}`);
   }
+
+  const rowTruncated = fetched.length > effectiveLimit;
+  let rows: any[] = rowTruncated ? fetched.slice(0, effectiveLimit) : fetched;
+  const selectFields = extractSelectFields(query);
+
+  // Summary is stable across byte-budget iterations (computed over `fetched`,
+  // which doesn't change). Lazy-cache so it's built at most once, regardless
+  // of which truncation source fires.
+  let cachedSummary: GaqlSummary | null | undefined;
+  const getSummary = () => {
+    if (cachedSummary === undefined) {
+      cachedSummary = buildGaqlSummary(fetched, selectFields, query);
+    }
+    return cachedSummary;
+  };
+
+  const buildResponse = (rowsOut: any[], byteTruncated: boolean): GaqlReport => {
+    const truncated = rowTruncated || byteTruncated;
+    const reason: GaqlReport["truncationReason"] = byteTruncated
+      ? "byte_budget"
+      : rowTruncated
+      ? "row_limit"
+      : null;
+    const summary = truncated ? getSummary() : null;
+    const hint = truncated
+      ? buildContinuationHint(query, rowsOut.length, effectiveLimit, {
+          rowTruncated,
+          byteTruncated,
+        })
+      : null;
+    return {
+      rowCount: rowsOut.length,
+      requestedLimit: effectiveLimit,
+      fetchedRowCount: fetched.length,
+      truncated,
+      truncationReason: reason,
+      ...(summary ? { summary } : {}),
+      ...(hint ? { continuationHint: hint } : {}),
+      rows: rowsOut,
+    };
+  };
+
+  let response = buildResponse(rows, false);
+  let size = Buffer.byteLength(JSON.stringify(response));
+
+  // Shrink rows geometrically until the response fits the byte budget. Summary
+  // remains intact so callers keep decision-grade aggregates even when the raw
+  // row set had to be trimmed.
+  while (size > GAQL_BYTE_BUDGET && rows.length > 1) {
+    rows = rows.slice(0, Math.max(1, Math.floor(rows.length / 2)));
+    response = buildResponse(rows, true);
+    size = Buffer.byteLength(JSON.stringify(response));
+  }
+
+  return response;
 }
 
 // ─── Resource Metadata (Field Discovery) ────────────────────────────
