@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AuthContext } from "@/lib/google-ads";
 import { registerReadTools } from "./read-tools";
 import { registerWriteTools } from "./write-tools";
+import { withMcpTelemetry } from "./telemetry";
 
 /**
  * A tool collected from the MCP registrars in a portable shape.
@@ -55,6 +56,7 @@ class ToolCollector {
  */
 export function collectAdsTools(currentAuth: () => AuthContext): CollectedTool[] {
   const collector = new ToolCollector();
+  withMcpTelemetry(collector);
   registerReadTools(collector as unknown as McpServer, currentAuth);
   registerWriteTools(collector as unknown as McpServer, currentAuth);
   return collector.tools;

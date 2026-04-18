@@ -45,6 +45,8 @@ export type AuthContext = {
   authMethod?: string | null;
   /** User-Agent header from the HTTP request. */
   userAgent?: string | null;
+  /** mcp_sessions.id for MCP paths. Null for chat/agent paths. */
+  sessionId?: number | null;
 };
 
 /**

@@ -1262,7 +1262,14 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     if (undoResult.success) {
       await markRolledBack(changeId);
-      await logChange(targetId, auth.userId, change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${change.toolName})`, auth.clientName);
+      await logChange({
+        accountId: targetId,
+        userId: auth.userId,
+        campaignId: change.campaignId ?? null,
+        writeResult: undoResult,
+        reasoning: `Undo of change #${changeId} (${change.toolName})`,
+        clientSource: auth.clientName,
+      });
     }
 
     return jsonResult({

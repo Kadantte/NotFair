@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -424,16 +424,28 @@ export default function DevPage() {
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
                         <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
                     </div>
-                    <Button
-                        onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false, usageSource); fetchContacts(false); fetchCustomers(false); }}
-                        disabled={loading}
-                        variant="outline"
-                        size="sm"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 shrink-0"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        <span className="hidden sm:inline">Refresh</span>
-                    </Button>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Link href="/dev/telemetry" prefetch>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5"
+                            >
+                                <Activity className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Telemetry</span>
+                            </Button>
+                        </Link>
+                        <Button
+                            onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false, usageSource); fetchContacts(false); fetchCustomers(false); }}
+                            disabled={loading}
+                            variant="outline"
+                            size="sm"
+                            className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">Refresh</span>
+                        </Button>
+                    </div>
                 </div>
                 <div className="flex gap-0 px-4 sm:px-6 border-t border-[#3D3C36]/50">
                     {(['customers', 'usage', 'outreach'] as const).map((tab) => (

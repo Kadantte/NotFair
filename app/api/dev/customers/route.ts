@@ -1,24 +1,12 @@
-import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { sql, desc, inArray, isNotNull } from "drizzle-orm";
-import { DEV_EMAILS } from "@/lib/dev-access";
+import { requireDevEmail } from "@/lib/dev-access";
 import { parseCustomerIds } from "@/lib/google-ads";
 import { isGmailConfigured, listDraftRecipientEmails } from "@/lib/gmail";
 
 export async function GET() {
-  let googleEmail: string | null = null;
-  try {
-    const ctx = await getAuthContext();
-    googleEmail = ctx.auth.realGoogleEmail ?? ctx.session.googleEmail;
-  } catch (err) {
-    if (err instanceof Error && err.message === "Not authenticated") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-    return Response.json({ error: "Internal server error" }, { status: 500 });
-  }
-  if (!googleEmail || !DEV_EMAILS.includes(googleEmail)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await requireDevEmail();
+  if (denied) return denied;
 
   // Get unique customers from mcp_sessions
   const customers = await db()

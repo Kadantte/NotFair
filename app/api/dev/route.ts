@@ -1,22 +1,10 @@
-import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { sql, desc } from "drizzle-orm";
-import { DEV_EMAILS } from "@/lib/dev-access";
+import { requireDevEmail } from "@/lib/dev-access";
 
 export async function GET(request: Request) {
-  let googleEmail: string | null = null;
-  try {
-    const ctx = await getAuthContext();
-    googleEmail = ctx.auth.realGoogleEmail ?? ctx.session.googleEmail;
-  } catch (err) {
-    if (err instanceof Error && err.message === "Not authenticated") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-    return Response.json({ error: "Internal server error" }, { status: 500 });
-  }
-  if (!googleEmail || !DEV_EMAILS.includes(googleEmail)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await requireDevEmail();
+  if (denied) return denied;
 
   const url = new URL(request.url);
   const tz = url.searchParams.get("tz") || "America/Los_Angeles";

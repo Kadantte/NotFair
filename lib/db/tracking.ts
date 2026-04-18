@@ -84,21 +84,77 @@ function getEntityCode(action: string): number {
   return ENTITY_CODE.unknown;
 }
 
+// ─── Per-call telemetry (captured at the MCP boundary) ─────────────
+
+export const ERROR_CLASS = {
+  THROWN: "THROWN",
+  RATE_LIMIT: "RATE_LIMIT",
+  WRITE_REJECTED: "WRITE_REJECTED",
+  LOGGING: "LOGGING",
+} as const;
+
+export type ErrorClass = (typeof ERROR_CLASS)[keyof typeof ERROR_CLASS];
+
+export type CallTelemetry = {
+  sessionId?: number | null;
+  requestId?: string | null;
+  /** Raw camelCase MCP tool name (e.g. "listCampaigns"). */
+  toolName?: string | null;
+  /** Already-redacted args object (see lib/db/redact.ts). */
+  args?: unknown;
+  argsSha256?: string | null;
+  latencyMs?: number | null;
+  bytesOut?: number | null;
+  errorClass?: ErrorClass | null;
+};
+
+/**
+ * Resolve a human-readable action label from an operations row. Prefers the
+ * raw `tool_name` (populated for every new row) and falls back to the legacy
+ * `tool_code` map for rows written before the telemetry migration.
+ */
+export function resolveToolLabel(row: {
+  toolName: string | null;
+  toolCode: number | null;
+}): string {
+  if (row.toolName) return row.toolName;
+  if (row.toolCode != null && CODE_TO_TOOL[row.toolCode]) return CODE_TO_TOOL[row.toolCode];
+  return `unknown_${row.toolCode ?? "null"}`;
+}
+
+function telemetryColumns(
+  telemetry: CallTelemetry | undefined,
+  toolNameFallback: string,
+) {
+  return {
+    sessionId: telemetry?.sessionId ?? null,
+    requestId: telemetry?.requestId ?? null,
+    toolName: telemetry?.toolName ?? toolNameFallback,
+    args: (telemetry?.args as object | null) ?? null,
+    argsSha256: telemetry?.argsSha256 ?? null,
+    latencyMs: telemetry?.latencyMs ?? null,
+    bytesOut: telemetry?.bytesOut ?? null,
+  };
+}
+
 // ─── Write Logging ──────────────────────────────────────────────────
 
-export async function logChange(
-  accountId: string,
-  userId: string | null | undefined,
-  campaignId: string | null,
-  writeResult: WriteResult,
-  reasoning?: string,
-  clientSource?: string | null,
-) {
+export type LogChangeOpts = {
+  accountId: string;
+  userId: string | null | undefined;
+  campaignId: string | null;
+  writeResult: WriteResult;
+  reasoning?: string;
+  clientSource?: string | null;
+  telemetry?: CallTelemetry;
+};
+
+export async function logChange(opts: LogChangeOpts) {
+  const { accountId, userId, campaignId, writeResult, reasoning, clientSource, telemetry } = opts;
   try {
-    const code = toolNameToCode(writeResult.action);
-    if (code === undefined) {
-      console.error(`[tracking] Unknown tool name: ${writeResult.action}`);
-      return null;
+    const code = toolNameToCode(writeResult.action) ?? null;
+    if (code === null) {
+      console.warn(`[tracking] Unmapped tool name (logged with null tool_code): ${writeResult.action}`);
     }
 
     const [inserted] = await db()
@@ -118,12 +174,15 @@ export async function logChange(
         clientSource: clientSource ?? null,
         success: writeResult.success ? 1 : 0,
         errorMessage: writeResult.success ? null : writeResult.error ?? null,
+        errorClass:
+          telemetry?.errorClass ??
+          (writeResult.success ? null : ERROR_CLASS.WRITE_REJECTED),
+        ...telemetryColumns(telemetry, writeResult.action),
       })
       .returning();
 
     return inserted;
   } catch (error) {
-    // CRITICAL: Log error but don't throw — the write operation already succeeded
     console.error("[tracking] Failed to log change:", error);
     return null;
   }
@@ -131,16 +190,19 @@ export async function logChange(
 
 // ─── Read Logging ───────────────────────────────────────────────────
 
-export async function logRead(
-  accountId: string,
-  userId: string | null | undefined,
-  toolName: string,
-  campaignId?: string | null,
-  clientSource?: string | null,
-) {
+export type LogReadOpts = {
+  accountId: string;
+  userId: string | null | undefined;
+  toolName: string;
+  campaignId?: string | null;
+  clientSource?: string | null;
+  telemetry?: CallTelemetry;
+};
+
+export async function logRead(opts: LogReadOpts) {
+  const { accountId, userId, toolName, campaignId, clientSource, telemetry } = opts;
   try {
-    const code = toolNameToCode(toolName);
-    if (code === undefined) return;
+    const code = toolNameToCode(toolName) ?? null;
 
     await db()
       .insert(schema.operations)
@@ -151,9 +213,12 @@ export async function logRead(
         opType: OP_TYPE.READ,
         toolCode: code,
         clientSource: clientSource ?? null,
+        errorClass: telemetry?.errorClass ?? null,
+        // Read "success" mirrors existing semantics: 1 = happy path, 0 = threw.
+        success: telemetry?.errorClass ? 0 : 1,
+        ...telemetryColumns(telemetry, toolName),
       });
   } catch (error) {
-    // Never block read operations for logging failures
     console.error("[tracking] Failed to log read:", error);
   }
 }
@@ -194,7 +259,7 @@ export async function getChanges(
   return {
     items: rows.map((row) => ({
       id: row.id,
-      action: CODE_TO_TOOL[row.toolCode] ?? `unknown_${row.toolCode}`,
+      action: resolveToolLabel(row),
       entityType: CODE_TO_ENTITY[row.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
       entityId: row.entityId ?? "",
       label: row.label ?? null,
@@ -282,7 +347,7 @@ export async function getImpact(
   return {
     change: {
       id: change.id,
-      action: CODE_TO_TOOL[change.toolCode] ?? `unknown_${change.toolCode}`,
+      action: resolveToolLabel(change),
       entityId: change.entityId,
       timestamp: change.createdAt,
     },
@@ -365,11 +430,12 @@ export async function getUndoableChange(accountId: string, changeId: number) {
     return { error: `Change is ${Math.floor(ageDays)} days old. Undo window is ${UNDO_WINDOW_DAYS} days.` };
   }
 
-  // Check reversibility
-  const toolName = CODE_TO_TOOL[change.toolCode];
-  if (REVERSIBLE_ACTIONS[change.toolCode] === undefined) {
-    return { error: `Action "${toolName}" is not reversible` };
+  // Undo only operates on mapped tool_codes; unmapped new tools gain undo
+  // support when added to REVERSIBLE_ACTIONS.
+  if (change.toolCode == null || REVERSIBLE_ACTIONS[change.toolCode] === undefined) {
+    return { error: `Action "${resolveToolLabel(change)}" is not reversible` };
   }
+  const toolName = CODE_TO_TOOL[change.toolCode];
 
   // Check if entity was modified after this change (stale undo guard) — only successful
   // writes count as modifications.

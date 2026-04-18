@@ -45,8 +45,9 @@ export const operations = pgTable("operations", {
   campaignId: text("campaign_id"),
   /** 0=read, 1=write — see OP_TYPE in tracking.ts */
   opType: smallint("op_type").notNull(),
-  /** Compact tool code — see TOOL_CODE in tracking.ts */
-  toolCode: smallint("tool_code").notNull(),
+  /** Compact tool code — see TOOL_CODE in tracking.ts. Nullable for tools
+   * not yet mapped — we still record tool_name so analytics don't lose rows. */
+  toolCode: smallint("tool_code"),
   /** Compact entity type — see ENTITY_CODE in tracking.ts */
   entityCode: smallint("entity_code"),
   entityId: text("entity_id"),
@@ -67,11 +68,30 @@ export const operations = pgTable("operations", {
   errorMessage: text("error_message"),
   /** Raw MCP clientInfo.name — e.g. "claude-code", "claude-desktop". Null for chat/agent. */
   clientSource: text("client_source"),
+  /** FK-ish to mcp_sessions.id. Null for chat/agent paths. */
+  sessionId: integer("session_id"),
+  /** UUID shared by a tool call and any sub-calls it fans out (e.g. audit). */
+  requestId: text("request_id"),
+  /** Raw camelCase MCP tool name. Works for tools not in TOOL_CODE. */
+  toolName: text("tool_name"),
+  /** Redacted + truncated args (jsonb). Null if not captured. */
+  args: jsonb("args"),
+  /** SHA-256 hex of canonicalized args — groups identical call shapes. */
+  argsSha256: text("args_sha256"),
+  /** Wall-clock duration of the underlying fn() call in ms. */
+  latencyMs: integer("latency_ms"),
+  /** UTF-8 byte length of the JSON-serialized result. */
+  bytesOut: integer("bytes_out"),
+  /** Coarse failure bucket — RATE_LIMIT, THROWN, WRITE_REJECTED, etc. */
+  errorClass: text("error_class"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("ops_account_created_idx").on(table.accountId, table.createdAt),
   index("ops_account_type_idx").on(table.accountId, table.opType, table.createdAt),
   index("ops_user_created_idx").on(table.userId, table.createdAt),
+  index("ops_session_created_idx").on(table.sessionId, table.createdAt),
+  index("ops_tool_name_created_idx").on(table.toolName, table.createdAt),
+  index("ops_args_sha_idx").on(table.argsSha256),
 ]);
 
 // ─── Performance Snapshots ───────────────────────────────────────────

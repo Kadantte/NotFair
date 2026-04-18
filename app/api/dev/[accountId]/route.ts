@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { sql, desc, eq, and } from "drizzle-orm";
-import { OP_TYPE, CODE_TO_TOOL, CODE_TO_ENTITY, ENTITY_CODE } from "@/lib/db/tracking";
+import { OP_TYPE, CODE_TO_ENTITY, ENTITY_CODE, resolveToolLabel } from "@/lib/db/tracking";
 
 export async function GET(
   request: Request,
@@ -123,7 +123,7 @@ export async function GET(
     recentOperations: recentOps.map((op) => ({
       id: op.id,
       opType: op.opType === OP_TYPE.WRITE ? "write" : "read",
-      action: CODE_TO_TOOL[op.toolCode] ?? `unknown_${op.toolCode}`,
+      action: resolveToolLabel(op),
       entityType: CODE_TO_ENTITY[op.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
       entityId: op.entityId ?? "",
       campaignId: op.campaignId,

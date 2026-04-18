@@ -11,12 +11,12 @@ import { eq, and, gte } from "drizzle-orm";
 import { registerReadTools, registerWriteTools } from "@/lib/mcp";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { jsonResult } from "@/lib/mcp/types";
+import { withMcpTelemetry } from "@/lib/mcp/telemetry";
 
 // ─── Per-request auth via AsyncLocalStorage ──────────────────────────
 
 type AuthContextWithSession = AuthContext & {
   sessionToken?: string;
-  sessionId?: number;
   clientName?: string | null;
   clientVersion?: string | null;
   /** "oauth" (Claude Connector) or "direct" (Bearer token) */
@@ -112,6 +112,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
 
 const mcpHandler = createMcpHandler(
   (server) => {
+    withMcpTelemetry(server);
     registerReadTools(server, currentAuth);
     registerWriteTools(server, currentAuth);
 

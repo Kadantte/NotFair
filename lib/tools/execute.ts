@@ -1,8 +1,10 @@
-import { logChange, logRead } from "@/lib/db/tracking";
+import { logChange, logRead, ERROR_CLASS, type CallTelemetry, type ErrorClass } from "@/lib/db/tracking";
 import { invalidateCache } from "@/lib/google-ads";
 import type { WriteResult } from "@/lib/google-ads";
-import { enforceRateLimit, recordOperation } from "@/lib/mcp/rate-limit";
+import { enforceRateLimit, recordOperation, RateLimitError } from "@/lib/mcp/rate-limit";
 import { trackServerEvent } from "@/lib/analytics-server";
+import { getTelemetry, type ToolCallTelemetry } from "@/lib/mcp/telemetry";
+import { redactAndTruncate, sha256Hex, byteLengthOf } from "@/lib/db/redact";
 
 /**
  * Minimal auth needed for tool execution: refresh token, customer ID, and user ID.
@@ -18,7 +20,34 @@ export type ToolAuth = {
   authMethod?: string | null;
   /** User-Agent header from the HTTP request (usually mcp-remote's UA, not the end client) */
   userAgent?: string | null;
+  /** mcp_sessions.id for MCP paths. Null for chat/agent paths. */
+  sessionId?: number | null;
 };
+
+/**
+ * Snapshot the telemetry context while we're still inside the AsyncLocalStorage
+ * frame. Deferred work reads from this snapshot instead of calling
+ * `getTelemetry()` after we've fire-and-forgot the logging step.
+ */
+function buildTelemetry(
+  ctx: ToolCallTelemetry | undefined,
+  auth: ToolAuth,
+  latencyMs: number,
+  bytesOut: number | null,
+  errorClass: ErrorClass | null,
+): CallTelemetry {
+  const redactedArgs = ctx ? redactAndTruncate(ctx.args) : null;
+  return {
+    sessionId: auth.sessionId ?? null,
+    requestId: ctx?.requestId ?? null,
+    toolName: ctx?.toolName ?? null,
+    args: redactedArgs,
+    argsSha256: redactedArgs == null ? null : sha256Hex(redactedArgs),
+    latencyMs,
+    bytesOut,
+    errorClass,
+  };
+}
 
 /**
  * Execute a write operation with rate limiting, cache invalidation, and change logging.
@@ -34,15 +63,48 @@ export async function execWrite(
   reasoning?: string,
 ): Promise<WriteResult & { changeId: number | null }> {
   await enforceRateLimit(auth.userId);
-  const result = await fn();
+  const ctx = getTelemetry();
+  const t0 = performance.now();
+  let result: WriteResult;
+  try {
+    result = await fn();
+  } catch (error) {
+    // Network/runtime throws propagate uncounted — the user's quota shouldn't
+    // charge for infra failures — but we still log a telemetry row so the
+    // admin dashboard sees the outage.
+    const latencyMs = Math.round(performance.now() - t0);
+    if (ctx?.toolName) {
+      void logRead({
+        accountId,
+        userId: auth.userId,
+        toolName: ctx.toolName,
+        campaignId,
+        clientSource: auth.clientName,
+        telemetry: buildTelemetry(ctx, auth, latencyMs, 0, ERROR_CLASS.THROWN),
+      });
+    }
+    throw error;
+  }
 
-  // Log + count every returned WriteResult, success or failure. Rationale: Google counts every
-  // attempted mutate op toward its quota, and we err on the side of over-counting so the user's
-  // daily limit can't be under-reported. Pre-validation rejections count too — trivial over-count
-  // vs Google but simpler and safer than tracking per-call reached-api state. Throws from fn()
-  // still propagate uncounted (network outages shouldn't charge the user).
   if (result.success) invalidateCache(accountId);
-  const change = await logChange(accountId, auth.userId, campaignId, result, reasoning, auth.clientName);
+  const latencyMs = Math.round(performance.now() - t0);
+  const bytesOut = byteLengthOf(result);
+  const telemetry = buildTelemetry(
+    ctx,
+    auth,
+    latencyMs,
+    bytesOut,
+    result.success ? null : ERROR_CLASS.WRITE_REJECTED,
+  );
+  const change = await logChange({
+    accountId,
+    userId: auth.userId,
+    campaignId,
+    writeResult: result,
+    reasoning,
+    clientSource: auth.clientName,
+    telemetry,
+  });
   recordOperation(auth.userId);
   trackServerEvent(auth.userId, result.success ? "ai_change_executed" : "ai_change_failed", {
     tool_name: result.action,
@@ -56,6 +118,7 @@ export async function execWrite(
     client_version: auth.clientVersion ?? null,
     auth_method: auth.authMethod ?? null,
     user_agent: auth.userAgent ?? null,
+    latency_ms: latencyMs,
   });
   return { ...result, changeId: change?.id ?? null };
 }
@@ -71,18 +134,67 @@ export async function execRead<T>(
   fn: () => Promise<T>,
   campaignId?: string | null,
 ): Promise<T> {
-  await enforceRateLimit(auth.userId);
-  const result = await fn();
-  void logRead(accountId, auth.userId, toolName, campaignId, auth.clientName);
-  recordOperation(auth.userId);
-  trackServerEvent(auth.userId, "ai_read_executed", {
-    tool_name: toolName,
-    account_id: accountId,
-    campaign_id: campaignId ?? null,
-    client_name: auth.clientName ?? null,
-    client_version: auth.clientVersion ?? null,
-    auth_method: auth.authMethod ?? null,
-    user_agent: auth.userAgent ?? null,
+  const ctx = getTelemetry();
+  try {
+    await enforceRateLimit(auth.userId);
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      void logRead({
+        accountId,
+        userId: auth.userId,
+        toolName,
+        campaignId,
+        clientSource: auth.clientName,
+        telemetry: buildTelemetry(ctx, auth, 0, null, ERROR_CLASS.RATE_LIMIT),
+      });
+    }
+    throw error;
+  }
+  const t0 = performance.now();
+  let result: T;
+  try {
+    result = await fn();
+  } catch (error) {
+    const latencyMs = Math.round(performance.now() - t0);
+    void logRead({
+      accountId,
+      userId: auth.userId,
+      toolName,
+      campaignId,
+      clientSource: auth.clientName,
+      telemetry: buildTelemetry(ctx, auth, latencyMs, 0, ERROR_CLASS.THROWN),
+    });
+    throw error;
+  }
+  const latencyMs = Math.round(performance.now() - t0);
+  // Defer redact + hash + JSON-stringify off the caller's critical path. The
+  // await'd promise has already resolved with `result`; the deferred work
+  // runs before Node returns to the event loop but after the caller receives
+  // the value — so large GAQL results don't pay the serialization cost on
+  // the hot path.
+  queueMicrotask(() => {
+    const bytesOut = byteLengthOf(result);
+    const telemetry = buildTelemetry(ctx, auth, latencyMs, bytesOut, null);
+    void logRead({
+      accountId,
+      userId: auth.userId,
+      toolName,
+      campaignId,
+      clientSource: auth.clientName,
+      telemetry,
+    });
+    trackServerEvent(auth.userId, "ai_read_executed", {
+      tool_name: toolName,
+      account_id: accountId,
+      campaign_id: campaignId ?? null,
+      client_name: auth.clientName ?? null,
+      client_version: auth.clientVersion ?? null,
+      auth_method: auth.authMethod ?? null,
+      user_agent: auth.userAgent ?? null,
+      latency_ms: latencyMs,
+      bytes_out: bytesOut,
+    });
   });
+  recordOperation(auth.userId);
   return result;
 }

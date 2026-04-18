@@ -368,7 +368,7 @@ export async function addNegativesAction(campaignId: string, terms: string[]) {
     for (const term of terms) {
       const result = await addNegativeKeyword(auth, campaignId, term);
       if (result.success) {
-        await logChange(session.customerId, session.userId, campaignId, result, `Added negative from dashboard: "${term}"`);
+        await logChange({ accountId: session.customerId, userId: session.userId, campaignId, writeResult: result, reasoning: `Added negative from dashboard: "${term}"` });
       }
       results.push({ term, success: result.success, error: result.error });
     }
@@ -388,7 +388,7 @@ export async function pauseKeywordAction(
 
     const result = await pauseKeyword(auth, campaignId, adGroupId, criterionId);
     if (result.success) {
-      await logChange(session.customerId, session.userId, campaignId, result, "Paused from dashboard issue card");
+      await logChange({ accountId: session.customerId, userId: session.userId, campaignId, writeResult: result, reasoning: "Paused from dashboard issue card" });
     }
     return result;
   });
@@ -400,7 +400,7 @@ export async function adjustBudgetAction(campaignId: string, newBudgetDollars: n
 
     const result = await updateCampaignBudget(auth, campaignId, toMicros(newBudgetDollars));
     if (result.success) {
-      await logChange(session.customerId, session.userId, campaignId, result, "Budget adjusted from dashboard opportunity card");
+      await logChange({ accountId: session.customerId, userId: session.userId, campaignId, writeResult: result, reasoning: "Budget adjusted from dashboard opportunity card" });
     }
     return result;
   });

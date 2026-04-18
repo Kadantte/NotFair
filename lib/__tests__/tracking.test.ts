@@ -34,19 +34,19 @@ describe("tracking userId propagation", () => {
   });
 
   it("writes userId on change logs", async () => {
-    await logChange(
-      "acct-1",
-      "user-1",
-      "camp-1",
-      {
+    await logChange({
+      accountId: "acct-1",
+      userId: "user-1",
+      campaignId: "camp-1",
+      writeResult: {
         success: true,
         action: "pause_campaign",
         entityId: "entity-1",
         beforeValue: "ENABLED",
         afterValue: "PAUSED",
       },
-      "reason",
-    );
+      reasoning: "reason",
+    });
 
     expect(insertMock).toHaveBeenCalledWith("operations");
     expect(valuesMock).toHaveBeenCalledWith(
@@ -59,7 +59,12 @@ describe("tracking userId propagation", () => {
   });
 
   it("writes userId on read logs", async () => {
-    await logRead("acct-1", "user-1", "list_campaigns", "camp-1");
+    await logRead({
+      accountId: "acct-1",
+      userId: "user-1",
+      toolName: "list_campaigns",
+      campaignId: "camp-1",
+    });
 
     expect(insertMock).toHaveBeenCalledWith("operations");
     expect(valuesMock).toHaveBeenCalledWith(
@@ -72,12 +77,17 @@ describe("tracking userId propagation", () => {
   });
 
   it("writes success=1 and no errorMessage for successful changes", async () => {
-    await logChange("acct-1", "user-1", "camp-1", {
-      success: true,
-      action: "pause_campaign",
-      entityId: "entity-1",
-      beforeValue: "ENABLED",
-      afterValue: "PAUSED",
+    await logChange({
+      accountId: "acct-1",
+      userId: "user-1",
+      campaignId: "camp-1",
+      writeResult: {
+        success: true,
+        action: "pause_campaign",
+        entityId: "entity-1",
+        beforeValue: "ENABLED",
+        afterValue: "PAUSED",
+      },
     });
 
     expect(valuesMock).toHaveBeenCalledWith(
@@ -86,13 +96,18 @@ describe("tracking userId propagation", () => {
   });
 
   it("writes success=0 and errorMessage for failed writes", async () => {
-    await logChange("acct-1", "user-1", "camp-1", {
-      success: false,
-      action: "pause_keyword",
-      entityId: "kw-1",
-      beforeValue: "ENABLED",
-      afterValue: "ENABLED",
-      error: "INVALID_ARGUMENT: criterion not found",
+    await logChange({
+      accountId: "acct-1",
+      userId: "user-1",
+      campaignId: "camp-1",
+      writeResult: {
+        success: false,
+        action: "pause_keyword",
+        entityId: "kw-1",
+        beforeValue: "ENABLED",
+        afterValue: "ENABLED",
+        error: "INVALID_ARGUMENT: criterion not found",
+      },
     });
 
     expect(valuesMock).toHaveBeenCalledWith(

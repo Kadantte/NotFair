@@ -1,0 +1,111 @@
+import { db, schema } from "@/lib/db";
+import { sql, desc, and, gte, isNotNull } from "drizzle-orm";
+import { requireDevEmail } from "@/lib/dev-access";
+
+/**
+ * Dev-gated telemetry endpoint. Returns aggregate views over the operations
+ * table that answer "how are users using AdsAgent?": top tools with p50/p95
+ * latency, top arg-shape buckets, a funnel of reads vs writes by day, and
+ * the last 50 raw calls with their args. Full args are gated to DEV_EMAILS
+ * so the payload never leaks outside the admin group.
+ */
+export async function GET(request: Request) {
+  const denied = await requireDevEmail();
+  if (denied) return denied;
+
+  const url = new URL(request.url);
+  const rawDays = parseInt(url.searchParams.get("days") || "7", 10);
+  const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 7;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const whereRecent = gte(schema.operations.createdAt, since);
+
+  const [topTools, topArgShapes, recentCalls, dailyCounts, errorBreakdown] = await Promise.all([
+    db()
+      .select({
+        toolName: schema.operations.toolName,
+        calls: sql<number>`count(*)::int`,
+        p50: sql<number>`coalesce(percentile_disc(0.5) within group (order by ${schema.operations.latencyMs}), 0)::int`,
+        p95: sql<number>`coalesce(percentile_disc(0.95) within group (order by ${schema.operations.latencyMs}), 0)::int`,
+        avgBytes: sql<number>`coalesce(avg(${schema.operations.bytesOut}), 0)::int`,
+        errors: sql<number>`sum(case when ${schema.operations.errorClass} is not null then 1 else 0 end)::int`,
+      })
+      .from(schema.operations)
+      .where(and(whereRecent, isNotNull(schema.operations.toolName)))
+      .groupBy(schema.operations.toolName)
+      .orderBy(desc(sql`count(*)`))
+      .limit(40),
+
+    // Grouped call counts per (tool_name, args_sha256). The sample args are
+    // fetched via a lateral subquery — `array_agg(... order by ...)[1]`
+    // materializes the entire partition into memory, which OOMs once popular
+    // arg shapes cross ~100K rows. The subquery with LIMIT 1 lets Postgres
+    // use the ops_args_sha_idx to seek straight to the most recent row.
+    db()
+      .select({
+        toolName: schema.operations.toolName,
+        argsSha256: schema.operations.argsSha256,
+        calls: sql<number>`count(*)::int`,
+        sampleArgs: sql<unknown>`(
+          SELECT o2.args FROM operations o2
+          WHERE o2.args_sha256 = ${schema.operations.argsSha256}
+          ORDER BY o2.created_at DESC
+          LIMIT 1
+        )`,
+      })
+      .from(schema.operations)
+      .where(and(whereRecent, isNotNull(schema.operations.argsSha256), isNotNull(schema.operations.toolName)))
+      .groupBy(schema.operations.toolName, schema.operations.argsSha256)
+      .orderBy(desc(sql`count(*)`))
+      .limit(30),
+
+    db()
+      .select({
+        id: schema.operations.id,
+        toolName: schema.operations.toolName,
+        userId: schema.operations.userId,
+        sessionId: schema.operations.sessionId,
+        clientSource: schema.operations.clientSource,
+        latencyMs: schema.operations.latencyMs,
+        bytesOut: schema.operations.bytesOut,
+        errorClass: schema.operations.errorClass,
+        opType: schema.operations.opType,
+        args: schema.operations.args,
+        createdAt: schema.operations.createdAt,
+      })
+      .from(schema.operations)
+      .where(whereRecent)
+      .orderBy(desc(schema.operations.createdAt))
+      .limit(50),
+
+    db()
+      .select({
+        day: sql<string>`to_char(date_trunc('day', ${schema.operations.createdAt}), 'YYYY-MM-DD')`,
+        reads: sql<number>`sum(case when ${schema.operations.opType} = 0 then 1 else 0 end)::int`,
+        writes: sql<number>`sum(case when ${schema.operations.opType} = 1 then 1 else 0 end)::int`,
+      })
+      .from(schema.operations)
+      .where(whereRecent)
+      .groupBy(sql`date_trunc('day', ${schema.operations.createdAt})`)
+      .orderBy(sql`date_trunc('day', ${schema.operations.createdAt})`),
+
+    db()
+      .select({
+        errorClass: schema.operations.errorClass,
+        calls: sql<number>`count(*)::int`,
+      })
+      .from(schema.operations)
+      .where(and(whereRecent, isNotNull(schema.operations.errorClass)))
+      .groupBy(schema.operations.errorClass)
+      .orderBy(desc(sql`count(*)`)),
+  ]);
+
+  return Response.json({
+    days,
+    topTools,
+    topArgShapes,
+    recentCalls,
+    dailyCounts,
+    errorBreakdown,
+  });
+}

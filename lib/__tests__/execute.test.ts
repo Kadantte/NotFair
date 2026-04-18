@@ -29,6 +29,12 @@ vi.mock("@/lib/mcp/rate-limit", async () => {
 vi.mock("@/lib/db/tracking", () => ({
   logChange: mockLogChange,
   logRead: mockLogRead,
+  ERROR_CLASS: {
+    THROWN: "THROWN",
+    RATE_LIMIT: "RATE_LIMIT",
+    WRITE_REJECTED: "WRITE_REJECTED",
+    LOGGING: "LOGGING",
+  },
 }));
 
 vi.mock("@/lib/google-ads", () => ({
@@ -70,30 +76,27 @@ describe("execWrite", () => {
 
     const result = await execWrite(auth, "acct-1", "camp-1", fn, "test reason");
 
-    // Rate limit checked first
     expect(mockEnforceRateLimit).toHaveBeenCalledWith("user-1");
-
-    // fn was called
     expect(fn).toHaveBeenCalled();
-
-    // Cache invalidated for the account
     expect(mockInvalidateCache).toHaveBeenCalledWith("acct-1");
-
-    // Change logged
-    expect(mockLogChange).toHaveBeenCalledWith(
-      "acct-1", "user-1", "camp-1", writeResult, "test reason", "test-client",
-    );
-
-    // Operation recorded for rate limiter
+    expect(mockLogChange).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: "acct-1",
+      userId: "user-1",
+      campaignId: "camp-1",
+      writeResult,
+      reasoning: "test reason",
+      clientSource: "test-client",
+      telemetry: expect.objectContaining({
+        errorClass: null,
+        latencyMs: expect.any(Number),
+        bytesOut: expect.any(Number),
+      }),
+    }));
     expect(mockRecordOperation).toHaveBeenCalledWith("user-1");
-
-    // Analytics tracked
     expect(mockTrackServerEvent).toHaveBeenCalledWith(
       "user-1", "ai_change_executed",
       expect.objectContaining({ tool_name: "pause_campaign", account_id: "acct-1" }),
     );
-
-    // Returns result with changeId
     expect(result.success).toBe(true);
     expect(result.changeId).toBe(42);
   });
@@ -116,9 +119,12 @@ describe("execWrite", () => {
     // Cache NOT invalidated — nothing actually changed.
     expect(mockInvalidateCache).not.toHaveBeenCalled();
     // But operation IS logged and counted — err on the side of overcount vs Google's quota.
-    expect(mockLogChange).toHaveBeenCalledWith(
-      "acct-1", "user-1", "camp-1", failResult, undefined, "test-client",
-    );
+    expect(mockLogChange).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: "acct-1",
+      writeResult: failResult,
+      clientSource: "test-client",
+      telemetry: expect.objectContaining({ errorClass: "WRITE_REJECTED" }),
+    }));
     expect(mockRecordOperation).toHaveBeenCalledWith("user-1");
     expect(mockTrackServerEvent).toHaveBeenCalledWith(
       "user-1", "ai_change_failed",
@@ -132,7 +138,7 @@ describe("execWrite", () => {
     expect(result.changeId).toBe(42);
   });
 
-  it("throws from fn() propagate without logging or counting", async () => {
+  it("throws from fn() propagate without counting; THROWN telemetry only when wrapped by a telemetry context", async () => {
     const fn = vi.fn().mockRejectedValue(new Error("network dropped"));
 
     await expect(execWrite(auth, "acct-1", "camp-1", fn)).rejects.toThrow("network dropped");
@@ -190,20 +196,23 @@ describe("execRead", () => {
     // fn was called
     expect(fn).toHaveBeenCalled();
 
-    // Read logged (fire-and-forget, but still called)
-    expect(mockLogRead).toHaveBeenCalledWith("acct-1", "user-1", "list_campaigns", "camp-1", "test-client");
+    expect(result).toEqual(data);
+    // Logging + analytics are deferred to a microtask; flush before asserting.
+    await new Promise<void>((r) => queueMicrotask(() => r()));
 
-    // Operation recorded
+    expect(mockLogRead).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: "acct-1",
+      userId: "user-1",
+      toolName: "list_campaigns",
+      campaignId: "camp-1",
+      clientSource: "test-client",
+      telemetry: expect.objectContaining({ errorClass: null, latencyMs: expect.any(Number) }),
+    }));
     expect(mockRecordOperation).toHaveBeenCalledWith("user-1");
-
-    // Analytics tracked
     expect(mockTrackServerEvent).toHaveBeenCalledWith(
       "user-1", "ai_read_executed",
       expect.objectContaining({ tool_name: "list_campaigns", account_id: "acct-1" }),
     );
-
-    // Returns raw result
-    expect(result).toEqual(data);
   });
 
   it("rate limit exceeded: throws before calling fn", async () => {
@@ -213,7 +222,13 @@ describe("execRead", () => {
     await expect(execRead(auth, "acct-1", "list_campaigns", fn)).rejects.toThrow(RateLimitError);
 
     expect(fn).not.toHaveBeenCalled();
-    expect(mockLogRead).not.toHaveBeenCalled();
+    // Rate-limit rejections log a RATE_LIMIT telemetry row so the admin
+    // dashboard can surface "users hitting the cap" as a signal.
+    expect(mockLogRead).toHaveBeenCalledWith(expect.objectContaining({
+      toolName: "list_campaigns",
+      clientSource: "test-client",
+      telemetry: expect.objectContaining({ errorClass: "RATE_LIMIT" }),
+    }));
   });
 
   it("works without campaignId", async () => {
@@ -222,6 +237,11 @@ describe("execRead", () => {
     const result = await execRead(auth, "acct-1", "get_account_info", fn);
 
     expect(result).toEqual({ info: "test" });
-    expect(mockLogRead).toHaveBeenCalledWith("acct-1", "user-1", "get_account_info", undefined, "test-client");
+    await new Promise<void>((r) => queueMicrotask(() => r()));
+    expect(mockLogRead).toHaveBeenCalledWith(expect.objectContaining({
+      toolName: "get_account_info",
+      campaignId: undefined,
+      telemetry: expect.objectContaining({ errorClass: null }),
+    }));
   });
 });

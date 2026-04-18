@@ -159,7 +159,13 @@ export async function undoChangeAction(changeId: number) {
         }
 
         await markRolledBack(changeId);
-        await logChange(customerId, userId, check.change.campaignId ?? null, undoResult, `Undo of change #${changeId} (${check.change.toolName})`);
+        await logChange({
+            accountId: customerId,
+            userId,
+            campaignId: check.change.campaignId ?? null,
+            writeResult: undoResult,
+            reasoning: `Undo of change #${changeId} (${check.change.toolName})`,
+        });
 
         const changeAge = Date.now() - check.change.createdAt.getTime();
         trackServerEvent(userId, "ai_change_undone", {
@@ -295,7 +301,7 @@ export async function pauseCampaignAction(campaignId: string) {
         }
 
         campaignsCache.delete(customerId);
-        await logChange(customerId, userId, campaignId, result, "Paused from campaigns page");
+        await logChange({ accountId: customerId, userId, campaignId, writeResult: result, reasoning: "Paused from campaigns page" });
         return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Pause Campaign Error:", error);
@@ -320,7 +326,7 @@ export async function enableCampaignAction(campaignId: string) {
         }
 
         campaignsCache.delete(customerId);
-        await logChange(customerId, userId, campaignId, result, "Enabled from campaigns page");
+        await logChange({ accountId: customerId, userId, campaignId, writeResult: result, reasoning: "Enabled from campaigns page" });
         return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Enable Campaign Error:", error);
@@ -345,7 +351,7 @@ export async function removeCampaignAction(campaignId: string) {
         }
 
         campaignsCache.delete(customerId);
-        await logChange(customerId, userId, campaignId, result, "Deleted from campaigns page");
+        await logChange({ accountId: customerId, userId, campaignId, writeResult: result, reasoning: "Deleted from campaigns page" });
         return { success: true, campaignId };
     } catch (error) {
         console.error("Remove Campaign Error:", error);

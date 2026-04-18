@@ -127,13 +127,13 @@ describe("app/actions", () => {
       },
       "999",
     );
-    expect(mockLogChange).toHaveBeenCalledWith(
-      "1301265570",
-      "user-1",
-      "999",
-      expect.objectContaining({ action: "remove_campaign", success: true }),
-      "Deleted from campaigns page",
-    );
+    expect(mockLogChange).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: "1301265570",
+      userId: "user-1",
+      campaignId: "999",
+      writeResult: expect.objectContaining({ action: "remove_campaign", success: true }),
+      reasoning: "Deleted from campaigns page",
+    }));
     expect(result).toEqual({ success: true, campaignId: "999" });
   });
 });
