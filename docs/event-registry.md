@@ -396,7 +396,7 @@ No properties.
 | Property | Type | Example | Description |
 |---|---|---|---|
 | `signup_method` | string | `"google_oauth"` | Authentication mechanism used to sign up |
-| `signup_referrer` | string \| null | `"https://google.com"` | Value of the `Referer` header on the OAuth callback request |
+| `signup_referrer` | string \| null | `"https://github.com/..."` | The user's original cross-origin referrer captured on the first landing page, threaded through the OAuth round-trip so it survives the `accounts.google.com` bounce. Null when the user arrived via direct navigation. |
 | `google_email` | string \| null | `"user@example.com"` | Email returned by Google OAuth |
 | `utm_source` | string \| undefined | `"google"` | UTM source captured at the start of the OAuth flow and threaded through state |
 | `utm_medium` | string \| undefined | `"cpc"` | UTM medium |

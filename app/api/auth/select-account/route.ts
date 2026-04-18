@@ -5,8 +5,12 @@ import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
 import { listAccessibleCustomers, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
+import { createClient } from "@/lib/supabase/server";
+import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 
 export async function POST(request: Request) {
+  after(flushServerEvents);
+
   let body;
   try {
     body = await request.json();
@@ -178,6 +182,35 @@ export async function POST(request: Request) {
   const accountNames = deriveCustomerName(customerIds);
 
   const isNewSignup = pendingToken && !session.customerId;
+
+  // Multi-account signups go through this route rather than the auth callback's
+  // single-account path, so fire user_signed_up here — otherwise PostHog misses
+  // every multi-account signup entirely (17% of signups as of Apr 2026).
+  // UTMs and signup_referrer were written to Supabase user_metadata by the
+  // callback before branching; read them back so attribution is preserved.
+  if (isNewSignup && session.userId) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>;
+      const forwardedFor = request.headers.get("x-forwarded-for");
+      const clientIp = forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || undefined;
+      trackServerEvent(session.userId, "user_signed_up", {
+        utm_source: meta.utm_source,
+        utm_medium: meta.utm_medium,
+        utm_campaign: meta.utm_campaign,
+        utm_term: meta.utm_term,
+        utm_content: meta.utm_content,
+        signup_referrer: meta.signup_referrer,
+        google_email: user?.email,
+        signup_method: "google_oauth",
+        ...(clientIp ? { $ip: clientIp } : {}),
+      });
+    } catch (err) {
+      console.error("[select-account] Failed to fire user_signed_up:", err);
+    }
+  }
+
   const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect'}`,
   });

@@ -35,6 +35,11 @@ export async function GET(request: Request) {
     if (val) utm[key] = val;
   }
 
+  // The caller passes the original marketing referrer (e.g. github.com) so we
+  // can attribute it on user_signed_up — the HTTP Referer header on the
+  // callback is always accounts.google.com, which is useless for attribution.
+  const signupReferrer = searchParams.get("signup_referrer");
+
   // Generate a random nonce for CSRF protection.
   // The nonce goes into both the OAuth state param and a short-lived cookie.
   // The callback verifies they match before proceeding.
@@ -48,6 +53,7 @@ export async function GET(request: Request) {
     popup,
     ...(scopeRetry ? { scope_retry: true } : {}),
     ...(Object.keys(utm).length > 0 ? { utm } : {}),
+    ...(signupReferrer ? { signup_referrer: signupReferrer } : {}),
   })).toString("base64url");
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;

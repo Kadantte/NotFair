@@ -15,6 +15,9 @@ function buildAuthUrl(next: string, popup: boolean) {
       ?? sessionStorage.getItem(`${UTM_STORAGE_PREFIX}${key}`);
     if (val) url.searchParams.set(key, val);
   }
+  // Forward the original marketing referrer (captured before OAuth bounces it to accounts.google.com)
+  const storedReferrer = sessionStorage.getItem(`${UTM_STORAGE_PREFIX}referrer`);
+  if (storedReferrer) url.searchParams.set("signup_referrer", storedReferrer);
   return url.toString();
 }
 
