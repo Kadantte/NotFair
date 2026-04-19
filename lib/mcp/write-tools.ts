@@ -232,6 +232,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const targetId = resolveAccountId(auth, accountId);
     await enforceRateLimit(auth.userId); // Check before API call (not deferred to execWrite)
 
+    const t0 = performance.now();
     const createResult = await createSearchCampaign(authForAccount(auth, accountId), {
       campaignName,
       dailyBudgetDollars,
@@ -244,6 +245,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       geoTargetIds,
       languageIds,
     });
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const writeResult: WriteResult = {
       success: createResult.success,
@@ -254,7 +256,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       error: createResult.error,
     };
 
-    const logged = await execWrite(auth, targetId, createResult.campaignId ?? null, async () => writeResult);
+    const logged = await execWrite(auth, targetId, createResult.campaignId ?? null, async () => writeResult, undefined, { overrideLatencyMs });
 
     return jsonResult({
       ...createResult,
@@ -349,9 +351,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     await enforceRateLimit(auth.userId); // Check before API call (not deferred to execWrite)
+    const t0 = performance.now();
     const writeResult = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
     const resolvedCampaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
-    const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult);
+    const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult, undefined, { overrideLatencyMs });
     return jsonResult(result);
   }));
 
@@ -516,11 +520,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, updates }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const t0 = performance.now();
     const results = await bulkUpdateBids(authForAccount(auth, accountId), updates);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        execWrite(auth, targetId, input.campaignId, async () => result)
+        execWrite(auth, targetId, input.campaignId, async () => result, undefined, { overrideLatencyMs })
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -555,11 +561,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, keywords }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const t0 = performance.now();
     const results = await bulkPauseKeywords(authForAccount(auth, accountId), keywords);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        execWrite(auth, targetId, input.campaignId, async () => result)
+        execWrite(auth, targetId, input.campaignId, async () => result, undefined, { overrideLatencyMs })
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -593,11 +601,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, keywords }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const t0 = performance.now();
     const results = await bulkAddKeywords(authForAccount(auth, accountId), adGroupId, keywords);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        execWrite(auth, targetId, campaignId, async () => result)
+        execWrite(auth, targetId, campaignId, async () => result, undefined, { overrideLatencyMs })
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -630,18 +640,20 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const t0 = performance.now();
     const result = await moveKeywords(authForAccount(auth, accountId), campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     // Route every result (success or failure) through execWrite so failures count toward the daily
     // limit — same overcount-preferred policy as every other write path.
     const addChangeIds = await Promise.all(
       result.added.map((r) =>
-        execWrite(auth, targetId, campaignId, async () => r),
+        execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs }),
       ),
     );
     const pauseChangeIds = await Promise.all(
       result.paused.map((r) =>
-        execWrite(auth, targetId, campaignId, async () => r),
+        execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs }),
       ),
     );
 
@@ -798,10 +810,12 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     if (negativeLocationTargeting) params.negativeLocationTargeting = negativeLocationTargeting;
     if (adSchedule) params.adSchedule = adSchedule;
 
+    const t0 = performance.now();
     const result = await updateCampaignSettings(authForAccount(auth, accountId), campaignId, params);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
-      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r)),
+      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs })),
     );
 
     return jsonResult({
@@ -909,7 +923,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, conversionActionId, conversions }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
 
+    const t0 = performance.now();
     const result = await uploadClickConversions(targetAuth, conversionActionId, conversions);
+    const overrideLatencyMs = Math.round(performance.now() - t0);
 
     // Log as a write operation for tracking (execWrite handles rate limiting)
     if (result.successCount > 0) {
@@ -920,7 +936,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         beforeValue: "",
         afterValue: `${result.successCount} conversions`,
       };
-      await execWrite(auth, targetId, null, async () => writeResult);
+      await execWrite(auth, targetId, null, async () => writeResult, undefined, { overrideLatencyMs });
     } else {
       // Still rate-limit even when no successes (prevents abuse via invalid uploads)
       await enforceRateLimit(auth.userId);
@@ -1026,9 +1042,11 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, add, remove }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const t0 = performance.now();
     const result = await updateCampaignLanguages(authForAccount(auth, accountId), campaignId, { add, remove });
+    const overrideLatencyMs = Math.round(performance.now() - t0);
     const logged = await Promise.all(
-      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r)),
+      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs })),
     );
     return jsonResult({ success: result.success, error: result.error, results: logged });
   }));

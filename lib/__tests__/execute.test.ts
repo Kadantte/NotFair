@@ -138,6 +138,47 @@ describe("execWrite", () => {
     expect(result.changeId).toBe(42);
   });
 
+  it("options.overrideLatencyMs wins over measured fn() latency (bulk fan-out path)", async () => {
+    // Bulk write handlers measure the real upstream API call themselves and
+    // pass the latency to every fan-out execWrite invocation, since the
+    // `fn = async () => r` stub itself resolves in microseconds.
+    const writeResult: WriteResult = {
+      success: true,
+      action: "pause_keyword",
+      entityId: "kw-1",
+      beforeValue: "ENABLED",
+      afterValue: "PAUSED",
+    };
+    const fn = vi.fn().mockResolvedValue(writeResult);
+
+    await execWrite(auth, "acct-1", "camp-1", fn, undefined, { overrideLatencyMs: 742 });
+
+    expect(mockLogChange).toHaveBeenCalledWith(expect.objectContaining({
+      telemetry: expect.objectContaining({ latencyMs: 742 }),
+    }));
+  });
+
+  it("options.overrideLatencyMs is honored on the failure path too", async () => {
+    const failResult: WriteResult = {
+      success: false,
+      action: "update_bid",
+      entityId: "kw-1",
+      beforeValue: "N/A",
+      afterValue: "3500000",
+      error: "Bid changes not supported for 3 strategy",
+    };
+    const fn = vi.fn().mockResolvedValue(failResult);
+
+    await execWrite(auth, "acct-1", "camp-1", fn, undefined, { overrideLatencyMs: 501 });
+
+    expect(mockLogChange).toHaveBeenCalledWith(expect.objectContaining({
+      telemetry: expect.objectContaining({
+        errorClass: "WRITE_REJECTED",
+        latencyMs: 501,
+      }),
+    }));
+  });
+
   it("throws from fn() propagate without counting; THROWN telemetry only when wrapped by a telemetry context", async () => {
     const fn = vi.fn().mockRejectedValue(new Error("network dropped"));
 

@@ -2,6 +2,12 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.19.3] - 2026-04-19
+
+### Fixed
+- `/dev/telemetry` dashboard now reports honest invocation counts for bulk MCP tools. Before: `bulkPauseKeywords`, `bulkAddKeywords`, `bulkUpdateBids`, `moveKeywords`, `updateCampaignSettings`, `createCampaign`, `setTrackingTemplate`, `uploadClickConversions`, and `updateCampaignLanguages` inflated call counts 5-7× because each fan-out item wrote its own row. The dashboard now dedupes by `request_id` across `topTools`, `topArgShapes`, and `dailyCounts`. Latency percentiles are computed per-invocation so one slow bulk call isn't weighted 25× in p50/p95.
+- MCP bulk-tool telemetry now records real latency instead of 0 ms. The per-item `execWrite` stub path (`async () => result`) resolved in microseconds, so every fan-out row logged `latency_ms = 0` — 281/281 rows in the wild. Bulk handlers now measure the real Google API call themselves and thread the latency through a new `overrideLatencyMs` option on `execWrite`. Dashboards will start showing real write latencies for bulk tools immediately after deploy.
+
 ## [0.2.19.2] - 2026-04-16
 
 ### Changed

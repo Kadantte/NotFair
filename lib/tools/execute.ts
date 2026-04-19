@@ -61,6 +61,13 @@ export async function execWrite(
   campaignId: string | null,
   fn: () => Promise<WriteResult>,
   reasoning?: string,
+  // Bulk fan-out handlers call the real Google API once upstream, then invoke
+  // execWrite N times with `fn = async () => result` to log per-item rows for
+  // undo/impact history. Timing the stub reads 0ms, which collapses the
+  // /dev/telemetry p50/p95 for every bulk write. The caller measures the real
+  // API latency and threads it in here so every fan-out row carries the same
+  // honest invocation latency.
+  options?: { overrideLatencyMs?: number },
 ): Promise<WriteResult & { changeId: number | null }> {
   await enforceRateLimit(auth.userId);
   const ctx = getTelemetry();
@@ -72,7 +79,7 @@ export async function execWrite(
     // Network/runtime throws propagate uncounted — the user's quota shouldn't
     // charge for infra failures — but we still log a telemetry row so the
     // admin dashboard sees the outage.
-    const latencyMs = Math.round(performance.now() - t0);
+    const latencyMs = options?.overrideLatencyMs ?? Math.round(performance.now() - t0);
     if (ctx?.toolName) {
       void logRead({
         accountId,
@@ -87,7 +94,7 @@ export async function execWrite(
   }
 
   if (result.success) invalidateCache(accountId);
-  const latencyMs = Math.round(performance.now() - t0);
+  const latencyMs = options?.overrideLatencyMs ?? Math.round(performance.now() - t0);
   const bytesOut = byteLengthOf(result);
   const telemetry = buildTelemetry(
     ctx,
