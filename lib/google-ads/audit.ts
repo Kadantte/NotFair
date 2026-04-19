@@ -1,10 +1,57 @@
 import { getCachedCustomer, MATCH_TYPE_NAME } from "./client";
-import { getDateRange, micros } from "./helpers";
+import { getDateRange, micros, normalizeCustomerId } from "./helpers";
 import type { AuthContext } from "./types";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
 type ISMatrix = "healthy" | "relevance_problem" | "capital_problem" | "structural_problem";
+
+/** Pointer to the most recent change touching an entity relevant to a finding.
+ *  When present, the finding's metrics span a window that pre-dates (or straddles)
+ *  the change — callers should re-evaluate whether the issue is still current. */
+export interface RecentChange {
+  /** Whole days between the change and "now" (audit end date). 0 = today. */
+  daysAgo: number;
+  /** ISO datetime of the change. */
+  changeDateTime: string;
+  /** Fields that were modified, e.g. "status", "cpc_bid_micros". */
+  changedFields: string[];
+  /** "CREATE" | "UPDATE" | "REMOVE" */
+  operation: string;
+  /** Where the change originated: "GOOGLE_ADS_WEB_CLIENT", "GOOGLE_ADS_API", etc. */
+  clientType: string;
+  /** "CAMPAIGN" | "AD_GROUP" | "AD_GROUP_CRITERION" | "CAMPAIGN_BUDGET" | ... */
+  resourceType: string;
+  /** Number of additional changes on this resource inside the audit window. */
+  otherChangesInWindow: number;
+}
+
+/** Pre/post split of core metrics for a campaign, bucketed around its most
+ *  recent change. `beforeDays + afterDays` should equal the audit lookback. */
+export interface MetricsSplit {
+  splitAt: string;
+  beforeDays: number;
+  afterDays: number;
+  before: { spend: number; clicks: number; conversions: number; cpa: number | null };
+  after: { spend: number; clicks: number; conversions: number; cpa: number | null };
+  /** afterCpa - beforeCpa; null if either side lacks conversions. Negative = improved. */
+  cpaDelta: number | null;
+  /** Normalized daily spend delta: (afterSpend/afterDays) - (beforeSpend/beforeDays). */
+  dailySpendDelta: number;
+}
+
+export interface ChangeEventSummary {
+  resourceName: string;
+  resourceType: string;
+  operation: string;
+  changeDateTime: string;
+  daysAgo: number;
+  changedFields: string[];
+  clientType: string;
+  campaignName: string | null;
+  adGroupName: string | null;
+  userEmail: string | null;
+}
 
 interface DeviceMetrics {
   spend: number;
@@ -65,6 +112,11 @@ interface AuditCampaign {
   }[];
   deviceBreakdown: Record<string, DeviceMetrics>;
   searchPartnersMetrics: { spend: number; clicks: number; conversions: number } | null;
+  recentChange: RecentChange | null;
+  /** Set only when the campaign (or its budget/criteria) was changed inside the
+   *  audit window. Splits the lookback into pre- and post-change metrics so
+   *  callers can tell whether a problem has already been addressed. */
+  metricsSplit: MetricsSplit | null;
 }
 
 interface WastedItem {
@@ -75,6 +127,7 @@ interface WastedItem {
   spend: number;
   clicks: number;
   qualityScore?: number | null;
+  recentChange: RecentChange | null;
 }
 
 interface SearchTermItem {
@@ -84,6 +137,10 @@ interface SearchTermItem {
   spend: number;
   clicks: number;
   conversions: number;
+  /** Attached when the campaign or ad group that would own this term was
+   *  changed inside the window — e.g. a negative was added, the ad group was
+   *  paused, bids were moved. Search terms themselves are not editable. */
+  recentChange: RecentChange | null;
 }
 
 interface BrandLeakage {
@@ -116,6 +173,7 @@ const PREVIEW_LIMITS = {
   negativeConflicts: 10,
   landingPages: 15,
   budgetConstrainedWinners: 5,
+  recentChanges: 50,
 } as const;
 
 export function toFindingList<T>(
@@ -154,6 +212,7 @@ interface NegativeConflict {
   blockedTerm: string;
   blockedTermConversions: number;
   blockedTermSpend: number;
+  recentChange: RecentChange | null;
 }
 
 interface MatchTypeBreakdown {
@@ -212,6 +271,7 @@ export interface AuditResult {
       cpa: number;
       dailyBudget: number | null;
       spend: number;
+      recentChange: RecentChange | null;
     }>;
     negativeConflicts: FindingList<NegativeConflict>;
     hasAudienceSegments: boolean;
@@ -220,6 +280,10 @@ export interface AuditResult {
     assetCoverage: AssetCoverage[];
     landingPages: FindingList<LandingPage>;
   };
+  /** All account-modifying changes inside the lookback window (from Google Ads
+   *  `change_event` — captures both MCP and direct-UI edits). Callers should
+   *  treat findings with a matching `recentChange` as possibly-already-addressed. */
+  recentChanges: FindingList<ChangeEventSummary>;
   errors?: string[];
 }
 
@@ -278,6 +342,75 @@ function negativeBlocks(termLower: string, negText: string, negMatchType: number
   return negWords.every((w) => termLower.includes(w));
 }
 
+// Google Ads change_event enums we care about.
+const RESOURCE_CHANGE_OP: Record<number, string> = {
+  2: "CREATE",
+  3: "UPDATE",
+  4: "REMOVE",
+};
+
+const CHANGE_RESOURCE_TYPE: Record<number, string> = {
+  2: "AD",
+  3: "AD_GROUP",
+  4: "AD_GROUP_CRITERION",
+  5: "CAMPAIGN",
+  6: "CAMPAIGN_BUDGET",
+  7: "CAMPAIGN_CRITERION",
+  8: "AD_GROUP_BID_MODIFIER",
+  9: "AD_GROUP_FEED",
+  10: "CAMPAIGN_FEED",
+  11: "AD_GROUP_AD",
+  13: "ASSET",
+  14: "CUSTOMER_ASSET",
+  15: "CAMPAIGN_ASSET",
+  16: "AD_GROUP_ASSET",
+  17: "ASSET_SET",
+  18: "ASSET_SET_ASSET",
+  19: "CAMPAIGN_ASSET_SET",
+};
+
+const CHANGE_CLIENT_TYPE: Record<number, string> = {
+  2: "GOOGLE_ADS_WEB_CLIENT",
+  3: "GOOGLE_ADS_AUTOMATED_RULE",
+  4: "GOOGLE_ADS_SCRIPTS",
+  5: "GOOGLE_ADS_BULK_UPLOAD",
+  6: "GOOGLE_ADS_API",
+  7: "GOOGLE_ADS_EDITOR",
+  8: "GOOGLE_ADS_MOBILE_APP",
+  9: "GOOGLE_ADS_RECOMMENDATIONS",
+  10: "SEARCH_ADS_360_SYNC",
+  11: "SEARCH_ADS_360_POST",
+  12: "INTERNAL_TOOL",
+  13: "OTHER",
+};
+
+/** Extract the list of modified fields from a FieldMask proto.
+ *  The google-ads-api library exposes it as either a string ("a,b,c"),
+ *  or { paths: string[] }. Accept both defensively. */
+function extractChangedFields(raw: unknown): string[] {
+  if (!raw) return [];
+  if (typeof raw === "string") {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (typeof raw === "object" && "paths" in (raw as any)) {
+    const paths = (raw as { paths?: unknown[] }).paths;
+    if (Array.isArray(paths)) return paths.map(String).filter(Boolean);
+  }
+  return [];
+}
+
+/** Whole days between two ISO date/datetime strings. Truncates fractional days,
+ *  so a change from 4h ago returns 0 ("today"). */
+function daysBetween(changeISO: string, referenceISO: string): number {
+  const changeMs = new Date(changeISO).getTime();
+  const refMs = new Date(referenceISO + "T23:59:59").getTime();
+  if (!isFinite(changeMs) || !isFinite(refMs)) return 0;
+  return Math.max(0, Math.floor((refMs - changeMs) / 86_400_000));
+}
+
+/** Exported for tests. @internal */
+export const __testing = { daysBetween, extractChangedFields };
+
 // Device enum → human name
 const DEVICE_NAME: Record<number, string> = {
   2: "MOBILE",
@@ -304,6 +437,14 @@ export async function runAudit(
   const customer = getCachedCustomer(auth);
   const boundedDays = Math.min(Math.max(days, 1), 90); // IS capped at 90
   const { start, end } = getDateRange(boundedDays);
+  // change_event is hard-capped at 30 rolling days by the Google Ads API.
+  // Use the tighter of boundedDays and 30 so the filter always validates.
+  const changeEventDays = Math.min(boundedDays, 30);
+  const { start: changeEventStart } = getDateRange(changeEventDays);
+  const customerId = normalizeCustomerId(auth.customerId);
+  const campaignResourcePrefix = `customers/${customerId}/campaigns/`;
+  const adGroupResourcePrefix = `customers/${customerId}/adGroups/`;
+  const criterionResourcePrefix = `customers/${customerId}/adGroupCriteria/`;
   const errors: string[] = [];
 
   // ── All queries in parallel ────────────────────────────────────────
@@ -386,7 +527,7 @@ export async function runAudit(
     // 5. Top search terms by spend
     customer.query(`
       SELECT
-        campaign.id, campaign.name, ad_group.name,
+        campaign.id, campaign.name, ad_group.id, ad_group.name,
         search_term_view.search_term, search_term_view.status,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
@@ -400,7 +541,7 @@ export async function runAudit(
     // 6. Converting search terms (mining)
     customer.query(`
       SELECT
-        campaign.name, ad_group.name,
+        campaign.id, campaign.name, ad_group.id, ad_group.name,
         search_term_view.search_term,
         metrics.conversions, metrics.cost_micros, metrics.clicks
       FROM search_term_view
@@ -414,7 +555,7 @@ export async function runAudit(
     // 7. Zero-conversion keywords (waste)
     customer.query(`
       SELECT
-        campaign.name, ad_group.name,
+        campaign.id, campaign.name, ad_group.id, ad_group.name,
         ad_group_criterion.keyword.text,
         ad_group_criterion.keyword.match_type,
         ad_group_criterion.criterion_id,
@@ -537,6 +678,37 @@ export async function runAudit(
       ORDER BY metrics.cost_micros DESC
       LIMIT 200
     `),
+
+    // 17. Account changes (change_event) — up to 30 days by API rule.
+    // Date filter MUST use change_event.change_date_time and >= (BETWEEN not
+    // supported). ORDER BY change_date_time DESC is required by the API.
+    customer.query(`
+      SELECT
+        change_event.change_date_time,
+        change_event.change_resource_type,
+        change_event.resource_name,
+        change_event.client_type,
+        change_event.user_email,
+        change_event.changed_fields,
+        change_event.resource_change_operation,
+        change_event.campaign,
+        change_event.ad_group
+      FROM change_event
+      WHERE change_event.change_date_time >= '${changeEventStart} 00:00:00'
+      ORDER BY change_event.change_date_time DESC
+      LIMIT 10000
+    `),
+
+    // 18. Per-day per-campaign metrics for pre/post-change splits.
+    // Adds ~(active_campaigns * days) rows; cheap at typical account sizes.
+    customer.query(`
+      SELECT
+        campaign.id, segments.date,
+        metrics.cost_micros, metrics.clicks, metrics.conversions
+      FROM campaign
+      WHERE campaign.status != 'REMOVED'
+        AND segments.date BETWEEN '${start}' AND '${end}'
+    `),
   ]);
 
   // ── Extract results with graceful degradation ─────────────────────
@@ -564,12 +736,140 @@ export async function runAudit(
   const networkRows = unwrap(results[14], "network_segmentation");
   const assetRows = unwrap(results[15], "campaign_assets");
   const landingPageRows = unwrap(results[16], "landing_pages");
+  const changeEventRows = unwrap(results[17], "change_events");
+  const dailyCampaignRows = unwrap(results[18], "daily_campaign_metrics");
 
   // ── Account info ──────────────────────────────────────────────────
 
   const acct = (accountRows ?? [])[0]?.customer ?? {};
   const businessName = acct.descriptive_name ?? "Unknown";
   const brandVariants = generateBrandVariants(businessName);
+
+  // ── Build change_event indexes ────────────────────────────────────
+  // We need three lookup surfaces:
+  //   - byResource:    exact `resource_name` match (e.g. an ad_group_criterion)
+  //   - byCampaign:    any change scoped to a campaign (via change_event.campaign)
+  //   - byAdGroup:     any change scoped to an ad_group
+  // Each entry tracks the MOST RECENT change (driving daysAgo) plus a count of
+  // other changes in the window, so callers can see "5 edits in 7 days, most
+  // recent 2d ago". Rows are already ORDER BY change_date_time DESC.
+  interface ChangeEntry {
+    latest: ChangeEventSummary;
+    count: number;
+  }
+  const changesByResource = new Map<string, ChangeEntry>();
+  const changesByCampaign = new Map<string, ChangeEntry>();
+  const changesByAdGroup = new Map<string, ChangeEntry>();
+  const allChanges: ChangeEventSummary[] = [];
+  const campaignNameById = new Map<string, string>();
+  const adGroupNameById = new Map<string, string>();
+  for (const row of campaignRows ?? []) {
+    if (row.campaign?.id) {
+      campaignNameById.set(String(row.campaign.id), row.campaign.name ?? "");
+    }
+  }
+  for (const row of adGroupRows ?? []) {
+    if (row.ad_group?.id) {
+      adGroupNameById.set(String(row.ad_group.id), row.ad_group.name ?? "");
+    }
+  }
+
+  function bumpEntry(
+    map: Map<string, ChangeEntry>,
+    key: string,
+    summary: ChangeEventSummary,
+  ) {
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { latest: summary, count: 1 });
+    } else {
+      existing.count++;
+      // Rows are DESC by change_date_time, so the first row seen wins.
+    }
+  }
+
+  for (const row of changeEventRows ?? []) {
+    const ce = row.change_event ?? {};
+    const changeDateTime = ce.change_date_time;
+    if (!changeDateTime) continue;
+    const resourceName = ce.resource_name ?? "";
+    const resourceType =
+      CHANGE_RESOURCE_TYPE[ce.change_resource_type] ?? String(ce.change_resource_type ?? "UNKNOWN");
+    const operation =
+      RESOURCE_CHANGE_OP[ce.resource_change_operation] ?? String(ce.resource_change_operation ?? "UNKNOWN");
+    const clientType =
+      CHANGE_CLIENT_TYPE[ce.client_type] ?? String(ce.client_type ?? "UNKNOWN");
+    const changedFields = extractChangedFields(ce.changed_fields);
+    const campaignResource = ce.campaign ?? "";
+    const adGroupResource = ce.ad_group ?? "";
+    const campaignId = campaignResource?.startsWith(campaignResourcePrefix)
+      ? campaignResource.slice(campaignResourcePrefix.length)
+      : null;
+    const adGroupId = adGroupResource?.startsWith(adGroupResourcePrefix)
+      ? adGroupResource.slice(adGroupResourcePrefix.length)
+      : null;
+
+    const summary: ChangeEventSummary = {
+      resourceName,
+      resourceType,
+      operation,
+      changeDateTime,
+      daysAgo: daysBetween(changeDateTime, end),
+      changedFields,
+      clientType,
+      campaignName: campaignId ? campaignNameById.get(campaignId) ?? null : null,
+      adGroupName: adGroupId ? adGroupNameById.get(adGroupId) ?? null : null,
+      userEmail: ce.user_email ?? null,
+    };
+    allChanges.push(summary);
+
+    if (resourceName) bumpEntry(changesByResource, resourceName, summary);
+    if (campaignId) bumpEntry(changesByCampaign, campaignId, summary);
+    if (adGroupId) bumpEntry(changesByAdGroup, adGroupId, summary);
+
+    // CAMPAIGN_BUDGET resources aren't tied to a campaign via change_event.campaign,
+    // but the campaign_budget row itself was just changed — find any campaign that
+    // uses this budget. We don't have that mapping here, so treat budget edits
+    // as campaign-scoped via `campaignId` already being set by the API (it is,
+    // for CAMPAIGN_BUDGET resource changes — change_event.campaign is populated).
+  }
+
+  function toRecentChange(entry: ChangeEntry | undefined): RecentChange | null {
+    if (!entry) return null;
+    const { latest, count } = entry;
+    return {
+      daysAgo: latest.daysAgo,
+      changeDateTime: latest.changeDateTime,
+      changedFields: latest.changedFields,
+      operation: latest.operation,
+      clientType: latest.clientType,
+      resourceType: latest.resourceType,
+      otherChangesInWindow: Math.max(0, count - 1),
+    };
+  }
+
+  /** Resolve the most relevant RecentChange for a finding by walking the
+   *  specificity ladder (resource → ad group → campaign), returning the first
+   *  hit. Callers pass whatever identifiers they have. */
+  function resolveRecentChange(opts: {
+    resourceName?: string | null;
+    adGroupId?: string | null;
+    campaignId?: string | null;
+  }): RecentChange | null {
+    if (opts.resourceName) {
+      const hit = toRecentChange(changesByResource.get(opts.resourceName));
+      if (hit) return hit;
+    }
+    if (opts.adGroupId) {
+      const hit = toRecentChange(changesByAdGroup.get(opts.adGroupId));
+      if (hit) return hit;
+    }
+    if (opts.campaignId) {
+      const hit = toRecentChange(changesByCampaign.get(opts.campaignId));
+      if (hit) return hit;
+    }
+    return null;
+  }
 
   // ── Build QS lookup ───────────────────────────────────────────────
 
@@ -668,7 +968,73 @@ export async function runAudit(
       topKeywords: [],
       deviceBreakdown: {},
       searchPartnersMetrics: null,
+      recentChange: resolveRecentChange({ campaignId: id }),
+      metricsSplit: null,
     });
+  }
+
+  // ── Compute per-campaign pre/post split around the latest change ──
+  // Uses the daily segmented campaign metrics (Q18). Only emit a split when
+  // there's a change inside the window AND both sides have ≥1 day of data.
+  const dailyByCampaign = new Map<
+    string,
+    { date: string; spend: number; clicks: number; conversions: number }[]
+  >();
+  for (const row of dailyCampaignRows ?? []) {
+    const cid = String(row.campaign?.id ?? "");
+    const date = row.segments?.date;
+    if (!cid || !date) continue;
+    if (!dailyByCampaign.has(cid)) dailyByCampaign.set(cid, []);
+    dailyByCampaign.get(cid)!.push({
+      date,
+      spend: micros(row.metrics?.cost_micros),
+      clicks: row.metrics?.clicks ?? 0,
+      conversions: row.metrics?.conversions ?? 0,
+    });
+  }
+
+  for (const camp of Array.from(campaignMap.values())) {
+    const rc = camp.recentChange;
+    if (!rc) continue;
+    const daily = dailyByCampaign.get(camp.id);
+    if (!daily || daily.length === 0) continue;
+
+    // Bucket by splitDate = the calendar day of the change. Everything strictly
+    // before that day is "before"; everything on-or-after is "after". This
+    // intentionally attributes the day-of-change to the post-change window.
+    const splitDate = rc.changeDateTime.slice(0, 10);
+    let bSpend = 0, bClicks = 0, bConv = 0;
+    let aSpend = 0, aClicks = 0, aConv = 0;
+    const beforeDates = new Set<string>();
+    const afterDates = new Set<string>();
+    for (const d of daily) {
+      if (d.date < splitDate) {
+        bSpend += d.spend; bClicks += d.clicks; bConv += d.conversions;
+        beforeDates.add(d.date);
+      } else {
+        aSpend += d.spend; aClicks += d.clicks; aConv += d.conversions;
+        afterDates.add(d.date);
+      }
+    }
+    const beforeDays = beforeDates.size;
+    const afterDays = afterDates.size;
+    // Need at least 1 day on each side for the split to mean anything.
+    if (beforeDays === 0 || afterDays === 0) continue;
+
+    const beforeCpa = bConv > 0 ? bSpend / bConv : null;
+    const afterCpa = aConv > 0 ? aSpend / aConv : null;
+    const cpaDelta = beforeCpa != null && afterCpa != null ? afterCpa - beforeCpa : null;
+    const dailySpendDelta = aSpend / afterDays - bSpend / beforeDays;
+
+    camp.metricsSplit = {
+      splitAt: splitDate,
+      beforeDays,
+      afterDays,
+      before: { spend: bSpend, clicks: bClicks, conversions: bConv, cpa: beforeCpa },
+      after: { spend: aSpend, clicks: aClicks, conversions: aConv, cpa: afterCpa },
+      cpaDelta,
+      dailySpendDelta,
+    };
   }
 
   // ── Attach ad groups ──────────────────────────────────────────────
@@ -869,7 +1235,13 @@ export async function runAudit(
     const spend = micros(row.metrics?.cost_micros);
     if (spend <= wasteThreshold) continue;
     const criterionId = String(row.ad_group_criterion?.criterion_id);
+    const adGroupId = row.ad_group?.id ? String(row.ad_group.id) : null;
+    const campaignId = row.campaign?.id ? String(row.campaign.id) : null;
     const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
+    // ad_group_criterion resource name: customers/X/adGroupCriteria/{agId}~{critId}
+    const resourceName = adGroupId && criterionId
+      ? `${criterionResourcePrefix}${adGroupId}~${criterionId}`
+      : null;
     wastedKeywords.push({
       text: row.ad_group_criterion?.keyword?.text ?? "",
       matchType: (typeof rawMatchType === "number" ? MATCH_TYPE_NAME[rawMatchType] : rawMatchType) ?? "UNKNOWN",
@@ -878,6 +1250,7 @@ export async function runAudit(
       spend,
       clicks: row.metrics?.clicks ?? 0,
       qualityScore: qsMap.get(criterionId)?.qualityScore ?? null,
+      recentChange: resolveRecentChange({ resourceName, adGroupId, campaignId }),
     });
   }
   wastedKeywords.sort((a, b) => b.spend - a.spend);
@@ -891,6 +1264,8 @@ export async function runAudit(
     if (conv > 0 || clicks < 10) continue;
     const spend = micros(row.metrics?.cost_micros);
     searchTermWaste += spend;
+    const adGroupId = row.ad_group?.id ? String(row.ad_group.id) : null;
+    const campaignId = row.campaign?.id ? String(row.campaign.id) : null;
     wastedSearchTerms.push({
       term: row.search_term_view?.search_term ?? "",
       campaignName: row.campaign?.name ?? "",
@@ -898,6 +1273,7 @@ export async function runAudit(
       spend,
       clicks,
       conversions: 0,
+      recentChange: resolveRecentChange({ adGroupId, campaignId }),
     });
   }
   wastedSearchTerms.sort((a, b) => b.spend - a.spend);
@@ -921,6 +1297,8 @@ export async function runAudit(
       if (campName.toLowerCase().includes("brand")) continue;
       const spend = micros(row.metrics?.cost_micros);
       brandTotalSpend += spend;
+      const adGroupId = row.ad_group?.id ? String(row.ad_group.id) : null;
+      const campaignId = row.campaign?.id ? String(row.campaign.id) : null;
       brandTerms.push({
         term,
         campaignName: campName,
@@ -928,6 +1306,7 @@ export async function runAudit(
         spend,
         clicks: row.metrics?.clicks ?? 0,
         conversions: row.metrics?.conversions ?? 0,
+        recentChange: resolveRecentChange({ adGroupId, campaignId }),
       });
     }
   }
@@ -939,6 +1318,8 @@ export async function runAudit(
   for (const row of convertingRows ?? []) {
     const conv = row.metrics?.conversions ?? 0;
     if (conv < 2) continue;
+    const adGroupId = row.ad_group?.id ? String(row.ad_group.id) : null;
+    const campaignId = row.campaign?.id ? String(row.campaign.id) : null;
     miningOpportunities.push({
       term: row.search_term_view?.search_term ?? "",
       campaignName: row.campaign?.name ?? "",
@@ -946,6 +1327,7 @@ export async function runAudit(
       spend: micros(row.metrics?.cost_micros),
       clicks: row.metrics?.clicks ?? 0,
       conversions: conv,
+      recentChange: resolveRecentChange({ adGroupId, campaignId }),
     });
   }
 
@@ -972,6 +1354,7 @@ export async function runAudit(
             blockedTerm: term,
             blockedTermConversions: conv,
             blockedTermSpend: micros(row.metrics?.cost_micros),
+            recentChange: resolveRecentChange({ campaignId: campId }),
           });
         }
       }
@@ -995,6 +1378,7 @@ export async function runAudit(
       cpa: c.cpa!,
       dailyBudget: c.dailyBudget,
       spend: c.spend,
+      recentChange: c.recentChange,
     }));
 
   // ── Demand captured ───────────────────────────────────────────────
@@ -1098,6 +1482,11 @@ export async function runAudit(
         (p) => p.spend,
       ),
     },
+    recentChanges: toFindingList(
+      allChanges,
+      PREVIEW_LIMITS.recentChanges,
+      () => 0, // no spend attribution on change events
+    ),
   };
 
   if (errors.length > 0) result.errors = errors;

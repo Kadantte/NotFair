@@ -1,3 +1,8 @@
+## North Star Metrics
+Always read `docs/north-stars.md` before any growth, activation, or retention analysis.
+Frame findings around Weekly Active Writers (WAW) and D0 Write Users by default.
+Flag anything that doesn't plausibly move those metrics as off-strategy.
+
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.

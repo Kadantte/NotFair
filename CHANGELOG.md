@@ -2,6 +2,14 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.20.0] - 2026-04-19
+
+### Added
+- `audit` MCP tool is now change-aware. Every audit pulls Google Ads `change_event` for the last 30 days and attaches a `recentChange` pointer to every campaign and every flagged item (wasted keywords, wasted search terms, mining opportunities, brand-leakage terms, negative conflicts, budget-constrained winners). When the pointer is populated, the finding's metrics pre-date the fix — agents re-evaluate instead of recommending work that's already done. Each `recentChange` carries `{ daysAgo, changedFields, operation, clientType, resourceType, otherChangesInWindow }` so callers can see "budget raised 2 days ago, 3 other edits this week."
+- Per-campaign `metricsSplit` splits spend/clicks/conversions/CPA into `before` vs `after` buckets around the campaign's most recent edit, with `cpaDelta` and `dailySpendDelta` for quick post-change judgment.
+- Top-level `recentChanges` list surfaces every account edit in the window, including edits from the Google Ads UI (not just MCP writes) — `client_type` tells the agent where the change came from.
+- Tool description now instructs the agent to prefer `metricsSplit.dailySpendDelta` over the aggregate `budgetLostIS` when `changedFields` includes `amount_micros` or bidding fields, since impression-share metrics reflect the full 30-day window and lag post-change reality.
+
 ## [0.2.19.3] - 2026-04-19
 
 ### Fixed

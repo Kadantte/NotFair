@@ -1,6 +1,47 @@
 import { describe, it, expect } from "vitest";
 
-import { toFindingList } from "@/lib/google-ads/audit";
+import { toFindingList, __testing } from "@/lib/google-ads/audit";
+
+const { daysBetween, extractChangedFields } = __testing;
+
+describe("daysBetween", () => {
+  it("returns 0 for a change on the reference date", () => {
+    expect(daysBetween("2026-04-19T10:00:00Z", "2026-04-19")).toBe(0);
+  });
+  it("returns 7 for a change one week before", () => {
+    expect(daysBetween("2026-04-12T12:00:00Z", "2026-04-19")).toBe(7);
+  });
+  it("clamps negative deltas to 0 (change in the future)", () => {
+    expect(daysBetween("2026-05-01T00:00:00Z", "2026-04-19")).toBe(0);
+  });
+  it("handles invalid input without throwing", () => {
+    expect(daysBetween("not-a-date", "2026-04-19")).toBe(0);
+  });
+});
+
+describe("extractChangedFields", () => {
+  it("parses a comma-separated FieldMask string", () => {
+    expect(extractChangedFields("status,cpc_bid_micros"))
+      .toEqual(["status", "cpc_bid_micros"]);
+  });
+  it("parses a FieldMask object with `paths`", () => {
+    expect(extractChangedFields({ paths: ["status", "cpc_bid_micros"] }))
+      .toEqual(["status", "cpc_bid_micros"]);
+  });
+  it("trims whitespace and drops empty entries", () => {
+    expect(extractChangedFields("status, , cpc_bid_micros "))
+      .toEqual(["status", "cpc_bid_micros"]);
+  });
+  it("returns [] for null/undefined/empty", () => {
+    expect(extractChangedFields(null)).toEqual([]);
+    expect(extractChangedFields(undefined)).toEqual([]);
+    expect(extractChangedFields("")).toEqual([]);
+  });
+  it("returns [] for unexpected shapes", () => {
+    expect(extractChangedFields(42 as unknown)).toEqual([]);
+    expect(extractChangedFields({ foo: "bar" })).toEqual([]);
+  });
+});
 
 describe("toFindingList", () => {
   type Row = { name: string; spend: number };
