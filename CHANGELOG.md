@@ -2,6 +2,12 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.20.1] - 2026-04-19
+
+### Fixed
+- `change_event` query in `audit` now includes an upper bound on `change_date_time` (Google Ads rejects one-sided date filters on this resource). Fixes `recentChange` and `recentChanges` coming back empty immediately after the v0.2.20.0 deploy.
+- Audit error reporting now uses `extractErrorMessage` so `GoogleAdsFailure` objects produce readable messages instead of `[object Object]`. Also fixes the pre-existing `campaign_assets` and `landing_pages` log lines.
+
 ## [0.2.20.0] - 2026-04-19
 
 ### Added

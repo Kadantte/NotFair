@@ -1,5 +1,5 @@
 import { getCachedCustomer, MATCH_TYPE_NAME } from "./client";
-import { getDateRange, micros, normalizeCustomerId } from "./helpers";
+import { extractErrorMessage, getDateRange, micros, normalizeCustomerId } from "./helpers";
 import type { AuthContext } from "./types";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -695,6 +695,7 @@ export async function runAudit(
         change_event.ad_group
       FROM change_event
       WHERE change_event.change_date_time >= '${changeEventStart} 00:00:00'
+        AND change_event.change_date_time <= '${end} 23:59:59'
       ORDER BY change_event.change_date_time DESC
       LIMIT 10000
     `),
@@ -715,7 +716,7 @@ export async function runAudit(
 
   function unwrap(result: PromiseSettledResult<unknown>, label: string): any[] | null {
     if (result.status === "fulfilled") return result.value as any[];
-    errors.push(`${label}: ${(result.reason as any)?.message ?? result.reason ?? "Unknown error"}`);
+    errors.push(`${label}: ${extractErrorMessage(result.reason, { log: false })}`);
     return null;
   }
 
