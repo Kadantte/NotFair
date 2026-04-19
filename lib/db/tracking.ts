@@ -117,6 +117,13 @@ export type CallTelemetry = {
   latencyMs?: number | null;
   bytesOut?: number | null;
   errorClass?: ErrorClass | null;
+  /**
+   * Human-readable error message for non-success telemetry rows. Populated
+   * alongside `errorClass` for THROWN / RATE_LIMIT paths so dashboards don't
+   * see `error_class='THROWN'` with `error_message=NULL`. Callers should
+   * normalize unknowns through `extractErrorMessage` before setting.
+   */
+  errorMessage?: string | null;
 };
 
 /**
@@ -184,7 +191,9 @@ export async function logChange(opts: LogChangeOpts) {
         reasoning: reasoning ?? null,
         clientSource: clientSource ?? null,
         success: writeResult.success ? 1 : 0,
-        errorMessage: writeResult.success ? null : writeResult.error ?? null,
+        errorMessage: writeResult.success
+          ? null
+          : writeResult.error ?? telemetry?.errorMessage ?? null,
         errorClass:
           telemetry?.errorClass ??
           (writeResult.success ? null : ERROR_CLASS.WRITE_REJECTED),
@@ -225,6 +234,7 @@ export async function logRead(opts: LogReadOpts) {
         toolCode: code,
         clientSource: clientSource ?? null,
         errorClass: telemetry?.errorClass ?? null,
+        errorMessage: telemetry?.errorMessage ?? null,
         // Read "success" mirrors existing semantics: 1 = happy path, 0 = threw.
         success: telemetry?.errorClass ? 0 : 1,
         ...telemetryColumns(telemetry, toolName),

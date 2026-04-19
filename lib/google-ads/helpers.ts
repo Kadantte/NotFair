@@ -33,6 +33,98 @@ export function extractErrorMessage(
   try { return JSON.stringify(error); } catch { return "Unknown error"; }
 }
 
+/**
+ * Rewrite "Negative ad group criteria are not updateable" errors into an
+ * actionable pointer to the correct tool. Google Ads has no pause state for
+ * negatives; the equivalent is to remove them.
+ */
+export function rewriteNegativePauseError(msg: string): string {
+  if (/negative ad group criteria are not updateable/i.test(msg) ||
+      /ad_group_criterion_error=6/i.test(msg)) {
+    return `${msg} — Negative keywords cannot be paused in Google Ads. Call \`removeNegativeKeyword\` (or \`removeKeywordFromNegativeList\` for shared lists) instead; use \`addNegativeKeyword\` to re-add later.`;
+  }
+  return msg;
+}
+
+/**
+ * Extract PolicyViolationDetails from a GoogleAdsFailure and rewrite it into an
+ * actionable message. Google Ads returns one or more errors with
+ * `error_code.policy_violation_error === 2` (POLICY_ERROR); each carries
+ * `details.policy_violation_details.{external_policy_name, key.{policy_name, violating_text}}`
+ * and `trigger.string_value` (the offending text).
+ *
+ * Returns null if no policy-violation errors are present on the failure.
+ */
+export function extractPolicyDetails(error: unknown): string | null {
+  if (!error || typeof error !== "object" || !("errors" in error)) return null;
+  const failures = (error as { errors: Array<Record<string, any>> }).errors;
+  if (!Array.isArray(failures) || failures.length === 0) return null;
+
+  const parts: string[] = [];
+  for (const f of failures) {
+    const code = f?.error_code ?? {};
+    const isPolicy =
+      code.policy_violation_error === 2 ||
+      code.policy_violation_error === "POLICY_ERROR" ||
+      code.policy_finding_error != null;
+    if (!isPolicy) continue;
+
+    const pvd = f?.details?.policy_violation_details;
+    const policyName: string | undefined =
+      pvd?.key?.policy_name ?? pvd?.external_policy_name;
+    const violatingText: string | undefined =
+      pvd?.key?.violating_text ?? f?.trigger?.string_value;
+    const description: string | undefined = pvd?.external_policy_description;
+
+    const label = policyName ?? "POLICY";
+    if (violatingText) {
+      parts.push(`${label} on text "${violatingText}"`);
+    } else if (description) {
+      parts.push(`${label}: ${description}`);
+    } else {
+      parts.push(label);
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return `Policy violation: ${parts.join("; ")}. Google Ads rejected this ad copy/keyword. Rewrite without the restricted phrase, or request a trademark/policy exception in the Google Ads UI.`;
+}
+
+/**
+ * Rewrite "operation is not allowed for removed resources" errors
+ * (context_error=3 / OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE) into an
+ * actionable message. Avoids expensive pre-query checks — callers pass an
+ * optional entity hint (e.g. "Campaign 12345").
+ */
+export function rewriteRemovedResourceError(msg: string, entityHint?: string): string {
+  if (
+    /context_error=3/i.test(msg) ||
+    /operation is not allowed for removed resources/i.test(msg) ||
+    /OPERATION_NOT_PERMITTED_FOR_REMOVED_RESOURCE/i.test(msg)
+  ) {
+    return `${entityHint ?? "Entity"} has already been removed and cannot be modified. If you intended to operate on a different entity, list current entities first (e.g. listCampaigns / listAdGroups / listAds).`;
+  }
+  return msg;
+}
+
+/**
+ * Compose a guardrail rejection message with a concrete follow-up. The agent
+ * can parse the requested percent and use `setGuardrails` with an exact value.
+ */
+export function guardrailRejectionMessage(
+  kind: "budget" | "bid",
+  requestedChangePct: number,
+  currentMaxPct: number,
+): string {
+  const requested = Math.ceil(requestedChangePct * 100);
+  const current = Math.round(currentMaxPct * 100);
+  // Suggest rounding up to the next 10% above requested, at least +5 over current.
+  const suggested = Math.max(Math.ceil((requested + 5) / 10) * 10, current + 10);
+  const argName = kind === "budget" ? "maxBudgetChangePct" : "maxBidChangePct";
+  const kindLabel = kind === "budget" ? "Budget" : "Bid";
+  return `${kindLabel} change of ${requested}% exceeds maximum allowed ${current}%. To allow larger changes, call setGuardrails with { ${argName}: ${suggested / 100} } (or higher). Use this only if you've confirmed with the user.`;
+}
+
 export function normalizeCustomerId(customerId: string): string {
   return customerId.replace(/-/g, "").trim();
 }

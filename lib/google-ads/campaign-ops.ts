@@ -1,5 +1,5 @@
 import { getCachedCustomer, getCustomer, AD_GROUP_TYPE, MATCH_TYPE, STATUS } from "./client";
-import { extractErrorMessage, isValidFinalUrl, normalizeCustomerId, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
+import { extractErrorMessage, extractPolicyDetails, isValidFinalUrl, normalizeCustomerId, rewriteRemovedResourceError, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
 
 // ─── Create Campaign ─────────────────────────────────────────────────
@@ -236,7 +236,7 @@ export async function createSearchCampaign(
     return {
       success: false,
       campaignName: params.campaignName,
-      error: extractErrorMessage(error),
+      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
     };
   }
 }
@@ -1436,13 +1436,16 @@ export async function updateAdAssets(
       afterValue,
     };
   } catch (error) {
+    const policy = extractPolicyDetails(error);
+    const raw = extractErrorMessage(error);
+    const rewritten = rewriteRemovedResourceError(raw, `Ad ${adId}`);
     return {
       success: false,
       action: "update_ad_assets",
       entityId,
       beforeValue,
       afterValue,
-      error: extractErrorMessage(error),
+      error: policy ?? rewritten,
     };
   }
 }

@@ -72,7 +72,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Keyword Management ─────────────────────────────────────────
 
   server.registerTool("pauseKeyword", {
-    description: "Pause an active keyword. Returns changeId.",
+    description: "Pause a POSITIVE (active) keyword. Does NOT work on negative keywords — Google Ads has no 'pause' for negatives; call `removeNegativeKeyword` instead (and `addNegativeKeyword` to re-add later). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -139,7 +139,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Negative Keywords ──────────────────────────────────────────
 
   server.registerTool("addNegativeKeyword", {
-    description: "Add a negative keyword to a campaign. Returns changeId.",
+    description: "Add a negative keyword to a campaign. Also use this to re-enable a previously removed negative keyword (Google Ads has no 'enable' state for negatives). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -154,7 +154,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("removeNegativeKeyword", {
-    description: "Remove a negative keyword from a campaign. If the same keyword text exists under multiple match types, specify matchType to remove the correct one. Returns changeId.",
+    description: "Remove a negative keyword from a campaign. This is the correct tool for 'pausing' or 'disabling' a negative keyword — Google Ads has no pause state for negatives, removing is the equivalent. To re-add later, call `addNegativeKeyword` with the same text and match type. If the same keyword text exists under multiple match types, specify matchType to remove the correct one. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -543,7 +543,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Bulk Keyword Operations ─────────────────────────────────────
 
   server.registerTool("bulkPauseKeywords", {
-    description: "Pause up to 100 keywords in one call. Partial success is possible. Returns per-keyword results with individual changeIds.",
+    description: "Pause up to 100 POSITIVE keywords in one call. Does NOT work on negative keywords — for negatives, call `removeNegativeKeyword` (single) or loop over them; Google Ads has no 'pause' for negatives. Partial success is possible. Returns per-keyword results with individual changeIds.",
     inputSchema: {
       accountId: accountIdParam,
       keywords: z

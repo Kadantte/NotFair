@@ -1,8 +1,93 @@
 import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
-import { extractErrorMessage, normalizeCustomerId, safeEntityId, toMicros } from "./helpers";
+import { extractErrorMessage, extractPolicyDetails, normalizeCustomerId, rewriteNegativePauseError, safeEntityId, toMicros } from "./helpers";
 import type { AuthContext, Guardrails, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
 import { addKeyword, pauseKeyword } from "./writes";
+
+// ─── Bidding Strategy Type Enum Mapping ──────────────────────────────
+// The google-ads-api library may return bidding_strategy_type as a numeric
+// enum value OR a string name, depending on the response decoder path. Map
+// both forms to a canonical string name so downstream checks work.
+// Source: google-ads-api enums.BiddingStrategyType (v22)
+const BIDDING_STRATEGY_TYPE_NAME: Record<number, string> = {
+  0: "UNSPECIFIED",
+  1: "UNKNOWN",
+  2: "ENHANCED_CPC",
+  3: "MANUAL_CPC",
+  4: "MANUAL_CPM",
+  5: "PAGE_ONE_PROMOTED",
+  6: "TARGET_CPA",
+  7: "TARGET_OUTRANK_SHARE",
+  8: "TARGET_ROAS",
+  9: "TARGET_SPEND",
+  10: "MAXIMIZE_CONVERSIONS",
+  11: "MAXIMIZE_CONVERSION_VALUE",
+  12: "PERCENT_CPC",
+  13: "MANUAL_CPV",
+  14: "TARGET_CPM",
+  15: "TARGET_IMPRESSION_SHARE",
+  16: "COMMISSION",
+  17: "INVALID",
+  18: "MANUAL_CPA",
+  19: "FIXED_CPM",
+  20: "TARGET_CPV",
+  21: "TARGET_CPC",
+  22: "FIXED_SHARE_OF_VOICE",
+};
+
+function normalizeBiddingStrategyName(raw: unknown): string {
+  if (raw == null) return "UNKNOWN";
+  if (typeof raw === "number") return BIDDING_STRATEGY_TYPE_NAME[raw] ?? `UNKNOWN_${raw}`;
+  const s = String(raw);
+  // Sometimes the API returns the number as a string ("3")
+  const asNum = Number(s);
+  if (Number.isInteger(asNum) && BIDDING_STRATEGY_TYPE_NAME[asNum]) {
+    return BIDDING_STRATEGY_TYPE_NAME[asNum];
+  }
+  return s;
+}
+
+// ─── Retry helpers ────────────────────────────────────────────────────
+// Google Ads occasionally returns `database_error=2` meaning "Multiple
+// requests were attempting to modify the same resource at once. Retry the
+// request." This is a transient, retryable error. Retry with exponential
+// backoff + jitter.
+function isDatabaseContentionError(message: string | undefined | null): boolean {
+  if (!message) return false;
+  return (
+    message.includes("database_error=2") ||
+    message.includes("Multiple requests were attempting to modify the same resource")
+  );
+}
+
+// Backoff schedule for retries AFTER the initial attempt.
+// Attempt 2: 200ms + rand(0-100); Attempt 3: 500ms + rand(0-200)
+const DB_CONTENTION_BACKOFFS_MS: Array<{ base: number; jitter: number }> = [
+  { base: 200, jitter: 100 },
+  { base: 500, jitter: 200 },
+];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Invoke an async op that returns a WriteResult. If it returns an unsuccessful
+ * result whose error matches the database contention pattern, retry up to 2
+ * additional times with jittered exponential backoff. Any other error (or
+ * success) returns immediately.
+ */
+async function withDatabaseContentionRetry<T extends WriteResult>(
+  op: () => Promise<T>,
+): Promise<T> {
+  let result = await op();
+  for (const { base, jitter } of DB_CONTENTION_BACKOFFS_MS) {
+    if (result.success || !isDatabaseContentionError(result.error)) return result;
+    await sleep(base + Math.floor(Math.random() * (jitter + 1)));
+    result = await op();
+  }
+  return result;
+}
 
 // ─── Bulk Operations ─────────────────────────────────────────────────
 
@@ -35,7 +120,11 @@ export async function bulkUpdateBids(
   const preCheckData = new Map<string, { strategy: string; bidMicros: number }>();
   for (const [campaignId, group] of byCampaign) {
     const campId = safeEntityId(campaignId);
-    const criterionIds = group.map((u) => Number(u.criterionId)).join(",");
+    const validIds = group
+      .map((u) => Number(u.criterionId))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (validIds.length === 0) continue; // every criterionId malformed — let the downstream "Keyword not found" path report
+    const criterionIds = validIds.join(",");
     const rows = await customer.query(`
       SELECT
         campaign.bidding_strategy_type,
@@ -48,7 +137,7 @@ export async function bulkUpdateBids(
     for (const row of rows as any[]) {
       const critId = String(row.ad_group_criterion?.criterion_id ?? "");
       preCheckData.set(`${campaignId}:${critId}`, {
-        strategy: row.campaign?.bidding_strategy_type ?? "UNKNOWN",
+        strategy: normalizeBiddingStrategyName(row.campaign?.bidding_strategy_type),
         bidMicros: row.ad_group_criterion?.cpc_bid_micros ?? 0,
       });
     }
@@ -68,7 +157,15 @@ export async function bulkUpdateBids(
       continue;
     }
     if (data.strategy && !manualStrategies.includes(data.strategy)) {
-      results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: "N/A", afterValue: String(newBidMicros), error: `Bid changes not supported for ${data.strategy} strategy`, input: u });
+      results.push({
+        success: false,
+        action: "update_bid",
+        entityId: u.criterionId,
+        beforeValue: "N/A",
+        afterValue: String(newBidMicros),
+        error: `Campaign uses bidding strategy ${data.strategy}; manual bid edits are only supported on MANUAL_CPC or ENHANCED_CPC campaigns. To change bids, either switch the campaign's bidding strategy (updateCampaignBidding) or let the strategy handle bids automatically.`,
+        input: u,
+      });
       continue;
     }
     if (newBidMicros <= 0) {
@@ -205,14 +302,14 @@ export async function bulkPauseKeywords(
         const k = chunk[j];
         const errorMsg = failedIndices.get(j);
         if (errorMsg) {
-          results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: errorMsg, input: k });
+          results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: rewriteNegativePauseError(errorMsg), input: k });
         } else {
           results.push({ success: true, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "PAUSED", input: k });
         }
       }
     } catch (error) {
       // Full batch failure (network error, auth, etc.) — mark all in chunk as failed.
-      const msg = extractErrorMessage(error);
+      const msg = rewriteNegativePauseError(extractErrorMessage(error));
       for (const k of chunk) {
         results.push({ success: false, action: "pause_keyword", entityId: k.criterionId, beforeValue: "ENABLED", afterValue: "ENABLED", error: msg, input: k });
       }
@@ -284,11 +381,14 @@ export async function bulkAddKeywords(
         }
       }
     } catch (error) {
+      const policy = extractPolicyDetails(error);
       const msg = extractErrorMessage(error);
       for (const { input, text } of chunk) {
+        const finalError = policy
+          ?? (msg.includes("ALREADY_EXISTS") ? `Keyword "${text}" already exists in this ad group` : msg);
         results.push({
           success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text,
-          error: msg.includes("ALREADY_EXISTS") ? `Keyword "${text}" already exists in this ad group` : msg,
+          error: finalError,
           input,
         });
       }
@@ -360,7 +460,10 @@ export async function moveKeywords(
         const kw = keywordMap.get(critId)!;
         // Use explicit matchType override if provided, otherwise inherit from source
         const effectiveMatchType = matchType ?? kw.sourceMatchType;
-        const addResult = await addKeyword(auth, toAdGroupId, kw.text, effectiveMatchType);
+        // Retry on transient database contention (database_error=2)
+        const addResult = await withDatabaseContentionRetry(() =>
+          addKeyword(auth, toAdGroupId, kw.text, effectiveMatchType),
+        );
         return { ...addResult, criterionId: critId };
       }),
     );
@@ -371,7 +474,10 @@ export async function moveKeywords(
   const successfulCriterionIds = added.filter((r) => r.success).map((r) => r.criterionId);
   const paused: Array<WriteResult & { criterionId: string }> = [];
   for (const critId of successfulCriterionIds) {
-    const pauseResult = await pauseKeyword(auth, campaignId, fromAdGroupId, critId);
+    // Retry on transient database contention (database_error=2)
+    const pauseResult = await withDatabaseContentionRetry(() =>
+      pauseKeyword(auth, campaignId, fromAdGroupId, critId),
+    );
     paused.push({ ...pauseResult, criterionId: critId });
   }
 

@@ -1,5 +1,5 @@
 import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
-import { extractErrorMessage, normalizeCustomerId, safeEntityId } from "./helpers";
+import { extractErrorMessage, guardrailRejectionMessage, normalizeCustomerId, rewriteNegativePauseError, rewriteRemovedResourceError, safeEntityId } from "./helpers";
 import type { AuthContext, Guardrails, UpdateCampaignBiddingParams, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
 
@@ -86,7 +86,10 @@ export async function pauseKeyword(
       entityId: criterionId,
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(
+        rewriteNegativePauseError(extractErrorMessage(error)),
+        `Keyword ${criterionId}`,
+      ),
     };
   }
 }
@@ -128,7 +131,7 @@ export async function enableKeyword(
       entityId: criterionId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Keyword ${criterionId}`),
     };
   }
 }
@@ -238,7 +241,7 @@ export async function removeKeyword(
       entityId: criterionId,
       beforeValue: criterionId,
       afterValue: criterionId,
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Keyword ${criterionId}`),
     };
   }
 }
@@ -293,7 +296,7 @@ export async function updateBid(
         beforeValue: String(currentBidMicros),
         afterValue: String(newBidMicros),
         label: keywordText,
-        error: `Bid change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBidChangePct * 100).toFixed(0)}%. Use setGuardrails to adjust limits.`,
+        error: guardrailRejectionMessage("bid", changePct, guardrails.maxBidChangePct),
       };
     }
   }
@@ -338,7 +341,7 @@ export async function updateBid(
       beforeValue: String(currentBidMicros),
       afterValue: String(newBidMicros),
       label: keywordText,
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Keyword ${criterionId}`),
     };
   }
 }
@@ -465,7 +468,7 @@ export async function removeNegativeKeyword(
       entityId: keywordText,
       beforeValue: keywordText,
       afterValue: "",
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -515,7 +518,7 @@ export async function updateCampaignBudget(
         entityId: campaignId,
         beforeValue: String(currentBudgetMicros),
         afterValue: String(newDailyBudgetMicros),
-        error: `Budget change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBudgetChangePct * 100).toFixed(0)}%. Use setGuardrails to adjust limits.`,
+        error: guardrailRejectionMessage("budget", changePct, guardrails.maxBudgetChangePct),
       };
     }
   }
@@ -557,7 +560,7 @@ export async function updateCampaignBudget(
       entityId: campaignId,
       beforeValue: String(currentBudgetMicros),
       afterValue: String(newDailyBudgetMicros),
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -783,7 +786,7 @@ export async function updateCampaignBidding(
       entityId: campaignId,
       beforeValue,
       afterValue,
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -870,7 +873,7 @@ export async function updateCampaignGoalConfig(
       entityId: campaignId,
       beforeValue: currentLevel,
       afterValue: level,
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -907,6 +910,7 @@ export async function pauseCampaign(
     if (msg.toLowerCase().includes("trial") || msg.toLowerCase().includes("experiment") || msg.includes("CANNOT_MODIFY_FOR_TRIAL_CAMPAIGN")) {
       msg = `Cannot pause this campaign — it may be a trial/experiment campaign. Trial campaigns are controlled by their experiment and cannot be paused directly. Pause the base campaign or end the experiment instead. (Original error: ${msg})`;
     }
+    msg = rewriteRemovedResourceError(msg, `Campaign ${campaignId}`);
     return {
       success: false,
       action: "pause_campaign",
@@ -951,7 +955,7 @@ export async function enableCampaign(
       entityId: campaignId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -986,7 +990,7 @@ export async function removeCampaign(
       entityId: campaignId,
       beforeValue: "PAUSED",
       afterValue: "PAUSED",
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -1039,7 +1043,7 @@ export async function renameCampaign(
       entityId: campaignId,
       beforeValue: "",
       afterValue: trimmed,
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
     };
   }
 }
@@ -1092,7 +1096,7 @@ export async function renameAdGroup(
       entityId: adGroupId,
       beforeValue: "",
       afterValue: trimmed,
-      error: extractErrorMessage(error),
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Ad group ${adGroupId}`),
     };
   }
 }

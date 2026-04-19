@@ -1,5 +1,5 @@
 import { logChange, logRead, ERROR_CLASS, type CallTelemetry, type ErrorClass } from "@/lib/db/tracking";
-import { invalidateCache } from "@/lib/google-ads";
+import { extractErrorMessage, invalidateCache } from "@/lib/google-ads";
 import type { WriteResult } from "@/lib/google-ads";
 import { enforceRateLimit, recordOperation, RateLimitError } from "@/lib/mcp/rate-limit";
 import { trackServerEvent } from "@/lib/analytics-server";
@@ -35,6 +35,7 @@ function buildTelemetry(
   latencyMs: number,
   bytesOut: number | null,
   errorClass: ErrorClass | null,
+  errorMessage: string | null = null,
 ): CallTelemetry {
   const redactedArgs = ctx ? redactAndTruncate(ctx.args) : null;
   return {
@@ -46,6 +47,7 @@ function buildTelemetry(
     latencyMs,
     bytesOut,
     errorClass,
+    errorMessage,
   };
 }
 
@@ -80,6 +82,10 @@ export async function execWrite(
     // charge for infra failures — but we still log a telemetry row so the
     // admin dashboard sees the outage.
     const latencyMs = options?.overrideLatencyMs ?? Math.round(performance.now() - t0);
+    // Normalize unknown throws (GoogleAdsFailure, raw objects, strings) into a
+    // readable string so telemetry rows aren't THROWN+NULL. `log: false`
+    // avoids double-logging since the caller will still see the re-throw.
+    const errorMessage = extractErrorMessage(error, { log: false });
     if (ctx?.toolName) {
       void logRead({
         accountId,
@@ -87,7 +93,7 @@ export async function execWrite(
         toolName: ctx.toolName,
         campaignId,
         clientSource: auth.clientName,
-        telemetry: buildTelemetry(ctx, auth, latencyMs, 0, ERROR_CLASS.THROWN),
+        telemetry: buildTelemetry(ctx, auth, latencyMs, 0, ERROR_CLASS.THROWN, errorMessage),
       });
     }
     throw error;
@@ -152,7 +158,14 @@ export async function execRead<T>(
         toolName,
         campaignId,
         clientSource: auth.clientName,
-        telemetry: buildTelemetry(ctx, auth, 0, null, ERROR_CLASS.RATE_LIMIT),
+        telemetry: buildTelemetry(
+          ctx,
+          auth,
+          0,
+          null,
+          ERROR_CLASS.RATE_LIMIT,
+          extractErrorMessage(error, { log: false }),
+        ),
       });
     }
     throw error;
@@ -163,13 +176,14 @@ export async function execRead<T>(
     result = await fn();
   } catch (error) {
     const latencyMs = Math.round(performance.now() - t0);
+    const errorMessage = extractErrorMessage(error, { log: false });
     void logRead({
       accountId,
       userId: auth.userId,
       toolName,
       campaignId,
       clientSource: auth.clientName,
-      telemetry: buildTelemetry(ctx, auth, latencyMs, 0, ERROR_CLASS.THROWN),
+      telemetry: buildTelemetry(ctx, auth, latencyMs, 0, ERROR_CLASS.THROWN, errorMessage),
     });
     throw error;
   }

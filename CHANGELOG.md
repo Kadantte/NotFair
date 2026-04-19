@@ -2,6 +2,23 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.21.0] - 2026-04-19
+
+### Fixed
+- `bulkUpdateBids` was rejecting 100% of calls with "Bid changes not supported for 3 strategy" because the bidding strategy enum was compared as a raw number (`3`) against the string list `["MANUAL_CPC", "ENHANCED_CPC"]`. Added `normalizeBiddingStrategyName` so numeric, string, and numeric-string forms all resolve correctly. Manual-CPC campaigns now work again; auto-bidding campaigns return a clear "switch to MANUAL_CPC or let the strategy handle bids" message.
+- `moveKeywords` now auto-retries up to 3 attempts with jittered backoff when Google Ads returns transient `database_error=2` ("Multiple requests were attempting to modify the same resource. Retry the request."). Eliminates ~20 failures/week that required no human action.
+- `pauseKeyword` and `bulkPauseKeywords` now detect "Negative ad group criteria are not updateable" and rewrite the error with a pointer to `removeNegativeKeyword`. Tool descriptions updated so agents call the right tool first try.
+- Policy violations on `createCampaign`, `bulkAddKeywords`, and `updateAdAssets` now parse `PolicyViolationDetails` from the Google Ads failure and return a readable message like `"TRADEMARK on text \"Nike\""` instead of the opaque `policy_violation_error=2`.
+- Budget and bid guardrail rejections (`updateCampaignBudget`, `updateBid`) now include concrete `setGuardrails` args in the error message, so agents can parse the exact threshold to request instead of guessing.
+- Mutate catch blocks now recognize `context_error=3` / "operation is not allowed for removed resources" and emit an entity-specific message pointing at `listCampaigns` / `listAdGroups` / `listAds` so agents stop retrying against tombstoned entities.
+- Telemetry `operations` rows with `error_class='THROWN'` or `'RATE_LIMIT'` now populate `error_message` (previously `NULL`). The bug lived in the shared `execRead` / `execWrite` wrappers, so every MCP read and write tool benefits. Closes 14 diagnostic-blind failures/week.
+- `bulkUpdateBids` GAQL pre-check now filters non-integer criterion IDs before interpolation, preventing `IN (123,NaN,456)` from failing the entire batch.
+
+### Changed
+- `pauseKeyword` / `bulkPauseKeywords` tool descriptions clarify "POSITIVE keywords only" and point to `removeNegativeKeyword` for negatives.
+- `removeNegativeKeyword` description now includes the word "pause" so LLM semantic search routes there.
+- `addNegativeKeyword` description notes it is the re-enable path for negatives (Google Ads has no "enable" state for negatives).
+
 ## [0.2.20.1] - 2026-04-19
 
 ### Fixed
