@@ -15,6 +15,7 @@ import {
   getCampaignSettings,
   getRecommendations,
   getNegativeKeywords,
+  getPaidVsOrganicAnalysis,
   getResourceMetadata,
   listQueryableResources,
   searchGeoTargets,
@@ -569,6 +570,32 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, sharedSetId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_negative_keyword_list_items", () => getNegativeKeywordListItems(targetAuth, sharedSetId, limit), null);
+    return jsonResult(result);
+  }));
+
+  // ─── Paid vs Organic ──────────────────────────────────────────────
+
+  server.registerTool("getPaidVsOrganicAnalysis", {
+    description:
+      "Compare paid Google Ads performance vs organic Google Search performance for the same search queries. " +
+      "Returns per-term paid clicks/conversions/cost alongside organic clicks/impressions, plus a cannibalization " +
+      "estimate (what % of paid conversions organic would have caught anyway), estimated incremental CPA, and a " +
+      "verdict per term. Use to decide whether to keep, reduce, or pause paid spend on brand or any keyword theme. " +
+      "REQUIRES Search Console linked to the Google Ads account (Tools → Linked accounts → Search Console). " +
+      "If not linked, response.gscLinked = false with setup instructions.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z.number().int().min(1).max(365).default(90).describe("Lookback days (default 90)"),
+      searchTermContains: z.string().optional().describe("Filter to search terms containing this substring (e.g. 'pawsvip' for brand analysis)"),
+      campaignId: z.string().optional().describe("Optional: limit to a single campaign"),
+      limit: z.number().int().min(1).max(1000).default(200).describe("Max search terms returned"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days, searchTermContains, campaignId, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_paid_vs_organic_analysis", () =>
+      getPaidVsOrganicAnalysis(targetAuth, { days, searchTermContains, campaignId, limit }),
+    );
     return jsonResult(result);
   }));
 
