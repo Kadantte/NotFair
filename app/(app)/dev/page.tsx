@@ -175,7 +175,7 @@ export default function DevPage() {
     const [loadingContacts, setLoadingContacts] = useState(!cachedContacts);
     const [customers, setCustomers] = useState<Customer[]>(cachedCustomers ?? []);
     const [loadingCustomers, setLoadingCustomers] = useState(!cachedCustomers);
-    const [sortKey, setSortKey] = useState<CustomerSortKey>('firstSeen');
+    const [sortKey, setSortKey] = useState<CustomerSortKey>('operations');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [importing, setImporting] = useState(false);
     const [deletingContactId, setDeletingContactId] = useState<number | null>(null);
@@ -577,6 +577,29 @@ export default function DevPage() {
                         </h2>
                         <>
                         {/* Mobile: card layout */}
+                            <div className="sm:hidden mb-3 flex items-center gap-2">
+                                <label className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Sort</label>
+                                <select
+                                    value={sortKey}
+                                    onChange={(e) => setSortKey(e.target.value as CustomerSortKey)}
+                                    className="flex-1 bg-[#24231F] border border-[#3D3C36] rounded-md px-2 py-1.5 text-xs text-[#E8E4DD]"
+                                >
+                                    <option value="operations">Operations</option>
+                                    <option value="budget">Daily Budget</option>
+                                    <option value="accounts">Accounts</option>
+                                    <option value="lastActive">Last Active</option>
+                                    <option value="firstSeen">First Seen</option>
+                                    <option value="email">Customer</option>
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
+                                    className="p-1.5 rounded-md border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD]"
+                                    title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+                                >
+                                    {sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                                </button>
+                            </div>
                             <div className="sm:hidden space-y-2">
                                 {sortedCustomers.map((c) => {
                                     const totalBudget = c.accounts.reduce((s, a) => s + (a.dailyBudget ?? 0), 0);
