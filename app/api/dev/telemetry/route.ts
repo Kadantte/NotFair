@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   const rawDays = parseInt(url.searchParams.get("days") || "7", 10);
   const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 7;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const sinceIso = since.toISOString();
 
   const whereRecent = gte(schema.operations.createdAt, since);
 
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
             SELECT MAX(latency_ms) AS lat
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
-              AND o2.created_at >= ${since}
+              AND o2.created_at >= ${sinceIso}::timestamp
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
             SELECT MAX(latency_ms) AS lat
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
-              AND o2.created_at >= ${since}
+              AND o2.created_at >= ${sinceIso}::timestamp
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
