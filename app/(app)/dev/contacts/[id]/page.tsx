@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { STATUS_CONFIG } from "@/lib/outreach-metrics";
 import { isGmailConfigured, listThreadsForEmail, type GmailThreadSummary } from "@/lib/gmail";
+import { reconcileContactFromThreads } from "@/lib/outreach-reconcile";
 import { ContactDraftEditor } from "./contact-draft-editor";
 import { ThreadCard, formatDateTime } from "@/components/outreach/thread-card";
 
@@ -24,19 +25,21 @@ export default async function ContactProfilePage({
   if (!session.connected) redirect("/connect");
   if (!session.isDev) redirect("/dashboard");
 
-  const [contact] = await db()
+  const [initial] = await db()
     .select()
     .from(schema.contacts)
     .where(eq(schema.contacts.id, contactId))
     .limit(1);
-  if (!contact) notFound();
+  if (!initial) notFound();
 
   let threads: GmailThreadSummary[] = [];
   let gmailError: string | null = null;
+  let contact = initial;
   const gmailOn = isGmailConfigured();
   if (gmailOn) {
     try {
       threads = await listThreadsForEmail(contact.email, 15);
+      contact = (await reconcileContactFromThreads(contact.email, threads, contact)) ?? contact;
     } catch (err) {
       gmailError = err instanceof Error ? err.message : String(err);
     }

@@ -1,6 +1,16 @@
 import dns from "dns/promises";
 
 /**
+ * Lowercase + trim. Throws on missing '@'. Use at every email entrypoint so
+ * downstream `eq(contacts.email, x)` lookups always match the normalized form.
+ */
+export function normalizeEmail(raw: string): string {
+  const email = raw.toLowerCase().trim();
+  if (!email || !email.includes("@")) throw new Error("Invalid email");
+  return email;
+}
+
+/**
  * Validates an email address format and checks that the domain has MX records.
  * This catches dead domains, typos (gmial.com), and fake domains — typically
  * 5-15% of bad addresses in a lead list.

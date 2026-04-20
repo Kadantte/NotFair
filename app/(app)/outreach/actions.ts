@@ -2,7 +2,7 @@
 
 import { db, schema } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
-import { validateEmails } from "@/lib/email-validation";
+import { normalizeEmail, validateEmails } from "@/lib/email-validation";
 import { getSession } from "@/lib/session";
 import {
   isGmailConfigured,
@@ -13,6 +13,11 @@ import {
   findDraftForEmail,
   type GmailThreadSummary,
 } from "@/lib/gmail";
+import { reconcileContactFromThreads } from "@/lib/outreach-reconcile";
+import {
+  markContactStatusUpgrade,
+  upsertCustomerContactByEmail,
+} from "@/lib/outreach-contacts";
 
 async function requireDev() {
   const session = await getSession();
@@ -167,14 +172,10 @@ export async function sendDraftViaGmailAction(contactId: number) {
   await sendDraft(draftId);
   invalidateThreadCache(contact.email);
 
-  await db()
-    .update(schema.contacts)
-    .set({
-      status: "contacted",
-      lastContactedAt: new Date(),
-      gmailDraftId: null,
-    })
-    .where(eq(schema.contacts.id, contactId));
+  await markContactStatusUpgrade(contact, "contacted", {
+    lastContactedAt: new Date(),
+    clearGmailDraftId: true,
+  });
 }
 
 export type CustomerOutreachState = {
@@ -192,12 +193,6 @@ export type CustomerOutreachState = {
   threads: GmailThreadSummary[];
 };
 
-function normalizeEmail(raw: string): string {
-  const email = raw.toLowerCase().trim();
-  if (!email || !email.includes("@")) throw new Error("Invalid email");
-  return email;
-}
-
 /**
  * Read-only outreach state for a connected customer, keyed by email. Never
  * writes — browsing customer pages must not pollute the contacts table. If no
@@ -210,21 +205,26 @@ export async function getCustomerOutreachAction(
   await requireDev();
   const email = normalizeEmail(rawEmail);
 
-  const [contact] = await db()
-    .select()
-    .from(schema.contacts)
-    .where(eq(schema.contacts.email, email))
-    .limit(1);
-
   const gmailConfigured = isGmailConfigured();
   let threads: GmailThreadSummary[] = [];
   let gmailError: string | null = null;
-  if (gmailConfigured) {
-    try {
-      threads = await listThreadsForEmail(email, 15);
-    } catch (err) {
-      gmailError = err instanceof Error ? err.message : String(err);
-    }
+
+  const [[initial], threadsResult] = await Promise.all([
+    db().select().from(schema.contacts).where(eq(schema.contacts.email, email)).limit(1),
+    gmailConfigured
+      ? listThreadsForEmail(email, 15).then(
+          (t) => ({ ok: true as const, threads: t }),
+          (err: unknown) => ({ ok: false as const, err }),
+        )
+      : Promise.resolve({ ok: true as const, threads: [] as GmailThreadSummary[] }),
+  ]);
+
+  let contact: typeof schema.contacts.$inferSelect | null = initial ?? null;
+  if (threadsResult.ok) {
+    threads = threadsResult.threads;
+    contact = await reconcileContactFromThreads(email, threads, contact);
+  } else {
+    gmailError = threadsResult.err instanceof Error ? threadsResult.err.message : String(threadsResult.err);
   }
 
   // Local DB is the source of truth for drafts the app created. If it's empty
@@ -280,34 +280,6 @@ export async function getCustomerOutreachAction(
     gmailError,
     threads,
   };
-}
-
-/**
- * Upsert a contact row for a connected customer. Only called from the customer
- * save/send paths — never from reads. Idempotent: if the row already exists we
- * return it untouched (including its existing kind, so a row that started as a
- * 'lead' and is now a 'customer' we're re-engaging keeps its history).
- */
-async function upsertCustomerContactByEmail(email: string) {
-  const existing = await db()
-    .select()
-    .from(schema.contacts)
-    .where(eq(schema.contacts.email, email))
-    .limit(1);
-  if (existing.length > 0) return existing[0];
-
-  await db()
-    .insert(schema.contacts)
-    .values({ email, status: "new", kind: "customer" })
-    .onConflictDoNothing();
-
-  const [row] = await db()
-    .select()
-    .from(schema.contacts)
-    .where(eq(schema.contacts.email, email))
-    .limit(1);
-  if (!row) throw new Error("Failed to upsert contact");
-  return row;
 }
 
 /**
@@ -391,16 +363,16 @@ export async function sendDraftForCustomerAction(rawEmail: string): Promise<void
   await sendDraft(draftId);
   invalidateThreadCache(email);
 
+  // Persist the (possibly Gmail-discovered) draft body alongside the status
+  // upgrade so the contacts row reflects what was actually sent.
   await db()
     .update(schema.contacts)
-    .set({
-      draftSubject: subject,
-      draftBody: body,
-      status: "contacted",
-      lastContactedAt: new Date(),
-      gmailDraftId: null,
-    })
+    .set({ draftSubject: subject, draftBody: body })
     .where(eq(schema.contacts.id, contact.id));
+  await markContactStatusUpgrade(contact, "contacted", {
+    lastContactedAt: new Date(),
+    clearGmailDraftId: true,
+  });
 }
 
 export async function scheduleContactAction(contactId: number, scheduledAt: Date) {
@@ -436,9 +408,5 @@ export async function sendOutreachAction(contactId: number) {
 
   if (error) throw new Error(error.message);
 
-  // Mark as contacted
-  await db()
-    .update(schema.contacts)
-    .set({ status: "contacted", lastContactedAt: new Date() })
-    .where(eq(schema.contacts.id, contactId));
+  await markContactStatusUpgrade(contact, "contacted", { lastContactedAt: new Date() });
 }

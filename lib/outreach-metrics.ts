@@ -15,7 +15,21 @@ export const STATUS_CONFIG = [
     { key: 'clicked', label: 'Clicked', color: '#34D399' },
     { key: 'replied', label: 'Replied', color: '#4CAF6E' },
     { key: 'bounced', label: 'Bounced', color: '#C45D4A' },
-];
+] as const;
+
+export type ContactStatus = typeof STATUS_CONFIG[number]['key'];
+
+/** Status precedence for upgrade-only writes. 'bounced' is terminal and absent. */
+export const STATUS_RANK: Record<Exclude<ContactStatus, 'bounced'>, number> = {
+    new: 0,
+    drafted: 1,
+    scheduled: 2,
+    contacted: 3,
+    delivered: 4,
+    opened: 5,
+    clicked: 6,
+    replied: 7,
+};
 
 type ContactLike = { email: string; status: string };
 

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { eq, and, lte, asc } from "drizzle-orm";
+import { and, lte, asc, eq } from "drizzle-orm";
 import { getResend } from "@/lib/resend";
+import { markContactStatusUpgrade } from "@/lib/outreach-contacts";
 
 /**
  * Send scheduled outreach emails that are due.
@@ -60,10 +61,7 @@ export async function GET(request: Request) {
       continue;
     }
 
-    await db()
-      .update(schema.contacts)
-      .set({ status: "contacted", lastContactedAt: new Date() })
-      .where(eq(schema.contacts.id, contact.id));
+    await markContactStatusUpgrade(contact, "contacted", { lastContactedAt: new Date() });
 
     results.push({ email: contact.email, company: contact.company, success: true });
   }
