@@ -390,8 +390,12 @@ No properties.
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (server)
-**Trigger:** Fires once per user, the first time they complete the Google OAuth flow and create their initial Google Ads session. Detected via the `gads_new_signup` cookie set on the success response from the auth callback.
+**Trigger:** Fires once per user, the first time they complete the Google OAuth flow and create their initial Google Ads session. Detected via the `gads_new_signup` cookie set on the success response from the auth callback. Fires from two paths: single-account auto-connect in `app/auth/callback/route.ts` and multi-account selection in `app/api/auth/select-account/route.ts`. Both routes use `after(flushServerEvents)` to keep the Vercel Lambda alive until the async PostHog POST completes.
 **Hypothesis:** We believe tracking this tells us first-touch sign-up volume with full UTM attribution attached, which lets us measure paid/organic acquisition channels and tie them to long-term retention.
+
+> **Known ~15% residual miss rate vs Supabase `mcp_sessions` first-row count (post Apr 17 2026).** A larger 43-50% gap was fixed in commit `76d1d96` on 2026-04-17 (multi-account path missing + Lambda flush race). The remaining ~15% is concentrated in the "null `client_name`" cohort — users who complete OAuth but never launch an MCP client and never fire any operation. Two things this means for analysts:
+> 1. **Trust Supabase `mcp_sessions` for signup counts**, not `user_signed_up`. Use PostHog for UTM / referrer attribution, not volume.
+> 2. **When comparing pre/post windows around Apr 17 2026, split at 20:15 UTC (13:15 PT)** — the fix deploy time. Otherwise pre-fix and post-fix signups mix in the same bucket and the miss rate looks period-specific when it isn't.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
