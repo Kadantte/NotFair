@@ -1,0 +1,11 @@
+Subject: sparkle cleaners google ads
+
+Hey Ahmed,
+
+Thanks for using AdsAgent — really appreciate it.
+
+One thing jumped out: your top-spend keywords ("dry cleaners near me", "laundry service") are sitting at quality score 2-3, which means Google is charging you more per click and showing your ads less often. That's why you're only capturing 22% of searches with 54% lost to rank, not budget. The usual levers: tighter ad copy per theme, negatives for wrong-intent traffic, and a lead-capture form on the landing pages (audit flagged 0/4).
+
+Mostly sharing as feedback — curious if this matches what you're seeing, or if anything about AdsAgent's been rough.
+
+Tong

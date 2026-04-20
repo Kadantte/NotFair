@@ -1,0 +1,11 @@
+Subject: sparkle cleaners google ads
+
+Hey Ahmed,
+
+Thanks for using AdsAgent — really appreciate it.
+
+One thing jumped out on Sparkle: your top-spend phrase terms ("dry cleaners near me", "laundry service") are sitting at quality score 2–3, which means Google is charging you more per click and showing your ads less often. That's what's driving the 54% lost to rank on only 22% impression share — not budget. Two likely levers: tighter ad copy per keyword theme, and getting a lead-capture form on the landing pages (currently 0/4).
+
+Mostly sharing as feedback — curious if this matches what you're seeing, or if there's something I'm missing.
+
+Tong

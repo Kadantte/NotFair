@@ -1,6 +1,6 @@
 ---
 name: user-outreach
-description: "Draft personalized outreach emails to AdsAgent users who connected their Google Ads accounts. Uses real audit data from their accounts to write hyper-relevant emails. Invoke this skill whenever the user wants to email new signups, reach out to connected users, draft onboarding emails, write welcome emails based on account data, or says things like 'email new users', 'reach out to signups', 'draft outreach for connected accounts', 'onboard new users', or 'who haven't I emailed yet'. Also trigger when the user asks to check which users need outreach."
+description: "Draft personalized outreach emails to AdsAgent users who connected their Google Ads accounts. Uses real audit data from their accounts to write hyper-relevant emails. Supports two modes: cold outreach with a cal.com CTA (for users who signed up but haven't engaged), and warm feedback/sharing outreach (for users already using AdsAgent — opens a feedback loop instead of pushing a call). Invoke this skill whenever the user wants to email new signups, reach out to connected users, draft onboarding emails, write welcome/thank-you emails, gather product feedback from active users, share account findings, or says things like 'email new users', 'reach out to signups', 'draft outreach for connected accounts', 'gather feedback from users', 'thank users', 'share what I found', 'onboard new users', or 'who haven't I emailed yet'. Also trigger when the user asks to check which users need outreach, or wants to write emails that feel like sharing/feedback rather than pitching."
 ---
 
 # User Outreach: Personalized Emails from Real Audit Data
@@ -8,6 +8,28 @@ description: "Draft personalized outreach emails to AdsAgent users who connected
 This skill drafts outreach emails to AdsAgent users who have connected their Google Ads accounts. Unlike cold outreach to strangers, these emails are hyper-relevant because you have access to their actual account data via the adsagent MCP tools.
 
 The goal: make the user feel like a senior Google Ads expert personally reviewed their account and found something worth sharing. Because that's exactly what's happening.
+
+## The One Rule That Overrides Everything
+
+**Every email body must be under 100 words.** Subject and signature don't count; everything between "Hey X" and "Tong" does. Count before you ship. If you're at 101, cut a word. If you're at 90, don't pad, send it.
+
+Why this is non-negotiable: the whole pitch of this outreach is "founder noticed something specific about your account and sent you a quick note." A 200-word email breaks that premise, it reads as a pitch deck, not a note. Short emails get read; long ones get archived. Every rule below serves this ceiling.
+
+## Sound Human, Not AI
+
+Two dead giveaways that an email was AI-drafted:
+
+1. **Em dashes (—).** Humans typing fast don't reach for em dashes. They use commas, periods, or parentheses. Never write `—` in the body. Use a comma or a period break instead.
+   - Bad: "Real volume — pages load fast"
+   - Good: "Real volume, pages load fast" or "Real volume. Pages load fast."
+
+2. **Hedged closes that aren't real questions.** "Curious if this matches what you're seeing" and "mostly sharing as feedback" sound polite but don't *ask* anything, so people don't reply. Every email must end with a single **literal question mark**. It makes replying feel like an answer, not a favor.
+   - Bad: "Curious if this matches what you're seeing, or if there's anything I'm missing."
+   - Good: "One thing that'd make AdsAgent more useful for you?"
+   - Good: "Any suggestions to make AdsAgent better?"
+   - Good: "What's the biggest thing missing for you?"
+
+Other small things that read human: lowercase "adsagent" sometimes, contractions ("that'd", "thats" without the apostrophe occasionally), starting sentences with "Also" or "Two things.", the occasional comma splice. Don't over-polish.
 
 ## Tong's Voice
 
@@ -18,6 +40,39 @@ Every email comes from Tong. Here's who he is — use this naturally, not as a t
 - Built AdsAgent because he needed it for his own business
 - Manages his own Google Ads — speaks from experience, not theory
 - Casual, direct, no fluff. Writes like a founder texting a friend, not a salesperson drafting a pitch.
+
+## Pick an Outreach Mode
+
+Before drafting, decide which mode the email is in. Different user, different mode.
+
+### Mode A — Cold Outreach (cal.com CTA)
+
+**Use when:** user signed up, connected their account, but you have no signal they've actually used AdsAgent (no MCP tool calls, no engagement). The goal is to get them on a 20-min free setup call so Tong can show them Claude + AdsAgent.
+
+**Close with:** a concrete, low-friction cal.com link inline.
+
+**Existing CTAs below in "Good CTAs" apply here.**
+
+### Mode B — Warm Feedback / Sharing (no hard CTA)
+
+**Use when:** user is actively using the product (tool calls in `mcp_sessions`, you've already emailed them once and want to re-engage, or they're a sophisticated operator / agency that would feel condescended-to by a "free setup call" pitch).
+
+**Differences from Mode A:**
+- **Opener thanks them for using AdsAgent.** "Thanks for using AdsAgent, really appreciate it" before the finding. This reads as warmth, not flattery, and signals you know they're engaged, not cold.
+- **Close asks for product feedback with a direct question.** "One thing that'd make AdsAgent more useful for you?" or "Any suggestions to make AdsAgent better?" Forward-framed, ends in a `?`. Do NOT use "rough or missing" style phrasing, it hedges and people skip it.
+- **No cal.com link.** Including one in feedback mode breaks the tone, it reads as bait-and-switch.
+- **Keep findings direct, not apologetic.** "Two things worth sharing" is fine. Avoid performative phrases like "mostly sharing as feedback" or "I'd guess your team's across this already", they pad word count and signal insecurity.
+
+**Why two modes:** the cal.com CTA is high-leverage for cold users because you're trading a specific finding for a specific next step. For warm users, the same CTA reads as pushy and transactional — they've already raised their hand by using the product, and what you actually want from them is feedback that makes the product better. Asking for the call first skips the relationship.
+
+### How to choose when unclear
+
+- **No MCP tool calls + recent signup** → Mode A (cold).
+- **Active MCP usage OR already emailed once** → Mode B (warm).
+- **Agency managing multiple accounts** → default to Mode B. Agencies don't want setup calls; they want a peer to compare notes with.
+- **Score 70+ account (exceptional)** → Mode B regardless — these people are operators, treat them as peers.
+
+When in doubt, Mode B is the safer choice. You can always follow up with a call offer later; a too-salesy first email can't be undone.
 
 ## Step 1: Find Users Who Need Outreach
 
@@ -46,8 +101,18 @@ A generic Tier 1 email ("you're just getting started, the first month leaks mone
    ```bash
    bunx tsx scripts/trigger-audits.ts <account_id_1> <account_id_2> ...
    ```
-   This script reads credentials from `mcp_sessions`, runs the full Google Ads audit pipeline, and writes a `audit_snapshots` row. Takes ~10-30 sec per account, runs them in series. Run it in the background while you draft the accounts that already have data, then re-query and draft the rest.
+   This script reads credentials from `mcp_sessions`, runs the full Google Ads audit pipeline, and writes a `audit_snapshots` row. Takes ~10-30 sec per account, runs them in series.
+
+   **Batch pattern that works well:** kick this off with `run_in_background: true` for all the accounts missing data, and immediately start drafting emails for the accounts that already have audit data. By the time you're done with the first batch, the background audits are usually finished. This parallelism is the difference between a session that takes 10 minutes and one that takes 40.
 3. After the script finishes, re-query `audit_snapshots` for the freshly-audited accounts and draft from real findings.
+4. **Skip signals from the audit script.** When the script reports any of the following for an account, skip that user — don't draft:
+   - `Skipped — no refresh token` (OAuth expired or revoked — can't audit)
+   - `ERROR: invalid_grant` (same root cause)
+   - `empty account` / `0 campaigns` after a fresh audit (there's genuinely nothing to react to; emailing them would be the generic spam this skill exists to prevent)
+
+   Log these in the final report so Tong knows who was skipped and why.
+
+5. **Only cite numbers you can point at in the audit data.** The Gmail draft creation tool has a content-integrity guard that blocks drafts where specific metrics (quality scores, CTRs, conversion counts, keyword names) appear to be invented. Before writing `QS 3` or `$2.91 CPA` into a draft, make sure that exact value is visible in the `top_actions` / `impression_share_diagnosis` / `topKeywords` fields of the audit row you pulled. If you can't pin the number to real data, either broaden the language ("a very high CTR", "on broad-match generic terms") or drop the number and describe the pattern instead. Pattern-level observations read just as credible and don't trip the guard.
 
 The only legitimate case for a Tier 1 "raw/empty" email is when the audit itself shows the account is genuinely empty (no campaigns, no spend, no history) — that's a real finding, not an absence of data. Even then, mention something concrete from the audit (e.g., "your campaigns are paused" or "no conversion tracking is set up yet"), not generic "first month" boilerplate.
 
@@ -109,6 +174,39 @@ Most advertisers genuinely don't understand impression share. They see "10% capt
 
 **Why this is good outreach material**: it's a finding the user almost certainly hasn't seen, framed in plain English, with a concrete direction. That's the whole package.
 
+### Quality Score is the other killer angle
+
+Quality Score is the single most-underused lever in Google Ads. Advertisers either don't know it exists, assume it's a black box they can't influence, or conflate it with bid. In reality it's the direct output of three inputs that are all actionable:
+
+- **Ad relevance** — does the keyword actually appear in the headline/description, and does the ad promise what the search implies? The fastest fix is grouping keywords by theme and writing ad copy that matches each theme literally.
+- **Expected CTR** — Google's estimate of how often your ad gets clicked vs. others at the same position. Driven by historical CTR of the keyword in your account + ad strength. The fix is usually to prune low-CTR keywords (or add negatives to filter wrong-intent traffic that drags CTR down) and write more compelling copy for the winners.
+- **Landing page experience** — mobile speed, HTTPS, content match, and crucially, whether the page has a form / CTA that matches the search intent. The audit pipeline flags "0 pages with forms" as a common offender — if someone searches "hmo consultant" and lands on a homepage without a contact form, LPX tanks.
+
+**When to lead with QS over impression share**: if the audit shows QS 1–3 on the highest-spend keywords, or "Creative Quality: BELOW_AVERAGE" / "Post-Click Quality: BELOW_AVERAGE" on winning terms, QS is the tighter lead. Impression-share framing is about "how much demand you're capturing." Quality-score framing is about "why Google is ranking your ads below where they should be." Same underlying problem, but QS gives the reader concrete next steps (write better copy, add forms, add negatives) instead of the vaguer "improve ad relevance."
+
+**Example QS framing** (from a real send):
+
+> "Quality score is the main ceiling. Your key phrase terms are sitting at QS 2–3, which is what's driving the lost-to-rank number. The three QS levers are ad relevance, expected CTR, and landing page experience. Practically: tighten ad copy to match each keyword theme more literally, get lead-capture forms on the landing pages (the audit flagged 0/9 pages with forms), and add negatives for the wrong-intent traffic dragging CTR down."
+
+Three concrete actions, one per lever. Not a tutorial — a punch list.
+
+### Name the *consequence*, not the *metric*
+
+Most people don't know what "QS 2" means. Saying "your keywords have quality score 2 to 3" sounds like a diagnostic number — they can't tell if that's good or bad, and won't bother looking it up. Always translate the metric into **what it's costing them** in plain English. That's what makes the finding land.
+
+**Translation cheat sheet:**
+
+| Metric | Don't say | Say instead |
+|---|---|---|
+| Quality score 1–3 | "QS is 2" | "Google charges you more per click and shows your ads less often" |
+| Low impression share (budget-limited) | "IS at 14%, 86% lost to budget" | "you're only showing up for 14% of relevant searches, mostly because budget runs out" |
+| Low impression share (rank-limited) | "87% lost to rank" | "Google isn't ranking your ads high enough to show them as often as they could" |
+| No conversion tracking | "no conversions imported" | "Google has no idea which clicks turn into leads, so it can't find you more of them" |
+| Multiple primary conversions | "3 primary conversion actions" | "your reported CPA mixes 3 different events, so the number is misleading and bidding chases the wrong one" |
+| High CPC on brand | "brand CPC $4" | "you're paying $4/click for people already searching your name — that's usually free traffic" |
+
+**Rule of thumb:** every number should be followed by "which means…" in plain English. If the reader has to know Google Ads jargon to understand why it matters, rewrite.
+
 ## Step 3: Classify the Account
 
 Based on the audit, classify into one of three tiers:
@@ -146,12 +244,12 @@ Tong
 **Signals:** Active campaigns but problems — too many conversion events, no conversion tracking, poor keyword structure, high wasted spend, low quality scores, missing negatives, broad match bleeding money.
 
 **Email approach:**
-- Lead with the SPECIFIC finding — the one thing that would make the biggest impact
-- Explain WHY it matters (not just what's wrong, but the consequence)
-- Show you understand their business context
-- Offer to share what you found or help fix it
+- **Open with what's working well first.** Every functional account has at least one thing done right: tight campaign structure, clear niche focus, low waste rate, strong brand QS, real conversion volume at reasonable CPA, disciplined budget control, a winning exact-match keyword. Find it and open with it — "the account's working" / "you've kept the account tight" / "real conversions coming through at reasonable CPAs". This is not flattery; it's accurate observation, and it makes the criticism that follows land as a peer's advice rather than a consultant's audit. Without it, the email reads as "here's what's broken," which makes the reader defensive.
+- Then lead with the SPECIFIC finding — the one thing (or at most two) that would make the biggest impact. Explain WHY it matters (not just what's wrong, but the consequence).
+- Show you understand their business context.
+- Offer to share what you found or help fix it (Mode A) or invite feedback (Mode B).
 - Medium length (5-8 sentences). Enough to be credible, not so much they tune out.
-- Subject should reference the specific issue + their business name
+- Subject should reference the specific issue + their business name.
 
 **Example (Fix Fireplace — conversion tracking mess):**
 ```
@@ -214,17 +312,17 @@ Tong
 - Always include cal.com link inline: https://cal.com/tong-chen-uuovdl/30min
 - **Subject: keep it boring.** "{business} google ads" beats any clever hook. No em dashes, no "top 10% account", no "one easy unlock". Tong's actual sends use 3-word lowercase subjects like "batchy google ads".
 
-**Example (Batchy — top 5% account, budget-bound — this is Tong's actual send, study it):**
+**Example (Batchy — top 5% account, budget-bound — 78 words, under the 100-word ceiling):**
 ```
 Subject: batchy google ads
 
-I'm Tong — built AdsAgent, former Meta data scientist, now running a multi-location dog daycare in Seattle. I do quick reviews of accounts that connected to adsagent, and yours is definitely in the top 5% I've audited.
+I'm Tong — built AdsAgent, run a dog daycare in Seattle. Yours is top 5% of accounts I've reviewed.
 
-You seem to be operating in a interesting industry, Your $1.82 CPA is crazy low. Impression-wise, currently you lose out on 86% of impressions due to budget running out, which is not a bad thing at all, It means you can probably get more conversions at similar cost if you decide to increase your budget,
+$1.82 CPA is crazy low. You're losing 86% of impressions to budget — not a bad thing. It means you can likely get a lot more conversions at similar CPA by raising the budget.
 
-AdsAgent isn't an agency — it turns Claude into your ads manager so you can pull stuff like this on demand and execute fixes or spin up more campaigns with AI in the loop.
+AdsAgent turns Claude into your ads manager, so you can pull stuff like this on demand.
 
-Happy to do a quick free 20-min walkthrough if you want to see more things you can do with adsagent or claude integrations: https://cal.com/tong-chen-uuovdl/30min
+Happy to do a quick free 20-min walkthrough: https://cal.com/tong-chen-uuovdl/30min
 
 Tong
 ```
@@ -238,6 +336,38 @@ Tong
 - **Loose register.** "crazy low", "pull stuff like this on demand", "spin up more campaigns" — operator-speak, not deck-speak.
 - **CTA is direct and singular.** "Happy to do a quick free 20-min walkthrough… {link}". Doesn't ask permission, doesn't soft-pedal, doesn't say "if you're interested". Just makes the offer.
 - **Sign-off: "Tong". No "Best,". No "Cheers,".** Period.
+
+### Agency Detection & Framing
+
+Agencies need a different voice than business owners. They already know what ad rank is, what impression share means, how Smart Bidding works. Explaining those concepts reads as condescending and gets the email archived. Instead, talk to them as a peer comparing notes across portfolios.
+
+**How to detect an agency:**
+
+1. **Email domain looks like an agency.** Signals include: "marketing", "digital", "agency", "agencie", "media", "creative", "consult" in the domain. Known agency domains Tong has seen: `digital-mastermind.com`, `mintdigital.au`, `thankduck.au`, `localwebadvisors.com.au`, `sherpamarketing.ch`, `mbdigital.co.za`, `cheshirecatmarketing.co.uk`, `goyalmarketing.com`, `baldwinson.com`, `proconsult.rs`, `creativeweb360.com`, `alta-agentie.ro`. This list is not exhaustive — trust the pattern, not the enumeration.
+2. **User has connected 3+ accounts with different brand names.** One person with Heylife + Allcook Kitchen + Fit 'n' Tasty + HEYLIFE.COM is almost certainly an agency or a holding-company marketer, not a single business owner with four brands.
+3. **Account names look like managed portfolios.** "DP - GADS - SRCH - USA_CA - Brand" naming conventions, heavy use of brand/gen/market suffixes, consistent tagging across campaigns — these are agency-style operational habits.
+
+**Agency framing differences:**
+- **No explaining basics.** Don't define quality score, impression share, or match types. They know. Jump to the pattern.
+- **Talk in portfolio terms.** "One pattern jumped out across all four accounts" / "curious if this matches what you're seeing client-side" / "agency-side feedback" — signal you understand they manage multiple brands.
+- **Default to Mode B (warm/feedback).** Agencies never convert on a setup call pitch — they'd be insulted. The feedback/peer frame is much stronger.
+- **Acknowledge their expertise.** "I'd guess your team's across this already, but…" is not hedging; it's respect. It positions the email as cross-pollination between operators, not an audit.
+
+**Example (Nicole — agency managing 4 brands across CH/DE/FR):**
+
+> "Saw you connected four accounts (Heylife, Allcook, Fit 'n' Tasty, HEYLIFE.COM) so I took a look across them. One pattern jumped out across all four: rank-limited losses everywhere — Allcook at 86% lost to rank, Fit 'n' Tasty at 77%… Mostly sharing this as agency-side feedback since I imagine you're already across it — curious if the pattern matches what you're seeing, or if there's something about the vertical I'm missing."
+
+Notice: no QS explainer, no "here's how ad rank works", no cal.com. Just pattern + peer-to-peer ask.
+
+### Multi-brand same person
+
+Some people manage multiple agencies and have different domain emails for each (e.g. tanaka@mintdigital.au, tanaka@localwebadvisors.com.au, tanaka@thankduck.au — same human). Before drafting a new email to one of these addresses, search Gmail sent for any of the person's other addresses. If you've emailed them before at a different brand, acknowledge it in the new email:
+
+> "I've pinged your other agency addresses before on different accounts — apologies for the dupes, same reviewer."
+
+Without this acknowledgment, it reads as spammy coincidence. With it, it reads as "this person is paying attention." Same content, opposite impression.
+
+How to detect: same first-name token in the email's local part + different domains all recognizable as agencies. When in doubt, err on the side of acknowledging — a false-positive acknowledgment is harmless; a false-negative dupe is irritating.
 
 ## Step 4: Draft the Email
 
@@ -264,14 +394,20 @@ For each user, compose the email with:
 
 **Length and tone — this is the hardest part to get right:**
 
-The email should feel like a friendly note from a fellow operator, not a consulting deliverable. Aim for **150-200 words total**. If you're over 250, you've gone too long — cut.
+**STRICT WORD LIMIT: under 100 words total (body only, excluding subject and signature).** This is non-negotiable. Count the words before sending. If you're at 110, cut. If you're at 90, ship. The reason: founder-to-operator notes that get read are short. The moment an email looks like it'll take more than 20 seconds to read, people archive. Every sentence has to earn its place.
 
-- **One insight, one sentence of "why it matters", one sentence of "the fix direction".** That's it. Do NOT pull specific keyword names, quality score numbers per keyword, lists of what Google is flagging, or paragraph-length explanations of how ad rank works. The reader does not need a tutorial — they need to feel that someone smart looked at their account and noticed something real.
-- **Don't lecture.** If you find yourself explaining a concept ("Google's ad rank is mostly driven by three things..."), you're lecturing. Cut it. Trust the reader to know their own domain or to ask if they're curious.
-- **Don't stack details to prove you looked.** One specific number (e.g., "you're capturing about 10% of available searches, and 87% of the misses are quality, not budget") is enough. More numbers = less personable, more sales-deck.
-- **No bulleted lists, no sub-points, no headers.** Plain prose paragraphs only. Lists make it feel like a report.
-- **2-4 short paragraphs max.** White space matters. A wall of text is the #1 reason people bounce.
-- **Read it out loud.** If it sounds like something a friend would text you, ship it. If it sounds like a LinkedIn post or a sales email, rewrite.
+How to hit <100 words:
+- **One insight. One number. One next step.** That's the whole email. No "why it matters" paragraph, no "here's how it works" explainer, no three-sentence intro about who Tong is (one short clause is enough — "I'm Tong, built AdsAgent").
+- **Cut any sentence that doesn't contain a specific fact about their account or a concrete offer.** Filler like "hope this is useful either way" is fine as a closer but shouldn't appear mid-email.
+- **Merge sentences.** "You're capturing 10% of searches. 87% of the misses are quality score, not budget." → "You're capturing ~10% of searches — 87% of the misses are quality score, not budget."
+- **Delete the credentials paragraph if tight on budget.** "Former Meta data scientist, runs a dog daycare" is nice but optional. The finding is the credential.
+- **No bulleted lists, no sub-points, no headers.** Plain prose paragraphs only.
+- **2-3 short paragraphs max.** White space matters.
+- **Read it out loud.** If it sounds like a friend texting you, ship it. If it sounds like a LinkedIn post or sales email, rewrite.
+
+Examples of word counts that work: the trimmed Batchy example in this doc is 78 words. That's the target zone (70–95). Anything over 100 needs to justify every extra word — and almost always can't.
+
+**How to check before shipping:** paste the body (no subject, no signature) into a word counter. If it's over 100, find the longest sentence and cut it or split it. Ask: "does this sentence contain a number from their account or a concrete offer?" If no, it's filler.
 
 **The mental test:** would *you* read this email if a stranger sent it to you? Or would you skim the first paragraph and archive? Optimize for "actually finishes reading."
 
@@ -286,7 +422,7 @@ This is bad because it implies the reader has to reply (or worse, book a call) t
 The shift is: you've already given them the value. The CTA is optional follow-up, not a paywall.
 
 **What NOT to do:**
-- Don't stack multiple findings. Pick the ONE biggest opportunity.
+- Don't stack 3+ findings. **At most two improvements — ideally one.** If you include two, at least one should be quality score when QS is clearly the bottleneck (QS 1–3 on high-spend keywords, "BELOW_AVERAGE" creative/post-click flags, high lost-to-rank %). The second finding, if included, should be a cleanly-separable pattern (not a variation of the first). Three findings stacked reads as an audit report; two reads as a curated observation; one reads as a friend pointing at the thing they noticed.
 - Don't use marketing language ("revolutionary", "game-changing", "unlock")
 - Don't use "wasted spend" or "waste" — it sounds negative and off-putting. Frame things positively (e.g. "room to capture more demand" not "you're wasting money").
 - Don't send the same email template with names swapped
@@ -295,15 +431,38 @@ The shift is: you've already given them the value. The CTA is optional follow-up
 - For strong accounts, use percentile language: "top 10%" or "top 25% of accounts we've audited" — this is more compelling than listing specific metrics. **Score calibration (real distribution from our audits):** 60+ is genuinely very healthy and should be treated as Tier 3 / top 10% — most accounts score in the 30s-50s. 70+ is exceptional / top 5%. 50-59 is Tier 2 (functional but real issues). Below 50 is Tier 2 with clear problems or Tier 1 if empty. Don't undersell a 60+ account by calling it "decent" or "OK" — it's actually strong, lead with that.
 - Don't pitch AdsAgent features in a salesy way. The CTA should feel like a genuine offer to help, not a product demo. The formula: [specific value you already delivered] + [soft availability] + [single ask].
 
-**The CTA goal: book a free setup call.** The whole point of outreach is to get them on a quick call where Tong shows them how to use Claude + AdsAgent so they can find issues and have AI fix them on their own. The audit finding in the email is the hook — the call is the conversion. Make the offer concrete, free, and low-commitment, but always offer it.
+**The CTA depends on the mode you picked.** Mode A (cold) optimizes for the cal.com call; Mode B (warm feedback) optimizes for a product-feedback reply. Never stack both.
 
-**Good CTAs (pick one, don't stack). All assume the finding is already in the email:**
+**The Mode A goal: book a free setup call.** For cold users, the point of outreach is to get them on a quick call where Tong shows them how to use Claude + AdsAgent so they can find issues and have AI fix them on their own. The audit finding in the email is the hook — the call is the conversion. Make the offer concrete, free, and low-commitment.
+
+**The Mode B goal: get them talking.** For warm users (active MCP usage, agencies, sophisticated operators, Tier 3 exceptional accounts, or follow-up contacts), the point is to deepen the relationship and extract product feedback. The audit finding is the gift; the ask is "what's rough about AdsAgent?" Any response — positive, negative, or a random feature request — is the win.
+
+**Good Mode A CTAs (pick one, don't stack). All assume the finding is already in the email:**
 - "Happy to hop on a quick call and get you set up — I'll show you how to use Claude + AdsAgent to find stuff like this and have AI fix it for you. Free, takes about 20 min: https://cal.com/tong-chen-uuovdl/30min"
 - "If you want, I can walk you through it on a quick free setup call — I'll show you how to use Claude to find issues like this and fix them with AI. https://cal.com/tong-chen-uuovdl/30min"
 - "Want me to show you how? I do free 20-min setup calls — you'll leave knowing how to spot stuff like this and have Claude fix it for you. https://cal.com/tong-chen-uuovdl/30min"
 - (Tier 3 only, when a finding is borderline) "Open to a 15-min call to walk through what else I noticed? https://cal.com/tong-chen-uuovdl/30min"
 
-The CTA should feel like a friendly offer ("happy to show you how"), not a sales pitch ("book a demo"). Always include the cal.com link inline so it's one click to schedule.
+The Mode A CTA should feel like a friendly offer ("happy to show you how"), not a sales pitch ("book a demo"). Always include the cal.com link inline so it's one click to schedule.
+
+**Good Mode B closes (pick one, don't stack). Every close ends with a literal `?`. No cal.com link in Mode B:**
+- "One thing that'd make AdsAgent more useful for you?" (strongest default, single concrete ask, forward-framed)
+- "Any suggestions to make AdsAgent better?"
+- "What's the biggest thing missing for you?"
+- "One thing you'd add or fix?"
+- (Agency) "One thing AdsAgent could do to make managing multiple accounts easier?" (agency-flavored, still a product-feedback ask)
+- (Agency) "What's the biggest pain in managing these accounts right now?" (surfaces a pain we could solve)
+
+Avoid hedged non-questions: "rough or missing", "curious if this matches what you're seeing", "I'd guess your team's across this already", "does this pattern hold across your portfolio?" All of these are polite-but-skippable. The last one especially: it asks the reader to mentally review their portfolio and agree/disagree with an observation *I* made, which is real work and yields zero product signal. Stay focused on AdsAgent itself, that's what we actually want feedback on.
+
+The Mode B close should leave the reader with a low-cost reply option: one specific improvement idea. Any answer is a win. The worst outcome is no response, and hedged non-questions are what make "no response" the default.
+
+**Good-question test (apply before shipping):**
+1. Can a busy reader answer it in 5-10 seconds with a single thought? If it requires recalling data or scanning their portfolio first, rewrite.
+2. Does the answer give us product signal about AdsAgent? If the best possible answer is "yes" / "no" / "interesting observation", you're asking the wrong thing.
+3. Is the subject of the question *them and their needs*, or *me and my observation*? The former gets replies. The latter flatters you and gets archived.
+
+**Why no cal.com in Mode B:** when someone is already using the product, the biggest risk isn't that they don't schedule a call — it's that they churn silently because the product fell short somewhere and they never told you. A product-feedback ask opens that channel; a setup-call CTA closes it by signaling "I want something from you" rather than "I want to hear from you." Don't mix these signals.
 
 **Bad CTAs (do not use — they gate the insight):**
 - "Let me know if you'd like me to share what I found"
