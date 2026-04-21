@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { after } from "next/server";
@@ -9,6 +9,7 @@ import { deriveCustomerName, listAccessibleCustomers, parseCustomerIds, syncAcco
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
+import { sendRedditConversion } from "@/lib/reddit-capi";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
@@ -687,6 +688,22 @@ export async function GET(request: Request) {
       signup_method: "google_oauth",
       ...(clientIp ? { $ip: clientIp } : {}),
     });
+
+    const conversionId = randomUUID();
+    response.cookies.set("reddit_signup_id", conversionId, { path: "/", maxAge: 60 });
+    const userAgent = request.headers.get("user-agent") ?? undefined;
+    after(
+      sendRedditConversion({
+        trackingType: "SignUp",
+        conversionId,
+        email: user.email ?? null,
+        externalId: user.id,
+        ipAddress: clientIp ?? null,
+        userAgent: userAgent ?? null,
+        valueDecimal: 1.0,
+        currency: "USD",
+      }),
+    );
   }
 
   // Clear the one-time OAuth nonce cookie
