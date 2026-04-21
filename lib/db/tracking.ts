@@ -1,6 +1,7 @@
 import { db, schema } from "./index";
 import { eq, and, gt, gte, lt, lte, desc, inArray, sql } from "drizzle-orm";
 import type { WriteResult } from "@/lib/google-ads";
+import { maybeFireRedditFirstWrite } from "@/lib/reddit-first-write";
 import {
   IMPACT_CORRELATION_DISCLAIMER,
   IMPACT_WINDOW_DAYS,
@@ -200,6 +201,10 @@ export async function logChange(opts: LogChangeOpts) {
         ...telemetryColumns(telemetry, writeResult.action),
       })
       .returning();
+
+    if (inserted && userId && writeResult.success) {
+      void maybeFireRedditFirstWrite({ userId, justInsertedId: inserted.id });
+    }
 
     return inserted;
   } catch (error) {

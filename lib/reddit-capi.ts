@@ -1,5 +1,7 @@
 const REDDIT_CAPI_ENDPOINT = "https://ads-api.reddit.com/api/v2.0/conversions/events";
 
+export const REDDIT_SIGNUP_ID_COOKIE = "reddit_signup_id";
+
 export type RedditTrackingType =
   | "PageVisit"
   | "ViewContent"

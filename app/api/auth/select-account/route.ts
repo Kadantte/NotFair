@@ -8,7 +8,12 @@ import { listAccessibleCustomers, deriveCustomerName, parseCustomerIds, syncAcco
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
-import { sendRedditConversion } from "@/lib/reddit-capi";
+import {
+  REDDIT_SIGNUP_ID_COOKIE,
+  sendRedditConversion,
+  type RedditConversionInput,
+} from "@/lib/reddit-capi";
+import { getClientIp } from "@/lib/request-ip";
 
 export async function POST(request: Request) {
   after(flushServerEvents);
@@ -190,17 +195,14 @@ export async function POST(request: Request) {
   // every multi-account signup entirely (17% of signups as of Apr 2026).
   // UTMs and signup_referrer were written to Supabase user_metadata by the
   // callback before branching; read them back so attribution is preserved.
-  let redditConversionPayload:
-    | Parameters<typeof sendRedditConversion>[0]
-    | null = null;
+  let redditConversionPayload: RedditConversionInput | null = null;
 
   if (isNewSignup && session.userId) {
     try {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>;
-      const forwardedFor = request.headers.get("x-forwarded-for");
-      const clientIp = forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || undefined;
+      const clientIp = getClientIp(request);
       trackServerEvent(session.userId, "user_signed_up", {
         utm_source: meta.utm_source,
         utm_medium: meta.utm_medium,
@@ -219,7 +221,7 @@ export async function POST(request: Request) {
         email: user?.email ?? null,
         externalId: session.userId,
         ipAddress: clientIp ?? null,
-        userAgent: request.headers.get("user-agent") ?? null,
+        userAgent: request.headers.get("user-agent"),
         valueDecimal: 1.0,
         currency: "USD",
       };
@@ -236,7 +238,7 @@ export async function POST(request: Request) {
     response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
   }
   if (redditConversionPayload) {
-    response.cookies.set("reddit_signup_id", redditConversionPayload.conversionId, {
+    response.cookies.set(REDDIT_SIGNUP_ID_COOKIE, redditConversionPayload.conversionId, {
       path: "/",
       maxAge: 60,
     });

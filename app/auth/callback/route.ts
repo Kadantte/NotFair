@@ -9,7 +9,8 @@ import { deriveCustomerName, listAccessibleCustomers, parseCustomerIds, syncAcco
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
-import { sendRedditConversion } from "@/lib/reddit-capi";
+import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi";
+import { getClientIp } from "@/lib/request-ip";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
@@ -674,15 +675,12 @@ export async function GET(request: Request) {
   // Track signup event with UTM attribution in PostHog
   const isNewSignup = response.cookies.get("gads_new_signup")?.value === "1";
   if (isNewSignup && user?.id) {
-    const utmProps = state.utm ?? {};
-    // Extract the originating client IP so PostHog can geoip the server event.
     // request.headers.get("referer") is useless here (always accounts.google.com
     // because OAuth redirected through it) — state.signup_referrer carries the
     // real marketing referrer captured before the OAuth bounce.
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    const clientIp = forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || undefined;
+    const clientIp = getClientIp(request);
     trackServerEvent(user.id, "user_signed_up", {
-      ...utmProps,
+      ...(state.utm ?? {}),
       signup_referrer: state.signup_referrer ?? undefined,
       google_email: user.email,
       signup_method: "google_oauth",
@@ -690,8 +688,7 @@ export async function GET(request: Request) {
     });
 
     const conversionId = randomUUID();
-    response.cookies.set("reddit_signup_id", conversionId, { path: "/", maxAge: 60 });
-    const userAgent = request.headers.get("user-agent") ?? undefined;
+    response.cookies.set(REDDIT_SIGNUP_ID_COOKIE, conversionId, { path: "/", maxAge: 60 });
     after(
       sendRedditConversion({
         trackingType: "SignUp",
@@ -699,7 +696,7 @@ export async function GET(request: Request) {
         email: user.email ?? null,
         externalId: user.id,
         ipAddress: clientIp ?? null,
-        userAgent: userAgent ?? null,
+        userAgent: request.headers.get("user-agent"),
         valueDecimal: 1.0,
         currency: "USD",
       }),

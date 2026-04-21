@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.22.0] - 2026-04-20
+
+### Added
+- Reddit Ads conversion tracking: client Pixel (PageVisit on every page, SignUp echo with advanced matching for authenticated users) plus server-side Conversions API for dedup-safe event delivery. Requires `NEXT_PUBLIC_REDDIT_PIXEL_ID` and `REDDIT_CONVERSION_ACCESS_TOKEN` env vars.
+- First successful write now fires a Reddit `Lead` conversion so the pixel optimizer trains on AdsAgent's activation north star (D0-Write) instead of OAuth connects. Uses a stable `first-write-${userId}` conversion_id so concurrent bulk-write races dedupe.
+- `getClientIp()` helper in `lib/request-ip.ts` — shared IP extraction for PostHog and Reddit CAPI callers.
+
+### Changed
+- In-process cache on the first-write check: once a user has any prior successful write, subsequent `logChange` calls short-circuit without hitting the DB. Bulk-write ops (`bulkUpdateBids`, `bulkPauseKeywords`) no longer pay N extra SELECTs.
+- Exported `REDDIT_SIGNUP_ID_COOKIE` + `RedditConversionInput` so auth routes and the client tracker share one cookie name and one input type.
+
 ## [0.2.21.0] - 2026-04-19
 
 ### Fixed
