@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.22.2] - 2026-04-20
+
+### Fixed
+- Reddit Conversions API `action_source` must be uppercase (`WEBSITE`, `APP`, etc.), not lowercase. Prior releases sent `"website"` and Reddit returned `400 invalid action_source` on every server-side fire. Caught via `test_id` probe against Reddit's Test Events endpoint.
+
 ## [0.2.22.1] - 2026-04-20
 
 ### Fixed

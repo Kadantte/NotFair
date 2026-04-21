@@ -14,14 +14,14 @@ export type RedditTrackingType =
   | "Custom";
 
 export type RedditActionSource =
-  | "website"
-  | "app"
-  | "email"
-  | "phone_call"
-  | "chat"
-  | "physical_store"
-  | "system_generated"
-  | "other";
+  | "WEBSITE"
+  | "APP"
+  | "EMAIL"
+  | "PHONE_CALL"
+  | "CHAT"
+  | "PHYSICAL_STORE"
+  | "SYSTEM_GENERATED"
+  | "OTHER";
 
 export type RedditConversionInput = {
   trackingType: RedditTrackingType;
@@ -70,7 +70,7 @@ export async function sendRedditConversion(event: RedditConversionInput): Promis
       events: [
         {
           event_at: Date.now(),
-          action_source: event.actionSource ?? "website",
+          action_source: event.actionSource ?? "WEBSITE",
           type: {
             tracking_type: event.trackingType,
             ...(event.customEventName ? { custom_event_name: event.customEventName } : {}),

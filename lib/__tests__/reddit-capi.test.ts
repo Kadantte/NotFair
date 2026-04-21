@@ -74,7 +74,7 @@ describe("sendRedditConversion", () => {
     expect(body.test_mode).toBeUndefined();
     expect(body.data.events).toHaveLength(1);
     const [event] = body.data.events;
-    expect(event.action_source).toBe("website");
+    expect(event.action_source).toBe("WEBSITE");
     expect(event.type).toEqual({ tracking_type: "SignUp" });
     expect(event.metadata).toEqual({
       conversion_id: "conv-123",
