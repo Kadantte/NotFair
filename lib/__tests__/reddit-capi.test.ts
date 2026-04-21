@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { sendRedditConversion } from "../reddit-capi";
 
-const ENDPOINT = "https://ads-api.reddit.com/api/v2.0/conversions/events";
+const BASE = "https://ads-api.reddit.com/api/v3/pixels";
 
 describe("sendRedditConversion", () => {
   const originalEnv = { ...process.env };
@@ -65,19 +65,20 @@ describe("sendRedditConversion", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe(`${ENDPOINT}/a2_testpixel`);
+    expect(url).toBe(`${BASE}/a2_testpixel/conversion_events`);
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer secret-token");
     expect(init.headers["Content-Type"]).toBe("application/json");
 
     const body = JSON.parse(init.body);
-    expect(body.test_mode).toBe(false);
-    expect(body.events).toHaveLength(1);
-    const [event] = body.events;
-    expect(event.event_type).toEqual({ tracking_type: "SignUp" });
-    expect(event.event_metadata).toEqual({
+    expect(body.test_mode).toBeUndefined();
+    expect(body.data.events).toHaveLength(1);
+    const [event] = body.data.events;
+    expect(event.action_source).toBe("website");
+    expect(event.type).toEqual({ tracking_type: "SignUp" });
+    expect(event.metadata).toEqual({
       conversion_id: "conv-123",
-      value_decimal: 1,
+      value: 1,
       currency: "USD",
     });
     expect(event.user).toEqual({
@@ -86,8 +87,8 @@ describe("sendRedditConversion", () => {
       ip_address: "1.2.3.4",
       user_agent: "UA/1.0",
     });
-    expect(typeof event.event_at).toBe("string");
-    expect(Number.isFinite(Date.parse(event.event_at))).toBe(true);
+    expect(typeof event.event_at).toBe("number");
+    expect(event.event_at).toBeGreaterThan(1700000000000);
   });
 
   it("honors REDDIT_CAPI_TEST_MODE flag", async () => {
@@ -102,6 +103,7 @@ describe("sendRedditConversion", () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.test_mode).toBe(true);
+    expect(body.data.events).toHaveLength(1);
   });
 
   it("falls back to NEXT_PUBLIC_REDDIT_PIXEL_ID when REDDIT_PIXEL_ID is unset", async () => {
@@ -115,7 +117,7 @@ describe("sendRedditConversion", () => {
       email: "a@b.com",
     });
 
-    expect(fetchMock.mock.calls[0][0]).toBe(`${ENDPOINT}/a2_publicfallback`);
+    expect(fetchMock.mock.calls[0][0]).toBe(`${BASE}/a2_publicfallback/conversion_events`);
   });
 
   it("logs and swallows non-2xx responses", async () => {

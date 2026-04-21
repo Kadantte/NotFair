@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.22.1] - 2026-04-20
+
+### Fixed
+- Reddit Conversions API now targets the v3 endpoint (`POST /api/v3/pixels/{pixel_id}/conversion_events`) with the v3 payload shape: `data.events[]`, `event_at` as unix-ms, nested `type: { tracking_type }`, `metadata` (not `event_metadata`), and a required `action_source` defaulting to `"website"`. The v2.0 endpoint the prior release targeted no longer exists in Reddit's docs, so every CAPI call was silently 404-ing.
+
 ## [0.2.22.0] - 2026-04-20
 
 ### Added

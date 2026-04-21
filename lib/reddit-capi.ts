@@ -1,4 +1,4 @@
-const REDDIT_CAPI_ENDPOINT = "https://ads-api.reddit.com/api/v2.0/conversions/events";
+const REDDIT_CAPI_BASE = "https://ads-api.reddit.com/api/v3/pixels";
 
 export const REDDIT_SIGNUP_ID_COOKIE = "reddit_signup_id";
 
@@ -13,6 +13,16 @@ export type RedditTrackingType =
   | "SignUp"
   | "Custom";
 
+export type RedditActionSource =
+  | "website"
+  | "app"
+  | "email"
+  | "phone_call"
+  | "chat"
+  | "physical_store"
+  | "system_generated"
+  | "other";
+
 export type RedditConversionInput = {
   trackingType: RedditTrackingType;
   customEventName?: string;
@@ -22,6 +32,8 @@ export type RedditConversionInput = {
   ipAddress?: string | null;
   userAgent?: string | null;
   uuid?: string | null;
+  clickId?: string | null;
+  actionSource?: RedditActionSource;
   valueDecimal?: number;
   currency?: string;
 };
@@ -44,39 +56,46 @@ export async function sendRedditConversion(event: RedditConversionInput): Promis
   if (event.userAgent) user.user_agent = event.userAgent;
   if (event.uuid) user.uuid = event.uuid;
 
-  if (Object.keys(user).length === 0) {
+  if (Object.keys(user).length === 0 && !event.clickId) {
     console.warn("[reddit-capi] no attribution signals; Reddit requires at least one");
     return;
   }
 
+  const metadata: Record<string, unknown> = { conversion_id: event.conversionId };
+  if (event.valueDecimal !== undefined) metadata.value = event.valueDecimal;
+  if (event.currency) metadata.currency = event.currency;
+
   const body = {
-    events: [
-      {
-        event_at: new Date().toISOString(),
-        event_type: {
-          tracking_type: event.trackingType,
-          ...(event.customEventName ? { custom_event_name: event.customEventName } : {}),
+    data: {
+      events: [
+        {
+          event_at: Date.now(),
+          action_source: event.actionSource ?? "website",
+          type: {
+            tracking_type: event.trackingType,
+            ...(event.customEventName ? { custom_event_name: event.customEventName } : {}),
+          },
+          ...(event.clickId ? { click_id: event.clickId } : {}),
+          ...(Object.keys(user).length > 0 ? { user } : {}),
+          metadata,
         },
-        event_metadata: {
-          conversion_id: event.conversionId,
-          ...(event.valueDecimal !== undefined ? { value_decimal: event.valueDecimal } : {}),
-          ...(event.currency ? { currency: event.currency } : {}),
-        },
-        user,
-      },
-    ],
-    test_mode: process.env.REDDIT_CAPI_TEST_MODE === "1",
+      ],
+    },
+    ...(process.env.REDDIT_CAPI_TEST_MODE === "1" ? { test_mode: true } : {}),
   };
 
   try {
-    const res = await fetch(`${REDDIT_CAPI_ENDPOINT}/${encodeURIComponent(pixelId)}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const res = await fetch(
+      `${REDDIT_CAPI_BASE}/${encodeURIComponent(pixelId)}/conversion_events`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+    );
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       console.error("[reddit-capi] failed", { status: res.status, body: text.slice(0, 500) });
