@@ -10,6 +10,7 @@ import { GadsConversionTracker } from "@/components/gads-conversion-tracker";
 import { getSession } from "@/lib/session";
 
 const GADS_CONVERSION_ID = "AW-18054900065";
+const REDDIT_PIXEL_ID = process.env.NEXT_PUBLIC_REDDIT_PIXEL_ID;
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -111,6 +112,18 @@ export default async function RootLayout({
             gtag('config', '${GADS_CONVERSION_ID}');
           `}
         </Script>
+        {REDDIT_PIXEL_ID && (
+          <Script id="reddit-pixel" strategy="afterInteractive">
+            {`!function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js?pixel_id=${REDDIT_PIXEL_ID}",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);rdt('init',${JSON.stringify(REDDIT_PIXEL_ID)},${JSON.stringify(
+              session.connected
+                ? {
+                    ...(session.googleEmail ? { email: session.googleEmail } : {}),
+                    ...(session.userId ? { externalId: session.userId } : {}),
+                  }
+                : {},
+            )});rdt('track','PageVisit');`}
+          </Script>
+        )}
         <PostHogProvider bootstrapUser={bootstrapUser}>
           <GadsConversionTracker />
           {children}
