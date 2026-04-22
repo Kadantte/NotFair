@@ -20,6 +20,7 @@ import {
 import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, PassItem, QsSubLabel } from "@/lib/audit/scoring";
+import { trackEvent } from "@/lib/analytics";
 
 // ─── Time Range ──────────────────────────────────────────────────────
 
@@ -1036,6 +1037,40 @@ export function AuditContent({
             onAskAI={onAskAI}
           />
         </div>
+
+        {/* Post-audit Claude/MCP upsell — pitch at peak trust, right after the 3 passes */}
+        {auditResult && !detailsLoading && (
+          <Link
+            href="/connect"
+            prefetch
+            onClick={() =>
+              trackEvent("post_audit_claude_cta_clicked", {
+                destination: "/connect",
+                overall_score: auditResult.overallScore,
+                wasted_spend_monthly: auditResult.wastedSpend?.total ?? null,
+              })
+            }
+            className="group block rounded-lg border border-[#4CAF6E]/40 bg-[#1F2A23] p-5 transition-colors hover:border-[#4CAF6E] hover:bg-[#223028]"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#4CAF6E]/40 bg-[#4CAF6E]/10">
+                <Wrench className="h-4 w-4 text-[#4CAF6E]" />
+              </div>
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold text-[#E8E4DD]">
+                  Ready to ship these fixes?
+                </div>
+                <p className="mt-1 text-[13px] leading-relaxed text-[#C4C0B6]">
+                  Connect AdsAgent to Claude. Every action above becomes a one-command fix — nothing auto-runs without your approval.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 self-center text-[13px] font-medium text-[#4CAF6E] group-hover:text-[#6BC58A]">
+                Connect to Claude
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* Campaign Performance */}
         <CampaignPerformanceSection campaigns={overview.campaigns} />

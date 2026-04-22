@@ -15,12 +15,16 @@ export function AuditCTA({
   session,
   page,
   size = "default",
+  variant = "primary",
+  position,
   connectedLabel = "View Your Audit",
   disconnectedLabel = "Audit Now",
 }: {
   session: { connected: boolean };
   page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server" | "header";
   size?: "sm" | "default" | "lg";
+  variant?: "primary" | "secondary";
+  position?: string;
   connectedLabel?: string;
   disconnectedLabel?: string;
 }) {
@@ -32,6 +36,8 @@ export function AuditCTA({
     trackEvent("cta_clicked", {
       page,
       cta: session.connected ? "view_audit" : "audit_now",
+      position,
+      variant,
       destination: "/audit",
       requires_auth: !session.connected,
     });
@@ -52,15 +58,21 @@ export function AuditCTA({
   const spinnerSize = size === "sm" ? "h-3.5 w-3.5" : "h-5 w-5";
   const arrowSize = size === "sm" ? "h-3.5 w-3.5 ml-1.5" : "h-5 w-5 ml-2";
 
+  const primaryStyles =
+    "bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C] border border-[#4CAF6E]";
+  const secondaryStyles =
+    "bg-transparent text-[#E8E4DD] border border-[#4CAF6E]/50 hover:border-[#4CAF6E] hover:bg-[#4CAF6E]/10";
+  const spinnerColor = variant === "secondary" ? "border-[#E8E4DD]" : "border-[#1A1917]";
+
   return (
     <Button
       onClick={handleCTA}
       disabled={loading}
-      className={`${sizeClasses} rounded-full bg-[#4CAF6E] font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70`}
+      className={`${sizeClasses} rounded-full font-semibold transition-all hover:scale-[1.02] disabled:opacity-70 ${variant === "secondary" ? secondaryStyles : primaryStyles}`}
     >
       {loading ? (
         <span className="inline-flex items-center gap-2">
-          <span className={`${spinnerSize} animate-spin rounded-full border-2 border-[#1A1917] border-t-transparent`} />
+          <span className={`${spinnerSize} animate-spin rounded-full border-2 ${spinnerColor} border-t-transparent`} />
           Connecting...
         </span>
       ) : (

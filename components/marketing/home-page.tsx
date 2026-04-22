@@ -21,7 +21,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
-import { fadeInUp } from "@/components/marketing/audit-cta";
+import { fadeInUp, AuditCTA } from "@/components/marketing/audit-cta";
 import { GitHubStarBadge } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
@@ -383,6 +383,14 @@ export function HomePage({
               <div className="mt-8 flex flex-col items-start gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <ConnectClaudeCTA session={session} position="hero" />
+                  <AuditCTA
+                    session={session}
+                    page="homepage"
+                    position="hero"
+                    variant="secondary"
+                    disconnectedLabel="Run free audit"
+                    connectedLabel="View your audit"
+                  />
                 </div>
                 <div className="flex items-center gap-5 text-sm text-[#C4C0B6]">
                   <span>Free</span>
@@ -391,22 +399,6 @@ export function HomePage({
                   <span className="h-1 w-1 rounded-full bg-[#3D3C36]" />
                   <span>No credit card</span>
                 </div>
-                <Link
-                  href="/google-ads-audit"
-                  prefetch
-                  onClick={() =>
-                    trackEvent("cta_clicked", {
-                      page: "homepage",
-                      cta: "free_audit_link",
-                      position: "hero",
-                      destination: "/google-ads-audit",
-                      requires_auth: false,
-                    })
-                  }
-                  className="text-sm text-[#C4C0B6] underline underline-offset-4 hover:text-[#E8E4DD] transition-colors"
-                >
-                  Free Google Ads Audit →
-                </Link>
               </div>
             </motion.div>
 
