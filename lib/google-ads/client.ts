@@ -48,52 +48,18 @@ export function getCustomer(auth: AuthContext) {
 
 // ─── Query Cache ────────────────────────────────────────────────────
 //
-// In-memory TTL cache for read queries. Keyed by customerId + GAQL.
-// Mutations invalidate all entries for the affected customerId.
+// Cache lives in `./query-cache` — this file just wires it into the
+// `customer.query()` proxy below. Re-exported for backward compatibility
+// so existing imports from `@/lib/google-ads` keep working.
 
-const CACHE_TTL_MS = 45_000; // 45 seconds
-const CACHE_MAX_SIZE = 500;
+export {
+  invalidateCache,
+  clearCache,
+  getCacheMetrics,
+  resetCacheMetrics,
+} from "./query-cache";
 
-type CacheEntry = {
-  data: any;
-  expiresAt: number;
-};
-
-const queryCache = new Map<string, CacheEntry>();
-
-/** Evict oldest entries when cache exceeds max size. Map insertion order = age. */
-function evictIfNeeded() {
-  if (queryCache.size <= CACHE_MAX_SIZE) return;
-  const toDelete = queryCache.size - CACHE_MAX_SIZE;
-  const iter = queryCache.keys();
-  for (let i = 0; i < toDelete; i++) {
-    const { value } = iter.next();
-    if (value) queryCache.delete(value);
-  }
-}
-
-function cacheKey(customerId: string, query: string, loginCustomerId?: string | null): string {
-  const prefix = loginCustomerId
-    ? `${normalizeCustomerId(loginCustomerId)}/${normalizeCustomerId(customerId)}`
-    : normalizeCustomerId(customerId);
-  return `${prefix}::${query.replace(/\s+/g, " ").trim()}`;
-}
-
-/** Invalidate all cached queries for a customer (call after mutations). */
-export function invalidateCache(customerId: string) {
-  const normalized = normalizeCustomerId(customerId);
-  for (const key of queryCache.keys()) {
-    // Match both direct keys (customerId::...) and manager-routed keys (managerId/customerId::...)
-    if (key.includes(`${normalized}::`) || key.includes(`/${normalized}::`)) {
-      queryCache.delete(key);
-    }
-  }
-}
-
-/** Clear the entire cache (used by Refresh buttons). */
-export function clearCache() {
-  queryCache.clear();
-}
+import { cachedQuery } from "./query-cache";
 
 /**
  * Append PARAMETERS omit_unselected_resource_names=true to a GAQL SELECT query
@@ -109,31 +75,24 @@ function appendGaqlParameters(query: string): string {
 
 /**
  * Get a customer client with cached queries.
- * customer.query() results are cached with a TTL. Use for read-only functions.
+ * customer.query() results are cached with a TTL and coalesce concurrent
+ * identical queries into a single upstream fetch. Use for read-only functions.
  */
 export function getCachedCustomer(auth: AuthContext) {
   const raw = getCustomer(auth);
-  const customerId = auth.customerId;
-  const loginCustomerId = auth.loginCustomerId;
+  const { userId, customerId, loginCustomerId } = auth;
 
   return new Proxy(raw, {
     get(target, prop) {
       if (prop === "query") {
-        return async (query: string) => {
+        return (query: string) => {
           const optimizedQuery = appendGaqlParameters(query);
-          const key = cacheKey(customerId, optimizedQuery, loginCustomerId);
-          const now = Date.now();
-          const cached = queryCache.get(key);
-          if (cached && cached.expiresAt > now) {
-            return cached.data;
-          }
-          const result = await target.query(optimizedQuery);
-          queryCache.set(key, { data: result, expiresAt: now + CACHE_TTL_MS });
-          evictIfNeeded();
-          return result;
+          return cachedQuery(userId, customerId, loginCustomerId, optimizedQuery, () =>
+            target.query(optimizedQuery),
+          );
         };
       }
-      return (target as any)[prop];
+      return (target as unknown as Record<PropertyKey, unknown>)[prop as PropertyKey];
     },
   });
 }
