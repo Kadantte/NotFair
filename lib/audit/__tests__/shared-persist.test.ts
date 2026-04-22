@@ -9,11 +9,29 @@ import type { AuditResult } from "../scoring";
 
 type DedupResponse = Array<{ id: string }>;
 type InsertBehavior = "ok" | "slug-conflict-once" | "throw";
+type InsertedRow = {
+  id: string;
+  slug: string;
+  ownerUserId: string;
+  source: string;
+  visibility: string;
+  accountFingerprint: string;
+  payload: {
+    keyNumbers: {
+      topCampaign: string | null;
+      totalSpend: { band: string; exact?: number } | null;
+    };
+    [k: string]: unknown;
+  };
+  showCampaignNames: boolean;
+  showSpend: boolean;
+  showExactSpend: boolean;
+};
 
 const state = {
   dedupResponse: [] as DedupResponse,
   insertBehavior: "ok" as InsertBehavior,
-  insertedValues: [] as any[],
+  insertedValues: [] as InsertedRow[],
   insertCalls: 0,
   selectCalls: 0,
 };
@@ -37,7 +55,7 @@ vi.mock("@/lib/db", () => {
     },
   };
   const insertBuilder = {
-    values: async (vals: any) => {
+    values: async (vals: InsertedRow) => {
       state.insertCalls += 1;
       if (state.insertBehavior === "throw") {
         throw new Error("boom");
@@ -156,7 +174,7 @@ describe("saveAuditToHistory", () => {
     // Anonymization must have run — no raw campaign name in payload.
     expect(JSON.stringify(row.payload)).not.toContain("Main");
     expect(row.payload.keyNumbers.topCampaign).toBe("Campaign A");
-    expect(row.payload.keyNumbers.totalSpend.band).toBe("$10k–$25k/mo");
+    expect(row.payload.keyNumbers.totalSpend?.band).toBe("$10k–$25k/mo");
   });
 
   it("skips insert when a recent save exists for the same user+account (dedup)", async () => {
