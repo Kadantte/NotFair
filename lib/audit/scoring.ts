@@ -183,6 +183,7 @@ export type TopAction = {
   targetId?: string;
   campaignId?: string;
   adGroupId?: string;
+  estimatedMonthlySavings?: number;
 };
 
 // ─── Pulse Metrics & 3-Pass Types (matches /ads-audit skill) ────────
@@ -200,7 +201,23 @@ export type PassItem = {
   targetId?: string;
   campaignId?: string;
   adGroupId?: string;
+  estimatedMonthlySavings?: number;
 };
+
+// Reversible actions: easy to undo with a single opposite operation.
+// Keep this SET permissive — only add action types here that are truly
+// one-click reversible. Future action types like `remove_campaign`
+// (which delete rather than pause) MUST NOT be added to this set.
+const REVERSIBLE_ACTIONS = new Set<NonNullable<PassItem["actionType"]>>([
+  "pause_campaign",
+  "pause_keyword",
+  "add_negative",
+]);
+
+export function isReversible(actionType?: PassItem["actionType"]): boolean {
+  if (!actionType) return true; // unknown/text-only actions are treated as reversible
+  return REVERSIBLE_ACTIONS.has(actionType);
+}
 
 export type AuditPasses = {
   stopWasting: PassItem[];     // max 3
@@ -1202,6 +1219,7 @@ function computeTopActions(input: AuditInput): TopAction[] {
       targetId,
       campaignId,
       adGroupId,
+      estimatedMonthlySavings: r.estimatedMonthlySavings,
     };
   });
 }
@@ -1263,6 +1281,7 @@ function computePasses(
       impact: `Save ~$${camp.cost.toFixed(2)}/month`,
       actionType: "pause_campaign",
       targetId: camp.id,
+      estimatedMonthlySavings: camp.cost,
     });
   }
 
@@ -1277,6 +1296,7 @@ function computePasses(
         targetId: action.targetId,
         campaignId: action.campaignId,
         adGroupId: action.adGroupId,
+        estimatedMonthlySavings: action.estimatedMonthlySavings,
       });
     }
   }
@@ -1290,9 +1310,14 @@ function computePasses(
         const cpa = campaign.cost / campaign.conversions;
         const lostPct = ((camp.budgetLostIS ?? 0) * 100).toFixed(0);
         const estExtra = Math.round(campaign.conversions * (camp.budgetLostIS ?? 0));
+        // Approximate "savings" as the value of the additional conversions we'd capture
+        // at the current CPA. This is an investment (spend more to earn more), not a cut,
+        // but surfacing a dollar figure lets chat output say "~$X/mo in additional value."
+        const estValue = estExtra > 0 ? estExtra * (campaign.cost / Math.max(campaign.conversions, 1)) : 0;
         captureMore.push({
           action: `Increase budget on "${camp.campaignName}" — ${lostPct}% budget-lost IS at $${cpa.toFixed(2)} CPA`,
           impact: estExtra > 0 ? `Est. +${estExtra} conv/month` : "Capture more demand",
+          ...(estValue > 0 ? { estimatedMonthlySavings: estValue } : {}),
         });
       }
     }
@@ -1310,6 +1335,7 @@ function computePasses(
     captureMore.push({
       action: `Add "${st.searchTerm}" as exact match keyword — ${st.conversions} conversions in 30 days`,
       impact: `At $${stCpa.toFixed(2)} CPA`,
+      // No reliable savings estimate; this is an acquisition play.
     });
   }
 
@@ -1352,6 +1378,7 @@ function computePasses(
         targetId: action.targetId,
         campaignId: action.campaignId,
         adGroupId: action.adGroupId,
+        estimatedMonthlySavings: action.estimatedMonthlySavings,
       });
     }
   }
