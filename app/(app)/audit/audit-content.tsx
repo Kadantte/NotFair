@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
   OctagonAlert,
   TrendingUp,
   Settings,
+  History,
 } from "lucide-react";
 import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
@@ -942,6 +944,14 @@ export function AuditContent({
                 Last 30 days
               </span>
             )}
+            <Link
+              href="/audit/shares"
+              prefetch
+              className="flex items-center gap-1.5 rounded-sm bg-[#3D3C36] px-2.5 py-1 text-[11px] font-medium text-[#E8E4DD] transition hover:bg-[#4D4C46]"
+            >
+              <History className="h-3 w-3" />
+              History
+            </Link>
             {onRedoAudit && (
               <button
                 type="button"
@@ -987,6 +997,20 @@ export function AuditContent({
             loading={detailsLoading}
           />
         </div>
+
+        {/* Saved-to-history indicator — appears once the audit result is ready */}
+        {auditResult && !detailsLoading && (
+          <div className="flex items-center justify-end gap-1.5 text-[11px] text-[#6B6760]">
+            <span>Saved to your history.</span>
+            <Link
+              href="/audit/shares"
+              prefetch
+              className="text-[#4CAF6E] transition hover:text-[#3D9A5C] hover:underline"
+            >
+              View past audits
+            </Link>
+          </div>
+        )}
 
         {/* Verdict */}
         <VerdictCard verdict={auditResult?.verdict ?? null} loading={detailsLoading} />

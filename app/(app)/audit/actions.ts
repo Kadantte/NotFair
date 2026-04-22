@@ -21,6 +21,7 @@ import { getAuthContext } from "@/lib/session";
 import { computeAuditScore, type AuditInput, type AuditResult } from "@/lib/audit/scoring";
 import { analyzeAdLandingPages } from "@/lib/audit/landing-page";
 import { saveAuditSnapshot } from "@/lib/audit/persist";
+import { saveAuditToHistory } from "@/lib/audit/shared-persist";
 
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
@@ -315,6 +316,18 @@ export async function getAuditDetails(days: number = 30) {
     // Fire-and-forget: persist snapshot for dev dashboard
     saveAuditSnapshot(session.customerId, session.userId ?? null, auditResult, auditInput).catch((e) => {
       console.error("audit snapshot save failed", e);
+    });
+
+    // Fire-and-forget: save an anonymized copy to the user's audit history
+    // (private by default — Phase 1 of shareable audits). Never blocks the
+    // audit response; dedup and auth guards live inside saveAuditToHistory.
+    saveAuditToHistory({
+      userId: session.userId ?? null,
+      accountId: session.customerId,
+      result: auditResult,
+      source: "web",
+    }).catch((e) => {
+      console.error("audit history save failed", e);
     });
 
     return { auditResult };

@@ -303,6 +303,50 @@ export const toolPermissions = pgTable("tool_permissions", {
   uniqueIndex("tool_permissions_user_tool_idx").on(table.userId, table.toolName),
 ]);
 
+// ─── Shared Audits (Phase 1: private auto-save of each run) ────────
+//
+// Every audit a signed-in user runs is auto-saved here so they can browse
+// their history. Phase 2 will add public sharing — the columns supporting
+// that (visibility, show_* flags, view_count, cta_click_count, takedown_*)
+// are added now so the migration is one-shot. Phase 1 writes `visibility=
+// 'private'` only; no public reads are allowed.
+//
+// Payload is the anonymized, render-ready `SharedAuditPayload` shape from
+// `lib/audit/anonymize.ts`. We never store raw `AuditInput`; the anonymizer
+// runs at save time even for private audits so upgrading one to public
+// later is a no-op on the data.
+
+export const sharedAudits = pgTable("shared_audits", {
+  id: text("id").primaryKey(), // UUID
+  /** 10-char nanoid, URL-safe. Unique across all rows. */
+  slug: text("slug").notNull().unique(),
+  /** FK to mcp_sessions.user_id. NOT NULL in Phase 1 (no CLI path yet). */
+  ownerUserId: text("owner_user_id").notNull(),
+  /** 'web' | 'cli' | 'chat' — Phase 1 only writes 'web'. */
+  source: text("source").notNull(),
+  /** 'private' | 'public' — Phase 1 only writes 'private'. */
+  visibility: text("visibility").notNull().default("private"),
+  /** sha256(accountId + AUDIT_SHARE_SALT) — for dedup + future collision detection. */
+  accountFingerprint: text("account_fingerprint").notNull(),
+  /** Anonymized, render-ready `SharedAuditPayload` (see lib/audit/anonymize.ts). */
+  payload: jsonb("payload").notNull(),
+  showCampaignNames: boolean("show_campaign_names").notNull().default(false),
+  showSpend: boolean("show_spend").notNull().default(true),
+  showExactSpend: boolean("show_exact_spend").notNull().default(false),
+  industry: text("industry"),
+  takedownReason: text("takedown_reason"),
+  takenDownAt: timestamp("taken_down_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  viewCount: integer("view_count").notNull().default(0),
+  ctaClickCount: integer("cta_click_count").notNull().default(0),
+}, (table) => [
+  // Primary query: list a user's audits newest-first.
+  index("shared_audits_owner_created_idx").on(table.ownerUserId, table.createdAt),
+  // Phase 2 prep: public-feed query. Partial index defined in the SQL
+  // migration (drizzle-orm doesn't yet emit partial indexes cleanly).
+]);
+
 // ─── Chat Messages ──────────────────────────────────────────────────
 
 export const chatMessages = pgTable("chat_messages", {
