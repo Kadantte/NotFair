@@ -35,6 +35,12 @@ import {
   getLandingPagePerformance,
   getWasteFindings,
 } from "@/lib/google-ads/audit/views";
+import {
+  getTimeseries,
+  TIMESERIES_METRICS,
+  GRANULARITIES,
+  GROUP_BYS,
+} from "@/lib/google-ads/timeseries";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
 import { MIN_AFTER_DAYS_FOR_DIRECTION } from "@/lib/db/impact";
 import { execRead } from "@/lib/tools/execute";
@@ -688,6 +694,54 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_landing_page_performance", () =>
       getLandingPagePerformance(targetAuth, days, limit),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("getTimeseries", {
+    description:
+      "Chart-ready timeseries for Google Ads metrics. Drops directly into Recharts / Chart.js / visx with zero reshape code. " +
+      "Returns an array of segments, each with a `dimensions` object and an array of `{ date, metric, metric, ... }` points. " +
+      "Derived metrics (cpa, ctr, conversion_rate, roas) are computed per-bucket, not aggregated across groups — zero-denominator " +
+      "cases return null so charts render gaps correctly instead of spiking to 0 or NaN. " +
+      "Granularity `day` buckets per-day; `week` buckets by ISO week start (Monday); `month` buckets by calendar month (YYYY-MM). " +
+      "`groupBy: 'account'` returns one segment. `'campaign'` returns one per campaign (filterable via `campaignIds`). " +
+      "`'device'` and `'network'` cross-segment campaigns by device or ad-network. " +
+      "`comparePreviousPeriod: true` adds a shifted same-length window in `comparison`. " +
+      "Range is capped at 730 days. Typical call fires 1 upstream query (2 with comparison).",
+    inputSchema: {
+      accountId: accountIdParam,
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
+      granularity: z.enum(GRANULARITIES).default("day"),
+      metrics: z
+        .array(z.enum(TIMESERIES_METRICS))
+        .min(1)
+        .default(["spend", "clicks", "conversions", "cpa"])
+        .describe("Which metrics to emit per point. Derived metrics return null on zero-denominator."),
+      groupBy: z.enum(GROUP_BYS).default("account"),
+      comparePreviousPeriod: z
+        .boolean()
+        .default(false)
+        .describe("When true, also returns the same-length prior window under `comparison`."),
+      campaignIds: z
+        .array(z.string().regex(/^\d+$/, "Must be a digit string"))
+        .optional()
+        .describe("Optional campaign.id filter. Only valid when groupBy is campaign, device, or network."),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, startDate, endDate, granularity, metrics, groupBy, comparePreviousPeriod, campaignIds }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_timeseries", () =>
+      getTimeseries(targetAuth, {
+        startDate,
+        endDate,
+        granularity,
+        metrics,
+        groupBy,
+        comparePreviousPeriod,
+        campaignIds,
+      }),
     );
     return typedResult(result);
   }));

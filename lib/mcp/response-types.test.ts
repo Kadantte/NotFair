@@ -118,6 +118,7 @@ describe("response-types — registry completeness", () => {
       getAccountChanges: true,
       getLandingPagePerformance: true,
       getWasteFindings: true,
+      getTimeseries: true,
       listConnectedAccounts: true,
       // Write tools
       pauseKeyword: true,

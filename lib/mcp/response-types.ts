@@ -143,6 +143,9 @@ export type GetLandingPagePerformanceResponse = StructuredShape<
 >;
 export type GetWasteFindingsResponse = StructuredShape<Unwrap<typeof getWasteFindings>>;
 
+import type { getTimeseries } from "@/lib/google-ads/timeseries";
+export type GetTimeseriesResponse = StructuredShape<Unwrap<typeof getTimeseries>>;
+
 // `listConnectedAccounts` is registered inline in `app/api/[transport]/route.ts`
 // (not a Google Ads helper call). Declare its shape explicitly.
 export interface ListConnectedAccountsResponse {
@@ -302,6 +305,7 @@ export interface McpToolResponseRegistry {
   getAccountChanges: GetAccountChangesResponse;
   getLandingPagePerformance: GetLandingPagePerformanceResponse;
   getWasteFindings: GetWasteFindingsResponse;
+  getTimeseries: GetTimeseriesResponse;
   // Inline-registered (route.ts)
   listConnectedAccounts: ListConnectedAccountsResponse;
 
