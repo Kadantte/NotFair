@@ -24,25 +24,46 @@ vi.mock("@/lib/stripe/config", () => ({
 }));
 
 let mockRow: Record<string, unknown> | undefined = undefined;
+let mockMcpSessionEmail: string | null = null;
 
-vi.mock("@/lib/db", () => ({
-  db: () => ({
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: () => (mockRow ? [mockRow] : []),
-        }),
+vi.mock("@/lib/db", () => {
+  // The resolver makes at most two queries: (1) subscriptions, (2) mcp_sessions
+  // for the dev-email override lookup. We route by the first `from()` target.
+  const fromTable = { current: "subscriptions" as "subscriptions" | "mcpSessions" };
+  return {
+    db: () => ({
+      select: () => ({
+        from: (table: { __name: string }) => {
+          fromTable.current = table.__name === "mcpSessions" ? "mcpSessions" : "subscriptions";
+          return {
+            where: () => ({
+              limit: () => {
+                if (fromTable.current === "mcpSessions") {
+                  return mockMcpSessionEmail === null ? [] : [{ email: mockMcpSessionEmail }];
+                }
+                return mockRow ? [mockRow] : [];
+              },
+            }),
+          };
+        },
       }),
     }),
-  }),
-  schema: {
-    subscriptions: {
-      userId: "userId",
-      stripeCustomerId: "stripeCustomerId",
-      email: "email",
+    schema: {
+      subscriptions: {
+        __name: "subscriptions",
+        userId: "userId",
+        env: "env",
+        stripeCustomerId: "stripeCustomerId",
+        email: "email",
+      },
+      mcpSessions: {
+        __name: "mcpSessions",
+        userId: "userId",
+        googleEmail: "googleEmail",
+      },
     },
-  },
-}));
+  };
+});
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ["eq", ...args]),
@@ -111,6 +132,7 @@ function row(opts: {
 describe("subscription resolver", () => {
   beforeEach(() => {
     mockRow = undefined;
+    mockMcpSessionEmail = null;
   });
 
   describe("PLANS registry", () => {
@@ -292,6 +314,35 @@ describe("subscription resolver", () => {
       mockRow = row({ data: makeSubData({ status: "active" }) });
       expect(await hasFeature("growth-user", "unlimitedOperations")).toBe(true);
       expect(await hasFeature("growth-user", "prioritySupport")).toBe(true);
+    });
+  });
+
+  describe("dev-email override", () => {
+    it("dev emails resolve to growth with unlimited ops", async () => {
+      mockRow = undefined;
+      mockMcpSessionEmail = "tongchen92@gmail.com";
+      const sub = await getUserSubscription("dev-user");
+      expect(sub.plan).toBe("growth");
+      expect(sub.status).toBe("active");
+      expect((await getUserPlanLimits("dev-user")).dailyOpLimit).toBeNull();
+      expect(await hasFeature("dev-user", "unlimitedOperations")).toBe(true);
+    });
+
+    it("non-dev emails stay on free", async () => {
+      mockRow = undefined;
+      mockMcpSessionEmail = "someone@example.com";
+      const sub = await getUserSubscription("normal-user");
+      expect(sub.plan).toBe("free");
+    });
+
+    it("override does not override real paid Stripe subscription state", async () => {
+      // If a dev actually pays, the real Stripe subscription (e.g. past_due)
+      // must flow through instead of being masked by the override.
+      mockRow = row({ data: makeSubData({ status: "past_due" }) });
+      mockMcpSessionEmail = "tongchen92@gmail.com";
+      const sub = await getUserSubscription("dev-user");
+      expect(sub.plan).toBe("growth");
+      expect(sub.status).toBe("past_due");
     });
   });
 

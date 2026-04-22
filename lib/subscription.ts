@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
 import { resolvePrice, stripeMode } from "@/lib/stripe/config";
+import { DEV_EMAILS } from "@/lib/dev-emails";
 
 // ─── Plan registry ────────────────────────────────────────────────────
 //
@@ -167,13 +168,49 @@ export async function getUserSubscription(userId: string | null | undefined): Pr
     )
     .limit(1);
 
-  if (!row) return FREE_SUBSCRIPTION;
+  const resolved = row
+    ? resolveFromStripeData(
+        row.data as Stripe.Subscription | null,
+        row.email,
+        row.stripeCustomerId,
+      )
+    : FREE_SUBSCRIPTION;
 
-  return resolveFromStripeData(
-    row.data as Stripe.Subscription | null,
-    row.email,
-    row.stripeCustomerId,
-  );
+  // Dev-email override: if the account belongs to a developer and doesn't
+  // already have a paid entitlement, grant a synthetic growth plan so rate
+  // limits and feature gates behave as if they were on Growth. A real Stripe
+  // subscription (if ever created) still wins.
+  if (resolved.plan === "free") {
+    const devOverride = await maybeDevOverride(userId, resolved);
+    if (devOverride) return devOverride;
+  }
+
+  return resolved;
+}
+
+// Cache userId → isDev permanently. Dev-email membership is static for the
+// life of the process, and this resolver runs on every rate-limit check.
+const devUserCache = new Map<string, boolean>();
+
+async function maybeDevOverride(
+  userId: string,
+  base: UserSubscription,
+): Promise<UserSubscription | null> {
+  if (!(await isDevUser(userId))) return null;
+  return { ...base, plan: "growth", status: "active" };
+}
+
+async function isDevUser(userId: string): Promise<boolean> {
+  const cached = devUserCache.get(userId);
+  if (cached !== undefined) return cached;
+  const [row] = await db()
+    .select({ email: schema.mcpSessions.googleEmail })
+    .from(schema.mcpSessions)
+    .where(eq(schema.mcpSessions.userId, userId))
+    .limit(1);
+  const isDev = !!row?.email && DEV_EMAILS.includes(row.email);
+  devUserCache.set(userId, isDev);
+  return isDev;
 }
 
 export async function getUserPlan(userId: string | null | undefined): Promise<Plan> {

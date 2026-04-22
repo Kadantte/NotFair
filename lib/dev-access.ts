@@ -1,6 +1,7 @@
 import { getAuthContext } from "@/lib/session";
+import { DEV_EMAILS } from "@/lib/dev-emails";
 
-export const DEV_EMAILS: string[] = ["tongchen92@gmail.com", "izhongyuting@gmail.com"];
+export { DEV_EMAILS };
 
 /**
  * Gate a route to `DEV_EMAILS`. Returns a 403/500 Response when access is

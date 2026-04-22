@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.23.1] - 2026-04-22
+
+### Added
+- Developer accounts (listed in `DEV_EMAILS`) now resolve to an unlimited Growth-equivalent plan without a paid Stripe subscription, so rate limits and feature gates behave as if those accounts were on Growth. A real Stripe subscription still takes precedence when present.
+
 ## [0.2.23.0] - 2026-04-21
 
 ### Changed
