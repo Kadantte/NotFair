@@ -141,7 +141,7 @@ interface AuditCampaign {
   metricsSplit: MetricsSplit | null;
 }
 
-interface WastedItem {
+export interface WastedItem {
   text: string;
   matchType?: string;
   campaignName: string;
@@ -152,7 +152,7 @@ interface WastedItem {
   recentChange: RecentChange | null;
 }
 
-interface SearchTermItem {
+export interface SearchTermItem {
   term: string;
   campaignName: string;
   adGroupName?: string;
@@ -218,7 +218,7 @@ interface ConversionActionSummary {
   defaultValue: number | null;
 }
 
-interface LandingPage {
+export interface LandingPage {
   url: string;
   spend: number;
   clicks: number;

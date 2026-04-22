@@ -30,6 +30,11 @@ import {
   type AuthContext,
 } from "@/lib/google-ads";
 import { runAudit } from "@/lib/google-ads/audit";
+import {
+  getAccountChanges,
+  getLandingPagePerformance,
+  getWasteFindings,
+} from "@/lib/google-ads/audit/views";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
 import { MIN_AFTER_DAYS_FOR_DIRECTION } from "@/lib/db/impact";
 import { execRead } from "@/lib/tools/execute";
@@ -633,6 +638,80 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, days }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "audit", () => runAudit(targetAuth, days));
+    return typedResult(result);
+  }));
+
+  // ─── Narrow audit views ───────────────────────────────────────────
+  // Composable slices of the audit pipeline that fire only the queries
+  // they need. Use these for dashboards that refresh one panel at a
+  // time; fall back to `audit` when you need everything at once.
+
+  server.registerTool("getAccountChanges", {
+    description:
+      "Every account-modifying edit in the lookback window (MCP writes AND direct UI edits via `change_event`). " +
+      "Returns each change with user email, resource type, changed fields, operation, and days-ago — plus " +
+      "aggregated counts by user, resource type, and client type so you can answer 'who changed what recently' " +
+      "without paging through the full audit. Use THIS instead of `audit` when the user asks about recent " +
+      "activity, who-changed-what, or when a metric shift started. Fires 3 queries (campaigns + ad_groups for " +
+      "name lookup, change_event) vs `audit`'s 19. " +
+      "The API caps change_event at 30 rolling days; `days` is clamped to that cap. " +
+      "Response: `{ dateRange, totalChanges, byUser, byResourceType, byClientType, changes: FindingList<ChangeEventSummary> }`.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z.number().int().min(1).max(30).default(30).describe("Lookback days (API-capped at 30)"),
+      limit: z.number().int().min(1).max(200).default(50).describe("Max changes returned (default 50)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_account_changes", () =>
+      getAccountChanges(targetAuth, days, limit),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("getLandingPagePerformance", {
+    description:
+      "Landing page performance (spend, clicks, conversions, CPA, conversion rate) sorted by spend. " +
+      "Use THIS instead of `audit` when the user asks about landing page quality, which pages convert, or CRO targets. " +
+      "Fires 1 query (landing_page_view) vs `audit`'s 19. " +
+      "Landing pages aren't directly editable entities so no `recentChange` attribution is attached; " +
+      "pair with `getAccountChanges` if you need to know whether an ad group pointing at a page was recently edited. " +
+      "Response: `{ dateRange, landingPages: FindingList<LandingPage> }`.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90)"),
+      limit: z.number().int().min(1).max(100).default(15).describe("Max pages returned (default 15)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_landing_page_performance", () =>
+      getLandingPagePerformance(targetAuth, days, limit),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("getWasteFindings", {
+    description:
+      "Zero-conversion keywords burning more than 2x the account CPA, plus search terms with 10+ clicks and " +
+      "zero conversions. Every item carries a `recentChange` pointer — when present, the keyword/ad-group/campaign " +
+      "was edited inside the window so the metrics are stale; RE-EVALUATE before recommending a pause. " +
+      "Use THIS instead of `audit` when the user asks 'where am I wasting money' or 'what should I pause'. " +
+      "Fires 5 queries (campaigns, ad_groups, search_terms, zero-conv keywords, change_event) vs `audit`'s 19. " +
+      "Response: `{ dateRange, accountCpa, wasteThreshold, totalWaste, wasteRate, wastedKeywords: FindingList<WastedItem>, wastedSearchTerms: FindingList<SearchTermItem> }`. " +
+      "`accountCpa` is null when the account has no conversions in the window — treat that account as having no usable threshold.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90)"),
+      limit: z.number().int().min(1).max(50).default(10).describe("Max items per list (default 10)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_waste_findings", () =>
+      getWasteFindings(targetAuth, days, limit),
+    );
     return typedResult(result);
   }));
 };

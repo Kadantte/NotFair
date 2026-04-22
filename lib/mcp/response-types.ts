@@ -129,6 +129,20 @@ export type GetPaidVsOrganicAnalysisResponse = StructuredShape<
 >;
 export type AuditResponse = StructuredShape<Unwrap<typeof runAudit>>;
 
+// ─── Narrow audit views (Phase 4) ───────────────────────────────────
+
+import type {
+  getAccountChanges,
+  getLandingPagePerformance,
+  getWasteFindings,
+} from "@/lib/google-ads/audit/views";
+
+export type GetAccountChangesResponse = StructuredShape<Unwrap<typeof getAccountChanges>>;
+export type GetLandingPagePerformanceResponse = StructuredShape<
+  Unwrap<typeof getLandingPagePerformance>
+>;
+export type GetWasteFindingsResponse = StructuredShape<Unwrap<typeof getWasteFindings>>;
+
 // `listConnectedAccounts` is registered inline in `app/api/[transport]/route.ts`
 // (not a Google Ads helper call). Declare its shape explicitly.
 export interface ListConnectedAccountsResponse {
@@ -284,6 +298,10 @@ export interface McpToolResponseRegistry {
   getNegativeKeywordListItems: GetNegativeKeywordListItemsResponse;
   getPaidVsOrganicAnalysis: GetPaidVsOrganicAnalysisResponse;
   audit: AuditResponse;
+  // Narrow audit views
+  getAccountChanges: GetAccountChangesResponse;
+  getLandingPagePerformance: GetLandingPagePerformanceResponse;
+  getWasteFindings: GetWasteFindingsResponse;
   // Inline-registered (route.ts)
   listConnectedAccounts: ListConnectedAccountsResponse;
 

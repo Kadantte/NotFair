@@ -115,6 +115,9 @@ describe("response-types — registry completeness", () => {
       getNegativeKeywordListItems: true,
       getPaidVsOrganicAnalysis: true,
       audit: true,
+      getAccountChanges: true,
+      getLandingPagePerformance: true,
+      getWasteFindings: true,
       listConnectedAccounts: true,
       // Write tools
       pauseKeyword: true,
