@@ -638,15 +638,41 @@ export async function getUsageSummaryAction() {
 const SLACK_FEEDBACK_WEBHOOK =
     'https://hooks.slack.com/services/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';
 
-export async function submitFeedback(message: string) {
-    const auth = await getSessionAuth();
-    const email = auth?.googleEmail ?? 'anonymous';
-    const text = `*${email}*\n${message}`;
-    await fetch(SLACK_FEEDBACK_WEBHOOK, {
+async function postToSlack(text: string) {
+    const res = await fetch(SLACK_FEEDBACK_WEBHOOK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
+        signal: AbortSignal.timeout(5000),
     });
+    if (!res.ok) throw new Error(`Slack webhook failed: ${res.status}`);
+}
+
+export async function submitFeedback(message: string) {
+    const auth = await getSessionAuth();
+    const email = auth?.googleEmail ?? 'anonymous';
+    await postToSlack(`*${email}*\n${message}`);
+}
+
+export async function requestSetupHelp(context: {
+    activeTab: 'claude-code' | 'connector';
+    codeSubTab: 'manual' | 'auto';
+    pathname: string;
+    connected: boolean;
+}) {
+    const auth = await getSessionAuth();
+    const email = auth?.googleEmail ?? 'anonymous';
+    const setupPath =
+        context.activeTab === 'claude-code'
+            ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
+            : 'Claude Connector (Web / Cowork)';
+    await postToSlack([
+        ':sos: *Setup help requested*',
+        `*User:* <mailto:${email}|${email}>`,
+        `*Setup path:* ${setupPath}`,
+        `*Account connected:* ${context.connected ? 'yes' : 'no'}`,
+        `*Page:* ${context.pathname}`,
+    ].join('\n'));
 }
 
 export async function submitManagedInquiry(data: {
@@ -654,17 +680,10 @@ export async function submitManagedInquiry(data: {
     email: string;
     message?: string;
 }) {
-    const text = [
+    await postToSlack([
         ':star2: *New Managed Plan Inquiry*',
         `*Name:* ${data.name ?? '—'}`,
         `*Email:* ${data.email}`,
         data.message ? `*Message:* ${data.message}` : '',
-    ]
-        .filter(Boolean)
-        .join('\n');
-    await fetch(SLACK_FEEDBACK_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-    });
+    ].filter(Boolean).join('\n'));
 }

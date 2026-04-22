@@ -280,21 +280,28 @@ No properties.
 
 ---
 
-## chat_opened_from_connect
+## setup_help_requested
 
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks the "Open Chat" button on the connect page.
-**Hypothesis:** We believe tracking this tells us how many users choose built-in chat over MCP setup, which lets us prioritize chat vs MCP investment.
+**Trigger:** Fires when a user clicks the "Need help with setup?" button on the connect page. Also triggers a Slack notification to the team (`requestSetupHelp` in `app/actions.ts`) carrying the same context.
+**Hypothesis:** We believe tracking this tells us when users hit a wall during Claude Code / Claude Connector setup — a direct signal of setup friction. Volume per `active_tab` / `code_sub_tab` tells us which path is hardest; the ratio vs `install_command_copied` / `connector_credential_copied` tells us whether users are asking for help instead of completing setup.
 
-No properties.
+> **Replaces `chat_opened_from_connect`** (retired 2026-04-22). Analysis of the Apr 21–22 cohort showed the chat fallback was catching setup-frustrated users who then bounced at 0% D0 write rate — routing them to human help via Slack is higher-leverage.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `active_tab` | string | `"claude-code"` | Which setup path the user was on at click time. Enum: `claude-code`, `connector` |
+| `code_sub_tab` | string | `"auto"` | Claude Code sub-tab at click time. Enum: `manual`, `auto`. Always populated; ignore when `active_tab="connector"`. |
+| `connected` | boolean | `true` | Whether the user already has a Google Ads session (token) at click time. Distinguishes "stuck on OAuth" from "stuck on client wiring". |
+| `pathname` | string | `"/connect/claude-code/auto"` | Exact pathname when the button was clicked. |
 
 ```json
-{ "event": "chat_opened_from_connect" }
+{ "event": "setup_help_requested", "properties": { "active_tab": "claude-code", "code_sub_tab": "auto", "connected": true, "pathname": "/connect/claude-code/auto" } }
 ```
 
-**Files:** `components/connect-page.tsx`
+**Files:** `components/connect-page.tsx`, `app/actions.ts`
 
 ---
 

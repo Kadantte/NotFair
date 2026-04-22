@@ -4,11 +4,12 @@ import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
+import { requestSetupHelp } from '@/app/actions';
 
 function imageKeyFromSrc(src: string): string {
     const file = src.split('/').pop() ?? src;
@@ -572,15 +573,35 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
     );
 }
 
-function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeSubTab }: {
+function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
     prompt: string;
     copied: boolean;
     onCopy: () => void;
-    onOpenChat: () => void;
     token: string;
     activeTab: SetupTab;
     codeSubTab: ClaudeCodeSubTab;
 }) {
+    const [helpStatus, setHelpStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+
+    async function handleRequestHelp() {
+        if (helpStatus !== 'idle') return;
+        setHelpStatus('sending');
+        const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
+        const connected = Boolean(token);
+        try {
+            await requestSetupHelp({ activeTab, codeSubTab, pathname, connected });
+            trackEvent('setup_help_requested', {
+                active_tab: activeTab,
+                code_sub_tab: codeSubTab,
+                connected,
+                pathname,
+            });
+            setHelpStatus('sent');
+        } catch {
+            setHelpStatus('idle');
+        }
+    }
+
     return (
         <div className="flex flex-col items-center space-y-8 text-center">
             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your client</h2>
@@ -655,7 +676,6 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
                 <ClaudeConnectorSection />
             )}
 
-            {/* Chat CTA */}
             <div className="flex w-full items-center gap-4">
                 <div className="h-px flex-1 bg-[#3D3C36]" />
                 <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]">or</span>
@@ -665,16 +685,29 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
             <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
-                        <p className="text-sm font-medium text-[#E8E4DD]">Want results right now?</p>
+                        <p className="text-sm font-medium text-[#E8E4DD]">Stuck on setup?</p>
                         <p className="text-sm text-[#C4C0B6]">
-                            Run an instant audit in our chat. We&apos;ll surface your top 3 fixes with dollar impact in about 10 seconds.
+                            {helpStatus === 'sent'
+                                ? "Got it — we'll reach out to your Google email shortly."
+                                : "Send a ping to our team and we'll help you get connected."}
                         </p>
                     </div>
                     <Button
-                        onClick={onOpenChat}
-                        className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
+                        onClick={handleRequestHelp}
+                        disabled={helpStatus !== 'idle'}
+                        className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C] disabled:opacity-80 disabled:hover:bg-[#4CAF6E]"
                     >
-                        Run instant audit
+                        {helpStatus === 'sending' ? (
+                            <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" /> Sending…
+                            </span>
+                        ) : helpStatus === 'sent' ? (
+                            <span className="flex items-center gap-2">
+                                <Check className="h-4 w-4" /> Sent
+                            </span>
+                        ) : (
+                            'Need help with setup?'
+                        )}
                     </Button>
                 </div>
             </div>
@@ -789,12 +822,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
         }
-    }
-
-    function openAgenticAi() {
-        trackEvent('chat_opened_from_connect');
-        const newThreadId = crypto.randomUUID();
-        window.location.assign(`/chat/${newThreadId}?auto=audit`);
     }
 
     function toggleAccount(accountId: string) {
@@ -985,7 +1012,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                 trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'install' });
                                 setTimeout(() => setCopied(false), 2000);
                             }}
-                            onOpenChat={openAgenticAi}
                             token={token}
                             activeTab={activeTab}
                             codeSubTab={codeSubTab}
