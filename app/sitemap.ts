@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { allLandingPages } from "@/lib/marketing-pages";
 import { allBlogPosts } from "@/lib/blog-posts";
+import { allVerticalAuditPages } from "@/lib/vertical-audit-pages";
 import { SITE_URL } from "@/lib/seo";
 
 const publicMarketingRoutes = [
@@ -26,6 +27,7 @@ const seoLandingRoutes = new Set([
 ]);
 const marketingPagesLastModified = new Date("2026-04-07");
 const homepageLastModified = new Date("2026-04-07");
+const verticalAuditLastModified = new Date("2026-04-22");
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const marketingEntries: MetadataRoute.Sitemap = publicMarketingRoutes.map(
@@ -37,6 +39,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })
   );
 
+  const verticalAuditEntries: MetadataRoute.Sitemap = allVerticalAuditPages.map(
+    (page) => ({
+      url: new URL(`/google-ads-audit/${page.slug}`, SITE_URL).toString(),
+      lastModified: verticalAuditLastModified,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    })
+  );
+
   const blogEntries: MetadataRoute.Sitemap = allBlogPosts.map((post) => ({
     url: new URL(`/blog/${post.slug}`, SITE_URL).toString(),
     lastModified: new Date(post.updatedAt),
@@ -44,5 +55,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
-  return [...marketingEntries, ...blogEntries];
+  return [...marketingEntries, ...verticalAuditEntries, ...blogEntries];
 }

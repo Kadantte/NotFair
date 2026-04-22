@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Target,
@@ -8,9 +9,11 @@ import {
   BarChart3,
   DollarSign,
   AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
+import { allVerticalAuditPages } from "@/lib/vertical-audit-pages";
 
 /* ─────────────────────────────────────────────────────── Data ──────────── */
 
@@ -380,6 +383,52 @@ export function GoogleAdsAuditPage() {
                   {step.desc}
                 </p>
               </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── By industry ── */}
+      <section className="border-t border-[#3D3C36] px-4 py-20">
+        <div className="mx-auto max-w-6xl">
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            className="mb-10 max-w-3xl"
+          >
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              By industry
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Google Ads audits tuned for your vertical.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
+              Every industry leaks money in different places. Pick your vertical
+              for a version of this audit that knows the specific checks,
+              benchmarks, and fix patterns that matter for your account.
+            </p>
+          </motion.div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {allVerticalAuditPages.map((v) => (
+              <Link
+                key={v.slug}
+                href={`/google-ads-audit/${v.slug}`}
+                prefetch
+                className="group flex items-start justify-between gap-3 rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 transition-colors hover:border-[#4CAF6E]/40 hover:bg-[#2E2D28]"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#E8E4DD]">
+                    {v.industry}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-[#C4C0B6]">
+                    Spend {v.spendRange} · CPC {v.cpcRange}
+                  </p>
+                </div>
+                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E] transition-transform group-hover:translate-x-0.5" />
+              </Link>
             ))}
           </div>
         </div>
