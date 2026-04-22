@@ -1,5 +1,5 @@
 /**
- * Tests that the plan-aware rate limiter correctly bypasses Free's 300/day cap
+ * Tests that the plan-aware rate limiter correctly bypasses Free's 300/month cap
  * for users on the Growth plan.
  *
  * This file is separate from rate-limit.test.ts because it stubs the
@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Force the rate limiter out of dev short-circuit so resolveDailyLimit
+// Force the rate limiter out of dev short-circuit so resolveMonthlyLimit
 // actually consults the subscription helper. vitest sets NODE_ENV=test by
 // default, which already misses the "development" branch — that's enough.
 // We just need to be sure no other test accidentally flipped it.
@@ -48,8 +48,8 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("@/lib/subscription", () => ({
   getUserPlanLimits: (...args: unknown[]) => mockGetPlanLimits(...args),
   PLANS: {
-    free: { limits: { dailyOpLimit: 300 } },
-    growth: { limits: { dailyOpLimit: null } },
+    free: { limits: { monthlyOpLimit: 300 } },
+    growth: { limits: { monthlyOpLimit: null } },
   },
 }));
 
@@ -62,22 +62,22 @@ describe("rate-limit (plan-aware)", () => {
     mockOpsCount.mockReturnValue([{ count: 0 }]);
   });
 
-  it("free user blocked at 300 ops/day", async () => {
-    mockGetPlanLimits.mockResolvedValue({ dailyOpLimit: 300 });
+  it("free user blocked at 300 ops/month", async () => {
+    mockGetPlanLimits.mockResolvedValue({ monthlyOpLimit: 300 });
     mockOpsCount.mockReturnValue([{ count: 300 }]);
 
     await expect(enforceRateLimit("free-user-1")).rejects.toThrow(RateLimitError);
   });
 
   it("free user under cap is allowed", async () => {
-    mockGetPlanLimits.mockResolvedValue({ dailyOpLimit: 300 });
+    mockGetPlanLimits.mockResolvedValue({ monthlyOpLimit: 300 });
     mockOpsCount.mockReturnValue([{ count: 299 }]);
 
     await expect(enforceRateLimit("free-user-2")).resolves.toBeUndefined();
   });
 
   it("growth user with 999 ops is allowed (unlimited)", async () => {
-    mockGetPlanLimits.mockResolvedValue({ dailyOpLimit: null });
+    mockGetPlanLimits.mockResolvedValue({ monthlyOpLimit: null });
     mockOpsCount.mockReturnValue([{ count: 999_999 }]);
 
     await expect(enforceRateLimit("growth-user-1")).resolves.toBeUndefined();
@@ -86,7 +86,7 @@ describe("rate-limit (plan-aware)", () => {
   });
 
   it("growth user skips DB query on every call (perf)", async () => {
-    mockGetPlanLimits.mockResolvedValue({ dailyOpLimit: null });
+    mockGetPlanLimits.mockResolvedValue({ monthlyOpLimit: null });
 
     await enforceRateLimit("growth-user-2");
     await enforceRateLimit("growth-user-2");
@@ -103,7 +103,7 @@ describe("rate-limit (plan-aware)", () => {
   });
 
   it("getUsageInfo reports unlimited:true for growth users", async () => {
-    mockGetPlanLimits.mockResolvedValue({ dailyOpLimit: null });
+    mockGetPlanLimits.mockResolvedValue({ monthlyOpLimit: null });
     mockOpsCount.mockReturnValue([{ count: 5000 }]);
 
     const info = await getUsageInfo("growth-info");
@@ -114,7 +114,7 @@ describe("rate-limit (plan-aware)", () => {
   });
 
   it("getUsageInfo reports normal limits for free users", async () => {
-    mockGetPlanLimits.mockResolvedValue({ dailyOpLimit: 300 });
+    mockGetPlanLimits.mockResolvedValue({ monthlyOpLimit: 300 });
     mockOpsCount.mockReturnValue([{ count: 100 }]);
 
     const info = await getUsageInfo("free-info");

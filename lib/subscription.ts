@@ -14,8 +14,8 @@ import { resolvePrice, stripeMode } from "@/lib/stripe/config";
 export type PlanKey = "free" | "growth";
 
 export interface PlanLimits {
-  /** Daily Google Ads operation count. null = unlimited. */
-  dailyOpLimit: number | null;
+  /** Monthly Google Ads operation count. null = unlimited. */
+  monthlyOpLimit: number | null;
 }
 
 export interface PlanFeatures {
@@ -39,7 +39,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     name: "Free",
     priceMonthlyUsd: 0,
     priceYearlyUsd: 0,
-    limits: { dailyOpLimit: 300 },
+    limits: { monthlyOpLimit: 300 },
     features: { unlimitedOperations: false, prioritySupport: false },
   },
   growth: {
@@ -47,7 +47,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     name: "Growth",
     priceMonthlyUsd: 99,
     priceYearlyUsd: 950,
-    limits: { dailyOpLimit: null },
+    limits: { monthlyOpLimit: null },
     features: { unlimitedOperations: true, prioritySupport: true },
   },
 };

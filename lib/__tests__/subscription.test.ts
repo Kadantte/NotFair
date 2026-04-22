@@ -114,13 +114,13 @@ describe("subscription resolver", () => {
   });
 
   describe("PLANS registry", () => {
-    it("free plan caps at 300 ops/day", () => {
-      expect(PLANS.free.limits.dailyOpLimit).toBe(300);
+    it("free plan caps at 300 ops/month", () => {
+      expect(PLANS.free.limits.monthlyOpLimit).toBe(300);
       expect(PLANS.free.features.unlimitedOperations).toBe(false);
     });
 
     it("growth plan is unlimited", () => {
-      expect(PLANS.growth.limits.dailyOpLimit).toBeNull();
+      expect(PLANS.growth.limits.monthlyOpLimit).toBeNull();
       expect(PLANS.growth.features.unlimitedOperations).toBe(true);
     });
 
@@ -266,18 +266,18 @@ describe("subscription resolver", () => {
   });
 
   describe("getUserPlan + getUserPlanLimits", () => {
-    it("free user gets 300/day", async () => {
+    it("free user gets 300/month", async () => {
       mockRow = undefined;
       const plan = await getUserPlan("user-free");
       const limits = await getUserPlanLimits("user-free");
       expect(plan.key).toBe("free");
-      expect(limits.dailyOpLimit).toBe(300);
+      expect(limits.monthlyOpLimit).toBe(300);
     });
 
     it("growth user gets unlimited", async () => {
       mockRow = row({ data: makeSubData({ status: "active" }) });
       const limits = await getUserPlanLimits("user-growth");
-      expect(limits.dailyOpLimit).toBeNull();
+      expect(limits.monthlyOpLimit).toBeNull();
     });
   });
 

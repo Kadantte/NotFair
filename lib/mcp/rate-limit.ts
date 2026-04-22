@@ -4,21 +4,24 @@ import { getUserPlanLimits, PLANS } from "@/lib/subscription";
 
 // ─── Config ────────────────────────────────────────────────────────
 
-/** Default cap for users on the Free plan. Dev mode is effectively unlimited. */
-const FREE_DAILY_OP_LIMIT = process.env.NODE_ENV === "development" ? 999999 : PLANS.free.limits.dailyOpLimit ?? 300;
+/** Default cap for users on the Free plan (used only when subscription lookup fails). */
+const FREE_MONTHLY_OP_LIMIT = PLANS.free.limits.monthlyOpLimit ?? 300;
+
+/** Dev mode bypasses the monthly cap entirely so local development isn't gated. */
+const IS_DEV_BYPASS = process.env.NODE_ENV === "development";
 
 /**
- * Resolve a user's effective daily op limit. `null` = unlimited.
- * Test mode is short-circuited so the rate-limit suite doesn't need to mock subscriptions.
+ * Resolve a user's effective monthly op limit. `null` = unlimited.
  */
-async function resolveDailyLimit(userId: string): Promise<number | null> {
-  // if (process.env.NODE_ENV === "development") return FREE_DAILY_OP_LIMIT;
+async function resolveMonthlyLimit(userId: string): Promise<number | null> {
+  if (IS_DEV_BYPASS) return null;
+  // return 10
   try {
     const limits = await getUserPlanLimits(userId);
-    return limits.dailyOpLimit;
+    return limits.monthlyOpLimit;
   } catch {
     // If subscription lookup fails (e.g. table missing in tests), fall back to free.
-    return FREE_DAILY_OP_LIMIT;
+    return FREE_MONTHLY_OP_LIMIT;
   }
 }
 
@@ -28,8 +31,8 @@ interface UsageEntry {
   count: number;
   /** Timestamp when this cache entry was fetched from DB */
   fetchedAt: number;
-  /** Midnight UTC that this count is relative to */
-  resetAt: number;
+  /** Start of the billing period (ms since epoch) this count is relative to */
+  periodStartMs: number;
 }
 
 const usageCache = new Map<string, UsageEntry>();
@@ -37,84 +40,88 @@ const usageCache = new Map<string, UsageEntry>();
 /** Cache entries are valid for 10 seconds */
 const CACHE_TTL_MS = 10_000;
 
-/** Get midnight UTC for today */
-function todayMidnightUTC(): Date {
+/** First of the current month (UTC). */
+function currentPeriodStart(): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** First of next calendar month (UTC). */
+function nextPeriodStart(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 }
 
 /**
- * Count operations for a user since midnight UTC today.
+ * Count operations for a user since the start of the current billing period.
  * Uses a short-lived in-memory cache to reduce DB pressure.
  */
 async function getUsageCount(userId: string): Promise<number> {
-  const midnight = todayMidnightUTC();
-  const midnightMs = midnight.getTime();
+  const periodStart = currentPeriodStart();
+  const periodStartMs = periodStart.getTime();
   const now = Date.now();
 
   const cached = usageCache.get(userId);
   if (
     cached &&
-    cached.resetAt === midnightMs &&
+    cached.periodStartMs === periodStartMs &&
     now - cached.fetchedAt < CACHE_TTL_MS
   ) {
     return cached.count;
   }
 
-  // Query DB for today's operation count
   const [result] = await db()
     .select({ count: sql<number>`count(*)` })
     .from(schema.operations)
     .where(
       and(
         eq(schema.operations.userId, userId),
-        gte(schema.operations.createdAt, midnight),
+        gte(schema.operations.createdAt, periodStart),
       ),
     );
 
   const count = Number(result?.count ?? 0);
-  usageCache.set(userId, { count, fetchedAt: now, resetAt: midnightMs });
+  usageCache.set(userId, { count, fetchedAt: now, periodStartMs });
   return count;
 }
 
 /** Increment the cached count after a successful operation (avoids stale reads). */
 function incrementCachedCount(userId: string) {
-  const midnightMs = todayMidnightUTC().getTime();
+  const periodStartMs = currentPeriodStart().getTime();
   const cached = usageCache.get(userId);
-  if (cached && cached.resetAt === midnightMs) {
+  if (cached && cached.periodStartMs === periodStartMs) {
     cached.count++;
   }
 }
 
 // ─── Public API ────────────────────────────────────────────────────
 
+function formatResetHint(): string {
+  const ms = nextPeriodStart().getTime() - Date.now();
+  const days = Math.floor(ms / 86_400_000);
+  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
+  if (days > 0) return `${days}d ${hours}h`;
+  const minutes = Math.ceil((ms % 3_600_000) / 60_000);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
 export class RateLimitError extends Error {
   constructor(
     public readonly used: number,
     public readonly limit: number,
   ) {
-    const ms = nextMidnightUTC().getTime() - Date.now();
-    const hours = Math.floor(ms / 3_600_000);
-    const minutes = Math.ceil((ms % 3_600_000) / 60_000);
-    const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-
     super(
-      `Daily operation limit reached (${used}/${limit}). ` +
-      `Your limit resets in ${timeStr} (midnight UTC). ` +
-      `Check your usage at /usage.`,
+      `Monthly operation limit reached (${used}/${limit}). ` +
+      `Upgrade to Growth for unlimited operations: https://adsagent.org/upgrade. ` +
+      `Otherwise your limit resets in ${formatResetHint()} (first of next month, UTC). ` +
+      `Check your usage at https://adsagent.org/usage.`,
     );
     this.name = "RateLimitError";
   }
 }
 
-function nextMidnightUTC(): Date {
-  const m = todayMidnightUTC();
-  m.setUTCDate(m.getUTCDate() + 1);
-  return m;
-}
-
 /**
- * Check if the user is within their daily operation limit.
+ * Check if the user is within their monthly operation limit.
  * Throws RateLimitError if the limit is exceeded.
  * Call this BEFORE executing the operation.
  *
@@ -123,7 +130,7 @@ function nextMidnightUTC(): Date {
 export async function enforceRateLimit(userId: string | null | undefined): Promise<void> {
   if (!userId) return; // Anonymous users are not rate-limited (they have other guards)
 
-  const limit = await resolveDailyLimit(userId);
+  const limit = await resolveMonthlyLimit(userId);
   if (limit === null) return; // Unlimited plan (Growth+)
 
   const used = await getUsageCount(userId);
@@ -145,16 +152,20 @@ export function recordOperation(userId: string | null | undefined): void {
  * Get current usage info for a user (for display purposes).
  */
 export async function getUsageInfo(userId: string | null | undefined) {
+  const resetsAt = nextPeriodStart().toISOString();
+  const periodStart = currentPeriodStart().toISOString();
+
   if (!userId) {
     return {
       used: 0,
-      limit: FREE_DAILY_OP_LIMIT,
-      remaining: FREE_DAILY_OP_LIMIT,
+      limit: FREE_MONTHLY_OP_LIMIT,
+      remaining: FREE_MONTHLY_OP_LIMIT,
       unlimited: false,
-      resetsAt: nextMidnightUTC().toISOString(),
+      resetsAt,
+      periodStart,
     };
   }
-  const limit = await resolveDailyLimit(userId);
+  const limit = await resolveMonthlyLimit(userId);
   const used = await getUsageCount(userId);
   if (limit === null) {
     return {
@@ -162,7 +173,8 @@ export async function getUsageInfo(userId: string | null | undefined) {
       limit: null,
       remaining: null,
       unlimited: true,
-      resetsAt: nextMidnightUTC().toISOString(),
+      resetsAt,
+      periodStart,
     };
   }
   return {
@@ -170,39 +182,58 @@ export async function getUsageInfo(userId: string | null | undefined) {
     limit,
     remaining: Math.max(0, limit - used),
     unlimited: false,
-    resetsAt: nextMidnightUTC().toISOString(),
+    resetsAt,
+    periodStart,
   };
 }
 
 /**
- * Get hourly operation breakdown for the current day (for usage chart).
+ * Daily operation breakdown for the current calendar month (for usage chart).
+ * Returns one entry for every day of the month (1 → last day), regardless of
+ * whether that day has passed. Future days have count 0.
+ *
+ * Display-only — independent of the quota cutover used by `getUsageCount`.
  */
-export async function getHourlyUsage(userId: string | null | undefined) {
+export async function getDailyUsage(userId: string | null | undefined) {
   if (!userId) return [];
 
-  const midnight = todayMidnightUTC();
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const todayUtcIso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    .toISOString()
+    .slice(0, 10);
 
   const rows = await db()
     .select({
-      hour: sql<number>`extract(hour from ${schema.operations.createdAt})`,
+      day: sql<string>`to_char(${schema.operations.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`,
       count: sql<number>`count(*)`,
     })
     .from(schema.operations)
     .where(
       and(
         eq(schema.operations.userId, userId),
-        gte(schema.operations.createdAt, midnight),
+        gte(schema.operations.createdAt, monthStart),
       ),
     )
-    .groupBy(sql`extract(hour from ${schema.operations.createdAt})`)
-    .orderBy(sql`extract(hour from ${schema.operations.createdAt})`);
+    .groupBy(sql`to_char(${schema.operations.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`)
+    .orderBy(sql`to_char(${schema.operations.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`);
 
-  // Fill all 24 hours
-  const hourMap = new Map(rows.map((r) => [Number(r.hour), Number(r.count)]));
-  const nowHour = new Date().getUTCHours();
-  return Array.from({ length: 24 }, (_, h) => ({
-    hour: h,
-    count: hourMap.get(h) ?? 0,
-    isCurrent: h === nowHour,
-  }));
+  const countByDay = new Map<string, number>(rows.map((r) => [String(r.day), Number(r.count)]));
+
+  const result: { date: string; day: number; count: number; isCurrent: boolean }[] = [];
+  for (
+    let d = new Date(monthStart.getTime());
+    d.getTime() < monthEnd.getTime();
+    d = new Date(d.getTime() + 86_400_000)
+  ) {
+    const iso = d.toISOString().slice(0, 10);
+    result.push({
+      date: iso,
+      day: d.getUTCDate(),
+      count: countByDay.get(iso) ?? 0,
+      isCurrent: iso === todayUtcIso,
+    });
+  }
+  return result;
 }

@@ -5,13 +5,16 @@ import { RefreshCw, Gauge, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getUsageAction } from '@/app/actions';
 
+type DailyEntry = { date: string; day: number; count: number; isCurrent: boolean };
+
 type UsageData = {
     used: number;
     limit: number | null;
     remaining: number | null;
     unlimited?: boolean;
     resetsAt: string;
-    hourly: { hour: number; count: number; isCurrent: boolean }[];
+    periodStart: string;
+    daily: DailyEntry[];
 };
 
 let cachedUsage: UsageData | null = null;
@@ -19,17 +22,12 @@ let cachedUsage: UsageData | null = null;
 function formatTimeUntilReset(resetsAt: string): string {
     const ms = new Date(resetsAt).getTime() - Date.now();
     if (ms <= 0) return 'Resetting now...';
-    const hours = Math.floor(ms / 3_600_000);
+    const days = Math.floor(ms / 86_400_000);
+    const hours = Math.floor((ms % 86_400_000) / 3_600_000);
+    if (days > 0) return `${days}d ${hours}h`;
     const minutes = Math.floor((ms % 3_600_000) / 60_000);
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
-}
-
-function formatHour(h: number): string {
-    if (h === 0) return '12a';
-    if (h < 12) return `${h}a`;
-    if (h === 12) return '12p';
-    return `${h - 12}p`;
 }
 
 function usagePct(used: number, limit: number): number {
@@ -79,7 +77,7 @@ export default function UsagePage() {
     const isUnlimited = !!data?.unlimited;
     const pct = data && data.limit != null ? usagePct(data.used, data.limit) : 0;
     const color = isUnlimited ? '#4CAF6E' : statusColor(pct);
-    const maxHourly = data ? Math.max(...data.hourly.map((h) => h.count), 1) : 1;
+    const maxDaily = data ? Math.max(...data.daily.map((d) => d.count), 1) : 1;
 
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
@@ -88,7 +86,7 @@ export default function UsagePage() {
                 <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Usage</h1>
-                        <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">Daily operation usage and rate limits</p>
+                        <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">Monthly operation usage and rate limits</p>
                     </div>
                     <Button
                         variant="outline"
@@ -117,9 +115,9 @@ export default function UsagePage() {
                             <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-xl p-5 flex items-start gap-4">
                                 <AlertCircle className="w-5 h-5 text-[#C45D4A] shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="text-[#E8E4DD] font-medium">Daily limit reached</p>
+                                    <p className="text-[#E8E4DD] font-medium">Monthly limit reached</p>
                                     <p className="text-sm text-[#C4C0B6] mt-1">
-                                        You&apos;ve used all {data.limit} operations for today. New operations will be available in <span className="text-[#E8E4DD] font-medium tabular-nums">{countdown}</span> when the limit resets at midnight UTC.
+                                        You&apos;ve used all {data.limit} operations for this month. New operations will be available in <span className="text-[#E8E4DD] font-medium tabular-nums">{countdown}</span> when the limit resets on the first of next month (UTC).
                                     </p>
                                 </div>
                             </div>
@@ -130,7 +128,7 @@ export default function UsagePage() {
                             <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-4 sm:p-5">
                                 <div className="flex items-center gap-2 mb-2 sm:mb-3">
                                     <Gauge className="w-4 h-4 text-[#C4C0B6]" />
-                                    <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Used today</span>
+                                    <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Used this month</span>
                                 </div>
                                 <p className="text-2xl sm:text-3xl font-semibold tabular-nums" style={{ color }}>
                                     {data.used}
@@ -166,7 +164,7 @@ export default function UsagePage() {
                                 <p className="text-2xl sm:text-3xl font-semibold text-[#E8E4DD] tabular-nums">
                                     {countdown}
                                 </p>
-                                <p className="text-xs text-[#C4C0B6] mt-1">at midnight UTC</p>
+                                <p className="text-xs text-[#C4C0B6] mt-1">1st of next month (UTC)</p>
                             </div>
                             )}
                         </div>
@@ -175,7 +173,7 @@ export default function UsagePage() {
                         {!isUnlimited && (
                             <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Daily limit</span>
+                                    <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Monthly limit</span>
                                     <span className="text-sm tabular-nums" style={{ color }}>
                                         {pct}%
                                     </span>
@@ -193,56 +191,56 @@ export default function UsagePage() {
                             </div>
                         )}
 
-                        {/* Hourly breakdown chart */}
+                        {/* Daily breakdown chart */}
                         <div className="bg-[#24231F] border border-[#3D3C36] rounded-xl p-5">
                             <div className="flex items-center justify-between mb-4">
-                                <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Operations by hour (UTC)</span>
+                                <span className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Operations by day (UTC)</span>
                             </div>
                             <div className="flex items-end gap-[3px] h-32">
-                                {data.hourly.map((h) => {
-                                    const barH = h.count > 0 ? Math.max(4, (h.count / maxHourly) * 100) : 0;
+                                {data.daily.map((d) => {
+                                    const barH = d.count > 0 ? Math.max(4, (d.count / maxDaily) * 100) : 0;
                                     return (
                                         <div
-                                            key={h.hour}
+                                            key={d.date}
                                             className="flex-1 flex flex-col items-center justify-end h-full group relative"
                                         >
-                                            {/* Tooltip */}
                                             <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[#E8E4DD] bg-[#2E2D28] border border-[#3D3C36] rounded px-1.5 py-0.5 pointer-events-none whitespace-nowrap tabular-nums">
-                                                {h.count} ops
+                                                {d.count} ops · {d.date}
                                             </div>
-                                            {/* Bar */}
                                             <div
                                                 className="w-full rounded-sm transition-all duration-150"
                                                 style={{
                                                     height: `${barH}%`,
-                                                    backgroundColor: h.isCurrent ? '#4CAF6E' : '#4CAF6E50',
-                                                    minHeight: h.count > 0 ? 4 : 0,
+                                                    backgroundColor: d.isCurrent ? '#4CAF6E' : '#4CAF6E50',
+                                                    minHeight: d.count > 0 ? 4 : 0,
                                                 }}
                                             />
                                         </div>
                                     );
                                 })}
                             </div>
-                            {/* X-axis labels */}
                             <div className="flex gap-[3px] mt-1.5">
-                                {data.hourly.map((h) => (
-                                    <div
-                                        key={h.hour}
-                                        className={`flex-1 text-center text-[8px] tabular-nums ${
-                                            h.hour % 6 === 0 ? 'text-[#C4C0B6]' : 'text-transparent'
-                                        }`}
-                                    >
-                                        {formatHour(h.hour)}
-                                    </div>
-                                ))}
+                                {data.daily.map((d, i) => {
+                                    const showLabel = i === 0 || i === data.daily.length - 1 || d.day % 5 === 0;
+                                    return (
+                                        <div
+                                            key={d.date}
+                                            className={`flex-1 text-center text-[8px] tabular-nums ${
+                                                showLabel ? 'text-[#C4C0B6]' : 'text-transparent'
+                                            }`}
+                                        >
+                                            {d.day}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         {/* Info */}
                         <p className="text-xs text-[#C4C0B6] leading-relaxed">
                             {isUnlimited
-                                ? 'Your Growth plan includes unlimited operations. The counter shown above tracks today\'s activity and resets at midnight UTC.'
-                                : 'Every tool call (reads and writes) from both the chat interface and MCP clients counts toward your daily limit. The limit resets at midnight UTC each day. Undo operations are not counted.'}
+                                ? 'Your Growth plan includes unlimited operations. The counter shown above tracks this month\'s activity and resets on the 1st of each month (UTC).'
+                                : 'Every tool call (reads and writes) from both the chat interface and MCP clients counts toward your monthly limit. The limit resets on the 1st of each month (UTC). Undo operations are not counted.'}
                         </p>
                     </div>
                 ) : null}

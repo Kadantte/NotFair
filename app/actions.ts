@@ -7,7 +7,7 @@ import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampa
 import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
-import { getUsageInfo, getHourlyUsage } from "@/lib/mcp/rate-limit";
+import { getUsageInfo, getDailyUsage } from "@/lib/mcp/rate-limit";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 
 type CampaignHistoryRow = {
@@ -622,11 +622,17 @@ export async function getSmartCampaignSettingAction(campaignId: string) {
 
 export async function getUsageAction() {
     const auth = await getSessionAuth();
-    const [info, hourly] = await Promise.all([
+    const [info, daily] = await Promise.all([
         getUsageInfo(auth.userId),
-        getHourlyUsage(auth.userId),
+        getDailyUsage(auth.userId),
     ]);
-    return { ...info, hourly };
+    return { ...info, daily };
+}
+
+/** Lightweight summary used by the app header to flag exceeded quota. Skips the daily bucket aggregation. */
+export async function getUsageSummaryAction() {
+    const auth = await getSessionAuth();
+    return await getUsageInfo(auth.userId);
 }
 
 const SLACK_FEEDBACK_WEBHOOK =

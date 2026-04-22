@@ -21,10 +21,10 @@ vi.mock("@/lib/db", () => ({
 // test file focused on op-counting math by stubbing the helper to free.
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/subscription", () => ({
-  getUserPlanLimits: vi.fn().mockResolvedValue({ dailyOpLimit: 300 }),
+  getUserPlanLimits: vi.fn().mockResolvedValue({ monthlyOpLimit: 300 }),
   PLANS: {
-    free: { limits: { dailyOpLimit: 300 } },
-    growth: { limits: { dailyOpLimit: null } },
+    free: { limits: { monthlyOpLimit: 300 } },
+    growth: { limits: { monthlyOpLimit: null } },
   },
 }));
 
@@ -88,7 +88,7 @@ describe("rate-limit", () => {
       const error = new RateLimitError(300, 300);
       expect(error.message).toContain("300/300");
       expect(error.message).toMatch(/resets in/);
-      expect(error.message).toContain("midnight UTC");
+      expect(error.message).toContain("first of next month");
       expect(error.name).toBe("RateLimitError");
     });
 

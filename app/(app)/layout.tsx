@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
@@ -14,6 +14,7 @@ import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
 import { ProductHuntBanner } from '@/components/product-hunt-banner';
 import { trackEvent } from '@/lib/analytics';
+import { getUsageSummaryAction } from '@/app/actions';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -121,6 +122,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [plan, setPlan] = useState<string | null>(null);
     const isFree = plan === 'free';
     const planLoaded = plan !== null;
+    const [usageExceeded, setUsageExceeded] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const refreshThreads = useCallback(() => {
@@ -173,6 +175,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             .then(sub => setPlan(sub?.plan ?? 'free'))
             .catch(() => {});
     }, []);
+
+    useEffect(() => {
+        if (plan !== 'free') return;
+        getUsageSummaryAction()
+            .then(info => {
+                const exceeded = !info.unlimited && info.remaining !== null && info.remaining <= 0;
+                setUsageExceeded(exceeded);
+            })
+            .catch(() => {});
+    }, [plan]);
 
     function toggleCollapsed() {
         localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
@@ -429,6 +441,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 {plan.charAt(0).toUpperCase() + plan.slice(1)}
                             </span>
                         )}
+                        {planLoaded && isFree && usageExceeded && (
+                            <Link
+                                href="/upgrade"
+                                prefetch
+                                onClick={() => trackEvent('upgrade_clicked', { location: 'usage_exceeded_badge', page: pathname })}
+                                className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#C45D4A] bg-[#C45D4A] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(196,93,74,0.18)] transition-all hover:bg-[#B54E3D] hover:shadow-[0_0_0_4px_rgba(196,93,74,0.28)]"
+                                aria-label="Monthly usage limit reached — upgrade to Growth for unlimited operations"
+                            >
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                                </span>
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                <span>Monthly usage limit reached — upgrade to get unlimited access</span>
+                                <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+                            </Link>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <FeedbackButton />
@@ -446,6 +475,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <UserMenu isCollapsed={false} />
                     </div>
                 </div>
+                {/* Usage-exceeded banner — shown below the header on < lg screens where the inline pill is hidden */}
+                {planLoaded && isFree && usageExceeded && (
+                    <Link
+                        href="/upgrade"
+                        prefetch
+                        onClick={() => trackEvent('upgrade_clicked', { location: 'usage_exceeded_banner', page: pathname })}
+                        className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#C45D4A]/60 bg-[#C45D4A] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#B54E3D] lg:hidden"
+                        aria-label="Monthly usage limit reached — upgrade to Growth for unlimited operations"
+                    >
+                        <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                        </span>
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        <span className="hidden sm:inline">
+                            Monthly usage limit reached — upgrade to get unlimited access
+                        </span>
+                        <span className="sm:hidden">Monthly limit reached — upgrade</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+                    </Link>
+                )}
                 {/* Scrollable content area */}
                 <div className="flex-1 overflow-y-auto">
                     <ImpersonationBanner />
