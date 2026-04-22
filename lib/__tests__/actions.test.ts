@@ -28,6 +28,14 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
+// `after()` requires a real request scope at runtime. In tests we just
+// execute the callback immediately so flush paths still run synchronously.
+vi.mock("next/server", () => ({
+  after: (fn: () => void | Promise<void>) => {
+    if (typeof fn === "function") void fn();
+  },
+}));
+
 vi.mock("@/lib/session", () => ({
   getSessionAuth: mockGetSessionAuth,
 }));

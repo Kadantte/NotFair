@@ -2,6 +2,7 @@ import { db, schema } from "./index";
 import { eq, and, gt, gte, lt, lte, desc, inArray, sql } from "drizzle-orm";
 import type { WriteResult } from "@/lib/google-ads";
 import { maybeFireRedditFirstWrite } from "@/lib/reddit-first-write";
+import { trackServerEvent } from "@/lib/analytics-server";
 import {
   IMPACT_CORRELATION_DISCLAIMER,
   IMPACT_WINDOW_DAYS,
@@ -156,6 +157,61 @@ function telemetryColumns(
   };
 }
 
+// ─── First-tool-call activation instrumentation ────────────────────
+
+/**
+ * Fire PostHog events the first time a user invokes any tool (read or write),
+ * so we can measure the signup → first-tool-call drop in the activation
+ * funnel. Called BEFORE the insert on both the read and write paths — an
+ * empty prior-rows query means "this insert will be the first". Querying
+ * before the insert (rather than after with a `gt(id, justInsertedId)`
+ * filter) keeps the logic identical across read and write paths, since
+ * `logRead` does not call `.returning()`.
+ *
+ * Never throws — telemetry must never break the user request.
+ *
+ * IMPORTANT: Every route handler that reaches this code path MUST wrap its
+ * response with `after(flushServerEvents)` from `next/server`. Without the
+ * flush, posthog-node races the Vercel Lambda freezing and events drop
+ * (verified Apr 2026 for `user_signed_up` — 43% loss).
+ */
+export async function maybeFireFirstToolCallEvent(opts: {
+  userId: string | null | undefined;
+  toolName: string | null;
+  success: number; // 0 or 1
+  errorClass: string | null;
+  clientSource: string | null;
+}): Promise<void> {
+  if (!opts.userId) return;
+
+  try {
+    const prior = await db()
+      .select({ id: schema.operations.id })
+      .from(schema.operations)
+      .where(eq(schema.operations.userId, opts.userId))
+      .limit(1);
+
+    if (prior.length > 0) return;
+
+    trackServerEvent(opts.userId, "first_tool_call_attempted", {
+      tool_name: opts.toolName,
+      client_source: opts.clientSource,
+      success: opts.success === 1,
+      error_class: opts.errorClass,
+    });
+
+    if (opts.success === 0) {
+      trackServerEvent(opts.userId, "first_tool_call_error", {
+        tool_name: opts.toolName,
+        client_source: opts.clientSource,
+        error_class: opts.errorClass,
+      });
+    }
+  } catch (err) {
+    console.error("[tracking] maybeFireFirstToolCallEvent failed:", err);
+  }
+}
+
 // ─── Write Logging ──────────────────────────────────────────────────
 
 export type LogChangeOpts = {
@@ -175,6 +231,18 @@ export async function logChange(opts: LogChangeOpts) {
     if (code === null) {
       console.warn(`[tracking] Unmapped tool name (logged with null tool_code): ${writeResult.action}`);
     }
+
+    // Fire first-tool-call PostHog events BEFORE the insert so the "prior rows"
+    // query detects a truly empty history. See `maybeFireFirstToolCallEvent`.
+    await maybeFireFirstToolCallEvent({
+      userId: userId ?? null,
+      toolName: telemetry?.toolName ?? writeResult.action,
+      success: writeResult.success ? 1 : 0,
+      errorClass:
+        telemetry?.errorClass ??
+        (writeResult.success ? null : ERROR_CLASS.WRITE_REJECTED),
+      clientSource: clientSource ?? null,
+    });
 
     const [inserted] = await db()
       .insert(schema.operations)
@@ -228,6 +296,15 @@ export async function logRead(opts: LogReadOpts) {
   const { accountId, userId, toolName, campaignId, clientSource, telemetry } = opts;
   try {
     const code = toolNameToCode(toolName) ?? null;
+
+    // Fire first-tool-call PostHog events BEFORE the insert — see logChange.
+    await maybeFireFirstToolCallEvent({
+      userId: userId ?? null,
+      toolName: telemetry?.toolName ?? toolName,
+      success: telemetry?.errorClass ? 0 : 1,
+      errorClass: telemetry?.errorClass ?? null,
+      clientSource: clientSource ?? null,
+    });
 
     await db()
       .insert(schema.operations)

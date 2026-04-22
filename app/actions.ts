@@ -1,5 +1,6 @@
 "use server"
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
@@ -7,7 +8,7 @@ import { getSessionAuth } from "@/lib/session";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 import { getUsageInfo, getHourlyUsage } from "@/lib/mcp/rate-limit";
-import { trackServerEvent } from "@/lib/analytics-server";
+import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 
 type CampaignHistoryRow = {
     segments: {
@@ -173,6 +174,7 @@ export async function undoChangeAction(changeId: number) {
             minutes_since_change: Math.round(changeAge / 60_000),
         });
 
+        after(flushServerEvents);
         return { success: true, changeId };
     });
 }
@@ -302,6 +304,7 @@ export async function pauseCampaignAction(campaignId: string) {
 
         campaignsCache.delete(customerId);
         await logChange({ accountId: customerId, userId, campaignId, writeResult: result, reasoning: "Paused from campaigns page" });
+        after(flushServerEvents);
         return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Pause Campaign Error:", error);
@@ -327,6 +330,7 @@ export async function enableCampaignAction(campaignId: string) {
 
         campaignsCache.delete(customerId);
         await logChange({ accountId: customerId, userId, campaignId, writeResult: result, reasoning: "Enabled from campaigns page" });
+        after(flushServerEvents);
         return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Enable Campaign Error:", error);
@@ -352,6 +356,7 @@ export async function removeCampaignAction(campaignId: string) {
 
         campaignsCache.delete(customerId);
         await logChange({ accountId: customerId, userId, campaignId, writeResult: result, reasoning: "Deleted from campaigns page" });
+        after(flushServerEvents);
         return { success: true, campaignId };
     } catch (error) {
         console.error("Remove Campaign Error:", error);

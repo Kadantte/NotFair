@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import {
   listCampaigns,
   getKeywords,
@@ -16,6 +17,7 @@ import { getAuthContext } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { getChanges, getImpact, logChange } from "@/lib/db/tracking";
+import { flushServerEvents } from "@/lib/analytics-server";
 import { computeHealthScore, type HealthInput } from "@/lib/dashboard/health-score";
 import { detectIssues, type SearchTermData, type KeywordData, type CampaignPerfData } from "@/lib/dashboard/issues";
 import { detectOpportunities, type ImpressionShareData, type RecommendationData } from "@/lib/dashboard/opportunities";
@@ -374,6 +376,7 @@ export async function addNegativesAction(campaignId: string, terms: string[]) {
     }
 
     const succeeded = results.filter((r) => r.success).length;
+    after(flushServerEvents);
     return { succeeded, total: terms.length, results };
   });
 }
@@ -390,6 +393,7 @@ export async function pauseKeywordAction(
     if (result.success) {
       await logChange({ accountId: session.customerId, userId: session.userId, campaignId, writeResult: result, reasoning: "Paused from dashboard issue card" });
     }
+    after(flushServerEvents);
     return result;
   });
 }
@@ -402,6 +406,7 @@ export async function adjustBudgetAction(campaignId: string, newBudgetDollars: n
     if (result.success) {
       await logChange({ accountId: session.customerId, userId: session.userId, campaignId, writeResult: result, reasoning: "Budget adjusted from dashboard opportunity card" });
     }
+    after(flushServerEvents);
     return result;
   });
 }

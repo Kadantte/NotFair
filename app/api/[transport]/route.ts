@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 if (!process.env.GCLOUD_PROJECT) {
   process.env.GCLOUD_PROJECT = "ads-agent-mcp";
 }
+import { after } from "next/server";
 import { createMcpHandler } from "mcp-handler";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
@@ -12,6 +13,7 @@ import { registerReadTools, registerWriteTools } from "@/lib/mcp";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { jsonResult } from "@/lib/mcp/types";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
+import { flushServerEvents } from "@/lib/analytics-server";
 
 // ─── Per-request auth via AsyncLocalStorage ──────────────────────────
 
@@ -236,6 +238,10 @@ async function handler(request: Request): Promise<Response> {
   if (request.method === "POST" && auth.sessionId != null && !auth.clientName) {
     void captureClientInfo(request.clone(), auth.sessionId, auth.authMethod, auth.userAgent);
   }
+
+  // Keep the Lambda alive long enough for posthog-node to POST queued events
+  // (e.g. first_tool_call_attempted). No-op if nothing was captured.
+  after(flushServerEvents);
 
   return authStore.run(auth, () => mcpHandler(request));
 }
