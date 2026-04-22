@@ -34,7 +34,7 @@ import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
 import { MIN_AFTER_DAYS_FOR_DIRECTION } from "@/lib/db/impact";
 import { execRead } from "@/lib/tools/execute";
 import { getEnv } from "@/lib/env";
-import { jsonResult, safeHandler, accountIdParam, READ_ANNOTATIONS } from "./types";
+import { typedResult, safeHandler, accountIdParam, READ_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 import { resolveToolAuth } from "./helpers";
 
@@ -54,7 +54,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_account_info", () => getAccountInfo(targetAuth));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Campaigns ──────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, limit, includeRemoved }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "list_campaigns", () => listCampaigns(targetAuth, { limit, includeRemoved }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getCampaignPerformance", {
@@ -104,7 +104,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(auth, targetId, "get_campaign_performance", () =>
       getCampaignPerformance(targetAuth, campaignId, { days, startDate, endDate, comparePreviousPeriod }),
     campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Keywords & Search Terms ────────────────────────────────────
@@ -121,7 +121,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, days, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_keywords", () => getKeywords(targetAuth, campaignId, days, limit), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getNegativeKeywords", {
@@ -135,7 +135,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_negative_keywords", () => getNegativeKeywords(targetAuth, campaignId, limit), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getSearchTermReport", {
@@ -150,7 +150,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, days, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_search_term_report", () => getSearchTermReport(targetAuth, campaignId, days, limit), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Custom Query ───────────────────────────────────────────────
@@ -190,7 +190,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, query, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "run_gaql_query", () => runSafeGaqlReport(targetAuth, query, limit));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Tracking Templates ──────────────────────────────────────────
@@ -221,7 +221,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       : undefined;
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_tracking_template", () => getTrackingTemplate(targetAuth, level, entityId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Ad Groups & Ads ────────────────────────────────────────────
@@ -237,7 +237,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "list_ad_groups", () => listAdGroups(targetAuth, campaignId, limit), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("listAds", {
@@ -253,7 +253,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, days, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "list_ads", () => listAds(targetAuth, campaignId, adGroupId, days, limit), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Competitive Intelligence ────────────────────────────────────
@@ -269,7 +269,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, days }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_impression_share", () => getImpressionShare(targetAuth, campaignId, days), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Conversion Tracking ─────────────────────────────────────────
@@ -283,7 +283,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_conversion_actions", () => getConversionActions(targetAuth));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Account & Campaign Settings ────────────────────────────────
@@ -297,7 +297,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_account_settings", () => getAccountSettings(targetAuth));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getCampaignSettings", {
@@ -310,7 +310,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_campaign_settings", () => getCampaignSettings(targetAuth, campaignId), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Geo Target Search ──────────────────────────────────────────
@@ -342,7 +342,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, query, countryCode, locale }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "search_geo_targets", () => searchGeoTargets(targetAuth, query, countryCode, locale));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Recommendations ─────────────────────────────────────────────
@@ -357,7 +357,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_recommendations", () => getRecommendations(targetAuth, campaignId), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Change History ───────────────────────────────────────────
@@ -373,7 +373,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_changes", () => getChanges(targetId, { limit, campaignId }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("reviewChangeImpact", {
@@ -402,7 +402,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(auth, targetId, "review_change_impact", () =>
       reviewChangeImpact(targetId, { days, limit }),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Field & Resource Discovery ─────────────────────────────────────
@@ -421,7 +421,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, resourceName }) => {
     const { targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await getResourceMetadata(targetAuth, resourceName);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("listQueryableResources", {
@@ -434,7 +434,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await listQueryableResources(targetAuth);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Performance Max ─────────────────────────────────────────────
@@ -451,7 +451,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_pmax_asset_groups", () => getPmaxAssetGroups(targetAuth, campaignId, limit), campaignId);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getPmaxAssets", {
@@ -466,7 +466,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, assetGroupId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_pmax_assets", () => getPmaxAssets(targetAuth, assetGroupId, limit));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Keyword Research ───────────────────────────────────────────
@@ -498,7 +498,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(callerAuth, callerAuth.customerId, "get_keyword_ideas", () =>
       getKeywordIdeas(platformAuth, keywords, url, language, geoTargetIds, pageSize),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Callout Extensions (RMF C.75) ───────────────────────────────
@@ -512,7 +512,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "list_callout_assets", () => listCalloutAssets(targetAuth));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97, R.130) ──
@@ -526,7 +526,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "list_bidding_strategies", () => listBiddingStrategies(targetAuth));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getBiddingStrategyPerformance", {
@@ -542,7 +542,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(auth, targetId, "get_bidding_strategy_performance", () =>
       getBiddingStrategyPerformance(targetAuth, { days, includeRemoved }),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Negative Keyword Lists (Shared Sets) ──────────────────────────
@@ -556,7 +556,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "list_negative_keyword_lists", () => listNegativeKeywordLists(targetAuth));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("getNegativeKeywordListItems", {
@@ -570,7 +570,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, sharedSetId, limit }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_negative_keyword_list_items", () => getNegativeKeywordListItems(targetAuth, sharedSetId, limit), null);
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Paid vs Organic ──────────────────────────────────────────────
@@ -596,7 +596,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(auth, targetId, "get_paid_vs_organic_analysis", () =>
       getPaidVsOrganicAnalysis(targetAuth, { days, searchTermContains, campaignId, limit }),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Account Audit ────────────────────────────────────────────────
@@ -633,6 +633,6 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, days }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "audit", () => runAudit(targetAuth, days));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 };

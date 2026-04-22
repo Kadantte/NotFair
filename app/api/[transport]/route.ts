@@ -11,7 +11,7 @@ import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { registerReadTools, registerWriteTools } from "@/lib/mcp";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
-import { jsonResult } from "@/lib/mcp/types";
+import { typedResult } from "@/lib/mcp/types";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
 import { flushServerEvents } from "@/lib/analytics-server";
 
@@ -129,7 +129,7 @@ const mcpHandler = createMcpHandler(
     }, async () => {
       const auth = currentAuth();
       const accounts = auth.customerIds ?? [{ id: auth.customerId, name: "" }];
-      return jsonResult({
+      return typedResult({
         accounts: accounts.map((a) => ({
           id: a.id,
           name: a.name || "Unknown Account",

@@ -100,7 +100,7 @@ vi.mock("@/lib/mcp/rate-limit", () => ({
 }));
 
 vi.mock("@/lib/mcp/types", () => ({
-  jsonResult: vi.fn(),
+  typedResult: vi.fn(),
   safeHandler: vi.fn((fn: any) => fn),
   accountIdParam: {},
   WRITE_ANNOTATIONS: {},

@@ -60,7 +60,7 @@ import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
 import { enforceRateLimit } from "@/lib/mcp/rate-limit";
-import { jsonResult, safeHandler, accountIdParam, READ_ANNOTATIONS, WRITE_ANNOTATIONS, DESTRUCTIVE_WRITE_ANNOTATIONS } from "./types";
+import { typedResult, safeHandler, accountIdParam, READ_ANNOTATIONS, WRITE_ANNOTATIONS, DESTRUCTIVE_WRITE_ANNOTATIONS } from "./types";
 import type { ToolRegistrar } from "./types";
 import { resolveToolAuth } from "./helpers";
 
@@ -84,7 +84,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pauseKeyword(targetAuth, campaignId, adGroupId, criterionId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("enableKeyword", {
@@ -98,7 +98,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, adGroupId, criterionId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => enableKeyword(targetAuth, adGroupId, criterionId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("addKeyword", {
@@ -114,7 +114,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => addKeyword(targetAuth, adGroupId, keyword, matchType));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Bid Management ─────────────────────────────────────────────
@@ -134,7 +134,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execWrite(auth, targetId, campaignId, () =>
       updateBid(targetAuth, campaignId, adGroupId, criterionId, toMicros(newBidDollars)),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Negative Keywords ──────────────────────────────────────────
@@ -151,7 +151,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => addNegativeKeyword(targetAuth, campaignId, keyword, matchType));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeNegativeKeyword", {
@@ -171,7 +171,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => removeNegativeKeyword(targetAuth, campaignId, keyword, matchType));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Budget Management ──────────────────────────────────────────
@@ -189,7 +189,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execWrite(auth, targetId, campaignId, () =>
       updateCampaignBudget(targetAuth, campaignId, toMicros(newDailyBudgetDollars)),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Create Campaign ────────────────────────────────────────────
@@ -259,7 +259,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const logged = await execWrite(auth, targetId, createResult.campaignId ?? null, async () => writeResult, undefined, { overrideLatencyMs });
 
-    return jsonResult({
+    return typedResult({
       ...createResult,
       changeId: logged.changeId,
       status: createResult.success ? "PAUSED" : undefined,
@@ -286,7 +286,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pauseCampaign(targetAuth, campaignId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("enableCampaign", {
@@ -299,7 +299,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enableCampaign(targetAuth, campaignId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeCampaign", {
@@ -317,7 +317,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => removeCampaign(targetAuth, campaignId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Tracking Templates ─────────────────────────────────────────
@@ -357,7 +357,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const overrideLatencyMs = Math.round(performance.now() - t0);
     const resolvedCampaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
     const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult, undefined, { overrideLatencyMs });
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Ad Group Management ────────────────────────────────────────
@@ -373,7 +373,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupName }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => createAdGroup(targetAuth, campaignId, adGroupName));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Ad Management ──────────────────────────────────────────────
@@ -400,7 +400,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => createAd(targetAuth, adGroupId, { headlines, descriptions, finalUrl }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("pauseAd", {
@@ -415,7 +415,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pauseAd(targetAuth, adGroupId, adId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("enableAd", {
@@ -430,7 +430,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enableAd(targetAuth, adGroupId, adId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeAd", {
@@ -445,7 +445,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => removeAd(targetAuth, adGroupId, adId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("updateAdFinalUrl", {
@@ -461,7 +461,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => updateAdFinalUrl(targetAuth, adGroupId, adId, finalUrl));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("updateAdAssets", {
@@ -496,7 +496,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => updateAdAssets(targetAuth, adGroupId, adId, { headlines, descriptions }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Bulk Operations ────────────────────────────────────────────
@@ -535,7 +535,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const succeeded = logged.filter((r) => r.success).length;
     const failed = logged.filter((r) => !r.success).length;
 
-    return jsonResult({
+    return typedResult({
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
@@ -576,7 +576,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const succeeded = logged.filter((r) => r.success).length;
     const failed = logged.filter((r) => !r.success).length;
 
-    return jsonResult({
+    return typedResult({
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
@@ -616,7 +616,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const succeeded = logged.filter((r) => r.success).length;
     const failed = logged.filter((r) => !r.success).length;
 
-    return jsonResult({
+    return typedResult({
       summary: { total: results.length, succeeded, failed },
       results: logged,
     });
@@ -658,7 +658,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       ),
     );
 
-    return jsonResult({
+    return typedResult({
       success: result.success,
       summary: {
         added: { total: result.added.length, succeeded: result.added.filter((r) => r.success).length },
@@ -685,7 +685,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, newName }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => renameCampaign(targetAuth, campaignId, newName));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("renameAdGroup", {
@@ -700,7 +700,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, adGroupId, newName }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => renameAdGroup(targetAuth, campaignId, adGroupId, newName));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Campaign Bidding Strategy ──────────────────────────────────
@@ -739,7 +739,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       }),
     );
 
-    return jsonResult(logged);
+    return typedResult(logged);
   });
 
   // ─── Campaign Goal Config ───────────────────────────────────────
@@ -758,7 +758,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execWrite(auth, targetId, campaignId, () =>
       updateCampaignGoalConfig(targetAuth, campaignId, goalConfigLevel as GoalConfigLevel),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Campaign Settings ──────────────────────────────────────────
@@ -828,7 +828,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs })),
     );
 
-    return jsonResult({
+    return typedResult({
       success: result.success,
       error: result.error,
       results: logged,
@@ -874,7 +874,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
       }),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("updateConversionAction", {
@@ -911,7 +911,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
       }),
     );
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("uploadClickConversions", {
@@ -952,7 +952,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       await enforceRateLimit(auth.userId);
     }
 
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Guardrails ─────────────────────────────────────────────────
@@ -979,7 +979,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     if (maxBudgetChangePct !== undefined) goals.maxBudgetChangePct = maxBudgetChangePct;
     if (maxKeywordPausePct !== undefined) goals.maxKeywordPausePct = maxKeywordPausePct;
     const result = await setGoals(targetId, campaignId ?? null, goals);
-    return jsonResult({ success: true, ...result });
+    return typedResult({ success: true, ...result });
   }));
 
   server.registerTool("getGuardrails", {
@@ -993,7 +993,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const { targetId } = resolveToolAuth(currentAuth, accountId);
     const goals = await getGoals(targetId, campaignId);
     if (!goals) {
-      return jsonResult({
+      return typedResult({
         source: "defaults",
         targetCpa: null,
         monthlyCap: null,
@@ -1002,7 +1002,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         maxKeywordPausePct: 0.30,
       });
     }
-    return jsonResult({
+    return typedResult({
       source: campaignId && goals.campaignId === campaignId ? "campaign" : "account",
       ...goals,
     });
@@ -1021,7 +1021,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => pausePmaxAssetGroup(targetAuth, campaignId, assetGroupId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("enablePmaxAssetGroup", {
@@ -1035,7 +1035,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => enablePmaxAssetGroup(targetAuth, campaignId, assetGroupId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Language Targeting (RMF C.30 / M.10) ────────────────────────
@@ -1058,7 +1058,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const logged = await Promise.all(
       result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs })),
     );
-    return jsonResult({ success: result.success, error: result.error, results: logged });
+    return typedResult({ success: result.success, error: result.error, results: logged });
   }));
 
   // ─── Callout Extensions (RMF C.75) ───────────────────────────────
@@ -1074,7 +1074,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, text, linkToAccount }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => createCalloutAsset(targetAuth, { text, linkToAccount }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("linkCalloutToAccount", {
@@ -1087,7 +1087,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, assetId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => linkCalloutToAccount(targetAuth, assetId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeCalloutFromAccount", {
@@ -1100,7 +1100,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, assetId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => removeCalloutFromAccount(targetAuth, assetId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97) ─────────
@@ -1123,7 +1123,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       targetCpaMicros: targetCpa != null ? toMicros(targetCpa) : undefined,
       targetRoas,
     }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("updateBiddingStrategy", {
@@ -1144,7 +1144,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       targetCpaMicros: targetCpa != null ? toMicros(targetCpa) : undefined,
       targetRoas,
     }));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeBiddingStrategy", {
@@ -1157,7 +1157,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, biddingStrategyId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => removeBiddingStrategy(targetAuth, biddingStrategyId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("linkCampaignToBiddingStrategy", {
@@ -1171,7 +1171,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, biddingStrategyId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => linkCampaignToBiddingStrategy(targetAuth, campaignId, biddingStrategyId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Negative Keyword Lists (Shared Sets) ──────────────────────────
@@ -1186,7 +1186,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, name }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => createNegativeKeywordList(targetAuth, name));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeNegativeKeywordList", {
@@ -1199,7 +1199,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, sharedSetId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => removeNegativeKeywordList(targetAuth, sharedSetId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("addKeywordToNegativeList", {
@@ -1214,7 +1214,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, sharedSetId, keyword, matchType }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => addKeywordToNegativeList(targetAuth, sharedSetId, keyword, matchType));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("removeKeywordFromNegativeList", {
@@ -1229,7 +1229,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, sharedSetId, keyword, matchType }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => removeKeywordFromNegativeList(targetAuth, sharedSetId, keyword, matchType));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("linkNegativeListToCampaign", {
@@ -1243,7 +1243,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => linkNegativeListToCampaign(targetAuth, campaignId, sharedSetId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   server.registerTool("unlinkNegativeListFromCampaign", {
@@ -1257,7 +1257,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, campaignId, () => unlinkNegativeListFromCampaign(targetAuth, campaignId, sharedSetId));
-    return jsonResult(result);
+    return typedResult(result);
   }));
 
   // ─── Undo ───────────────────────────────────────────────────────
@@ -1280,7 +1280,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const check = await getUndoableChange(targetId, changeId);
     if ("error" in check) {
-      return jsonResult({ success: false, error: check.error });
+      return typedResult({ success: false, error: check.error });
     }
 
     const { change } = check;
@@ -1300,7 +1300,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       });
     }
 
-    return jsonResult({
+    return typedResult({
       ...undoResult,
       undoneChangeId: changeId,
       originalAction: change.toolName,

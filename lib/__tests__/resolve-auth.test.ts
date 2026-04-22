@@ -52,7 +52,7 @@ vi.mock("@/lib/mcp", () => ({
 }));
 
 vi.mock("@/lib/mcp/types", () => ({
-  jsonResult: vi.fn(),
+  typedResult: vi.fn(),
 }));
 
 // Import the handler which exposes resolveAuth indirectly
