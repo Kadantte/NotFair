@@ -13,6 +13,7 @@ import { registerReadTools, registerWriteTools } from "@/lib/mcp";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { typedResult } from "@/lib/mcp/types";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
+import { PLAYBOOKS } from "@/lib/mcp/playbooks";
 import { flushServerEvents } from "@/lib/analytics-server";
 
 // ─── Per-request auth via AsyncLocalStorage ──────────────────────────
@@ -138,6 +139,32 @@ const mcpHandler = createMcpHandler(
         totalAccounts: accounts.length,
       });
     });
+
+    // ─── MCP resources — playbooks ────────────────────────────────
+    // Publishes canonical tool-call sequences so Claude fetches the
+    // recipe for "build a dashboard" / "explain a regression" instead
+    // of rediscovering it every session. Content is bundled at build
+    // time; no auth required to read.
+    for (const playbook of PLAYBOOKS) {
+      server.registerResource(
+        playbook.uri.replace("adsagent://playbooks/", ""),
+        playbook.uri,
+        {
+          title: playbook.name,
+          description: playbook.description,
+          mimeType: "text/markdown",
+        },
+        async (uri) => ({
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: "text/markdown",
+              text: playbook.content,
+            },
+          ],
+        }),
+      );
+    }
   },
   {},
   {

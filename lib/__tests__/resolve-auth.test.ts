@@ -40,7 +40,7 @@ vi.mock("@/lib/google-ads", () => ({
 vi.mock("mcp-handler", () => ({
   createMcpHandler: vi.fn((setupFn: (server: unknown) => void) => {
     // Call setup with a stub server so registerTool etc. don't fail
-    setupFn({ registerTool: vi.fn() });
+    setupFn({ registerTool: vi.fn(), registerResource: vi.fn() });
     // Return a handler that returns an empty 200 (never reached in auth-error tests)
     return vi.fn(async () => new Response("ok"));
   }),
