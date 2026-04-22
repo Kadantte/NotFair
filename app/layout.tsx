@@ -114,7 +114,7 @@ export default async function RootLayout({
         </Script>
         {REDDIT_PIXEL_ID && (
           <Script id="reddit-pixel" strategy="afterInteractive">
-            {`!function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js?pixel_id=${REDDIT_PIXEL_ID}",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);rdt('init',${JSON.stringify(REDDIT_PIXEL_ID)},${JSON.stringify(
+            {`try{var u=new URL(location.href),c=u.searchParams.get("rdt_cid");if(c&&/^\\{\\{.*\\}\\}$/.test(c)){u.searchParams.delete("rdt_cid");history.replaceState(history.state,"",u.toString())}}catch(e){}!function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js?pixel_id=${REDDIT_PIXEL_ID}",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);rdt('init',${JSON.stringify(REDDIT_PIXEL_ID)},${JSON.stringify(
               session.connected
                 ? {
                     ...(session.googleEmail ? { email: session.googleEmail } : {}),

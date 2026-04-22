@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.22.3] - 2026-04-21
+
+### Fixed
+- Reddit Pixel now strips unresolved `{{RDT_CID}}` template placeholders from the URL before initializing. When a Reddit campaign's URL tracking template contains a non-macro like `?rdt_cid={{RDT_CID}}`, Reddit leaves it as literal text — the pixel would then send the string `{{RDT_CID}}` as the `click_id`, triggering Reddit's "Invalid match key 'click ID'" event-quality warning on ~18% of PageVisits. We now detect `rdt_cid` values matching `{{...}}` and remove them via `history.replaceState` so Reddit's auto-appended real click ID wins.
+
 ## [0.2.22.2] - 2026-04-20
 
 ### Fixed
