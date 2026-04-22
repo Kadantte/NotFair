@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-14.
+> Source of truth for all analytics events. Last updated: 2026-04-22.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -385,6 +385,30 @@ No properties.
 
 ---
 
+## product_hunt_banner_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks anywhere on the `ProductHuntBanner`. The banner is a single `<a>` element that opens `producthunt.com` in a new tab, so the whole countdown + badge + CTA cluster resolves to one click target. The banner is mounted in both the marketing layout and the app layout, so the same event fires across signed-out and signed-in sessions.
+**Hypothesis:** We believe tracking this tells us CTR on the PH launch banner sliced by surface (marketing vs app) and by signed-in state, which lets us decide (a) whether the banner is worth keeping after launch week, (b) whether paid users click on promo banners at a rate that justifies future campaigns inside the app, and (c) which pages/surfaces drive PH engagement. Time-bound event — retire or repurpose after the Product Hunt launch cycle ends.
+
+> **Why a dedicated event, not an extension of `cta_clicked`.** `cta_clicked` is scoped to marketing-page CTAs with a stable `page` enum. The PH banner also renders inside the authenticated app, so mixing it into `cta_clicked` would fracture the existing `page` enum and muddy the marketing-funnel queries. Keeping it separate also makes it trivial to mute/delete after the campaign.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `surface` | string | `"marketing"` | Which layout rendered the banner. Enum: `marketing` (public marketing pages), `app` (authenticated app layout). |
+| `page` | string | `"/campaigns"` | Pathname at click time — use for finding which pages drive the most PH clicks. |
+| `is_authenticated` | boolean | `true` | Whether the clicker has a Google session. Always `true` for `surface: "app"`; mixed for `surface: "marketing"`. |
+
+```json
+{ "event": "product_hunt_banner_clicked", "properties": { "surface": "app", "page": "/campaigns", "is_authenticated": true } }
+```
+
+**Files:** `components/product-hunt-banner.tsx`, `app/(marketing)/layout.tsx`, `app/(app)/layout.tsx`
+
+---
+
 ## user_signed_up
 
 **Phase:** 1
@@ -554,3 +578,4 @@ Valid candidates that don't yet meet the "what would we do differently?" bar —
 - **`connector_credentials_visible`** *(category: funnel_entry)* — fires once when the Client ID/Secret block first renders for a user. Useful as a denominator for `connector_credential_copied / connector_credentials_visible` (copy-through rate). Defer — `oauth_credentials_generated` is currently a close-enough proxy.
 - **`connector_screenshot_lightbox_dwell`** *(category: ambient)* — fires on lightbox close with a `dwell_ms` property. Tells us *how long* users inspected each step. Defer — `connector_screenshot_expanded` counts are enough until we see one image dominating the distribution.
 - **`audit_help_panel_pill_visible`** *(category: ambient)* — fires when the collapsed pill is in view via IntersectionObserver. Useful for distinguishing "pill seen but ignored" from "pill never on screen." Defer — only worth the wiring cost if dismissal rates suggest a visibility problem.
+- **`product_hunt_banner_shown`** *(category: ambient)* — fires once per page when the PH banner renders. Would give us a precise CTR denominator. Defer — `$pageview` filtered to paths where the banner renders is good enough for a one-week promo. Revisit if we run a second PH-style time-bound campaign.

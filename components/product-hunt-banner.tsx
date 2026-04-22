@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
+
+export type ProductHuntBannerSurface = "marketing" | "app";
 
 // 2026-04-23 00:00 PT (PDT = UTC-7)
 const TARGET_MS = Date.UTC(2026, 3, 23, 7, 0, 0);
@@ -70,13 +74,27 @@ function Countdown() {
   );
 }
 
-export function ProductHuntBanner() {
+export function ProductHuntBanner({
+  surface,
+  isAuthenticated,
+}: {
+  surface: ProductHuntBannerSurface;
+  isAuthenticated: boolean;
+}) {
+  const pathname = usePathname();
   return (
     <a
       href="https://www.producthunt.com/products/adsagent-google-ads-claude-connector?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-adsagent-google-ads-claude-connector"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Upvote AdsAgent on Product Hunt and get 50% off"
+      onClick={() =>
+        trackEvent("product_hunt_banner_clicked", {
+          surface,
+          page: pathname,
+          is_authenticated: isAuthenticated,
+        })
+      }
       className="group relative block w-full overflow-hidden border-b border-[#D4882A]/50 bg-[#D4882A] text-[#1A1917] transition-colors hover:bg-[#C07A22]"
     >
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-center gap-x-3 gap-y-2 px-4 py-2.5 sm:gap-x-4 sm:px-6 sm:py-3">

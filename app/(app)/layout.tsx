@@ -385,7 +385,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex h-full flex-col bg-[#1A1917]">
-            <ProductHuntBanner />
+            <ProductHuntBanner surface="app" isAuthenticated={true} />
             <div className="flex min-h-0 flex-1 flex-col md:flex-row">
             {/* Mobile header */}
             <header className="flex md:hidden h-12 shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F] px-4">
