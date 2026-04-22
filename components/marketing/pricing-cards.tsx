@@ -39,7 +39,7 @@ export function CheckoutStatusBanner() {
 }
 
 export const FREE_FEATURES = [
-  "300 Google Ads operations per day",
+  "300 Google Ads operations per month",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Read campaign performance, search terms, and recommendations",
   "Make bid and budget edits with guardrails",
@@ -264,7 +264,7 @@ export function PricingCards({
       </div>
 
       {/* Plan cards */}
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid gap-6 sm:grid-cols-2" suppressHydrationWarning>
         {/* Free */}
         <div className="flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 sm:p-7 lg:p-8">
           <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
@@ -284,7 +284,7 @@ export function PricingCards({
             {FREE_FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
-                <span>{f}</span>
+                <span suppressHydrationWarning>{f}</span>
               </li>
             ))}
           </ul>
@@ -360,7 +360,7 @@ export function PricingCards({
             {GROWTH_FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
-                <span>{f}</span>
+                <span suppressHydrationWarning>{f}</span>
               </li>
             ))}
           </ul>
@@ -414,7 +414,7 @@ export function PricingCards({
         </div>
 
         {/* Managed */}
-        <div className="relative flex flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 sm:p-7 lg:p-8">
+        <div className="relative hidden flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 sm:p-7 lg:p-8">
           <div className="absolute -top-3 right-6 rounded-full bg-[#C45D4A] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_2px_8px_rgba(196,93,74,0.4)] sm:right-7 lg:right-8">
             Limited time · 50% off
           </div>

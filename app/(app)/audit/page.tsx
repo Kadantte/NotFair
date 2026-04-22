@@ -145,7 +145,7 @@ export default function AuditPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="relative flex h-full min-h-0">
       <div
         className={`h-full min-w-0 overflow-y-auto transition-[width] duration-300 ease-in-out ${
           drawerOpen ? "w-1/2" : "w-full"
@@ -182,7 +182,7 @@ export default function AuditPage() {
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="group fixed right-4 top-[72px] z-30 flex items-center justify-end gap-2 overflow-hidden rounded-md p-0 text-[13px] font-medium text-[#C4C0B6] transition-all duration-200 ease-out hover:text-[#4CAF6E] md:right-6 lg:right-8"
+            className="group absolute right-4 top-4 z-30 flex items-center justify-end gap-2 overflow-hidden rounded-md p-0 text-[13px] font-medium text-[#C4C0B6] transition-all duration-200 ease-out hover:text-[#4CAF6E] md:right-6 lg:right-8"
           >
             <span className="max-w-0 whitespace-nowrap opacity-0 transition-all duration-200 ease-out group-hover:max-w-[140px] group-hover:opacity-100">
               Show AI panel
