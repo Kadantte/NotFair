@@ -17,6 +17,8 @@ import {
   Home,
   Heart,
   Briefcase,
+  Zap,
+  UserCheck,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { fadeInUp } from "@/components/marketing/audit-cta";
@@ -76,6 +78,65 @@ function ConnectClaudeCTA({
         </>
       )}
     </Button>
+  );
+}
+
+type AudienceItem = {
+  icon: typeof ArrowRight;
+  title: string;
+  desc: string;
+};
+
+function AudienceSection({
+  eyebrow,
+  heading,
+  lede,
+  items,
+}: {
+  eyebrow: string;
+  heading: string;
+  lede: string;
+  items: AudienceItem[];
+}) {
+  return (
+    <section className="px-4 pb-16">
+      <motion.div
+        className="container mx-auto max-w-5xl"
+        variants={fadeInUp}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, margin: "-60px" }}
+      >
+        <div className="mb-10 max-w-2xl">
+          <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+            {eyebrow}
+          </p>
+          <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+            {heading}
+          </h2>
+          <p className="mt-4 text-lg leading-relaxed text-[#C4C0B6]">{lede}</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.title}
+                className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6"
+              >
+                <Icon className="h-5 w-5 text-[#4CAF6E]" />
+                <h3 className="mt-4 text-lg font-semibold text-[#E8E4DD]">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
+                  {item.desc}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+    </section>
   );
 }
 
@@ -314,10 +375,9 @@ export function HomePage({
                 <span className="text-[#4CAF6E]">manager.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                Claude has no commissions, no incentive to overspend your budget.
-                AdsAgent gives Claude the tools to monitor your campaigns 24/7,
-                cut waste, and tirelessly surface opportunities —
-                with your best interest at heart.
+                Every Google Ads campaign deserves your best work.
+                AdsAgent gives Claude the tools to analyze and execute
+                across Google Ads, CRM, GA4, and Search Console.
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-4">
@@ -509,46 +569,49 @@ export function HomePage({
         <div className="container mx-auto max-w-5xl">
           <div className="mb-10 max-w-2xl">
             <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              An ads manager with your best interest at heart.
+              Everything Claude needs to run real ads work.
             </h2>
+            <p className="mt-4 text-lg leading-relaxed text-[#C4C0B6]">
+              Cross-system analysis, continuous monitoring, and execution — on one account or a hundred.
+            </p>
           </div>
           <div className="divide-y divide-[#3D3C36] border-y border-[#3D3C36]">
             {[
               {
-                icon: Heart,
-                title: "Your best interest, always",
-                stat: "$0",
-                desc: "No commissions, no retainers tied to spend. Claude has no incentive to burn your budget — every recommendation is purely in your interest.",
+                icon: Layers,
+                title: "Cross-system analysis",
+                stat: "4+ sources",
+                desc: "Claude reads Google Ads alongside your CRM, GA4, and Search Console — catching the search terms that convert on ads but never close downstream.",
+              },
+              {
+                icon: Zap,
+                title: "Executes, not just reports",
+                stat: "Read + Write",
+                desc: "Pause keywords, restructure campaigns, write RSAs, rebuild landing pages. Not a dashboard — an operator.",
               },
               {
                 icon: TrendingUp,
-                title: "Tirelessly finds opportunities",
+                title: "Tireless monitoring",
                 stat: "24/7",
-                desc: "Claude monitors your campaigns around the clock, surfacing wins you'd miss with a monthly agency check-in.",
+                desc: "Claude watches for wasted spend, search term drift, and new opportunities around the clock — wins you'd miss between weekly check-ins.",
               },
               {
-                icon: Layers,
-                title: "Unlimited ad accounts",
+                icon: Briefcase,
+                title: "Every account, same depth",
                 stat: "∞",
-                desc: "Connect as many Google Ads accounts as you manage. One subscription covers them all — no per-account fees.",
-              },
-              {
-                icon: Globe,
-                title: "Works wherever you use Claude",
-                stat: "MCP",
-                desc: "Claude.ai, Claude Code, Cursor, or any MCP-compatible client — your ads account goes where you go.",
-              },
-              {
-                icon: DollarSign,
-                title: "Wasted spend recovery",
-                stat: "15–25%",
-                desc: "Claude analyzes your search terms and keywords to find irrelevant clicks bleeding your budget.",
+                desc: "One account or a hundred. Apply your full playbook consistently — the marginal cost of deep analysis drops to near zero.",
               },
               {
                 icon: Eye,
                 title: "Full transparency & control",
                 stat: "100%",
-                desc: "Every change is explained in plain English with before/after data. Nothing happens without your approval.",
+                desc: "Every change explained in plain English with before/after data. Nothing ships without your approval.",
+              },
+              {
+                icon: Globe,
+                title: "Wherever you use Claude",
+                stat: "MCP",
+                desc: "Claude.ai, Claude Code, Cursor, or any MCP-compatible client — your ads account goes where you go.",
               },
             ].map((item) => {
               const Icon = item.icon;
@@ -575,6 +638,52 @@ export function HomePage({
           </div>
         </div>
       </section>
+
+      <AudienceSection
+        eyebrow="For agencies"
+        heading="Your playbook, applied consistently to every client."
+        lede="The hard part isn't knowing what to do — it's executing it the same way across a roster. Claude encodes your playbook and runs it on every account, every week."
+        items={[
+          {
+            icon: Briefcase,
+            title: "Scale your playbook",
+            desc: "Audits, search-term reviews, weekly reports, QBR prep — encoded once, applied across your entire roster. Every client gets senior-level analysis, not templated output.",
+          },
+          {
+            icon: DollarSign,
+            title: "Smaller accounts become profitable",
+            desc: "The marginal cost of deep work drops to near zero. Accounts that never justified weekly depth suddenly can — without adding headcount.",
+          },
+          {
+            icon: Shield,
+            title: "Raise the quality floor",
+            desc: "Every client gets the playbook applied the same way — not whichever AM happens to be sharp that week. You stay in the loop on every change.",
+          },
+        ]}
+      />
+
+      <AudienceSection
+        eyebrow="For small business owners"
+        heading="The depth a top agency reserves for its biggest clients — on your account."
+        lede="If you run your own ads, Claude makes the deep work no freelancer would touch at your spend finally viable."
+        items={[
+          {
+            icon: Scale,
+            title: "Work that never fit your budget",
+            desc: "Proper account restructures, intent-aligned ad groups, custom landing pages — the work that actually moves Quality Score and CPA, now viable at any spend.",
+          },
+          {
+            icon: Layers,
+            title: "One brain across your whole stack",
+            desc: "Claude sees Google Ads, CRM, GA4, and Search Console together. Spots the search terms converting on ads but never closing downstream — and fixes them.",
+          },
+          {
+            icon: UserCheck,
+            title: "You stay in the driver's seat",
+            desc: "No retainer, no middleman, no misaligned incentives. Claude proposes and executes. You approve every change.",
+          },
+        ]}
+      />
 
       {/* ── Comparison table ── */}
       <section className="px-4 pb-24">

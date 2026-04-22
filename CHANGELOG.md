@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.23.0] - 2026-04-21
+
+### Changed
+- Home page hero repositioned around dual-audience value prop: "Every Google Ads campaign deserves your best work. AdsAgent gives Claude the tools to analyze and execute across Google Ads, CRM, GA4, and Search Console." Drops the defensive "no commissions, best interest at heart" framing that only spoke to self-managing operators and missed the agency execution story entirely.
+- "What you get" section rewritten around cross-system analysis, execution (not just reporting), playbook-at-scale, and full transparency — the value props that resonate with both small-business operators and agency owners managing client rosters.
+
+### Added
+- New "For agencies" section (Briefcase/DollarSign/Shield cards): scale your playbook, smaller accounts become profitable, raise the quality floor. Speaks to agency owners who want consistent execution across a roster without adding headcount.
+- New "For small business owners" section (Scale/Layers/UserCheck cards): work that never fit your budget, one brain across your whole stack, you stay in the driver's seat. Speaks to operators who already run their own ads but want depth no freelancer would do at their spend.
+- `AudienceSection` component extracted locally in `home-page.tsx` to eliminate duplicated section scaffolding (motion wrapper, header block, 3-card grid).
+
 ## [0.2.22.3] - 2026-04-21
 
 ### Fixed
