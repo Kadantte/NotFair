@@ -1,6 +1,28 @@
 import { getCachedCustomer, MATCH_TYPE_NAME } from "./client";
 import { extractErrorMessage, getDateRange, micros, normalizeCustomerId } from "./helpers";
 import type { AuthContext } from "./types";
+import {
+  queryAccountInfo,
+  queryCampaigns,
+  queryGeoTargeting,
+  queryKeywords,
+  queryQualityScores,
+  querySearchTerms,
+  queryConvertingSearchTerms,
+  queryZeroConversionKeywords,
+  queryAds,
+  queryAdGroups,
+  queryConversionActions,
+  queryAudienceSegmentCheck,
+  queryDevicePerformance,
+  queryNegativeKeywords,
+  queryNetworkSegmentation,
+  queryCampaignAssets,
+  queryLandingPages,
+  queryChangeEvents,
+  queryDailyCampaignMetrics,
+} from "./audit/queries";
+import { buildChangeIndex, buildNameMaps } from "./audit/change-index";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -342,74 +364,15 @@ function negativeBlocks(termLower: string, negText: string, negMatchType: number
   return negWords.every((w) => termLower.includes(w));
 }
 
-// Google Ads change_event enums we care about.
-const RESOURCE_CHANGE_OP: Record<number, string> = {
-  2: "CREATE",
-  3: "UPDATE",
-  4: "REMOVE",
-};
-
-const CHANGE_RESOURCE_TYPE: Record<number, string> = {
-  2: "AD",
-  3: "AD_GROUP",
-  4: "AD_GROUP_CRITERION",
-  5: "CAMPAIGN",
-  6: "CAMPAIGN_BUDGET",
-  7: "CAMPAIGN_CRITERION",
-  8: "AD_GROUP_BID_MODIFIER",
-  9: "AD_GROUP_FEED",
-  10: "CAMPAIGN_FEED",
-  11: "AD_GROUP_AD",
-  13: "ASSET",
-  14: "CUSTOMER_ASSET",
-  15: "CAMPAIGN_ASSET",
-  16: "AD_GROUP_ASSET",
-  17: "ASSET_SET",
-  18: "ASSET_SET_ASSET",
-  19: "CAMPAIGN_ASSET_SET",
-};
-
-const CHANGE_CLIENT_TYPE: Record<number, string> = {
-  2: "GOOGLE_ADS_WEB_CLIENT",
-  3: "GOOGLE_ADS_AUTOMATED_RULE",
-  4: "GOOGLE_ADS_SCRIPTS",
-  5: "GOOGLE_ADS_BULK_UPLOAD",
-  6: "GOOGLE_ADS_API",
-  7: "GOOGLE_ADS_EDITOR",
-  8: "GOOGLE_ADS_MOBILE_APP",
-  9: "GOOGLE_ADS_RECOMMENDATIONS",
-  10: "SEARCH_ADS_360_SYNC",
-  11: "SEARCH_ADS_360_POST",
-  12: "INTERNAL_TOOL",
-  13: "OTHER",
-};
-
-/** Extract the list of modified fields from a FieldMask proto.
- *  The google-ads-api library exposes it as either a string ("a,b,c"),
- *  or { paths: string[] }. Accept both defensively. */
-function extractChangedFields(raw: unknown): string[] {
-  if (!raw) return [];
-  if (typeof raw === "string") {
-    return raw.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-  if (typeof raw === "object" && "paths" in (raw as any)) {
-    const paths = (raw as { paths?: unknown[] }).paths;
-    if (Array.isArray(paths)) return paths.map(String).filter(Boolean);
-  }
-  return [];
-}
-
-/** Whole days between two ISO date/datetime strings. Truncates fractional days,
- *  so a change from 4h ago returns 0 ("today"). */
-function daysBetween(changeISO: string, referenceISO: string): number {
-  const changeMs = new Date(changeISO).getTime();
-  const refMs = new Date(referenceISO + "T23:59:59").getTime();
-  if (!isFinite(changeMs) || !isFinite(refMs)) return 0;
-  return Math.max(0, Math.floor((refMs - changeMs) / 86_400_000));
-}
+// Change-event enums + field extraction + date math now live in
+// ./audit/change-index.ts. Re-exported here for the legacy test harness.
+import {
+  daysBetween as _daysBetween,
+  extractChangedFields as _extractChangedFields,
+} from "./audit/change-index";
 
 /** Exported for tests. @internal */
-export const __testing = { daysBetween, extractChangedFields };
+export const __testing = { daysBetween: _daysBetween, extractChangedFields: _extractChangedFields };
 
 // Device enum → human name
 const DEVICE_NAME: Record<number, string> = {
@@ -442,274 +405,31 @@ export async function runAudit(
   const changeEventDays = Math.min(boundedDays, 30);
   const { start: changeEventStart } = getDateRange(changeEventDays);
   const customerId = normalizeCustomerId(auth.customerId);
-  const campaignResourcePrefix = `customers/${customerId}/campaigns/`;
-  const adGroupResourcePrefix = `customers/${customerId}/adGroups/`;
   const criterionResourcePrefix = `customers/${customerId}/adGroupCriteria/`;
   const errors: string[] = [];
 
   // ── All queries in parallel ────────────────────────────────────────
+  // Every GAQL string lives in ./audit/queries.ts so view tools share it.
   const results = await Promise.allSettled([
-    // 0. Account info + settings
-    customer.query(`
-      SELECT
-        customer.id, customer.descriptive_name, customer.currency_code,
-        customer.time_zone, customer.auto_tagging_enabled,
-        customer.tracking_url_template
-      FROM customer LIMIT 1
-    `),
-
-    // 1. All campaigns with IS, budget, network settings, bid strategy, values
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name, campaign.status,
-        campaign.advertising_channel_type, campaign.bidding_strategy_type,
-        campaign.target_cpa.target_cpa_micros,
-        campaign.network_settings.target_search_network,
-        campaign.network_settings.target_content_network,
-        campaign.geo_target_type_setting.positive_geo_target_type,
-        campaign_budget.amount_micros,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions, metrics.conversions_value, metrics.all_conversions,
-        metrics.search_impression_share,
-        metrics.search_budget_lost_impression_share,
-        metrics.search_rank_lost_impression_share
-      FROM campaign
-      WHERE campaign.status != 'REMOVED'
-        AND segments.date BETWEEN '${start}' AND '${end}'
-      ORDER BY metrics.cost_micros DESC
-    `),
-
-    // 2. Geo targeting criteria
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name,
-        campaign_criterion.type, campaign_criterion.negative,
-        campaign_criterion.location.geo_target_constant,
-        campaign_criterion.proximity.radius,
-        campaign_criterion.proximity.radius_units
-      FROM campaign_criterion
-      WHERE campaign.status = 'ENABLED'
-        AND campaign_criterion.type IN ('LOCATION', 'PROXIMITY')
-    `),
-
-    // 3. Top keywords by spend (with metrics)
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name,
-        ad_group.id, ad_group.name,
-        ad_group_criterion.criterion_id,
-        ad_group_criterion.keyword.text,
-        ad_group_criterion.keyword.match_type,
-        ad_group_criterion.status,
-        metrics.impressions, metrics.clicks, metrics.ctr,
-        metrics.cost_micros, metrics.average_cpc, metrics.conversions
-      FROM keyword_view
-      WHERE segments.date BETWEEN '${start}' AND '${end}'
-        AND campaign.status = 'ENABLED'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 2000
-    `),
-
-    // 4. Quality scores for all active keywords (lookup table)
-    customer.query(`
-      SELECT
-        ad_group_criterion.criterion_id,
-        ad_group_criterion.quality_info.quality_score,
-        ad_group_criterion.quality_info.creative_quality_score,
-        ad_group_criterion.quality_info.post_click_quality_score,
-        ad_group_criterion.quality_info.search_predicted_ctr
-      FROM ad_group_criterion
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group_criterion.type = 'KEYWORD'
-        AND ad_group_criterion.status != 'REMOVED'
-    `),
-
-    // 5. Top search terms by spend
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
-        search_term_view.search_term, search_term_view.status,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM search_term_view
-      WHERE segments.date BETWEEN '${start}' AND '${end}'
-        AND campaign.status = 'ENABLED'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 2000
-    `),
-
-    // 6. Converting search terms (mining)
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
-        search_term_view.search_term,
-        metrics.conversions, metrics.cost_micros, metrics.clicks
-      FROM search_term_view
-      WHERE segments.date BETWEEN '${start}' AND '${end}'
-        AND campaign.status = 'ENABLED'
-        AND metrics.conversions > 0
-      ORDER BY metrics.conversions DESC
-      LIMIT 500
-    `),
-
-    // 7. Zero-conversion keywords (waste)
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
-        ad_group_criterion.keyword.text,
-        ad_group_criterion.keyword.match_type,
-        ad_group_criterion.criterion_id,
-        metrics.clicks, metrics.cost_micros
-      FROM keyword_view
-      WHERE segments.date BETWEEN '${start}' AND '${end}'
-        AND campaign.status = 'ENABLED'
-        AND metrics.conversions = 0
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 500
-    `),
-
-    // 8. Ad copy + strength
-    customer.query(`
-      SELECT
-        campaign.id, ad_group.name,
-        ad_group_ad.ad.final_urls,
-        ad_group_ad.ad.responsive_search_ad.headlines,
-        ad_group_ad.ad.responsive_search_ad.descriptions,
-        ad_group_ad.ad_strength, ad_group_ad.status,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM ad_group_ad
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group_ad.status != 'REMOVED'
-        AND segments.date BETWEEN '${start}' AND '${end}'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 1000
-    `),
-
-    // 9. Ad groups
-    customer.query(`
-      SELECT
-        campaign.id,
-        ad_group.id, ad_group.name, ad_group.status,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM ad_group
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group.status != 'REMOVED'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 1000
-    `),
-
-    // 10. Conversion actions
-    customer.query(`
-      SELECT
-        conversion_action.name, conversion_action.type,
-        conversion_action.status, conversion_action.counting_type,
-        conversion_action.include_in_conversions_metric,
-        conversion_action.primary_for_goal,
-        conversion_action.value_settings.default_value
-      FROM conversion_action
-      WHERE conversion_action.status != 'REMOVED'
-      ORDER BY conversion_action.name ASC
-    `),
-
-    // 11. Audience segments (existence check)
-    customer.query(`
-      SELECT campaign.id, ad_group.id, ad_group_criterion.type
-      FROM ad_group_criterion
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group_criterion.type IN ('USER_LIST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE')
-      LIMIT 1
-    `),
-
-    // 12. Device performance segmentation
-    customer.query(`
-      SELECT
-        campaign.id, segments.device,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions, metrics.conversions_value
-      FROM campaign
-      WHERE campaign.status = 'ENABLED'
-        AND segments.date BETWEEN '${start}' AND '${end}'
-      ORDER BY metrics.cost_micros DESC
-    `),
-
-    // 13. Negative keywords per campaign
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name,
-        campaign_criterion.keyword.text,
-        campaign_criterion.keyword.match_type
-      FROM campaign_criterion
-      WHERE campaign.status = 'ENABLED'
-        AND campaign_criterion.type = 'KEYWORD'
-        AND campaign_criterion.negative = TRUE
-    `),
-
-    // 14. Network type segmentation (Search vs Search Partners)
-    customer.query(`
-      SELECT
-        campaign.id, segments.ad_network_type,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM campaign
-      WHERE campaign.status = 'ENABLED'
-        AND segments.date BETWEEN '${start}' AND '${end}'
-    `),
-
-    // 15. Campaign assets / extensions
-    customer.query(`
-      SELECT
-        campaign.id, campaign.name,
-        campaign_asset.field_type
-      FROM campaign_asset
-      WHERE campaign.status = 'ENABLED'
-    `),
-
-    // 16. Landing page performance
-    customer.query(`
-      SELECT
-        landing_page_view.unexpanded_final_url,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM landing_page_view
-      WHERE segments.date BETWEEN '${start}' AND '${end}'
-        AND campaign.status = 'ENABLED'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 200
-    `),
-
-    // 17. Account changes (change_event) — up to 30 days by API rule.
-    // Date filter MUST use change_event.change_date_time and >= (BETWEEN not
-    // supported). ORDER BY change_date_time DESC is required by the API.
-    customer.query(`
-      SELECT
-        change_event.change_date_time,
-        change_event.change_resource_type,
-        change_event.resource_name,
-        change_event.client_type,
-        change_event.user_email,
-        change_event.changed_fields,
-        change_event.resource_change_operation,
-        change_event.campaign,
-        change_event.ad_group
-      FROM change_event
-      WHERE change_event.change_date_time >= '${changeEventStart} 00:00:00'
-        AND change_event.change_date_time <= '${end} 23:59:59'
-      ORDER BY change_event.change_date_time DESC
-      LIMIT 10000
-    `),
-
-    // 18. Per-day per-campaign metrics for pre/post-change splits.
-    // Adds ~(active_campaigns * days) rows; cheap at typical account sizes.
-    customer.query(`
-      SELECT
-        campaign.id, segments.date,
-        metrics.cost_micros, metrics.clicks, metrics.conversions
-      FROM campaign
-      WHERE campaign.status != 'REMOVED'
-        AND segments.date BETWEEN '${start}' AND '${end}'
-    `),
+    customer.query(queryAccountInfo()),
+    customer.query(queryCampaigns(start, end)),
+    customer.query(queryGeoTargeting()),
+    customer.query(queryKeywords(start, end)),
+    customer.query(queryQualityScores()),
+    customer.query(querySearchTerms(start, end)),
+    customer.query(queryConvertingSearchTerms(start, end)),
+    customer.query(queryZeroConversionKeywords(start, end)),
+    customer.query(queryAds(start, end)),
+    customer.query(queryAdGroups()),
+    customer.query(queryConversionActions()),
+    customer.query(queryAudienceSegmentCheck()),
+    customer.query(queryDevicePerformance(start, end)),
+    customer.query(queryNegativeKeywords()),
+    customer.query(queryNetworkSegmentation(start, end)),
+    customer.query(queryCampaignAssets()),
+    customer.query(queryLandingPages(start, end)),
+    customer.query(queryChangeEvents(changeEventStart, end)),
+    customer.query(queryDailyCampaignMetrics(start, end)),
   ]);
 
   // ── Extract results with graceful degradation ─────────────────────
@@ -746,131 +466,10 @@ export async function runAudit(
   const businessName = acct.descriptive_name ?? "Unknown";
   const brandVariants = generateBrandVariants(businessName);
 
-  // ── Build change_event indexes ────────────────────────────────────
-  // We need three lookup surfaces:
-  //   - byResource:    exact `resource_name` match (e.g. an ad_group_criterion)
-  //   - byCampaign:    any change scoped to a campaign (via change_event.campaign)
-  //   - byAdGroup:     any change scoped to an ad_group
-  // Each entry tracks the MOST RECENT change (driving daysAgo) plus a count of
-  // other changes in the window, so callers can see "5 edits in 7 days, most
-  // recent 2d ago". Rows are already ORDER BY change_date_time DESC.
-  interface ChangeEntry {
-    latest: ChangeEventSummary;
-    count: number;
-  }
-  const changesByResource = new Map<string, ChangeEntry>();
-  const changesByCampaign = new Map<string, ChangeEntry>();
-  const changesByAdGroup = new Map<string, ChangeEntry>();
-  const allChanges: ChangeEventSummary[] = [];
-  const campaignNameById = new Map<string, string>();
-  const adGroupNameById = new Map<string, string>();
-  for (const row of campaignRows ?? []) {
-    if (row.campaign?.id) {
-      campaignNameById.set(String(row.campaign.id), row.campaign.name ?? "");
-    }
-  }
-  for (const row of adGroupRows ?? []) {
-    if (row.ad_group?.id) {
-      adGroupNameById.set(String(row.ad_group.id), row.ad_group.name ?? "");
-    }
-  }
-
-  function bumpEntry(
-    map: Map<string, ChangeEntry>,
-    key: string,
-    summary: ChangeEventSummary,
-  ) {
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, { latest: summary, count: 1 });
-    } else {
-      existing.count++;
-      // Rows are DESC by change_date_time, so the first row seen wins.
-    }
-  }
-
-  for (const row of changeEventRows ?? []) {
-    const ce = row.change_event ?? {};
-    const changeDateTime = ce.change_date_time;
-    if (!changeDateTime) continue;
-    const resourceName = ce.resource_name ?? "";
-    const resourceType =
-      CHANGE_RESOURCE_TYPE[ce.change_resource_type] ?? String(ce.change_resource_type ?? "UNKNOWN");
-    const operation =
-      RESOURCE_CHANGE_OP[ce.resource_change_operation] ?? String(ce.resource_change_operation ?? "UNKNOWN");
-    const clientType =
-      CHANGE_CLIENT_TYPE[ce.client_type] ?? String(ce.client_type ?? "UNKNOWN");
-    const changedFields = extractChangedFields(ce.changed_fields);
-    const campaignResource = ce.campaign ?? "";
-    const adGroupResource = ce.ad_group ?? "";
-    const campaignId = campaignResource?.startsWith(campaignResourcePrefix)
-      ? campaignResource.slice(campaignResourcePrefix.length)
-      : null;
-    const adGroupId = adGroupResource?.startsWith(adGroupResourcePrefix)
-      ? adGroupResource.slice(adGroupResourcePrefix.length)
-      : null;
-
-    const summary: ChangeEventSummary = {
-      resourceName,
-      resourceType,
-      operation,
-      changeDateTime,
-      daysAgo: daysBetween(changeDateTime, end),
-      changedFields,
-      clientType,
-      campaignName: campaignId ? campaignNameById.get(campaignId) ?? null : null,
-      adGroupName: adGroupId ? adGroupNameById.get(adGroupId) ?? null : null,
-      userEmail: ce.user_email ?? null,
-    };
-    allChanges.push(summary);
-
-    if (resourceName) bumpEntry(changesByResource, resourceName, summary);
-    if (campaignId) bumpEntry(changesByCampaign, campaignId, summary);
-    if (adGroupId) bumpEntry(changesByAdGroup, adGroupId, summary);
-
-    // CAMPAIGN_BUDGET resources aren't tied to a campaign via change_event.campaign,
-    // but the campaign_budget row itself was just changed — find any campaign that
-    // uses this budget. We don't have that mapping here, so treat budget edits
-    // as campaign-scoped via `campaignId` already being set by the API (it is,
-    // for CAMPAIGN_BUDGET resource changes — change_event.campaign is populated).
-  }
-
-  function toRecentChange(entry: ChangeEntry | undefined): RecentChange | null {
-    if (!entry) return null;
-    const { latest, count } = entry;
-    return {
-      daysAgo: latest.daysAgo,
-      changeDateTime: latest.changeDateTime,
-      changedFields: latest.changedFields,
-      operation: latest.operation,
-      clientType: latest.clientType,
-      resourceType: latest.resourceType,
-      otherChangesInWindow: Math.max(0, count - 1),
-    };
-  }
-
-  /** Resolve the most relevant RecentChange for a finding by walking the
-   *  specificity ladder (resource → ad group → campaign), returning the first
-   *  hit. Callers pass whatever identifiers they have. */
-  function resolveRecentChange(opts: {
-    resourceName?: string | null;
-    adGroupId?: string | null;
-    campaignId?: string | null;
-  }): RecentChange | null {
-    if (opts.resourceName) {
-      const hit = toRecentChange(changesByResource.get(opts.resourceName));
-      if (hit) return hit;
-    }
-    if (opts.adGroupId) {
-      const hit = toRecentChange(changesByAdGroup.get(opts.adGroupId));
-      if (hit) return hit;
-    }
-    if (opts.campaignId) {
-      const hit = toRecentChange(changesByCampaign.get(opts.campaignId));
-      if (hit) return hit;
-    }
-    return null;
-  }
+  // ── Build change_event indexes (shared helper) ────────────────────
+  const nameMaps = buildNameMaps(campaignRows, adGroupRows);
+  const changeIndex = buildChangeIndex(changeEventRows, customerId, end, nameMaps);
+  const { allChanges, resolveRecentChange } = changeIndex;
 
   // ── Build QS lookup ───────────────────────────────────────────────
 

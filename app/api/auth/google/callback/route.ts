@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 import { getEnv } from "@/lib/env";
-import { listAccessibleCustomers, listClientAccountsUnderManager } from "@/lib/google-ads";
+import { getUsableAccounts, listAccessibleCustomers, listClientAccountsUnderManager } from "@/lib/google-ads";
 import { randomBytes } from "crypto";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { setSessionCookies } from "@/lib/auth-cookies";
 import { trackServerEvent } from "@/lib/analytics-server";
-import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
+import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyAccountLoadError, classifyGoogleError } from "@/lib/auth-errors";
 
 function redirectWithError(message: string) {
   return NextResponse.redirect(
@@ -272,16 +272,11 @@ export async function GET(request: Request) {
     } catch (error) {
       console.error("[auth] Failed to load Google Ads accounts:", error);
       const raw = describeError(error);
-      const msg = raw.includes("PERMISSION_DENIED") || raw.includes("insufficient authentication scopes")
-        ? "Google Ads access was not granted. Please try again and make sure to approve all permissions on the Google consent screen."
-        : "Failed to load Google Ads accounts. Please try again.";
       trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.LOAD_ACCOUNTS_FAILED, step: AUTH_ERROR_STEP.LIST_ACCOUNTS, error: raw });
-      return errorResponse(msg, isPopup);
+      return errorResponse(classifyAccountLoadError(raw), isPopup);
     }
 
-    const directAccounts = customers.filter(
-      (c) => !("error" in c) && !c.isManager,
-    );
+    const directAccounts = getUsableAccounts(customers);
     const managerAccounts = customers.filter(
       (c) => !("error" in c) && c.isManager,
     );
@@ -317,8 +312,8 @@ export async function GET(request: Request) {
     // No usable accounts — error
     if (usableAccounts.length === 0) {
       const msg = managerAccounts.length > 0
-        ? "No client accounts found under your manager account. Make sure you have at least one active Google Ads client account."
-        : "No Google Ads accounts found. Connect a Google account that has access to at least one Google Ads account.";
+        ? AUTH_ERROR_MESSAGES.NO_CLIENT_ACCOUNTS
+        : AUTH_ERROR_MESSAGES.NO_ACCOUNTS;
       return errorResponse(msg, isPopup);
     }
 

@@ -29,6 +29,12 @@ const {
 vi.mock("@/lib/google-ads", () => ({
   listAccessibleCustomers: mockListAccessibleCustomers,
   listClientAccountsUnderManager: mockListClientAccountsUnderManager,
+  getUsableAccounts: <T extends { isManager: boolean }>(
+    customers: Array<T | { error: string }>,
+  ) => customers.filter((c): c is T => !("error" in c) && !c.isManager),
+  hasManagerAccount: <T extends { isManager: boolean }>(
+    customers: Array<T | { error: string }>,
+  ) => customers.some((c) => !("error" in c) && c.isManager),
 }));
 
 vi.mock("@/lib/db", () => ({

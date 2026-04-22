@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { clearSessionCookies, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
-import { deriveCustomerName, listAccessibleCustomers, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
+import { deriveCustomerName, getUsableAccounts, hasManagerAccount, listAccessibleCustomers, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
@@ -13,7 +13,7 @@ import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi
 import { getClientIp } from "@/lib/request-ip";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
-import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyGoogleError } from "@/lib/auth-errors";
+import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyAccountLoadError, classifyGoogleError } from "@/lib/auth-errors";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -277,29 +277,21 @@ async function createOrRedirectGoogleAdsSession({
     customers = await listAccessibleCustomers(refreshToken);
   } catch (error) {
     console.error("[auth] Failed to load Google Ads accounts:", error);
-    const raw = describeError(error);
-    const msg = raw.includes("PERMISSION_DENIED") || raw.includes("insufficient authentication scopes")
-      ? "Google Ads access was not granted. Please try again and make sure to approve all permissions on the Google consent screen."
-      : "Failed to load Google Ads accounts. Please try again.";
+    const msg = classifyAccountLoadError(describeError(error));
     return popup
       ? popupErrorResponse(origin, msg)
       : redirectWithError(origin, msg);
   }
 
-  const usableAccounts = customers.filter(
-    (customer) => !("error" in customer) && !customer.isManager,
-  );
+  const usableAccounts = getUsableAccounts(customers);
 
   if (usableAccounts.length === 0) {
+    const msg = hasManagerAccount(customers)
+      ? AUTH_ERROR_MESSAGES.MANAGER_ONLY_UNSUPPORTED
+      : AUTH_ERROR_MESSAGES.NO_ACCOUNTS;
     const response = popup
-      ? popupErrorResponse(
-          origin,
-          "No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.",
-        )
-      : redirectWithError(
-          origin,
-          "No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.",
-        );
+      ? popupErrorResponse(origin, msg)
+      : redirectWithError(origin, msg);
     if (!popup) {
       clearSessionCookies(response);
     }

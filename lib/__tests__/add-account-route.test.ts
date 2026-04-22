@@ -14,6 +14,12 @@ vi.mock("@/lib/session", () => ({
 
 vi.mock("@/lib/google-ads", () => ({
   listAccessibleCustomers: mockListAccessibleCustomers,
+  getUsableAccounts: <T extends { isManager: boolean }>(
+    customers: Array<T | { error: string }>,
+  ) => customers.filter((c): c is T => !("error" in c) && !c.isManager),
+  hasManagerAccount: <T extends { isManager: boolean }>(
+    customers: Array<T | { error: string }>,
+  ) => customers.some((c) => !("error" in c) && c.isManager),
   parseCustomerIds: vi.fn((raw: string | null | undefined) => {
     if (!raw) return [];
     try {

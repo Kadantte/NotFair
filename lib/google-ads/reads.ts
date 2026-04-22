@@ -67,6 +67,18 @@ export async function getAccountBudgetSummary(auth: AuthContext) {
   };
 }
 
+export function getUsableAccounts<T extends { isManager: boolean }>(
+  customers: Array<T | { error: string }>,
+): T[] {
+  return customers.filter((c): c is T => !("error" in c) && !c.isManager);
+}
+
+export function hasManagerAccount<T extends { isManager: boolean }>(
+  customers: Array<T | { error: string }>,
+): boolean {
+  return customers.some((c) => !("error" in c) && c.isManager);
+}
+
 export async function listAccessibleCustomers(refreshToken: string) {
   const client = getClient();
   const response = (await client.listAccessibleCustomers(refreshToken)) as {

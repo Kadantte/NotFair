@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
-import { listAccessibleCustomers, parseCustomerIds } from "@/lib/google-ads";
+import { getUsableAccounts, hasManagerAccount, listAccessibleCustomers, parseCustomerIds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-errors";
 
 function redirectWithError(message: string) {
   return NextResponse.redirect(
@@ -21,13 +22,13 @@ export async function GET() {
   try {
     const session = await getSessionAuth();
     const customers = await listAccessibleCustomers(session.refreshToken);
-    const usableAccounts = customers.filter(
-      (customer) => !("error" in customer) && !customer.isManager,
-    );
+    const usableAccounts = getUsableAccounts(customers);
 
     if (usableAccounts.length === 0) {
       return redirectWithError(
-        "No Google Ads accounts found. You may only have manager accounts, which aren't supported yet.",
+        hasManagerAccount(customers)
+          ? AUTH_ERROR_MESSAGES.NO_CLIENT_ACCOUNTS
+          : AUTH_ERROR_MESSAGES.NO_ACCOUNTS,
       );
     }
 

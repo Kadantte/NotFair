@@ -37,12 +37,41 @@ export const AUTH_ERROR_MESSAGES = {
   LOAD_ACCOUNTS_GENERIC:
     "Failed to load Google Ads accounts. Please try again.",
   NO_ACCOUNTS:
-    "No Google Ads accounts found. Connect a Google account that has access to at least one Google Ads account.",
+    "This Google account doesn't have a Google Ads account. Sign in with a Google account that has access to at least one Google Ads account, or create one at ads.google.com first.",
   NO_CLIENT_ACCOUNTS:
     "No client accounts found under your manager account. Make sure you have at least one active Google Ads client account.",
+  MANAGER_ONLY_UNSUPPORTED:
+    "No Google Ads client accounts found. You only have manager (MCC) accounts, which aren't supported yet — connect with a Google account that has access to a regular Google Ads account.",
 } as const;
 
-/** Classify a Google OAuth error param into an internal reason string. */
+// Error-string signals from google-ads-api's ListAccessibleCustomers RPC
+// that mean "this Google identity has no Ads customer" rather than a
+// scope/transient issue. Kept as a plain list so new surface wordings
+// can be appended without restructuring.
+const NO_ADS_ACCOUNT_SIGNALS = [
+  "not_ads_user",
+  "user_permission_denied",
+  "the caller does not have permission",
+  "customer not found",
+  "no customers accessible",
+];
+
+export function isNoAdsAccountError(raw: string): boolean {
+  const s = raw.toLowerCase();
+  return NO_ADS_ACCOUNT_SIGNALS.some((signal) => s.includes(signal));
+}
+
+// Separate from PERMISSION_DENIED, which usually just means "no Ads account".
+export function isScopeError(raw: string): boolean {
+  return raw.toLowerCase().includes("insufficient authentication scopes");
+}
+
+export function classifyAccountLoadError(raw: string): string {
+  if (isScopeError(raw)) return AUTH_ERROR_MESSAGES.SCOPE_INSUFFICIENT;
+  if (isNoAdsAccountError(raw)) return AUTH_ERROR_MESSAGES.NO_ACCOUNTS;
+  return AUTH_ERROR_MESSAGES.LOAD_ACCOUNTS_GENERIC;
+}
+
 export function classifyGoogleError(error: string): string {
   return error === "access_denied"
     ? AUTH_ERROR_REASON.CONSENT_DENIED
