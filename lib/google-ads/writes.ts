@@ -581,7 +581,10 @@ export async function updateCampaignBidding(
       campaign.bidding_strategy_type,
       campaign.target_cpa.target_cpa_micros,
       campaign.maximize_conversions.target_cpa_micros,
-      campaign.target_roas.target_roas
+      campaign.target_roas.target_roas,
+      campaign.target_impression_share.location,
+      campaign.target_impression_share.location_fraction_micros,
+      campaign.target_impression_share.cpc_bid_ceiling_micros
     FROM campaign
     WHERE campaign.id = ${cid}
     LIMIT 1
@@ -603,11 +606,15 @@ export async function updateCampaignBidding(
     ?? row.campaign?.maximize_conversions?.target_cpa_micros
     ?? null;
   const currentTargetRoas = row.campaign?.target_roas?.target_roas ?? null;
+  const currentTis = row.campaign?.target_impression_share ?? null;
 
   const beforeValue = JSON.stringify({
     strategy: currentStrategy,
     targetCpaMicros: currentTargetCpa,
     targetRoas: currentTargetRoas,
+    impressionShareLocation: currentTis?.location ?? null,
+    locationFractionMicros: currentTis?.location_fraction_micros ?? null,
+    cpcBidCeilingMicros: currentTis?.cpc_bid_ceiling_micros ?? null,
   });
 
   // Validate params
@@ -651,12 +658,40 @@ export async function updateCampaignBidding(
       error: "Target CPA must be at least $0.10 (100,000 micros)",
     };
   }
+  const fail = (error: string): WriteResult => ({
+    success: false,
+    action: "update_bidding",
+    entityId: campaignId,
+    beforeValue,
+    afterValue: params.biddingStrategy,
+    error,
+  });
+
+  if (params.biddingStrategy === "TARGET_IMPRESSION_SHARE") {
+    if (params.impressionShareLocation == null) {
+      return fail("impressionShareLocation is required for TARGET_IMPRESSION_SHARE (ANYWHERE_ON_PAGE | TOP_OF_PAGE | ABSOLUTE_TOP_OF_PAGE)");
+    }
+    if (params.locationFractionMicros == null) {
+      return fail("locationFractionMicros is required for TARGET_IMPRESSION_SHARE (1–1_000_000, where 950_000 = 95%)");
+    }
+    if (params.locationFractionMicros < 1 || params.locationFractionMicros > 1_000_000) {
+      return fail("locationFractionMicros must be between 1 and 1_000_000 (e.g. 950_000 = 95%)");
+    }
+    if (params.cpcBidCeilingMicros == null) {
+      return fail("cpcBidCeilingMicros is required for TARGET_IMPRESSION_SHARE — without a ceiling Google can bid unbounded to hit the IS target");
+    }
+    if (params.cpcBidCeilingMicros < 10_000) {
+      return fail("cpcBidCeilingMicros must be at least $0.01 (10,000 micros)");
+    }
+  }
 
   // For non-conversion strategies, auto-clear campaign-specific goals
-  // (otherwise Google silently ignores the bidding change)
+  // (otherwise Google silently ignores the bidding change). TARGET_IMPRESSION_SHARE
+  // is presence-based, not conversion-based, so it needs the same treatment.
   const isNonConversionStrategy =
     params.biddingStrategy === "MAXIMIZE_CLICKS" ||
-    params.biddingStrategy === "MANUAL_CPC";
+    params.biddingStrategy === "MANUAL_CPC" ||
+    params.biddingStrategy === "TARGET_IMPRESSION_SHARE";
 
   let goalConfigCleared = false;
   if (isNonConversionStrategy) {
@@ -720,12 +755,24 @@ export async function updateCampaignBidding(
     case "MANUAL_CPC":
       resource.manual_cpc = { enhanced_cpc_enabled: false };
       break;
+    case "TARGET_IMPRESSION_SHARE":
+      resource.target_impression_share = {
+        location: params.impressionShareLocation,
+        location_fraction_micros: params.locationFractionMicros,
+        cpc_bid_ceiling_micros: params.cpcBidCeilingMicros,
+      };
+      break;
   }
 
   const afterValue = JSON.stringify({
     strategy: params.biddingStrategy,
     targetCpaMicros: params.targetCpaMicros ?? null,
     targetRoas: params.targetRoas ?? null,
+    ...(params.biddingStrategy === "TARGET_IMPRESSION_SHARE" && {
+      impressionShareLocation: params.impressionShareLocation,
+      locationFractionMicros: params.locationFractionMicros,
+      cpcBidCeilingMicros: params.cpcBidCeilingMicros,
+    }),
     ...(goalConfigCleared && { goalConfigCleared: true }),
   });
 
@@ -757,6 +804,7 @@ export async function updateCampaignBidding(
       TARGET_ROAS: { num: 8, str: "TARGET_ROAS" },       // 7 is deprecated TARGET_OUTRANK_SHARE
       MAXIMIZE_CLICKS: { num: 9, str: "TARGET_SPEND" },  // API internal name
       MANUAL_CPC: { num: 3, str: "MANUAL_CPC" },
+      TARGET_IMPRESSION_SHARE: { num: 15, str: "TARGET_IMPRESSION_SHARE" },
     };
     const expected = expectedStrategyMap[params.biddingStrategy];
 

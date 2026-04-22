@@ -374,6 +374,17 @@ describe("protobuf validation: updateCampaignBidding", () => {
     });
     assertAllCapturedOpsEncode();
   });
+
+  it("TARGET_IMPRESSION_SHARE strategy", async () => {
+    mockCurrentBidding();
+    await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_IMPRESSION_SHARE",
+      impressionShareLocation: "TOP_OF_PAGE",
+      locationFractionMicros: 950_000,
+      cpcBidCeilingMicros: 2_000_000,
+    });
+    assertAllCapturedOpsEncode();
+  });
 });
 
 describe("protobuf validation: updateCampaignSettings", () => {

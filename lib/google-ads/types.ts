@@ -101,12 +101,27 @@ export type BiddingStrategyType =
   | "MAXIMIZE_CLICKS"
   | "MANUAL_CPC"
   | "TARGET_CPA"
-  | "TARGET_ROAS";
+  | "TARGET_ROAS"
+  | "TARGET_IMPRESSION_SHARE";
+
+/** Where on the SERP the Target Impression Share strategy should try to appear. */
+export const TARGET_IMPRESSION_SHARE_LOCATIONS = [
+  "ANYWHERE_ON_PAGE",
+  "TOP_OF_PAGE",
+  "ABSOLUTE_TOP_OF_PAGE",
+] as const;
+export type TargetImpressionShareLocation = (typeof TARGET_IMPRESSION_SHARE_LOCATIONS)[number];
 
 export interface UpdateCampaignBiddingParams {
   biddingStrategy: BiddingStrategyType;
   targetCpaMicros?: number;  // required for TARGET_CPA, optional for MAXIMIZE_CONVERSIONS
   targetRoas?: number;       // required for TARGET_ROAS; optional cap for MAXIMIZE_CONVERSION_VALUE
+  /** TARGET_IMPRESSION_SHARE: where on the SERP to target. Required for this strategy. */
+  impressionShareLocation?: TargetImpressionShareLocation;
+  /** TARGET_IMPRESSION_SHARE: IS target, 1–1_000_000 where 1_000_000 = 100% (e.g. 950_000 = 95%). Required. */
+  locationFractionMicros?: number;
+  /** TARGET_IMPRESSION_SHARE: max CPC bid ceiling in micros. Required — without a ceiling Google can bid unbounded. */
+  cpcBidCeilingMicros?: number;
 }
 
 export interface UpdateCampaignSettingsParams {

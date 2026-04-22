@@ -535,4 +535,95 @@ describe("updateCampaignBidding", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
   });
+
+  describe("TARGET_IMPRESSION_SHARE", () => {
+    it("requires impressionShareLocation", async () => {
+      mockCurrentBidding();
+      const result = await updateCampaignBidding(AUTH, "100", {
+        biddingStrategy: "TARGET_IMPRESSION_SHARE",
+        locationFractionMicros: 950_000,
+        cpcBidCeilingMicros: 2_000_000,
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("impressionShareLocation is required");
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("requires locationFractionMicros", async () => {
+      mockCurrentBidding();
+      const result = await updateCampaignBidding(AUTH, "100", {
+        biddingStrategy: "TARGET_IMPRESSION_SHARE",
+        impressionShareLocation: "TOP_OF_PAGE",
+        cpcBidCeilingMicros: 2_000_000,
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("locationFractionMicros is required");
+    });
+
+    it("rejects out-of-range locationFractionMicros", async () => {
+      mockCurrentBidding();
+      const result = await updateCampaignBidding(AUTH, "100", {
+        biddingStrategy: "TARGET_IMPRESSION_SHARE",
+        impressionShareLocation: "TOP_OF_PAGE",
+        locationFractionMicros: 1_500_000,
+        cpcBidCeilingMicros: 2_000_000,
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("between 1 and 1_000_000");
+    });
+
+    it("requires cpcBidCeilingMicros", async () => {
+      mockCurrentBidding();
+      const result = await updateCampaignBidding(AUTH, "100", {
+        biddingStrategy: "TARGET_IMPRESSION_SHARE",
+        impressionShareLocation: "TOP_OF_PAGE",
+        locationFractionMicros: 950_000,
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("cpcBidCeilingMicros is required");
+    });
+
+    it("builds target_impression_share resource with all three fields", async () => {
+      mockCurrentBidding();
+      const result = await updateCampaignBidding(AUTH, "100", {
+        biddingStrategy: "TARGET_IMPRESSION_SHARE",
+        impressionShareLocation: "TOP_OF_PAGE",
+        locationFractionMicros: 950_000,
+        cpcBidCeilingMicros: 2_000_000,
+      });
+      expect(result.success).toBe(true);
+      const op = mockMutateResources.mock.calls[0][0][0];
+      expect(op.resource.target_impression_share).toEqual({
+        location: "TOP_OF_PAGE",
+        location_fraction_micros: 950_000,
+        cpc_bid_ceiling_micros: 2_000_000,
+      });
+    });
+
+    it("captures TIS fields in beforeValue when previous strategy was TIS", async () => {
+      mockQuery.mockResolvedValueOnce([
+        {
+          campaign: {
+            bidding_strategy_type: "TARGET_IMPRESSION_SHARE",
+            target_cpa: null,
+            maximize_conversions: null,
+            target_roas: null,
+            target_impression_share: {
+              location: "ABSOLUTE_TOP_OF_PAGE",
+              location_fraction_micros: 900_000,
+              cpc_bid_ceiling_micros: 1_500_000,
+            },
+          },
+        },
+      ]);
+      const result = await updateCampaignBidding(AUTH, "100", {
+        biddingStrategy: "MAXIMIZE_CLICKS",
+      });
+      expect(result.success).toBe(true);
+      const before = JSON.parse(result.beforeValue!);
+      expect(before.impressionShareLocation).toBe("ABSOLUTE_TOP_OF_PAGE");
+      expect(before.locationFractionMicros).toBe(900_000);
+      expect(before.cpcBidCeilingMicros).toBe(1_500_000);
+    });
+  });
 });

@@ -55,7 +55,8 @@ import {
   linkNegativeListToCampaign,
   unlinkNegativeListFromCampaign,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation } from "@/lib/google-ads";
+import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
 import { enforceRateLimit } from "@/lib/mcp/rate-limit";
@@ -705,19 +706,25 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaign Bidding Strategy ──────────────────────────────────
 
   server.registerTool("updateCampaignBidding", {
-    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), MAXIMIZE_CONVERSION_VALUE (maximize total conversion value, optionally with a target ROAS — required for PMAX value-based bidding), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS, MANUAL_CPC. For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS and MAXIMIZE_CONVERSION_VALUE, targetRoas is required/optional respectively (e.g. 2.0 = 200% ROAS). Returns a changeId for undo support.",
+    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), MAXIMIZE_CONVERSION_VALUE (maximize total conversion value, optionally with a target ROAS — required for PMAX value-based bidding), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS, MANUAL_CPC, TARGET_IMPRESSION_SHARE (presence-based — 'just win' on a given SERP position, ideal for brand campaigns). For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS and MAXIMIZE_CONVERSION_VALUE, targetRoas is required/optional respectively (e.g. 2.0 = 200% ROAS). For TARGET_IMPRESSION_SHARE, impressionShareLocation, locationFraction, and cpcBidCeiling are all required — Google will not accept this strategy without all three. Returns a changeId for undo support.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
-      biddingStrategy: z.enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "MAXIMIZE_CLICKS", "MANUAL_CPC", "TARGET_CPA", "TARGET_ROAS"])
-        .describe("The bidding strategy to set. Use MAXIMIZE_CONVERSION_VALUE for Performance Max campaigns optimizing for revenue/value."),
+      biddingStrategy: z.enum(["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "MAXIMIZE_CLICKS", "MANUAL_CPC", "TARGET_CPA", "TARGET_ROAS", "TARGET_IMPRESSION_SHARE"])
+        .describe("The bidding strategy to set. Use MAXIMIZE_CONVERSION_VALUE for Performance Max campaigns optimizing for revenue/value. Use TARGET_IMPRESSION_SHARE for brand campaigns where 'just win the auction' matters more than per-conversion efficiency."),
       targetCpa: z.number().optional()
         .describe("Target CPA in dollars (e.g. 10.50 for $10.50). Required for TARGET_CPA, optional cap for MAXIMIZE_CONVERSIONS."),
       targetRoas: z.number().optional()
         .describe("Target ROAS as a multiplier (e.g. 2.0 = 200% return). Required for TARGET_ROAS, optional cap for MAXIMIZE_CONVERSION_VALUE."),
+      impressionShareLocation: z.enum(TARGET_IMPRESSION_SHARE_LOCATIONS).optional()
+        .describe("TARGET_IMPRESSION_SHARE only: where on the SERP to target. TOP_OF_PAGE = above organic results (most common for brand). ABSOLUTE_TOP_OF_PAGE = position 1. ANYWHERE_ON_PAGE = any paid slot."),
+      locationFraction: z.number().min(0.01).max(1).optional()
+        .describe("TARGET_IMPRESSION_SHARE only: the IS target as a fraction from 0.01 to 1.00 (e.g. 0.95 = 95%). Typical brand target is 0.90–0.95."),
+      cpcBidCeiling: z.number().positive().optional()
+        .describe("TARGET_IMPRESSION_SHARE only: max CPC bid cap in dollars (e.g. 2.00 = $2.00). Required — without a ceiling Google can bid unbounded to hit the IS target."),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, async ({ accountId, campaignId, biddingStrategy, targetCpa, targetRoas }) => {
+  }, async ({ accountId, campaignId, biddingStrategy, targetCpa, targetRoas, impressionShareLocation, locationFraction, cpcBidCeiling }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
@@ -726,6 +733,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         biddingStrategy: biddingStrategy as BiddingStrategyType,
         targetCpaMicros: targetCpa != null ? toMicros(targetCpa) : undefined,
         targetRoas,
+        impressionShareLocation,
+        locationFractionMicros: locationFraction != null ? Math.round(locationFraction * 1_000_000) : undefined,
+        cpcBidCeilingMicros: cpcBidCeiling != null ? toMicros(cpcBidCeiling) : undefined,
       }),
     );
 
@@ -1458,11 +1468,21 @@ export async function executeUndoForChange(
     case "update_bidding": {
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous bidding strategy not recorded" };
       try {
-        const prev = JSON.parse(beforeValue) as { strategy: string; targetCpaMicros: number | null; targetRoas: number | null };
+        const prev = JSON.parse(beforeValue) as {
+          strategy: string;
+          targetCpaMicros: number | null;
+          targetRoas: number | null;
+          impressionShareLocation?: TargetImpressionShareLocation | null;
+          locationFractionMicros?: number | null;
+          cpcBidCeilingMicros?: number | null;
+        };
         return updateCampaignBidding(auth, entityId, {
           biddingStrategy: prev.strategy as BiddingStrategyType,
           targetCpaMicros: prev.targetCpaMicros ?? undefined,
           targetRoas: prev.targetRoas ?? undefined,
+          impressionShareLocation: prev.impressionShareLocation ?? undefined,
+          locationFractionMicros: prev.locationFractionMicros ?? undefined,
+          cpcBidCeilingMicros: prev.cpcBidCeilingMicros ?? undefined,
         });
       } catch {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous bidding strategy" };
