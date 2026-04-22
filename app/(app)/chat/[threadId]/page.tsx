@@ -3,7 +3,7 @@
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowDown, Check, Copy, Link2, Send, Square, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +27,11 @@ const emptyAccount: StoredAccount = {
   customerName: null,
 };
 
-const starterPrompts = [
-  "Audit my connected account and tell me the 3 biggest optimization opportunities.",
-  "List my top 10 campaigns by spend and explain which ones are inefficient.",
-  "For campaign 123456789, summarize the last 30 days and tell me what to change.",
-  "Write a GAQL report to show campaign CTR, CPC, and conversions, then explain it.",
+const primaryPrompt = "Run an audit on my account and suggest the 3 biggest fixes with dollar impact.";
+const secondaryPrompts = [
+  "List my top 10 campaigns by spend and explain which are inefficient.",
+  "For campaign 123456789, summarize the last 30 days and what to change.",
+  "Write a GAQL report showing CTR, CPC, conversions, then explain it.",
 ];
 
 async function readServerSession(): Promise<Session> {
@@ -56,6 +56,8 @@ async function fetchMessages(threadId: string): Promise<GoogleAdsAgentUIMessage[
 
 export default function ChatPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const threadId = params.threadId as string;
   const [input, setInput] = useState("");
   const [account, setAccount] = useState<StoredAccount>(emptyAccount);
@@ -120,6 +122,21 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+
+  // Auto-submit audit when redirected with ?auto=audit (first-signup OAuth flow)
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    if (!isHydrated) return;
+    if (!account.connected) return;
+    if (messages.length !== 0) return;
+    if (searchParams.get("auto") !== "audit") return;
+    autoFiredRef.current = true;
+    shouldScrollRef.current = true;
+    sendMessage({ text: primaryPrompt });
+    // Strip query param so refresh doesn't re-fire on navigation
+    router.replace(`/chat/${threadId}`);
+  }, [isHydrated, account.connected, messages.length, searchParams, sendMessage, router, threadId]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -226,17 +243,27 @@ export default function ChatPage() {
             <h1 className="text-2xl font-medium text-white md:text-3xl">
               What can I help with your Google Ads account today?
             </h1>
-            <div className="mx-auto mt-8 grid w-full max-w-3xl gap-2 sm:grid-cols-2">
-              {starterPrompts.map(prompt => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => { if (isReady) { shouldScrollRef.current = true; sendMessage({ text: prompt }); } }}
-                  className="rounded-2xl border border-[#4a4a48] bg-[#2c2c2b] px-4 py-3 text-left text-sm leading-6 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white"
-                >
-                  {prompt}
-                </button>
-              ))}
+            <div className="mx-auto mt-8 w-full max-w-3xl">
+              <button
+                type="button"
+                onClick={() => { if (isReady) { shouldScrollRef.current = true; sendMessage({ text: primaryPrompt }); } }}
+                disabled={!isReady}
+                className="w-full rounded-2xl bg-white px-5 py-4 text-left text-base font-medium leading-6 text-[#222221] shadow-lg transition-colors hover:bg-white/90 disabled:opacity-50"
+              >
+                {primaryPrompt}
+              </button>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {secondaryPrompts.map(prompt => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => { if (isReady) { shouldScrollRef.current = true; sendMessage({ text: prompt }); } }}
+                    className="rounded-xl border border-[#4a4a48] bg-[#2c2c2b] px-3 py-2 text-left text-xs leading-5 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (

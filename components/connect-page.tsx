@@ -665,16 +665,16 @@ function SetupTabs({ prompt, copied, onCopy, onOpenChat, token, activeTab, codeS
             <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
-                        <p className="text-sm font-medium text-[#E8E4DD]">Don&apos;t want to set up MCP yourself?</p>
+                        <p className="text-sm font-medium text-[#E8E4DD]">Want results right now?</p>
                         <p className="text-sm text-[#C4C0B6]">
-                            Try our agentic AI instead. AdsAgent Chat is already wired up and ready to use out of the box.
+                            Run an instant audit in our chat. We&apos;ll surface your top 3 fixes with dollar impact in about 10 seconds.
                         </p>
                     </div>
                     <Button
                         onClick={onOpenChat}
                         className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C]"
                     >
-                        Open Chat
+                        Run instant audit
                     </Button>
                 </div>
             </div>
@@ -793,7 +793,8 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
     function openAgenticAi() {
         trackEvent('chat_opened_from_connect');
-        window.location.assign('/chat');
+        const newThreadId = crypto.randomUUID();
+        window.location.assign(`/chat/${newThreadId}?auto=audit`);
     }
 
     function toggleAccount(accountId: string) {
