@@ -9,7 +9,7 @@ import { after } from "next/server";
 import { createMcpHandler } from "mcp-handler";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
-import { registerReadTools, registerWriteTools } from "@/lib/mcp";
+import { registerReadTools, registerWriteTools, registerCodeModeTools } from "@/lib/mcp";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { typedResult } from "@/lib/mcp/types";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
@@ -118,6 +118,12 @@ const mcpHandler = createMcpHandler(
     withMcpTelemetry(server);
     registerReadTools(server, currentAuth);
     registerWriteTools(server, currentAuth);
+    // Phase 1 of code-mode MCP: one `runScript` tool that lets agents compose
+    // GAQL queries server-side, reducing the need for bespoke aggregator tools.
+    // Gated by env so production traffic is unaffected until we flip it on.
+    if (process.env.ADSAGENT_CODE_MODE === "1") {
+      registerCodeModeTools(server, currentAuth);
+    }
 
     // ─── Session management tools (registered in app layer) ─────
     server.registerTool("listConnectedAccounts", {
