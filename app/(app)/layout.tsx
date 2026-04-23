@@ -13,7 +13,6 @@ import { DemoBanner } from '@/components/demo-banner';
 import { onThreadEvent } from '@/lib/thread-events';
 import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
-import { ProductHuntBanner } from '@/components/product-hunt-banner';
 import { trackEvent } from '@/lib/analytics';
 import { getUsageSummaryAction } from '@/app/actions';
 
@@ -385,9 +384,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ); }
 
     return (
-        <div className="flex h-full flex-col bg-[#1A1917]">
-            <ProductHuntBanner surface="app" isAuthenticated={true} />
-            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex h-full flex-col md:flex-row bg-[#1A1917]">
             {/* Mobile header */}
             <header className="flex md:hidden h-12 shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F] px-4">
                 <Link href="/" className="flex items-center gap-2">
@@ -513,7 +510,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <MobileNavItem href="/operations" icon={Activity} label="Ops" active={pathname === '/operations'} />
                 <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} />
             </nav>
-            </div>
         </div>
     );
 }
