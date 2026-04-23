@@ -48,7 +48,7 @@ export function queryCampaigns(start: string, end: string): string {
 export function queryGeoTargeting(): string {
   return `
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         campaign_criterion.type, campaign_criterion.negative,
         campaign_criterion.location.geo_target_constant,
         campaign_criterion.proximity.radius,
@@ -63,7 +63,7 @@ export function queryGeoTargeting(): string {
 export function queryKeywords(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         ad_group.id, ad_group.name,
         ad_group_criterion.criterion_id,
         ad_group_criterion.keyword.text,
@@ -83,6 +83,7 @@ export function queryKeywords(start: string, end: string): string {
 export function queryQualityScores(): string {
   return `
       SELECT
+        campaign.status,
         ad_group_criterion.criterion_id,
         ad_group_criterion.quality_info.quality_score,
         ad_group_criterion.quality_info.creative_quality_score,
@@ -99,7 +100,8 @@ export function queryQualityScores(): string {
 export function querySearchTerms(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
         search_term_view.search_term, search_term_view.status,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
@@ -115,7 +117,8 @@ export function querySearchTerms(start: string, end: string): string {
 export function queryConvertingSearchTerms(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
         search_term_view.search_term,
         metrics.conversions, metrics.cost_micros, metrics.clicks
       FROM search_term_view
@@ -131,7 +134,8 @@ export function queryConvertingSearchTerms(start: string, end: string): string {
 export function queryZeroConversionKeywords(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
         ad_group_criterion.keyword.text,
         ad_group_criterion.keyword.match_type,
         ad_group_criterion.criterion_id,
@@ -149,7 +153,8 @@ export function queryZeroConversionKeywords(start: string, end: string): string 
 export function queryAds(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, ad_group.name,
+        campaign.id, campaign.status,
+        ad_group.name,
         ad_group_ad.ad.final_urls,
         ad_group_ad.ad.responsive_search_ad.headlines,
         ad_group_ad.ad.responsive_search_ad.descriptions,
@@ -169,7 +174,7 @@ export function queryAds(start: string, end: string): string {
 export function queryAdGroups(): string {
   return `
       SELECT
-        campaign.id,
+        campaign.id, campaign.status,
         ad_group.id, ad_group.name, ad_group.status,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
@@ -199,7 +204,7 @@ export function queryConversionActions(): string {
 /** Q11: Audience segments (existence check only — LIMIT 1). */
 export function queryAudienceSegmentCheck(): string {
   return `
-      SELECT campaign.id, ad_group.id, ad_group_criterion.type
+      SELECT campaign.id, campaign.status, ad_group.id, ad_group_criterion.type
       FROM ad_group_criterion
       WHERE campaign.status = 'ENABLED'
         AND ad_group_criterion.type IN ('USER_LIST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE')
@@ -211,7 +216,7 @@ export function queryAudienceSegmentCheck(): string {
 export function queryDevicePerformance(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, segments.device,
+        campaign.id, campaign.status, segments.device,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions, metrics.conversions_value
       FROM campaign
@@ -225,7 +230,7 @@ export function queryDevicePerformance(start: string, end: string): string {
 export function queryNegativeKeywords(): string {
   return `
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         campaign_criterion.keyword.text,
         campaign_criterion.keyword.match_type
       FROM campaign_criterion
@@ -239,7 +244,7 @@ export function queryNegativeKeywords(): string {
 export function queryNetworkSegmentation(start: string, end: string): string {
   return `
       SELECT
-        campaign.id, segments.ad_network_type,
+        campaign.id, campaign.status, segments.ad_network_type,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
       FROM campaign
@@ -252,7 +257,7 @@ export function queryNetworkSegmentation(start: string, end: string): string {
 export function queryCampaignAssets(): string {
   return `
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         campaign_asset.field_type
       FROM campaign_asset
       WHERE campaign.status = 'ENABLED'
@@ -263,6 +268,7 @@ export function queryCampaignAssets(): string {
 export function queryLandingPages(start: string, end: string): string {
   return `
       SELECT
+        campaign.status,
         landing_page_view.unexpanded_final_url,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions

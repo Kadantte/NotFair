@@ -13,7 +13,7 @@ exports[`audit queries > queryAccountInfo — matches snapshot 1`] = `
 exports[`audit queries > queryAdGroups — LIMIT 1000 1`] = `
 "
       SELECT
-        campaign.id,
+        campaign.id, campaign.status,
         ad_group.id, ad_group.name, ad_group.status,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
@@ -28,7 +28,8 @@ exports[`audit queries > queryAdGroups — LIMIT 1000 1`] = `
 exports[`audit queries > queryAds — date range + LIMIT 1000 1`] = `
 "
       SELECT
-        campaign.id, ad_group.name,
+        campaign.id, campaign.status,
+        ad_group.name,
         ad_group_ad.ad.final_urls,
         ad_group_ad.ad.responsive_search_ad.headlines,
         ad_group_ad.ad.responsive_search_ad.descriptions,
@@ -46,7 +47,7 @@ exports[`audit queries > queryAds — date range + LIMIT 1000 1`] = `
 
 exports[`audit queries > queryAudienceSegmentCheck — LIMIT 1 (existence check only) 1`] = `
 "
-      SELECT campaign.id, ad_group.id, ad_group_criterion.type
+      SELECT campaign.id, campaign.status, ad_group.id, ad_group_criterion.type
       FROM ad_group_criterion
       WHERE campaign.status = 'ENABLED'
         AND ad_group_criterion.type IN ('USER_LIST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE')
@@ -57,7 +58,7 @@ exports[`audit queries > queryAudienceSegmentCheck — LIMIT 1 (existence check 
 exports[`audit queries > queryCampaignAssets — matches snapshot 1`] = `
 "
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         campaign_asset.field_type
       FROM campaign_asset
       WHERE campaign.status = 'ENABLED'
@@ -123,7 +124,8 @@ exports[`audit queries > queryConversionActions — ORDER BY name 1`] = `
 exports[`audit queries > queryConvertingSearchTerms — LIMIT 500, conversions > 0 1`] = `
 "
       SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
         search_term_view.search_term,
         metrics.conversions, metrics.cost_micros, metrics.clicks
       FROM search_term_view
@@ -149,7 +151,7 @@ exports[`audit queries > queryDailyCampaignMetrics — date range 1`] = `
 exports[`audit queries > queryDevicePerformance — date range 1`] = `
 "
       SELECT
-        campaign.id, segments.device,
+        campaign.id, campaign.status, segments.device,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions, metrics.conversions_value
       FROM campaign
@@ -162,7 +164,7 @@ exports[`audit queries > queryDevicePerformance — date range 1`] = `
 exports[`audit queries > queryGeoTargeting — matches snapshot 1`] = `
 "
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         campaign_criterion.type, campaign_criterion.negative,
         campaign_criterion.location.geo_target_constant,
         campaign_criterion.proximity.radius,
@@ -176,7 +178,7 @@ exports[`audit queries > queryGeoTargeting — matches snapshot 1`] = `
 exports[`audit queries > queryKeywords — date range + LIMIT 2000 1`] = `
 "
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         ad_group.id, ad_group.name,
         ad_group_criterion.criterion_id,
         ad_group_criterion.keyword.text,
@@ -195,6 +197,7 @@ exports[`audit queries > queryKeywords — date range + LIMIT 2000 1`] = `
 exports[`audit queries > queryLandingPages — LIMIT 200 1`] = `
 "
       SELECT
+        campaign.status,
         landing_page_view.unexpanded_final_url,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
@@ -209,7 +212,7 @@ exports[`audit queries > queryLandingPages — LIMIT 200 1`] = `
 exports[`audit queries > queryNegativeKeywords — filters to negative = TRUE 1`] = `
 "
       SELECT
-        campaign.id, campaign.name,
+        campaign.id, campaign.name, campaign.status,
         campaign_criterion.keyword.text,
         campaign_criterion.keyword.match_type
       FROM campaign_criterion
@@ -222,7 +225,7 @@ exports[`audit queries > queryNegativeKeywords — filters to negative = TRUE 1`
 exports[`audit queries > queryNetworkSegmentation — date range 1`] = `
 "
       SELECT
-        campaign.id, segments.ad_network_type,
+        campaign.id, campaign.status, segments.ad_network_type,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
       FROM campaign
@@ -234,6 +237,7 @@ exports[`audit queries > queryNetworkSegmentation — date range 1`] = `
 exports[`audit queries > queryQualityScores — matches snapshot 1`] = `
 "
       SELECT
+        campaign.status,
         ad_group_criterion.criterion_id,
         ad_group_criterion.quality_info.quality_score,
         ad_group_criterion.quality_info.creative_quality_score,
@@ -249,7 +253,8 @@ exports[`audit queries > queryQualityScores — matches snapshot 1`] = `
 exports[`audit queries > querySearchTerms — date range + LIMIT 2000 1`] = `
 "
       SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
         search_term_view.search_term, search_term_view.status,
         metrics.impressions, metrics.clicks, metrics.cost_micros,
         metrics.conversions
@@ -264,7 +269,8 @@ exports[`audit queries > querySearchTerms — date range + LIMIT 2000 1`] = `
 exports[`audit queries > queryZeroConversionKeywords — LIMIT 500, conversions = 0 1`] = `
 "
       SELECT
-        campaign.id, campaign.name, ad_group.id, ad_group.name,
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
         ad_group_criterion.keyword.text,
         ad_group_criterion.keyword.match_type,
         ad_group_criterion.criterion_id,
