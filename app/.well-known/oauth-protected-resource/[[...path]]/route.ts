@@ -1,22 +1,31 @@
 import { NextResponse } from "next/server";
-import { getAppOrigin } from "@/lib/app-url";
 
 /**
  * OAuth 2.0 Protected Resource Metadata (RFC 9470).
  *
- * mcp-remote discovers this before connecting. Without it,
- * it throws "Resource server does not implement OAuth 2.0
- * Protected Resource Metadata" and the connection fails.
+ * The resource/issuer URLs are built from the request's Host header so the
+ * values match whichever hostname the connector is configured against
+ * (www.adsagent.org vs adsagent.org). A hardcoded origin breaks Claude's
+ * OAuth audience validation when the client URL and discovery URL disagree.
  *
  * The [[...path]] catch-all handles both:
  *   /.well-known/oauth-protected-resource          (root)
  *   /.well-known/oauth-protected-resource/api/mcp  (path-appended)
  */
-export async function GET() {
-  const origin = getAppOrigin();
+export async function GET(request: Request) {
+  const origin = originFromRequest(request);
 
   return NextResponse.json({
     resource: `${origin}/api/mcp`,
     authorization_servers: [origin],
   });
+}
+
+function originFromRequest(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("host") ?? url.host;
+  const proto =
+    request.headers.get("x-forwarded-proto") ??
+    (url.protocol ? url.protocol.replace(":", "") : "https");
+  return `${proto}://${host}`;
 }

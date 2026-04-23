@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { getAppOrigin } from "@/lib/app-url";
 
 /**
  * OAuth 2.0 Authorization Server Metadata (RFC 8414).
  *
- * Tells Claude (and other OAuth clients) where our authorization
- * and token endpoints are.
+ * The issuer + endpoint URLs are built from the request's Host header so
+ * Claude's OAuth audience lines up with whichever hostname the connector
+ * is configured against. A hardcoded origin would force Claude to redirect
+ * between www and bare mid-flow, which breaks the token exchange.
  */
-export async function GET() {
-  const origin = getAppOrigin();
+export async function GET(request: Request) {
+  const origin = originFromRequest(request);
 
   return NextResponse.json({
     issuer: origin,
@@ -19,4 +20,13 @@ export async function GET() {
     code_challenge_methods_supported: ["S256", "plain"],
     token_endpoint_auth_methods_supported: ["client_secret_post"],
   });
+}
+
+function originFromRequest(request: Request): string {
+  const url = new URL(request.url);
+  const host = request.headers.get("host") ?? url.host;
+  const proto =
+    request.headers.get("x-forwarded-proto") ??
+    (url.protocol ? url.protocol.replace(":", "") : "https");
+  return `${proto}://${host}`;
 }
