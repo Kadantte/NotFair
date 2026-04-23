@@ -2,6 +2,7 @@ import { GoogleAdsApi } from "google-ads-api";
 import { getRequiredEnv } from "@/lib/env";
 import { normalizeCustomerId } from "./helpers";
 import type { AuthContext } from "./types";
+import { isDemoAuth } from "@/lib/demo/constants";
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -38,12 +39,39 @@ export function getClient() {
   return _clientInstance;
 }
 
-export function getCustomer(auth: AuthContext) {
+type RealCustomer = ReturnType<GoogleAdsApi["Customer"]>;
+
+export function getCustomer(auth: AuthContext): RealCustomer {
+  if (isDemoAuth(auth)) return demoStubCustomer() as unknown as RealCustomer;
   return getClient().Customer({
     customer_id: normalizeCustomerId(auth.customerId),
     refresh_token: auth.refreshToken,
     ...(auth.loginCustomerId && { login_customer_id: normalizeCustomerId(auth.loginCustomerId) }),
   });
+}
+
+/**
+ * Safety net for demo auth paths that slip past the explicit `if (isDemoAuth)`
+ * guards inside each read/write function — e.g. MCP tools like `runAudit` that
+ * call `customer.query()` directly. Returns a stub that answers every GAQL
+ * query with `[]` and every mutation with a plausible success shape. Demo
+ * reviewers get empty results for these paths instead of a crash.
+ */
+function demoStubCustomer() {
+  const stub = {
+    query: async (_gaql: string) => [] as unknown[],
+    mutateResources: async (ops: Array<{ entity?: string; operation?: string }>) => ({
+      mutate_operation_responses: (ops ?? []).map(() => ({})),
+    }),
+    // Minimal shim so report/streaming callers don't blow up. The google-ads
+    // library exposes these on real Customer objects; demo stubs swallow them.
+    reportStream: async function* () {},
+    search: async () => [],
+  };
+  // Cast through unknown so callers see the real type even though the stub
+  // only implements a subset. Anything else they reach for returns undefined,
+  // which the google-ads-api client handles as "no data".
+  return stub;
 }
 
 // ─── Query Cache ────────────────────────────────────────────────────
@@ -79,6 +107,7 @@ function appendGaqlParameters(query: string): string {
  * identical queries into a single upstream fetch. Use for read-only functions.
  */
 export function getCachedCustomer(auth: AuthContext) {
+  if (isDemoAuth(auth)) return getCustomer(auth);
   const raw = getCustomer(auth);
   const { userId, customerId, loginCustomerId } = auth;
 

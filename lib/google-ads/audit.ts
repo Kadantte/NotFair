@@ -1,6 +1,8 @@
 import { getCachedCustomer, MATCH_TYPE_NAME } from "./client";
 import { extractErrorMessage, getDateRange, micros, normalizeCustomerId } from "./helpers";
 import type { AuthContext } from "./types";
+import { isDemoAuth } from "@/lib/demo/constants";
+import { demoRunAudit } from "@/lib/demo/audit";
 import {
   queryAccountInfo,
   queryCampaigns,
@@ -320,7 +322,7 @@ function classifyIS(budgetLost: number | null, rankLost: number | null): ISMatri
   return "structural_problem";
 }
 
-function generateBrandVariants(businessName: string): string[] {
+export function generateBrandVariants(businessName: string): string[] {
   const name = businessName.toLowerCase().trim();
   if (!name) return [];
 
@@ -397,6 +399,7 @@ export async function runAudit(
   auth: AuthContext,
   days = 30,
 ): Promise<AuditResult> {
+  if (isDemoAuth(auth)) return demoRunAudit(days);
   const customer = getCachedCustomer(auth);
   const boundedDays = Math.min(Math.max(days, 1), 90); // IS capped at 90
   const { start, end } = getDateRange(boundedDays);

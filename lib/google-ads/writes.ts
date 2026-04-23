@@ -2,6 +2,22 @@ import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
 import { extractErrorMessage, guardrailRejectionMessage, normalizeCustomerId, rewriteNegativePauseError, rewriteRemovedResourceError, safeEntityId } from "./helpers";
 import type { AuthContext, Guardrails, UpdateCampaignBiddingParams, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
+import { isDemoAuth } from "@/lib/demo/constants";
+import {
+  demoAddKeyword,
+  demoAddNegativeKeyword,
+  demoEnableCampaign,
+  demoEnableKeyword,
+  demoPauseCampaign,
+  demoPauseKeyword,
+  demoRemoveCampaign,
+  demoRemoveKeyword,
+  demoRemoveNegativeKeyword,
+  demoRenameAdGroup,
+  demoRenameCampaign,
+  demoUpdateBid,
+  demoUpdateCampaignBudget,
+} from "@/lib/demo/writes";
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -29,6 +45,7 @@ export async function pauseKeyword(
   criterionId: string,
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoPauseKeyword(criterionId);
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
@@ -99,6 +116,7 @@ export async function enableKeyword(
   adGroupId: string,
   criterionId: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoEnableKeyword(criterionId);
   const customer = getCustomer(auth);
 
   // Fetch keyword text for logging
@@ -142,6 +160,7 @@ export async function addKeyword(
   keywordText: string,
   matchType: "BROAD" | "PHRASE" | "EXACT" = "BROAD",
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoAddKeyword(keywordText, matchType);
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
 
@@ -211,6 +230,7 @@ export async function removeKeyword(
   adGroupId: string,
   criterionId: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoRemoveKeyword(criterionId);
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
 
@@ -254,6 +274,7 @@ export async function updateBid(
   newBidMicros: number,
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoUpdateBid(criterionId, newBidMicros);
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
@@ -352,6 +373,7 @@ export async function addNegativeKeyword(
   keywordText: string,
   matchType: "BROAD" | "PHRASE" | "EXACT" = "PHRASE",
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoAddNegativeKeyword(campaignId, keywordText);
   const customer = getCustomer(auth);
   safeEntityId(campaignId);
 
@@ -411,6 +433,7 @@ export async function removeNegativeKeyword(
   keywordText: string,
   matchType?: "BROAD" | "PHRASE" | "EXACT",
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoRemoveNegativeKeyword(keywordText);
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
@@ -479,6 +502,7 @@ export async function updateCampaignBudget(
   newDailyBudgetMicros: number,
   guardrails = DEFAULT_GUARDRAILS,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoUpdateCampaignBudget(campaignId, newDailyBudgetMicros);
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
@@ -570,6 +594,15 @@ export async function updateCampaignBidding(
   campaignId: string,
   params: UpdateCampaignBiddingParams,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) {
+    return {
+      success: true,
+      action: "update_bidding",
+      entityId: campaignId,
+      beforeValue: "TARGET_CPA",
+      afterValue: params.biddingStrategy,
+    };
+  }
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
   const customerId = normalizeCustomerId(auth.customerId);
@@ -857,6 +890,15 @@ export async function updateCampaignGoalConfig(
   campaignId: string,
   level: GoalConfigLevel,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) {
+    return {
+      success: true,
+      action: "update_goal_config",
+      entityId: campaignId,
+      beforeValue: "CUSTOMER",
+      afterValue: level,
+    };
+  }
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
   const customerId = normalizeCustomerId(auth.customerId);
@@ -930,6 +972,7 @@ export async function pauseCampaign(
   auth: AuthContext,
   campaignId: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoPauseCampaign(campaignId);
   const customer = getCustomer(auth);
   safeEntityId(campaignId);
 
@@ -974,6 +1017,7 @@ export async function enableCampaign(
   auth: AuthContext,
   campaignId: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoEnableCampaign(campaignId);
   const customer = getCustomer(auth);
   safeEntityId(campaignId);
 
@@ -1012,6 +1056,7 @@ export async function removeCampaign(
   auth: AuthContext,
   campaignId: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoRemoveCampaign(campaignId);
   const customer = getCustomer(auth);
   const normalizedCampaignId = safeEntityId(campaignId);
 
@@ -1050,6 +1095,7 @@ export async function renameCampaign(
   campaignId: string,
   newName: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoRenameCampaign(campaignId, newName);
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
   const id = safeEntityId(campaignId);
@@ -1102,6 +1148,7 @@ export async function renameAdGroup(
   adGroupId: string,
   newName: string,
 ): Promise<WriteResult> {
+  if (isDemoAuth(auth)) return demoRenameAdGroup(adGroupId, newName, campaignId);
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
   safeEntityId(campaignId);

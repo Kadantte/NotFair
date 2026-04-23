@@ -824,6 +824,30 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         }
     }
 
+    const [demoStarting, setDemoStarting] = useState(false);
+    async function startDemoSession() {
+        if (demoStarting) return;
+        setDemoStarting(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/demo/start', {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error ?? 'Failed to start demo');
+                setDemoStarting(false);
+                return;
+            }
+            trackEvent('demo_mode_started');
+            window.location.assign(data.redirectUrl ?? '/dashboard');
+        } catch {
+            setError('Failed to start demo');
+            setDemoStarting(false);
+        }
+    }
+
     function toggleAccount(accountId: string) {
         setSelectedAccounts(prev => {
             if (prev.includes(accountId)) {
@@ -1001,6 +1025,29 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                 Sign in with Google <ExternalLink className="ml-2 h-5 w-5" />
                             </Button>
                             <p className="text-xs text-[#C4C0B6]/60">OAuth 2.0 — we never see your password.</p>
+                            <div className="flex w-full max-w-sm items-center gap-3 pt-4">
+                                <div className="h-px flex-1 bg-[#3D3C36]" />
+                                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]/60">or</span>
+                                <div className="h-px flex-1 bg-[#3D3C36]" />
+                            </div>
+                            <div className="flex flex-col items-center space-y-2">
+                                <p className="max-w-md text-sm text-[#C4C0B6]">
+                                    Don&apos;t have a Google Ads account yet? Try AdsAgent with sample data.
+                                </p>
+                                <Button
+                                    onClick={startDemoSession}
+                                    disabled={demoStarting}
+                                    variant="outline"
+                                    className="h-11 rounded-full border-[#3D3C36] bg-[#24231F] px-6 text-sm font-medium text-[#E8E4DD] hover:bg-[#2E2D28] hover:text-[#E8E4DD] disabled:opacity-60"
+                                >
+                                    {demoStarting ? (
+                                        <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Starting demo…</span>
+                                    ) : (
+                                        <>Explore with demo data</>
+                                    )}
+                                </Button>
+                                <p className="text-xs text-[#C4C0B6]/60">Simulated ecommerce clothing brand · 30 days of data · no sign-up required</p>
+                            </div>
                         </div>
                     ) : (
                         <SetupTabs

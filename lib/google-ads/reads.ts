@@ -1,10 +1,28 @@
 import { getCachedCustomer, getClient, getCustomer, MATCH_TYPE_NAME } from "./client";
 import { extractErrorMessage, formatDate, getDateRange, micros, normalizeCustomerId, safeEntityId } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
+import { isDemoAuth } from "@/lib/demo/constants";
+import {
+  demoGetAccountBudgetSummary,
+  demoGetAccountInfo,
+  demoGetAccountSettings,
+  demoGetCampaignPerformance,
+  demoGetCampaignSettings,
+  demoGetConversionActions,
+  demoGetImpressionShare,
+  demoGetKeywords,
+  demoGetNegativeKeywords,
+  demoGetRecommendations,
+  demoGetSearchTermReport,
+  demoListAdGroups,
+  demoListAds,
+  demoListCampaigns,
+} from "@/lib/demo/reads";
 
 // ─── Read Functions ──────────────────────────────────────────────────
 
 export async function getAccountInfo(auth: AuthContext) {
+  if (isDemoAuth(auth)) return demoGetAccountInfo();
   const customer = getCachedCustomer(auth);
   const result = await customer.query(`
     SELECT
@@ -33,6 +51,7 @@ export async function getAccountInfo(auth: AuthContext) {
  * number of active campaigns, and currency code.
  */
 export async function getAccountBudgetSummary(auth: AuthContext) {
+  if (isDemoAuth(auth)) return demoGetAccountBudgetSummary();
   const customer = getCachedCustomer(auth);
   const result = await customer.query(`
     SELECT
@@ -146,6 +165,7 @@ export async function listCampaigns(
   auth: AuthContext,
   options: { limit?: number; includeRemoved?: boolean; days?: number } = {},
 ) {
+  if (isDemoAuth(auth)) return demoListCampaigns(options);
   const customer = getCachedCustomer(auth);
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
   const conditions: string[] = [];
@@ -292,6 +312,7 @@ export async function getCampaignPerformance(
   campaignId: string,
   daysOrOptions: number | CampaignPerformanceOptions = 30,
 ) {
+  if (isDemoAuth(auth)) return demoGetCampaignPerformance(campaignId, daysOrOptions);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
 
@@ -375,6 +396,7 @@ export async function getKeywords(
   days = 30,
   limit = 50,
 ) {
+  if (isDemoAuth(auth)) return demoGetKeywords(campaignId, days, limit);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
@@ -470,6 +492,7 @@ export async function getSearchTermReport(
   days = 30,
   limit = 50,
 ) {
+  if (isDemoAuth(auth)) return demoGetSearchTermReport(campaignId, days, limit);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
@@ -691,6 +714,7 @@ export async function getNegativeKeywords(
   campaignId: string,
   limit = 100,
 ) {
+  if (isDemoAuth(auth)) return demoGetNegativeKeywords(campaignId, limit);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedLimit = Math.min(Math.max(limit, 1), 500);
@@ -720,6 +744,7 @@ export async function listAdGroups(
   campaignId: string,
   limit = 50,
 ) {
+  if (isDemoAuth(auth)) return demoListAdGroups(campaignId, limit);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const bounded = Math.min(Math.max(limit, 1), 100);
@@ -760,6 +785,7 @@ export async function listAds(
   days = 30,
   limit = 50,
 ) {
+  if (isDemoAuth(auth)) return demoListAds(campaignId, adGroupId, days, limit);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 365);
@@ -967,6 +993,7 @@ export async function getImpressionShare(
   campaignId: string,
   days: number,
 ) {
+  if (isDemoAuth(auth)) return demoGetImpressionShare(campaignId, days);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
   const boundedDays = Math.min(Math.max(days, 1), 90);
@@ -1015,6 +1042,7 @@ export async function getImpressionShare(
 }
 
 export async function getConversionActions(auth: AuthContext) {
+  if (isDemoAuth(auth)) return demoGetConversionActions();
   const customer = getCachedCustomer(auth);
 
   const result = await customer.query(`
@@ -1052,6 +1080,7 @@ export async function getConversionActions(auth: AuthContext) {
 }
 
 export async function getAccountSettings(auth: AuthContext) {
+  if (isDemoAuth(auth)) return demoGetAccountSettings();
   const customer = getCachedCustomer(auth);
 
   const result = await customer.query(`
@@ -1085,6 +1114,7 @@ export async function getCampaignSettings(
   auth: AuthContext,
   campaignId: string,
 ) {
+  if (isDemoAuth(auth)) return demoGetCampaignSettings(campaignId);
   const customer = getCachedCustomer(auth);
   const id = safeEntityId(campaignId);
 
@@ -1212,6 +1242,7 @@ export async function getRecommendations(
   auth: AuthContext,
   campaignId?: string,
 ) {
+  if (isDemoAuth(auth)) return demoGetRecommendations(campaignId);
   const customer = getCachedCustomer(auth);
   const campaignFilter = campaignId
     ? `AND campaign.id = ${safeEntityId(campaignId)}`

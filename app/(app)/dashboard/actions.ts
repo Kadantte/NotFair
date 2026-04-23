@@ -21,6 +21,8 @@ import { flushServerEvents } from "@/lib/analytics-server";
 import { computeHealthScore, type HealthInput } from "@/lib/dashboard/health-score";
 import { detectIssues, type SearchTermData, type KeywordData, type CampaignPerfData } from "@/lib/dashboard/issues";
 import { detectOpportunities, type ImpressionShareData, type RecommendationData } from "@/lib/dashboard/opportunities";
+import { isDemoCustomerId } from "@/lib/demo/constants";
+import { demoSparklineData, demoWoWPerformance } from "@/lib/demo/reads";
 
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
@@ -257,6 +259,7 @@ export async function getDashboardDetails() {
 // ─── Sparkline Data (7-day daily snapshots) ─────────────────────────
 
 async function fetchSparklineData(accountId: string) {
+  if (isDemoCustomerId(accountId)) return demoSparklineData(7);
   try {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
@@ -302,6 +305,10 @@ async function computeWoWPerformance(
   accountId: string,
   campaigns: Array<{ id: string; name: string }>,
 ): Promise<CampaignPerfData[]> {
+  if (isDemoCustomerId(accountId)) {
+    const allowed = new Set(campaigns.map((c) => c.id));
+    return demoWoWPerformance().filter((r) => allowed.has(r.campaignId));
+  }
   const now = new Date();
   const thisWeekEnd = now.toISOString().slice(0, 10);
   const thisWeekStart = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);

@@ -9,6 +9,8 @@ import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 import { getUsageInfo, getDailyUsage } from "@/lib/mcp/rate-limit";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
+import { isDemoCustomerId } from "@/lib/demo/constants";
+import { demoGetCampaignPerformance, demoGetKeywords } from "@/lib/demo/reads";
 
 type CampaignHistoryRow = {
     segments: {
@@ -372,6 +374,18 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
     return requireAuth(async () => {
     try {
         const { refreshToken, customerId } = await getSessionAuth();
+        if (isDemoCustomerId(customerId)) {
+            const perf = demoGetCampaignPerformance(campaignId, { startDate: effectiveStartDate, endDate: effectiveEndDate });
+            return perf.daily.map((d) => ({
+                date: d.date,
+                impressions: d.impressions,
+                clicks: d.clicks,
+                cost: d.cost,
+                ctr: d.ctr,
+                averageCpc: d.averageCpc,
+                conversions: d.conversions,
+            }));
+        }
         const customer = getClient().Customer({
             customer_id: customerId,
             refresh_token: refreshToken,
@@ -415,6 +429,20 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
     return requireAuth(async () => {
     try {
         const { refreshToken, customerId } = await getSessionAuth();
+        if (isDemoCustomerId(customerId)) {
+            const result = demoGetKeywords(campaignId, 30, 50);
+            return result.keywords.map((k) => ({
+                id: k.criterionId,
+                text: k.text,
+                status: k.status,
+                qualityScore: k.qualityScore ?? 0,
+                impressions: k.impressions,
+                clicks: k.clicks,
+                ctr: k.ctr,
+                cost: k.cost,
+                averageCpc: k.averageCpc,
+            }));
+        }
         const customer = getClient().Customer({
             customer_id: customerId,
             refresh_token: refreshToken,

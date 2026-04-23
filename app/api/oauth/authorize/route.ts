@@ -2,6 +2,8 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
+import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 
 /**
  * OAuth 2.0 Authorization Endpoint for Claude Connector.
@@ -35,6 +37,12 @@ export async function GET(request: Request) {
       { error: "invalid_request", error_description: "Missing client_id or redirect_uri" },
       { status: 400 },
     );
+  }
+
+  // Lazy-bootstrap the permanent demo client on first use so external
+  // reviewers (Anthropic's MCP review team) can pair without any setup.
+  if (clientId === DEMO_OAUTH_CLIENT_ID) {
+    await ensureDemoOAuthClient();
   }
 
   // Look up the OAuth client → linked MCP session

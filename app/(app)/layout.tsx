@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { ImpersonationBanner } from '@/components/impersonation-banner';
+import { DemoBanner } from '@/components/demo-banner';
 import { onThreadEvent } from '@/lib/thread-events';
 import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
@@ -498,6 +499,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
                 {/* Scrollable content area */}
                 <div className="flex-1 overflow-y-auto">
+                    <DemoBanner />
                     <ImpersonationBanner />
                     {children}
                 </div>
