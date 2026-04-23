@@ -210,21 +210,39 @@ function installHostApis(
           .then(() => impl(...args))
           .then(
             (value) => {
-              const json = safeStringify(value);
-              const handle = ctx.newString(json);
-              deferred.resolve(handle);
-              handle.dispose();
+              // Host call may settle AFTER the outer script returned and the
+              // context was disposed (script didn't await the promise). Guard
+              // every handle op so fire-and-forget calls don't crash the Node
+              // process with an unhandled rejection on a disposed runtime.
+              if (!ctx.alive) return;
+              try {
+                const handle = ctx.newString(safeStringify(value));
+                deferred.resolve(handle);
+                handle.dispose();
+              } catch {
+                /* context torn down between the alive check and the write */
+              }
             },
             (err) => {
-              const msg = err instanceof Error ? err.message : String(err);
-              const handle = ctx.newError(msg);
-              deferred.reject(handle);
-              handle.dispose();
+              if (!ctx.alive) return;
+              try {
+                const msg = err instanceof Error ? err.message : String(err);
+                const handle = ctx.newError(msg);
+                deferred.reject(handle);
+                handle.dispose();
+              } catch {
+                /* same: context disposed mid-settle */
+              }
             },
           );
         // Drain QuickJS's pending-job queue whenever the host promise settles
-        // so `await` inside the script actually resumes.
-        deferred.settled.then(() => runtime.executePendingJobs());
+        // so `await` inside the script actually resumes. Guarded for the same
+        // fire-and-forget / disposal race as above.
+        deferred.settled.then(() => {
+          if (ctx.alive) {
+            try { runtime.executePendingJobs(); } catch { /* disposed */ }
+          }
+        });
         return deferred.handle;
       });
       // Wrap the raw (JSON-string-returning) host fn with a JSON.parse shim so

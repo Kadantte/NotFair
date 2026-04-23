@@ -141,6 +141,43 @@ describe("runScriptInSandbox", () => {
     expect(out.globalThisKeys).not.toContain("process");
   });
 
+  it("survives fire-and-forget host calls that settle after sandbox disposal", async () => {
+    // If the script doesn't await a host promise, the host impl may resolve
+    // AFTER the runtime has been disposed. The sandbox must not throw an
+    // unhandled rejection when trying to write the result back to a dead VM.
+    let resolveHostCall: (v: unknown) => void = () => {};
+    const host: HostApi = {
+      ads: {
+        gaql: () =>
+          new Promise((resolve) => {
+            resolveHostCall = resolve;
+          }),
+      },
+    };
+    const rejections: unknown[] = [];
+    const onRejection = (e: unknown) => rejections.push(e);
+    process.on("unhandledRejection", onRejection);
+    try {
+      const r = await runScriptInSandbox({
+        code: `
+          // Fire-and-forget — don't await. The script returns before the host
+          // call settles; the sandbox will be disposed in between.
+          ads.gaql("SELECT anything FROM campaign");
+          return "done";
+        `,
+        host,
+      });
+      expect(r.ok).toBe(true);
+      expect(r.result).toBe("done");
+      // Now let the host call settle after the sandbox is gone.
+      resolveHostCall({ rows: [] });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+  });
+
   it("preserves per-query errors in ads.gaqlParallel without failing the script", async () => {
     let call = 0;
     const host: HostApi = {
