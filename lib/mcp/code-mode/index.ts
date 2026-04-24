@@ -32,8 +32,8 @@ Rules of thumb:
 ── API SURFACE (all on the \`ads\` namespace) ──
 
 Async RPCs:
-- ads.gaql(query, limit?) -> GaqlReport (same shape as runGaqlQuery)
-- ads.gaqlParallel([{name, query, limit?}, ...]) -> { [name]: GaqlReport | { error } } — max 20 per call. USE THIS.
+- ads.gaql(query, limit?) -> GaqlReport — single GAQL query. THIS IS THE ENTRY POINT FOR AD-HOC QUERIES. For one-off data pulls, use \`return await ads.gaql('SELECT ...')\` — there is no separate runGaqlQuery tool.
+- ads.gaqlParallel([{name, query, limit?}, ...]) -> { [name]: GaqlReport | { error } } — max 20 per call. USE THIS for multi-surface analysis.
 
 Pre-built GAQL strings (sync, no RPC cost):
 - Parameterless: ads.queries.accountInfo | geoTargeting | qualityScores | adGroups | conversionActions | audienceSegmentCheck | negativeKeywords | campaignAssets

@@ -62,7 +62,7 @@ That's five parallel tool calls. Cache coalescing means only ~7 unique upstream 
 
 - Do **not** call \`audit\` here — that's 19 queries for a view that needs 7.
 - Do **not** call \`getCampaignPerformance\` per-campaign to build the top-campaigns table; \`listCampaigns\` already has the data.
-- Do **not** call \`runGaqlQuery\` unless drilling into specifics the view tools don't cover.
+- Do **not** call \`runScript\` unless drilling into specifics the view tools don't cover — one \`ads.gaql()\` inside a runScript replaces a raw GAQL call.
 `;
 
 const CUSTOMIZE_DASHBOARD = `# Customize a dashboard based on user feedback
@@ -127,7 +127,7 @@ Use this when the user points at a specific item in a dashboard — "tell me mor
 
 | Need | Tool |
 |---|---|
-| Exact GAQL slice we don't have a view for | \`runGaqlQuery\` — but try a view tool first |
+| Exact GAQL slice we don't have a view for | \`runScript\` with \`return await ads.gaql('SELECT ...')\` — but try a view tool first |
 | A specific field on a specific entity | \`getResourceMetadata(resourceName)\` to discover valid fields before querying |
 | Change history for one entity | Filter \`getAccountChanges.changes.items\` by resourceName or campaignName |
 | Before/after of a specific change | \`reviewChangeImpact\` or \`getChanges\` with specific changeId |
@@ -135,7 +135,7 @@ Use this when the user points at a specific item in a dashboard — "tell me mor
 ## Don't
 
 - Don't call \`audit\` to drill. The full audit is 19 queries. Drill calls are 1–3.
-- Don't \`runGaqlQuery\` before trying a view tool — the view tools cover most drill patterns and are cached.
+- Don't reach for \`runScript\` before trying a view tool — the view tools cover most drill patterns and are cached.
 - Don't guess field names — use \`getResourceMetadata(resourceName)\` first.
 `;
 

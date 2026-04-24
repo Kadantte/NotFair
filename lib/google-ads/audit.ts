@@ -76,7 +76,7 @@ export interface LandingPage {
  *  population size (before `shown` was sliced out); `totalSpend` is the sum of
  *  the spend-impact metric across the *full* population so callers can act on
  *  totals even when only a preview is returned. For full drill-down, use
- *  `runGaqlQuery` with a focused filter. */
+ *  `runScript` with `return await ads.gaql('...')` and a focused filter. */
 export interface FindingList<T> {
   shown: number;
   total: number;

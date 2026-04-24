@@ -1,0 +1,20 @@
+[
+  {
+    "id": "casual-7d",
+    "prompt": "how is my google ads account doing in the last 7 days",
+    "expected": "runScript",
+    "reason": "Open-ended analytical question — should pick runScript to correlate surfaces in one call."
+  },
+  {
+    "id": "full-audit",
+    "prompt": "audit my account and find what's most broken",
+    "expected": "runScript",
+    "reason": "Multi-surface audit — one runScript call replaces 5-10 point-query reads."
+  },
+  {
+    "id": "targeted-cpa",
+    "prompt": "show me CPA by campaign for the last 30 days",
+    "expected": "getTimeseries",
+    "reason": "Negative test: caller named the surface and metric. runScript would be overkill. This guards against over-rotating toward runScript and breaking targeted asks."
+  }
+]

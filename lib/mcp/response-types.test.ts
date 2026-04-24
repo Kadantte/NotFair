@@ -89,7 +89,6 @@ describe("response-types — registry completeness", () => {
       getKeywords: true,
       getNegativeKeywords: true,
       getSearchTermReport: true,
-      runGaqlQuery: true,
       getTrackingTemplate: true,
       listAdGroups: true,
       listAds: true,

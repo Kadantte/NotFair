@@ -78,7 +78,6 @@ describe("MCP read tools — registration", () => {
     expect(names).toContain("getAccountInfo");
     expect(names).toContain("listCampaigns");
     expect(names).toContain("getKeywords");
-    expect(names).toContain("runGaqlQuery");
   });
 
   it("every registered read tool declares readOnlyHint = true", () => {

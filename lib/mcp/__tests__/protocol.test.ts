@@ -111,7 +111,7 @@ describe("MCP protocol — tools/list", () => {
       expect(tools.length).toBeGreaterThan(20);
 
       const byName = new Map(tools.map((t) => [t.name, t]));
-      for (const anchor of ["listCampaigns", "getKeywords", "pauseKeyword", "runGaqlQuery"]) {
+      for (const anchor of ["listCampaigns", "getKeywords", "pauseKeyword", "runScript"]) {
         const t = byName.get(anchor);
         expect(t, `${anchor} should be advertised`).toBeDefined();
         // The SDK turns the raw Zod shape into a JSON schema; connectors

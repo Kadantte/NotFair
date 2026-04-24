@@ -21,7 +21,6 @@ import type {
   getKeywords,
   getNegativeKeywords,
   getSearchTermReport,
-  runSafeGaqlReport,
   listAdGroups,
   listAds,
   getImpressionShare,
@@ -93,7 +92,6 @@ export type GetCampaignPerformanceResponse = StructuredShape<Unwrap<typeof getCa
 export type GetKeywordsResponse = StructuredShape<Unwrap<typeof getKeywords>>;
 export type GetNegativeKeywordsResponse = StructuredShape<Unwrap<typeof getNegativeKeywords>>;
 export type GetSearchTermReportResponse = StructuredShape<Unwrap<typeof getSearchTermReport>>;
-export type RunGaqlQueryResponse = StructuredShape<Unwrap<typeof runSafeGaqlReport>>;
 export type GetTrackingTemplateResponse = StructuredShape<Unwrap<typeof getTrackingTemplate>>;
 export type ListAdGroupsResponse = StructuredShape<Unwrap<typeof listAdGroups>>;
 export type ListAdsResponse = StructuredShape<Unwrap<typeof listAds>>;
@@ -272,7 +270,6 @@ export interface McpToolResponseRegistry {
   getKeywords: GetKeywordsResponse;
   getNegativeKeywords: GetNegativeKeywordsResponse;
   getSearchTermReport: GetSearchTermReportResponse;
-  runGaqlQuery: RunGaqlQueryResponse;
   getTrackingTemplate: GetTrackingTemplateResponse;
   listAdGroups: ListAdGroupsResponse;
   listAds: ListAdsResponse;

@@ -63,7 +63,7 @@ import type { HostApi } from "./sandbox";
  * Two channels:
  *   - `host`: async RPCs to the parent process (gaql, gaqlParallel).
  *     These cross the JSON serialization boundary and go through execRead for
- *     rate-limit + telemetry parity with runGaqlQuery — no hidden bypass.
+ *     rate-limit + telemetry parity with the typed read tools — no hidden bypass.
  *   - `bootstrap`: VM-local data and pure functions (query builders, constants,
  *     serializable helpers). Installed once at sandbox startup so scripts can
  *     use them synchronously without paying an RPC cost.
