@@ -8,7 +8,7 @@ if (!process.env.GCLOUD_PROJECT) {
 import { after } from "next/server";
 import { createMcpHandler } from "mcp-handler";
 import { db, schema } from "@/lib/db";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, desc } from "drizzle-orm";
 import { registerReadTools, registerWriteTools, registerCodeModeTools } from "@/lib/mcp";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { typedResult } from "@/lib/mcp/types";
@@ -41,6 +41,55 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
   const bearerToken = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
     : null;
+
+  // Dev-only bypass: lets the local dev server serve MCP traffic without an
+  // OAuth or Bearer handshake, so eval-mcp subagents (which can't do dynamic
+  // client registration against localhost) can iterate against uncommitted
+  // code. Triple-gated: NODE_ENV must be development, DEV_LOCAL_EMAIL must be
+  // explicitly set, and the caller must have sent NO Authorization header
+  // (real bearer flows still work in dev). Resolves to the most recent valid
+  // mcpSession for that email — piggybacks on whatever the user last signed
+  // in with, no test fixtures or fake customers needed.
+  if (!bearerToken && process.env.NODE_ENV === "development" && process.env.DEV_LOCAL_EMAIL) {
+    const devEmail = process.env.DEV_LOCAL_EMAIL;
+    const [s] = await db()
+      .select()
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.googleEmail, devEmail),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        ),
+      )
+      .orderBy(desc(schema.mcpSessions.createdAt))
+      .limit(1);
+    if (!s) {
+      throw new Error(
+        `DEV_LOCAL_EMAIL bypass active but no valid mcpSession found for ${devEmail}. ` +
+        `Sign in at http://localhost:3000/connect first.`,
+      );
+    }
+    if (!s.customerId) {
+      throw new Error("Dev session has no customerId. Complete setup at /connect.");
+    }
+    const customerIds = parseCustomerIds(s.customerIds);
+    const userAgent = request.headers.get("user-agent") ?? null;
+    return {
+      refreshToken: s.refreshToken,
+      customerId: s.customerId,
+      customerIds: customerIds.length > 0 ? customerIds : [{ id: s.customerId, name: "" }],
+      loginCustomerId: s.loginCustomerId ?? null,
+      userId: s.userId ?? null,
+      clientName: s.clientName ?? "dev-local",
+      clientVersion: s.clientVersion ?? null,
+      // Distinct from "oauth" / "direct" so dev traffic doesn't poison
+      // client-type analytics. Telemetry writers key off this.
+      authMethod: "dev-local",
+      userAgent,
+      sessionToken: "dev-local",
+      sessionId: s.id,
+    };
+  }
 
   if (!bearerToken) {
     throw new Error("No valid authentication. Sign in at /connect to get your MCP token.");

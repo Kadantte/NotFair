@@ -222,4 +222,192 @@ describe("MCP write tools — smoke", () => {
     });
     expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
+
+  it("bulkPauseKeywords fails atomically when pre-validation finds a negative keyword", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: { id: "100", status: "ENABLED" },
+        ad_group: { id: "111", status: "ENABLED" },
+        ad_group_criterion: {
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: true,
+          keyword: { match_type: "UNSPECIFIED" },
+        },
+      },
+    ]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkPauseKeywords", {
+      keywords: [{ campaignId: "100", adGroupId: "111", criterionId: "222" }],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: false,
+      reason: "PRE_VALIDATION_FAILED",
+      summary: { total: 1, wouldSucceed: 0, wouldFail: 1 },
+      wouldSucceedIds: [],
+    });
+    expect(JSON.stringify(structured.errors)).toContain("NEGATIVE_KEYWORDS_CANNOT_PAUSE");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("bulkPauseKeywords rejects criterion IDs that belong to a different ad group", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: { id: "100", status: "ENABLED" },
+        ad_group: { id: "999", status: "ENABLED" },
+        ad_group_criterion: {
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: false,
+          keyword: { match_type: "PHRASE" },
+        },
+      },
+    ]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkPauseKeywords", {
+      keywords: [{ campaignId: "100", adGroupId: "111", criterionId: "222" }],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: false,
+      reason: "PRE_VALIDATION_FAILED",
+      summary: { total: 1, wouldSucceed: 0, wouldFail: 1 },
+    });
+    expect(JSON.stringify(structured.errors)).toContain("ENTITY_NOT_FOUND");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+
+  it("bulkPauseKeywords continueOnError skips invalid items and executes the valid subset", async () => {
+    mockQuery
+      .mockResolvedValueOnce([
+        {
+          campaign: { id: "100", status: "ENABLED" },
+          ad_group: { id: "111", status: "ENABLED" },
+          ad_group_criterion: {
+            criterion_id: "222",
+            status: "ENABLED",
+            negative: true,
+            keyword: { match_type: "UNSPECIFIED" },
+          },
+        },
+        {
+          campaign: { id: "100", status: "ENABLED" },
+          ad_group: { id: "111", status: "ENABLED" },
+          ad_group_criterion: {
+            criterion_id: "333",
+            status: "ENABLED",
+            negative: false,
+            keyword: { match_type: "PHRASE" },
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        { ad_group_criterion: { criterion_id: "333" } },
+        { ad_group_criterion: { criterion_id: "444" } },
+      ])
+      .mockResolvedValueOnce([
+        { ad_group_criterion: { criterion_id: "333" } },
+        { ad_group_criterion: { criterion_id: "444" } },
+      ]);
+    mockMutateResources.mockResolvedValueOnce({ mutate_operation_responses: [{}] });
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkPauseKeywords", {
+      continueOnError: true,
+      keywords: [
+        { campaignId: "100", adGroupId: "111", criterionId: "222" },
+        { campaignId: "100", adGroupId: "111", criterionId: "333" },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: true,
+      summary: { total: 2, succeeded: 1, skipped: 1, failed: 0 },
+    });
+    expect(JSON.stringify(structured.skipped)).toContain("NEGATIVE_KEYWORDS_CANNOT_PAUSE");
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
+  });
+
+  it("bulkAddKeywords dryRun returns validation shape and does not mutate", async () => {
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkAddKeywords", {
+      campaignId: "100",
+      adGroupId: "111",
+      dryRun: true,
+      keywords: [
+        { keyword: "one two three four five six seven eight nine ten eleven", matchType: "PHRASE" },
+        { keyword: "valid keyword", matchType: "EXACT" },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: false,
+      reason: "DRY_RUN",
+      summary: { total: 2, wouldSucceed: 1, wouldFail: 1 },
+    });
+    expect(JSON.stringify(structured.errors)).toContain("INVALID_KEYWORD_SYNTAX");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("bulkAddKeywords rejects duplicates within the same request", async () => {
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkAddKeywords", {
+      campaignId: "100",
+      adGroupId: "111",
+      keywords: [
+        { keyword: "valid keyword", matchType: "EXACT" },
+        { keyword: " valid   keyword ", matchType: "EXACT" },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: false,
+      reason: "PRE_VALIDATION_FAILED",
+      summary: { total: 2, wouldSucceed: 0, wouldFail: 2 },
+    });
+    expect(JSON.stringify(structured.errors)).toContain("DUPLICATE_IN_REQUEST");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+
+  it("bulkUpdateBids fails atomically when a bid violates guardrails", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: { id: "100", status: "ENABLED", bidding_strategy_type: "MANUAL_CPC" },
+        ad_group: { id: "111", status: "ENABLED" },
+        ad_group_criterion: {
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: false,
+          cpc_bid_micros: 1_000_000,
+          keyword: { match_type: "PHRASE" },
+        },
+      },
+    ]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkUpdateBids", {
+      updates: [
+        { campaignId: "100", adGroupId: "111", criterionId: "222", newBidDollars: 2 },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: false,
+      reason: "PRE_VALIDATION_FAILED",
+      summary: { total: 1, wouldSucceed: 0, wouldFail: 1 },
+    });
+    expect(JSON.stringify(structured.errors)).toContain("BID_CHANGE_EXCEEDS_GUARDRAIL");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
 });

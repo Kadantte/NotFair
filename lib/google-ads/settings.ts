@@ -19,6 +19,39 @@ const ALL_DAYS: AdScheduleSlot["dayOfWeek"][] = [
   "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY",
 ];
 
+const BIDDING_STRATEGY_TYPE_NAME: Record<number, string> = {
+  0: "UNSPECIFIED",
+  1: "UNKNOWN",
+  2: "ENHANCED_CPC",
+  3: "MANUAL_CPC",
+  4: "MANUAL_CPM",
+  5: "PAGE_ONE_PROMOTED",
+  6: "TARGET_CPA",
+  7: "TARGET_OUTRANK_SHARE",
+  8: "TARGET_ROAS",
+  9: "TARGET_SPEND",
+  10: "MAXIMIZE_CONVERSIONS",
+  11: "MAXIMIZE_CONVERSION_VALUE",
+  12: "PERCENT_CPC",
+  13: "MANUAL_CPV",
+  14: "TARGET_CPM",
+  15: "TARGET_IMPRESSION_SHARE",
+  16: "COMMISSION",
+  17: "INVALID",
+  18: "MANUAL_CPA",
+  19: "FIXED_CPM",
+  20: "TARGET_CPV",
+  21: "TARGET_CPC",
+  22: "FIXED_SHARE_OF_VOICE",
+};
+
+const SMART_BIDDING_STRATEGIES = new Set([
+  "TARGET_CPA",
+  "TARGET_ROAS",
+  "MAXIMIZE_CONVERSIONS",
+  "MAXIMIZE_CONVERSION_VALUE",
+]);
+
 function expandSlots(slots: AdScheduleSlot[]): AdScheduleSlot[] {
   return slots.flatMap((s) =>
     s.dayOfWeek === "ALL" ? ALL_DAYS.map((d) => ({ ...s, dayOfWeek: d })) : [s],
@@ -40,8 +73,15 @@ function validateSlot(s: AdScheduleSlot): string | null {
 interface CampaignSettingsResult {
   success: boolean;
   results: WriteResult[];
+  warnings?: Array<{ code: string; message: string }>;
   error?: string;
 }
+
+type CampaignBiddingStrategyRow = {
+  campaign?: {
+    bidding_strategy_type?: string | number | null;
+  };
+};
 
 /** Normalize a geo target input to a full resource name. Accepts "2840", "geoTargetConstants/2840", etc. */
 function toGeoTargetConstant(input: string): string {
@@ -60,6 +100,7 @@ export async function updateCampaignSettings(
   const customerId = normalizeCustomerId(auth.customerId);
   const campaignResourceName = `customers/${customerId}/campaigns/${cid}`;
   const results: WriteResult[] = [];
+  const warnings: Array<{ code: string; message: string }> = [];
 
   // 1. Update network settings
   if (params.networks) {
@@ -257,6 +298,19 @@ export async function updateCampaignSettings(
         const err = validateSlot(s);
         if (err) throw new Error(err);
       }
+      const scheduleRestrictsHours = expanded.length > 0 && !isFullWeekAllDay(expanded);
+      if (scheduleRestrictsHours) {
+        const biddingStrategy = await getCampaignBiddingStrategy(customer, cid);
+        if (SMART_BIDDING_STRATEGIES.has(biddingStrategy)) {
+          warnings.push({
+            code: "SMART_BIDDING_SCHEDULE_RESTRICTION",
+            message:
+              `Campaign uses ${biddingStrategy}. Ad schedule restrictions are respected, ` +
+              "but can reduce smart bidding learning signal. Prefer 24/7 schedules unless " +
+              "you have strong data that specific hours are unprofitable even at low bids.",
+          });
+        }
+      }
 
       // Fetch existing ad schedule criteria for beforeValue + removal.
       const existing = await customer.query(`
@@ -350,7 +404,48 @@ export async function updateCampaignSettings(
   return {
     success: results.every((r) => r.success),
     results,
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
+}
+
+async function getCampaignBiddingStrategy(
+  customer: ReturnType<typeof getCustomer>,
+  campaignId: string | number,
+): Promise<string> {
+  const rows = await customer.query(`
+    SELECT campaign.bidding_strategy_type
+    FROM campaign
+    WHERE campaign.id = ${campaignId}
+    LIMIT 1
+  `);
+  return normalizeBiddingStrategyName((rows as CampaignBiddingStrategyRow[])[0]?.campaign?.bidding_strategy_type);
+}
+
+function normalizeBiddingStrategyName(raw: unknown): string {
+  if (raw == null) return "UNKNOWN";
+  if (typeof raw === "number") return BIDDING_STRATEGY_TYPE_NAME[raw] ?? `UNKNOWN_${raw}`;
+  const asNumber = Number(raw);
+  if (Number.isInteger(asNumber) && BIDDING_STRATEGY_TYPE_NAME[asNumber]) {
+    return BIDDING_STRATEGY_TYPE_NAME[asNumber];
+  }
+  return String(raw);
+}
+
+function isFullWeekAllDay(slots: AdScheduleSlot[]): boolean {
+  const days = new Set<string>();
+  for (const slot of slots) {
+    const startMinute = slot.startMinute ?? "ZERO";
+    const endMinute = slot.endMinute ?? "ZERO";
+    if (slot.startHour !== 0 || slot.endHour !== 24 || startMinute !== "ZERO" || endMinute !== "ZERO") {
+      return false;
+    }
+    if (slot.dayOfWeek === "ALL") {
+      ALL_DAYS.forEach((day) => days.add(day));
+    } else {
+      days.add(slot.dayOfWeek);
+    }
+  }
+  return ALL_DAYS.every((day) => days.has(day));
 }
 
 // ─── Language Targeting (C.30 / M.10) ───────────────────────────────

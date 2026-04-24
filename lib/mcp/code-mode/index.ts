@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resolveToolAuth } from "../helpers";
 import { safeHandler, typedResult, accountIdParam, READ_ANNOTATIONS, type ToolRegistrar } from "../types";
+import { enforceRateLimit } from "../rate-limit";
 import { runScriptInSandbox } from "./sandbox";
 import { buildAdsHost } from "./ads-client";
 
@@ -28,8 +29,9 @@ Rules of thumb:
 ── API SURFACE (all on the \`ads\` namespace) ──
 
 Async RPCs:
-- ads.gaql(query, limit?) -> GaqlReport — single GAQL query. THIS IS THE ENTRY POINT FOR AD-HOC QUERIES. For one-off data pulls, use \`return await ads.gaql('SELECT ...')\` — there is no separate runGaqlQuery tool.
-- ads.gaqlParallel([{name, query, limit?}, ...]) -> { [name]: GaqlReport | { error } } — max 20 per call. USE THIS for multi-surface analysis.
+- ads.gaql(query, limit?, options?) -> GaqlReport — single GAQL query. THIS IS THE ENTRY POINT FOR AD-HOC QUERIES. For one-off data pulls, use \`return await ads.gaql('SELECT ...')\` — there is no separate runGaqlQuery tool.
+- ads.gaqlParallel([{name, query, limit?}, ...], options?) -> { [name]: GaqlReport | { error } } — max 20 per call. USE THIS for multi-surface analysis.
+- options.excludeRemovedParents defaults to true. Rows under REMOVED campaigns/ad groups are filtered out server-side because most audits need current serving state. Pass \`{ excludeRemovedParents: false }\` only for historical analysis.
 
 Pre-built GAQL strings (sync, no RPC cost):
 - Parameterless: ads.queries.accountInfo | geoTargeting | qualityScores | adGroups | conversionActions | audienceSegmentCheck | negativeKeywords | campaignAssets
@@ -99,6 +101,11 @@ export const registerCodeModeTools: ToolRegistrar = (server, currentAuth) => {
     },
     safeHandler(async ({ accountId, code, timeoutMs }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
+      // Gate sandbox execution at the handler level so a user already at their
+      // monthly cap can't burn compute on empty/looping scripts that never
+      // reach an execRead-wrapped ads.gaql call. Per-query enforceRateLimit
+      // inside the host bindings still runs as defense-in-depth.
+      await enforceRateLimit(targetAuth.userId);
       const { host, bootstrap } = buildAdsHost(targetAuth, targetId);
       const result = await runScriptInSandbox({ code, host, bootstrap, timeoutMs });
       return typedResult(result);

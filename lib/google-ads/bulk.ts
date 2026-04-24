@@ -146,7 +146,6 @@ export async function bulkUpdateBids(
   // Validate all updates and build mutations
   const results: Array<WriteResult & { input: BulkBidUpdate }> = [];
   const validMutations: Array<{ update: BulkBidUpdate; newBidMicros: number; currentBidMicros: number }> = [];
-  const manualStrategies = ["MANUAL_CPC", "ENHANCED_CPC"];
 
   for (const u of updates) {
     const newBidMicros = toMicros(u.newBidDollars);
@@ -154,18 +153,6 @@ export async function bulkUpdateBids(
 
     if (!data) {
       results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: "N/A", afterValue: String(newBidMicros), error: "Keyword not found", input: u });
-      continue;
-    }
-    if (data.strategy && !manualStrategies.includes(data.strategy)) {
-      results.push({
-        success: false,
-        action: "update_bid",
-        entityId: u.criterionId,
-        beforeValue: "N/A",
-        afterValue: String(newBidMicros),
-        error: `Campaign uses bidding strategy ${data.strategy}; manual bid edits are only supported on MANUAL_CPC or ENHANCED_CPC campaigns. To change bids, either switch the campaign's bidding strategy (updateCampaignBidding) or let the strategy handle bids automatically.`,
-        input: u,
-      });
       continue;
     }
     if (newBidMicros <= 0) {
@@ -219,6 +206,511 @@ export type BulkPauseKeywordInput = {
   criterionId: string;
 };
 
+export type BulkValidationOperation = "pause_keyword" | "add_keyword" | "update_bid";
+
+export type BulkValidationIssue = {
+  id: string;
+  code: string;
+  severity: "error" | "warning";
+  reason: string;
+  criterionId?: string;
+  alternativeTool?: string;
+  fix?: string;
+};
+
+export type BulkPreValidationResult<T> = {
+  ok: boolean;
+  valid: Array<{ id: string; input: T }>;
+  invalid: Array<BulkValidationIssue & { input: T }>;
+};
+
+type KeywordPrevalidationRow = {
+  campaign?: {
+    id?: string | number;
+    status?: string | number;
+    bidding_strategy_type?: string | number;
+  };
+  ad_group?: {
+    id?: string | number;
+    status?: string | number;
+  };
+  ad_group_criterion?: {
+    criterion_id?: string | number;
+    status?: string | number;
+    cpc_bid_micros?: string | number;
+    negative?: boolean;
+    keyword?: {
+      text?: string;
+      match_type?: string | number;
+    };
+  };
+};
+
+type BulkAddValidationInput = BulkAddKeywordInput & {
+  campaignId: string;
+  adGroupId: string;
+};
+
+type AddKeywordPrevalidationRow = {
+  campaign?: {
+    id?: string | number;
+    status?: string | number;
+  };
+  ad_group?: {
+    id?: string | number;
+    status?: string | number;
+  };
+  ad_group_criterion?: {
+    criterion_id?: string | number;
+    negative?: boolean;
+    status?: string | number;
+    keyword?: {
+      text?: string;
+      match_type?: string | number;
+    };
+  };
+};
+
+export async function preValidateBulkMutation(
+  auth: AuthContext,
+  operation: "pause_keyword",
+  items: BulkPauseKeywordInput[],
+): Promise<BulkPreValidationResult<BulkPauseKeywordInput>>;
+export async function preValidateBulkMutation(
+  auth: AuthContext,
+  operation: "update_bid",
+  items: BulkBidUpdate[],
+  guardrails?: Guardrails,
+): Promise<BulkPreValidationResult<BulkBidUpdate>>;
+export async function preValidateBulkMutation(
+  auth: AuthContext,
+  operation: "add_keyword",
+  items: BulkAddValidationInput[],
+): Promise<BulkPreValidationResult<BulkAddValidationInput>>;
+export async function preValidateBulkMutation(
+  auth: AuthContext,
+  operation: BulkValidationOperation,
+  items: Array<BulkPauseKeywordInput | BulkBidUpdate | BulkAddValidationInput>,
+  guardrails = DEFAULT_GUARDRAILS,
+): Promise<BulkPreValidationResult<BulkPauseKeywordInput | BulkBidUpdate | BulkAddValidationInput>> {
+  if (items.length === 0) return { ok: true, valid: [], invalid: [] };
+  if (operation === "add_keyword") {
+    return preValidateBulkAddKeywords(auth, items as BulkAddValidationInput[]);
+  }
+  return preValidateCriterionBulkMutation(
+    auth,
+    operation,
+    items as Array<BulkPauseKeywordInput | BulkBidUpdate>,
+    guardrails,
+  );
+}
+
+async function preValidateCriterionBulkMutation<T extends BulkPauseKeywordInput | BulkBidUpdate>(
+  auth: AuthContext,
+  operation: "pause_keyword" | "update_bid",
+  items: T[],
+  guardrails: Guardrails,
+): Promise<BulkPreValidationResult<T>> {
+  if (items.length === 0) return { ok: true, valid: [], invalid: [] };
+
+  const customer = getCustomer(auth);
+  const byCampaign = new Map<string, T[]>();
+  for (const k of items) {
+    const arr = byCampaign.get(k.campaignId) ?? [];
+    arr.push(k);
+    byCampaign.set(k.campaignId, arr);
+  }
+
+  const records = new Map<string, KeywordPrevalidationRow>();
+  await Promise.all(
+    [...byCampaign.entries()].map(async ([campaignId, group]) => {
+      const validIds = group
+        .map((k) => Number(k.criterionId))
+        .filter((n) => Number.isInteger(n) && n > 0);
+      if (validIds.length === 0) return;
+
+      const rows = await customer.query(`
+        SELECT
+          campaign.id,
+          campaign.status,
+          campaign.bidding_strategy_type,
+          ad_group.id,
+          ad_group.status,
+          ad_group_criterion.criterion_id,
+          ad_group_criterion.status,
+          ad_group_criterion.cpc_bid_micros,
+          ad_group_criterion.negative,
+          ad_group_criterion.keyword.match_type
+        FROM keyword_view
+        WHERE campaign.id = ${safeEntityId(campaignId)}
+          AND ad_group.id IN (${[...new Set(group.map((k) => safeEntityId(k.adGroupId)))].join(",")})
+          AND ad_group_criterion.criterion_id IN (${validIds.join(",")})
+        LIMIT ${Math.min(validIds.length + 1, 2000)}
+      `);
+
+      for (const row of rows as KeywordPrevalidationRow[]) {
+        const criterionId = String(row.ad_group_criterion?.criterion_id ?? "");
+        const adGroupId = String(row.ad_group?.id ?? "");
+        if (criterionId && adGroupId) records.set(`${campaignId}:${adGroupId}:${criterionId}`, row);
+      }
+    }),
+  );
+
+  const valid: Array<{ id: string; input: T }> = [];
+  const invalid: Array<BulkValidationIssue & { input: T }> = [];
+  const activePauseCountByCampaign = new Map<string, number>();
+  const requestedPauseCountByCampaign = new Map<string, number>();
+
+  for (const item of items) {
+    const id = item.criterionId;
+    const record = records.get(`${item.campaignId}:${item.adGroupId}:${item.criterionId}`);
+    const issues = validateCriterionRecord(operation, item, record, guardrails);
+    if (issues.length > 0) {
+      invalid.push(...issues.map((issue) => ({ ...issue, input: item })));
+    }
+    if (issues.some((issue) => issue.severity === "error")) {
+      continue;
+    }
+    if (operation === "pause_keyword") {
+      requestedPauseCountByCampaign.set(
+        item.campaignId,
+        (requestedPauseCountByCampaign.get(item.campaignId) ?? 0) + 1,
+      );
+    }
+    valid.push({ id, input: item });
+  }
+
+  if (operation === "pause_keyword") {
+    await Promise.all(
+      [...requestedPauseCountByCampaign.keys()].map(async (campaignId) => {
+        const countResult = await customer.query(`
+          SELECT ad_group_criterion.criterion_id
+          FROM keyword_view
+          WHERE campaign.id = ${safeEntityId(campaignId)}
+            AND campaign.status != 'REMOVED'
+            AND ad_group.status != 'REMOVED'
+            AND ad_group_criterion.status = 'ENABLED'
+            AND ad_group_criterion.negative = FALSE
+        `);
+        activePauseCountByCampaign.set(campaignId, (countResult as unknown[]).length);
+      }),
+    );
+
+    for (const [campaignId, requestedCount] of requestedPauseCountByCampaign) {
+      const activeCount = activePauseCountByCampaign.get(campaignId) ?? 0;
+      if (requestedCount >= activeCount) {
+        for (const item of valid.filter((v) => v.input.campaignId === campaignId)) {
+          invalid.push({
+            id: item.id,
+            criterionId: item.id,
+            code: "WOULD_LEAVE_CAMPAIGN_WITH_NO_ACTIVE_KEYWORDS",
+            severity: "error",
+            reason: `Cannot pause ${requestedCount} of ${activeCount} active positive keywords in campaign ${campaignId}.`,
+            fix: "Leave at least one active positive keyword in the campaign.",
+            input: item.input,
+          });
+        }
+      }
+    }
+  }
+
+  const invalidIds = new Set(invalid.filter((issue) => issue.severity === "error").map((issue) => `${issue.id}:${issue.code}`));
+  const validAfterCampaignChecks = valid.filter((item) =>
+    ![...invalidIds].some((key) => key.startsWith(`${item.id}:`)),
+  );
+
+  return {
+    ok: invalid.every((issue) => issue.severity === "warning"),
+    valid: validAfterCampaignChecks,
+    invalid,
+  };
+}
+
+function validateCriterionRecord<T extends BulkPauseKeywordInput | BulkBidUpdate>(
+  operation: "pause_keyword" | "update_bid",
+  item: T,
+  record: KeywordPrevalidationRow | undefined,
+  guardrails: Guardrails,
+): BulkValidationIssue[] {
+  const id = item.criterionId;
+  if (!record) {
+    return [{
+      id,
+      criterionId: id,
+      code: "ENTITY_NOT_FOUND",
+      severity: "error",
+      reason: `Keyword criterion ${id} was not found in campaign ${item.campaignId}.`,
+    }];
+  }
+
+  const issues: BulkValidationIssue[] = [];
+  const campaignStatus = normalizeStatus(record.campaign?.status);
+  if (campaignStatus === "REMOVED") {
+    return [{
+      id,
+      criterionId: id,
+      code: "PARENT_CAMPAIGN_REMOVED",
+      severity: "error",
+      reason: `Parent campaign ${item.campaignId} is REMOVED.`,
+    }];
+  }
+
+  const adGroupStatus = normalizeStatus(record.ad_group?.status);
+  if (adGroupStatus === "REMOVED") {
+    return [{
+      id,
+      criterionId: id,
+      code: "PARENT_AD_GROUP_REMOVED",
+      severity: "error",
+      reason: `Parent ad group ${item.adGroupId} is REMOVED.`,
+    }];
+  }
+
+  const rawMatchType = record.ad_group_criterion?.keyword?.match_type;
+  const matchType = normalizeMatchType(rawMatchType);
+  const isNegative = record.ad_group_criterion?.negative === true || matchType === "UNSPECIFIED";
+  if (operation === "pause_keyword" && isNegative) {
+    return [{
+      id,
+      criterionId: id,
+      code: "NEGATIVE_KEYWORDS_CANNOT_PAUSE",
+      severity: "error",
+      reason: `Criterion ${id} is a negative keyword. Google Ads negatives cannot be paused.`,
+      alternativeTool: "removeNegativeKeyword",
+      fix: "Remove this ID from the batch, or call removeNegativeKeyword/removeKeywordFromNegativeList if you want to unblock that query.",
+    }];
+  }
+  if (operation === "update_bid" && isNegative) {
+    return [{
+      id,
+      criterionId: id,
+      code: "NEGATIVE_KEYWORDS_HAVE_NO_BID",
+      severity: "error",
+      reason: `Criterion ${id} is a negative keyword and has no CPC bid to update.`,
+      alternativeTool: "removeNegativeKeyword",
+    }];
+  }
+
+  const criterionStatus = normalizeStatus(record.ad_group_criterion?.status);
+  if (operation === "pause_keyword" && criterionStatus === "PAUSED") {
+    return [{
+      id,
+      criterionId: id,
+      code: "ALREADY_PAUSED",
+      severity: "error",
+      reason: `Keyword criterion ${id} is already PAUSED.`,
+    }];
+  }
+
+  if (operation === "update_bid") {
+    const update = item as BulkBidUpdate;
+    const strategy = normalizeBiddingStrategyName(record.campaign?.bidding_strategy_type);
+    if (!["MANUAL_CPC", "ENHANCED_CPC"].includes(strategy)) {
+      issues.push({
+        id,
+        criterionId: id,
+        code: "SMART_BIDDING_MANUAL_BID_OVERRIDE",
+        severity: "warning",
+        reason: `Campaign uses ${strategy}; keyword CPC bid edits may be ignored by smart bidding.`,
+      });
+    }
+    const currentBidMicros = Number(record.ad_group_criterion?.cpc_bid_micros ?? 0);
+    const newBidMicros = toMicros(update.newBidDollars);
+    if (newBidMicros <= 0) {
+      return [{
+        id,
+        criterionId: id,
+        code: "INVALID_BID",
+        severity: "error",
+        reason: "Bid must be greater than zero.",
+      }];
+    }
+    if (currentBidMicros > 0) {
+      const changePct = Math.abs(newBidMicros - currentBidMicros) / currentBidMicros;
+      if (changePct > guardrails.maxBidChangePct) {
+        return [{
+          id,
+          criterionId: id,
+          code: "BID_CHANGE_EXCEEDS_GUARDRAIL",
+          severity: "error",
+          reason: `Bid change of ${(changePct * 100).toFixed(0)}% exceeds maximum allowed ${(guardrails.maxBidChangePct * 100).toFixed(0)}%.`,
+        }];
+      }
+    }
+  }
+
+  return issues;
+}
+
+async function preValidateBulkAddKeywords(
+  auth: AuthContext,
+  items: BulkAddValidationInput[],
+): Promise<BulkPreValidationResult<BulkAddValidationInput>> {
+  if (items.length === 0) return { ok: true, valid: [], invalid: [] };
+
+  const customer = getCustomer(auth);
+  const byCampaign = new Map<string, BulkAddValidationInput[]>();
+  for (const item of items) {
+    const arr = byCampaign.get(item.campaignId) ?? [];
+    arr.push(item);
+    byCampaign.set(item.campaignId, arr);
+  }
+
+  const rowsByCampaign = new Map<string, AddKeywordPrevalidationRow[]>();
+  await Promise.all(
+    [...byCampaign.entries()].map(async ([campaignId, group]) => {
+      const adGroupIds = [...new Set(group.map((item) => safeEntityId(item.adGroupId)))];
+      const rows = await customer.query(`
+        SELECT
+          campaign.id,
+          campaign.status,
+          ad_group.id,
+          ad_group.status,
+          ad_group_criterion.criterion_id,
+          ad_group_criterion.status,
+          ad_group_criterion.negative,
+          ad_group_criterion.keyword.text,
+          ad_group_criterion.keyword.match_type
+        FROM keyword_view
+        WHERE campaign.id = ${safeEntityId(campaignId)}
+          AND ad_group.id IN (${adGroupIds.join(",")})
+        LIMIT 2000
+      `);
+      rowsByCampaign.set(campaignId, rows as AddKeywordPrevalidationRow[]);
+    }),
+  );
+
+  const valid: Array<{ id: string; input: BulkAddValidationInput }> = [];
+  const invalid: Array<BulkValidationIssue & { input: BulkAddValidationInput }> = [];
+  const seenSubmitted = new Map<string, { id: string; input: BulkAddValidationInput }>();
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const signature = `${item.campaignId}:${item.adGroupId}:${normalizeKeywordText(item.keyword)}:${item.matchType ?? "BROAD"}`;
+    const id = `${signature}:${i}`;
+    const rows = rowsByCampaign.get(item.campaignId) ?? [];
+    const issue = validateAddKeywordItem(id, item, rows);
+    if (issue) {
+      invalid.push({ ...issue, input: item });
+      continue;
+    }
+
+    const firstSubmitted = seenSubmitted.get(signature);
+    if (firstSubmitted) {
+      invalid.push({
+        id,
+        code: "DUPLICATE_IN_REQUEST",
+        severity: "error",
+        reason: `Keyword "${normalizeKeywordText(item.keyword)}" (${item.matchType ?? "BROAD"}) appears more than once in this bulkAddKeywords request.`,
+        fix: "Remove duplicate keyword entries from the same request before executing.",
+        input: item,
+      });
+      invalid.push({
+        id: firstSubmitted.id,
+        code: "DUPLICATE_IN_REQUEST",
+        severity: "error",
+        reason: `Keyword "${normalizeKeywordText(item.keyword)}" (${item.matchType ?? "BROAD"}) appears more than once in this bulkAddKeywords request.`,
+        fix: "Remove duplicate keyword entries from the same request before executing.",
+        input: firstSubmitted.input,
+      });
+      continue;
+    }
+
+    seenSubmitted.set(signature, { id, input: item });
+    valid.push({ id, input: item });
+  }
+
+  const duplicateIds = new Set(
+    invalid
+      .filter((issue) => issue.code === "DUPLICATE_IN_REQUEST")
+      .map((issue) => issue.id),
+  );
+
+  return {
+    ok: invalid.every((issue) => issue.severity === "warning"),
+    valid: valid.filter((item) => !duplicateIds.has(item.id)),
+    invalid,
+  };
+}
+
+function validateAddKeywordItem(
+  id: string,
+  item: BulkAddValidationInput,
+  rows: AddKeywordPrevalidationRow[],
+): BulkValidationIssue | null {
+  const keyword = normalizeKeywordText(item.keyword);
+  const matchType = item.matchType ?? "BROAD";
+  if (!keyword) {
+    return { id, code: "INVALID_KEYWORD_SYNTAX", severity: "error", reason: "Keyword text cannot be empty." };
+  }
+  if (keyword.split(/\s+/).length > 10) {
+    return { id, code: "INVALID_KEYWORD_SYNTAX", severity: "error", reason: "Keyword text cannot exceed 10 words." };
+  }
+
+  const parentRow = rows.find((row) => String(row.ad_group?.id ?? "") === item.adGroupId) ?? rows[0];
+  const campaignStatus = normalizeStatus(parentRow?.campaign?.status);
+  if (campaignStatus === "REMOVED") {
+    return { id, code: "PARENT_CAMPAIGN_REMOVED", severity: "error", reason: `Parent campaign ${item.campaignId} is REMOVED.` };
+  }
+  const adGroupStatus = normalizeStatus(parentRow?.ad_group?.status);
+  if (adGroupStatus === "REMOVED") {
+    return { id, code: "PARENT_AD_GROUP_REMOVED", severity: "error", reason: `Parent ad group ${item.adGroupId} is REMOVED.` };
+  }
+
+  for (const row of rows) {
+    const existingText = normalizeKeywordText(row.ad_group_criterion?.keyword?.text ?? "");
+    const existingMatchType = normalizeMatchType(row.ad_group_criterion?.keyword?.match_type);
+    if (existingText !== keyword || existingMatchType !== matchType) continue;
+    if (row.ad_group_criterion?.negative) {
+      return {
+        id,
+        code: "CONFLICTS_WITH_NEGATIVE",
+        severity: "error",
+        reason: `Keyword "${keyword}" conflicts with an existing negative keyword in this campaign/ad group.`,
+        alternativeTool: "removeNegativeKeyword",
+      };
+    }
+    const rowAdGroupId = String(row.ad_group?.id ?? "");
+    if (rowAdGroupId === item.adGroupId) {
+      return {
+        id,
+        code: "DUPLICATE_IN_AD_GROUP",
+        severity: "error",
+        reason: `Keyword "${keyword}" (${matchType}) already exists in ad group ${item.adGroupId}.`,
+      };
+    }
+    return {
+      id,
+      code: "DUPLICATE_IN_CAMPAIGN",
+      severity: "error",
+      reason: `Keyword "${keyword}" (${matchType}) already exists in another ad group in campaign ${item.campaignId}.`,
+    };
+  }
+
+  return null;
+}
+
+function normalizeStatus(raw: unknown): string {
+  if (raw == null) return "UNKNOWN";
+  if (raw === 2) return "ENABLED";
+  if (raw === 3) return "PAUSED";
+  if (raw === 4) return "REMOVED";
+  return String(raw);
+}
+
+function normalizeMatchType(raw: unknown): string {
+  if (raw == null) return "UNKNOWN";
+  if (typeof raw === "number") {
+    if (raw === 0) return "UNSPECIFIED";
+    return MATCH_TYPE_NAME[raw] ?? String(raw);
+  }
+  return String(raw);
+}
+
+function normalizeKeywordText(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export async function bulkPauseKeywords(
   auth: AuthContext,
   keywords: BulkPauseKeywordInput[],
@@ -247,6 +739,7 @@ export async function bulkPauseKeywords(
         FROM keyword_view
         WHERE campaign.id = ${campId}
           AND ad_group_criterion.status = 'ENABLED'
+          AND ad_group_criterion.negative = FALSE
       `);
       activeCountByCampaign.set(campaignId, (countResult as any[]).length);
     }),

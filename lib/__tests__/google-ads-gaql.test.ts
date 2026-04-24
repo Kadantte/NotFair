@@ -286,9 +286,51 @@ describe("runSafeGaqlReport validation", () => {
       runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign DROP TABLE x"),
     ).rejects.toThrow(/forbidden/);
   });
+
+  it("rejects non-date segment filters that are missing from SELECT", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT metrics.conversions FROM customer WHERE segments.conversion_action = 'customers/123/conversionActions/456'",
+      ),
+    ).rejects.toThrow(/segments\.conversion_action/);
+  });
+
+  it("allows date filters without selecting segments.date", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+    );
+    expect(mockQuery).toHaveBeenCalled();
+  });
 });
 
 describe("runSafeGaqlReport limit + truncation", () => {
+  it("filters removed campaign and ad group parents on child resources by default", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT search_term_view.search_term, campaign.name, ad_group.name FROM search_term_view WHERE segments.date DURING LAST_30_DAYS ORDER BY metrics.cost_micros DESC",
+      100,
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    expect(query).toContain("campaign.status != 'REMOVED'");
+    expect(query).toContain("ad_group.status != 'REMOVED'");
+    expect(query.indexOf("campaign.status")).toBeLessThan(query.indexOf("ORDER BY"));
+  });
+
+  it("can opt out of removed-parent filtering for historical GAQL", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign",
+      100,
+      { excludeRemovedParents: false },
+    );
+    expect(mockQuery.mock.calls[0][0]).not.toContain("campaign.status");
+  });
+
   it("uses default limit when none provided", async () => {
     mockQuery.mockResolvedValueOnce([]);
     await runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign");

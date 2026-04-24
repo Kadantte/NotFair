@@ -1437,13 +1437,70 @@ export type GaqlReport = {
   rows: unknown[];
 };
 
+export type RunSafeGaqlOptions = {
+  /**
+   * Most agent reads ask for current account state. GAQL does not implicitly
+   * hide children of REMOVED campaigns/ad groups, so default to excluding them
+   * when the queried resource has a campaign/ad group parent.
+   */
+  excludeRemovedParents?: boolean;
+};
+
+const DEFAULT_EXCLUDE_REMOVED_PARENTS = true;
+
+const CAMPAIGN_SCOPED_RESOURCES = new Set([
+  "campaign",
+  "ad_group",
+  "ad_group_ad",
+  "keyword_view",
+  "search_term_view",
+  "landing_page_view",
+  "campaign_criterion",
+  "campaign_asset",
+  "ad_group_criterion",
+  "ad_group_asset",
+  "asset_group",
+  "asset_group_asset",
+  "asset_group_product_group_view",
+  "detail_placement_view",
+  "display_keyword_view",
+  "geographic_view",
+  "group_placement_view",
+  "location_view",
+  "paid_organic_search_term_view",
+  "shopping_performance_view",
+  "user_location_view",
+]);
+
+const AD_GROUP_SCOPED_RESOURCES = new Set([
+  "ad_group",
+  "ad_group_ad",
+  "keyword_view",
+  "search_term_view",
+  "ad_group_criterion",
+  "ad_group_asset",
+  "detail_placement_view",
+  "display_keyword_view",
+  "group_placement_view",
+  "paid_organic_search_term_view",
+]);
+
+const SEGMENT_WHERE_SELECT_EXEMPTIONS = new Set([
+  "segments.date",
+  "segments.week",
+  "segments.month",
+  "segments.quarter",
+  "segments.year",
+]);
+
 export async function runSafeGaqlReport(
   auth: AuthContext,
   rawQuery: string,
   limit: number = DEFAULT_GAQL_LIMIT,
+  options: RunSafeGaqlOptions = {},
 ): Promise<GaqlReport> {
-  const query = rawQuery.trim();
-  const normalized = query.toUpperCase();
+  let query = rawQuery.trim();
+  let normalized = query.toUpperCase();
 
   if (!normalized.startsWith("SELECT ")) {
     throw new Error("Only read-only SELECT GAQL queries are allowed.");
@@ -1455,6 +1512,13 @@ export async function runSafeGaqlReport(
   const forbidden = [" INSERT ", " UPDATE ", " DELETE ", " CREATE ", " ALTER ", " DROP ", " TRUNCATE "];
   if (forbidden.some((term) => ` ${normalized} `.includes(term))) {
     throw new Error("The query contains forbidden keywords.");
+  }
+
+  validateSegmentsInWhereAreSelected(query);
+
+  if (options.excludeRemovedParents ?? DEFAULT_EXCLUDE_REMOVED_PARENTS) {
+    query = applyRemovedParentFilters(query);
+    normalized = query.toUpperCase();
   }
 
   // Resolve effective limit: an explicit GAQL `LIMIT N` wins over the param
@@ -1534,6 +1598,69 @@ export async function runSafeGaqlReport(
   }
 
   return response;
+}
+
+function validateSegmentsInWhereAreSelected(query: string) {
+  const selectMatch = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i);
+  const whereMatch = query.match(/\sWHERE\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i);
+  if (!selectMatch || !whereMatch) return;
+
+  const selected = new Set(
+    selectMatch[1]
+      .split(",")
+      .map((field) => field.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const missing = new Set<string>();
+  const segmentRegex = /\bsegments\.[a-z_]+\b/gi;
+  for (const match of whereMatch[1].matchAll(segmentRegex)) {
+    const field = match[0].toLowerCase();
+    if (SEGMENT_WHERE_SELECT_EXEMPTIONS.has(field)) continue;
+    if (!selected.has(field)) missing.add(field);
+  }
+
+  if (missing.size > 0) {
+    const fields = [...missing].sort();
+    throw new Error(
+      `GAQL segment filter must also be selected: ${fields.join(", ")}. ` +
+      `Add ${fields.join(", ")} to the SELECT clause or remove it from WHERE.`,
+    );
+  }
+}
+
+function applyRemovedParentFilters(query: string): string {
+  const resource = extractFromResource(query);
+  if (!resource) return query;
+
+  const filters: string[] = [];
+  if (
+    CAMPAIGN_SCOPED_RESOURCES.has(resource) &&
+    !/\bcampaign\.status\s*(?:=|!=|\bIN\b|\bNOT\s+IN\b)/i.test(query)
+  ) {
+    filters.push("campaign.status != 'REMOVED'");
+  }
+  if (
+    AD_GROUP_SCOPED_RESOURCES.has(resource) &&
+    !/\bad_group\.status\s*(?:=|!=|\bIN\b|\bNOT\s+IN\b)/i.test(query)
+  ) {
+    filters.push("ad_group.status != 'REMOVED'");
+  }
+  if (filters.length === 0) return query;
+
+  const insertionPoint = findTrailingClauseIndex(query);
+  const head = query.slice(0, insertionPoint).trimEnd();
+  const tail = query.slice(insertionPoint);
+  const connector = /\sWHERE\s/i.test(head) ? " AND " : " WHERE ";
+  return `${head}${connector}${filters.join(" AND ")}${tail}`;
+}
+
+function extractFromResource(query: string): string | null {
+  return query.match(/\sFROM\s+([a-z_]+)/i)?.[1]?.toLowerCase() ?? null;
+}
+
+function findTrailingClauseIndex(query: string): number {
+  const matches = [...query.matchAll(/\s(?:ORDER\s+BY|LIMIT|PARAMETERS)\s/gi)];
+  return matches.length > 0 ? matches[0].index ?? query.length : query.length;
 }
 
 // ─── Resource Metadata (Field Discovery) ────────────────────────────

@@ -100,6 +100,7 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     installConsole(ctx, appendLog);
     installHostApis(ctx, runtime, opts.host);
     if (opts.bootstrap) runBootstrap(ctx, opts.bootstrap);
+    warnOnReservedNamespaceShadowing(opts.code, opts.host, appendLog);
 
     const wrapped = `(async () => {\n${opts.code}\n})()`;
     const evalResult = await ctx.evalCodeAsync(wrapped, "script.js");
@@ -172,6 +173,26 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     // Disposing the context disposes the runtime it owns; do NOT double-dispose.
     ctx.dispose();
   }
+}
+
+function warnOnReservedNamespaceShadowing(
+  code: string,
+  host: HostApi,
+  appendLog: (line: string) => void,
+) {
+  for (const namespace of Object.keys(host)) {
+    const pattern = new RegExp(`\\b(?:const|let|var)\\s+${escapeRegExp(namespace)}\\b`);
+    if (pattern.test(code)) {
+      appendLog(
+        `[warn] variable '${namespace}' shadows the SDK namespace. ` +
+        `Use a different local name such as '${namespace}Rows' or 'adList'.`,
+      );
+    }
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // ─── Internals ──────────────────────────────────────────────────────────

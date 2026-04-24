@@ -77,6 +77,17 @@ async function getUsageCount(userId: string): Promise<number> {
       and(
         eq(schema.operations.userId, userId),
         gte(schema.operations.createdAt, periodStart),
+        // Count rows that represent actual Google API work: success (null
+        // errorClass) and writes Google rejected (WRITE_REJECTED — the call
+        // still went out, the API still processed it).
+        //
+        // Excluded so the user isn't billed for work they didn't do:
+        //  - THROWN: infra failure, matches execWrite's "propagate uncounted"
+        //    policy (see execute.test.ts: "throws from fn() propagate without
+        //    counting").
+        //  - RATE_LIMIT: the rejection never touched Google. Including these
+        //    would let a rate-limited retry loop self-compound the overage.
+        sql`(${schema.operations.errorClass} IS NULL OR ${schema.operations.errorClass} = 'WRITE_REJECTED')`,
       ),
     );
 

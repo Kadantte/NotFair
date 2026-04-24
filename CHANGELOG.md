@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.0] - 2026-04-24
+
+### Fixed
+- **Monthly op quota no longer self-amplifies when a user crosses their cap.** `getUsageCount` used to include every `operations` row — including rate-limit rejections and network throws that never touched Google — so a rate-limited retry loop would write 20+ `RATE_LIMIT` log rows per `gaqlParallel` and each of those rows counted toward the next quota check. Filter now only counts real work: `errorClass IS NULL OR errorClass = 'WRITE_REJECTED'`. Cache and DB tallies now always agree.
+- **`ads.gaqlParallel` now surfaces `RateLimitError` to the script instead of burying it in an `{ error }` map.** When a user was at their cap, all N parallel tasks threw `RateLimitError`, `Promise.allSettled` caught each one, and the script saw N indistinguishable error entries — then cheerfully called `gaqlParallel` again. Added a pre-check (`enforceRateLimit` before fan-out, so a user already over cap pays zero log rows) plus a post-check (any task rejected with `RateLimitError` re-throws). Non-rate-limit errors still stay soft per-task so partial results are usable.
+- **`runScript` handler now gates sandbox execution on the monthly cap.** Empty scripts (`return 42;`) or infinite loops (`while(true){}`) previously charged zero ops and consumed up to 45s of QuickJS CPU per call — a user at quota could keep firing sandbox executions indefinitely. Added `enforceRateLimit` at the tool-handler boundary so the cap protects server compute, not just Google API calls.
+
+### Added
+- **Local MCP dev-auth bypass for iteration.** When `NODE_ENV=development` and `DEV_LOCAL_EMAIL` is set, `/api/[transport]` resolves unauthenticated calls to the most recent valid `mcpSession` for that email. Subagent MCP clients that can't do OAuth dynamic client registration against localhost (like `/eval-mcp` runners) now hit the dev server with real Google Ads credentials and iterate in seconds. Triple-gated: dev-only env, explicit email opt-in, and only fires when no `Authorization` header is sent. Tagged `authMethod: "dev-local"` so telemetry stays clean.
+- **21 new tests for runScript op-counting fidelity** (`lib/mcp/code-mode/ads-client-quota.test.ts`). Locks down per-query charging, validation-error short-circuits (no phantom charges when a script passes a bad argument), `RateLimitError` propagation, non-rate-limit error isolation, and the "bootstrap surface is free" invariant. Plus one test in `lib/__tests__/rate-limit.test.ts` that inspects the `getUsageCount` WHERE clause and asserts `RATE_LIMIT` and `THROWN` are NOT listed as counted error classes — guards against a future filter edit silently re-breaking the self-compounding overage.
+
 ## [0.2.24.0] - 2026-04-24
 
 ### Changed

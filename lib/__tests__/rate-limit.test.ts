@@ -79,6 +79,29 @@ describe("rate-limit", () => {
       await expect(enforceRateLimit(undefined)).resolves.toBeUndefined();
       expect(mockWhere).not.toHaveBeenCalled();
     });
+
+    it("getUsageCount excludes THROWN and RATE_LIMIT rows from the monthly count", async () => {
+      // Force a DB hit (no cached entry exists for this user).
+      mockWhere.mockReturnValue([{ count: 10 }]);
+      await enforceRateLimit("user-filter-probe");
+
+      expect(mockWhere).toHaveBeenCalled();
+      // and(eq(userId), gte(createdAt), sql`(errorClass IS NULL OR ...)`)
+      // With the drizzle-orm mocks above, and() returns ["and", ...args].
+      const whereArg = mockWhere.mock.calls[0][0] as [string, ...unknown[]];
+      expect(whereArg[0]).toBe("and");
+      const sqlFilter = whereArg[3] as { strings: readonly string[] };
+      // The sql template mock stores the raw strings array — assert the
+      // filter's literal shape so the error-class list stays locked down.
+      const raw = sqlFilter.strings.join("");
+      expect(raw).toMatch(/IS NULL/);
+      expect(raw).toMatch(/WRITE_REJECTED/);
+      // THROWN and RATE_LIMIT must NOT appear as allowed classes — if someone
+      // adds them to the filter we want this test to loudly fail so they
+      // re-review the self-compounding-overage scenario.
+      expect(raw).not.toMatch(/THROWN/);
+      expect(raw).not.toMatch(/RATE_LIMIT/);
+    });
   });
 
   // ─── RateLimitError ────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import {
   updateAdAssets,
   bulkUpdateBids,
   bulkPauseKeywords,
+  preValidateBulkMutation,
   bulkAddKeywords,
   moveKeywords,
   renameCampaign,
@@ -55,7 +56,7 @@ import {
   linkNegativeListToCampaign,
   unlinkNegativeListFromCampaign,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue } from "@/lib/google-ads";
 import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
@@ -69,6 +70,90 @@ import { resolveToolAuth } from "./helpers";
  * All tools include guardrails to prevent excessive changes.
  * All successful writes are logged to the changes table with a changeId for undo support.
  */
+
+type BulkValidationWithInput<T> = BulkValidationIssue & { input: T };
+
+function summarizeBulkValidationIssues<T>(issues: Array<BulkValidationWithInput<T>>) {
+  const grouped = new Map<string, {
+    code: string;
+    severity: "error" | "warning";
+    count: number;
+    affectedIds: string[];
+    affectedCriterionIds: string[];
+    alternativeTool?: string;
+    fix?: string;
+    reason: string;
+  }>();
+
+  for (const issue of issues) {
+    const key = [
+      issue.code,
+      issue.severity,
+      issue.alternativeTool ?? "",
+      issue.fix ?? "",
+      issue.reason,
+    ].join("|");
+    const existing = grouped.get(key) ?? {
+      code: issue.code,
+      severity: issue.severity,
+      count: 0,
+      affectedIds: [],
+      affectedCriterionIds: [],
+      alternativeTool: issue.alternativeTool,
+      fix: issue.fix,
+      reason: issue.reason,
+    };
+    existing.count += 1;
+    existing.affectedIds.push(issue.id);
+    if (issue.criterionId) existing.affectedCriterionIds.push(issue.criterionId);
+    grouped.set(key, existing);
+  }
+
+  return [...grouped.values()].map((group) => ({
+    code: group.code,
+    severity: group.severity,
+    count: group.count,
+    affectedIds: group.affectedIds,
+    ...(group.affectedCriterionIds.length > 0 ? { affectedCriterionIds: group.affectedCriterionIds } : {}),
+    ...(group.alternativeTool ? { alternativeTool: group.alternativeTool } : {}),
+    ...(group.fix ? { fix: group.fix } : {}),
+    reason: group.reason,
+  }));
+}
+
+function buildBulkValidationResponse<T>(
+  reason: "PRE_VALIDATION_FAILED" | "DRY_RUN",
+  total: number,
+  validIds: string[],
+  issues: Array<BulkValidationWithInput<T>>,
+) {
+  const blockingIssues = issues.filter((issue) => issue.severity === "error");
+  return {
+    executed: false,
+    reason,
+    summary: {
+      total,
+      wouldSucceed: validIds.length,
+      wouldFail: blockingIssues.length,
+    },
+    errors: summarizeBulkValidationIssues(issues),
+    wouldSucceedIds: validIds,
+  };
+}
+
+function buildBulkSkipped<T>(issues: Array<BulkValidationWithInput<T>>) {
+  return issues
+    .filter((issue) => issue.severity === "error")
+    .map((issue) => ({
+      id: issue.id,
+      ...(issue.criterionId ? { criterionId: issue.criterionId } : {}),
+      code: issue.code,
+      reason: issue.reason,
+      ...(issue.alternativeTool ? { alternativeTool: issue.alternativeTool } : {}),
+      ...(issue.fix ? { fix: issue.fix } : {}),
+    }));
+}
+
 export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Keyword Management ─────────────────────────────────────────
 
@@ -502,7 +587,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Bulk Operations ────────────────────────────────────────────
 
   server.registerTool("bulkUpdateBids", {
-    description: "Update up to 50 keyword bids in one call. Each bid capped at 25% change. Returns per-keyword results with individual changeIds.",
+    description: "Update up to 50 keyword bids in one call. Atomic by default: the server pre-validates every item and executes nothing if any item fails static checks. Set continueOnError=true to skip invalid items and update the valid subset. Set dryRun=true to validate only. Each bid capped at 25% change. Returns per-keyword results with individual changeIds when executed.",
     inputSchema: {
       accountId: accountIdParam,
       updates: z
@@ -516,13 +601,32 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         )
         .min(1)
         .max(50),
+      continueOnError: z
+        .boolean()
+        .default(false)
+        .describe("If true, skip invalid items and execute the valid subset. If false, fail the whole batch before writing when any item fails pre-validation."),
+      dryRun: z
+        .boolean()
+        .default(false)
+        .describe("If true, run pre-validation but do not execute. Returns wouldSucceedIds and structured errors/warnings."),
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, updates }) => {
+  }, safeHandler(async ({ accountId, updates, continueOnError, dryRun }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
-    const results = await bulkUpdateBids(authForAccount(auth, accountId), updates);
+    const targetAuth = authForAccount(auth, accountId);
+    const validation = await preValidateBulkMutation(targetAuth, "update_bid", updates);
+    const validUpdates = validation.valid.map((item) => item.input);
+
+    if (dryRun) {
+      return typedResult(buildBulkValidationResponse("DRY_RUN", updates.length, validation.valid.map((item) => item.id), validation.invalid));
+    }
+    if (!validation.ok && !continueOnError) {
+      return typedResult(buildBulkValidationResponse("PRE_VALIDATION_FAILED", updates.length, validation.valid.map((item) => item.id), validation.invalid));
+    }
+
+    const results = validUpdates.length > 0 ? await bulkUpdateBids(targetAuth, validUpdates) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
@@ -534,9 +638,15 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const succeeded = logged.filter((r) => r.success).length;
     const failed = logged.filter((r) => !r.success).length;
+    const skipped = buildBulkSkipped(validation.invalid);
 
     return typedResult({
-      summary: { total: results.length, succeeded, failed },
+      executed: true,
+      summary: continueOnError
+        ? { total: updates.length, succeeded, skipped: skipped.length, failed }
+        : { total: results.length, succeeded, failed },
+      ...(skipped.length > 0 ? { skipped } : {}),
+      ...(validation.invalid.some((issue) => issue.severity === "warning") ? { warnings: summarizeBulkValidationIssues(validation.invalid.filter((issue) => issue.severity === "warning")) } : {}),
       results: logged,
     });
   }));
@@ -544,7 +654,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Bulk Keyword Operations ─────────────────────────────────────
 
   server.registerTool("bulkPauseKeywords", {
-    description: "Pause up to 100 POSITIVE keywords in one call. Does NOT work on negative keywords — for negatives, call `removeNegativeKeyword` (single) or loop over them; Google Ads has no 'pause' for negatives. Partial success is possible. Returns per-keyword results with individual changeIds.",
+    description: "Pause up to 100 POSITIVE keywords in one call. Atomic by default: the server pre-validates every item and executes nothing if any item fails static checks. Does NOT work on negative keywords — for negatives, call `removeNegativeKeyword` or `removeKeywordFromNegativeList`; Google Ads has no 'pause' for negatives. Set continueOnError=true to skip invalid items and pause the valid subset. Set dryRun=true to validate only. Returns per-keyword results with individual changeIds when executed.",
     inputSchema: {
       accountId: accountIdParam,
       keywords: z
@@ -557,13 +667,32 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         )
         .min(1)
         .max(100),
+      dryRun: z
+        .boolean()
+        .default(false)
+        .describe("Validate and report what would happen without writing to Google Ads or logging changes."),
+      continueOnError: z
+        .boolean()
+        .default(false)
+        .describe("If true, skip invalid items and execute the valid subset. If false, fail the whole batch before writing when any item fails pre-validation."),
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, keywords }) => {
+  }, safeHandler(async ({ accountId, keywords, dryRun, continueOnError }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
-    const results = await bulkPauseKeywords(authForAccount(auth, accountId), keywords);
+    const targetAuth = authForAccount(auth, accountId);
+    const validation = await preValidateBulkMutation(targetAuth, "pause_keyword", keywords);
+    const validKeywords = validation.valid.map((item) => item.input);
+
+    if (dryRun) {
+      return typedResult(buildBulkValidationResponse("DRY_RUN", keywords.length, validation.valid.map((item) => item.id), validation.invalid));
+    }
+    if (!validation.ok && !continueOnError) {
+      return typedResult(buildBulkValidationResponse("PRE_VALIDATION_FAILED", keywords.length, validation.valid.map((item) => item.id), validation.invalid));
+    }
+
+    const results = validKeywords.length > 0 ? await bulkPauseKeywords(targetAuth, validKeywords) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
@@ -575,15 +704,20 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const succeeded = logged.filter((r) => r.success).length;
     const failed = logged.filter((r) => !r.success).length;
+    const skipped = buildBulkSkipped(validation.invalid);
 
     return typedResult({
-      summary: { total: results.length, succeeded, failed },
+      executed: true,
+      summary: continueOnError
+        ? { total: keywords.length, succeeded, skipped: skipped.length, failed }
+        : { total: results.length, succeeded, failed },
+      ...(skipped.length > 0 ? { skipped } : {}),
       results: logged,
     });
   }));
 
   server.registerTool("bulkAddKeywords", {
-    description: "Add up to 100 keywords to an ad group in one call. Partial success is possible. Returns per-keyword results with individual changeIds.",
+    description: "Add up to 100 keywords to an ad group in one call. Atomic by default: the server pre-validates every item and executes nothing if any keyword fails static checks such as duplicates, invalid syntax, removed parents, or negative-keyword conflicts. Set continueOnError=true to skip invalid items and add the valid subset. Set dryRun=true to validate only. Returns per-keyword results with individual changeIds when executed.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
@@ -597,13 +731,36 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         )
         .min(1)
         .max(100),
+      continueOnError: z
+        .boolean()
+        .default(false)
+        .describe("If true, skip invalid items and execute the valid subset. If false, fail the whole batch before writing when any item fails pre-validation."),
+      dryRun: z
+        .boolean()
+        .default(false)
+        .describe("If true, run pre-validation but do not execute. Returns wouldSucceedIds and structured errors/warnings."),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, adGroupId, keywords }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, keywords, continueOnError, dryRun }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
-    const results = await bulkAddKeywords(authForAccount(auth, accountId), adGroupId, keywords);
+    const targetAuth = authForAccount(auth, accountId);
+    const validationInputs = keywords.map((keyword) => ({ ...keyword, campaignId, adGroupId }));
+    const validation = await preValidateBulkMutation(targetAuth, "add_keyword", validationInputs);
+    const validKeywords = validation.valid.map((item) => ({
+      keyword: item.input.keyword,
+      matchType: item.input.matchType,
+    }));
+
+    if (dryRun) {
+      return typedResult(buildBulkValidationResponse("DRY_RUN", keywords.length, validation.valid.map((item) => item.id), validation.invalid));
+    }
+    if (!validation.ok && !continueOnError) {
+      return typedResult(buildBulkValidationResponse("PRE_VALIDATION_FAILED", keywords.length, validation.valid.map((item) => item.id), validation.invalid));
+    }
+
+    const results = validKeywords.length > 0 ? await bulkAddKeywords(targetAuth, adGroupId, validKeywords) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
@@ -615,9 +772,14 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
     const succeeded = logged.filter((r) => r.success).length;
     const failed = logged.filter((r) => !r.success).length;
+    const skipped = buildBulkSkipped(validation.invalid);
 
     return typedResult({
-      summary: { total: results.length, succeeded, failed },
+      executed: true,
+      summary: continueOnError
+        ? { total: keywords.length, succeeded, skipped: skipped.length, failed }
+        : { total: results.length, succeeded, failed },
+      ...(skipped.length > 0 ? { skipped } : {}),
       results: logged,
     });
   }));
@@ -764,7 +926,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaign Settings ──────────────────────────────────────────
 
   server.registerTool("updateCampaignSettings", {
-    description: "Update campaign network targeting, location targeting, and/or ad schedule. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Ad schedule: replace the entire schedule with a list of slots (use dayOfWeek 'ALL' as a shortcut for all 7 days; pass an empty array to clear the schedule and run 24/7). Returns a changeId per mutation.",
+    description: "Update campaign network targeting, location targeting, and/or ad schedule. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Ad schedule: replace the entire schedule with a list of slots (use dayOfWeek 'ALL' as a shortcut for all 7 days; pass an empty array to clear the schedule and run 24/7). NOTE: If the campaign uses smart bidding (TARGET_CPA/TARGET_ROAS/MAXIMIZE_CONVERSIONS/MAXIMIZE_CONVERSION_VALUE), schedule restrictions are respected but can hurt performance by removing learning signal. Prefer 24/7 schedules unless you have strong evidence specific hours are unprofitable. Returns a changeId per mutation plus any warnings.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -807,7 +969,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
             .describe("Replace the entire ad schedule with these slots. Pass [] to clear (run 24/7)."),
         })
         .optional()
-        .describe("Ad schedule (dayparting) — REPLACES the entire current schedule"),
+        .describe("Ad schedule (dayparting) — REPLACES the entire current schedule. For smart-bidding campaigns, non-24/7 schedules can reduce learning signal; the tool returns a SMART_BIDDING_SCHEDULE_RESTRICTION warning when detected."),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting, adSchedule }) => {
@@ -831,6 +993,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return typedResult({
       success: result.success,
       error: result.error,
+      warnings: result.warnings,
       results: logged,
     });
   }));

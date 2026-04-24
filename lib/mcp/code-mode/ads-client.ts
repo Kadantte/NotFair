@@ -36,6 +36,7 @@ import {
   daysBetween,
 } from "@/lib/google-ads/audit/change-index";
 import { execRead } from "@/lib/tools/execute";
+import { enforceRateLimit, RateLimitError } from "@/lib/mcp/rate-limit";
 
 // Inlined from lib/google-ads/audit.ts so this module doesn't need to pull in
 // the full audit engine (keeps the code-mode commit self-contained).
@@ -56,6 +57,10 @@ function generateBrandVariants(businessName: string): string[] {
   return Array.from(variants).filter((v) => v.length >= 4);
 }
 import type { HostApi } from "./sandbox";
+
+type GaqlOptions = {
+  excludeRemovedParents?: boolean;
+};
 
 /**
  * Build the host-side `ads` namespace exposed to scripts.
@@ -78,18 +83,25 @@ export function buildAdsHost(
   const DEFAULT_LIMIT = 200;
   const MAX_LIMIT = 2000;
 
-  async function gaql(queryArg: unknown, limitArg?: unknown) {
+  async function gaql(queryArg: unknown, limitArg?: unknown, optionsArg?: unknown) {
     const query = expectString(queryArg, "ads.gaql: `query` must be a string");
-    const limit = normalizeLimit(limitArg, DEFAULT_LIMIT, MAX_LIMIT);
+    const limit = isPlainObject(limitArg)
+      ? DEFAULT_LIMIT
+      : normalizeLimit(limitArg, DEFAULT_LIMIT, MAX_LIMIT);
+    const options = normalizeGaqlOptions(isPlainObject(limitArg) ? limitArg : optionsArg);
     return execRead(auth, targetId, "run_script_gaql", () =>
-      runSafeGaqlReport(auth, query, limit),
+      runSafeGaqlReport(auth, query, limit, options),
     );
   }
 
-  async function gaqlParallel(queriesArg: unknown) {
+  async function gaqlParallel(queriesArg: unknown, optionsArg?: unknown) {
     if (!Array.isArray(queriesArg)) {
-      throw new Error("ads.gaqlParallel: expected an array of { name, query, limit? }");
+      throw new Error(
+        "ads.gaqlParallel: expected an array of { name, query, limit? }. " +
+        "Example: await ads.gaqlParallel([{ name: 'campaigns', query: 'SELECT campaign.id FROM campaign', limit: 100 }])",
+      );
     }
+    const options = normalizeGaqlOptions(optionsArg);
     if (queriesArg.length === 0) return {};
     if (queriesArg.length > MAX_PARALLEL_QUERIES) {
       throw new Error(
@@ -115,13 +127,30 @@ export function buildAdsHost(
       seen.add(t.name);
     }
 
+    // Fail fast when the user is already at their monthly cap. Without this,
+    // all N tasks would each hit the per-call enforceRateLimit inside execRead,
+    // producing N RATE_LIMIT log rows and returning N `{ error }` entries —
+    // the script then can't distinguish quota from transient RPC failures.
+    await enforceRateLimit(auth.userId);
+
     const results = await Promise.allSettled(
       tasks.map((t) =>
         execRead(auth, targetId, "run_script_gaql_parallel", () =>
-          runSafeGaqlReport(auth, t.query, t.limit),
+          runSafeGaqlReport(auth, t.query, t.limit, options),
         ),
       ),
     );
+
+    // If a task crossed the cap mid-fan-out (race between the pre-check above
+    // and the per-task enforceRateLimit), surface the RateLimitError to the
+    // script instead of burying it in an { error } map. Other kinds of throws
+    // (bad GAQL, RPC flake) stay per-task so the script can still use the
+    // partial results.
+    for (const r of results) {
+      if (r.status === "rejected" && r.reason instanceof RateLimitError) {
+        throw r.reason;
+      }
+    }
 
     const out: Record<string, unknown> = {};
     results.forEach((r, i) => {
@@ -239,4 +268,26 @@ function normalizeLimit(value: unknown, fallback: number, max: number): number {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n) || n < 1) return fallback;
   return Math.min(n, max);
+}
+
+function normalizeGaqlOptions(value: unknown): GaqlOptions {
+  if (value == null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(
+      "GAQL options must be an object. Example: { excludeRemovedParents: false }",
+    );
+  }
+  const raw = value as Record<string, unknown>;
+  const out: GaqlOptions = {};
+  if (raw.excludeRemovedParents != null) {
+    if (typeof raw.excludeRemovedParents !== "boolean") {
+      throw new Error("GAQL option `excludeRemovedParents` must be a boolean.");
+    }
+    out.excludeRemovedParents = raw.excludeRemovedParents;
+  }
+  return out;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

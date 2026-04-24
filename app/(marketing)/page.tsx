@@ -5,9 +5,9 @@ import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
 
 export const metadata = buildMetadata({
-  title: "Google Ads MCP Server & Free Audit for Claude | AdsAgent",
+  title: "AI Google Ads Operator for Claude | AdsAgent",
   description:
-    "AdsAgent is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude Cowork and let AI manage your campaigns.",
+    "Connect Google Ads to Claude. Ask what is working, what is wasting spend, and approve fixes across campaigns, keywords, budgets, and ads.",
   path: "/",
   keywords: [
     "Google Ads MCP server",

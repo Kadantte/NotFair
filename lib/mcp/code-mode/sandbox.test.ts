@@ -117,6 +117,18 @@ describe("runScriptInSandbox", () => {
     expect(r.result).toBe("caught:upstream 400");
   });
 
+  it("warns when script variables shadow host namespaces", async () => {
+    const r = await runScriptInSandbox({
+      code: `
+        const ads = [];
+        return ads.length;
+      `,
+      host: { ads: { gaql: async () => ({}) } },
+    });
+    expect(r.ok).toBe(true);
+    expect(r.logs.some((line) => line.includes("shadows the SDK namespace"))).toBe(true);
+  });
+
   it("isolates the script from host globals (no fetch, no process, no require)", async () => {
     const r = await runScriptInSandbox({
       code: `

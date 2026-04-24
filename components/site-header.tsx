@@ -65,8 +65,8 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                         session={{ connected }}
                         page="header"
                         size="sm"
-                        connectedLabel="Get started"
-                        disconnectedLabel="Get started"
+                        connectedLabel="Start now"
+                        disconnectedLabel="Start now"
                     />
                 </div>
             </div>
