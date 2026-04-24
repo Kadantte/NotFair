@@ -1,6 +1,7 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc, inArray, isNotNull } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
+import { devEmailSqlList } from "@/lib/dev-ops-filter";
 import { parseCustomerIds } from "@/lib/google-ads";
 import { isGmailConfigured, listDraftRecipientEmails } from "@/lib/gmail";
 
@@ -8,7 +9,8 @@ export async function GET() {
   const denied = await requireDevEmail();
   if (denied) return denied;
 
-  // Get unique customers from mcp_sessions
+  // Get unique customers from mcp_sessions. Exclude dev users so their sessions
+  // and operations are never counted in customer-level aggregates.
   const customers = await db()
     .select({
       userId: schema.mcpSessions.userId,
@@ -21,6 +23,9 @@ export async function GET() {
     })
     .from(schema.mcpSessions)
     .groupBy(schema.mcpSessions.userId)
+    .having(
+      sql`coalesce(lower(max(${schema.mcpSessions.googleEmail})), '') not in (${devEmailSqlList()})`,
+    )
     .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`));
 
   // Collect all unique account IDs across all customers

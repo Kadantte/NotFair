@@ -4,6 +4,9 @@ Living list of deferred work. Each item names why it was deferred and what unblo
 
 ## Activation / audit pivot (follow-ups to PRs #52/#53/#54)
 
+> **Note (2026-04-23):** The `audit` MCP tool was removed — it returned >60KB responses that exceeded MCP token limits and forced agents to fall back to narrow-view tools anyway. The insights and evals below that key on `tool_name = 'audit'` need to be re-framed around the narrow views (`getWasteFindings`, `getAccountChanges`, `getLandingPagePerformance`, `getImpressionShare`) or around the *user-facing prompt* ("Run an audit...") rather than a specific tool name.
+
+
 ### P1 — PostHog insight: "web-chat first-audit rate"
 **What:** Create a PostHog insight that reports, for each week, the % of new web-chat threads (`client_source = 'adsagent-chat'`, `thread_messages = 0` at time of event) whose first tool call is `audit`.
 **Why:** This is the real eval for PR #53. Before the prompt change, this rate is ~10%; after, we expect >60%. If it moves, the pivot worked; if not, the system prompt isn't being followed and we need a different hook.

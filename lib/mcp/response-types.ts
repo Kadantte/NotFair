@@ -45,16 +45,13 @@ import type {
   WriteResult,
 } from "@/lib/google-ads";
 import type { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
-import type { runAudit } from "@/lib/google-ads/audit";
 
 // Re-export shared audit sub-types so non-audit modules can import them from
 // the registry rather than reaching into `lib/google-ads/audit`.
 export type {
   RecentChange,
-  MetricsSplit,
   ChangeEventSummary,
   FindingList,
-  AuditResult,
 } from "@/lib/google-ads/audit";
 
 // ─── Utility types ──────────────────────────────────────────────────
@@ -127,8 +124,6 @@ export type GetNegativeKeywordListItemsResponse = StructuredShape<
 export type GetPaidVsOrganicAnalysisResponse = StructuredShape<
   Unwrap<typeof getPaidVsOrganicAnalysis>
 >;
-export type AuditResponse = StructuredShape<Unwrap<typeof runAudit>>;
-
 // ─── Narrow audit views (Phase 4) ───────────────────────────────────
 
 import type {
@@ -300,7 +295,6 @@ export interface McpToolResponseRegistry {
   listNegativeKeywordLists: ListNegativeKeywordListsResponse;
   getNegativeKeywordListItems: GetNegativeKeywordListItemsResponse;
   getPaidVsOrganicAnalysis: GetPaidVsOrganicAnalysisResponse;
-  audit: AuditResponse;
   // Narrow audit views
   getAccountChanges: GetAccountChangesResponse;
   getLandingPagePerformance: GetLandingPagePerformanceResponse;

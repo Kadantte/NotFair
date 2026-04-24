@@ -29,7 +29,6 @@ import {
   getNegativeKeywordListItems,
   type AuthContext,
 } from "@/lib/google-ads";
-import { runAudit } from "@/lib/google-ads/audit";
 import {
   getAccountChanges,
   getLandingPagePerformance,
@@ -607,43 +606,6 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const result = await execRead(auth, targetId, "get_paid_vs_organic_analysis", () =>
       getPaidVsOrganicAnalysis(targetAuth, { days, searchTermContains, campaignId, limit }),
     );
-    return typedResult(result);
-  }));
-
-  // ─── Account Audit ────────────────────────────────────────────────
-
-  server.registerTool("audit", {
-    description:
-      "Full account audit: collects all campaign data in parallel and returns pre-computed findings " +
-      "(waste rate, QS issues, impression share matrix, brand leakage, budget-constrained winners). " +
-      "One call replaces 20+ individual tool calls. " +
-      "Finding lists (wastedKeywords, wastedSearchTerms, brandLeakage.terms, miningOpportunities, " +
-      "negativeConflicts, landingPages, budgetConstrainedWinners, recentChanges) are envelopes: " +
-      "`{shown, total, totalSpend, items}`. " +
-      "Use `total` and `totalSpend` for account-wide decisions — don't assume `items` is complete. " +
-      "For full drill-down (all items, not just the top-N preview), call `runGaqlQuery` with a focused filter. " +
-      "\n\nCHANGE-AWARE — every audit pulls `change_event` for the last 30 days (API cap). " +
-      "Each campaign and each flagged item carries `recentChange` (or null): " +
-      "`{ daysAgo, changedFields, operation, clientType, resourceType, otherChangesInWindow }`. " +
-      "When `recentChange` is present, the item's metrics reflect a window that pre-dates the fix — " +
-      "RE-EVALUATE before recommending action. Treat small `daysAgo` + relevant `changedFields` " +
-      "(e.g. status, cpc_bid_micros, budget.amount_micros, negative keyword added) as strong evidence " +
-      "the issue may already be addressed. Each campaign with a recent change also carries " +
-      "`metricsSplit: { splitAt, beforeDays, afterDays, before, after, cpaDelta, dailySpendDelta }` — " +
-      "use the post-change metrics to judge current state, not the aggregate. " +
-      "IMPORTANT: `impressionShare`, `budgetLostIS`, `rankLostIS`, and `isMatrix` reflect the FULL " +
-      "lookback window and DO NOT update in `metricsSplit`. When `changedFields` contains " +
-      "`amount_micros` (budget raised) or bidding-strategy fields, prefer `metricsSplit.dailySpendDelta` " +
-      "over `budgetLostIS` for 'is this still budget-constrained?' — the IS number is stale. " +
-      "Top-level `recentChanges` lists all edits in the window for context.",
-    inputSchema: {
-      accountId: accountIdParam,
-      days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90 for impression share)"),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "audit", () => runAudit(targetAuth, days));
     return typedResult(result);
   }));
 

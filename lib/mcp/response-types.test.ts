@@ -5,10 +5,8 @@ import type {
   McpToolResponseRegistry,
   StructuredShape,
   WriteToolResponse,
-  AuditResult,
   FindingList,
   RecentChange,
-  MetricsSplit,
   ChangeEventSummary,
 } from "./response-types";
 
@@ -114,7 +112,6 @@ describe("response-types — registry completeness", () => {
       listNegativeKeywordLists: true,
       getNegativeKeywordListItems: true,
       getPaidVsOrganicAnalysis: true,
-      audit: true,
       getAccountChanges: true,
       getLandingPagePerformance: true,
       getWasteFindings: true,
@@ -179,7 +176,7 @@ describe("response-types — registry completeness", () => {
 });
 
 describe("response-types — audit sub-types are re-exported", () => {
-  it("exposes RecentChange, MetricsSplit, ChangeEventSummary, FindingList, AuditResult", () => {
+  it("exposes RecentChange, ChangeEventSummary, FindingList", () => {
     // Compile-time presence proven by the imports at the top of this file.
     // Runtime assertion just exercises the type with a literal.
     const finding: FindingList<{ spend: number }> = {
@@ -201,17 +198,6 @@ describe("response-types — audit sub-types are re-exported", () => {
     };
     expect(change.daysAgo).toBe(1);
 
-    const split: MetricsSplit = {
-      splitAt: "2026-04-15",
-      beforeDays: 7,
-      afterDays: 7,
-      before: { spend: 0, clicks: 0, conversions: 0, cpa: null },
-      after: { spend: 0, clicks: 0, conversions: 0, cpa: null },
-      cpaDelta: null,
-      dailySpendDelta: 0,
-    };
-    expect(split.afterDays).toBe(7);
-
     const summary: ChangeEventSummary = {
       resourceName: "customers/1/campaigns/2",
       resourceType: "CAMPAIGN",
@@ -225,12 +211,6 @@ describe("response-types — audit sub-types are re-exported", () => {
       userEmail: null,
     };
     expect(summary.resourceType).toBe("CAMPAIGN");
-
-    // Type-level sanity: AuditResult is an object type (not `never`, not
-    // `unknown`). Force-resolve via a conditional so the check shows up in
-    // typecheck.
-    type _auditIsObject = Equals<AuditResult extends object ? true : false, true>;
-    assert<_auditIsObject>(true);
   });
 });
 

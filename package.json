@@ -13,7 +13,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:backfill-operation-user-ids": "npx tsx scripts/backfill-operation-user-ids.ts"
+    "db:backfill-operation-user-ids": "npx tsx scripts/backfill-operation-user-ids.ts",
+    "eval:mcp": "npx tsx scripts/eval-mcp/eval.ts",
+    "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",

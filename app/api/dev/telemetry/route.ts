@@ -1,6 +1,7 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc, and, gte, isNotNull } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
+import { excludeDevOpsFilter, devEmailSqlList } from "@/lib/dev-ops-filter";
 
 /**
  * Dev-gated telemetry endpoint. Returns aggregate views over the operations
@@ -19,7 +20,9 @@ export async function GET(request: Request) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const sinceIso = since.toISOString();
 
-  const whereRecent = gte(schema.operations.createdAt, since);
+  // Exclude ops attributed to dev users so internal testing doesn't skew telemetry.
+  const notDev = excludeDevOpsFilter();
+  const whereRecent = and(gte(schema.operations.createdAt, since), notDev);
 
   const [topTools, topArgShapes, recentCalls, dailyCounts, errorBreakdown] = await Promise.all([
     // Bulk write tools (bulkPauseKeywords, bulkAddKeywords, moveKeywords, ...)
@@ -40,6 +43,7 @@ export async function GET(request: Request) {
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
               AND o2.created_at >= ${sinceIso}::timestamp
+              AND NOT EXISTS (SELECT 1 FROM mcp_sessions s WHERE s.user_id = o2.user_id AND lower(s.google_email) IN (${devEmailSqlList()}))
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
@@ -50,6 +54,7 @@ export async function GET(request: Request) {
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
               AND o2.created_at >= ${sinceIso}::timestamp
+              AND NOT EXISTS (SELECT 1 FROM mcp_sessions s WHERE s.user_id = o2.user_id AND lower(s.google_email) IN (${devEmailSqlList()}))
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,

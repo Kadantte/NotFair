@@ -1,0 +1,22 @@
+[
+  {
+    "id": "audit-full",
+    "prompt": "Please audit my Google Ads account and tell me what's most broken. Be specific about numbers."
+  },
+  {
+    "id": "wasted-spend",
+    "prompt": "What keywords are wasting the most money in my Google Ads account right now? Rank by wasted spend."
+  },
+  {
+    "id": "search-terms",
+    "prompt": "Pull my search term report and find irrelevant terms I should add as negatives."
+  },
+  {
+    "id": "campaign-health",
+    "prompt": "Which of my campaigns are underperforming vs the others? Show me CPA and conversion rate for each."
+  },
+  {
+    "id": "quick-wins",
+    "prompt": "Give me 3 concrete optimizations I can make today to improve ROAS. Cite real account data."
+  }
+]

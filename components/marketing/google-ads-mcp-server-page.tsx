@@ -25,7 +25,7 @@ const tools = [
   { name: "getKeywords", category: "Read", description: "Keyword bids, Quality Scores, impressions" },
   { name: "getSearchTermReport", category: "Read", description: "Actual search queries triggering your ads" },
   { name: "getCampaignPerformance", category: "Read", description: "Deep metrics over any date range" },
-  { name: "runAudit", category: "Read", description: "Full account audit with prioritized recommendations" },
+  { name: "getWasteFindings", category: "Read", description: "Wasted spend on low-conversion keywords and search terms" },
   { name: "getSpendReport", category: "Read", description: "Spend breakdown by campaign and ad group" },
   { name: "updateBid", category: "Write", description: "Adjust keyword or ad group bids — reviewable" },
   { name: "pauseCampaign", category: "Write", description: "Pause underperforming campaigns" },

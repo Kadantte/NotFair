@@ -75,7 +75,7 @@ const jsonLd = [
       "listCampaigns — campaign performance metrics",
       "getKeywords — keyword bids and Quality Scores",
       "getSearchTermReport — search term reports",
-      "runAudit — full account audit with recommendations",
+      "getWasteFindings — wasted-spend analysis for keywords and search terms",
       "updateBid — keyword and ad group bid management",
       "pauseCampaign — pause underperforming campaigns",
       "addNegativeKeyword — block wasted search terms",

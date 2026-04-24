@@ -52,8 +52,8 @@ export function getCustomer(auth: AuthContext): RealCustomer {
 
 /**
  * Safety net for demo auth paths that slip past the explicit `if (isDemoAuth)`
- * guards inside each read/write function — e.g. MCP tools like `runAudit` that
- * call `customer.query()` directly. Returns a stub that answers every GAQL
+ * guards inside each read/write function — e.g. MCP tools that call
+ * `customer.query()` directly. Returns a stub that answers every GAQL
  * query with `[]` and every mutation with a plausible success shape. Demo
  * reviewers get empty results for these paths instead of a crash.
  */

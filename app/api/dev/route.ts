@@ -1,6 +1,7 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
+import { excludeDevOpsFilter } from "@/lib/dev-ops-filter";
 
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
@@ -25,9 +26,11 @@ export async function GET(request: Request) {
     : source
       ? sql`${schema.operations.clientSource} = ${source}`
       : undefined;
+  // Exclude ops attributed to dev users so internal testing doesn't skew stats.
+  const excludeDevs = excludeDevOpsFilter();
   const whereClause = sourceFilter
-    ? sql`${timeFilter} and ${sourceFilter}`
-    : timeFilter;
+    ? sql`${timeFilter} and ${sourceFilter} and ${excludeDevs}`
+    : sql`${timeFilter} and ${excludeDevs}`;
 
   const [dailyUsage, sources] = await Promise.all([
     db()
@@ -48,7 +51,7 @@ export async function GET(request: Request) {
         ops: sql<number>`count(*)::int`.as("ops"),
       })
       .from(schema.operations)
-      .where(timeFilter)
+      .where(sql`${timeFilter} and ${excludeDevs}`)
       .groupBy(sql`coalesce(${schema.operations.clientSource}, 'chat')`)
       .orderBy(desc(sql`count(*)`)),
   ]);
