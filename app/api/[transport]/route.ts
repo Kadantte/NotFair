@@ -315,9 +315,24 @@ async function handler(request: Request): Promise<Response> {
     if (schemaOnly) {
       return mcpHandler(cloned);
     }
+    // RFC 6750 §3 + MCP spec: 401 responses from protected resources MUST
+    // include WWW-Authenticate so clients can discover the auth server and
+    // kick off an OAuth flow. resource_metadata points at the RFC 9470
+    // protected-resource document (served from the same host as the request
+    // so apex vs. www stays consistent for Claude's audience validation).
+    const url = new URL(request.url);
+    const host = request.headers.get("host") ?? url.host;
+    const proto = request.headers.get("x-forwarded-proto") ?? "https";
+    const resourceMetadata = `${proto}://${host}/.well-known/oauth-protected-resource`;
     return new Response(
       JSON.stringify({ error: (e as Error).message || "Authentication required" }),
-      { status: 401, headers: { "Content-Type": "application/json" } },
+      {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+          "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadata}"`,
+        },
+      },
     );
   }
 
