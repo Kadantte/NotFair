@@ -324,7 +324,7 @@ describe("subscription resolver", () => {
       const sub = await getUserSubscription("dev-user");
       expect(sub.plan).toBe("growth");
       expect(sub.status).toBe("active");
-      expect((await getUserPlanLimits("dev-user")).dailyOpLimit).toBeNull();
+      expect((await getUserPlanLimits("dev-user")).monthlyOpLimit).toBeNull();
       expect(await hasFeature("dev-user", "unlimitedOperations")).toBe(true);
     });
 

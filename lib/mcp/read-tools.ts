@@ -662,15 +662,15 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
 
   server.registerTool("getTimeseries", {
     description:
-      "Chart-ready timeseries for Google Ads metrics. Drops directly into Recharts / Chart.js / visx with zero reshape code. " +
-      "Returns an array of segments, each with a `dimensions` object and an array of `{ date, metric, metric, ... }` points. " +
-      "Derived metrics (cpa, ctr, conversion_rate, roas) are computed per-bucket, not aggregated across groups — zero-denominator " +
-      "cases return null so charts render gaps correctly instead of spiking to 0 or NaN. " +
-      "Granularity `day` buckets per-day; `week` buckets by ISO week start (Monday); `month` buckets by calendar month (YYYY-MM). " +
-      "`groupBy: 'account'` returns one segment. `'campaign'` returns one per campaign (filterable via `campaignIds`). " +
-      "`'device'` and `'network'` cross-segment campaigns by device or ad-network. " +
+      "Targeted timeseries query for a specific metric set over a named date range. " +
+      "Use when the caller has ALREADY decided which metrics, date range, and grouping they need — e.g. 'show CPA daily for the last 30 days', 'weekly spend by campaign this quarter', or when building a chart panel. " +
+      "NOT the right tool for open-ended 'how is my account doing' or 'what's working' questions — for those, call `runScript` instead; it correlates timeseries with search terms, quality scores, and change events in one pass. " +
+      "Returns chart-ready segments: each has `dimensions` and a points array `[{ date, metric, metric, ... }]` — drops directly into Recharts / Chart.js / visx with zero reshape. " +
+      "Derived metrics (cpa, ctr, conversion_rate, roas) are computed per-bucket and return null on zero-denominator so charts render gaps instead of spiking. " +
+      "Granularity: `day` / ISO-week start (Monday) / calendar month. " +
+      "`groupBy`: `account` (one segment) | `campaign` (one per, filterable via `campaignIds`) | `device` | `network`. " +
       "`comparePreviousPeriod: true` adds a shifted same-length window in `comparison`. " +
-      "Range is capped at 730 days. Typical call fires 1 upstream query (2 with comparison).",
+      "Range cap 730 days. Fires 1 upstream query (2 with comparison).",
     inputSchema: {
       accountId: accountIdParam,
       startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),

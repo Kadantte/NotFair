@@ -18,5 +18,9 @@
   {
     "id": "quick-wins",
     "prompt": "Give me 3 concrete optimizations I can make today to improve ROAS. Cite real account data."
+  },
+  {
+    "id": "account-health-casual",
+    "prompt": "how is my google ads account doing in the last 7 days"
   }
 ]

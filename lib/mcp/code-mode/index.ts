@@ -6,6 +6,20 @@ import { buildAdsHost } from "./ads-client";
 
 const RUN_SCRIPT_DESCRIPTION = `Run a JavaScript orchestration script in a sandboxed QuickJS runtime. This is a REPLACEMENT for chaining individual tool calls, not a supplement — one runScript call does what would otherwise take 10+ sequential tool invocations.
 
+── WHEN TO USE THIS ──
+
+This is the DEFAULT tool for any open-ended analytical question about a Google Ads account. Reach for it first when you see:
+- "How is my account doing?" / "What's working?" / "What's broken?" / "How did last week go?"
+- "Audit my account" / "Find wasted spend" / "What should I change?" / "Any quick wins?"
+- Any question where you would otherwise fire 3+ read tools back-to-back
+- Any question that benefits from correlating surfaces (spend + search terms + quality scores + change events) in a single pass
+
+Use individual read tools (getTimeseries, getSearchTermReport, getCampaignPerformance, etc.) ONLY when:
+- The caller has explicitly named the surface they want ("pull the search term report", "show CPA daily for the last 30 days")
+- You are drilling down on a specific finding from a prior runScript pass
+
+Default bias: if in doubt between runScript and a point-query tool for an analytical question, pick runScript. The cost of one extra GAQL subquery inside a batch is negligible; the cost of a shallow answer is a whole second round-trip.
+
 ── BATCHING DISCIPLINE (read this first) ──
 
 Prefer ONE runScript call that fans out with ads.gaqlParallel (up to 20 queries concurrently) and does the full analysis in-script. Each runScript invocation costs ~5–10s of model deliberation PLUS the max GAQL latency across its queries. Batching 15 queries in one call ≈ 1 round-trip; doing the same across 5 calls ≈ 5 round-trips (5x slower).

@@ -113,17 +113,47 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
 
 // ─── MCP Server ──────────────────────────────────────────────────────
 
+// Server-level routing heuristic. The MCP spec surfaces this to the agent as
+// system-level guidance; it's the right home for "which tool do I pick?"
+// decisions that would otherwise get baked into individual tool descriptions
+// (and rot on every refactor). Keep it short, outcome-framed, and tool-neutral
+// where possible — named tools referenced here must exist.
+const MCP_INSTRUCTIONS = `You are connected to adsagent, a Google Ads analysis and operations MCP server.
+
+Tool-selection heuristic — pick ONE path per user question:
+
+1. Open-ended analytical questions → \`runScript\`.
+   Examples: "how is my account doing", "what's working", "what should I change",
+   "audit my account", "find wasted spend", "why did conversions drop last week",
+   "any quick wins". \`runScript\` fans out up to 20 GAQL queries in parallel
+   inside one call and correlates surfaces (spend, search terms, quality scores,
+   change events) in a single pass. One invocation replaces what would otherwise
+   be 5-10 sequential read-tool calls. Cast a wide net on the first call;
+   filtering happens in-script for free.
+
+2. Targeted single-surface lookups → individual read tools.
+   Examples: "pull the search term report for campaign X" → getSearchTermReport,
+   "show CPA daily for the last 30 days" → getTimeseries, "list my negative
+   keyword lists" → listNegativeKeywordLists. Use these when the user has
+   named the surface, or when drilling down on a specific finding from a
+   prior runScript pass.
+
+3. Mutations (pause, bid change, add keyword, create campaign) → individual
+   write tools. Never wrap mutations in \`runScript\` — writes happen through
+   dedicated tools with guardrails and change-tracking.
+
+Follow-up rule: after a \`runScript\` pass, drill down with targeted read tools
+only if the analysis surfaced a specific question. Don't chain \`runScript\`
+calls unless the next one has a fundamentally different shape — if you catch
+yourself about to call \`runScript\` a second time, ask whether the batch
+could have been in the first call.`;
+
 const mcpHandler = createMcpHandler(
   (server) => {
     withMcpTelemetry(server);
     registerReadTools(server, currentAuth);
     registerWriteTools(server, currentAuth);
-    // Phase 1 of code-mode MCP: one `runScript` tool that lets agents compose
-    // GAQL queries server-side, reducing the need for bespoke aggregator tools.
-    // Gated by env so production traffic is unaffected until we flip it on.
-    if (process.env.ADSAGENT_CODE_MODE === "1") {
-      registerCodeModeTools(server, currentAuth);
-    }
+    registerCodeModeTools(server, currentAuth);
 
     // ─── Session management tools (registered in app layer) ─────
     server.registerTool("listConnectedAccounts", {
@@ -172,7 +202,9 @@ const mcpHandler = createMcpHandler(
       );
     }
   },
-  {},
+  {
+    instructions: MCP_INSTRUCTIONS,
+  },
   {
     basePath: "/api",
     maxDuration: 60,
