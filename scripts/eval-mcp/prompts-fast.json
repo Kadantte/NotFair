@@ -14,7 +14,7 @@
   {
     "id": "targeted-cpa",
     "prompt": "show me CPA by campaign for the last 30 days",
-    "expected": "getTimeseries",
-    "reason": "Negative test: caller named the surface and metric. runScript would be overkill. This guards against over-rotating toward runScript and breaking targeted asks."
+    "expected": "runScript",
+    "reason": "Policy: runScript owns all reads, including targeted asks. Script writes a single GAQL against campaign + segments.date and returns CPA — no need for a bespoke getTimeseries tool."
   }
 ]
