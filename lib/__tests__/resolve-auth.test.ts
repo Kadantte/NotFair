@@ -49,6 +49,7 @@ vi.mock("mcp-handler", () => ({
 vi.mock("@/lib/mcp", () => ({
   registerReadTools: vi.fn(),
   registerWriteTools: vi.fn(),
+  registerCodeModeTools: vi.fn(),
 }));
 
 vi.mock("@/lib/mcp/types", () => ({

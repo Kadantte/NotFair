@@ -78,7 +78,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       adGroupId: z.string(),
-      criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
+      criterionId: z.string().describe("Keyword criterion ID (query keyword_view via runScript)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId }) => {
@@ -92,7 +92,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       adGroupId: z.string(),
-      criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
+      criterionId: z.string().describe("Keyword criterion ID (query keyword_view via runScript)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, adGroupId, criterionId }) => {
@@ -125,7 +125,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       adGroupId: z.string(),
-      criterionId: z.string().describe("Keyword criterion ID (from getKeywords)"),
+      criterionId: z.string().describe("Keyword criterion ID (query keyword_view via runScript)"),
       newBidDollars: z.number().positive().describe("New bid in dollars (e.g. 1.50)"),
     },
     annotations: WRITE_ANNOTATIONS,
@@ -631,7 +631,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       fromAdGroupId: z.string(),
       toAdGroupId: z.string(),
-      criterionIds: z.array(z.string()).min(1).max(100).describe("Keyword criterion IDs (from getKeywords)"),
+      criterionIds: z.array(z.string()).min(1).max(100).describe("Keyword criterion IDs (query keyword_view via runScript)"),
       matchType: z
         .enum(["BROAD", "PHRASE", "EXACT"])
         .optional()
@@ -881,7 +881,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     description: "Update an existing conversion action's settings — promote secondary to primary, change value, toggle status. Use getConversionActions to find the conversionActionId first. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      conversionActionId: z.string().describe("Conversion action ID (from getConversionActions)"),
+      conversionActionId: z.string().describe("Conversion action ID (query conversion_action via runScript)"),
       name: z.string().min(1).optional(),
       category: z.enum([
         "PURCHASE", "LEAD", "IMPORTED_LEAD", "QUALIFIED_LEAD", "CONVERTED_LEAD",
@@ -1015,7 +1015,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Performance Max campaign ID"),
-      assetGroupId: z.string().describe("Asset group ID to pause (from getPmaxAssetGroups)"),
+      assetGroupId: z.string().describe("Asset group ID to pause (query asset_group WHERE type = PERFORMANCE_MAX via runScript)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
@@ -1029,7 +1029,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Performance Max campaign ID"),
-      assetGroupId: z.string().describe("Asset group ID to enable (from getPmaxAssetGroups)"),
+      assetGroupId: z.string().describe("Asset group ID to enable (query asset_group WHERE type = PERFORMANCE_MAX via runScript)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
@@ -1081,7 +1081,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     description: "Link an existing callout asset to the customer (account) level so it can serve across all campaigns. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      assetId: z.string().describe("Callout asset ID (from listCalloutAssets)"),
+      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, assetId }) => {
@@ -1094,7 +1094,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     description: "Remove a callout's account-level link. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      assetId: z.string().describe("Callout asset ID (from listCalloutAssets)"),
+      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, assetId }) => {
@@ -1193,7 +1193,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     description: "Delete a shared negative keyword list. This also unlinks it from all campaigns. Permanent — cannot be undone. Use listNegativeKeywordLists to find the sharedSetId. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, sharedSetId }) => {
@@ -1206,7 +1206,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     description: "Add a keyword to a shared negative keyword list. The keyword will be blocked across all campaigns linked to this list. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
       keyword: z.string().min(1).describe("Keyword text to block"),
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("PHRASE").describe("Match type (default: PHRASE)"),
     },
@@ -1221,7 +1221,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     description: "Remove a keyword from a shared negative keyword list. If the same keyword text exists under multiple match types, specify matchType to remove the correct one. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
-      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
       keyword: z.string().min(1).describe("Exact keyword text to remove"),
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).optional().describe("Match type to disambiguate"),
     },
@@ -1237,7 +1237,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
-      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {
@@ -1251,7 +1251,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
-      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
+      sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {

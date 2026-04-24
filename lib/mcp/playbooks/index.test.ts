@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { PLAYBOOKS, findPlaybook } from "./index";
 
 describe("playbooks registry", () => {
-  it("publishes all four playbooks with adsagent:// URIs", () => {
-    expect(PLAYBOOKS).toHaveLength(4);
+  it("publishes runScript-centric playbooks with adsagent:// URIs", () => {
+    expect(PLAYBOOKS.length).toBeGreaterThanOrEqual(2);
     for (const p of PLAYBOOKS) {
       expect(p.uri).toMatch(/^adsagent:\/\/playbooks\//);
     }
@@ -23,44 +23,33 @@ describe("playbooks registry", () => {
   });
 
   it("findPlaybook returns the right playbook by URI", () => {
-    expect(findPlaybook("adsagent://playbooks/build-daily-dashboard")?.name).toContain(
-      "daily Google Ads dashboard",
-    );
-    expect(findPlaybook("adsagent://playbooks/explain-regression")?.name).toContain(
-      "regression",
-    );
+    expect(findPlaybook("adsagent://playbooks/audit-account")?.name).toContain("Audit");
+    expect(findPlaybook("adsagent://playbooks/explain-regression")?.name).toContain("regression");
   });
 
   it("findPlaybook returns undefined for an unknown URI", () => {
     expect(findPlaybook("adsagent://playbooks/does-not-exist")).toBeUndefined();
   });
 
-  it("build-daily-dashboard references the Phase 4 view tools (not audit)", () => {
-    const p = findPlaybook("adsagent://playbooks/build-daily-dashboard")!;
-    expect(p.content).toContain("getWasteFindings");
-    expect(p.content).toContain("getAccountChanges");
-    expect(p.content).toContain("getTimeseries");
-    // The "don't over-call" section should warn against the monolith
-    expect(p.content).toMatch(/Do \*\*not\*\* call.*audit/);
+  it("every playbook demonstrates the runScript + gaqlParallel pattern", () => {
+    for (const p of PLAYBOOKS) {
+      expect(p.content).toMatch(/ads\.gaqlParallel/);
+    }
   });
 
-  it("explain-regression composes timeseries + changes + waste", () => {
+  it("audit-account playbook teaches the wasted-spend threshold heuristic", () => {
+    const p = findPlaybook("adsagent://playbooks/audit-account")!;
+    expect(p.content).toContain("accountCpa");
+    expect(p.content).toContain("accountCpa * 2");
+    expect(p.content).toContain("search_term_view");
+    expect(p.content).toContain("change_event");
+  });
+
+  it("explain-regression playbook correlates timeseries + changes + waste", () => {
     const p = findPlaybook("adsagent://playbooks/explain-regression")!;
-    expect(p.content).toContain("getTimeseries");
-    expect(p.content).toContain("getAccountChanges");
-    expect(p.content).toContain("getWasteFindings");
-  });
-
-  it("drill-down tells Claude to check recentChange before recommending a pause", () => {
-    const p = findPlaybook("adsagent://playbooks/drill-down")!;
-    expect(p.content).toContain("recentChange");
-  });
-
-  it("customize-dashboard maps common user phrases to tool calls", () => {
-    const p = findPlaybook("adsagent://playbooks/customize-dashboard")!;
-    expect(p.content).toContain("granularity");
-    expect(p.content).toContain("campaignIds");
-    expect(p.content).toContain("comparePreviousPeriod");
+    expect(p.content).toContain("segments.date");
+    expect(p.content).toContain("change_event");
+    expect(p.content).toContain("search_term_view");
   });
 
   it("every playbook description is under 300 chars so it fits in resources/list", () => {

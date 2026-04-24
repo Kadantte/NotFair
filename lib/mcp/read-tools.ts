@@ -1,44 +1,12 @@
 import { z } from "zod";
 import {
-  getAccountInfo,
-  listCampaigns,
-  getCampaignPerformance,
-  getKeywords,
-  getSearchTermReport,
-  getTrackingTemplate,
-  listAdGroups,
-  listAds,
-  getImpressionShare,
-  getConversionActions,
-  getAccountSettings,
-  getCampaignSettings,
   getRecommendations,
-  getNegativeKeywords,
-  getPaidVsOrganicAnalysis,
   getResourceMetadata,
   listQueryableResources,
   searchGeoTargets,
-  getPmaxAssetGroups,
-  getPmaxAssets,
   getKeywordIdeas,
-  listCalloutAssets,
-  listBiddingStrategies,
-  getBiddingStrategyPerformance,
-  listNegativeKeywordLists,
-  getNegativeKeywordListItems,
   type AuthContext,
 } from "@/lib/google-ads";
-import {
-  getAccountChanges,
-  getLandingPagePerformance,
-  getWasteFindings,
-} from "@/lib/google-ads/audit/views";
-import {
-  getTimeseries,
-  TIMESERIES_METRICS,
-  GRANULARITIES,
-  GROUP_BYS,
-} from "@/lib/google-ads/timeseries";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
 import { MIN_AFTER_DAYS_FOR_DIRECTION } from "@/lib/db/impact";
 import { execRead } from "@/lib/tools/execute";
@@ -48,240 +16,12 @@ import type { ToolRegistrar } from "./types";
 import { resolveToolAuth } from "./helpers";
 
 /**
- * Read-only tools for querying Google Ads data.
- * These tools never modify account state.
+ * Non-GAQL read tools for Google Ads — specialized services that `runScript`
+ * can't cover (recommendation engine, keyword planner, geo target search,
+ * internal change log, schema introspection). Everything that's expressible
+ * as GAQL lives in `runScript` (see `./code-mode`).
  */
 export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
-  // ─── Account ────────────────────────────────────────────────────
-
-  server.registerTool("getAccountInfo", {
-    description: "Get connected Google Ads account details: name, currency, timezone, and test account status.",
-    inputSchema: {
-      accountId: accountIdParam,
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_account_info", () => getAccountInfo(targetAuth));
-    return typedResult(result);
-  }));
-
-  // ─── Campaigns ──────────────────────────────────────────────────
-
-  server.registerTool("listCampaigns", {
-    description: "List all campaigns with lifetime metrics (impressions, clicks, cost, conversions).",
-    inputSchema: {
-      accountId: accountIdParam,
-      limit: z.number().int().min(1).max(100).default(100),
-      includeRemoved: z.boolean().default(false),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, limit, includeRemoved }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_campaigns", () => listCampaigns(targetAuth, { limit, includeRemoved }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("getCampaignPerformance", {
-    description:
-      "Daily performance metrics for a campaign. Use startDate+endDate for exact date ranges or days for relative lookback; set comparePreviousPeriod to see % changes vs the prior period of equal length.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      days: z
-        .number()
-        .int()
-        .min(1)
-        .max(365)
-        .default(30)
-        .describe("Lookback days; ignored when startDate+endDate are provided"),
-      startDate: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
-        .optional()
-        .describe("YYYY-MM-DD; use with endDate for exact date ranges"),
-      endDate: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
-        .optional()
-        .describe("YYYY-MM-DD; use with startDate for exact date ranges"),
-      comparePreviousPeriod: z.boolean().default(false),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, days, startDate, endDate, comparePreviousPeriod }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_campaign_performance", () =>
-      getCampaignPerformance(targetAuth, campaignId, { days, startDate, endDate, comparePreviousPeriod }),
-    campaignId);
-    return typedResult(result);
-  }));
-
-  // ─── Keywords & Search Terms ────────────────────────────────────
-
-  server.registerTool("getKeywords", {
-    description: "Top keywords for a campaign with metrics: impressions, clicks, CTR, CPC, quality score, and conversions.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      days: z.number().int().min(1).max(365).default(30),
-      limit: z.number().int().min(1).max(100).default(50),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, days, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_keywords", () => getKeywords(targetAuth, campaignId, days, limit), campaignId);
-    return typedResult(result);
-  }));
-
-  server.registerTool("getNegativeKeywords", {
-    description: "List negative keywords for a campaign. Check before adding new negatives to avoid duplicates.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      limit: z.number().int().min(1).max(500).default(100),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_negative_keywords", () => getNegativeKeywords(targetAuth, campaignId, limit), campaignId);
-    return typedResult(result);
-  }));
-
-  server.registerTool("getSearchTermReport", {
-    description: "Actual search queries that triggered ads, ordered by cost. Use to find irrelevant terms to add as negative keywords.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      days: z.number().int().min(1).max(365).default(30),
-      limit: z.number().int().min(1).max(100).default(50),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, days, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_search_term_report", () => getSearchTermReport(targetAuth, campaignId, days, limit), campaignId);
-    return typedResult(result);
-  }));
-
-  // ─── Tracking Templates ──────────────────────────────────────────
-
-  server.registerTool("getTrackingTemplate", {
-    description: "Get the tracking template (click-tracking URL suffix) at the account, campaign, ad group, or ad level. Returns null if not set at that level.",
-    inputSchema: {
-      accountId: accountIdParam,
-      level: z.enum(["account", "campaign", "ad_group", "ad"]),
-      campaignId: z
-        .string()
-        .optional()
-        .describe("The campaign ID. Required when level is 'campaign'."),
-      adGroupId: z
-        .string()
-        .optional()
-        .describe("The ad group ID. Required when level is 'ad_group'."),
-      adId: z
-        .string()
-        .optional()
-        .describe("The ad ID. Required when level is 'ad'."),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, level, campaignId, adGroupId, adId }) => {
-    const entityId = level === "campaign" ? campaignId
-      : level === "ad_group" ? adGroupId
-      : level === "ad" ? adId
-      : undefined;
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_tracking_template", () => getTrackingTemplate(targetAuth, level, entityId));
-    return typedResult(result);
-  }));
-
-  // ─── Ad Groups & Ads ────────────────────────────────────────────
-
-  server.registerTool("listAdGroups", {
-    description: "List ad groups in a campaign with performance metrics (impressions, clicks, cost, conversions).",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      limit: z.number().int().min(1).max(100).default(50),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_ad_groups", () => listAdGroups(targetAuth, campaignId, limit), campaignId);
-    return typedResult(result);
-  }));
-
-  server.registerTool("listAds", {
-    description: "List ads in a campaign with RSA headlines, descriptions, final URLs, status, and performance metrics for a given date range. Optionally filter to one ad group.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      adGroupId: z.string().optional(),
-      days: z.number().int().min(1).max(365).default(30),
-      limit: z.number().int().min(1).max(100).default(50),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, adGroupId, days, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_ads", () => listAds(targetAuth, campaignId, adGroupId, days, limit), campaignId);
-    return typedResult(result);
-  }));
-
-  // ─── Competitive Intelligence ────────────────────────────────────
-
-  server.registerTool("getImpressionShare", {
-    description: "Impression share metrics for a campaign: search IS, absolute top IS, top IS, budget-lost IS, and rank-lost IS. Max 90 days (unlike most tools which support 365).",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-      days: z.number().int().min(1).max(90).default(30),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, days }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_impression_share", () => getImpressionShare(targetAuth, campaignId, days), campaignId);
-    return typedResult(result);
-  }));
-
-  // ─── Conversion Tracking ─────────────────────────────────────────
-
-  server.registerTool("getConversionActions", {
-    description: "List conversion actions with type, status, counting method, and value settings.",
-    inputSchema: {
-      accountId: accountIdParam,
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_conversion_actions", () => getConversionActions(targetAuth));
-    return typedResult(result);
-  }));
-
-  // ─── Account & Campaign Settings ────────────────────────────────
-
-  server.registerTool("getAccountSettings", {
-    description: "Account-level settings: auto-tagging status, tracking URL template, and conversion tracking IDs.",
-    inputSchema: {
-      accountId: accountIdParam,
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_account_settings", () => getAccountSettings(targetAuth));
-    return typedResult(result);
-  }));
-
-  server.registerTool("getCampaignSettings", {
-    description: "Campaign configuration: bidding strategy, network targeting (Search Partners, Display), location targeting, and ad schedule.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string(),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_campaign_settings", () => getCampaignSettings(targetAuth, campaignId), campaignId);
-    return typedResult(result);
-  }));
-
   // ─── Geo Target Search ──────────────────────────────────────────
 
   server.registerTool("searchGeoTargets", {
@@ -317,7 +57,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Recommendations ─────────────────────────────────────────────
 
   server.registerTool("getRecommendations", {
-    description: "Google Ads optimization recommendations with estimated impact (impressions, clicks, conversions). Optionally filter to a specific campaign.",
+    description: "Google Ads optimization recommendations with estimated impact (impressions, clicks, conversions). Optionally filter to a specific campaign. Served by Google's recommendation engine — not GAQL-expressible, use this tool (not runScript).",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().optional(),
@@ -329,10 +69,10 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     return typedResult(result);
   }));
 
-  // ─── Change History ───────────────────────────────────────────
+  // ─── Change History (AdsAgent-originated) ─────────────────────────
 
   server.registerTool("getChanges", {
-    description: "Recent changes made to the account via AdsAgent. Each change has a changeId usable with undoChange.",
+    description: "Recent changes made to the account via AdsAgent. Each change has a changeId usable with undoChange. Reads AdsAgent's internal change log (Postgres), not Google's change_event API — for Google-side edits use runScript with `SELECT ... FROM change_event`.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().optional(),
@@ -340,14 +80,14 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     annotations: READ_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "get_changes", () => getChanges(targetId, { limit, campaignId }));
     return typedResult(result);
   }));
 
   server.registerTool("reviewChangeImpact", {
     description:
-      `Estimate correlational impact of every successful change in the last \`days\` using daily campaign snapshots (captured by cron). For each change: compares 7-day daily averages BEFORE vs AFTER the change date on the affected campaign, classifies direction (improved/worsened/neutral/unknown), and returns cost/conversion/CPA deltas plus \`otherChangesInWindow\` so you can spot confounders (other writes in the 14-day envelope). Response includes per-action counts and a campaign-deduped aggregate sum — use this instead of stitching getChanges + getCampaignPerformance by hand. Ideal for weekly or ad-hoc impact reviews. Caveats: impact is correlational (seasonality, competitor bids, Google's algorithm also move numbers); changes <${MIN_AFTER_DAYS_FOR_DIRECTION} days old are typically 'tooNew' because the snapshot cron lags a day; keyword/ad changes attribute to the containing campaign (campaign-level granularity only); window boundaries are UTC.`,
+      `Estimate correlational impact of every successful change in the last \`days\` using daily campaign snapshots (captured by cron). For each change: compares 7-day daily averages BEFORE vs AFTER the change date on the affected campaign, classifies direction (improved/worsened/neutral/unknown), and returns cost/conversion/CPA deltas plus \`otherChangesInWindow\` so you can spot confounders (other writes in the 14-day envelope). Response includes per-action counts and a campaign-deduped aggregate sum — use this instead of stitching getChanges + a runScript performance query by hand. Ideal for weekly or ad-hoc impact reviews. Caveats: impact is correlational (seasonality, competitor bids, Google's algorithm also move numbers); changes <${MIN_AFTER_DAYS_FOR_DIRECTION} days old are typically 'tooNew' because the snapshot cron lags a day; keyword/ad changes attribute to the containing campaign (campaign-level granularity only); window boundaries are UTC.`,
     inputSchema: {
       accountId: accountIdParam,
       days: z
@@ -378,7 +118,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
 
   server.registerTool("getResourceMetadata", {
     description:
-      "Discover available fields for a GAQL resource. Returns selectable, filterable, and sortable fields with data types. Use this before constructing GAQL queries to avoid invalid field errors. Example: getResourceMetadata('campaign') returns all campaign.* fields.",
+      "Discover available fields for a GAQL resource. Returns selectable, filterable, and sortable fields with data types. Call this before writing a `runScript` that queries an unfamiliar resource, so you use valid field names. Example: getResourceMetadata('campaign') returns all campaign.* fields.",
     inputSchema: {
       accountId: accountIdParam,
       resourceName: z
@@ -395,7 +135,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
 
   server.registerTool("listQueryableResources", {
     description:
-      "List all queryable GAQL resources (e.g. campaign, ad_group, keyword_view). Use this to discover what data is available for custom GAQL queries.",
+      "List all queryable GAQL resources (e.g. campaign, ad_group, keyword_view). Pair with `getResourceMetadata` to discover fields, then write a `runScript` against them.",
     inputSchema: {
       accountId: accountIdParam,
     },
@@ -403,38 +143,6 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId }) => {
     const { targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await listQueryableResources(targetAuth);
-    return typedResult(result);
-  }));
-
-  // ─── Performance Max ─────────────────────────────────────────────
-
-  server.registerTool("getPmaxAssetGroups", {
-    description:
-      "List all asset groups in a Performance Max campaign. Asset groups are the PMAX equivalent of ad groups — each contains the creative assets (headlines, descriptions, images, videos) Google uses to build ads across all eligible placements. Returns asset group IDs, names, statuses, and final URLs.",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string().describe("Performance Max campaign ID"),
-      limit: z.number().int().min(1).max(100).default(50),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_pmax_asset_groups", () => getPmaxAssetGroups(targetAuth, campaignId, limit), campaignId);
-    return typedResult(result);
-  }));
-
-  server.registerTool("getPmaxAssets", {
-    description:
-      "List all assets in a Performance Max asset group, grouped by field type. Returns text assets (HEADLINE, LONG_HEADLINE, DESCRIPTION, BUSINESS_NAME), image assets (MARKETING_IMAGE, SQUARE_MARKETING_IMAGE, LOGO), video assets (YOUTUBE_VIDEO), and CALL_TO_ACTION. Use getPmaxAssetGroups first to get asset group IDs.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetGroupId: z.string().describe("Asset group ID (from getPmaxAssetGroups)"),
-      limit: z.number().int().min(1).max(200).default(100),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetGroupId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_pmax_assets", () => getPmaxAssets(targetAuth, assetGroupId, limit));
     return typedResult(result);
   }));
 
@@ -446,7 +154,8 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       "Provide seed keywords and/or a URL to discover new keyword opportunities. " +
       "Returns avg monthly searches, competition level, average CPC, and top-of-page bid estimates. " +
       "No Google Ads account connection required — works for all users. " +
-      "Use searchGeoTargets first to find geo target IDs for location targeting.",
+      "Use searchGeoTargets first to find geo target IDs for location targeting. " +
+      "Keyword Planner is a separate API (not GAQL) — use this tool, not runScript.",
     inputSchema: {
       keywords: z.array(z.string()).min(1).describe("Seed keywords to generate ideas from"),
       url: z.string().optional().describe("Page URL to generate ideas from (combines with keywords if both provided)"),
@@ -466,226 +175,6 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const callerAuth = currentAuth();
     const result = await execRead(callerAuth, callerAuth.customerId, "get_keyword_ideas", () =>
       getKeywordIdeas(platformAuth, keywords, url, language, geoTargetIds, pageSize),
-    );
-    return typedResult(result);
-  }));
-
-  // ─── Callout Extensions (RMF C.75) ───────────────────────────────
-
-  server.registerTool("listCalloutAssets", {
-    description: "List all callout extension assets on the account, with whether each one is linked at the customer (account) level. Returns assetId, text, and link state.",
-    inputSchema: {
-      accountId: accountIdParam,
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_callout_assets", () => listCalloutAssets(targetAuth));
-    return typedResult(result);
-  }));
-
-  // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97, R.130) ──
-
-  server.registerTool("listBiddingStrategies", {
-    description: "List all portfolio (shared) bidding strategies on the account. Returns id, name, type, status, target CPA / ROAS, and how many campaigns link to each.",
-    inputSchema: {
-      accountId: accountIdParam,
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_bidding_strategies", () => listBiddingStrategies(targetAuth));
-    return typedResult(result);
-  }));
-
-  server.registerTool("getBiddingStrategyPerformance", {
-    description: "Performance report for portfolio bidding strategies (RMF R.130). Returns clicks, cost_micros, impressions, average_cpc, conversions, and cost_per_conversion aggregated over the selected date range, plus strategy type and status.",
-    inputSchema: {
-      accountId: accountIdParam,
-      days: z.number().int().min(1).max(365).default(30).describe("Lookback days"),
-      includeRemoved: z.boolean().default(false).describe("Include REMOVED strategies in the report"),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days, includeRemoved }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_bidding_strategy_performance", () =>
-      getBiddingStrategyPerformance(targetAuth, { days, includeRemoved }),
-    );
-    return typedResult(result);
-  }));
-
-  // ─── Negative Keyword Lists (Shared Sets) ──────────────────────────
-
-  server.registerTool("listNegativeKeywordLists", {
-    description: "List all shared negative keyword lists in the account. Shows list name, keyword count, and which campaigns each list is linked to. Use these lists to manage negatives across multiple campaigns at once.",
-    inputSchema: {
-      accountId: accountIdParam,
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_negative_keyword_lists", () => listNegativeKeywordLists(targetAuth));
-    return typedResult(result);
-  }));
-
-  server.registerTool("getNegativeKeywordListItems", {
-    description: "List all keywords inside a shared negative keyword list. Use listNegativeKeywordLists first to get the sharedSetId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      sharedSetId: z.string().describe("Shared set ID (from listNegativeKeywordLists)"),
-      limit: z.number().int().min(1).max(1000).default(200),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, sharedSetId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_negative_keyword_list_items", () => getNegativeKeywordListItems(targetAuth, sharedSetId, limit), null);
-    return typedResult(result);
-  }));
-
-  // ─── Paid vs Organic ──────────────────────────────────────────────
-
-  server.registerTool("getPaidVsOrganicAnalysis", {
-    description:
-      "Compare paid Google Ads performance vs organic Google Search performance for the same search queries. " +
-      "Returns per-term paid clicks/conversions/cost alongside organic clicks/impressions, plus a cannibalization " +
-      "estimate (what % of paid conversions organic would have caught anyway), estimated incremental CPA, and a " +
-      "verdict per term. Use to decide whether to keep, reduce, or pause paid spend on brand or any keyword theme. " +
-      "REQUIRES Search Console linked to the Google Ads account (Tools → Linked accounts → Search Console). " +
-      "If not linked, response.gscLinked = false with setup instructions.",
-    inputSchema: {
-      accountId: accountIdParam,
-      days: z.number().int().min(1).max(365).default(90).describe("Lookback days (default 90)"),
-      searchTermContains: z.string().optional().describe("Filter to search terms containing this substring (e.g. 'pawsvip' for brand analysis)"),
-      campaignId: z.string().optional().describe("Optional: limit to a single campaign"),
-      limit: z.number().int().min(1).max(1000).default(200).describe("Max search terms returned"),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days, searchTermContains, campaignId, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_paid_vs_organic_analysis", () =>
-      getPaidVsOrganicAnalysis(targetAuth, { days, searchTermContains, campaignId, limit }),
-    );
-    return typedResult(result);
-  }));
-
-  // ─── Narrow audit views ───────────────────────────────────────────
-  // Composable slices of the audit pipeline that fire only the queries
-  // they need. Use these for dashboards that refresh one panel at a
-  // time; fall back to `audit` when you need everything at once.
-
-  server.registerTool("getAccountChanges", {
-    description:
-      "Every account-modifying edit in the lookback window (MCP writes AND direct UI edits via `change_event`). " +
-      "Returns each change with user email, resource type, changed fields, operation, and days-ago — plus " +
-      "aggregated counts by user, resource type, and client type so you can answer 'who changed what recently' " +
-      "without paging through the full audit. Use THIS instead of `audit` when the user asks about recent " +
-      "activity, who-changed-what, or when a metric shift started. Fires 3 queries (campaigns + ad_groups for " +
-      "name lookup, change_event) vs `audit`'s 19. " +
-      "The API caps change_event at 30 rolling days; `days` is clamped to that cap. " +
-      "Response: `{ dateRange, totalChanges, byUser, byResourceType, byClientType, changes: FindingList<ChangeEventSummary> }`.",
-    inputSchema: {
-      accountId: accountIdParam,
-      days: z.number().int().min(1).max(30).default(30).describe("Lookback days (API-capped at 30)"),
-      limit: z.number().int().min(1).max(200).default(50).describe("Max changes returned (default 50)"),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_account_changes", () =>
-      getAccountChanges(targetAuth, days, limit),
-    );
-    return typedResult(result);
-  }));
-
-  server.registerTool("getLandingPagePerformance", {
-    description:
-      "Landing page performance (spend, clicks, conversions, CPA, conversion rate) sorted by spend. " +
-      "Use THIS instead of `audit` when the user asks about landing page quality, which pages convert, or CRO targets. " +
-      "Fires 1 query (landing_page_view) vs `audit`'s 19. " +
-      "Landing pages aren't directly editable entities so no `recentChange` attribution is attached; " +
-      "pair with `getAccountChanges` if you need to know whether an ad group pointing at a page was recently edited. " +
-      "Response: `{ dateRange, landingPages: FindingList<LandingPage> }`.",
-    inputSchema: {
-      accountId: accountIdParam,
-      days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90)"),
-      limit: z.number().int().min(1).max(100).default(15).describe("Max pages returned (default 15)"),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_landing_page_performance", () =>
-      getLandingPagePerformance(targetAuth, days, limit),
-    );
-    return typedResult(result);
-  }));
-
-  server.registerTool("getTimeseries", {
-    description:
-      "Targeted timeseries query for a specific metric set over a named date range. " +
-      "Use when the caller has ALREADY decided which metrics, date range, and grouping they need — e.g. 'show CPA daily for the last 30 days', 'weekly spend by campaign this quarter', or when building a chart panel. " +
-      "NOT the right tool for open-ended 'how is my account doing' or 'what's working' questions — for those, call `runScript` instead; it correlates timeseries with search terms, quality scores, and change events in one pass. " +
-      "Returns chart-ready segments: each has `dimensions` and a points array `[{ date, metric, metric, ... }]` — drops directly into Recharts / Chart.js / visx with zero reshape. " +
-      "Derived metrics (cpa, ctr, conversion_rate, roas) are computed per-bucket and return null on zero-denominator so charts render gaps instead of spiking. " +
-      "Granularity: `day` / ISO-week start (Monday) / calendar month. " +
-      "`groupBy`: `account` (one segment) | `campaign` (one per, filterable via `campaignIds`) | `device` | `network`. " +
-      "`comparePreviousPeriod: true` adds a shifted same-length window in `comparison`. " +
-      "Range cap 730 days. Fires 1 upstream query (2 with comparison).",
-    inputSchema: {
-      accountId: accountIdParam,
-      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
-      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
-      granularity: z.enum(GRANULARITIES).default("day"),
-      metrics: z
-        .array(z.enum(TIMESERIES_METRICS))
-        .min(1)
-        .default(["spend", "clicks", "conversions", "cpa"])
-        .describe("Which metrics to emit per point. Derived metrics return null on zero-denominator."),
-      groupBy: z.enum(GROUP_BYS).default("account"),
-      comparePreviousPeriod: z
-        .boolean()
-        .default(false)
-        .describe("When true, also returns the same-length prior window under `comparison`."),
-      campaignIds: z
-        .array(z.string().regex(/^\d+$/, "Must be a digit string"))
-        .optional()
-        .describe("Optional campaign.id filter. Only valid when groupBy is campaign, device, or network."),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, startDate, endDate, granularity, metrics, groupBy, comparePreviousPeriod, campaignIds }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_timeseries", () =>
-      getTimeseries(targetAuth, {
-        startDate,
-        endDate,
-        granularity,
-        metrics,
-        groupBy,
-        comparePreviousPeriod,
-        campaignIds,
-      }),
-    );
-    return typedResult(result);
-  }));
-
-  server.registerTool("getWasteFindings", {
-    description:
-      "Zero-conversion keywords burning more than 2x the account CPA, plus search terms with 10+ clicks and " +
-      "zero conversions. Every item carries a `recentChange` pointer — when present, the keyword/ad-group/campaign " +
-      "was edited inside the window so the metrics are stale; RE-EVALUATE before recommending a pause. " +
-      "Use THIS instead of `audit` when the user asks 'where am I wasting money' or 'what should I pause'. " +
-      "Fires 5 queries (campaigns, ad_groups, search_terms, zero-conv keywords, change_event) vs `audit`'s 19. " +
-      "Response: `{ dateRange, accountCpa, wasteThreshold, totalWaste, wasteRate, wastedKeywords: FindingList<WastedItem>, wastedSearchTerms: FindingList<SearchTermItem> }`. " +
-      "`accountCpa` is null when the account has no conversions in the window — treat that account as having no usable threshold.",
-    inputSchema: {
-      accountId: accountIdParam,
-      days: z.number().int().min(1).max(90).default(30).describe("Lookback days (max 90)"),
-      limit: z.number().int().min(1).max(50).default(10).describe("Max items per list (default 10)"),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_waste_findings", () =>
-      getWasteFindings(targetAuth, days, limit),
     );
     return typedResult(result);
   }));

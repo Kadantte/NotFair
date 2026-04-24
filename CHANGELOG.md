@@ -2,6 +2,18 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.2.24.0] - 2026-04-24
+
+### Changed
+- **MCP read surface pared down to 8 tools.** `runScript` is now the single path for every analytical read against a Google Ads account — audits, dashboards, diagnostics, CPA-by-campaign, wasted-spend analysis. One call, one GAQL fan-out, full correlation across spend / search terms / change events / quality scores. The 25 prior point-query read tools (`listCampaigns`, `getKeywords`, `getTimeseries`, `getWasteFindings`, `getCampaignPerformance`, `getSearchTermReport`, `getLandingPagePerformance`, `getImpressionShare`, `getAccountChanges`, and others) are gone from the MCP wire surface because MCP clients don't reliably forward the server's `instructions` field into the model's prompt, so having parallel point-query tools quietly out-competed runScript on every analytical question.
+- `MCP_INSTRUCTIONS` and the `runScript` tool description now explicitly name the non-GAQL exceptions — `searchGeoTargets`, `getRecommendations`, `getKeywordIdeas`, `getChanges`, `reviewChangeImpact`, `getResourceMetadata`, `listQueryableResources` — so the model knows when to reach for a dedicated tool vs. `runScript`.
+- Playbooks (`adsagent://playbooks/audit-account`, `adsagent://playbooks/explain-regression`) replaced with runScript-centric recipes: single `ads.gaqlParallel` call with 4 queries, correlated in-script, ranked findings returned.
+- Marketing page (`/google-ads-mcp-server`) now leads with `runScript` as the primary read surface.
+
+### Fixed
+- `ads.gaqlParallel` code examples in `MCP_INSTRUCTIONS` and both playbooks previously demonstrated bare string arrays, but the sandbox requires `[{name, query, limit?}]` objects — every copied pattern would have crashed the runScript sandbox. Rewrote all examples to the correct object form with `.rows` destructuring.
+- 10 write-tool parameter descriptions pointed at deleted read tools ("from getKeywords", "from getConversionActions", "from listCalloutAssets", "from listNegativeKeywordLists", "from getPmaxAssetGroups"). Replaced each with the equivalent `runScript` GAQL query hint.
+
 ## [0.2.23.1] - 2026-04-22
 
 ### Added

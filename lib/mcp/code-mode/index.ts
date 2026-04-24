@@ -14,11 +14,7 @@ This is the DEFAULT tool for any open-ended analytical question about a Google A
 - Any question where you would otherwise fire 3+ read tools back-to-back
 - Any question that benefits from correlating surfaces (spend + search terms + quality scores + change events) in a single pass
 
-Use individual read tools (getTimeseries, getSearchTermReport, getCampaignPerformance, etc.) ONLY when:
-- The caller has explicitly named the surface they want ("pull the search term report", "show CPA daily for the last 30 days")
-- You are drilling down on a specific finding from a prior runScript pass
-
-Default bias: if in doubt between runScript and a point-query tool for an analytical question, pick runScript. The cost of one extra GAQL subquery inside a batch is negligible; the cost of a shallow answer is a whole second round-trip.
+runScript owns EVERY read of Google Ads data. There are no point-query read tools anymore — if the caller asks for spend, CPA, search terms, keywords, ads, impression share, or anything else expressible in GAQL, you write a runScript that queries it. The only non-runScript reads are for specialized services that aren't GAQL-expressible: searchGeoTargets, getRecommendations, getChanges (AdsAgent's own change log), reviewChangeImpact, getKeywordIdeas. For schema discovery before a query, use getResourceMetadata and listQueryableResources.
 
 ── BATCHING DISCIPLINE (read this first) ──
 

@@ -21,12 +21,12 @@ const MCP_CONFIG = `{
 }`;
 
 const tools = [
-  { name: "listCampaigns", category: "Read", description: "Live campaign performance, spend, and status" },
-  { name: "getKeywords", category: "Read", description: "Keyword bids, Quality Scores, impressions" },
-  { name: "getSearchTermReport", category: "Read", description: "Actual search queries triggering your ads" },
-  { name: "getCampaignPerformance", category: "Read", description: "Deep metrics over any date range" },
-  { name: "getWasteFindings", category: "Read", description: "Wasted spend on low-conversion keywords and search terms" },
-  { name: "getSpendReport", category: "Read", description: "Spend breakdown by campaign and ad group" },
+  { name: "runScript", category: "Read", description: "Sandboxed JS with GAQL fan-out — every analytical read goes through this one tool" },
+  { name: "getRecommendations", category: "Read", description: "Google's optimization suggestions with estimated impact" },
+  { name: "getKeywordIdeas", category: "Read", description: "Keyword Planner search volume, competition, and CPC" },
+  { name: "getChanges", category: "Read", description: "AdsAgent's own change log, undoable with one call" },
+  { name: "reviewChangeImpact", category: "Read", description: "Before/after impact analysis on recent edits" },
+  { name: "getResourceMetadata", category: "Read", description: "GAQL schema discovery for custom queries" },
   { name: "updateBid", category: "Write", description: "Adjust keyword or ad group bids — reviewable" },
   { name: "pauseCampaign", category: "Write", description: "Pause underperforming campaigns" },
   { name: "addNegativeKeyword", category: "Write", description: "Block wasted search terms instantly" },
@@ -353,7 +353,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                   What Claude does
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
-                  Calls <span className="font-mono-jb text-[#E8E4DD]">getCampaignPerformance</span> with your date range, filters for cost &gt; $500 and conversions = 0, then returns a ranked list with spend breakdown and top wasted search terms for each.
+                  Calls <span className="font-mono-jb text-[#E8E4DD]">runScript</span> with a GAQL fan-out across campaigns and search terms, filters for cost &gt; $500 and conversions = 0 in-script, then returns a ranked list with spend breakdown and top wasted search terms for each.
                 </p>
               </div>
               <div className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-5">

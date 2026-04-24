@@ -15,7 +15,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockQuery = vi.fn();
 const mockMutateResources = vi.fn();
-const mockCustomer = { query: mockQuery, mutateResources: mockMutateResources };
+const mockSearchGoogleAdsFields = vi.fn();
+const mockCustomer = {
+  query: mockQuery,
+  mutateResources: mockMutateResources,
+  googleAdsFields: { searchGoogleAdsFields: mockSearchGoogleAdsFields },
+};
 
 vi.mock("google-ads-api", () => ({
   GoogleAdsApi: class {
@@ -111,7 +116,7 @@ describe("MCP protocol — tools/list", () => {
       expect(tools.length).toBeGreaterThan(20);
 
       const byName = new Map(tools.map((t) => [t.name, t]));
-      for (const anchor of ["listCampaigns", "getKeywords", "pauseKeyword", "runScript"]) {
+      for (const anchor of ["getRecommendations", "getChanges", "pauseKeyword"]) {
         const t = byName.get(anchor);
         expect(t, `${anchor} should be advertised`).toBeDefined();
         // The SDK turns the raw Zod shape into a JSON schema; connectors
@@ -127,9 +132,9 @@ describe("MCP protocol — tools/list", () => {
     const { client, cleanup } = await connectClient();
     try {
       const { tools } = await client.listTools();
-      const listCampaigns = tools.find((t) => t.name === "listCampaigns");
+      const getRecommendations = tools.find((t) => t.name === "getRecommendations");
       const pauseKeyword = tools.find((t) => t.name === "pauseKeyword");
-      expect(listCampaigns?.annotations?.readOnlyHint).toBe(true);
+      expect(getRecommendations?.annotations?.readOnlyHint).toBe(true);
       expect(pauseKeyword?.annotations?.readOnlyHint).not.toBe(true);
     } finally {
       await cleanup();
@@ -143,36 +148,35 @@ describe("MCP protocol — tools/call", () => {
   it("calls a read tool and returns structuredContent over the wire", async () => {
     mockQuery.mockResolvedValueOnce([
       {
-        campaign: {
-          id: "42",
-          name: "Protocol smoke",
-          status: "ENABLED",
-          advertising_channel_type: "SEARCH",
-          bidding_strategy_type: "MAXIMIZE_CONVERSIONS",
-          network_settings: { target_content_network: false },
-          tracking_url_template: null,
+        recommendation: {
+          type: "KEYWORD",
+          campaign: "customers/1234567890/campaigns/42",
+          dismissed: false,
         },
-        metrics: { impressions: 1, clicks: 0, cost_micros: 0, conversions: 0, all_conversions: 0 },
       },
     ]);
 
     const { client, cleanup } = await connectClient();
     try {
-      const result = await client.callTool({ name: "listCampaigns", arguments: {} });
+      const result = await client.callTool({ name: "getRecommendations", arguments: {} });
       expect(result.isError).toBeFalsy();
-      const structured = result.structuredContent as { items: Array<{ id: string }> };
-      expect(structured.items).toHaveLength(1);
-      expect(structured.items[0].id).toBe("42");
+      const structured = result.structuredContent as {
+        recommendations: Array<{ type: string; campaignId: string }>;
+      };
+      expect(structured.recommendations).toHaveLength(1);
+      expect(structured.recommendations[0].campaignId).toBe("42");
     } finally {
       await cleanup();
     }
   });
 
   it("returns isError=true for handler-level failures, not a transport error", async () => {
-    mockQuery.mockRejectedValueOnce(new Error("BOOM_AT_API"));
+    // listQueryableResources lets upstream errors bubble up through the
+    // handler — perfect for exercising the errorResult path over the wire.
+    mockSearchGoogleAdsFields.mockRejectedValueOnce(new Error("BOOM_AT_API"));
     const { client, cleanup } = await connectClient();
     try {
-      const result = await client.callTool({ name: "listCampaigns", arguments: {} });
+      const result = await client.callTool({ name: "listQueryableResources", arguments: {} });
       expect(result.isError).toBe(true);
       const text = Array.isArray(result.content) && result.content[0]?.type === "text"
         ? result.content[0].text
@@ -214,6 +218,7 @@ describe("MCP protocol — resources", () => {
       const read = await client.readResource({ uri: sample.uri });
       const [content] = read.contents;
       expect(content.mimeType).toBe("text/markdown");
+      if (!("text" in content)) throw new Error("expected text content");
       expect(content.text).toBe(sample.content);
     } finally {
       await cleanup();

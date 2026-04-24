@@ -5,9 +5,6 @@ import type {
   McpToolResponseRegistry,
   StructuredShape,
   WriteToolResponse,
-  FindingList,
-  RecentChange,
-  ChangeEventSummary,
 } from "./response-types";
 
 // ─── Type-level assertions ───────────────────────────────────────────
@@ -82,40 +79,17 @@ describe("response-types — registry completeness", () => {
     // `McpToolResponseRegistry` fails `pnpm typecheck`. The runtime test then
     // just guards against copy-paste duplicates.
     const TOOL_NAMES: Record<McpToolName, true> = {
-      // Read tools
-      getAccountInfo: true,
-      listCampaigns: true,
-      getCampaignPerformance: true,
-      getKeywords: true,
-      getNegativeKeywords: true,
-      getSearchTermReport: true,
-      getTrackingTemplate: true,
-      listAdGroups: true,
-      listAds: true,
-      getImpressionShare: true,
-      getConversionActions: true,
-      getAccountSettings: true,
-      getCampaignSettings: true,
+      // Read tools (specialized, non-GAQL)
       searchGeoTargets: true,
       getRecommendations: true,
       getChanges: true,
       reviewChangeImpact: true,
       getResourceMetadata: true,
       listQueryableResources: true,
-      getPmaxAssetGroups: true,
-      getPmaxAssets: true,
       getKeywordIdeas: true,
-      listCalloutAssets: true,
-      listBiddingStrategies: true,
-      getBiddingStrategyPerformance: true,
-      listNegativeKeywordLists: true,
-      getNegativeKeywordListItems: true,
-      getPaidVsOrganicAnalysis: true,
-      getAccountChanges: true,
-      getLandingPagePerformance: true,
-      getWasteFindings: true,
-      getTimeseries: true,
       listConnectedAccounts: true,
+      // Code mode
+      runScript: true,
       // Write tools
       pauseKeyword: true,
       enableKeyword: true,
@@ -171,45 +145,6 @@ describe("response-types — registry completeness", () => {
     const names = Object.keys(TOOL_NAMES);
     expect(names.length).toBeGreaterThan(0);
     expect(new Set(names).size).toBe(names.length);
-  });
-});
-
-describe("response-types — audit sub-types are re-exported", () => {
-  it("exposes RecentChange, ChangeEventSummary, FindingList", () => {
-    // Compile-time presence proven by the imports at the top of this file.
-    // Runtime assertion just exercises the type with a literal.
-    const finding: FindingList<{ spend: number }> = {
-      shown: 0,
-      total: 0,
-      totalSpend: 0,
-      items: [],
-    };
-    expect(finding.items).toEqual([]);
-
-    const change: RecentChange = {
-      daysAgo: 1,
-      changeDateTime: "2026-04-21T00:00:00Z",
-      changedFields: ["status"],
-      operation: "UPDATE",
-      clientType: "GOOGLE_ADS_API",
-      resourceType: "CAMPAIGN",
-      otherChangesInWindow: 0,
-    };
-    expect(change.daysAgo).toBe(1);
-
-    const summary: ChangeEventSummary = {
-      resourceName: "customers/1/campaigns/2",
-      resourceType: "CAMPAIGN",
-      operation: "UPDATE",
-      changeDateTime: "2026-04-21T00:00:00Z",
-      daysAgo: 0,
-      changedFields: ["status"],
-      clientType: "GOOGLE_ADS_API",
-      campaignName: null,
-      adGroupName: null,
-      userEmail: null,
-    };
-    expect(summary.resourceType).toBe("CAMPAIGN");
   });
 });
 

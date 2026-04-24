@@ -1,7 +1,7 @@
 /**
- * Playbooks shipped as MCP resources so Claude can fetch the canonical
- * tool-call sequences for common dashboard tasks instead of re-deriving
- * them every conversation.
+ * Playbooks shipped as MCP resources — canonical `runScript` recipes for the
+ * most common user asks. Clients that surface resources to the model can fetch
+ * these to shortcut the "what GAQL do I write" step.
  *
  * Markdown is inlined as TS string constants so the bundler picks it up
  * with zero configuration (no outputFileTracing tweaks, no webpack loader).
@@ -19,203 +19,202 @@ export interface Playbook {
   content: string;
 }
 
-const BUILD_DAILY_DASHBOARD = `# Build a daily Google Ads dashboard
+const AUDIT_ACCOUNT = `# Audit a Google Ads account with runScript
 
-Use this when the user says "show me my dashboard", "how's my account today", "give me a daily recap", or similar. The goal is a compact, scannable overview they can check in under 10 seconds.
+Use this when the user asks anything like "audit my account", "how is my Google Ads doing", "what's working and what's not", "find wasted spend", "what should I fix today". The answer is almost always a single \`runScript\` call that fans out GAQL queries in parallel.
 
-## Tool-call sequence
+## The one-call pattern
 
-Call these tools **in parallel** — they share query primitives so the MCP cache coalesces duplicate upstream calls:
+\`ads.gaqlParallel\` takes \`[{name, query, limit?}, ...]\` and returns
+\`{ [name]: GaqlReport | { error } }\`. Destructure by name, read \`.rows\`.
 
-1. \`getAccountInfo\` — account name, currency, timezone. One call, free (cached aggressively).
-2. \`listCampaigns\` with \`limit: 10\` — top-spend campaigns with their impression share and cost.
-3. \`getWasteFindings\` with \`days: 7\` — anything wasting money right now. \`wasteRate\` + top 3–5 wasted keywords/search terms.
-4. \`getAccountChanges\` with \`days: 7, limit: 10\` — who changed what in the last week. Set context for anomalies.
-5. \`getTimeseries\` with \`granularity: "day", metrics: ["spend", "conversions", "cpa"], groupBy: "account", comparePreviousPeriod: true\` — the spark chart.
+\`\`\`js
+const r = await ads.gaqlParallel([
+  // 1. Account performance by campaign
+  { name: "campaigns", query: \`
+    SELECT campaign.id, campaign.name, campaign.status,
+           metrics.cost_micros, metrics.conversions, metrics.clicks,
+           metrics.impressions, metrics.ctr, metrics.average_cpc
+      FROM campaign
+      WHERE segments.date DURING LAST_30_DAYS
+      ORDER BY metrics.cost_micros DESC\` },
+  // 2. Search terms for wasted-spend detection
+  { name: "searchTerms", query: \`
+    SELECT search_term_view.search_term, campaign.name, ad_group.name,
+           metrics.cost_micros, metrics.clicks, metrics.conversions
+      FROM search_term_view
+      WHERE segments.date DURING LAST_30_DAYS
+        AND metrics.clicks > 5
+      ORDER BY metrics.cost_micros DESC\`, limit: 200 },
+  // 3. Zero-conversion keywords burning spend
+  { name: "zeroConvKw", query: \`
+    SELECT ad_group_criterion.keyword.text, campaign.name, ad_group.name,
+           metrics.cost_micros, metrics.clicks,
+           ad_group_criterion.quality_info.quality_score
+      FROM keyword_view
+      WHERE segments.date DURING LAST_30_DAYS
+        AND metrics.conversions = 0
+        AND metrics.cost_micros > 0
+      ORDER BY metrics.cost_micros DESC\`, limit: 100 },
+  // 4. Recent account changes (Google's change_event, capped at 30 days)
+  { name: "changes", query: \`
+    SELECT change_event.resource_name, change_event.change_date_time,
+           change_event.changed_fields, change_event.user_email,
+           change_event.resource_type, change_event.client_type,
+           change_event.change_resource_type
+      FROM change_event
+      WHERE change_event.change_date_time DURING LAST_30_DAYS
+      ORDER BY change_event.change_date_time DESC\`, limit: 50 }
+]);
 
-That's five parallel tool calls. Cache coalescing means only ~7 unique upstream queries fire, not 5 × N.
+const campaigns = r.campaigns.rows ?? [];
+const searchTerms = r.searchTerms.rows ?? [];
+const zeroConvKw = r.zeroConvKw.rows ?? [];
+const changes = r.changes.rows ?? [];
 
-## Dashboard composition (what to render, in this order)
+// Compute account CPA and flag wasted spend at 2x that threshold
+const toDollars = (micros) => (micros || 0) / 1_000_000;
+const totalSpend = campaigns.reduce((s, row) => s + toDollars(row.metrics.cost_micros), 0);
+const totalConv = campaigns.reduce((s, row) => s + (row.metrics.conversions || 0), 0);
+const accountCpa = totalConv > 0 ? totalSpend / totalConv : null;
+const threshold = accountCpa ? accountCpa * 2 : Infinity;
 
-1. **Header** — account name, date range, currency, pulse.
-   - \`<accountInfo.name> · last 7 days · <currency>\`
-   - Pulse line: \`Spend $X (Δ vs prev 7d), <totalConversions> conversions, CPA $Y\`
-2. **Top campaigns** (from \`listCampaigns\`) — 5 rows max: name, spend, CPA, impression share. Flag any with \`impressionShare < 0.5\` and \`budgetLostIS > 0.15\` as budget-constrained.
-3. **Waste panel** (from \`getWasteFindings\`) — only render if \`wasteRate > 5%\`. Show \`totalWaste\` USD, then the top 3 wasted keywords/search terms. Each row must show its \`recentChange.daysAgo\` if non-null — that means the issue may already be fixed.
-4. **Changes feed** (from \`getAccountChanges.changes.items\`) — last 5, newest first. Each: \`<daysAgo>d ago · <userEmail or client> · <resourceType> · <changedFields[0]>\`.
-5. **Timeseries** (from \`getTimeseries\`) — one chart, spend + conversions on a dual axis, with the previous-period overlay from \`response.comparison.series\` as dashed lines.
+const wastedKeywords = zeroConvKw
+  .filter(row => toDollars(row.metrics.cost_micros) > threshold)
+  .slice(0, 10);
+const wastedSearchTerms = searchTerms
+  .filter(row => row.metrics.conversions === 0 && row.metrics.clicks >= 10)
+  .slice(0, 10);
 
-## How to present it
+return {
+  accountCpa,
+  totalSpend,
+  totalConversions: totalConv,
+  campaigns: campaigns.slice(0, 20),
+  wastedKeywords,
+  wastedSearchTerms,
+  recentChanges: changes.slice(0, 20),
+};
+\`\`\`
 
-- Use tables for campaigns and changes. Charts drop \`response.structuredContent.series\` directly into Recharts — **no reshape code**.
-- Every monetary value formatted with \`accountInfo.currency\`.
-- If any tool returned \`errors\`, include a collapsed "Partial failures (N)" note at the bottom. Don't fail the whole render.
-
-## Common follow-ups
-
-- "What should I pause?" → drill into \`getWasteFindings.wastedKeywords\` and \`wastedSearchTerms\`; recommend pauses where \`recentChange\` is null (meaning nothing's been done yet). See \`drill-down\` playbook.
-- "Why did CPA go up?" → switch to the \`explain-regression\` playbook.
-- "Show me only last 3 days" → see \`customize-dashboard\` playbook.
-- "Show me only campaign X" → call \`getCampaignPerformance(campaignId, days, comparePreviousPeriod: true)\` and replace the timeseries panel.
-
-## Don't over-call
-
-- Do **not** call \`audit\` here — that's 19 queries for a view that needs 7.
-- Do **not** call \`getCampaignPerformance\` per-campaign to build the top-campaigns table; \`listCampaigns\` already has the data.
-- Do **not** call \`runScript\` unless drilling into specifics the view tools don't cover — one \`ads.gaql()\` inside a runScript replaces a raw GAQL call.
-`;
-
-const CUSTOMIZE_DASHBOARD = `# Customize a dashboard based on user feedback
-
-Use this when the user has a dashboard open and says "change the date range", "add X", "remove Y", "show only active", or similar. The goal is to update the specific slice they asked about without regenerating the whole artifact.
-
-## Translation table
-
-| User says… | Tool(s) to call |
-|---|---|
-| "Last 7 / 14 / 30 / 90 days" | Re-call the tools in \`build-daily-dashboard\` with updated \`days\`. Cache will coalesce shared queries. |
-| "Only campaign X" | Re-call \`getTimeseries\` with \`campaignIds: [X]\`. Keep the rest of the dashboard unless user says otherwise. |
-| "Weekly, not daily" | Re-call \`getTimeseries\` with \`granularity: "week"\`. Other panels unaffected. |
-| "Monthly for the year" | \`getTimeseries\` with \`granularity: "month"\`, \`startDate: <one year ago>\`, \`endDate: <today>\`. |
-| "Hide paused campaigns" | Filter \`listCampaigns\` output client-side on \`status === "ENABLED"\` — no new call. |
-| "Show ROAS instead of CPA" | \`getTimeseries\` with \`metrics: ["spend", "conversion_value", "roas"]\`. |
-| "Compare to last year" | \`getTimeseries\` with a longer range + \`comparePreviousPeriod: true\`. Note: prev period is same-length immediately preceding, not YoY. For true YoY, make two calls with shifted ranges. |
-| "Who changed X recently" | \`getAccountChanges\` with a tight \`days\`; filter \`changes.items\` client-side by \`resourceType\` or \`campaignName\`. |
-| "Drill into this finding" | See \`drill-down\` playbook. |
+One tool call. ~4 upstream queries. Everything correlated in-script. The agent then narrates the findings with real numbers.
 
 ## Rules of thumb
 
-1. **Never regenerate the entire artifact** — identify the specific panel the user referenced and update only that one.
-2. **Re-use cached queries** — the MCP cache keeps data warm for 45 seconds. A dashboard refresh within that window pays almost nothing.
-3. **Tell the user what you updated** — "Updated the timeseries to weekly granularity. Other panels unchanged." One short confirmation, not a full re-summary.
-4. **When in doubt about scope, ask once** — "Just the chart, or the whole dashboard?" Don't guess wide.
+1. **Always fan out with \`ads.gaqlParallel\`** when you need more than one surface. Sequential \`ads.gaql\` calls inside the same runScript are wasteful.
+2. **Filter in-script, not with SELECT *** — GAQL doesn't support \`SELECT *\`. List the fields you actually need.
+3. **Cast a wide net on the first call.** If the user says "audit my account", assume they also want to see wasted spend, recent changes, and quality-score laggards — correlating them is free once the queries have run.
+4. **One \`runScript\` call per user question.** If you catch yourself about to call runScript a second time for a related surface, stop and combine them.
+5. **Use \`LAST_N_DAYS\`, \`LAST_7_DAYS\`, \`LAST_30_DAYS\`, \`THIS_MONTH\`, etc.** — the date literal shorthand is faster to write and read than computing bounds.
 
-## Common missteps to avoid
+## Before you query an unfamiliar resource
 
-- Don't call \`audit\` when the user asks for a narrower slice — use a view tool.
-- Don't reshape \`getTimeseries\` output client-side; it's already chart-ready. If you're writing reshape code, stop and re-read the response shape.
-- Don't re-render panels whose data hasn't changed. Touching the DOM unnecessarily is jarring.
+Call \`getResourceMetadata('<resource_name>')\` once to see valid fields — saves a round-trip on "unknown field" errors. \`listQueryableResources\` returns every resource you can query.
+
+## For targeted asks
+
+Even when the user asks something narrow like "show me CPA by campaign for last 30 days", still use \`runScript\` — it's ONE call, ONE GAQL query, and the response is typed JSON the agent can format however it wants. No bespoke point-query tool needed.
 `;
 
-const DRILL_DOWN = `# Drill from a finding to supporting detail
+const EXPLAIN_REGRESSION = `# Explain a metric regression with runScript
 
-Use this when the user points at a specific item in a dashboard — "tell me more about that", "why is this keyword wasting", "what search terms triggered this". The goal is to answer the specific question with the narrowest tool call that gets the data, without firing the full audit again.
+Use this when the user asks "why did my CPA go up", "what happened to conversions last week", "ROAS tanked, what broke", or any "X is worse than it was" pattern. One \`runScript\` call correlates the timeseries + change events + waste surfaces in a single pass.
 
-## Decision tree
+## The one-call pattern
 
-**User points at a campaign finding** (budget-constrained winner, low IS, bad CPA):
-1. Read the finding's \`campaignId\` from the item.
-2. Call \`getCampaignPerformance(campaignId, days, comparePreviousPeriod: true)\` for the day-by-day metrics.
-3. Call \`getKeywords(campaignId, days, limit: 50)\` for top keywords with QS.
-4. Call \`getSearchTermReport(campaignId, days, limit: 50)\` if they ask "what queries are triggering this".
-5. If the finding has \`recentChange\`, surface it — the metrics may reflect a window that pre-dates a fix.
+\`ads.gaqlParallel\` takes \`[{name, query, limit?}, ...]\` and returns
+\`{ [name]: GaqlReport | { error } }\`. Destructure by name, read \`.rows\`.
 
-**User points at a wasted keyword:**
-1. \`pauseKeyword(accountId, campaignId, adGroupId, criterionId)\` is the obvious next action. Before recommending, check the item's \`recentChange\` — if non-null, the keyword was touched recently; re-evaluate before pausing.
-2. If they want more context: \`getKeywords(campaignId, days, limit: 100)\` to compare to other keywords in the ad group.
+\`\`\`js
+const r = await ads.gaqlParallel([
+  // 1. Account-wide daily timeseries (the shape of the regression)
+  { name: "daily", query: \`
+    SELECT segments.date, metrics.cost_micros, metrics.conversions,
+           metrics.clicks, metrics.impressions
+      FROM customer
+      WHERE segments.date DURING LAST_30_DAYS\` },
+  // 2. Per-campaign daily timeseries (which campaign moved)
+  { name: "byCampaign", query: \`
+    SELECT campaign.id, campaign.name, segments.date,
+           metrics.cost_micros, metrics.conversions
+      FROM campaign
+      WHERE segments.date DURING LAST_30_DAYS
+      ORDER BY segments.date DESC\` },
+  // 3. Recent changes — what was edited around the regression window
+  { name: "changes", query: \`
+    SELECT change_event.resource_name, change_event.change_date_time,
+           change_event.changed_fields, change_event.user_email,
+           change_event.resource_type, change_event.change_resource_type,
+           change_event.old_resource, change_event.new_resource
+      FROM change_event
+      WHERE change_event.change_date_time DURING LAST_30_DAYS
+      ORDER BY change_event.change_date_time DESC\` },
+  // 4. New wasted search terms that emerged in the window
+  { name: "wastedTerms", query: \`
+    SELECT search_term_view.search_term, campaign.name,
+           metrics.cost_micros, metrics.clicks, metrics.conversions
+      FROM search_term_view
+      WHERE segments.date DURING LAST_14_DAYS
+        AND metrics.conversions = 0
+        AND metrics.clicks >= 10
+      ORDER BY metrics.cost_micros DESC\`, limit: 50 }
+]);
 
-**User points at a wasted search term:**
-1. Convert it to a negative: \`addNegativeKeyword(accountId, campaignId, term, matchType)\`. Match type defaults to PHRASE for multi-word terms; recommend BROAD for single words.
-2. Before recommending, check the campaign's \`recentChange\` — if a negative was just added, the term may already be blocked.
+const daily = r.daily.rows ?? [];
+const byCampaign = r.byCampaign.rows ?? [];
+const changes = r.changes.rows ?? [];
+const wastedTerms = r.wastedTerms.rows ?? [];
 
-**User points at a recent change:**
-1. Read the \`resourceName\`, \`changedFields\`, \`operation\`, \`daysAgo\` from the change.
-2. Call \`reviewChangeImpact(days, limit)\` to pull the pre/post metrics for the change and see if it actually helped.
-3. If they ask "undo this": \`undoChange(accountId, changeId)\` — only works within 7 days AND if the entity hasn't been re-modified since.
+const toDollars = (m) => (m || 0) / 1_000_000;
 
-## Tools to reach for, by need
+// Split the account timeseries into two halves and compare CPA
+const sorted = daily.slice().sort((a, b) => a.segments.date.localeCompare(b.segments.date));
+const mid = Math.floor(sorted.length / 2);
+const older = sorted.slice(0, mid);
+const newer = sorted.slice(mid);
+const cpa = (rows) => {
+  const spend = rows.reduce((s, row) => s + toDollars(row.metrics.cost_micros), 0);
+  const conv = rows.reduce((s, row) => s + (row.metrics.conversions || 0), 0);
+  return conv > 0 ? spend / conv : null;
+};
 
-| Need | Tool |
-|---|---|
-| Exact GAQL slice we don't have a view for | \`runScript\` with \`return await ads.gaql('SELECT ...')\` — but try a view tool first |
-| A specific field on a specific entity | \`getResourceMetadata(resourceName)\` to discover valid fields before querying |
-| Change history for one entity | Filter \`getAccountChanges.changes.items\` by resourceName or campaignName |
-| Before/after of a specific change | \`reviewChangeImpact\` or \`getChanges\` with specific changeId |
+return {
+  cpaOlder: cpa(older),
+  cpaNewer: cpa(newer),
+  dailyCounts: { older: older.length, newer: newer.length },
+  byCampaign, // Agent sorts these client-side by delta
+  recentChanges: changes.slice(0, 25),
+  emergentWasteTerms: wastedTerms,
+};
+\`\`\`
 
-## Don't
-
-- Don't call \`audit\` to drill. The full audit is 19 queries. Drill calls are 1–3.
-- Don't reach for \`runScript\` before trying a view tool — the view tools cover most drill patterns and are cached.
-- Don't guess field names — use \`getResourceMetadata(resourceName)\` first.
-`;
-
-const EXPLAIN_REGRESSION = `# Explain a metric regression
-
-Use this when the user asks "why did my CPA go up", "what happened to conversions last week", "ROAS tanked, what broke", or any "X is worse than it was" pattern. The goal is to identify the cause quickly and concretely, and to surface whether it's already being fixed.
-
-## Tool-call sequence
-
-1. \`getTimeseries\` with the regressed window + comparePreviousPeriod, \`granularity: "day"\`, \`groupBy: "campaign"\` — pinpoints which day(s) the metric shifted and which campaigns drove it.
-2. \`getAccountChanges\` with \`days: <lookback covering the shift>\` — surfaces every edit that could have caused it.
-3. \`getWasteFindings\` with \`days: <window>\` — confirms whether the regression correlates with new waste.
-
-These run in parallel. Cache coalesces \`campaigns\` + \`change_event\` across tools 2 and 3.
-
-## Diagnostic questions to answer, in order
-
-**1. When exactly did it shift?**
-- Inspect \`getTimeseries.series\` day-by-day. Find the date the metric moved.
-- If the shift is gradual: likely a bidding/budget/seasonality issue.
-- If the shift is a cliff: likely a configuration change. Go to Q2.
-
-**2. What changed around that date?**
-- Filter \`getAccountChanges.changes.items\` to the 3 days around the cliff date.
-- Look at \`resourceType\` + \`changedFields\`. Common culprits:
-  - \`CAMPAIGN\` · \`status\` → campaign paused
-  - \`CAMPAIGN_BUDGET\` · \`amount_micros\` → budget raised/lowered
-  - \`CAMPAIGN\` · \`bidding_strategy_type\` → bidding flipped
-  - \`AD_GROUP_CRITERION\` · \`status\` → keyword paused/enabled
-  - \`CAMPAIGN_CRITERION\` · \`negative=true\` → negative added (usually good, but may have been too aggressive)
-
-**3. Which campaigns moved the most?**
-- Sort \`getTimeseries.series\` by delta between main window and comparison window. Top 3 are your explanation.
-- For each, check \`recentChange\` on related findings in \`getWasteFindings\` — sometimes the fix is already in flight.
-
-**4. Is it just noise?**
-- Compare the delta to the variance in the comparison window's daily values. If the regression is within the normal day-to-day band, it may not be real.
-- Watch for zero-conversion days. A single day's drop can skew week-over-week CPA unfairly.
+Then the agent answers: (1) when the shift happened, (2) which campaigns moved the most, (3) which changes correlate with the cliff date, (4) whether new wasted spend explains it. One call, ~4 queries, complete diagnosis.
 
 ## How to present the finding
 
-- Lead with **when** and **how much**, then **what changed**, then **next action**.
-  - "CPA doubled on 2026-04-18, driven by Campaign Brand (80% of the delta). That day, the bidding strategy flipped from TARGET_CPA to MAXIMIZE_CONVERSIONS — the change is logged at getAccountChanges, author was alice@example.com. Revert with \`updateCampaignBidding\`."
-- If the change is already being reversed (check \`recentChange\` on the finding), say so: "A correction is already in flight — the bidding strategy changed back yesterday. Spend should normalize over the next 24–48 hours."
-- If no changes explain it: surface that plainly. "No account edits correlate with the shift. Likely external — check for competitor bid changes, seasonality, or landing-page issues."
+Lead with **when** and **how much**, then **what changed**, then **next action**. Example: "CPA doubled on 2026-04-18, driven by Campaign Brand (80% of the delta). That day, the bidding strategy flipped from TARGET_CPA to MAXIMIZE_CONVERSIONS — user alice@example.com. Revert with \`updateCampaignBidding\`."
+
+If no changes correlate with the cliff date, say so plainly: "No account edits correlate with the shift. Likely external — check competitor bids, seasonality, or landing-page issues."
 
 ## Don't
 
 - Don't blame the first change you see. Always check correlation with the cliff date.
-- Don't recommend an undo without checking \`recentChange\` — a fix may already be in flight.
-- Don't fall back to \`audit\` for this. The three view tools above cover it.
+- Don't call \`runScript\` multiple times for related surfaces — the fan-out above already covers them. Combining them IS the point.
 `;
 
 export const PLAYBOOKS: readonly Playbook[] = [
   {
-    uri: "adsagent://playbooks/build-daily-dashboard",
-    name: "Build a daily Google Ads dashboard",
+    uri: "adsagent://playbooks/audit-account",
+    name: "Audit a Google Ads account with runScript",
     description:
-      "Parallel tool-call sequence and panel composition for a compact daily dashboard. Uses the Phase 4 view tools so queries stay narrow and cached.",
-    content: BUILD_DAILY_DASHBOARD,
-  },
-  {
-    uri: "adsagent://playbooks/customize-dashboard",
-    name: "Customize a dashboard",
-    description:
-      "Translation table from user feedback (date range, filter, granularity) to the exact tool calls. Avoids regenerating the entire artifact.",
-    content: CUSTOMIZE_DASHBOARD,
-  },
-  {
-    uri: "adsagent://playbooks/drill-down",
-    name: "Drill from a finding to detail",
-    description:
-      "How to answer 'tell me more about that' by picking the narrowest tool that gets the data, without firing the full audit again.",
-    content: DRILL_DOWN,
+      "One runScript call that fans out 4 GAQL queries in parallel: campaigns, search terms, zero-conversion keywords, recent changes. Correlates them in-script to return a ranked audit.",
+    content: AUDIT_ACCOUNT,
   },
   {
     uri: "adsagent://playbooks/explain-regression",
-    name: "Explain a metric regression",
+    name: "Explain a metric regression with runScript",
     description:
-      "Diagnostic flow for 'why did my CPA go up'. Composes getTimeseries + getAccountChanges + getWasteFindings to isolate the cause.",
+      "One runScript call that correlates the timeseries, per-campaign breakdown, change events, and emergent wasted search terms. Answers 'why did CPA go up' in a single pass.",
     content: EXPLAIN_REGRESSION,
   },
 ];

@@ -70,14 +70,18 @@ function resetMocks() {
 describe("MCP read tools — registration", () => {
   beforeEach(resetMocks);
 
-  it("registers a non-empty set of read tools", () => {
+  it("registers the narrow specialized-read surface", () => {
     const harness = buildHarness([registerReadTools], TEST_AUTH);
     const names = harness.listToolNames();
-    expect(names.length).toBeGreaterThan(10);
-    // A few anchors so a rename shows up loudly in diffs.
-    expect(names).toContain("getAccountInfo");
-    expect(names).toContain("listCampaigns");
-    expect(names).toContain("getKeywords");
+    // The surface deliberately stays small — only non-GAQL specialized tools
+    // live here, everything else is covered by `runScript`.
+    expect(names).toContain("searchGeoTargets");
+    expect(names).toContain("getRecommendations");
+    expect(names).toContain("getChanges");
+    expect(names).toContain("reviewChangeImpact");
+    expect(names).toContain("getResourceMetadata");
+    expect(names).toContain("listQueryableResources");
+    expect(names).toContain("getKeywordIdeas");
   });
 
   it("every registered read tool declares readOnlyHint = true", () => {
@@ -107,60 +111,50 @@ describe("MCP read tools — registration", () => {
 describe("MCP read tools — handler execution", () => {
   beforeEach(resetMocks);
 
-  it("listCampaigns returns structuredContent wrapped as { items: [...] }", async () => {
+  it("getRecommendations wraps object results as structuredContent", async () => {
     mockQuery.mockResolvedValueOnce([
       {
-        campaign: {
-          id: "999",
-          name: "Brand — US",
-          status: "ENABLED",
-          advertising_channel_type: "SEARCH",
-          bidding_strategy_type: "MAXIMIZE_CONVERSIONS",
-          network_settings: { target_content_network: false },
-          tracking_url_template: null,
+        recommendation: {
+          type: "KEYWORD",
+          campaign: "customers/1234567890/campaigns/999",
+          dismissed: false,
         },
-        metrics: { impressions: 100, clicks: 10, cost_micros: 1_000_000, conversions: 1, all_conversions: 1 },
       },
     ]);
 
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    const result = await harness.callTool("listCampaigns", {});
+    const result = await harness.callTool("getRecommendations", {});
     const structured = expectOk(result);
 
-    expect(structured).toHaveProperty("items");
-    expect(Array.isArray(structured.items)).toBe(true);
-    expect((structured.items as unknown[])[0]).toMatchObject({
-      id: "999",
-      name: "Brand — US",
-      status: "ENABLED",
+    expect(structured).toHaveProperty("recommendations");
+    expect(Array.isArray(structured.recommendations)).toBe(true);
+    expect((structured.recommendations as unknown[])[0]).toMatchObject({
+      type: "KEYWORD",
+      campaignId: "999",
     });
   });
 
   it("applies Zod defaults declared in the input schema", async () => {
-    mockQuery.mockResolvedValueOnce([]);
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-
-    // listCampaigns declares `limit` default 100, `includeRemoved` default false.
-    // Omitting them should not throw — harness runs Zod .parse() like the SDK does.
-    await expect(harness.callTool("listCampaigns", {})).resolves.toBeDefined();
-
-    // The resulting GAQL should include a LIMIT 100 clause and a non-REMOVED filter.
-    const [gaql] = mockQuery.mock.calls[0] ?? [];
-    expect(gaql).toMatch(/LIMIT 100/);
-    expect(gaql).toMatch(/campaign\.status != 'REMOVED'/);
+    // reviewChangeImpact declares `days` default 7, `limit` default 50.
+    // Omitting them should not throw — harness runs Zod .parse() like the SDK.
+    await expect(harness.callTool("reviewChangeImpact", {})).resolves.toBeDefined();
   });
 
   it("rejects invalid input at the Zod boundary", async () => {
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    // getKeywords.campaignId is z.string() — passing number should throw
-    // during validation, before the handler runs.
-    await expect(harness.callTool("getKeywords", { campaignId: 42 })).rejects.toThrow();
+    // getKeywordIdeas.keywords is z.array(z.string()).min(1) — passing a
+    // string instead of an array should throw during validation, before
+    // the handler runs.
+    await expect(
+      harness.callTool("getKeywordIdeas", { keywords: "not-an-array" }),
+    ).rejects.toThrow();
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
   it("surfaces unknown account errors as typed error responses, not thrown exceptions", async () => {
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    const result = await harness.callTool("listCampaigns", { accountId: "9999999999" });
+    const result = await harness.callTool("getRecommendations", { accountId: "9999999999" });
     const text = expectError(result);
     expect(text).toMatch(/not connected to this session/i);
     expect(text).toContain("listConnectedAccounts");
@@ -177,19 +171,22 @@ describe("MCP read tools — handler execution", () => {
     };
     mockQuery.mockResolvedValueOnce([]);
     const harness = buildHarness([registerReadTools], multiAccountAuth);
-    await harness.callTool("listCampaigns", { accountId: "2222222222" });
+    await harness.callTool("getRecommendations", { accountId: "2222222222" });
     // The real `customer` object is our stub, so we can't assert on
     // per-account instances directly — but the call must have reached the
     // query stub without throwing the "not connected" error.
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
-  it("wraps arbitrary handler errors via errorResult", async () => {
+  it("getRecommendations gracefully handles API failures", async () => {
+    // getRecommendations catches errors internally and returns { recommendations: [], error }
+    // because the Recommendations API isn't enabled on every account.
     mockQuery.mockRejectedValueOnce(new Error("SIMULATED_API_FAILURE"));
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    const result = await harness.callTool("listCampaigns", {});
-    const text = expectError(result);
-    expect(text).toContain("SIMULATED_API_FAILURE");
+    const result = await harness.callTool("getRecommendations", {});
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({ recommendations: [] });
+    expect(structured.error).toContain("SIMULATED_API_FAILURE");
   });
 });
 

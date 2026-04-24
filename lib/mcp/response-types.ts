@@ -15,43 +15,14 @@
  */
 
 import type {
-  getAccountInfo,
-  listCampaigns,
-  getCampaignPerformance,
-  getKeywords,
-  getNegativeKeywords,
-  getSearchTermReport,
-  listAdGroups,
-  listAds,
-  getImpressionShare,
-  getConversionActions,
-  getAccountSettings,
-  getCampaignSettings,
   searchGeoTargets,
   getRecommendations,
   getResourceMetadata,
   listQueryableResources,
-  getPmaxAssetGroups,
-  getPmaxAssets,
   getKeywordIdeas,
-  listCalloutAssets,
-  listBiddingStrategies,
-  getBiddingStrategyPerformance,
-  listNegativeKeywordLists,
-  getNegativeKeywordListItems,
-  getPaidVsOrganicAnalysis,
-  getTrackingTemplate,
   WriteResult,
 } from "@/lib/google-ads";
 import type { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
-
-// Re-export shared audit sub-types so non-audit modules can import them from
-// the registry rather than reaching into `lib/google-ads/audit`.
-export type {
-  RecentChange,
-  ChangeEventSummary,
-  FindingList,
-} from "@/lib/google-ads/audit";
 
 // ─── Utility types ──────────────────────────────────────────────────
 
@@ -85,59 +56,17 @@ export interface WriteToolResponse extends WriteResult {
 }
 
 // ─── Read-tool responses ───────────────────────────────────────────
+//
+// The read surface is deliberately narrow: only non-GAQL specialized tools
+// are first-class here. Everything else is reached via `runScript`.
 
-export type GetAccountInfoResponse = StructuredShape<Unwrap<typeof getAccountInfo>>;
-export type ListCampaignsResponse = StructuredShape<Unwrap<typeof listCampaigns>>;
-export type GetCampaignPerformanceResponse = StructuredShape<Unwrap<typeof getCampaignPerformance>>;
-export type GetKeywordsResponse = StructuredShape<Unwrap<typeof getKeywords>>;
-export type GetNegativeKeywordsResponse = StructuredShape<Unwrap<typeof getNegativeKeywords>>;
-export type GetSearchTermReportResponse = StructuredShape<Unwrap<typeof getSearchTermReport>>;
-export type GetTrackingTemplateResponse = StructuredShape<Unwrap<typeof getTrackingTemplate>>;
-export type ListAdGroupsResponse = StructuredShape<Unwrap<typeof listAdGroups>>;
-export type ListAdsResponse = StructuredShape<Unwrap<typeof listAds>>;
-export type GetImpressionShareResponse = StructuredShape<Unwrap<typeof getImpressionShare>>;
-export type GetConversionActionsResponse = StructuredShape<Unwrap<typeof getConversionActions>>;
-export type GetAccountSettingsResponse = StructuredShape<Unwrap<typeof getAccountSettings>>;
-export type GetCampaignSettingsResponse = StructuredShape<Unwrap<typeof getCampaignSettings>>;
 export type SearchGeoTargetsResponse = StructuredShape<Unwrap<typeof searchGeoTargets>>;
 export type GetRecommendationsResponse = StructuredShape<Unwrap<typeof getRecommendations>>;
 export type GetChangesResponse = StructuredShape<Unwrap<typeof getChanges>>;
 export type ReviewChangeImpactResponse = StructuredShape<Unwrap<typeof reviewChangeImpact>>;
 export type GetResourceMetadataResponse = StructuredShape<Unwrap<typeof getResourceMetadata>>;
 export type ListQueryableResourcesResponse = StructuredShape<Unwrap<typeof listQueryableResources>>;
-export type GetPmaxAssetGroupsResponse = StructuredShape<Unwrap<typeof getPmaxAssetGroups>>;
-export type GetPmaxAssetsResponse = StructuredShape<Unwrap<typeof getPmaxAssets>>;
 export type GetKeywordIdeasResponse = StructuredShape<Unwrap<typeof getKeywordIdeas>>;
-export type ListCalloutAssetsResponse = StructuredShape<Unwrap<typeof listCalloutAssets>>;
-export type ListBiddingStrategiesResponse = StructuredShape<Unwrap<typeof listBiddingStrategies>>;
-export type GetBiddingStrategyPerformanceResponse = StructuredShape<
-  Unwrap<typeof getBiddingStrategyPerformance>
->;
-export type ListNegativeKeywordListsResponse = StructuredShape<
-  Unwrap<typeof listNegativeKeywordLists>
->;
-export type GetNegativeKeywordListItemsResponse = StructuredShape<
-  Unwrap<typeof getNegativeKeywordListItems>
->;
-export type GetPaidVsOrganicAnalysisResponse = StructuredShape<
-  Unwrap<typeof getPaidVsOrganicAnalysis>
->;
-// ─── Narrow audit views (Phase 4) ───────────────────────────────────
-
-import type {
-  getAccountChanges,
-  getLandingPagePerformance,
-  getWasteFindings,
-} from "@/lib/google-ads/audit/views";
-
-export type GetAccountChangesResponse = StructuredShape<Unwrap<typeof getAccountChanges>>;
-export type GetLandingPagePerformanceResponse = StructuredShape<
-  Unwrap<typeof getLandingPagePerformance>
->;
-export type GetWasteFindingsResponse = StructuredShape<Unwrap<typeof getWasteFindings>>;
-
-import type { getTimeseries } from "@/lib/google-ads/timeseries";
-export type GetTimeseriesResponse = StructuredShape<Unwrap<typeof getTimeseries>>;
 
 // `listConnectedAccounts` is registered inline in `app/api/[transport]/route.ts`
 // (not a Google Ads helper call). Declare its shape explicitly.
@@ -146,6 +75,10 @@ export interface ListConnectedAccountsResponse {
   defaultAccountId: string;
   totalAccounts: number;
 }
+
+/** `runScript` returns whatever the sandbox code returned, JSON-stringified
+ *  or object-shaped. Declared as `unknown` because the shape is caller-defined. */
+export type RunScriptResponse = { value: unknown } | { items: unknown[] } | Record<string, unknown>;
 
 // ─── Write-tool responses ──────────────────────────────────────────
 //
@@ -263,42 +196,18 @@ export interface UndoChangeResponse extends WriteResult {
  * runtime — this is a compile-time contract.
  */
 export interface McpToolResponseRegistry {
-  // Read tools (30)
-  getAccountInfo: GetAccountInfoResponse;
-  listCampaigns: ListCampaignsResponse;
-  getCampaignPerformance: GetCampaignPerformanceResponse;
-  getKeywords: GetKeywordsResponse;
-  getNegativeKeywords: GetNegativeKeywordsResponse;
-  getSearchTermReport: GetSearchTermReportResponse;
-  getTrackingTemplate: GetTrackingTemplateResponse;
-  listAdGroups: ListAdGroupsResponse;
-  listAds: ListAdsResponse;
-  getImpressionShare: GetImpressionShareResponse;
-  getConversionActions: GetConversionActionsResponse;
-  getAccountSettings: GetAccountSettingsResponse;
-  getCampaignSettings: GetCampaignSettingsResponse;
+  // Read tools (specialized, non-GAQL only)
   searchGeoTargets: SearchGeoTargetsResponse;
   getRecommendations: GetRecommendationsResponse;
   getChanges: GetChangesResponse;
   reviewChangeImpact: ReviewChangeImpactResponse;
   getResourceMetadata: GetResourceMetadataResponse;
   listQueryableResources: ListQueryableResourcesResponse;
-  getPmaxAssetGroups: GetPmaxAssetGroupsResponse;
-  getPmaxAssets: GetPmaxAssetsResponse;
   getKeywordIdeas: GetKeywordIdeasResponse;
-  listCalloutAssets: ListCalloutAssetsResponse;
-  listBiddingStrategies: ListBiddingStrategiesResponse;
-  getBiddingStrategyPerformance: GetBiddingStrategyPerformanceResponse;
-  listNegativeKeywordLists: ListNegativeKeywordListsResponse;
-  getNegativeKeywordListItems: GetNegativeKeywordListItemsResponse;
-  getPaidVsOrganicAnalysis: GetPaidVsOrganicAnalysisResponse;
-  // Narrow audit views
-  getAccountChanges: GetAccountChangesResponse;
-  getLandingPagePerformance: GetLandingPagePerformanceResponse;
-  getWasteFindings: GetWasteFindingsResponse;
-  getTimeseries: GetTimeseriesResponse;
   // Inline-registered (route.ts)
   listConnectedAccounts: ListConnectedAccountsResponse;
+  // Code mode (sandboxed GAQL — owns all reads not covered above)
+  runScript: RunScriptResponse;
 
   // Write tools (50)
   pauseKeyword: PauseKeywordResponse;

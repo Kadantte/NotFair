@@ -144,23 +144,28 @@ Tool-selection heuristic — pick ONE path per user question:
    \`);
    \`\`\`
 
-   Example — parallel fan-out for an audit:
+   Example — parallel fan-out for an audit (gaqlParallel takes
+   [{name, query, limit?}, ...] and returns { [name]: GaqlReport }):
    \`\`\`js
-   const [campaigns, searchTerms, qualityScores] = await ads.gaqlParallel([
-     \`SELECT campaign.name, metrics.cost_micros, metrics.conversions,
-             metrics.ctr, metrics.average_cpc
-        FROM campaign WHERE segments.date DURING LAST_30_DAYS\`,
-     \`SELECT search_term_view.search_term, metrics.cost_micros,
-             metrics.conversions, campaign.name
-        FROM search_term_view WHERE segments.date DURING LAST_30_DAYS
-        ORDER BY metrics.cost_micros DESC LIMIT 100\`,
-     \`SELECT ad_group_criterion.keyword.text, ad_group_criterion.quality_info.quality_score,
-             metrics.cost_micros
-        FROM keyword_view WHERE segments.date DURING LAST_30_DAYS\`
+   const r = await ads.gaqlParallel([
+     { name: "campaigns", query: \`
+       SELECT campaign.name, metrics.cost_micros, metrics.conversions,
+              metrics.ctr, metrics.average_cpc
+         FROM campaign WHERE segments.date DURING LAST_30_DAYS\` },
+     { name: "searchTerms", query: \`
+       SELECT search_term_view.search_term, metrics.cost_micros,
+              metrics.conversions, campaign.name
+         FROM search_term_view WHERE segments.date DURING LAST_30_DAYS
+         ORDER BY metrics.cost_micros DESC\`, limit: 100 },
+     { name: "qualityScores", query: \`
+       SELECT ad_group_criterion.keyword.text,
+              ad_group_criterion.quality_info.quality_score,
+              metrics.cost_micros
+         FROM keyword_view WHERE segments.date DURING LAST_30_DAYS\` }
    ]);
-   const wastedSpend = searchTerms.filter(r => r.metrics.conversions === 0
-     && r.metrics.cost_micros > 50_000_000);
-   return { campaigns, wastedSpend, qualityScores };
+   const wastedSpend = (r.searchTerms.rows ?? []).filter(row =>
+     row.metrics.conversions === 0 && row.metrics.cost_micros > 50_000_000);
+   return { campaigns: r.campaigns.rows, wastedSpend, qualityScores: r.qualityScores.rows };
    \`\`\`
 
    Follow-up rule: after a \`runScript\` pass, don't chain \`runScript\` calls
@@ -170,7 +175,14 @@ Tool-selection heuristic — pick ONE path per user question:
 
 2. Mutations (pause, bid change, add keyword, create campaign) → individual
    write tools. Never wrap mutations in \`runScript\` — writes happen through
-   dedicated tools with guardrails and change-tracking.`;
+   dedicated tools with guardrails and change-tracking.
+
+3. Specialized non-GAQL reads → dedicated tools (not \`runScript\`):
+   - \`searchGeoTargets\` — geo target name lookup via GeoTargetConstantService.
+   - \`getRecommendations\` — Google's recommendation engine.
+   - \`getKeywordIdeas\` — Keyword Planner search-volume data.
+   - \`getChanges\` / \`reviewChangeImpact\` — AdsAgent's own change log + impact analysis.
+   - \`getResourceMetadata\` / \`listQueryableResources\` — GAQL schema discovery (use before writing an unfamiliar query).`;
 
 const mcpHandler = createMcpHandler(
   (server) => {
