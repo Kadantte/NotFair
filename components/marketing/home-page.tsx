@@ -292,9 +292,9 @@ function HeroMockup() {
       transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
       className="mx-auto w-full max-w-[480px]"
     >
-      <div className="flex h-[680px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-[#3D3C36] px-4 py-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#E8E4DD]">
+      <div className="flex h-[650px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#3D3C36] px-4 py-2">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#2E2D28] px-3 py-1 text-sm text-[#E8E4DD]">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
               <Image src="/claude-icon.svg" alt="" width={10} height={10} className="h-2.5 w-2.5 brightness-0 invert" />
             </span>
@@ -317,9 +317,9 @@ function HeroMockup() {
 
             <ChatReveal show={has("intro")}>
               <p className="text-sm leading-relaxed text-[#E8E4DD]">
-                <SmoothLine>Let me pull your search terms</SmoothLine>
-                <SmoothLine delay={0.12}>and campaign performance</SmoothLine>
-                <SmoothLine delay={0.24}>for the last 7 days.</SmoothLine>
+                <SmoothLine>
+                  Let me pull your search terms and campaign performance for the last 7 days.
+                </SmoothLine>
               </p>
             </ChatReveal>
 
@@ -519,13 +519,13 @@ export function HomePage({
 
   return (
     <>
-      <section className="relative overflow-hidden px-4 pb-16 pt-5 sm:pb-20 md:pt-6">
+      <section className="relative overflow-hidden px-4 pb-16 pt-4 sm:pb-20 sm:pt-5">
         <div className="container mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mb-6 flex justify-center sm:mb-8"
+            className="mb-4 flex justify-center sm:mb-5"
           >
             <a
               href="https://github.com/nowork-studio/toprank"
