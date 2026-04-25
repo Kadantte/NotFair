@@ -10,6 +10,7 @@ import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 import { BOOK_DEMO_URL } from '@/lib/links';
+import { notifyHelpClicked } from '@/app/actions';
 
 function imageKeyFromSrc(src: string): string {
     const file = src.split('/').pop() ?? src;
@@ -941,7 +942,22 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                             href={BOOK_DEMO_URL}
                             target="_blank"
                             rel="noopener noreferrer"
-                            onClick={() => trackEvent('setup_need_help_clicked', { connected: Boolean(token), pathname: typeof window !== 'undefined' ? window.location.pathname : '/connect' })}
+                            onClick={() => {
+                                const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
+                                trackEvent('setup_need_help_clicked', {
+                                    connected: Boolean(token),
+                                    pathname,
+                                    active_tab: activeTab,
+                                    code_sub_tab: codeSubTab,
+                                });
+                                void notifyHelpClicked({
+                                    activeTab,
+                                    codeSubTab,
+                                    pathname,
+                                    connected: Boolean(token),
+                                    source: 'connect_header',
+                                }).catch(() => {});
+                            }}
                             className="inline-flex items-center gap-2 rounded-lg border border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] px-4 py-2 text-sm font-medium text-[#4CAF6E] transition-all hover:border-[#4CAF6E]/70 hover:bg-[#4CAF6E]/[0.14]"
                         >
                             <Calendar className="h-4 w-4" />

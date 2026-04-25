@@ -704,7 +704,7 @@ export async function requestSetupHelp(context: {
 }
 
 export async function notifyHelpClicked(context: {
-    activeTab?: 'claude-code' | 'connector';
+    activeTab?: 'claude-code' | 'connector' | 'codex';
     codeSubTab?: 'manual' | 'auto';
     pathname: string;
     connected: boolean;
@@ -717,7 +717,9 @@ export async function notifyHelpClicked(context: {
             ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
             : context.activeTab === 'connector'
                 ? 'Claude Connector (Web / Cowork)'
-                : null;
+                : context.activeTab === 'codex'
+                    ? 'ChatGPT / Codex'
+                    : null;
     await postToSlack([
         ':sos: *Need help clicked* (cal link opened — not booked yet)',
         `*User:* <mailto:${email}|${email}>`,

@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.5] - 2026-04-25
+
+### Changed
+- **"Need help?" click on `/connect` pings Slack again.** Restored the fire-and-forget Slack notification (`notifyHelpClicked`) so the team sees in real time when someone opens cal.com from the header pill — including which setup tab they were on (Claude Code / Claude Cowork-Web / ChatGPT-Codex), connection status, and page URL. Cal.com still opens immediately on click; the Slack ping is async and never blocks the navigation. Also restored `active_tab` and `code_sub_tab` fields on the `setup_need_help_clicked` PostHog event so help-clicks can be attributed to setup path. `notifyHelpClicked` now recognizes the `'codex'` tab.
+
 ## [0.3.0.4] - 2026-04-25
 
 ### Added
