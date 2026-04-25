@@ -294,6 +294,61 @@ exports[`audit queries queryAccountInfo — matches snapshot 1`] = `
     "
 `;
 
+exports[`audit queries queryAdGroups — LIMIT 1000 1`] = `
+"
+      SELECT
+        campaign.id, campaign.status,
+        ad_group.id, ad_group.name, ad_group.status,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions
+      FROM ad_group
+      WHERE campaign.status = 'ENABLED'
+        AND ad_group.status != 'REMOVED'
+      ORDER BY metrics.cost_micros DESC
+      LIMIT 1000
+    "
+`;
+
+exports[`audit queries queryAds — date range + LIMIT 1000 1`] = `
+"
+      SELECT
+        campaign.id, campaign.status,
+        ad_group.name,
+        ad_group_ad.ad.final_urls,
+        ad_group_ad.ad.responsive_search_ad.headlines,
+        ad_group_ad.ad.responsive_search_ad.descriptions,
+        ad_group_ad.ad_strength, ad_group_ad.status,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions
+      FROM ad_group_ad
+      WHERE campaign.status = 'ENABLED'
+        AND ad_group_ad.status != 'REMOVED'
+        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+      ORDER BY metrics.cost_micros DESC
+      LIMIT 1000
+    "
+`;
+
+exports[`audit queries queryAudienceSegmentCheck — LIMIT 1 (existence check only) 1`] = `
+"
+      SELECT campaign.id, campaign.status, ad_group.id, ad_group_criterion.type
+      FROM ad_group_criterion
+      WHERE campaign.status = 'ENABLED'
+        AND ad_group_criterion.type IN ('USER_LIST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE')
+      LIMIT 1
+    "
+`;
+
+exports[`audit queries queryCampaignAssets — matches snapshot 1`] = `
+"
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        campaign_asset.field_type
+      FROM campaign_asset
+      WHERE campaign.status = 'ENABLED'
+    "
+`;
+
 exports[`audit queries queryCampaigns — substitutes date range 1`] = `
 "
       SELECT
@@ -311,6 +366,80 @@ exports[`audit queries queryCampaigns — substitutes date range 1`] = `
         metrics.search_rank_lost_impression_share
       FROM campaign
       WHERE campaign.status != 'REMOVED'
+        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+      ORDER BY metrics.cost_micros DESC
+    "
+`;
+
+exports[`audit queries queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 10000 1`] = `
+"
+      SELECT
+        change_event.change_date_time,
+        change_event.change_resource_type,
+        change_event.resource_name,
+        change_event.client_type,
+        change_event.user_email,
+        change_event.changed_fields,
+        change_event.resource_change_operation,
+        change_event.campaign,
+        change_event.ad_group
+      FROM change_event
+      WHERE change_event.change_date_time >= '2026-01-01 00:00:00'
+        AND change_event.change_date_time <= '2026-01-30 23:59:59'
+      ORDER BY change_event.change_date_time DESC
+      LIMIT 10000
+    "
+`;
+
+exports[`audit queries queryConversionActions — ORDER BY name 1`] = `
+"
+      SELECT
+        conversion_action.name, conversion_action.type,
+        conversion_action.status, conversion_action.counting_type,
+        conversion_action.include_in_conversions_metric,
+        conversion_action.primary_for_goal,
+        conversion_action.value_settings.default_value
+      FROM conversion_action
+      WHERE conversion_action.status != 'REMOVED'
+      ORDER BY conversion_action.name ASC
+    "
+`;
+
+exports[`audit queries queryConvertingSearchTerms — LIMIT 500, conversions > 0 1`] = `
+"
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name,
+        search_term_view.search_term,
+        metrics.conversions, metrics.cost_micros, metrics.clicks
+      FROM search_term_view
+      WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+        AND campaign.status = 'ENABLED'
+        AND metrics.conversions > 0
+      ORDER BY metrics.conversions DESC
+      LIMIT 500
+    "
+`;
+
+exports[`audit queries queryDailyCampaignMetrics — date range 1`] = `
+"
+      SELECT
+        campaign.id, segments.date,
+        metrics.cost_micros, metrics.clicks, metrics.conversions
+      FROM campaign
+      WHERE campaign.status != 'REMOVED'
+        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+    "
+`;
+
+exports[`audit queries queryDevicePerformance — date range 1`] = `
+"
+      SELECT
+        campaign.id, campaign.status, segments.device,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions, metrics.conversions_value
+      FROM campaign
+      WHERE campaign.status = 'ENABLED'
         AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
       ORDER BY metrics.cost_micros DESC
     "
@@ -349,6 +478,46 @@ exports[`audit queries queryKeywords — date range + LIMIT 2000 1`] = `
     "
 `;
 
+exports[`audit queries queryLandingPages — LIMIT 200 1`] = `
+"
+      SELECT
+        campaign.status,
+        landing_page_view.unexpanded_final_url,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions
+      FROM landing_page_view
+      WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+        AND campaign.status = 'ENABLED'
+      ORDER BY metrics.cost_micros DESC
+      LIMIT 200
+    "
+`;
+
+exports[`audit queries queryNegativeKeywords — filters to negative = TRUE 1`] = `
+"
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        campaign_criterion.keyword.text,
+        campaign_criterion.keyword.match_type
+      FROM campaign_criterion
+      WHERE campaign.status = 'ENABLED'
+        AND campaign_criterion.type = 'KEYWORD'
+        AND campaign_criterion.negative = TRUE
+    "
+`;
+
+exports[`audit queries queryNetworkSegmentation — date range 1`] = `
+"
+      SELECT
+        campaign.id, campaign.status, segments.ad_network_type,
+        metrics.impressions, metrics.clicks, metrics.cost_micros,
+        metrics.conversions
+      FROM campaign
+      WHERE campaign.status = 'ENABLED'
+        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+    "
+`;
+
 exports[`audit queries queryQualityScores — matches snapshot 1`] = `
 "
       SELECT
@@ -381,22 +550,6 @@ exports[`audit queries querySearchTerms — date range + LIMIT 2000 1`] = `
     "
 `;
 
-exports[`audit queries queryConvertingSearchTerms — LIMIT 500, conversions > 0 1`] = `
-"
-      SELECT
-        campaign.id, campaign.name, campaign.status,
-        ad_group.id, ad_group.name,
-        search_term_view.search_term,
-        metrics.conversions, metrics.cost_micros, metrics.clicks
-      FROM search_term_view
-      WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
-        AND campaign.status = 'ENABLED'
-        AND metrics.conversions > 0
-      ORDER BY metrics.conversions DESC
-      LIMIT 500
-    "
-`;
-
 exports[`audit queries queryZeroConversionKeywords — LIMIT 500, conversions = 0 1`] = `
 "
       SELECT
@@ -412,158 +565,5 @@ exports[`audit queries queryZeroConversionKeywords — LIMIT 500, conversions = 
         AND metrics.conversions = 0
       ORDER BY metrics.cost_micros DESC
       LIMIT 500
-    "
-`;
-
-exports[`audit queries queryAds — date range + LIMIT 1000 1`] = `
-"
-      SELECT
-        campaign.id, campaign.status,
-        ad_group.name,
-        ad_group_ad.ad.final_urls,
-        ad_group_ad.ad.responsive_search_ad.headlines,
-        ad_group_ad.ad.responsive_search_ad.descriptions,
-        ad_group_ad.ad_strength, ad_group_ad.status,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM ad_group_ad
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group_ad.status != 'REMOVED'
-        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 1000
-    "
-`;
-
-exports[`audit queries queryAdGroups — LIMIT 1000 1`] = `
-"
-      SELECT
-        campaign.id, campaign.status,
-        ad_group.id, ad_group.name, ad_group.status,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM ad_group
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group.status != 'REMOVED'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 1000
-    "
-`;
-
-exports[`audit queries queryConversionActions — ORDER BY name 1`] = `
-"
-      SELECT
-        conversion_action.name, conversion_action.type,
-        conversion_action.status, conversion_action.counting_type,
-        conversion_action.include_in_conversions_metric,
-        conversion_action.primary_for_goal,
-        conversion_action.value_settings.default_value
-      FROM conversion_action
-      WHERE conversion_action.status != 'REMOVED'
-      ORDER BY conversion_action.name ASC
-    "
-`;
-
-exports[`audit queries queryAudienceSegmentCheck — LIMIT 1 (existence check only) 1`] = `
-"
-      SELECT campaign.id, campaign.status, ad_group.id, ad_group_criterion.type
-      FROM ad_group_criterion
-      WHERE campaign.status = 'ENABLED'
-        AND ad_group_criterion.type IN ('USER_LIST', 'CUSTOM_AUDIENCE', 'COMBINED_AUDIENCE')
-      LIMIT 1
-    "
-`;
-
-exports[`audit queries queryDevicePerformance — date range 1`] = `
-"
-      SELECT
-        campaign.id, campaign.status, segments.device,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions, metrics.conversions_value
-      FROM campaign
-      WHERE campaign.status = 'ENABLED'
-        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
-      ORDER BY metrics.cost_micros DESC
-    "
-`;
-
-exports[`audit queries queryNegativeKeywords — filters to negative = TRUE 1`] = `
-"
-      SELECT
-        campaign.id, campaign.name, campaign.status,
-        campaign_criterion.keyword.text,
-        campaign_criterion.keyword.match_type
-      FROM campaign_criterion
-      WHERE campaign.status = 'ENABLED'
-        AND campaign_criterion.type = 'KEYWORD'
-        AND campaign_criterion.negative = TRUE
-    "
-`;
-
-exports[`audit queries queryNetworkSegmentation — date range 1`] = `
-"
-      SELECT
-        campaign.id, campaign.status, segments.ad_network_type,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM campaign
-      WHERE campaign.status = 'ENABLED'
-        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
-    "
-`;
-
-exports[`audit queries queryCampaignAssets — matches snapshot 1`] = `
-"
-      SELECT
-        campaign.id, campaign.name, campaign.status,
-        campaign_asset.field_type
-      FROM campaign_asset
-      WHERE campaign.status = 'ENABLED'
-    "
-`;
-
-exports[`audit queries queryLandingPages — LIMIT 200 1`] = `
-"
-      SELECT
-        campaign.status,
-        landing_page_view.unexpanded_final_url,
-        metrics.impressions, metrics.clicks, metrics.cost_micros,
-        metrics.conversions
-      FROM landing_page_view
-      WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
-        AND campaign.status = 'ENABLED'
-      ORDER BY metrics.cost_micros DESC
-      LIMIT 200
-    "
-`;
-
-exports[`audit queries queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 10000 1`] = `
-"
-      SELECT
-        change_event.change_date_time,
-        change_event.change_resource_type,
-        change_event.resource_name,
-        change_event.client_type,
-        change_event.user_email,
-        change_event.changed_fields,
-        change_event.resource_change_operation,
-        change_event.campaign,
-        change_event.ad_group
-      FROM change_event
-      WHERE change_event.change_date_time >= '2026-01-01 00:00:00'
-        AND change_event.change_date_time <= '2026-01-30 23:59:59'
-      ORDER BY change_event.change_date_time DESC
-      LIMIT 10000
-    "
-`;
-
-exports[`audit queries queryDailyCampaignMetrics — date range 1`] = `
-"
-      SELECT
-        campaign.id, segments.date,
-        metrics.cost_micros, metrics.clicks, metrics.conversions
-      FROM campaign
-      WHERE campaign.status != 'REMOVED'
-        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
     "
 `;
