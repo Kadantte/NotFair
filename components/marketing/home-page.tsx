@@ -349,7 +349,7 @@ export function HomePage({
               className="text-center lg:text-left"
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                AI operator for Google Ads
+                Google Ads MCP - Let Claude Manage Your Ads
               </p>
               <h1 className="font-display mx-auto mt-4 max-w-3xl text-5xl font-bold leading-[0.98] tracking-tight text-[#E8E4DD] sm:text-6xl lg:mx-0 lg:text-7xl">
                 Stop guessing where your ad spend goes.
