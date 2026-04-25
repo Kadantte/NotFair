@@ -307,21 +307,36 @@ export function HomePage({
 
   return (
     <>
-      <section className="relative overflow-hidden px-4 pb-16 pt-8 sm:pb-20 md:pt-12">
+      <section className="relative overflow-hidden px-4 pb-16 pt-5 sm:pb-20 md:pt-6">
         <div className="container mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mb-8 flex justify-center sm:mb-10"
+            className="mb-6 flex justify-center sm:mb-8"
           >
             <a
               href="https://github.com/nowork-studio/toprank"
               target="_blank"
               rel="noreferrer"
-              className="group relative inline-flex max-w-full items-center gap-2 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-3 py-2 text-center text-xs font-medium text-[#4CAF6E] sm:px-4 sm:text-sm"
+              className="group relative inline-flex items-center gap-3 rounded-full px-5 py-2 text-sm transition-all"
+              style={{ background: "linear-gradient(90deg, rgba(76,175,110,0.08), rgba(217,119,87,0.08), rgba(232,185,49,0.08))" }}
             >
-              <span>Open-source MCP</span>
+              <span
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{
+                  padding: "1px",
+                  background: "linear-gradient(90deg, #4CAF6E, #D97757, #E8B931, #4CAF6E)",
+                  backgroundSize: "200% 100%",
+                  animation: "rainbow-slide 3s linear infinite",
+                  WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                  WebkitMaskComposite: "xor",
+                  maskComposite: "exclude",
+                }}
+              />
+              <span className="text-[#E8E4DD]">
+                Open-source Claude Code skills for SEO, SEM &amp; Google Ads — live on GitHub
+              </span>
               <GitHubStarBadge stars={githubStars} />
             </a>
           </motion.div>
