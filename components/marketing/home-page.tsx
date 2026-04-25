@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { fadeInUp, AuditCTA } from "@/components/marketing/audit-cta";
-import { GitHubStarBadge } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
@@ -297,10 +296,8 @@ function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }
 }
 
 export function HomePage({
-  githubStars = null,
   pricing,
 }: {
-  githubStars?: number | null;
   pricing: Omit<PricingSectionProps, "page">;
 }) {
   const session = useSession();
@@ -315,15 +312,12 @@ export function HomePage({
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="mb-8 flex justify-center sm:mb-10"
           >
-            <a
-              href="https://github.com/nowork-studio/toprank"
-              target="_blank"
-              rel="noreferrer"
-              className="group relative inline-flex max-w-full items-center gap-2 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-3 py-2 text-center text-xs font-medium text-[#4CAF6E] sm:px-4 sm:text-sm"
+            <Link
+              href="/google-ads-claude-connector"
+              className="relative inline-flex max-w-full items-center rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-2 text-center text-xs font-medium text-[#4CAF6E] sm:text-sm"
             >
-              <span>Open-source MCP</span>
-              <GitHubStarBadge stars={githubStars} />
-            </a>
+              Connect Google Ads to Claude in minutes
+            </Link>
           </motion.div>
 
           <div className="grid items-center gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">

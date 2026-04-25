@@ -20,25 +20,11 @@ export const metadata = buildMetadata({
   ],
 });
 
-async function getGitHubStars(): Promise<number | null> {
-  try {
-    const res = await fetch("https://api.github.com/repos/nowork-studio/toprank", {
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.stargazers_count ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function Home() {
   const session = await getSession();
-  const [jsonLd, faqJsonLd, stars, subscription] = await Promise.all([
+  const [jsonLd, faqJsonLd, subscription] = await Promise.all([
     Promise.resolve(buildHomepageJsonLd()),
     Promise.resolve(buildFaqJsonLd(homepageFaq)),
-    getGitHubStars(),
     session.connected && session.userId
       ? getUserSubscription(session.userId)
       : Promise.resolve(null),
@@ -64,7 +50,7 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <HomePage githubStars={stars} pricing={pricing} />
+      <HomePage pricing={pricing} />
     </>
   );
 }
