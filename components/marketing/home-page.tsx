@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -221,14 +221,63 @@ function useChatStep(): Set<StepKey> {
   return reached;
 }
 
-const fadeUp = {
-  initial: { opacity: 0, y: 6 },
-  animate: { opacity: 1, y: 0 },
+const fadeInPlace = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
   transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+};
+
+const lineTransition = {
+  duration: 0.36,
+  ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
 };
 
 const initialQuestion = "Where did we waste money this week?";
 const followUpQuestion = "How can I fix $1,847 going to search terms with zero conversions?";
+
+function ChatReveal({ show, children }: { show: boolean; children: ReactNode }) {
+  return (
+    <div className="relative">
+      <div aria-hidden="true" className="pointer-events-none invisible select-none">
+        {children}
+      </div>
+      <AnimatePresence initial={false}>
+        {show && (
+          <motion.div {...fadeInPlace} className="absolute inset-x-0 top-0">
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function SmoothLine({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0, filter: "blur(4px)" }}
+      animate={{ opacity: 1, filter: "blur(0px)" }}
+      transition={{ ...lineTransition, delay }}
+      className={["block", className].filter(Boolean).join(" ")}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+function SmoothListItem({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  return (
+    <motion.li
+      initial={{ opacity: 0, filter: "blur(4px)" }}
+      animate={{ opacity: 1, filter: "blur(0px)" }}
+      transition={{ ...lineTransition, delay }}
+      className={className}
+    >
+      {children}
+    </motion.li>
+  );
+}
 
 function HeroMockup() {
   const reached = useChatStep();
@@ -243,7 +292,7 @@ function HeroMockup() {
       transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
       className="mx-auto w-full max-w-[480px]"
     >
-      <div className="flex h-[660px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
+      <div className="flex h-[680px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
         <div className="flex shrink-0 items-center justify-between border-b border-[#3D3C36] px-4 py-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#E8E4DD]">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
@@ -256,88 +305,90 @@ function HeroMockup() {
           </span>
         </div>
 
-        <div className="flex flex-1 flex-col justify-end gap-3 overflow-hidden px-4 pb-2 pt-4 sm:px-5">
-          <AnimatePresence>
-            {has("user") && (
-              <motion.div key="user" {...fadeUp} className="flex justify-end">
+        <div className="flex flex-1 flex-col justify-end overflow-hidden px-4 pb-2 pt-4 sm:px-5">
+          <div className="w-full space-y-3">
+            <ChatReveal show={has("user")}>
+              <div className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-[#2E2D28] px-4 py-2.5 text-sm text-[#E8E4DD]">
                   {initialQuestion}
                 </div>
-              </motion.div>
-            )}
+              </div>
+            </ChatReveal>
 
-            {has("intro") && (
-              <motion.p key="intro" {...fadeUp} className="text-sm leading-relaxed text-[#E8E4DD]">
-                Let me pull your search terms and campaign performance for the last 7 days.
-              </motion.p>
-            )}
+            <ChatReveal show={has("intro")}>
+              <p className="text-sm leading-relaxed text-[#E8E4DD]">
+                <SmoothLine>Let me pull your search terms</SmoothLine>
+                <SmoothLine delay={0.12}>and campaign performance</SmoothLine>
+                <SmoothLine delay={0.24}>for the last 7 days.</SmoothLine>
+              </p>
+            </ChatReveal>
 
-            {has("tool1") && (
-              <motion.div
-                key="tools"
-                {...fadeUp}
-                className="rounded-xl border border-[#3D3C36] bg-[#1F1E1A] px-3 py-2.5"
-              >
+            <ChatReveal show={has("tool1")}>
+              <div className="rounded-xl border border-[#3D3C36] bg-[#1F1E1A] px-3 py-2.5">
                 <div className="space-y-1.5 font-mono-jb text-[11px] leading-5">
                   <ToolLine
                     name="getSearchTermReport"
                     args="last 7d"
                     done={has("tool1Done")}
                   />
-                  {has("tool2") && (
+                  <ChatReveal show={has("tool2")}>
                     <ToolLine
                       name="getCampaignPerformance"
                       args="cost + conv"
                       done={has("tool2Done")}
                     />
-                  )}
-                  {has("toolSummary") && (
-                    <motion.div
-                      {...fadeUp}
-                      className="flex items-center gap-2 text-[#9B9689]"
-                    >
+                  </ChatReveal>
+                  <ChatReveal show={has("toolSummary")}>
+                    <div className="flex items-center gap-2 text-[#9B9689]">
                       <Check className="h-3 w-3 shrink-0 text-[#4CAF6E]" />
                       <span className="truncate">Analyzed 247 search terms across 4 campaigns</span>
-                    </motion.div>
-                  )}
+                    </div>
+                  </ChatReveal>
                 </div>
-              </motion.div>
-            )}
+              </div>
+            </ChatReveal>
 
-            {has("findings") && (
-              <motion.div key="findings" {...fadeUp} className="space-y-2">
+            <ChatReveal show={has("findings")}>
+              <div className="space-y-2">
                 <p className="text-sm leading-relaxed text-[#E8E4DD]">
-                  Found <span className="font-semibold">3 issues</span> worth fixing this week:
+                  <SmoothLine>
+                    Found <span className="font-semibold">3 issues</span> worth fixing this week:
+                  </SmoothLine>
                 </p>
                 <ul className="space-y-1.5 pl-1 text-sm leading-relaxed text-[#C4C0B6]">
-                  <li className="flex items-start gap-2">
+                  <SmoothListItem delay={0.12} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
                     <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">$1,847</span> to search terms with zero conversions</span>
-                  </li>
-                  <li className="flex items-start gap-2">
+                  </SmoothListItem>
+                  <SmoothListItem delay={0.24} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
                     <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">23</span> negatives to add across 4 campaigns</span>
-                  </li>
-                  <li className="flex items-start gap-2">
+                  </SmoothListItem>
+                  <SmoothListItem delay={0.36} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
                     <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">4</span> budgets to rebalance</span>
-                  </li>
+                  </SmoothListItem>
                 </ul>
-              </motion.div>
-            )}
+              </div>
+            </ChatReveal>
 
-            {has("permission") && (
-              <motion.div
-                key="permission"
-                {...fadeUp}
-                className="rounded-xl border border-[#E8B931]/30 bg-[#E8B931]/[0.04] p-3"
-              >
+            <ChatReveal show={has("permission")}>
+              <div className="rounded-xl border border-[#E8B931]/30 bg-[#E8B931]/[0.04] p-3">
                 <p className="text-xs leading-relaxed text-[#C4C0B6]">
-                  <span className="font-semibold text-[#E8E4DD]">AdsAgent</span> wants to run{" "}
-                  <span className="font-mono-jb text-[#E8B931]">bulkPauseKeywords</span>{" "}
-                  to pause 23 underperforming keywords with zero conversions
+                  <SmoothLine>
+                    <span className="font-semibold text-[#E8E4DD]">AdsAgent</span> wants to run{" "}
+                    <span className="font-mono-jb text-[#E8B931]">bulkPauseKeywords</span>
+                  </SmoothLine>
+                  <SmoothLine delay={0.12}>
+                    to pause 23 underperforming keywords with zero conversions
+                  </SmoothLine>
                 </p>
-                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                <motion.div
+                  initial={{ opacity: 0, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  transition={{ ...lineTransition, delay: 0.24 }}
+                  className="mt-3 grid grid-cols-3 gap-1.5"
+                >
                   <button className="rounded-lg bg-[#E8E4DD] px-2 py-2 text-xs font-semibold text-[#1A1917]">
                     Approve
                   </button>
@@ -347,21 +398,21 @@ function HeroMockup() {
                   <button className="rounded-lg border border-[#4D4C46] bg-[#2E2D28] px-2 py-2 text-xs font-medium text-[#E8E4DD]">
                     Deny
                   </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </motion.div>
+              </div>
+            </ChatReveal>
+          </div>
         </div>
 
         <div className="shrink-0 px-4 pb-4 pt-2 sm:px-5">
           <div className="rounded-2xl border border-[#3D3C36] bg-[#1F1E1A] p-3">
-              <p className={`min-h-[1.25rem] text-sm leading-5 ${inputText ? "text-[#E8E4DD]" : "text-[#7A7770]"}`}>
+              <p className={`min-h-10 text-sm leading-5 ${inputText ? "text-[#E8E4DD]" : "text-[#7A7770]"}`}>
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={inputText || "placeholder"}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.25, ease: "easeOut" }}
                     className="inline-block"
                   >
@@ -405,7 +456,7 @@ function HeroMockup() {
 
 function ToolLine({ name, args, done }: { name: string; args: string; done: boolean }) {
   return (
-    <motion.div {...fadeUp} className="flex items-center gap-2 text-[#C4C0B6]">
+    <div className="flex items-center gap-2 text-[#C4C0B6]">
       {done ? (
         <ChevronRight className="h-3 w-3 shrink-0 text-[#4CAF6E]" />
       ) : (
@@ -413,7 +464,7 @@ function ToolLine({ name, args, done }: { name: string; args: string; done: bool
       )}
       <span className="font-semibold text-[#E8E4DD]">{name}</span>
       <span className="truncate text-[#7A7770]">{args}</span>
-    </motion.div>
+    </div>
   );
 }
 
