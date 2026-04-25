@@ -2,17 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUp,
   Briefcase,
   ChevronDown,
+  ChevronRight,
   Check,
   Clock3,
   Eye,
   Layers,
+  Loader2,
   Shield,
   Store,
   TrendingUp,
@@ -76,12 +78,6 @@ function ConnectClaudeCTA({
     </Button>
   );
 }
-
-const proofStats = [
-  ["$1,847", "waste found"],
-  ["23", "negatives suggested"],
-  ["4", "budgets to adjust"],
-];
 
 const useCases = [
   {
@@ -189,7 +185,106 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+const chatTimeline = [
+  { key: "send", at: 300 },
+  { key: "user", at: 500 },
+  { key: "intro", at: 750 },
+  { key: "tool1", at: 1000 },
+  { key: "tool2", at: 1300 },
+  { key: "tool1Done", at: 1550 },
+  { key: "tool2Done", at: 1850 },
+  { key: "toolSummary", at: 2050 },
+  { key: "findings", at: 2300 },
+  { key: "permission", at: 2600 },
+  { key: "followUp", at: 3100 },
+] as const;
+
+type StepKey = (typeof chatTimeline)[number]["key"];
+
+function useChatStep(): Set<StepKey> {
+  const [reached, setReached] = useState<Set<StepKey>>(new Set());
+
+  useEffect(() => {
+    const timers = chatTimeline.map(({ key, at }) =>
+      setTimeout(() => {
+        setReached((prev) => {
+          if (prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
+      }, at),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return reached;
+}
+
+const fadeInPlace = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+};
+
+const lineTransition = {
+  duration: 0.36,
+  ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+};
+
+const initialQuestion = "Where did we waste money this week?";
+const followUpQuestion = "How can I fix $1,847 going to search terms with zero conversions?";
+
+function ChatReveal({ show, children }: { show: boolean; children: ReactNode }) {
+  return (
+    <div className="relative">
+      <div aria-hidden="true" className="pointer-events-none invisible select-none">
+        {children}
+      </div>
+      <AnimatePresence initial={false}>
+        {show && (
+          <motion.div {...fadeInPlace} className="absolute inset-x-0 top-0">
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function SmoothLine({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0, filter: "blur(4px)" }}
+      animate={{ opacity: 1, filter: "blur(0px)" }}
+      transition={{ ...lineTransition, delay }}
+      className={["block", className].filter(Boolean).join(" ")}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+function SmoothListItem({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  return (
+    <motion.li
+      initial={{ opacity: 0, filter: "blur(4px)" }}
+      animate={{ opacity: 1, filter: "blur(0px)" }}
+      transition={{ ...lineTransition, delay }}
+      className={className}
+    >
+      {children}
+    </motion.li>
+  );
+}
+
 function HeroMockup() {
+  const reached = useChatStep();
+  const has = (k: StepKey) => reached.has(k);
+  const sent = has("user");
+  const inputText = !sent ? initialQuestion : has("followUp") ? followUpQuestion : "";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -197,8 +292,8 @@ function HeroMockup() {
       transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
       className="mx-auto w-full max-w-[480px]"
     >
-      <div className="overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
-        <div className="flex items-center justify-between border-b border-[#3D3C36] px-4 py-3">
+      <div className="flex h-[680px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#3D3C36] px-4 py-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#E8E4DD]">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
               <Image src="/claude-icon.svg" alt="" width={10} height={10} className="h-2.5 w-2.5 brightness-0 invert" />
@@ -206,53 +301,170 @@ function HeroMockup() {
             Claude + AdsAgent
           </div>
           <span className="rounded-full bg-[#4CAF6E]/10 px-2.5 py-1 text-xs font-medium text-[#4CAF6E]">
-            Live data
+            Demo · mock data
           </span>
         </div>
 
-        <div className="space-y-4 p-4 sm:p-5">
-          <div className="rounded-2xl border border-[#4D4C46] bg-[#1A1917] p-4">
-            <p className="text-sm leading-relaxed text-[#E8E4DD] sm:text-base">
-              Where did we waste money this week?
-              <span className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] animate-[pulse_1s_ease-in-out_infinite] bg-[#E8E4DD] align-middle" />
-            </p>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-xs font-medium text-[#4CAF6E]">
-                AdsAgent enabled
-              </span>
-              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8E4DD] text-[#1A1917]">
-                <ArrowUp className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[#3D3C36] bg-[#1F1E1A] p-4">
-            <p className="text-sm font-semibold text-[#E8E4DD]">Found 3 fixes</p>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {proofStats.map(([value, label]) => (
-                <div key={label} className="rounded-xl bg-[#2E2D28] p-3 text-center">
-                  <div className="font-mono-jb text-lg font-bold text-[#4CAF6E]">{value}</div>
-                  <div className="mt-1 text-[10px] uppercase tracking-wide text-[#C4C0B6]">{label}</div>
+        <div className="flex flex-1 flex-col justify-end overflow-hidden px-4 pb-2 pt-4 sm:px-5">
+          <div className="w-full space-y-3">
+            <ChatReveal show={has("user")}>
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-[#2E2D28] px-4 py-2.5 text-sm text-[#E8E4DD]">
+                  {initialQuestion}
                 </div>
-              ))}
-            </div>
-            <div className="mt-4 space-y-2 text-sm text-[#C4C0B6]">
-              <div className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E]" />
-                Add irrelevant queries as negative keywords.
               </div>
-              <div className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E]" />
-                Move budget from high CPA to profitable campaigns.
+            </ChatReveal>
+
+            <ChatReveal show={has("intro")}>
+              <p className="text-sm leading-relaxed text-[#E8E4DD]">
+                <SmoothLine>Let me pull your search terms</SmoothLine>
+                <SmoothLine delay={0.12}>and campaign performance</SmoothLine>
+                <SmoothLine delay={0.24}>for the last 7 days.</SmoothLine>
+              </p>
+            </ChatReveal>
+
+            <ChatReveal show={has("tool1")}>
+              <div className="rounded-xl border border-[#3D3C36] bg-[#1F1E1A] px-3 py-2.5">
+                <div className="space-y-1.5 font-mono-jb text-[11px] leading-5">
+                  <ToolLine
+                    name="getSearchTermReport"
+                    args="last 7d"
+                    done={has("tool1Done")}
+                  />
+                  <ChatReveal show={has("tool2")}>
+                    <ToolLine
+                      name="getCampaignPerformance"
+                      args="cost + conv"
+                      done={has("tool2Done")}
+                    />
+                  </ChatReveal>
+                  <ChatReveal show={has("toolSummary")}>
+                    <div className="flex items-center gap-2 text-[#9B9689]">
+                      <Check className="h-3 w-3 shrink-0 text-[#4CAF6E]" />
+                      <span className="truncate">Analyzed 247 search terms across 4 campaigns</span>
+                    </div>
+                  </ChatReveal>
+                </div>
               </div>
-            </div>
-            <button className="mt-5 w-full rounded-full bg-[#4CAF6E] px-4 py-3 text-sm font-semibold text-[#1A1917]">
-              Approve fixes
-            </button>
+            </ChatReveal>
+
+            <ChatReveal show={has("findings")}>
+              <div className="space-y-2">
+                <p className="text-sm leading-relaxed text-[#E8E4DD]">
+                  <SmoothLine>
+                    Found <span className="font-semibold">3 issues</span> worth fixing this week:
+                  </SmoothLine>
+                </p>
+                <ul className="space-y-1.5 pl-1 text-sm leading-relaxed text-[#C4C0B6]">
+                  <SmoothListItem delay={0.12} className="flex items-start gap-2">
+                    <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
+                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">$1,847</span> to search terms with zero conversions</span>
+                  </SmoothListItem>
+                  <SmoothListItem delay={0.24} className="flex items-start gap-2">
+                    <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
+                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">23</span> negatives to add across 4 campaigns</span>
+                  </SmoothListItem>
+                  <SmoothListItem delay={0.36} className="flex items-start gap-2">
+                    <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
+                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">4</span> budgets to rebalance</span>
+                  </SmoothListItem>
+                </ul>
+              </div>
+            </ChatReveal>
+
+            <ChatReveal show={has("permission")}>
+              <div className="rounded-xl border border-[#E8B931]/30 bg-[#E8B931]/[0.04] p-3">
+                <p className="text-xs leading-relaxed text-[#C4C0B6]">
+                  <SmoothLine>
+                    <span className="font-semibold text-[#E8E4DD]">AdsAgent</span> wants to run{" "}
+                    <span className="font-mono-jb text-[#E8B931]">bulkPauseKeywords</span>
+                  </SmoothLine>
+                  <SmoothLine delay={0.12}>
+                    to pause 23 underperforming keywords with zero conversions
+                  </SmoothLine>
+                </p>
+                <motion.div
+                  initial={{ opacity: 0, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  transition={{ ...lineTransition, delay: 0.24 }}
+                  className="mt-3 grid grid-cols-3 gap-1.5"
+                >
+                  <button className="rounded-lg bg-[#E8E4DD] px-2 py-2 text-xs font-semibold text-[#1A1917]">
+                    Approve
+                  </button>
+                  <button className="rounded-lg border border-[#4D4C46] bg-[#2E2D28] px-2 py-2 text-xs font-medium text-[#E8E4DD]">
+                    Approve once
+                  </button>
+                  <button className="rounded-lg border border-[#4D4C46] bg-[#2E2D28] px-2 py-2 text-xs font-medium text-[#E8E4DD]">
+                    Deny
+                  </button>
+                </motion.div>
+              </div>
+            </ChatReveal>
           </div>
         </div>
-      </div>
+
+        <div className="shrink-0 px-4 pb-4 pt-2 sm:px-5">
+          <div className="rounded-2xl border border-[#3D3C36] bg-[#1F1E1A] p-3">
+              <p className={`min-h-10 text-sm leading-5 ${inputText ? "text-[#E8E4DD]" : "text-[#7A7770]"}`}>
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={inputText || "placeholder"}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className="inline-block"
+                  >
+                    {inputText || "Ask AdsAgent anything"}
+                  </motion.span>
+                </AnimatePresence>
+                {!sent && (
+                  <span className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] animate-[pulse_1s_ease-in-out_infinite] bg-[#E8E4DD] align-middle" />
+                )}
+              </p>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-[11px] font-medium text-[#4CAF6E]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
+                  <span className="sm:hidden">AdsAgent MCP</span>
+                  <span className="hidden sm:inline">AdsAgent · Google Ads MCP</span>
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]">
+                    Opus 4.7 Adaptive
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                  <motion.button
+                    animate={
+                      has("send") && !sent
+                        ? { scale: [1, 0.85, 1.05, 1], boxShadow: ["0 0 0 0 rgba(76,175,110,0)", "0 0 0 6px rgba(76,175,110,0.35)", "0 0 0 0 rgba(76,175,110,0)"] }
+                        : { scale: 1 }
+                    }
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E8E4DD] text-[#1A1917]"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
     </motion.div>
+  );
+}
+
+function ToolLine({ name, args, done }: { name: string; args: string; done: boolean }) {
+  return (
+    <div className="flex items-center gap-2 text-[#C4C0B6]">
+      {done ? (
+        <ChevronRight className="h-3 w-3 shrink-0 text-[#4CAF6E]" />
+      ) : (
+        <Loader2 className="h-3 w-3 shrink-0 animate-spin text-[#E8B931]" />
+      )}
+      <span className="font-semibold text-[#E8E4DD]">{name}</span>
+      <span className="truncate text-[#7A7770]">{args}</span>
+    </div>
   );
 }
 
@@ -349,7 +561,7 @@ export function HomePage({
               className="text-center lg:text-left"
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                AI operator for Google Ads
+                Google Ads MCP - Let Claude Manage Your Ads
               </p>
               <h1 className="font-display mx-auto mt-4 max-w-3xl text-5xl font-bold leading-[0.98] tracking-tight text-[#E8E4DD] sm:text-6xl lg:mx-0 lg:text-7xl">
                 Stop guessing where your ad spend goes.
