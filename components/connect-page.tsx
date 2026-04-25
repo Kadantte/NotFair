@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw, Loader2, Calendar } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, RefreshCw, Loader2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
-import { requestSetupHelp, notifyHelpClicked } from '@/app/actions';
 import { BOOK_DEMO_URL } from '@/lib/links';
+import { notifyHelpClicked } from '@/app/actions';
 
 function imageKeyFromSrc(src: string): string {
     const file = src.split('/').pop() ?? src;
@@ -497,7 +497,7 @@ function SetupScreenshot({ src, alt }: { src: string; alt: string }) {
     );
 }
 
-type SetupTab = 'claude-code' | 'connector';
+type SetupTab = 'claude-code' | 'connector' | 'codex';
 type ClaudeCodeSubTab = 'auto' | 'manual';
 
 function ClaudeCodeManualSection({ token }: { token: string }) {
@@ -574,6 +574,75 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
     );
 }
 
+function CodexSection({ token }: { token: string }) {
+    const serverUrl = 'https://adsagent.org/api/mcp';
+    return (
+        <div className="w-full space-y-6 text-left">
+            <div className="rounded-lg border border-[#3D3C36] bg-[#24231F]/50 p-4 text-sm text-[#C4C0B6]">
+                ChatGPT and Codex authenticate with a bearer token instead of OAuth. Use the MCP URL and your API key below.
+            </div>
+
+            {/* Step 1 */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">1</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Copy your credentials</p>
+                </div>
+                <div className="ml-8 space-y-3">
+                    <CredentialField
+                        label="MCP Server URL"
+                        value={serverUrl}
+                        onCopyTracked={() => trackEvent('connector_credential_copied', { setup_tab: 'codex', field: 'server_url' })}
+                    />
+                    <CredentialField
+                        label="Bearer Token (API Key)"
+                        value={token}
+                        mono
+                        onCopyTracked={() => trackEvent('connector_credential_copied', { setup_tab: 'codex', field: 'bearer_token' })}
+                    />
+                    <p className="text-xs text-[#C4C0B6]/60">
+                        This is your personal access token. Don&apos;t share it publicly.
+                    </p>
+                </div>
+            </div>
+
+            {/* Step 2 — ChatGPT */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">2</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Add to ChatGPT</p>
+                </div>
+                <div className="ml-8 space-y-2">
+                    <p className="text-sm text-[#C4C0B6]">
+                        In ChatGPT, open <strong className="text-[#E8E4DD]">Settings → Connectors → Advanced → Developer mode</strong>, then add a custom connector. Paste the <strong className="text-[#E8E4DD]">MCP Server URL</strong> above, choose <strong className="text-[#E8E4DD]">Custom auth</strong>, and paste your <strong className="text-[#E8E4DD]">Bearer Token</strong> as the value.
+                    </p>
+                </div>
+            </div>
+
+            {/* Step 3 — Codex CLI */}
+            <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">3</span>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Or add to Codex CLI</p>
+                </div>
+                <div className="ml-8 space-y-2">
+                    <p className="text-sm text-[#C4C0B6]">
+                        Add this block to <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">~/.codex/config.toml</code>:
+                    </p>
+                    <SetupCodeBlock
+                        content={`[mcp_servers.adsagent]\nurl = "${serverUrl}"\nbearer_token = "${token}"`}
+                        copied={false}
+                        onCopy={() => {
+                            navigator.clipboard.writeText(`[mcp_servers.adsagent]\nurl = "${serverUrl}"\nbearer_token = "${token}"`);
+                            trackEvent('install_command_copied', { setup_tab: 'codex', step: 'codex_config' });
+                        }}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
     prompt: string;
     copied: boolean;
@@ -582,49 +651,10 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
     activeTab: SetupTab;
     codeSubTab: ClaudeCodeSubTab;
 }) {
-    const [helpStatus, setHelpStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
-
-    async function handleRequestHelp() {
-        if (helpStatus !== 'idle') return;
-        setHelpStatus('sending');
-        const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
-        const connected = Boolean(token);
-        try {
-            await requestSetupHelp({ activeTab, codeSubTab, pathname, connected });
-            trackEvent('setup_help_requested', {
-                active_tab: activeTab,
-                code_sub_tab: codeSubTab,
-                connected,
-                pathname,
-            });
-            setHelpStatus('sent');
-        } catch {
-            setHelpStatus('idle');
-        }
-    }
-
-    const helpClickedRef = useRef(false);
-    function handleNeedHelpClick() {
-        const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
-        const connected = Boolean(token);
-        trackEvent('setup_need_help_clicked', {
-            active_tab: activeTab,
-            code_sub_tab: codeSubTab,
-            connected,
-            pathname,
-        });
-        // Guard against repeat clicks spamming Slack; cal.com still opens via the <a href>.
-        if (helpClickedRef.current) return;
-        helpClickedRef.current = true;
-        // Don't await — would delay the cal.com tab opening.
-        notifyHelpClicked({ activeTab, codeSubTab, pathname, connected, source: 'connect_setup_help' }).catch(() => {});
-    }
-
     return (
         <div className="flex flex-col items-center space-y-8 text-center">
-            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your client</h2>
             {/* Tab switcher */}
-            <div className="flex w-full max-w-md rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
+            <div className="flex w-full max-w-2xl rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
                 <Link
                     href="/connect/claude-code/manual"
                     prefetch
@@ -643,7 +673,17 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
                             : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
                         }`}
                 >
-                    Claude Connector (Web / Cowork)
+                    Claude Cowork / Web
+                </Link>
+                <Link
+                    href="/connect/chatgpt-codex"
+                    prefetch
+                    className={`flex-1 whitespace-nowrap rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'codex'
+                            ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
+                            : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
+                        }`}
+                >
+                    ChatGPT / Codex
                 </Link>
             </div>
 
@@ -690,61 +730,12 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
                         <ClaudeCodeManualSection token={token} />
                     )}
                 </>
-            ) : (
+            ) : activeTab === 'connector' ? (
                 <ClaudeConnectorSection />
+            ) : (
+                <CodexSection token={token} />
             )}
 
-            <div className="flex w-full items-center gap-4">
-                <div className="h-px flex-1 bg-[#3D3C36]" />
-                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]">or</span>
-                <div className="h-px flex-1 bg-[#3D3C36]" />
-            </div>
-
-            <div className="w-full rounded-lg border-2 border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.06] p-5 text-left shadow-lg shadow-[#4CAF6E]/10">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
-                        <p className="text-base font-semibold text-[#E8E4DD]">Need help?</p>
-                        <p className="text-sm text-[#C4C0B6]">
-                            Hop on a free 30-min call and we&apos;ll get you set up live.
-                        </p>
-                    </div>
-                    <a
-                        href={BOOK_DEMO_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={handleNeedHelpClick}
-                        className="inline-flex h-12 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#4CAF6E] px-7 text-base font-semibold text-[#1A1917] shadow-md shadow-[#4CAF6E]/30 ring-2 ring-[#4CAF6E]/20 transition-all hover:bg-[#3D9A5C] hover:shadow-xl hover:shadow-[#4CAF6E]/40"
-                    >
-                        <Calendar className="h-4 w-4" />
-                        Book a 30-min call
-                    </a>
-                </div>
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#4CAF6E]/20 pt-3">
-                    <p className="text-xs text-[#C4C0B6]">
-                        {helpStatus === 'sent'
-                            ? "Got it — we'll reach out to your Google email shortly."
-                            : "Prefer email? Ping our team and we'll follow up."}
-                    </p>
-                    <button
-                        type="button"
-                        onClick={handleRequestHelp}
-                        disabled={helpStatus !== 'idle'}
-                        className="shrink-0 text-xs font-medium text-[#C4C0B6] underline underline-offset-2 transition-colors hover:text-[#E8E4DD] disabled:opacity-60"
-                    >
-                        {helpStatus === 'sending' ? (
-                            <span className="inline-flex items-center gap-1.5">
-                                <Loader2 className="h-3 w-3 animate-spin" /> Sending…
-                            </span>
-                        ) : helpStatus === 'sent' ? (
-                            <span className="inline-flex items-center gap-1.5">
-                                <Check className="h-3 w-3" /> Sent
-                            </span>
-                        ) : (
-                            'Send a ping instead'
-                        )}
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }
@@ -752,6 +743,7 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
 function parseSlug(slug?: string[]): { activeTab: SetupTab; codeSubTab: ClaudeCodeSubTab } {
     if (!slug || slug.length === 0) return { activeTab: 'connector', codeSubTab: 'manual' };
     if (slug[0] === 'claude-connector') return { activeTab: 'connector', codeSubTab: 'manual' };
+    if (slug[0] === 'chatgpt-codex' || slug[0] === 'codex') return { activeTab: 'codex', codeSubTab: 'manual' };
     if (slug[0] === 'claude-code') {
         const sub = slug[1] === 'auto' ? 'auto' : 'manual';
         return { activeTab: 'claude-code', codeSubTab: sub };
@@ -945,29 +937,56 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
                         <p className="mt-0.5 text-sm text-[#C4C0B6]">Connect Google Ads and get the setup prompt for Claude Code.</p>
                     </div>
-                    {token ? (
-                        <div className="flex flex-wrap items-center justify-end gap-3">
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(token);
-                                    setKeyCopied(true);
-                                    setTimeout(() => setKeyCopied(false), 2000);
-                                }}
-                                className={actionBtnClass}
-                            >
-                                {keyCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                {keyCopied ? 'Copied' : 'Copy API Key'}
-                            </button>
-                            <button
-                                onClick={() => setShowRotateConfirm(true)}
-                                disabled={rotating}
-                                className={`${actionBtnClass} disabled:opacity-50`}
-                            >
-                                <RotateCw className={`h-4 w-4 ${rotating ? 'animate-spin' : ''}`} />
-                                {rotating ? 'Rotating...' : 'Rotate API Key'}
-                            </button>
-                        </div>
-                    ) : null}
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                        <a
+                            href={BOOK_DEMO_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => {
+                                const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
+                                trackEvent('setup_need_help_clicked', {
+                                    connected: Boolean(token),
+                                    pathname,
+                                    active_tab: activeTab,
+                                    code_sub_tab: codeSubTab,
+                                });
+                                void notifyHelpClicked({
+                                    activeTab,
+                                    codeSubTab,
+                                    pathname,
+                                    connected: Boolean(token),
+                                    source: 'connect_header',
+                                }).catch(() => {});
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg border border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] px-4 py-2 text-sm font-medium text-[#4CAF6E] transition-all hover:border-[#4CAF6E]/70 hover:bg-[#4CAF6E]/[0.14]"
+                        >
+                            <Calendar className="h-4 w-4" />
+                            Need help?
+                        </a>
+                        {token ? (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(token);
+                                        setKeyCopied(true);
+                                        setTimeout(() => setKeyCopied(false), 2000);
+                                    }}
+                                    className={actionBtnClass}
+                                >
+                                    {keyCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    {keyCopied ? 'Copied' : 'Copy API Key'}
+                                </button>
+                                <button
+                                    onClick={() => setShowRotateConfirm(true)}
+                                    disabled={rotating}
+                                    className={`${actionBtnClass} disabled:opacity-50`}
+                                >
+                                    <RotateCw className={`h-4 w-4 ${rotating ? 'animate-spin' : ''}`} />
+                                    {rotating ? 'Rotating...' : 'Rotate API Key'}
+                                </button>
+                            </>
+                        ) : null}
+                    </div>
                 </div>
             </header>
 
