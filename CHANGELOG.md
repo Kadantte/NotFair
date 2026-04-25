@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.2] - 2026-04-24
+
+### Added
+- **Prominent "Need help?" CTA on `/connect` once you're set up.** A bright green card under "Set up your client" leads with a one-click **Book a 30-min call** button that opens cal.com directly. The team gets a real-time Slack ping the moment someone clicks (with which setup tab they were on, whether their account is connected, and the page URL), so we can reach out before they bounce. The existing email-ping fallback stays available as a smaller secondary action. Cal.com link is now centralized in `lib/links.ts` and shared between this page and the audit help panel.
+
 ## [0.3.0.1] - 2026-04-25
 
 ### Added

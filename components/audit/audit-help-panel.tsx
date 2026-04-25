@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sparkles, Mail, Calendar, MessageCircle, ArrowUpRight, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { BOOK_DEMO_URL } from "@/lib/links";
 
 type HelpAction = "connect_claude" | "join_discord" | "email_expert" | "book_demo" | "chat_agent";
 
@@ -13,7 +14,6 @@ function trackHelpAction(action: HelpAction) {
 
 const DISCORD_URL = "https://discord.gg/5nzUggmVdG";
 const EMAIL = "tong.chen@adsagent.org";
-const BOOK_DEMO_URL = "https://cal.com/tong-chen-uuovdl/30min";
 const CONNECTOR_URL = "/connect/claude-connector";
 const STORAGE_KEY = "audit-help-panel-collapsed";
 

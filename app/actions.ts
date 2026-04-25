@@ -703,6 +703,31 @@ export async function requestSetupHelp(context: {
     ].join('\n'));
 }
 
+export async function notifyHelpClicked(context: {
+    activeTab?: 'claude-code' | 'connector';
+    codeSubTab?: 'manual' | 'auto';
+    pathname: string;
+    connected: boolean;
+    source?: string;
+}) {
+    const auth = await getSessionAuth().catch(() => null);
+    const email = auth?.googleEmail ?? 'anonymous';
+    const setupPath =
+        context.activeTab === 'claude-code'
+            ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
+            : context.activeTab === 'connector'
+                ? 'Claude Connector (Web / Cowork)'
+                : null;
+    await postToSlack([
+        ':sos: *Need help clicked* (cal link opened — not booked yet)',
+        `*User:* <mailto:${email}|${email}>`,
+        `*Account connected:* ${context.connected ? 'yes' : 'no'}`,
+        setupPath ? `*Setup path:* ${setupPath}` : null,
+        `*Source:* ${context.source ?? 'connect_page'}`,
+        `*Page:* ${context.pathname}`,
+    ].filter(Boolean).join('\n'));
+}
+
 export async function submitManagedInquiry(data: {
     name?: string;
     email: string;

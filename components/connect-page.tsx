@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw, Loader2 } from 'lucide-react';
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2, RotateCw, Key, RefreshCw, Loader2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
-import { requestSetupHelp } from '@/app/actions';
+import { requestSetupHelp, notifyHelpClicked } from '@/app/actions';
+import { BOOK_DEMO_URL } from '@/lib/links';
 
 function imageKeyFromSrc(src: string): string {
     const file = src.split('/').pop() ?? src;
@@ -602,6 +603,23 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
         }
     }
 
+    const helpClickedRef = useRef(false);
+    function handleNeedHelpClick() {
+        const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
+        const connected = Boolean(token);
+        trackEvent('setup_need_help_clicked', {
+            active_tab: activeTab,
+            code_sub_tab: codeSubTab,
+            connected,
+            pathname,
+        });
+        // Guard against repeat clicks spamming Slack; cal.com still opens via the <a href>.
+        if (helpClickedRef.current) return;
+        helpClickedRef.current = true;
+        // Don't await — would delay the cal.com tab opening.
+        notifyHelpClicked({ activeTab, codeSubTab, pathname, connected, source: 'connect_setup_help' }).catch(() => {});
+    }
+
     return (
         <div className="flex flex-col items-center space-y-8 text-center">
             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Set up your client</h2>
@@ -682,33 +700,49 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
                 <div className="h-px flex-1 bg-[#3D3C36]" />
             </div>
 
-            <div className="w-full rounded-lg border border-[#3D3C36] bg-[#24231F] p-5 text-left">
+            <div className="w-full rounded-lg border-2 border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.06] p-5 text-left shadow-lg shadow-[#4CAF6E]/10">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
-                        <p className="text-sm font-medium text-[#E8E4DD]">Stuck on setup?</p>
+                        <p className="text-base font-semibold text-[#E8E4DD]">Need help?</p>
                         <p className="text-sm text-[#C4C0B6]">
-                            {helpStatus === 'sent'
-                                ? "Got it — we'll reach out to your Google email shortly."
-                                : "Send a ping to our team and we'll help you get connected."}
+                            Hop on a free 30-min call and we&apos;ll get you set up live.
                         </p>
                     </div>
-                    <Button
+                    <a
+                        href={BOOK_DEMO_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={handleNeedHelpClick}
+                        className="inline-flex h-12 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#4CAF6E] px-7 text-base font-semibold text-[#1A1917] shadow-md shadow-[#4CAF6E]/30 ring-2 ring-[#4CAF6E]/20 transition-all hover:bg-[#3D9A5C] hover:shadow-xl hover:shadow-[#4CAF6E]/40"
+                    >
+                        <Calendar className="h-4 w-4" />
+                        Book a 30-min call
+                    </a>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#4CAF6E]/20 pt-3">
+                    <p className="text-xs text-[#C4C0B6]">
+                        {helpStatus === 'sent'
+                            ? "Got it — we'll reach out to your Google email shortly."
+                            : "Prefer email? Ping our team and we'll follow up."}
+                    </p>
+                    <button
+                        type="button"
                         onClick={handleRequestHelp}
                         disabled={helpStatus !== 'idle'}
-                        className="h-11 shrink-0 rounded-full bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:bg-[#3D9A5C] disabled:opacity-80 disabled:hover:bg-[#4CAF6E]"
+                        className="shrink-0 text-xs font-medium text-[#C4C0B6] underline underline-offset-2 transition-colors hover:text-[#E8E4DD] disabled:opacity-60"
                     >
                         {helpStatus === 'sending' ? (
-                            <span className="flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" /> Sending…
+                            <span className="inline-flex items-center gap-1.5">
+                                <Loader2 className="h-3 w-3 animate-spin" /> Sending…
                             </span>
                         ) : helpStatus === 'sent' ? (
-                            <span className="flex items-center gap-2">
-                                <Check className="h-4 w-4" /> Sent
+                            <span className="inline-flex items-center gap-1.5">
+                                <Check className="h-3 w-3" /> Sent
                             </span>
                         ) : (
-                            'Need help with setup?'
+                            'Send a ping instead'
                         )}
-                    </Button>
+                    </button>
                 </div>
             </div>
         </div>
