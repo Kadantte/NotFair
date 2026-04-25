@@ -275,6 +275,27 @@ describe("runSafeGaqlReport validation", () => {
     );
   });
 
+  it("accepts multi-line SELECT queries (newline immediately after SELECT keyword)", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    // Real-world template-literal formatting from agent telemetry — used to throw
+    // because startsWith("SELECT ") required a literal space after SELECT.
+    await runSafeGaqlReport(
+      auth,
+      `
+      SELECT
+        customer.id, customer.descriptive_name, customer.currency_code
+      FROM customer
+    `,
+    );
+    expect(mockQuery).toHaveBeenCalled();
+  });
+
+  it("accepts SELECT followed by tab", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(auth, "SELECT\tcampaign.id FROM campaign");
+    expect(mockQuery).toHaveBeenCalled();
+  });
+
   it("rejects queries with semicolons", async () => {
     await expect(
       runSafeGaqlReport(auth, "SELECT campaign.id FROM campaign;"),
@@ -318,6 +339,60 @@ describe("runSafeGaqlReport limit + truncation", () => {
     expect(query).toContain("campaign.status != 'REMOVED'");
     expect(query).toContain("ad_group.status != 'REMOVED'");
     expect(query.indexOf("campaign.status")).toBeLessThan(query.indexOf("ORDER BY"));
+  });
+
+  it("auto-adds campaign.status and ad_group.status to SELECT when injecting the WHERE filter", async () => {
+    // Google Ads rejects (query_error=16) when fields used in WHERE aren't in SELECT.
+    // The user's SELECT here doesn't include campaign.status / ad_group.status, so we
+    // must add them ourselves alongside the auto-injected WHERE filter.
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.name, ad_group.name, ad_group_criterion.keyword.text, metrics.cost_micros FROM keyword_view WHERE segments.date DURING LAST_30_DAYS",
+      100,
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    expect(selectClause).toMatch(/\bcampaign\.status\b/);
+    expect(selectClause).toMatch(/\bad_group\.status\b/);
+    expect(query).toContain("campaign.status != 'REMOVED'");
+    expect(query).toContain("ad_group.status != 'REMOVED'");
+  });
+
+  it("does not duplicate campaign.status in SELECT when user already included it", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.name, campaign.status FROM campaign",
+      100,
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    const occurrences = selectClause.match(/\bcampaign\.status\b/gi)?.length ?? 0;
+    expect(occurrences).toBe(1);
+    expect(query).toContain("campaign.status != 'REMOVED'");
+  });
+
+  it("auto-adds status fields to a multi-line SELECT without breaking formatting", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      `
+      SELECT
+        ad_group_ad.ad.id,
+        ad_group_ad.ad.final_urls,
+        metrics.cost_micros
+      FROM ad_group_ad
+      WHERE segments.date DURING LAST_30_DAYS
+    `,
+      100,
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    expect(query).toContain("campaign.status");
+    expect(query).toContain("ad_group.status");
+    expect(query).toContain("campaign.status != 'REMOVED'");
+    // FROM ad_group_ad must still be intact (not corrupted by SELECT rewrite)
+    expect(query).toMatch(/FROM\s+ad_group_ad\b/);
   });
 
   it("can opt out of removed-parent filtering for historical GAQL", async () => {

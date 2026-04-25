@@ -1663,7 +1663,9 @@ export async function runSafeGaqlReport(
   let query = rawQuery.trim();
   let normalized = query.toUpperCase();
 
-  if (!normalized.startsWith("SELECT ")) {
+  // Accept any whitespace after SELECT (newlines, tabs, spaces) — multi-line
+  // template-literal queries are the natural way agents format wide reports.
+  if (!/^SELECT\s/i.test(query)) {
     throw new Error("Only read-only SELECT GAQL queries are allowed.");
   }
   if (query.includes(";")) {
@@ -1794,23 +1796,42 @@ function applyRemovedParentFilters(query: string): string {
   if (!resource) return query;
 
   const filters: string[] = [];
+  const selectFieldsToAdd: string[] = [];
   if (
     CAMPAIGN_SCOPED_RESOURCES.has(resource) &&
     !/\bcampaign\.status\s*(?:=|!=|\bIN\b|\bNOT\s+IN\b)/i.test(query)
   ) {
     filters.push("campaign.status != 'REMOVED'");
+    // Google Ads rejects (query_error=16) when a field used in WHERE isn't in SELECT.
+    // Add it ourselves so our auto-injected filter doesn't break user queries.
+    if (!/\bcampaign\.status\b/i.test(query)) {
+      selectFieldsToAdd.push("campaign.status");
+    }
   }
   if (
     AD_GROUP_SCOPED_RESOURCES.has(resource) &&
     !/\bad_group\.status\s*(?:=|!=|\bIN\b|\bNOT\s+IN\b)/i.test(query)
   ) {
     filters.push("ad_group.status != 'REMOVED'");
+    if (!/\bad_group\.status\b/i.test(query)) {
+      selectFieldsToAdd.push("ad_group.status");
+    }
   }
   if (filters.length === 0) return query;
 
-  const insertionPoint = findTrailingClauseIndex(query);
-  const head = query.slice(0, insertionPoint).trimEnd();
-  const tail = query.slice(insertionPoint);
+  let result = query;
+  if (selectFieldsToAdd.length > 0) {
+    const selectMatch = result.match(/^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\s+)/i);
+    if (selectMatch) {
+      const [full, prefix, fields, suffix] = selectMatch;
+      const merged = `${fields.trimEnd().replace(/,\s*$/, "")}, ${selectFieldsToAdd.join(", ")}`;
+      result = result.replace(full, `${prefix}${merged}${suffix}`);
+    }
+  }
+
+  const insertionPoint = findTrailingClauseIndex(result);
+  const head = result.slice(0, insertionPoint).trimEnd();
+  const tail = result.slice(insertionPoint);
   const connector = /\sWHERE\s/i.test(head) ? " AND " : " WHERE ";
   return `${head}${connector}${filters.join(" AND ")}${tail}`;
 }
