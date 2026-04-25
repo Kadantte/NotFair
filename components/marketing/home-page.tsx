@@ -292,17 +292,21 @@ function HeroMockup() {
       transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
       className="mx-auto w-full max-w-[480px]"
     >
-      <div className="flex h-[650px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-[#3D3C36] px-4 py-2">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#2E2D28] px-3 py-1 text-sm text-[#E8E4DD]">
+      <div className="flex h-[630px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
+        <div className="relative flex shrink-0 items-center px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-full bg-[#FF5F57]" />
+            <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
+            <span className="h-3 w-3 rounded-full bg-[#28C840]" />
+          </div>
+          <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 text-xs font-medium text-[#C4C0B6]">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
               <Image src="/claude-icon.svg" alt="" width={10} height={10} className="h-2.5 w-2.5 brightness-0 invert" />
             </span>
-            Claude + AdsAgent
+            <span>Claude + AdsAgent</span>
+            <span className="text-[#5A5852]">·</span>
+            <span className="text-[#4CAF6E]">demo</span>
           </div>
-          <span className="rounded-full bg-[#4CAF6E]/10 px-2.5 py-1 text-xs font-medium text-[#4CAF6E]">
-            Demo · mock data
-          </span>
         </div>
 
         <div className="flex flex-1 flex-col justify-end overflow-hidden px-4 pb-2 pt-4 sm:px-5">
@@ -380,7 +384,7 @@ function HeroMockup() {
                     <span className="font-mono-jb text-[#E8B931]">bulkPauseKeywords</span>
                   </SmoothLine>
                   <SmoothLine delay={0.12}>
-                    to pause 23 underperforming keywords with zero conversions
+                    to pause 23 keywords with zero conversions
                   </SmoothLine>
                 </p>
                 <motion.div
