@@ -2,6 +2,18 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.4] - 2026-04-25
+
+### Added
+- **`/connect` now supports ChatGPT and Codex.** New "ChatGPT / Codex" tab uses bearer-token auth (instead of OAuth) and shows the MCP server URL plus your API key, with paste-ready instructions for ChatGPT custom connectors and a `~/.codex/config.toml` snippet for Codex CLI. Tab default labels updated: "Claude Connector (Web / Cowork)" → "Claude Cowork / Web". The /connect setup view now spans three clients instead of two.
+
+### Changed
+- **"Need help?" moved into the `/connect` page header.** Replaced the bottom green CTA box with a small persistent outlined pill in the page header (alongside Copy/Rotate API Key). Visible in every state — sign-in, account select, post-token setup — instead of only at the bottom of the setup view. Clicking opens cal.com directly. Removed the "Send a ping instead" secondary action and the Slack notification on click.
+- **Removed the "Set up your client" heading** above the tab switcher on `/connect`. The tabs themselves serve as the framing.
+
+### Removed
+- **Server actions `requestSetupHelp` and `notifyHelpClicked` are no longer called from the UI** (functions remain in `app/actions.ts` for now). The email-ping fallback flow is gone. Use the Need help? button to book directly.
+
 ## [0.3.0.2] - 2026-04-24
 
 ### Added
