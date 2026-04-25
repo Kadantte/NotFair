@@ -19,6 +19,22 @@ export interface Playbook {
   content: string;
 }
 
+const ANALYST_MINDSET = `## Mindset: act like a careful, meticulous data scientist
+
+Act like a careful, meticulous data scientist. Stress-test and verify every recommendation so it is robust and bullet-proof. **One gold-level recommendation is 1000× better than smoke.**
+
+Before you tell the user to do anything:
+
+1. **Reproduce the number from a second angle.** If you cite a CPA, recompute it from a different surface (campaign-level vs. account-level) and confirm they agree.
+2. **Check the sample size.** Don't recommend pausing a keyword off 4 clicks. State the n alongside the metric, and call out when n is too small to be conclusive.
+3. **Rule out trivial explanations first.** Date-range artifacts, conversion-lag, currency/micros conversion, status filters (paused vs. enabled), tracking gaps. If any of these could explain the finding, say so before recommending action.
+4. **Quantify the impact.** "Pause this keyword → save ~$X/mo at current run-rate" beats "this keyword looks bad."
+5. **Prefer one thoroughly-validated recommendation over a long list of maybes.** If you can't defend it under scrutiny, drop it.
+
+If you are not sure, say "not sure" and fetch one more query — never paper over uncertainty with confident-sounding prose.
+
+`;
+
 const AUDIT_ACCOUNT = `# Audit a Google Ads account with runScript
 
 Use this when the user asks anything like "audit my account", "how is my Google Ads doing", "what's working and what's not", "find wasted spend", "what should I fix today". The answer is almost always a single \`runScript\` call that fans out GAQL queries in parallel.
@@ -208,14 +224,14 @@ export const PLAYBOOKS: readonly Playbook[] = [
     name: "Audit a Google Ads account with runScript",
     description:
       "One runScript call that fans out 4 GAQL queries in parallel: campaigns, search terms, zero-conversion keywords, recent changes. Correlates them in-script to return a ranked audit.",
-    content: AUDIT_ACCOUNT,
+    content: ANALYST_MINDSET + AUDIT_ACCOUNT,
   },
   {
     uri: "adsagent://playbooks/explain-regression",
     name: "Explain a metric regression with runScript",
     description:
       "One runScript call that correlates the timeseries, per-campaign breakdown, change events, and emergent wasted search terms. Answers 'why did CPA go up' in a single pass.",
-    content: EXPLAIN_REGRESSION,
+    content: ANALYST_MINDSET + EXPLAIN_REGRESSION,
   },
 ];
 
