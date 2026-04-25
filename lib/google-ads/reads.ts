@@ -486,6 +486,167 @@ export async function getKeywords(
   };
 }
 
+export type ListKeywordsOptions = {
+  campaignId?: string;
+  adGroupId?: string;
+  /** true = positive keywords only; false = negative keywords only. Default true. */
+  positive?: boolean;
+  /** true = only ENABLED criteria; false = include PAUSED but still exclude REMOVED. Default true. */
+  enabledOnly?: boolean;
+  /** Exclude rows under REMOVED campaigns/ad groups. Default true. */
+  excludeRemovedParents?: boolean;
+  includeQualityInfo?: boolean;
+  includeBidInfo?: boolean;
+  limit?: number;
+};
+
+export async function listKeywords(auth: AuthContext, options: ListKeywordsOptions = {}) {
+  const {
+    campaignId,
+    adGroupId,
+    positive = true,
+    enabledOnly = true,
+    excludeRemovedParents = true,
+    includeQualityInfo = false,
+    includeBidInfo = false,
+  } = options;
+  const boundedLimit = Math.min(Math.max(options.limit ?? 500, 1), 1000);
+
+  if (isDemoAuth(auth)) {
+    const campaigns = campaignId
+      ? [{ id: campaignId }]
+      : demoListCampaigns({ limit: 100 }).map((campaign) => ({ id: campaign.id }));
+    const keywords = positive
+      ? campaigns.flatMap((campaign) =>
+          demoGetKeywords(campaign.id, 30, boundedLimit).keywords.map((keyword) => ({
+            campaignId: campaign.id,
+            campaignName: null as string | null,
+            campaignStatus: "ENABLED",
+            adGroupId: keyword.adGroupId,
+            adGroupName: keyword.adGroupName,
+            adGroupStatus: "ENABLED",
+            criterionId: keyword.criterionId,
+            resourceName: null as string | null,
+            text: keyword.text,
+            matchType: keyword.matchType,
+            status: keyword.status,
+            negative: false,
+            ...(includeBidInfo ? { cpcBidMicros: null as number | null, cpcBid: null as number | null } : {}),
+            ...(includeQualityInfo
+              ? {
+                  qualityScore: keyword.qualityScore,
+                  creativeQualityScore: keyword.creativeQualityScore,
+                  postClickQualityScore: keyword.postClickQualityScore,
+                  searchPredictedCtr: keyword.searchPredictedCtr,
+                }
+              : {}),
+          })),
+        )
+      : [];
+
+    const filtered = adGroupId ? keywords.filter((keyword) => keyword.adGroupId === adGroupId) : keywords;
+    return {
+      filters: { campaignId: campaignId ?? null, adGroupId: adGroupId ?? null, positive, enabledOnly, excludeRemovedParents, includeQualityInfo, includeBidInfo },
+      count: Math.min(filtered.length, boundedLimit),
+      keywords: filtered.slice(0, boundedLimit),
+    };
+  }
+
+  const customer = getCachedCustomer(auth);
+  const selectFields = [
+    "campaign.id",
+    "campaign.name",
+    "campaign.status",
+    "ad_group.id",
+    "ad_group.name",
+    "ad_group.status",
+    "ad_group_criterion.resource_name",
+    "ad_group_criterion.criterion_id",
+    "ad_group_criterion.status",
+    "ad_group_criterion.negative",
+    "ad_group_criterion.keyword.text",
+    "ad_group_criterion.keyword.match_type",
+  ];
+
+  if (includeBidInfo) {
+    selectFields.push("ad_group_criterion.cpc_bid_micros");
+  }
+  if (includeQualityInfo) {
+    selectFields.push(
+      "ad_group_criterion.quality_info.quality_score",
+      "ad_group_criterion.quality_info.creative_quality_score",
+      "ad_group_criterion.quality_info.post_click_quality_score",
+      "ad_group_criterion.quality_info.search_predicted_ctr",
+    );
+  }
+
+  const conditions = [
+    "ad_group_criterion.type = 'KEYWORD'",
+    `ad_group_criterion.negative = ${positive ? "FALSE" : "TRUE"}`,
+    enabledOnly
+      ? "ad_group_criterion.status = 'ENABLED'"
+      : "ad_group_criterion.status != 'REMOVED'",
+  ];
+  if (campaignId) conditions.push(`campaign.id = ${safeEntityId(campaignId)}`);
+  if (adGroupId) conditions.push(`ad_group.id = ${safeEntityId(adGroupId)}`);
+  if (excludeRemovedParents) {
+    conditions.push("campaign.status != 'REMOVED'", "ad_group.status != 'REMOVED'");
+  }
+
+  const rows = await customer.query(`
+    SELECT
+      ${selectFields.join(",\n      ")}
+    FROM ad_group_criterion
+    WHERE ${conditions.join("\n      AND ")}
+    ORDER BY campaign.name ASC, ad_group.name ASC, ad_group_criterion.keyword.text ASC
+    LIMIT ${boundedLimit}
+  `);
+
+  return {
+    filters: { campaignId: campaignId ?? null, adGroupId: adGroupId ?? null, positive, enabledOnly, excludeRemovedParents, includeQualityInfo, includeBidInfo },
+    count: (rows as unknown[]).length,
+    keywords: (rows as any[]).map((row) => {
+      const rawMatchType = row.ad_group_criterion?.keyword?.match_type;
+      const cpcBidMicros = row.ad_group_criterion?.cpc_bid_micros != null
+        ? Number(row.ad_group_criterion.cpc_bid_micros)
+        : null;
+      const quality = row.ad_group_criterion?.quality_info ?? {};
+      return {
+        campaignId: String(row.campaign?.id ?? ""),
+        campaignName: row.campaign?.name ?? null,
+        campaignStatus: row.campaign?.status ?? "UNKNOWN",
+        adGroupId: String(row.ad_group?.id ?? ""),
+        adGroupName: row.ad_group?.name ?? null,
+        adGroupStatus: row.ad_group?.status ?? "UNKNOWN",
+        criterionId: String(row.ad_group_criterion?.criterion_id ?? ""),
+        resourceName: row.ad_group_criterion?.resource_name ?? null,
+        text: row.ad_group_criterion?.keyword?.text ?? "",
+        matchType: normalizeKeywordMatchType(rawMatchType),
+        status: row.ad_group_criterion?.status ?? "UNKNOWN",
+        negative: row.ad_group_criterion?.negative ?? false,
+        ...(includeBidInfo ? { cpcBidMicros, cpcBid: cpcBidMicros != null ? micros(cpcBidMicros) : null } : {}),
+        ...(includeQualityInfo
+          ? {
+              qualityScore: quality.quality_score ?? null,
+              creativeQualityScore: quality.creative_quality_score ?? null,
+              postClickQualityScore: quality.post_click_quality_score ?? null,
+              searchPredictedCtr: quality.search_predicted_ctr ?? null,
+            }
+          : {}),
+      };
+    }),
+  };
+}
+
+function normalizeKeywordMatchType(raw: unknown): string {
+  if (raw == null) return "UNKNOWN";
+  if (typeof raw === "number") {
+    if (raw === 0) return "UNSPECIFIED";
+    return MATCH_TYPE_NAME[raw] ?? String(raw);
+  }
+  return String(raw);
+}
+
 export async function getSearchTermReport(
   auth: AuthContext,
   campaignId: string,

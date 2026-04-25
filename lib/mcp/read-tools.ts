@@ -5,6 +5,7 @@ import {
   listQueryableResources,
   searchGeoTargets,
   getKeywordIdeas,
+  listKeywords,
   type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
@@ -110,6 +111,50 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "review_change_impact", () =>
       reviewChangeImpact(targetId, { days, limit }),
+    );
+    return typedResult(result);
+  }));
+
+  // ─── Keyword Inventory ───────────────────────────────────────────
+
+  server.registerTool("listKeywords", {
+    description:
+      "Typed keyword inventory for safe mutation prep. Use this when you need keyword criterion IDs for bulkPauseKeywords, bulkUpdateBids, moveKeywords, or to inspect current positive/negative keyword state. This is intentionally narrow: for performance analysis, date-ranged metrics, search terms, or custom joins, use runScript. Defaults are safety-oriented: positive keywords only, enabled criteria only, and rows under REMOVED campaigns/ad groups excluded.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().optional().describe("Optional campaign ID to narrow the inventory."),
+      adGroupId: z.string().optional().describe("Optional ad group ID to narrow the inventory."),
+      positive: z
+        .boolean()
+        .default(true)
+        .describe("true = positive keywords only (default). false = negative keywords only."),
+      enabledOnly: z
+        .boolean()
+        .default(true)
+        .describe("true = only ENABLED keyword criteria (default). false = include PAUSED, still excluding REMOVED criteria."),
+      excludeRemovedParents: z
+        .boolean()
+        .default(true)
+        .describe("Exclude keywords whose campaign or ad group is REMOVED. Default true."),
+      includeQualityInfo: z.boolean().default(false).describe("Include quality score sub-fields."),
+      includeBidInfo: z.boolean().default(false).describe("Include CPC bid fields."),
+      limit: z.number().int().min(1).max(1000).default(500).describe("Maximum keywords to return. Default 500, max 1000."),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, positive, enabledOnly, excludeRemovedParents, includeQualityInfo, includeBidInfo, limit }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "list_keywords", () =>
+      listKeywords(targetAuth, {
+        campaignId,
+        adGroupId,
+        positive,
+        enabledOnly,
+        excludeRemovedParents,
+        includeQualityInfo,
+        includeBidInfo,
+        limit,
+      }),
+      campaignId,
     );
     return typedResult(result);
   }));

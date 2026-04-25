@@ -87,6 +87,7 @@ describe("response-types — registry completeness", () => {
       getResourceMetadata: true,
       listQueryableResources: true,
       getKeywordIdeas: true,
+      listKeywords: true,
       listConnectedAccounts: true,
       // Code mode
       runScript: true,

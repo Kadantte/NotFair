@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.1] - 2026-04-25
+
+### Added
+- **`listKeywords` MCP read tool for safe mutation prep.** Returns typed keyword inventory with safety defaults (`positive: true`, `enabledOnly: true`, `excludeRemovedParents: true`) plus optional campaign/ad group filters, bid fields, and quality-score fields. Keeps exploratory analytics in `runScript` while giving agents a predictable way to fetch keyword criterion IDs before bulk mutations.
+
 ## [0.3.0.0] - 2026-04-24
 
 ### Fixed

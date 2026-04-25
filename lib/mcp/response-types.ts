@@ -20,6 +20,7 @@ import type {
   getResourceMetadata,
   listQueryableResources,
   getKeywordIdeas,
+  listKeywords,
   WriteResult,
 } from "@/lib/google-ads";
 import type { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
@@ -67,6 +68,7 @@ export type ReviewChangeImpactResponse = StructuredShape<Unwrap<typeof reviewCha
 export type GetResourceMetadataResponse = StructuredShape<Unwrap<typeof getResourceMetadata>>;
 export type ListQueryableResourcesResponse = StructuredShape<Unwrap<typeof listQueryableResources>>;
 export type GetKeywordIdeasResponse = StructuredShape<Unwrap<typeof getKeywordIdeas>>;
+export type ListKeywordsResponse = StructuredShape<Unwrap<typeof listKeywords>>;
 
 // `listConnectedAccounts` is registered inline in `app/api/[transport]/route.ts`
 // (not a Google Ads helper call). Declare its shape explicitly.
@@ -204,6 +206,7 @@ export interface McpToolResponseRegistry {
   getResourceMetadata: GetResourceMetadataResponse;
   listQueryableResources: ListQueryableResourcesResponse;
   getKeywordIdeas: GetKeywordIdeasResponse;
+  listKeywords: ListKeywordsResponse;
   // Inline-registered (route.ts)
   listConnectedAccounts: ListConnectedAccountsResponse;
   // Code mode (sandboxed GAQL — owns all reads not covered above)

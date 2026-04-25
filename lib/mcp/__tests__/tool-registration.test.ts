@@ -82,6 +82,7 @@ describe("MCP read tools — registration", () => {
     expect(names).toContain("getResourceMetadata");
     expect(names).toContain("listQueryableResources");
     expect(names).toContain("getKeywordIdeas");
+    expect(names).toContain("listKeywords");
   });
 
   it("every registered read tool declares readOnlyHint = true", () => {
@@ -187,6 +188,68 @@ describe("MCP read tools — handler execution", () => {
     const structured = expectOk(result);
     expect(structured).toMatchObject({ recommendations: [] });
     expect(structured.error).toContain("SIMULATED_API_FAILURE");
+  });
+
+  it("listKeywords returns typed keyword inventory with safe default filters", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: { id: "100", name: "Search", status: "ENABLED" },
+        ad_group: { id: "111", name: "Dog Grooming", status: "ENABLED" },
+        ad_group_criterion: {
+          resource_name: "customers/1234567890/adGroupCriteria/111~222",
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: false,
+          cpc_bid_micros: 1_500_000,
+          keyword: { text: "dog grooming", match_type: "PHRASE" },
+          quality_info: { quality_score: 7 },
+        },
+      },
+    ]);
+
+    const harness = buildHarness([registerReadTools], TEST_AUTH);
+    const result = await harness.callTool("listKeywords", {
+      campaignId: "100",
+      adGroupId: "111",
+      includeBidInfo: true,
+      includeQualityInfo: true,
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      count: 1,
+      filters: {
+        campaignId: "100",
+        adGroupId: "111",
+        positive: true,
+        enabledOnly: true,
+        excludeRemovedParents: true,
+      },
+      keywords: [
+        {
+          campaignId: "100",
+          campaignName: "Search",
+          campaignStatus: "ENABLED",
+          adGroupId: "111",
+          adGroupName: "Dog Grooming",
+          adGroupStatus: "ENABLED",
+          criterionId: "222",
+          text: "dog grooming",
+          matchType: "PHRASE",
+          status: "ENABLED",
+          negative: false,
+          cpcBidMicros: 1_500_000,
+          cpcBid: 1.5,
+          qualityScore: 7,
+        },
+      ],
+    });
+
+    const query = mockQuery.mock.calls[0][0] as string;
+    expect(query).toContain("ad_group_criterion.negative = FALSE");
+    expect(query).toContain("ad_group_criterion.status = 'ENABLED'");
+    expect(query).toContain("campaign.status != 'REMOVED'");
+    expect(query).toContain("ad_group.status != 'REMOVED'");
   });
 });
 
