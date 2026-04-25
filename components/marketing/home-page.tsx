@@ -375,7 +375,8 @@ function HeroMockup() {
               <div className="mt-3 flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-[11px] font-medium text-[#4CAF6E]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
-                  AdsAgent · Google Ads MCP
+                  <span className="sm:hidden">AdsAgent MCP</span>
+                  <span className="hidden sm:inline">AdsAgent · Google Ads MCP</span>
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]">
