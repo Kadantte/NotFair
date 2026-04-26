@@ -123,6 +123,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const isFree = plan === 'free';
     const planLoaded = plan !== null;
     const [usageExceeded, setUsageExceeded] = useState(false);
+    const [usageNearLimit, setUsageNearLimit] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const refreshThreads = useCallback(() => {
@@ -181,7 +182,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         getUsageSummaryAction()
             .then(info => {
                 const exceeded = !info.unlimited && info.remaining !== null && info.remaining <= 0;
+                const nearLimit =
+                    !exceeded &&
+                    !info.unlimited &&
+                    info.limit !== null &&
+                    info.used / info.limit > 2 / 3;
                 setUsageExceeded(exceeded);
+                setUsageNearLimit(nearLimit);
             })
             .catch(() => {});
     }, [plan]);
@@ -456,6 +463,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                             </Link>
                         )}
+                        {planLoaded && isFree && usageNearLimit && (
+                            <Link
+                                href="/upgrade"
+                                prefetch
+                                onClick={() => trackEvent('upgrade_clicked', { location: 'usage_near_limit_badge', page: pathname })}
+                                className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#D89344] bg-[#D89344] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(216,147,68,0.18)] transition-all hover:bg-[#C0823A] hover:shadow-[0_0_0_4px_rgba(216,147,68,0.28)]"
+                                aria-label="Approaching monthly usage limit — upgrade to Growth for unlimited operations"
+                            >
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                <span>Approaching monthly limit — upgrade to get unlimited access</span>
+                                <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+                            </Link>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <FeedbackButton />
@@ -491,6 +511,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             Monthly usage limit reached — upgrade to get unlimited access
                         </span>
                         <span className="sm:hidden">Monthly limit reached — upgrade</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+                    </Link>
+                )}
+                {planLoaded && isFree && usageNearLimit && (
+                    <Link
+                        href="/upgrade"
+                        prefetch
+                        onClick={() => trackEvent('upgrade_clicked', { location: 'usage_near_limit_banner', page: pathname })}
+                        className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#D89344]/60 bg-[#D89344] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#C0823A] lg:hidden"
+                        aria-label="Approaching monthly usage limit — upgrade to Growth for unlimited operations"
+                    >
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        <span className="hidden sm:inline">
+                            Approaching monthly limit — upgrade to get unlimited access
+                        </span>
+                        <span className="sm:hidden">Near monthly limit — upgrade</span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                     </Link>
                 )}
