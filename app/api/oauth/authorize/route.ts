@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   // registered. (Pre-bound clients skip this — they trust whatever the
   // in-app form posted at registration time.)
   if (client.sessionId === null) {
-    if (!client.redirectUris || !client.redirectUris.includes(redirectUri)) {
+    if (!client.redirectUris || !redirectUriMatches(redirectUri, client.redirectUris)) {
       return NextResponse.json(
         { error: "invalid_request", error_description: "redirect_uri is not registered for this client" },
         { status: 400 },
@@ -162,4 +162,48 @@ export async function GET(request: Request) {
   if (state) url.searchParams.set("state", state);
 
   return NextResponse.redirect(url.toString());
+}
+
+/**
+ * RFC 8252 §7.3 — for loopback redirect URIs (`127.0.0.1`, `::1`), the
+ * authorization server MUST allow any port. Native OAuth clients like Codex
+ * bind to an ephemeral port at flow time, so the port registered via DCR
+ * almost never matches what comes back on /authorize. Match scheme + host +
+ * path for loopback registrations; require an exact match otherwise.
+ */
+function redirectUriMatches(requested: string, registered: string[]): boolean {
+  let req: URL;
+  try {
+    req = new URL(requested);
+  } catch {
+    return false;
+  }
+
+  for (const candidate of registered) {
+    if (candidate === requested) return true;
+
+    let reg: URL;
+    try {
+      reg = new URL(candidate);
+    } catch {
+      continue;
+    }
+
+    if (!isLoopbackHost(reg.hostname) || !isLoopbackHost(req.hostname)) continue;
+
+    if (
+      reg.protocol === req.protocol &&
+      reg.hostname === req.hostname &&
+      reg.pathname === req.pathname &&
+      reg.search === req.search
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
 }
