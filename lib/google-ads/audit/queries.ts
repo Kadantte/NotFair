@@ -188,12 +188,17 @@ export function queryAdGroups(): string {
 
 /** Q10: Conversion actions. */
 export function queryConversionActions(): string {
+  // owner_customer + type let agents filter out read-only actions before
+  // calling updateConversionAction. GA4-imported, Floodlight, Firebase, and
+  // manager-owned actions return mutate_error=9 if mutated; selecting them
+  // here lets a script skip them client-side instead of probing one at a time.
   return `
       SELECT
         conversion_action.name, conversion_action.type,
         conversion_action.status, conversion_action.counting_type,
         conversion_action.include_in_conversions_metric,
         conversion_action.primary_for_goal,
+        conversion_action.owner_customer,
         conversion_action.value_settings.default_value
       FROM conversion_action
       WHERE conversion_action.status != 'REMOVED'

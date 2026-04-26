@@ -23,6 +23,8 @@ import {
   extractSelectFields,
   buildGaqlSummary,
   buildContinuationHint,
+  rewriteInvalidDateLiterals,
+  enrichGaqlError,
   DEFAULT_GAQL_LIMIT,
   MAX_GAQL_LIMIT,
 } from "@/lib/google-ads/reads";
@@ -522,5 +524,99 @@ describe("runSafeGaqlReport limit + truncation", () => {
     await expect(
       runSafeGaqlReport(auth, "SELECT bogus FROM campaign"),
     ).rejects.toThrow(/GAQL query failed.*invalid field/);
+  });
+});
+
+describe("rewriteInvalidDateLiterals", () => {
+  // Pin the clock so BETWEEN windows are deterministic in tests.
+  const NOW = new Date("2026-04-25T12:00:00Z");
+
+  it("rewrites LAST_90_DAYS to a 90-day BETWEEN window ending today", () => {
+    const out = rewriteInvalidDateLiterals(
+      "SELECT campaign.id FROM campaign WHERE segments.date DURING LAST_90_DAYS",
+      NOW,
+    );
+    expect(out).toContain("BETWEEN '2026-01-26' AND '2026-04-25'");
+    expect(out).not.toContain("LAST_90_DAYS");
+  });
+
+  it("rewrites LAST_60_DAYS", () => {
+    const out = rewriteInvalidDateLiterals(
+      "SELECT campaign.id FROM campaign WHERE segments.date DURING LAST_60_DAYS",
+      NOW,
+    );
+    expect(out).toContain("BETWEEN '2026-02-25' AND '2026-04-25'");
+  });
+
+  it("rewrites LAST_180_DAYS and arbitrary LAST_N_DAYS", () => {
+    const out180 = rewriteInvalidDateLiterals("WHERE segments.date DURING LAST_180_DAYS", NOW);
+    expect(out180).toMatch(/BETWEEN '\d{4}-\d{2}-\d{2}' AND '2026-04-25'/);
+    const out45 = rewriteInvalidDateLiterals("WHERE segments.date DURING LAST_45_DAYS", NOW);
+    expect(out45).toMatch(/BETWEEN '\d{4}-\d{2}-\d{2}' AND '2026-04-25'/);
+  });
+
+  it("does NOT rewrite supported literals", () => {
+    const supported = ["LAST_7_DAYS", "LAST_14_DAYS", "LAST_30_DAYS"];
+    for (const lit of supported) {
+      const out = rewriteInvalidDateLiterals(`WHERE segments.date DURING ${lit}`, NOW);
+      expect(out).toContain(`DURING ${lit}`);
+      expect(out).not.toContain("BETWEEN");
+    }
+  });
+
+  it("does not touch other DURING literals like THIS_MONTH or LAST_BUSINESS_WEEK", () => {
+    const out1 = rewriteInvalidDateLiterals("WHERE segments.date DURING THIS_MONTH", NOW);
+    expect(out1).toContain("DURING THIS_MONTH");
+    const out2 = rewriteInvalidDateLiterals("WHERE segments.date DURING LAST_BUSINESS_WEEK", NOW);
+    expect(out2).toContain("DURING LAST_BUSINESS_WEEK");
+  });
+
+  it("rewrites THIS_YEAR to Jan 1 → today", () => {
+    const out = rewriteInvalidDateLiterals("WHERE segments.date DURING THIS_YEAR", NOW);
+    expect(out).toContain("BETWEEN '2026-01-01' AND '2026-04-25'");
+  });
+
+  it("rewrites LAST_YEAR to prev Jan 1 → prev Dec 31", () => {
+    const out = rewriteInvalidDateLiterals("WHERE segments.date DURING LAST_YEAR", NOW);
+    expect(out).toContain("BETWEEN '2025-01-01' AND '2025-12-31'");
+  });
+
+  it("is case-insensitive (matches lowercase `during`)", () => {
+    const out = rewriteInvalidDateLiterals("where segments.date during last_90_days", NOW);
+    expect(out).toContain("BETWEEN '2026-01-26' AND '2026-04-25'");
+  });
+
+  it("runs through runSafeGaqlReport so agents using LAST_90_DAYS get a working query", async () => {
+    mockQuery.mockResolvedValueOnce([{ campaign: { id: "1" } }]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign WHERE segments.date DURING LAST_90_DAYS",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("BETWEEN");
+    expect(sentQuery).not.toContain("LAST_90_DAYS");
+  });
+});
+
+describe("enrichGaqlError", () => {
+  it("appends a getResourceMetadata hint on unrecognized field errors", () => {
+    const out = enrichGaqlError("Unrecognized field in the query: 'metrics.roas'. (query_error=32)");
+    expect(out).toContain("getResourceMetadata");
+  });
+
+  it("hints to switch FROM resource on metric/resource incompatibility", () => {
+    const msg = "Cannot select or filter on the following metrics: 'conversions'(could not support requested resources: 'CONVERSION_ACTION'), since metric is incompatible with the resource in the FROM clause or other selected segmenting resources. (query_error=49)";
+    const out = enrichGaqlError(msg);
+    expect(out).toMatch(/Tip:.*FROM/);
+  });
+
+  it("lists supported date literals on Invalid date literal errors", () => {
+    const out = enrichGaqlError("Invalid date literal supplied for DURING operator: LAST_THIRTY_DAYS. (query_error=22)");
+    expect(out).toContain("LAST_30_DAYS");
+    expect(out).toContain("BETWEEN");
+  });
+
+  it("returns the original message unchanged for unknown errors", () => {
+    expect(enrichGaqlError("Random unrelated error")).toBe("Random unrelated error");
   });
 });

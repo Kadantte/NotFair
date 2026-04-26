@@ -716,6 +716,84 @@ const CATEGORY_REVERSE = reverseMap(CONVERSION_CATEGORY_MAP);
 const STATUS_REVERSE = reverseMap(CONVERSION_STATUS_MAP);
 const COUNTING_REVERSE = reverseMap(CONVERSION_COUNTING_MAP);
 
+// ConversionAction.type values that are read-only via the API. Mutating these
+// returns mutate_error=9 ("Mutates are not allowed for the requested resource").
+// Source: ConversionActionTypeEnum in google-ads-api protobuf. Includes types
+// imported from external systems (GA4, UA, Floodlight, Salesforce, SA360),
+// app-store integrations (Firebase, Google Play, Android pre-registration,
+// third-party app analytics), Smart Campaign auto-generated actions, and
+// Google-measured store visits. Numeric values match the enum.
+const READ_ONLY_CONVERSION_ACTION_TYPES = new Map<number, string>([
+  [1, "UNKNOWN"],
+  [4, "GOOGLE_PLAY_DOWNLOAD"],
+  [5, "GOOGLE_PLAY_IN_APP_PURCHASE"],
+  [12, "FIREBASE_ANDROID_FIRST_OPEN"],
+  [13, "FIREBASE_ANDROID_IN_APP_PURCHASE"],
+  [14, "FIREBASE_ANDROID_CUSTOM"],
+  [15, "FIREBASE_IOS_FIRST_OPEN"],
+  [16, "FIREBASE_IOS_IN_APP_PURCHASE"],
+  [17, "FIREBASE_IOS_CUSTOM"],
+  [18, "THIRD_PARTY_APP_ANALYTICS_ANDROID_FIRST_OPEN"],
+  [19, "THIRD_PARTY_APP_ANALYTICS_ANDROID_IN_APP_PURCHASE"],
+  [20, "THIRD_PARTY_APP_ANALYTICS_ANDROID_CUSTOM"],
+  [21, "THIRD_PARTY_APP_ANALYTICS_IOS_FIRST_OPEN"],
+  [22, "THIRD_PARTY_APP_ANALYTICS_IOS_IN_APP_PURCHASE"],
+  [23, "THIRD_PARTY_APP_ANALYTICS_IOS_CUSTOM"],
+  [24, "ANDROID_APP_PRE_REGISTRATION"],
+  [25, "ANDROID_INSTALLS_ALL_OTHER_APPS"],
+  [26, "FLOODLIGHT_ACTION"],
+  [27, "FLOODLIGHT_TRANSACTION"],
+  [28, "GOOGLE_HOSTED"],
+  [30, "SALESFORCE"],
+  [31, "SEARCH_ADS_360"],
+  [32, "SMART_CAMPAIGN_AD_CLICKS_TO_CALL"],
+  [33, "SMART_CAMPAIGN_MAP_CLICKS_TO_CALL"],
+  [34, "SMART_CAMPAIGN_MAP_DIRECTIONS"],
+  [35, "SMART_CAMPAIGN_TRACKED_CALLS"],
+  [36, "STORE_VISITS"],
+  [38, "UNIVERSAL_ANALYTICS_GOAL"],
+  [39, "UNIVERSAL_ANALYTICS_TRANSACTION"],
+  [40, "GOOGLE_ANALYTICS_4_CUSTOM"],
+  [41, "GOOGLE_ANALYTICS_4_PURCHASE"],
+]);
+
+/**
+ * Classify whether a conversion action can be mutated. Returns a human-readable
+ * reason string when read-only, or null when mutation is allowed.
+ *
+ * GAQL may return either numeric protobuf values or string enum names depending
+ * on the client version, so we accept both.
+ */
+function readOnlyConversionActionReason(
+  cid: string,
+  conversionActionId: string,
+  rawType: unknown,
+  ownerCustomer: unknown,
+): string | null {
+  // Manager-owned conversion actions are inherited and cannot be modified
+  // from the child account. owner_customer is a resource_name like
+  // "customers/123456". We compare against the current customer.
+  if (typeof ownerCustomer === "string" && ownerCustomer.length > 0) {
+    const ownerCid = ownerCustomer.split("/").pop();
+    if (ownerCid && ownerCid !== cid) {
+      return `Conversion action ${conversionActionId} is owned by a manager account (${ownerCid}). Inherited conversion actions are read-only from this account; modify it in the manager account or in the Google Ads UI.`;
+    }
+  }
+
+  if (typeof rawType === "number" && READ_ONLY_CONVERSION_ACTION_TYPES.has(rawType)) {
+    const typeName = READ_ONLY_CONVERSION_ACTION_TYPES.get(rawType);
+    return `Conversion action ${conversionActionId} has type ${typeName} and is read-only via the API. Modify it in the Google Ads UI or in its source system (e.g. GA4, Firebase, Salesforce, Floodlight).`;
+  }
+  if (typeof rawType === "string") {
+    for (const name of READ_ONLY_CONVERSION_ACTION_TYPES.values()) {
+      if (name === rawType) {
+        return `Conversion action ${conversionActionId} has type ${rawType} and is read-only via the API. Modify it in the Google Ads UI or in its source system (e.g. GA4, Firebase, Salesforce, Floodlight).`;
+      }
+    }
+  }
+  return null;
+}
+
 /** Enable Enhanced Conversions for Leads at account level (idempotent). */
 async function enableEcfl(
   customer: ReturnType<typeof getCustomer>,
@@ -888,8 +966,14 @@ export async function updateConversionAction(
   const cid = normalizeCustomerId(auth.customerId);
 
 
-  // Fetch current state for undo record
+  // Fetch current state for undo record + read-only classification.
+  // type and owner_customer let us pre-empt mutate_error=9 ("Mutates not
+  // allowed") on GA4-imported, Floodlight, Firebase, manager-owned, and other
+  // read-only conversion actions, returning a clear actionable error instead
+  // of a cryptic API failure.
   let beforeValue: string;
+  let rawType: unknown;
+  let ownerCustomer: unknown;
   try {
     const current = await customer.query(`
       SELECT
@@ -897,6 +981,8 @@ export async function updateConversionAction(
         conversion_action.status,
         conversion_action.category,
         conversion_action.counting_type,
+        conversion_action.type,
+        conversion_action.owner_customer,
         conversion_action.value_settings.default_value,
         conversion_action.value_settings.always_use_default_value
       FROM conversion_action
@@ -910,6 +996,8 @@ export async function updateConversionAction(
     const rawStatus = row.status;
     const rawCategory = row.category;
     const rawCounting = row.counting_type;
+    rawType = row.type;
+    ownerCustomer = row.owner_customer;
     beforeValue = JSON.stringify({
       name: row.name,
       status: typeof rawStatus === "number" ? STATUS_REVERSE[rawStatus] : rawStatus,
@@ -929,25 +1017,69 @@ export async function updateConversionAction(
     };
   }
 
+  // Pre-flight: refuse early when the conversion action is read-only via the
+  // API (manager-owned or imported from GA4/UA/Firebase/Floodlight/etc.).
+  // Without this we'd send a mutate that fails with mutate_error=9 and the
+  // agent gets no signal about why — agents iterating "demote all secondary"
+  // sweeps would burn N round trips.
+  const readOnlyReason = readOnlyConversionActionReason(
+    cid,
+    params.conversionActionId,
+    rawType,
+    ownerCustomer,
+  );
+  if (readOnlyReason) {
+    return {
+      success: false,
+      action: "update_conversion_action",
+      entityId: params.conversionActionId,
+      beforeValue,
+      afterValue: "",
+      error: readOnlyReason,
+    };
+  }
+
+  // Build the conversion_action mutate resource. Track whether we have any
+  // real field changes — if the caller is only flipping primaryForGoal, we
+  // must NOT issue an empty mutate. The google-ads-api library derives the
+  // field_mask from the resource keys, skipping camelCase `resourceName` but
+  // NOT snake_case `resource_name`. An empty resource would produce
+  // field_mask=["resource_name"], which Google rejects with mutate_error=9.
   const resource: Record<string, unknown> = {
     resource_name: `customers/${cid}/conversionActions/${params.conversionActionId}`,
   };
+  let hasFieldChanges = false;
 
-  if (params.name !== undefined) resource.name = params.name.trim();
-  if (params.category !== undefined) resource.category = CONVERSION_CATEGORY_MAP[params.category] ?? CONVERSION_CATEGORY_MAP.DEFAULT;
-  if (params.countingType !== undefined) resource.counting_type = CONVERSION_COUNTING_MAP[params.countingType] ?? CONVERSION_COUNTING_MAP.ONE_PER_CLICK;
-  if (params.status !== undefined) resource.status = CONVERSION_STATUS_MAP[params.status] ?? CONVERSION_STATUS_MAP.ENABLED;
+  if (params.name !== undefined) {
+    resource.name = params.name.trim();
+    hasFieldChanges = true;
+  }
+  if (params.category !== undefined) {
+    resource.category = CONVERSION_CATEGORY_MAP[params.category] ?? CONVERSION_CATEGORY_MAP.DEFAULT;
+    hasFieldChanges = true;
+  }
+  if (params.countingType !== undefined) {
+    resource.counting_type = CONVERSION_COUNTING_MAP[params.countingType] ?? CONVERSION_COUNTING_MAP.ONE_PER_CLICK;
+    hasFieldChanges = true;
+  }
+  if (params.status !== undefined) {
+    resource.status = CONVERSION_STATUS_MAP[params.status] ?? CONVERSION_STATUS_MAP.ENABLED;
+    hasFieldChanges = true;
+  }
   if (params.defaultValue !== undefined || params.alwaysUseDefaultValue !== undefined) {
     resource.value_settings = {
       ...(params.defaultValue !== undefined && { default_value: params.defaultValue }),
       ...(params.alwaysUseDefaultValue !== undefined && { always_use_default_value: params.alwaysUseDefaultValue }),
     };
+    hasFieldChanges = true;
   }
   if (params.viewThroughLookbackWindowDays !== undefined) {
     resource.view_through_lookback_window_days = params.viewThroughLookbackWindowDays;
+    hasFieldChanges = true;
   }
   if (params.clickThroughLookbackWindowDays !== undefined) {
     resource.click_through_lookback_window_days = params.clickThroughLookbackWindowDays;
+    hasFieldChanges = true;
   }
 
   const afterValue = JSON.stringify({
@@ -960,20 +1092,40 @@ export async function updateConversionAction(
   });
 
   try {
-    await customer.mutateResources([
-      {
-        entity: "conversion_action" as any,
-        operation: "update",
-        resource,
-      },
-    ]);
+    if (hasFieldChanges) {
+      await customer.mutateResources([
+        {
+          entity: "conversion_action" as any,
+          operation: "update",
+          resource,
+        },
+      ]);
+    }
 
     const warnings: string[] = [];
 
-    // Set primary/secondary via ConversionAction.primary_for_goal
+    // Set primary/secondary via ConversionAction.primary_for_goal. This is a
+    // separate mutate with primary_for_goal populated (non-empty field_mask),
+    // so it works even when no other fields are being changed.
     if (params.primaryForGoal !== undefined) {
       const goalError = await setPrimaryForGoal(customer, cid, params.conversionActionId, params.primaryForGoal);
-      if (goalError) warnings.push(`Setting primary_for_goal failed: ${goalError}`);
+      if (goalError) {
+        // If primaryForGoal was the ONLY thing being changed, the entire
+        // operation has effectively failed — surface it as a hard failure
+        // rather than a silent warning. Otherwise (real field changes also
+        // landed) keep it as a warning so the partial success is visible.
+        if (!hasFieldChanges) {
+          return {
+            success: false,
+            action: "update_conversion_action",
+            entityId: params.conversionActionId,
+            beforeValue,
+            afterValue,
+            error: `Setting primary_for_goal failed: ${goalError}`,
+          };
+        }
+        warnings.push(`Setting primary_for_goal failed: ${goalError}`);
+      }
     }
 
     // Enable Enhanced Conversions for Leads at account level if requested
