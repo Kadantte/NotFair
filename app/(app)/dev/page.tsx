@@ -161,9 +161,19 @@ type SortDir = 'asc' | 'desc';
 
 type Tab = 'customers' | 'usage' | 'outreach';
 
+const TAB_STORAGE_KEY = 'dev:activeTab';
+const VALID_TABS: ReadonlySet<Tab> = new Set(['customers', 'usage', 'outreach']);
+
+function readStoredTab(): Tab {
+    if (typeof window === 'undefined') return 'customers';
+    const raw = window.localStorage.getItem(TAB_STORAGE_KEY);
+    return raw && VALID_TABS.has(raw as Tab) ? (raw as Tab) : 'customers';
+}
+
 let cachedStats: DevStats | null = null;
 let cachedContacts: Contact[] | null = null;
 let cachedCustomers: Customer[] | null = null;
+let cachedDraftEmails: Set<string> | null = null;
 
 export default function DevPage() {
     const router = useRouter();
@@ -277,13 +287,14 @@ export default function DevPage() {
         }
     }, []);
 
-    const fetchStats = useCallback(async (background = false, source = 'all') => {
+    const fetchStats = useCallback(async (background = false, source = 'all', fresh = false) => {
         if (!background) setLoading(true);
         setError(null);
         try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const params = new URLSearchParams({ tz });
             if (source !== 'all') params.set('source', source);
+            if (fresh) params.set('fresh', '1');
             const res = await fetch(`/api/dev?${params}`, { credentials: 'include' });
             if (res.status === 403) {
                 setError('Access denied');
@@ -300,14 +311,47 @@ export default function DevPage() {
         }
     }, []);
 
-    const fetchCustomers = useCallback(async (background = false) => {
+    const fetchDraftEmails = useCallback(async () => {
+        try {
+            const res = await fetch('/api/dev/customers/drafts', { credentials: 'include' });
+            if (!res.ok) return;
+            const { emails } = (await res.json()) as { emails: string[] };
+            const set = new Set(emails.map((e) => e.toLowerCase()));
+            cachedDraftEmails = set;
+            // Patch outreachStatus on customers already in state.
+            setCustomers((prev) => prev.map((c) => {
+                if (c.outreachStatus !== 'none') return c;
+                const key = c.googleEmail?.toLowerCase();
+                if (key && set.has(key)) return { ...c, outreachStatus: 'drafted' as const };
+                return c;
+            }));
+            cachedCustomers = (cachedCustomers ?? []).map((c) => {
+                if (c.outreachStatus !== 'none') return c;
+                const key = c.googleEmail?.toLowerCase();
+                if (key && set.has(key)) return { ...c, outreachStatus: 'drafted' as const };
+                return c;
+            });
+        } catch { /* best-effort: out-of-band Gmail drafts just won't get pills */ }
+    }, []);
+
+    const fetchCustomers = useCallback(async (background = false, fresh = false) => {
         if (!background) setLoadingCustomers(true);
         try {
-            const res = await fetch('/api/dev/customers', { credentials: 'include' });
+            const res = await fetch(`/api/dev/customers${fresh ? '?fresh=1' : ''}`, { credentials: 'include' });
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
-            setCustomers(data.customers);
-            cachedCustomers = data.customers;
+            // Merge in any cached Gmail-draft pills so refreshes don't flicker.
+            const drafts = cachedDraftEmails;
+            const customers: Customer[] = drafts
+                ? data.customers.map((c: Customer) => {
+                    if (c.outreachStatus !== 'none') return c;
+                    const key = c.googleEmail?.toLowerCase();
+                    if (key && drafts.has(key)) return { ...c, outreachStatus: 'drafted' as const };
+                    return c;
+                })
+                : data.customers;
+            setCustomers(customers);
+            cachedCustomers = customers;
         } catch {
             setError('Failed to load customers');
         } finally {
@@ -315,11 +359,56 @@ export default function DevPage() {
         }
     }, []);
 
+    // Restore the user's last-used tab on mount. The `tabRestored` flag
+    // gates the lazy fetcher so we don't waste a round-trip on the
+    // SSR-default 'customers' tab when the stored choice is something else.
+    const [tabRestored, setTabRestored] = useState(false);
     useEffect(() => {
-        fetchStats(!!cachedStats, usageSource);
-        fetchContacts(!!cachedContacts);
-        fetchCustomers(!!cachedCustomers);
-    }, [fetchStats, fetchContacts, fetchCustomers, usageSource]);
+        const stored = readStoredTab();
+        if (stored !== 'customers') setActiveTab(stored);
+        setTabRestored(true);
+    }, []);
+
+    // Persist active tab — but only after the initial restore so we don't
+    // overwrite the stored value with the SSR default.
+    useEffect(() => {
+        if (!tabRestored) return;
+        window.localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    }, [activeTab, tabRestored]);
+
+    // Lazy-load per tab. Only fetch what the user is looking at; prefetch
+    // the other heavy tab (the user typically alternates customers/usage)
+    // in the background once the active tab has data.
+    useEffect(() => {
+        if (!tabRestored) return;
+        if (activeTab === 'customers') {
+            fetchCustomers(!!cachedCustomers);
+            // Out-of-band Gmail drafts — non-blocking.
+            if (!cachedDraftEmails) fetchDraftEmails();
+        } else if (activeTab === 'usage') {
+            fetchStats(!!cachedStats, usageSource);
+        } else if (activeTab === 'outreach') {
+            fetchContacts(!!cachedContacts);
+        }
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource]);
+
+    // Idle prefetch of the other heavy tab so the first switch is instant.
+    useEffect(() => {
+        if (!tabRestored || typeof window === 'undefined') return;
+        const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+            ?? ((cb: () => void) => window.setTimeout(cb, 800));
+        const handle = idle(() => {
+            if (activeTab === 'customers' && !cachedStats) fetchStats(true, usageSource);
+            else if (activeTab === 'usage' && !cachedCustomers) {
+                fetchCustomers(true);
+                if (!cachedDraftEmails) fetchDraftEmails();
+            }
+        });
+        return () => {
+            const cancel = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
+            if (cancel && typeof handle === 'number') cancel(handle);
+        };
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource]);
 
     async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -447,8 +536,21 @@ export default function DevPage() {
                             </Button>
                         </Link>
                         <Button
-                            onClick={() => { cachedStats = null; cachedContacts = null; cachedCustomers = null; fetchStats(false, usageSource); fetchContacts(false); fetchCustomers(false); }}
-                            disabled={loading}
+                            onClick={() => {
+                                cachedStats = null;
+                                cachedContacts = null;
+                                cachedCustomers = null;
+                                cachedDraftEmails = null;
+                                if (activeTab === 'customers') {
+                                    fetchCustomers(false, true);
+                                    fetchDraftEmails();
+                                } else if (activeTab === 'usage') {
+                                    fetchStats(false, usageSource, true);
+                                } else {
+                                    fetchContacts(false);
+                                }
+                            }}
+                            disabled={loading || loadingCustomers || loadingContacts}
                             variant="outline"
                             size="sm"
                             className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5"

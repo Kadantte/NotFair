@@ -3,6 +3,11 @@ import { sql, desc } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { excludeDevOpsFilter } from "@/lib/dev-ops-filter";
 
+// 60s admin cache keyed by tz+source. Usage stats roll up 30 days, so a
+// minute of staleness is invisible.
+const CACHE_TTL_MS = 60_000;
+const cache = new Map<string, { data: unknown; ts: number }>();
+
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
   if (denied) return denied;
@@ -15,6 +20,14 @@ export async function GET(request: Request) {
   }
 
   const source = url.searchParams.get("source"); // optional: "claude-code", "claude-desktop", "chat"
+  const fresh = url.searchParams.get("fresh") === "1";
+  const cacheKey = `${tz}|${source ?? ""}`;
+  if (!fresh) {
+    const hit = cache.get(cacheKey);
+    if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+      return Response.json(hit.data);
+    }
+  }
 
   // tz is already sanitized above via regex — safe to use sql.raw
   const tzLiteral = sql.raw(`'${tz}'`);
@@ -56,5 +69,7 @@ export async function GET(request: Request) {
       .orderBy(desc(sql`count(*)`)),
   ]);
 
-  return Response.json({ dailyUsage, sources });
+  const payload = { dailyUsage, sources };
+  cache.set(cacheKey, { data: payload, ts: Date.now() });
+  return Response.json(payload);
 }

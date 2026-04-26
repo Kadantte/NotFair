@@ -3,11 +3,22 @@ import { sql, desc, inArray, isNotNull } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { devEmailSqlList } from "@/lib/dev-ops-filter";
 import { parseCustomerIds } from "@/lib/google-ads";
-import { isGmailConfigured, listDraftRecipientEmails } from "@/lib/gmail";
 
-export async function GET() {
+// Single-tenant admin cache: dev dashboard is hit by a tiny set of authorized
+// users, and the underlying data (sessions, ops counts, account snapshots)
+// changes on the order of minutes. A 60s TTL turns repeat refreshes into a
+// memory hit — DB time goes from ~250ms to <1ms.
+const CACHE_TTL_MS = 60_000;
+let cache: { data: unknown; ts: number } | null = null;
+
+export async function GET(request: Request) {
   const denied = await requireDevEmail();
   if (denied) return denied;
+
+  const fresh = new URL(request.url).searchParams.get("fresh") === "1";
+  if (!fresh && cache && Date.now() - cache.ts < CACHE_TTL_MS) {
+    return Response.json(cache.data);
+  }
 
   // Get unique customers from mcp_sessions. Exclude dev users so their sessions
   // and operations are never counted in customer-level aggregates.
@@ -36,10 +47,11 @@ export async function GET() {
     return { ...c, accounts };
   });
 
-  // Batch-fetch account snapshots, operation counts, contacts (for outreach
-  // status), and Gmail draft recipients in parallel. Gmail is best-effort: if
-  // it fails we just don't show draft pills for out-of-band drafts.
-  const [snapshots, opsCounts, contactsByEmail, draftRecipients] = await Promise.all([
+  // Batch-fetch account snapshots, operation counts, and contacts (for
+  // outreach status) in parallel. Gmail draft recipients are deferred to
+  // /api/dev/customers/drafts so the table can render without waiting on
+  // multi-second Gmail round-trips.
+  const [snapshots, opsCounts, contactsByEmail] = await Promise.all([
     // Account snapshots (budgets, campaigns)
     (async () => {
       const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
@@ -101,17 +113,6 @@ export async function GET() {
       }
       return map;
     })(),
-    // Gmail draft recipients — best-effort. Catches drafts created via the
-    // Gmail MCP that never touched the contacts table.
-    (async () => {
-      if (!isGmailConfigured()) return new Set<string>();
-      try {
-        return await listDraftRecipientEmails();
-      } catch (err) {
-        console.error("listDraftRecipientEmails failed:", err);
-        return new Set<string>();
-      }
-    })(),
   ]);
 
   const result = parsed.map((c) => {
@@ -135,14 +136,13 @@ export async function GET() {
     // lastActive = most recent of session creation or any operation on their accounts
     const lastActive = lastOp && (lastOp as string) > c.lastSessionAt ? lastOp : c.lastSessionAt;
 
-    // Outreach status: contacted (already sent) wins over drafted. "Drafted"
-    // covers both contacts.draftBody and any out-of-band Gmail draft.
+    // Outreach status from contacts table only — out-of-band Gmail drafts
+    // are merged client-side from /api/dev/customers/drafts.
     const emailKey = c.googleEmail?.toLowerCase() ?? null;
     const contact = emailKey ? contactsByEmail.get(emailKey) : undefined;
-    const hasGmailDraft = emailKey ? draftRecipients.has(emailKey) : false;
     let outreachStatus: "contacted" | "drafted" | "none" = "none";
     if (contact?.status === "contacted") outreachStatus = "contacted";
-    else if (contact?.hasDraft || hasGmailDraft) outreachStatus = "drafted";
+    else if (contact?.hasDraft) outreachStatus = "drafted";
 
     return {
       userId: c.userId,
@@ -164,5 +164,7 @@ export async function GET() {
   // Re-sort by lastActive (SQL only sorted by session time, JS computed the true lastActive)
   result.sort((a, b) => (b.lastActive ?? "").localeCompare(a.lastActive ?? ""));
 
-  return Response.json({ customers: result });
+  const payload = { customers: result };
+  cache = { data: payload, ts: Date.now() };
+  return Response.json(payload);
 }

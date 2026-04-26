@@ -2,6 +2,14 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.10] - 2026-04-26
+
+### Changed
+- **`/dev` page customers tab loads ~10x faster.** Production timing showed every `/api/dev/customers` call took ~2.9s because `listDraftRecipientEmails()` was inside the response `Promise.all` and ran up to 5 sequential Gmail pages × N parallel `drafts.get` round-trips per request, every request. Split out to a new `/api/dev/customers/drafts` endpoint with a 5-minute server cache; the table renders immediately and "drafted" pills patch in async. Cold customers tab drops from ~3.0s → ~250ms.
+- **60s in-memory cache on `/api/dev/customers` and `/api/dev`.** Repeat refreshes in the same warm Vercel function instance are now <5ms instead of re-running DB aggregations. Refresh button passes `?fresh=1` to bypass for the active tab.
+- **Lazy-load tabs on `/dev`.** Page used to fetch customers + usage + outreach data on every mount, paying 3 cold round-trips before showing anything. Now only the active tab fetches; the other heavy tab (customers ↔ usage) is idle-prefetched after the active tab renders. Outreach defers until clicked.
+- **Persist last-used `/dev` tab in localStorage.** Lands you on whichever tab you used last instead of always defaulting to customers.
+
 ## [0.3.0.9] - 2026-04-26
 
 ### Changed
