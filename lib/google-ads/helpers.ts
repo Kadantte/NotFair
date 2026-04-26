@@ -1,3 +1,5 @@
+import type { NextToolHint } from "./types";
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -39,11 +41,16 @@ export function extractErrorMessage(
  * negatives; the equivalent is to remove them.
  */
 export function rewriteNegativePauseError(msg: string): string {
-  if (/negative ad group criteria are not updateable/i.test(msg) ||
-      /ad_group_criterion_error=6/i.test(msg)) {
+  if (isNegativePauseError(msg)) {
     return `${msg} — Negative keywords cannot be paused in Google Ads. Call \`removeNegativeKeyword\` (or \`removeKeywordFromNegativeList\` for shared lists) instead; use \`addNegativeKeyword\` to re-add later.`;
   }
   return msg;
+}
+
+/** Detect the "negative criterion can't be paused" error shape. */
+export function isNegativePauseError(msg: string): boolean {
+  return /negative ad group criteria are not updateable/i.test(msg) ||
+    /ad_group_criterion_error=6/i.test(msg);
 }
 
 /**
@@ -108,21 +115,49 @@ export function rewriteRemovedResourceError(msg: string, entityHint?: string): s
 }
 
 /**
- * Compose a guardrail rejection message with a concrete follow-up. The agent
- * can parse the requested percent and use `setGuardrails` with an exact value.
+ * Build a `removeNegativeKeyword` next-tool hint. Five call sites (single
+ * pauseKeyword precheck, pauseKeyword catch fallback, three bulk validators)
+ * used to inline this object — one typo in `campaignId` and the agent
+ * silently misroutes. Single source of truth for the args spelling.
  */
-export function guardrailRejectionMessage(
+export function removeNegativeKeywordHint(
+  campaignId: string,
+  keyword: string | null | undefined,
+  reason: string,
+  matchType?: "BROAD" | "PHRASE" | "EXACT",
+): NextToolHint {
+  const args: Record<string, unknown> = { campaignId };
+  if (keyword) args.keyword = keyword;
+  if (matchType) args.matchType = matchType;
+  return { name: "removeNegativeKeyword", reason, args };
+}
+
+/**
+ * Structured guardrail rejection — both the prose error AND a `nextTool` hint
+ * the agent can act on without parsing free text. Production traces showed
+ * agents retrying the original mutation 5+ times despite a clear "call
+ * setGuardrails with X" message, so we surface it as a typed field too.
+ */
+export function guardrailRejection(
   kind: "budget" | "bid",
   requestedChangePct: number,
   currentMaxPct: number,
-): string {
+): { error: string; nextTool: { name: "setGuardrails"; reason: string; args: Record<string, unknown> } } {
   const requested = Math.ceil(requestedChangePct * 100);
   const current = Math.round(currentMaxPct * 100);
   // Suggest rounding up to the next 10% above requested, at least +5 over current.
   const suggested = Math.max(Math.ceil((requested + 5) / 10) * 10, current + 10);
   const argName = kind === "budget" ? "maxBudgetChangePct" : "maxBidChangePct";
   const kindLabel = kind === "budget" ? "Budget" : "Bid";
-  return `${kindLabel} change of ${requested}% exceeds maximum allowed ${current}%. To allow larger changes, call setGuardrails with { ${argName}: ${suggested / 100} } (or higher). Use this only if you've confirmed with the user.`;
+  const error = `${kindLabel} change of ${requested}% exceeds maximum allowed ${current}%. To allow larger changes, call setGuardrails with { ${argName}: ${suggested / 100} } (or higher). Use this only if you've confirmed with the user.`;
+  return {
+    error,
+    nextTool: {
+      name: "setGuardrails",
+      reason: `${kindLabel} change of ${requested}% exceeds the current ${current}% guardrail. Confirm with the user before raising it.`,
+      args: { [argName]: suggested / 100 },
+    },
+  };
 }
 
 export function normalizeCustomerId(customerId: string): string {

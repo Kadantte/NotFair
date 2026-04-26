@@ -73,6 +73,19 @@ import { resolveToolAuth } from "./helpers";
 
 type BulkValidationWithInput<T> = BulkValidationIssue & { input: T };
 
+/**
+ * Stable JSON used as a Map key. Plain JSON.stringify preserves insertion
+ * order, so two structurally identical objects built differently would
+ * produce different strings and wouldn't collapse during validation-issue
+ * grouping. Sort keys to make the dedup key canonical.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const keys = Object.keys(value as Record<string, unknown>).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(",")}}`;
+}
+
 function summarizeBulkValidationIssues<T>(issues: Array<BulkValidationWithInput<T>>) {
   const grouped = new Map<string, {
     code: string;
@@ -81,17 +94,23 @@ function summarizeBulkValidationIssues<T>(issues: Array<BulkValidationWithInput<
     affectedIds: string[];
     affectedCriterionIds: string[];
     alternativeTool?: string;
+    nextTool?: BulkValidationIssue["nextTool"];
     fix?: string;
     reason: string;
   }>();
 
   for (const issue of issues) {
+    // Group by the routing-affecting fields. Two failures with the same
+    // code+reason but different nextTool.args (different campaign/keyword)
+    // are different failures — don't collapse them, or the agent loses the
+    // per-row routing data.
     const key = [
       issue.code,
       issue.severity,
       issue.alternativeTool ?? "",
       issue.fix ?? "",
       issue.reason,
+      issue.nextTool ? stableStringify(issue.nextTool) : "",
     ].join("|");
     const existing = grouped.get(key) ?? {
       code: issue.code,
@@ -100,6 +119,7 @@ function summarizeBulkValidationIssues<T>(issues: Array<BulkValidationWithInput<
       affectedIds: [],
       affectedCriterionIds: [],
       alternativeTool: issue.alternativeTool,
+      nextTool: issue.nextTool,
       fix: issue.fix,
       reason: issue.reason,
     };
@@ -116,6 +136,7 @@ function summarizeBulkValidationIssues<T>(issues: Array<BulkValidationWithInput<
     affectedIds: group.affectedIds,
     ...(group.affectedCriterionIds.length > 0 ? { affectedCriterionIds: group.affectedCriterionIds } : {}),
     ...(group.alternativeTool ? { alternativeTool: group.alternativeTool } : {}),
+    ...(group.nextTool ? { nextTool: group.nextTool } : {}),
     ...(group.fix ? { fix: group.fix } : {}),
     reason: group.reason,
   }));

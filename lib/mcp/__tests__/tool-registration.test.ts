@@ -257,12 +257,13 @@ describe("MCP write tools — smoke", () => {
   beforeEach(resetMocks);
 
   it("pauseKeyword flows through execWrite and returns a WriteResult with changeId", async () => {
-    // pauseKeyword first queries sibling criteria to compute blast radius
-    // (refuses to pause the sole active keyword), then issues a mutate.
-    // Return 2 active criteria so totalActive > 1.
+    // pauseKeyword pre-queries every keyword in the campaign (positives +
+    // negatives) so it can both compute blast radius and detect "agent tried
+    // to pause a negative" before issuing the mutate. Each row carries
+    // status (2 = ENABLED) and negative=false so totalActive counts both.
     mockQuery.mockResolvedValueOnce([
-      { ad_group_criterion: { criterion_id: "222", keyword: { text: "blue widgets" } } },
-      { ad_group_criterion: { criterion_id: "333", keyword: { text: "red widgets" } } },
+      { ad_group_criterion: { criterion_id: "222", status: 2, negative: false, keyword: { text: "blue widgets" } } },
+      { ad_group_criterion: { criterion_id: "333", status: 2, negative: false, keyword: { text: "red widgets" } } },
     ]);
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
@@ -314,6 +315,65 @@ describe("MCP write tools — smoke", () => {
     });
     expect(JSON.stringify(structured.errors)).toContain("NEGATIVE_KEYWORDS_CANNOT_PAUSE");
     expect(mockMutateResources).not.toHaveBeenCalled();
+    // Each invalid item carries a structured nextTool routing hint so agents
+    // following MCP_INSTRUCTIONS can pivot to removeNegativeKeyword without
+    // parsing free-text reasons. Bulk f9d2a291 in prod retried 13× because
+    // there was no structured signal here.
+    const errors = structured.errors as Array<{ alternativeTool?: string; nextTool?: { name: string; args?: Record<string, unknown> } }>;
+    expect(errors[0]?.nextTool?.name).toBe("removeNegativeKeyword");
+    expect(errors[0]?.nextTool?.args).toEqual({ campaignId: "100" });
+    // alternativeTool (deprecated string field) and nextTool.name must agree
+    // so older clients reading the legacy field aren't pointed at a different
+    // tool than newer clients reading the structured hint.
+    expect(errors[0]?.alternativeTool).toBe(errors[0]?.nextTool?.name);
+  });
+
+  it("bulkPauseKeywords keeps per-row args distinct when grouping multiple negative-pause failures", async () => {
+    // Two rows, both negative-pause failures but with different keyword text.
+    // The grouping in summarizeBulkValidationIssues must NOT collapse them
+    // (their nextTool.args differ) — otherwise the agent loses the per-row
+    // routing data and can't issue per-keyword removeNegativeKeyword calls.
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: { id: "100", status: "ENABLED" },
+        ad_group: { id: "111", status: "ENABLED" },
+        ad_group_criterion: {
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: true,
+          keyword: { text: "free", match_type: "UNSPECIFIED" },
+        },
+      },
+      {
+        campaign: { id: "100", status: "ENABLED" },
+        ad_group: { id: "111", status: "ENABLED" },
+        ad_group_criterion: {
+          criterion_id: "333",
+          status: "ENABLED",
+          negative: true,
+          keyword: { text: "cheap", match_type: "UNSPECIFIED" },
+        },
+      },
+    ]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkPauseKeywords", {
+      keywords: [
+        { campaignId: "100", adGroupId: "111", criterionId: "222" },
+        { campaignId: "100", adGroupId: "111", criterionId: "333" },
+      ],
+    });
+
+    const structured = expectOk(result);
+    const errors = structured.errors as Array<{
+      code: string;
+      affectedIds: string[];
+      nextTool?: { name: string; args?: Record<string, unknown> };
+    }>;
+    const negPauseEntries = errors.filter((e) => e.code === "NEGATIVE_KEYWORDS_CANNOT_PAUSE");
+    expect(negPauseEntries).toHaveLength(2);
+    const argKeywords = negPauseEntries.map((e) => e.nextTool?.args?.keyword).sort();
+    expect(argKeywords).toEqual(["cheap", "free"]);
   });
 
   it("bulkPauseKeywords rejects criterion IDs that belong to a different ad group", async () => {

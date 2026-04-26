@@ -140,8 +140,8 @@ describe("real function output → protobuf encoding", () => {
 
   it("pauseKeyword output encodes to valid protobuf", async () => {
     mockQuery.mockResolvedValueOnce([
-      { ad_group_criterion: { criterion_id: "222" } },
-      { ad_group_criterion: { criterion_id: "333" } },
+      { ad_group_criterion: { criterion_id: "222", status: 2, negative: false, keyword: { text: "running shoes" } } },
+      { ad_group_criterion: { criterion_id: "333", status: 2, negative: false, keyword: { text: "trail runners" } } },
     ]);
 
     await pauseKeyword(AUTH, "100", "111", "222");

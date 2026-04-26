@@ -231,7 +231,16 @@ Tool-selection heuristic — pick ONE path per user question:
    - \`getRecommendations\` — Google's recommendation engine.
    - \`getKeywordIdeas\` — Keyword Planner search-volume data.
    - \`getChanges\` / \`reviewChangeImpact\` — AdsAgent's own change log + impact analysis.
-   - \`getResourceMetadata\` / \`listQueryableResources\` — GAQL schema discovery (use before writing an unfamiliar query).`;
+   - \`getResourceMetadata\` / \`listQueryableResources\` — GAQL schema discovery (use before writing an unfamiliar query).
+
+Handling write rejections — important:
+
+When a write tool returns \`success: false\`, check \`structuredContent.nextTool\` before retrying:
+
+- If \`nextTool.name\` is set, call THAT tool next with \`nextTool.args\`. Do NOT retry the original tool — the rejection identified a routing mismatch (e.g. trying to pause a negative keyword, or hitting a guardrail). Retrying the same call will fail the same way.
+- If \`nextTool\` is absent, the prose \`error\` message is your guide; fix the inputs and try again, or escalate to the user if the message names a precondition you can't satisfy.
+
+When a rejection's \`error\` field lists actual existing entities (e.g. \`removeNegativeKeyword\` reporting the campaign's real negative keywords), treat that list as ground truth — your planning data was stale or hallucinated. Re-plan against the listed entities before issuing more writes; do not bulk-retry the same plan.`;
 
 const mcpHandler = createMcpHandler(
   (server) => {

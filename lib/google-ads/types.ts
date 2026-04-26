@@ -82,6 +82,31 @@ export const DEFAULT_GUARDRAILS: Guardrails = {
   maxKeywordPausePct: 0.30,
 };
 
+/**
+ * Tools we route agents to from a write rejection. Constrained to known
+ * destinations so a typo can't silently misroute. Extend when adding a new
+ * rejection-routing case (e.g. a new policy fix).
+ */
+export type NextToolName =
+  | "removeNegativeKeyword"
+  | "addNegativeKeyword"
+  | "setGuardrails";
+
+/**
+ * Structured "what to call instead" hint surfaced when a write rejection has a
+ * known better tool. Agents see this in `structuredContent` and should call
+ * `nextTool.name` next instead of retrying the original — prose-only "Call X
+ * instead" text in `error` is repeatedly ignored in production traces.
+ */
+export type NextToolHint = {
+  /** Exact MCP tool name to call (no prefix). */
+  name: NextToolName;
+  /** Why this tool, not the one we just tried. */
+  reason: string;
+  /** Args the agent can pass straight through. Optional. */
+  args?: Record<string, unknown>;
+};
+
 export type WriteResult = {
   success: boolean;
   action: string;
@@ -89,6 +114,8 @@ export type WriteResult = {
   beforeValue: string;
   afterValue: string;
   error?: string;
+  /** Structured next-tool routing for known rejection shapes (negative-pause, guardrail-blocked, etc). */
+  nextTool?: NextToolHint;
   /** Human-readable label for the entity (e.g. keyword text). Stored in operations log. */
   label?: string | null;
   /** Owning campaign ID — set by operations that resolve it as a side-effect (e.g. ad_group/ad tracking template updates). */

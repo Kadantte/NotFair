@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.7] - 2026-04-26
+
+### Added
+- **Structured `nextTool` routing hint on every write rejection.** When a write tool can identify a better tool for the agent to call next (negative-keyword pause, guardrail trip, hallucinated removal plan), the response now carries a typed `nextTool: { name, reason, args? }` field on `structuredContent` alongside the prose `error`. Agents that follow the new MCP server instruction read `nextTool` and call that tool with `nextTool.args` instead of retrying the failed call. Production traces showed agents retrying the same failed call 13–52× because the old prose-only "Call X instead" message was repeatedly ignored. `nextTool.name` is constrained to a known string union so typos can't silently misroute. The bulk path (`bulkPauseKeywords`, `bulkUpdateBids`, `bulkAddKeywords`) carries the same hint per validation issue, deduplicated stably across calls.
+
+### Changed
+- **`pauseKeyword` short-circuits on negative criteria before the API call.** A single pre-query (LIMIT 5000, with a targeted fallback for larger campaigns) detects "agent tried to pause a negative" and returns a structured `removeNegativeKeyword` hint without burning an API round-trip. Saves quota and gives the agent a typed routing signal on the first try.
+- **`removeNegativeKeyword` rejection now lists the campaign's actual negative keywords (top 20 + overflow count) when the requested keyword isn't found.** When an agent built a hallucinated removal plan from search-term data, it would issue 50+ `removeNegativeKeyword` calls in a row with text that didn't exist. The rejection now surfaces ground truth so the agent can abandon the bad plan after one call. Match types are formatted via `MATCH_TYPE_NAME` with an `UNKNOWN` fallback (never a misleading `PHRASE` default).
+- **`updateBid` and `updateCampaignBudget` guardrail rejections now carry `nextTool: setGuardrails`** with concrete args derived from the requested change. Agents previously re-tried the same mutation 5+ times despite a clear "Call setGuardrails with X" prose message.
+- **MCP server-level instructions tell agents how to handle write rejections.** Agents are now told to check `structuredContent.nextTool` before retrying, and to treat surfaced entity lists (e.g., "Campaign has these negatives: …") as ground truth that supersedes their planning data.
+
 ## [0.3.0.6] - 2026-04-25
 
 ### Fixed

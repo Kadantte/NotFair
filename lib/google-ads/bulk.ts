@@ -1,6 +1,6 @@
 import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
-import { extractErrorMessage, extractPolicyDetails, normalizeCustomerId, rewriteNegativePauseError, safeEntityId, toMicros } from "./helpers";
-import type { AuthContext, Guardrails, WriteResult } from "./types";
+import { extractErrorMessage, extractPolicyDetails, normalizeCustomerId, removeNegativeKeywordHint, rewriteNegativePauseError, safeEntityId, toMicros } from "./helpers";
+import type { AuthContext, Guardrails, NextToolHint, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
 import { addKeyword, pauseKeyword } from "./writes";
 
@@ -214,7 +214,10 @@ export type BulkValidationIssue = {
   severity: "error" | "warning";
   reason: string;
   criterionId?: string;
+  /** @deprecated use `nextTool.name` — kept for client backwards-compat. */
   alternativeTool?: string;
+  /** Structured tool-routing hint, parallel to WriteResult.nextTool. */
+  nextTool?: NextToolHint;
   fix?: string;
 };
 
@@ -470,6 +473,7 @@ function validateCriterionRecord<T extends BulkPauseKeywordInput | BulkBidUpdate
   const matchType = normalizeMatchType(rawMatchType);
   const isNegative = record.ad_group_criterion?.negative === true || matchType === "UNSPECIFIED";
   if (operation === "pause_keyword" && isNegative) {
+    const keywordText = record.ad_group_criterion?.keyword?.text;
     return [{
       id,
       criterionId: id,
@@ -477,10 +481,16 @@ function validateCriterionRecord<T extends BulkPauseKeywordInput | BulkBidUpdate
       severity: "error",
       reason: `Criterion ${id} is a negative keyword. Google Ads negatives cannot be paused.`,
       alternativeTool: "removeNegativeKeyword",
+      nextTool: removeNegativeKeywordHint(
+        item.campaignId,
+        keywordText,
+        `Criterion ${id} is a negative keyword; pause is not a valid operation for negatives.`,
+      ),
       fix: "Remove this ID from the batch, or call removeNegativeKeyword/removeKeywordFromNegativeList if you want to unblock that query.",
     }];
   }
   if (operation === "update_bid" && isNegative) {
+    const keywordText = record.ad_group_criterion?.keyword?.text;
     return [{
       id,
       criterionId: id,
@@ -488,6 +498,11 @@ function validateCriterionRecord<T extends BulkPauseKeywordInput | BulkBidUpdate
       severity: "error",
       reason: `Criterion ${id} is a negative keyword and has no CPC bid to update.`,
       alternativeTool: "removeNegativeKeyword",
+      nextTool: removeNegativeKeywordHint(
+        item.campaignId,
+        keywordText,
+        `Criterion ${id} is a negative keyword; it has no CPC bid to update.`,
+      ),
     }];
   }
 
@@ -668,6 +683,12 @@ function validateAddKeywordItem(
         severity: "error",
         reason: `Keyword "${keyword}" conflicts with an existing negative keyword in this campaign/ad group.`,
         alternativeTool: "removeNegativeKeyword",
+        nextTool: removeNegativeKeywordHint(
+          item.campaignId,
+          keyword,
+          `Keyword "${keyword}" exists as a negative on this campaign and is blocking the add.`,
+          matchType,
+        ),
       };
     }
     const rowAdGroupId = String(row.ad_group?.id ?? "");

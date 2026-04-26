@@ -144,10 +144,12 @@ describe("mutateResources operation format", () => {
 
   describe("update operations must pass resource as an object", () => {
     it("pauseKeyword passes resource as an object with resource_name", async () => {
-      // Mock: needs to check active keyword count first
+      // Mock: needs status + negative on every row so the new precheck can
+      // count active positives and detect "is the target a negative?" before
+      // issuing the mutation.
       mockQuery.mockResolvedValueOnce([
-        { ad_group_criterion: { criterion_id: "222" } },
-        { ad_group_criterion: { criterion_id: "333" } },
+        { ad_group_criterion: { criterion_id: "222", status: 2, negative: false, keyword: { text: "running shoes" } } },
+        { ad_group_criterion: { criterion_id: "333", status: 2, negative: false, keyword: { text: "trail runners" } } },
       ]);
 
       await pauseKeyword(AUTH, "100", "111", "222");

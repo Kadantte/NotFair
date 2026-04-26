@@ -1,5 +1,5 @@
 import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
-import { extractErrorMessage, guardrailRejectionMessage, normalizeCustomerId, rewriteNegativePauseError, rewriteRemovedResourceError, safeEntityId } from "./helpers";
+import { extractErrorMessage, guardrailRejection, isNegativePauseError, normalizeCustomerId, removeNegativeKeywordHint, rewriteNegativePauseError, rewriteRemovedResourceError, safeEntityId } from "./helpers";
 import type { AuthContext, Guardrails, UpdateCampaignBiddingParams, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
 import { isDemoAuth } from "@/lib/demo/constants";
@@ -49,18 +49,78 @@ export async function pauseKeyword(
   const customer = getCustomer(auth);
   const cid = safeEntityId(campaignId);
 
-  // Check blast radius: count active keywords in campaign + fetch target keyword text
+  // Pull every keyword in the campaign (positives + negatives) so we can
+  // (a) blast-radius count the active positives and (b) detect the
+  // "agent tried to pause a negative" case before we make a write call.
+  // Production traces showed agents retrying pauseKeyword on negatives 13×
+  // despite the API error explicitly naming the right tool — so we now
+  // short-circuit with a structured nextTool hint instead of letting the
+  // mutation fail.
   const countResult = await customer.query(`
-    SELECT ad_group_criterion.criterion_id, ad_group_criterion.keyword.text
+    SELECT ad_group_criterion.criterion_id,
+           ad_group_criterion.keyword.text,
+           ad_group_criterion.status,
+           ad_group_criterion.negative
     FROM keyword_view
     WHERE campaign.id = ${cid}
-      AND ad_group_criterion.status = 'ENABLED'
+    LIMIT 5000
   `);
-  const totalActive = (countResult as any[]).length;
-  const targetRow = (countResult as any[]).find(
+  type KeywordRow = {
+    ad_group_criterion?: {
+      criterion_id?: string | number;
+      keyword?: { text?: string };
+      status?: number;
+      negative?: boolean;
+    };
+  };
+  const rows = countResult as KeywordRow[];
+  let targetRow: KeywordRow | undefined = rows.find(
     (r) => String(r.ad_group_criterion?.criterion_id) === String(criterionId),
   );
+
+  // Campaigns with >5000 keywords would silently lose the target row to the
+  // LIMIT cap and the negative short-circuit wouldn't fire. Run a targeted
+  // lookup as a fallback so the precheck stays reliable on large campaigns.
+  // Cheap: single-row query, only fires when the bulk query was truncated.
+  if (!targetRow) {
+    const targeted = await customer.query(`
+      SELECT ad_group_criterion.criterion_id,
+             ad_group_criterion.keyword.text,
+             ad_group_criterion.status,
+             ad_group_criterion.negative
+      FROM keyword_view
+      WHERE ad_group_criterion.criterion_id = ${Number(criterionId)}
+      LIMIT 1
+    `);
+    targetRow = (targeted as KeywordRow[])[0];
+  }
   const keywordText = targetRow?.ad_group_criterion?.keyword?.text ?? null;
+
+  // If the criterion is a negative keyword, pausing is structurally impossible
+  // in Google Ads. Return a structured nextTool hint so the agent calls
+  // removeNegativeKeyword next instead of retrying.
+  if (targetRow?.ad_group_criterion?.negative === true) {
+    return {
+      success: false,
+      action: "pause_keyword",
+      entityId: criterionId,
+      beforeValue: "NEGATIVE",
+      afterValue: "NEGATIVE",
+      label: keywordText,
+      error: `Keyword ${criterionId}${keywordText ? ` ("${keywordText}")` : ""} is a NEGATIVE keyword. Google Ads has no pause state for negatives — call \`removeNegativeKeyword\` to remove it (and \`addNegativeKeyword\` to re-add later).`,
+      nextTool: removeNegativeKeywordHint(
+        campaignId,
+        keywordText,
+        `Criterion ${criterionId} is a negative keyword; pause is not a valid operation for negatives.`,
+      ),
+    };
+  }
+
+  const totalActive = rows.filter(
+    (r) =>
+      r.ad_group_criterion?.negative !== true &&
+      Number(r.ad_group_criterion?.status) === STATUS.ENABLED,
+  ).length;
 
   // Count how many are already paused this session (tracked externally)
   // For single-action guardrail, we check: can't pause if it would exceed threshold
@@ -97,16 +157,27 @@ export async function pauseKeyword(
       label: keywordText,
     };
   } catch (error) {
+    const rawMsg = extractErrorMessage(error);
+    const errorMsg = rewriteRemovedResourceError(rewriteNegativePauseError(rawMsg), `Keyword ${criterionId}`);
+    // Belt-and-suspenders: if the API tells us this is a negative (precheck
+    // raced an external edit, or our query data was stale), still surface the
+    // structured hint so the agent has a typed routing signal.
+    const nextTool = isNegativePauseError(rawMsg)
+      ? removeNegativeKeywordHint(
+          campaignId,
+          keywordText,
+          `Google Ads rejected the pause: criterion ${criterionId} is a negative keyword.`,
+        )
+      : undefined;
     return {
       success: false,
       action: "pause_keyword",
       entityId: criterionId,
       beforeValue: "ENABLED",
       afterValue: "ENABLED",
-      error: rewriteRemovedResourceError(
-        rewriteNegativePauseError(extractErrorMessage(error)),
-        `Keyword ${criterionId}`,
-      ),
+      label: keywordText,
+      error: errorMsg,
+      ...(nextTool ? { nextTool } : {}),
     };
   }
 }
@@ -310,6 +381,7 @@ export async function updateBid(
   if (currentBidMicros > 0) {
     const changePct = Math.abs(newBidMicros - currentBidMicros) / currentBidMicros;
     if (changePct > guardrails.maxBidChangePct) {
+      const rejection = guardrailRejection("bid", changePct, guardrails.maxBidChangePct);
       return {
         success: false,
         action: "update_bid",
@@ -317,7 +389,8 @@ export async function updateBid(
         beforeValue: String(currentBidMicros),
         afterValue: String(newBidMicros),
         label: keywordText,
-        error: guardrailRejectionMessage("bid", changePct, guardrails.maxBidChangePct),
+        error: rejection.error,
+        nextTool: rejection.nextTool,
       };
     }
   }
@@ -448,22 +521,57 @@ export async function removeNegativeKeyword(
         AND campaign_criterion.type = 'KEYWORD'
     `);
 
-    const match = (result as any[]).find(
-      (row) => {
-        if (row.campaign_criterion?.keyword?.text !== keywordText) return false;
-        if (matchType && row.campaign_criterion?.keyword?.match_type !== MATCH_TYPE[matchType]) return false;
-        return true;
-      },
-    );
+    const allNegatives = (result as Array<{
+      campaign_criterion?: {
+        criterion_id?: string | number;
+        keyword?: { text?: string; match_type?: number };
+      };
+    }>);
+    const match = allNegatives.find((row) => {
+      if (row.campaign_criterion?.keyword?.text !== keywordText) return false;
+      if (matchType && row.campaign_criterion?.keyword?.match_type !== MATCH_TYPE[matchType]) return false;
+      return true;
+    });
     const criterionId = match?.campaign_criterion?.criterion_id;
     if (!criterionId) {
+      // The agent built the removal plan from search-term data without
+      // verifying — surface the actual list so it abandons the bad plan
+      // after one call instead of re-running the same lookup 50× per session.
+      // Slice before formatting: campaigns can carry up to ~10k negatives and
+      // we only show the first 20.
+      const total = allNegatives.length;
+      const sample = allNegatives.slice(0, 20)
+        .map((row) => {
+          const text = row.campaign_criterion?.keyword?.text;
+          const mt = row.campaign_criterion?.keyword?.match_type;
+          if (!text) return null;
+          // Don't lie about match types we can't decode — calling an unmapped
+          // code "PHRASE" would push the agent toward the wrong matchType arg
+          // on the follow-up call.
+          const mtName = typeof mt === "number" ? MATCH_TYPE_NAME[mt] ?? "UNKNOWN" : "UNKNOWN";
+          return `"${text}" (${mtName})`;
+        })
+        .filter((s): s is string => s !== null);
+
+      const more = total > sample.length ? ` ... and ${total - sample.length} more` : "";
+      const inventory = total === 0
+        ? `Campaign ${campaignId} has no negative keywords at all — verify the campaign ID, or call \`addNegativeKeyword\` if you intended to add this term.`
+        : `Campaign ${campaignId} has ${total} negative keyword${total === 1 ? "" : "s"}: ${sample.join(", ")}${more}.`;
+
       return {
         success: false,
         action: "remove_negative_keyword",
         entityId: keywordText,
         beforeValue: keywordText,
         afterValue: "",
-        error: `Negative keyword "${keywordText}" not found in campaign ${campaignId}`,
+        error: `Negative keyword "${keywordText}"${matchType ? ` (${matchType})` : ""} not found in campaign ${campaignId}. ${inventory} Re-plan against the actual list before retrying.`,
+        nextTool: total === 0
+          ? {
+              name: "addNegativeKeyword",
+              reason: `No negatives exist on campaign ${campaignId}; if you wanted to block "${keywordText}", add it instead.`,
+              args: { campaignId, keyword: keywordText, ...(matchType ? { matchType } : {}) },
+            }
+          : undefined,
       };
     }
 
@@ -536,13 +644,15 @@ export async function updateCampaignBudget(
     const changePct =
       Math.abs(newDailyBudgetMicros - currentBudgetMicros) / currentBudgetMicros;
     if (changePct > guardrails.maxBudgetChangePct) {
+      const rejection = guardrailRejection("budget", changePct, guardrails.maxBudgetChangePct);
       return {
         success: false,
         action: "update_budget",
         entityId: campaignId,
         beforeValue: String(currentBudgetMicros),
         afterValue: String(newDailyBudgetMicros),
-        error: guardrailRejectionMessage("budget", changePct, guardrails.maxBudgetChangePct),
+        error: rejection.error,
+        nextTool: rejection.nextTool,
       };
     }
   }
