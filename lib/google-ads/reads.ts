@@ -1704,7 +1704,8 @@ export function rewriteInvalidDateLiterals(query: string, today: Date = new Date
 
 /**
  * Append a self-correcting hint to specific Google Ads errors so the agent's
- * next attempt has a clear path forward. Currently covers:
+ * next attempt has a clear path forward. Each tip names the exact next move
+ * (which tool to call, which clause to add) so the LLM doesn't have to guess.
  *
  *   - query_error=32 ("Unrecognized field"): point to getResourceMetadata.
  *   - query_error=49 ("metric ... incompatible with FROM clause"): hint to
@@ -1712,18 +1713,183 @@ export function rewriteInvalidDateLiterals(query: string, today: Date = new Date
  *   - query_error=22 ("Invalid date literal"): name the supported set and
  *     direct callers to BETWEEN — a backstop for literals our rewriter
  *     doesn't catch (e.g. typos like LAST_THIRTY_DAYS).
+ *   - query_error=16 ("must be present in SELECT clause"): name the field
+ *     and tell the agent to add it to SELECT (or drop it from WHERE).
+ *   - query_error=18 ("Invalid enum value … in WHERE"): tell the agent to
+ *     use the string enum name, not the numeric code.
+ *   - query_error=53 ("unsupported metric" with segment): tell the agent
+ *     the segment can't pair with that metric — drop one or the other.
+ *   - change_event_error=2 (start date too old): name the 30-day cap.
+ *   - change_event_error=3 (missing change_date_time filter): name the
+ *     exact filter shape that change_event requires.
  */
 export function enrichGaqlError(message: string): string {
   if (/Unrecognized fields? in the query/i.test(message)) {
     return `${message} Tip: call getResourceMetadata('<resource>') to discover valid fields before retrying.`;
   }
   if (/incompatible with the resource in the FROM clause/i.test(message)) {
-    return `${message} Tip: this metric is not selectable on that resource. Try a different FROM (e.g. metrics.cost_micros lives on campaign/ad_group/keyword_view, not on conversion_action).`;
+    return `${message} Tip: this metric is not selectable on that resource. Try a different FROM (e.g. metrics.cost_micros lives on campaign/ad_group/keyword_view, not on conversion_action). To break down metrics by conversion action, query FROM campaign (or ad_group) and SELECT segments.conversion_action_name.`;
   }
   if (/Invalid date literal supplied for DURING operator/i.test(message)) {
     return `${message} Tip: only LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS, TODAY, YESTERDAY, THIS_MONTH, LAST_MONTH, LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_MON_TODAY, THIS_WEEK_SUN_TODAY are valid. For longer windows use \`segments.date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'\`.`;
   }
+  const requiredSelect = message.match(
+    /must be present in SELECT clause: '([a-z_.]+)'/i,
+  );
+  if (requiredSelect) {
+    const field = requiredSelect[1];
+    return `${message} Tip: add \`${field}\` to the SELECT clause (Google requires that any field used in WHERE/ORDER BY also be selected), or drop it from WHERE if you don't need to filter on it.`;
+  }
+  if (/Invalid enum value cannot be included in WHERE clause/i.test(message)) {
+    return `${message} Tip: enum fields take STRING names, not numeric codes — write \`campaign.status = 'PAUSED'\`, not \`campaign.status = 3\`. Common enum names: status (ENABLED, PAUSED, REMOVED), advertising_channel_type (SEARCH, DISPLAY, SHOPPING, PERFORMANCE_MAX, VIDEO). Call getResourceMetadata('<resource>') for the full set.`;
+  }
+  if (
+    /unsupported metric is found in SELECT or WHERE clause/i.test(message) ||
+    /Cannot select the following segments because at least one unsupported metric/i.test(message)
+  ) {
+    return `${message} Tip: that segment doesn't pair with one of your selected metrics — pick one. Either drop the segment (e.g. segments.conversion_action_name) or drop the incompatible metric (e.g. metrics.cost_micros). To break down spend by conversion action, you generally can't — Google reports cost at the campaign/ad_group level, not per conversion action.`;
+  }
+  if (/change_event_error=2/i.test(message) || /start date is too old/i.test(message)) {
+    return `${message} Tip: change_event is capped at the last 30 days. Use \`WHERE change_event.change_date_time >= '<today minus 29 days> 00:00:00' AND change_event.change_date_time <= '<today> 23:59:59'\`. Use \`ads.queries.changeEvents(start, end)\` which already clamps the window.`;
+  }
+  if (/change_event_error=3/i.test(message) || /missing filters on change_event\.change_date_time/i.test(message)) {
+    return `${message} Tip: change_event REQUIRES an explicit \`change_event.change_date_time\` filter — \`segments.date DURING …\` does NOT work for this resource. Add \`WHERE change_event.change_date_time >= '<YYYY-MM-DD> 00:00:00' AND change_event.change_date_time <= '<YYYY-MM-DD> 23:59:59'\` (window must be inside the last 30 days).`;
+  }
   return message;
+}
+
+// ─── Pre-Flight GAQL Validators ─────────────────────────────────────
+//
+// Catch the most common LLM-authored GAQL mistakes BEFORE sending them to
+// Google. Each rejection names the exact fix so the next attempt converges.
+
+/**
+ * change_event has two hard requirements Google enforces:
+ *   1. The WHERE clause must filter on `change_event.change_date_time`
+ *      (segments.date is silently rejected with change_event_error=3).
+ *   2. The window cannot exceed 30 days (change_event_error=2).
+ *
+ * We catch both here before the round-trip so the agent gets one clear
+ * message instead of a vague Google error.
+ */
+export function validateChangeEventFilter(query: string) {
+  const resource = extractFromResource(query);
+  if (resource !== "change_event") return;
+  // The field is required in WHERE specifically — SELECT-only mentions don't
+  // count, since Google validates the predicate, not the projection.
+  const whereMatch = query.match(
+    /\sWHERE\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i,
+  );
+  const whereClause = whereMatch?.[1] ?? "";
+  if (!/\bchange_event\.change_date_time\b/i.test(whereClause)) {
+    throw new Error(
+      "GAQL pre-flight: queries against `change_event` REQUIRE a `change_event.change_date_time` filter in WHERE — `segments.date DURING ...` is not valid for this resource. " +
+        "Add `WHERE change_event.change_date_time >= '<YYYY-MM-DD> 00:00:00' AND change_event.change_date_time <= '<YYYY-MM-DD> 23:59:59'` (window must be inside the last 30 days). " +
+        "Easiest path: use `ads.queries.changeEvents(start, end)` — it builds the correct shape.",
+    );
+  }
+}
+
+/**
+ * `metrics.*` cannot be selected from `FROM conversion_action` — that resource
+ * carries dimensional/config fields only. Reject early with the agent's actual
+ * options spelled out.
+ */
+export function validateMetricsOnConversionAction(query: string) {
+  const resource = extractFromResource(query);
+  if (resource !== "conversion_action") return;
+  const selectMatch = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i);
+  if (!selectMatch) return;
+  const selectClause = selectMatch[1];
+  if (/\bmetrics\.[a-z_]+/i.test(selectClause)) {
+    throw new Error(
+      "GAQL pre-flight: `metrics.*` is not selectable from `FROM conversion_action` — that resource carries dimensional fields only (name, type, status, counting settings). " +
+        "If you want metric counts: query `FROM campaign` (or `ad_group`) and add `segments.conversion_action_name` to break down by conversion action. " +
+        "If you want config only: drop the `metrics.*` fields from SELECT and keep just `conversion_action.*` columns.",
+    );
+  }
+}
+
+/**
+ * Status / type enums on the major Google Ads resources accept STRING names,
+ * not numeric codes. LLMs sometimes paste numeric values from the Ads API
+ * proto definitions; Google rejects with query_error=18, but we can catch the
+ * mistake before the round-trip and tell the agent the valid names directly.
+ *
+ * Field-by-field map of accepted values. Lower-cased on read so detection is
+ * case-insensitive. Quote pairs in the regex are deliberately permissive
+ * (single, double, or unquoted numeric literal — agents have shipped all
+ * three).
+ */
+const ENUM_FIELD_VALUES: Record<string, readonly string[]> = {
+  "campaign.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
+  "ad_group.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
+  "ad_group_ad.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
+  "ad_group_criterion.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
+  "conversion_action.status": ["ENABLED", "REMOVED", "HIDDEN", "UNKNOWN", "UNSPECIFIED"],
+  "asset_group.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
+};
+
+export function validateEnumLiteralsInWhere(query: string) {
+  const whereMatch = query.match(
+    /\sWHERE\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i,
+  );
+  if (!whereMatch) return;
+  const whereClause = whereMatch[1];
+  const offenders: { field: string; literal: string; valid: readonly string[] }[] = [];
+  for (const [field, valid] of Object.entries(ENUM_FIELD_VALUES)) {
+    // Match: campaign.status = '3' | campaign.status = 3 | campaign.status IN (3, 5)
+    // Capture the literal so the error names what was passed.
+    const pattern = new RegExp(
+      String.raw`\b${field.replace(/\./g, "\\.")}\s*(?:=|!=|<>|\bIN\b|\bNOT\s+IN\b)\s*\(?\s*['"]?(\d+)['"]?`,
+      "gi",
+    );
+    for (const m of whereClause.matchAll(pattern)) {
+      offenders.push({ field, literal: m[1], valid });
+    }
+  }
+  if (offenders.length === 0) return;
+  const lines = offenders.map(
+    (o) =>
+      `  - \`${o.field} = ${o.literal}\` → use a string name from: ${o.valid.map((v) => `'${v}'`).join(", ")}`,
+  );
+  throw new Error(
+    "GAQL pre-flight: enum fields take STRING names in WHERE, not numeric codes.\n" +
+      lines.join("\n") +
+      "\nExample fix: `WHERE campaign.status = 'PAUSED'` (not `= 3`). Call getResourceMetadata('<resource>') if you need the full enum.",
+  );
+}
+
+/**
+ * change_event's `change_date_time` window is capped at the last 30 days.
+ * Agents routinely pass `today − 30 days` literally, which lands one day past
+ * the boundary because `>=` plus `00:00:00` is older than now-minus-30-days.
+ *
+ * Auto-clamp the lower bound to today − 29 days when we can parse the date.
+ * Cheap rewrite: only touches the literal in the `>=` predicate, leaves the
+ * rest of the query alone. Mirror of `rewriteInvalidDateLiterals` — fix the
+ * common mistake silently rather than make the agent retry.
+ */
+export function clampChangeEventDateWindow(query: string, today: Date = new Date()): string {
+  const resource = extractFromResource(query);
+  if (resource !== "change_event") return query;
+  const cutoff = new Date(today);
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 29);
+  const cutoffDate = formatDate(cutoff);
+
+  return query.replace(
+    /(\bchange_event\.change_date_time\s*>=\s*['"])(\d{4}-\d{2}-\d{2})([^'"]*)(['"])/gi,
+    (match, prefix: string, dateStr: string, timeTail: string, quote: string) => {
+      const parsed = new Date(`${dateStr}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return match;
+      if (parsed.getTime() >= cutoff.getTime()) return match;
+      // Preserve the agent's time-of-day suffix (e.g., " 00:00:00") if present;
+      // otherwise default to start-of-day.
+      const tail = timeTail && timeTail.trim().length > 0 ? timeTail : " 00:00:00";
+      return `${prefix}${cutoffDate}${tail}${quote}`;
+    },
+  );
 }
 
 export async function runSafeGaqlReport(
@@ -1733,6 +1899,7 @@ export async function runSafeGaqlReport(
   options: RunSafeGaqlOptions = {},
 ): Promise<GaqlReport> {
   let query = rewriteInvalidDateLiterals(rawQuery.trim());
+  query = clampChangeEventDateWindow(query);
   let normalized = query.toUpperCase();
 
   // Accept any whitespace after SELECT (newlines, tabs, spaces) — multi-line
@@ -1750,6 +1917,9 @@ export async function runSafeGaqlReport(
   }
 
   validateSegmentsInWhereAreSelected(query);
+  validateChangeEventFilter(query);
+  validateMetricsOnConversionAction(query);
+  validateEnumLiteralsInWhere(query);
 
   if (options.excludeRemovedParents ?? DEFAULT_EXCLUDE_REMOVED_PARENTS) {
     query = applyRemovedParentFilters(query);

@@ -25,6 +25,10 @@ import {
   buildContinuationHint,
   rewriteInvalidDateLiterals,
   enrichGaqlError,
+  validateChangeEventFilter,
+  validateMetricsOnConversionAction,
+  validateEnumLiteralsInWhere,
+  clampChangeEventDateWindow,
   DEFAULT_GAQL_LIMIT,
   MAX_GAQL_LIMIT,
 } from "@/lib/google-ads/reads";
@@ -618,5 +622,228 @@ describe("enrichGaqlError", () => {
 
   it("returns the original message unchanged for unknown errors", () => {
     expect(enrichGaqlError("Random unrelated error")).toBe("Random unrelated error");
+  });
+
+  it("hints to add the missing field to SELECT on query_error=16", () => {
+    const out = enrichGaqlError(
+      "The following field must be present in SELECT clause: 'campaign.id'. (query_error=16)",
+    );
+    expect(out).toContain("`campaign.id`");
+    expect(out).toMatch(/SELECT clause/);
+  });
+
+  it("hints to use string enum names on query_error=18", () => {
+    const out = enrichGaqlError(
+      "Invalid enum value cannot be included in WHERE clause: '3'. (query_error=18)",
+    );
+    expect(out).toContain("'PAUSED'");
+    expect(out).toMatch(/STRING names/);
+  });
+
+  it("hints to drop incompatible segment/metric on query_error=53", () => {
+    const out = enrichGaqlError(
+      "Cannot select the following segments because at least one unsupported metric is found in SELECT or WHERE clause: 'segments.conversion_action_name'(unsupported metrics: 'cost_micros'). (query_error=53)",
+    );
+    expect(out).toMatch(/Tip:.*segment/);
+    expect(out).toMatch(/cost_micros/);
+  });
+
+  it("names the 30-day cap on change_event_error=2", () => {
+    const out = enrichGaqlError(
+      "The requested start date is too old. It cannot be older than 30 days. (change_event_error=2)",
+    );
+    expect(out).toMatch(/30 days/);
+    expect(out).toContain("ads.queries.changeEvents");
+  });
+
+  it("names change_date_time as the required filter on change_event_error=3", () => {
+    const out = enrichGaqlError(
+      "The change_event request is missing filters on change_event.change_date_time or is filtering on change_event.change_date_time with an infinite range. (change_event_error=3)",
+    );
+    expect(out).toContain("change_event.change_date_time");
+    expect(out).toMatch(/segments\.date.*not/i);
+  });
+});
+
+// ─── Pre-flight validators ────────────────────────────────────────────
+
+describe("validateChangeEventFilter", () => {
+  it("rejects FROM change_event without change_date_time filter", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/change_event\.change_date_time/);
+  });
+
+  it("allows FROM change_event when change_date_time is filtered", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-04-01 00:00:00'",
+      ),
+    ).not.toThrow();
+  });
+
+  it("ignores other resources", () => {
+    expect(() =>
+      validateChangeEventFilter("SELECT campaign.id FROM campaign"),
+    ).not.toThrow();
+  });
+});
+
+describe("validateMetricsOnConversionAction", () => {
+  it("rejects metrics.* selected from FROM conversion_action", () => {
+    expect(() =>
+      validateMetricsOnConversionAction(
+        "SELECT conversion_action.name, metrics.conversions FROM conversion_action",
+      ),
+    ).toThrow(/conversion_action/);
+  });
+
+  it("allows non-metric fields from FROM conversion_action", () => {
+    expect(() =>
+      validateMetricsOnConversionAction(
+        "SELECT conversion_action.name, conversion_action.status FROM conversion_action",
+      ),
+    ).not.toThrow();
+  });
+
+  it("allows metrics from other resources", () => {
+    expect(() =>
+      validateMetricsOnConversionAction(
+        "SELECT campaign.id, metrics.conversions FROM campaign",
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("validateEnumLiteralsInWhere", () => {
+  it("rejects numeric literals on campaign.status", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status = '3'",
+      ),
+    ).toThrow(/STRING names/);
+  });
+
+  it("rejects unquoted numeric literals", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT ad_group.id, ad_group.status FROM ad_group WHERE ad_group.status = 2",
+      ),
+    ).toThrow(/STRING names/);
+  });
+
+  it("rejects numeric IN lists", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status IN ('2', '3')",
+      ),
+    ).toThrow(/STRING names/);
+  });
+
+  it("allows valid string enum names", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status = 'PAUSED'",
+      ),
+    ).not.toThrow();
+  });
+
+  it("allows IN clauses with string names", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status IN ('ENABLED', 'PAUSED')",
+      ),
+    ).not.toThrow();
+  });
+
+  it("ignores numeric comparisons on non-enum fields", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT campaign.id FROM campaign WHERE metrics.clicks > 100 AND campaign.id = 12345",
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("clampChangeEventDateWindow", () => {
+  const NOW = new Date("2026-04-26T12:00:00Z");
+
+  it("clamps a 30-days-ago lower bound to today − 29 days", () => {
+    // 2026-03-27 is exactly 30 days back from 2026-04-26 — Google rejects it
+    // because >= '2026-03-27 00:00:00' is older than now-minus-30-days.
+    const out = clampChangeEventDateWindow(
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-03-27 00:00:00' AND change_event.change_date_time <= '2026-04-26 23:59:59'",
+      NOW,
+    );
+    expect(out).toContain("'2026-03-28 00:00:00'");
+    expect(out).not.toContain("'2026-03-27 00:00:00'");
+  });
+
+  it("preserves a date that is already inside the window", () => {
+    const out = clampChangeEventDateWindow(
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-04-15 00:00:00'",
+      NOW,
+    );
+    expect(out).toContain("'2026-04-15 00:00:00'");
+  });
+
+  it("handles a bare YYYY-MM-DD literal (no time suffix)", () => {
+    const out = clampChangeEventDateWindow(
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-01-01'",
+      NOW,
+    );
+    expect(out).toMatch(/'2026-03-28( 00:00:00)?'/);
+  });
+
+  it("ignores non-change_event resources", () => {
+    const original = "SELECT campaign.id FROM campaign WHERE segments.date >= '2026-01-01'";
+    expect(clampChangeEventDateWindow(original, NOW)).toBe(original);
+  });
+});
+
+describe("runSafeGaqlReport pre-flight integration", () => {
+  it("rejects FROM change_event without change_date_time filter end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT change_event.change_date_time FROM change_event WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).rejects.toThrow(/change_event\.change_date_time/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects metrics.conversions FROM conversion_action end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT conversion_action.name, metrics.conversions FROM conversion_action",
+      ),
+    ).rejects.toThrow(/metrics.*not selectable/i);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects numeric enum in WHERE end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status = 3",
+      ),
+    ).rejects.toThrow(/STRING names/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("auto-clamps an out-of-window change_event lower bound before sending", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    // Date well outside the 30-day cap. Without the clamp, Google would reject;
+    // with it, the query reaches the API with a clamped lower bound.
+    await runSafeGaqlReport(
+      auth,
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2025-01-01 00:00:00' AND change_event.change_date_time <= '2026-04-26 23:59:59'",
+    );
+    const sent = mockQuery.mock.calls[0][0] as string;
+    expect(sent).not.toContain("'2025-01-01 00:00:00'");
+    expect(sent).toMatch(/change_event\.change_date_time\s*>=\s*'\d{4}-\d{2}-\d{2}/);
   });
 });

@@ -2,6 +2,14 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.9] - 2026-04-26
+
+### Changed
+- **`runScript` GAQL pre-flight catches the LLM's three most common authoring mistakes before they hit Google.** Live telemetry showed `runScript` errors fell from 75.7% (2026-04-25) to 36.3% (today) after the date-literal rewrite shipped, but ~70 of today's 114 errors are still LLM-authored schema mistakes that Google round-trips before rejecting. The server now rejects three classes pre-flight: (a) `FROM change_event` without a `change_event.change_date_time` filter in WHERE — agents kept writing `segments.date DURING ...` which silently fails with `change_event_error=3`; (b) `metrics.*` selected from `FROM conversion_action` — that resource carries dimensional fields only, so the metric list is incompatible (`query_error=49`); (c) numeric enum literals in WHERE for `campaign.status`, `ad_group.status`, etc. — agents pasted proto numeric codes; Google requires the string name. Each rejection names the exact fix (which clause to add, which valid value to use) so the next attempt converges instead of guessing.
+- **Auto-clamp out-of-window `change_event.change_date_time` lower bounds.** When the agent's lower bound is older than today − 29 days, the server rewrites it to today − 29 days before sending. This kills the `change_event_error=2` ("start date is too old") class outright — same strategy as the `LAST_90_DAYS → BETWEEN` rewrite shipped in 0.3.0.6.
+- **`enrichGaqlError` now adds tips for query_error=16, query_error=18, query_error=53, change_event_error=2, and change_event_error=3.** Each tip names the exact next move: which field to add to SELECT (16), the valid string enum names (18), how segment/metric incompatibility resolves (53), and the change_event window/filter requirements (2, 3).
+- **`runScript` tool description gains a "Common Gotchas" section.** Lists the change_event filter requirement, enum-string rule, and `metrics.*`-not-on-`conversion_action` rule, so agents avoid the mistakes the validators would otherwise have to catch.
+
 ## [0.3.0.8] - 2026-04-26
 
 ### Added

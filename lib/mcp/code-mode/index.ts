@@ -51,6 +51,14 @@ Valid \`DURING\` literals: TODAY, YESTERDAY, LAST_7_DAYS, LAST_14_DAYS, LAST_30_
 
 Note: \`change_event\` only supports the last 30 days regardless of how you express the range.
 
+── COMMON GOTCHAS (the validator will reject these before they reach Google) ──
+
+- **change_event REQUIRES \`change_event.change_date_time\` in WHERE.** \`segments.date DURING ...\` does NOT work for this resource (Google rejects with change_event_error=3). Window cap is 30 rolling days. Easiest: \`ads.queries.changeEvents(start, end)\` builds the right shape.
+- **Enums in WHERE are STRING names, not numbers.** Write \`WHERE campaign.status = 'PAUSED'\`, never \`= 3\`. Same for \`ad_group.status\`, \`ad_group_ad.status\`, \`ad_group_criterion.status\`, \`conversion_action.status\`, \`asset_group.status\`. Valid status values: ENABLED, PAUSED, REMOVED. Call \`getResourceMetadata('<resource>')\` for other enums (advertising_channel_type, bidding_strategy_type, etc.).
+- **\`metrics.*\` is NOT selectable from \`FROM conversion_action\`.** That resource carries dimensional fields only (name, type, status, counting). To break down metric counts by conversion action: query \`FROM campaign\` (or \`ad_group\`) and SELECT \`segments.conversion_action_name\`. To list configured actions: drop the metrics and keep only \`conversion_action.*\` fields.
+- **\`segments.conversion_action_name\` and friends don't pair with \`metrics.cost_micros\`.** Google reports cost at the campaign/ad_group level, not per conversion action — pick one or the other (query_error=53). For per-action cost-per-conversion, divide \`cost_micros\` (campaign-total) by per-action \`metrics.conversions\` in-script.
+- **Fields used in WHERE must also be in SELECT** (query_error=16). The server auto-injects \`campaign.status\`/\`ad_group.status\` when filtering REMOVED rows, but other fields are on you.
+
 Rules: top-level await works; no fetch/require/process/fs; return value must be JSON-serializable; defaults are 30s timeout (max 45s), 500KB return cap, 100K log chars.
 
 ── CANONICAL AUDIT (one call, wide net, filter in-script) ──
