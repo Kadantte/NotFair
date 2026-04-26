@@ -68,7 +68,7 @@ export function ConnectPage({ initialSession = emptySession, slug }: ConnectPage
     );
 }
 
-function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: boolean; onCopy: () => void }) {
+function SetupCodeBlock({ content, copied, onCopy, showTokenWarning = true }: { content: string; copied: boolean; onCopy: () => void; showTokenWarning?: boolean }) {
     return (
         <div className="w-full text-left">
             <div className="relative rounded-lg border border-[#3D3C36] bg-[#24231F] p-6">
@@ -91,9 +91,11 @@ function SetupCodeBlock({ content, copied, onCopy }: { content: string; copied: 
                         </>
                     )}
                 </button>
-                <p className="mt-4 pr-24 text-xs text-[#C4C0B6]/60">
-                    This contains your personal access token. Don&apos;t share it publicly.
-                </p>
+                {showTokenWarning && (
+                    <p className="mt-4 pr-24 text-xs text-[#C4C0B6]/60">
+                        This contains your personal access token. Don&apos;t share it publicly.
+                    </p>
+                )}
             </div>
         </div>
     );
@@ -580,11 +582,12 @@ function CodexSection({ token: _token }: { token: string }) {
     return (
         <div className="w-full space-y-4 text-left">
             <p className="text-sm text-[#C4C0B6]">
-                Run this once in your terminal. Codex registers itself, opens a browser to AdsAgent, and finishes when you sign in.
+                Run this in your terminal — Codex finishes setup on first use.
             </p>
             <SetupCodeBlock
                 content={oneLiner}
                 copied={false}
+                showTokenWarning={false}
                 onCopy={() => {
                     navigator.clipboard.writeText(oneLiner);
                     trackEvent('install_command_copied', { setup_tab: 'codex', step: 'codex_oneliner' });
