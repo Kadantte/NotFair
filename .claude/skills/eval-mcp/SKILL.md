@@ -174,6 +174,30 @@ Eight prompts, no tool-call cap, judge subagent per runner scoring on a 7-dim ru
 | `--label <name>` | git short SHA | Label for the run directory + history row |
 | `--runs <n>` | 1 | Runs per prompt (use 3 for variance bands) |
 
+## Chat-followup eval (use the headless harness)
+
+For evaluating chat-side behaviors — apply-intent recognition, forecast→build flow, language
+handling, connection-state reassurance, change-log recovery — use the headless harness with
+the dedicated chat prompt set. The skill's spawned-subagent loop doesn't model real
+chat-followup well (each runner is single-turn, no shared agent state, no dev server hot
+reload of write tools), so this case lives in `eval.ts`:
+
+```bash
+# Read-only chat prompts (eligible-zero-impressions ×2, connection-confusion):
+npm run eval:mcp -- --label chat-readonly --prompts prompts-chat.json
+
+# Full set including writes (apply-after-audit, forecast-then-build, stuck-recovery).
+# Point DEV_LOCAL_EMAIL at a test account first — these execute real mutations.
+EVAL_ALLOW_WRITES=1 npm run eval:mcp -- --label chat-full --prompts prompts-chat.json
+```
+
+Each prompt in `scripts/eval-mcp/prompts-chat.json` carries a `criteria` field that the judge
+applies on top of the 7-dim rubric — case-specific bars and AUTOMATIC FAILURES per prompt
+(e.g. `apply-after-audit` caps overall ≤ 4 if no write tools were called; `connection-confusion`
+caps the score if the agent tells the user to go to `/connect`). The harness reads
+prompts-chat.json the same way it reads prompts.json — same judge, same scoring shape,
+results land in `results/<label>.jsonl` and compare via `npm run eval:mcp:compare`.
+
 ## Storage layout
 
 ```

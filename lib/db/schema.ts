@@ -85,6 +85,10 @@ export const operations = pgTable("operations", {
   bytesOut: integer("bytes_out"),
   /** Coarse failure bucket — RATE_LIMIT, THROWN, WRITE_REJECTED, etc. */
   errorClass: text("error_class"),
+  /** Set when this write was triggered by an audit Apply — links back to
+   * audit_snapshots.id so we can show "from audit Y" attribution and aggregate
+   * apply impact in the digest. Null for MCP / chat / cron writes. */
+  auditSnapshotId: integer("audit_snapshot_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("ops_account_created_idx").on(table.accountId, table.createdAt),
@@ -93,6 +97,7 @@ export const operations = pgTable("operations", {
   index("ops_session_created_idx").on(table.sessionId, table.createdAt),
   index("ops_tool_name_created_idx").on(table.toolName, table.createdAt),
   index("ops_args_sha_idx").on(table.argsSha256),
+  index("ops_audit_snapshot_idx").on(table.auditSnapshotId),
 ]);
 
 // ─── Performance Snapshots ───────────────────────────────────────────
@@ -291,9 +296,42 @@ export const auditSnapshots = pgTable("audit_snapshots", {
   campaignCount: smallint("campaign_count").notNull().default(0),
   topActions: jsonb("top_actions").notNull().default([]),
   impressionShareDiagnosis: jsonb("impression_share_diagnosis"),
+  /** Updated whenever an Apply lands against this snapshot — used to detect
+   * stale-state on the audit page (re-run prompt) and to filter "audits that
+   * led to action" in analytics. */
+  lastApplyAt: timestamp("last_apply_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("audit_snapshots_account_idx").on(table.accountId, table.createdAt),
+]);
+
+// ─── Audit Applies — recommendation→write attribution ────────────────
+
+export const auditApplies = pgTable("audit_applies", {
+  id: serial("id").primaryKey(),
+  /** FK-ish to audit_snapshots.id. Not enforced (audit_snapshots can be pruned). */
+  snapshotId: integer("snapshot_id").notNull(),
+  /** Pass bucket key — 'stopWasting' | 'fixingFundamentals' | 'unlockingGrowth'. */
+  passKey: text("pass_key").notNull(),
+  /** 0-based position of the PassItem inside passes[passKey]. */
+  index: integer("index").notNull(),
+  /** Denormalized from snapshot for cheap digest queries. */
+  userId: text("user_id"),
+  accountId: text("account_id").notNull(),
+  /** Denormalized actionType — pause_campaign, add_negative, update_budget, etc. */
+  actionType: text("action_type").notNull(),
+  /** operations.id of the apply write. Null only on transient INSERT-before-write race. */
+  changeId: integer("change_id"),
+  /** operations.id of the undo write. Null until undone. */
+  undoChangeId: integer("undo_change_id"),
+  /** Serialized ToolCall to replay if user clicks Undo. Same shape as the
+   * MCP write tools accept. Null when the apply itself failed. */
+  undoToolCall: jsonb("undo_tool_call"),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  undoneAt: timestamp("undone_at"),
+}, (table) => [
+  uniqueIndex("audit_applies_lookup_idx").on(table.snapshotId, table.passKey, table.index),
+  index("audit_applies_user_applied_idx").on(table.userId, table.appliedAt),
 ]);
 
 // ─── Tool Permissions (per-user MCP tool approval policy) ──────────

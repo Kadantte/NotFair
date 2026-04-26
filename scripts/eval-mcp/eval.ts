@@ -19,6 +19,12 @@
  *   --only <id>       Run only the prompt with this id.
  *   --url <url>       MCP URL (default http://localhost:3000/api/mcp).
  *   --model <alias>   Claude model for the agent (default "sonnet"). Judge always uses opus.
+ *   --prompts <file>  Path to prompt set (default prompts.json). Use prompts-chat.json for the
+ *                     real-user-prompt eval set. Each entry may include an optional `criteria`
+ *                     string (passed to the judge as case-specific addendum to the rubric) and a
+ *                     `writes: true` flag (those prompts execute Google Ads writes against
+ *                     whichever account DEV_LOCAL_EMAIL / MCP_BEARER_TOKEN points at — they are
+ *                     SKIPPED by default and only run when EVAL_ALLOW_WRITES=1 is set).
  */
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from "node:fs";
@@ -31,7 +37,7 @@ loadEnvLocal();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── CLI args ──────────────────────────────────────────────────────────
-type Args = { label: string; runs: number; only?: string; url: string; model: string };
+type Args = { label: string; runs: number; only?: string; url: string; model: string; promptsFile: string };
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2);
@@ -50,11 +56,17 @@ function parseArgs(): Args {
     only: get("--only"),
     url: get("--url") ?? "http://localhost:3000/api/mcp",
     model: get("--model") ?? "sonnet",
+    promptsFile: get("--prompts") ?? "prompts.json",
   };
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────
-type Prompt = { id: string; prompt: string };
+// `criteria` is an optional per-prompt addendum to the judge rubric — used by
+// chat-followup evals where each prompt has a unique success shape (apply intent,
+// forecast→build, multilingual diagnostic, etc.) that the generic 7-dim rubric
+// doesn't fully capture. `writes: true` marks prompts that execute Google Ads
+// mutations against the configured account; gated behind EVAL_ALLOW_WRITES=1.
+type Prompt = { id: string; prompt: string; criteria?: string; writes?: boolean; lang?: string };
 
 type RunMetrics = {
   label: string;
@@ -251,8 +263,16 @@ const SCORE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-function judge(prompt: string, output: string): Promise<Score> {
-  const judgePrompt = `## User prompt\n${prompt}\n\n## Agent response\n${output}\n\nScore this response per the rubric. Return only the JSON object.`;
+function judge(prompt: string, output: string, criteria?: string): Promise<Score> {
+  // When the prompt entry has `criteria`, append it as a case-specific addendum
+  // to the rubric. The 7-dim rubric still applies — `criteria` adds prompt-specific
+  // bars and AUTOMATIC FAILURES that the judge should respect alongside the
+  // generic dimensions. Order matters: rubric first (general), criteria second
+  // (specific) — the latter qualifies the former.
+  const criteriaSection = criteria
+    ? `\n\n## Case-specific criteria for THIS prompt\n${criteria}\n\nApply these alongside the rubric. AUTOMATIC FAILURES named here cap the listed dimension regardless of how the response otherwise reads.`
+    : "";
+  const judgePrompt = `## User prompt\n${prompt}\n\n## Agent response\n${output}${criteriaSection}\n\nScore this response per the rubric (and any case-specific criteria above). Return only the JSON object.`;
 
   const args = [
     "-p",
@@ -321,14 +341,38 @@ async function main() {
   // judge errors.
   await preflightClaudeLogin();
 
-  const promptsPath = resolve(__dirname, "prompts.json");
-  const allPrompts: Prompt[] = JSON.parse(readFileSync(promptsPath, "utf-8"));
-  const prompts = args.only ? allPrompts.filter((p) => p.id === args.only) : allPrompts;
-
-  if (prompts.length === 0) {
-    console.error(`No prompts matched --only ${args.only}`);
+  const promptsPath = resolve(__dirname, args.promptsFile);
+  if (!existsSync(promptsPath)) {
+    console.error(`Prompts file not found: ${promptsPath}`);
     process.exit(1);
   }
+  const allPrompts: Prompt[] = JSON.parse(readFileSync(promptsPath, "utf-8"));
+  let prompts = args.only ? allPrompts.filter((p) => p.id === args.only) : allPrompts;
+
+  // Safety gate: prompts marked `writes: true` will execute Google Ads mutations
+  // (createCampaign, pauseKeyword, etc.) against the account DEV_LOCAL_EMAIL or
+  // MCP_BEARER_TOKEN resolves to. Skip them by default — opt in with
+  // EVAL_ALLOW_WRITES=1 once you've pointed the session at a test account.
+  const allowWrites = process.env.EVAL_ALLOW_WRITES === "1";
+  const writePrompts = prompts.filter((p) => p.writes);
+  if (writePrompts.length > 0 && !allowWrites) {
+    const skippedIds = writePrompts.map((p) => p.id).join(", ");
+    console.log(
+      `⚠ Skipping ${writePrompts.length} write-prompt(s) [${skippedIds}] — these execute real Google Ads mutations.\n` +
+      `  Set EVAL_ALLOW_WRITES=1 to run them (point DEV_LOCAL_EMAIL at a test account first).`,
+    );
+    prompts = prompts.filter((p) => !p.writes);
+  }
+
+  if (prompts.length === 0) {
+    if (args.only) {
+      console.error(`No prompts matched --only ${args.only}`);
+    } else {
+      console.error("No runnable prompts (all filtered out — see write-gate notice above).");
+    }
+    process.exit(1);
+  }
+  console.log(`Loaded ${prompts.length} prompt(s) from ${args.promptsFile}${allowWrites ? " (writes enabled)" : ""}`);
 
   const resultsDir = resolve(__dirname, "results");
   if (!existsSync(resultsDir)) mkdirSync(resultsDir, { recursive: true });
@@ -345,7 +389,7 @@ async function main() {
       let scores: Score | undefined;
       if (!run.error && run.final_text) {
         try {
-          scores = await judge(p.prompt, run.final_text);
+          scores = await judge(p.prompt, run.final_text, p.criteria);
         } catch (e) {
           run.error = `judge error: ${e instanceof Error ? e.message : String(e)}`;
         }

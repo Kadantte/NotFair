@@ -64,6 +64,39 @@ npm run eval:mcp:compare -- baseline my-change
 - `--only <id>` — run a single prompt by id (e.g. `--only audit-full`).
 - `--url <url>` — MCP endpoint (default `http://localhost:3000/api/mcp`).
 - `--model <alias>` — agent model (default `sonnet`; try `opus` or `haiku`).
+- `--prompts <file>` — prompt set file (default `prompts.json`). Use `prompts-chat.json` for the
+  real-user chat-followup set (encoded from the 6 stuck-chat prompts in the new-customer-intent
+  analysis). Each prompt in `prompts-chat.json` carries an optional `criteria` field that the
+  judge applies on top of the standard 7-dim rubric — case-specific bars and AUTOMATIC FAILURES
+  per prompt (e.g. "agent must call write tools, not stall in clarifying questions").
+
+### Chat-followup eval (`--prompts prompts-chat.json`)
+
+Six prompts modelled on real chat sessions where the assistant left value on the table:
+
+| id | Tests |
+|---|---|
+| `apply-after-audit` | Apply intent — "YES FETCH NOW" / "Fill and propose". Must execute writes, not just recommend. |
+| `forecast-then-build` | Pre-flight forecast → decision → campaign build (GK Dental flow). |
+| `eligible-zero-impressions` | Multi-surface diagnostic: budget / bid / keyword status / geo / approval. |
+| `eligible-zero-impressions-zh` | Same diagnostic in Chinese — must respond in Chinese without translating real campaign names. |
+| `connection-confusion` | "can you connect to my adsagent" — agent must verify connection works, not redirect to /connect. |
+| `stuck-recovery` | "retry" recovery — must call getChanges, identify failures, retry safely. |
+
+Three of these (`apply-after-audit`, `forecast-then-build`, `stuck-recovery`) are marked
+`writes: true` and **execute real Google Ads mutations** against whatever account
+`DEV_LOCAL_EMAIL` or `MCP_BEARER_TOKEN` resolves to. They are **skipped by default**. To run
+them, point your dev session at a test account and pass `EVAL_ALLOW_WRITES=1`:
+
+```bash
+EVAL_ALLOW_WRITES=1 npm run eval:mcp -- --label chat-baseline --prompts prompts-chat.json
+```
+
+Run the read-only subset with no flag — safe by default:
+
+```bash
+npm run eval:mcp -- --label chat-readonly --prompts prompts-chat.json
+```
 
 ## Interpreting results
 

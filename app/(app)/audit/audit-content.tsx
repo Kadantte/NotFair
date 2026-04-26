@@ -21,6 +21,7 @@ import type { AuditOverview, AuditDetails } from "./actions";
 import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } from "./actions";
 import type { AuditResult, PassItem, QsSubLabel } from "@/lib/audit/scoring";
 import { trackEvent } from "@/lib/analytics";
+import { RecommendationApply, applyBatch } from "@/components/audit/recommendation-card";
 
 // ─── Time Range ──────────────────────────────────────────────────────
 
@@ -227,6 +228,78 @@ function VerdictCard({ verdict, loading }: { verdict: string | null; loading?: b
   );
 }
 
+// ─── Apply All Button ───────────────────────────────────────────────
+
+/**
+ * Bottom-of-section batch apply. Fires applyBatch with every dispatchable
+ * item in the section, then individual cards flip to terminal state via the
+ * recommendation-card result bus. Aggregate banner ("Applied N · Failed M")
+ * persists for 8s afterward so the user sees a summary even when all cards
+ * are off-screen.
+ */
+function ApplyAllButton({
+  snapshotId,
+  passKey,
+  items,
+}: {
+  snapshotId: number;
+  passKey: keyof typeof PASS_CONFIG;
+  items: PassItem[];
+}) {
+  const dispatchable = items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => Boolean(item.actionType));
+  const [busy, setBusy] = useState(false);
+  const [summary, setSummary] = useState<{ applied: number; failed: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (dispatchable.length < 2) return null; // 1-item batch is just an apply click
+
+  const onClick = async () => {
+    setBusy(true);
+    setError(null);
+    setSummary(null);
+    try {
+      const data = await applyBatch(
+        snapshotId,
+        dispatchable.map(({ index }) => ({ passKey, index })),
+      );
+      let applied = 0;
+      let failed = 0;
+      for (const r of data.results) {
+        if (r.status === "applied" || r.status === "noop_already_applied") applied++;
+        else failed++;
+      }
+      setSummary({ applied, failed });
+      window.setTimeout(() => setSummary(null), 8000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 flex items-center justify-end gap-2">
+      {summary && (
+        <span className="text-[11px] text-[#C4C0B6]" aria-live="polite">
+          Applied {summary.applied}{summary.failed > 0 ? ` · Failed ${summary.failed}` : ""}
+        </span>
+      )}
+      {error && <span className="text-[11px] text-[#C45D4A]">{error}</span>}
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        className="flex items-center gap-1 rounded-sm border border-[#3D3C36] bg-[#2E2D28] px-2.5 py-1 text-[11px] font-medium text-[#E8E4DD] transition hover:bg-[#3D3C36] disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        Apply all {dispatchable.length}
+      </button>
+    </div>
+  );
+}
+
 // ─── Pass Section ───────────────────────────────────────────────────
 
 const PASS_CONFIG = {
@@ -255,11 +328,19 @@ function PassSection({
   items,
   loading,
   onAskAI,
+  snapshotId,
+  applyEnabled,
 }: {
   passKey: keyof typeof PASS_CONFIG;
   items: PassItem[];
   loading?: boolean;
   onAskAI?: (prompt: string) => void;
+  /** When provided alongside applyEnabled, each item with a dispatchable
+   * actionType renders the new RecommendationApply control (apply→DB row→
+   * undoable). Falls back to legacy `PassItemAction` server-action shortcuts
+   * otherwise — keeps the audit page functional during the staged flag rollout. */
+  snapshotId?: number | null;
+  applyEnabled?: boolean;
 }) {
   const config = PASS_CONFIG[passKey];
 
@@ -299,30 +380,45 @@ function PassSection({
       {items.length === 0 ? (
         <p className="mt-2 text-[13px] text-[#6B6760] italic">{config.empty}</p>
       ) : (
-        <div className="mt-3 space-y-2">
-          {items.map((item, i) => (
-            <div
-              key={i}
-              className="flex items-start justify-between gap-3 rounded border border-[#3D3C36] bg-[#1A1917] p-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start gap-2">
-                  <span
-                    className="mt-0.5 font-mono text-[13px] font-bold shrink-0"
-                    style={{ color: config.accentColor }}
-                  >
-                    {i + 1}.
-                  </span>
-                  <span className="text-[13px] text-[#E8E4DD]">{item.action}</span>
+        <>
+          <div className="mt-3 space-y-2">
+            {items.map((item, i) => (
+              <div
+                key={i}
+                className="flex items-start justify-between gap-3 rounded border border-[#3D3C36] bg-[#1A1917] p-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="mt-0.5 font-mono text-[13px] font-bold shrink-0"
+                      style={{ color: config.accentColor }}
+                    >
+                      {i + 1}.
+                    </span>
+                    <span className="text-[13px] text-[#E8E4DD]">{item.action}</span>
+                  </div>
+                  <div className="mt-1 ml-5 font-mono text-[12px] text-[#4CAF6E]">{item.impact}</div>
                 </div>
-                <div className="mt-1 ml-5 font-mono text-[12px] text-[#4CAF6E]">{item.impact}</div>
+                <div className="flex shrink-0 items-center gap-2 pt-0.5">
+                  {applyEnabled && snapshotId != null && item.actionType ? (
+                    <RecommendationApply
+                      snapshotId={snapshotId}
+                      passKey={passKey}
+                      index={i}
+                      item={item}
+                      enabled={applyEnabled}
+                    />
+                  ) : (
+                    <PassItemAction item={item} />
+                  )}
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2 pt-0.5">
-                <PassItemAction item={item} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {applyEnabled && snapshotId != null && (
+            <ApplyAllButton snapshotId={snapshotId} passKey={passKey} items={items} />
+          )}
+        </>
       )}
     </div>
   );
@@ -1023,18 +1119,24 @@ export function AuditContent({
             items={auditResult?.passes.stopWasting ?? []}
             loading={detailsLoading}
             onAskAI={onAskAI}
+            snapshotId={details?.snapshotId ?? null}
+            applyEnabled={details?.applyEnabled ?? false}
           />
           <PassSection
             passKey="captureMore"
             items={auditResult?.passes.captureMore ?? []}
             loading={detailsLoading}
             onAskAI={onAskAI}
+            snapshotId={details?.snapshotId ?? null}
+            applyEnabled={details?.applyEnabled ?? false}
           />
           <PassSection
             passKey="fixFundamentals"
             items={auditResult?.passes.fixFundamentals ?? []}
             loading={detailsLoading}
             onAskAI={onAskAI}
+            snapshotId={details?.snapshotId ?? null}
+            applyEnabled={details?.applyEnabled ?? false}
           />
         </div>
 

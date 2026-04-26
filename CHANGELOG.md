@@ -2,6 +2,15 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.8] - 2026-04-26
+
+### Added
+- **Audit recommendations are one-click applyable (dark-launched behind `FEATURE_AUDIT_APPLY`).** Each pass-item on `/audit` with a dispatchable `actionType` (pause campaign/keyword/ad, add negative, update budget, update bid) renders an Apply button that runs the underlying Google Ads write through the existing `execWrite` path with full guardrails and operations logging. Successful applies show a green check + Undo button; Undo replays a stored inverse `ToolCall` so every apply is a two-way door. Apply All (≥2 dispatchable items per pass) batches in parallel and uses an EventTarget pubsub so individual cards flip to their terminal state without a full re-render. A new `audit_applies` table records `(snapshot_id, pass_key, index)` with a unique index for idempotency, and an advisory-locked two-phase claim protocol guarantees concurrent applies of the same recommendation across tabs/windows can't double-write Google. Per-action TTLs (6h budget/bid, 24h pauses/negatives) prevent stale recommendations from being applied. Stale-claim recovery reclaims orphan rows after 30s if a phase-2 write process crashes mid-write. Fully unit-tested dispatcher (28 tests covering every action type, missing fields, invalid values, and round-trip undo). Feature flag is OFF by default in prod; the legacy text-only fallback continues to render until the flag flips.
+- **Chat-followup eval suite (`scripts/eval-mcp/prompts-chat.json`).** Six real failure-mode prompts from production chat sessions encoded as testable single-turn scenarios with per-prompt judge criteria: apply-after-audit ("YES FETCH NOW"), forecast-then-build, zero-impressions diagnosis (English + Chinese), connection confusion, and mid-turn recovery ("retry"). Eval harness now accepts `--prompts <file>` to swap prompt sets and `EVAL_ALLOW_WRITES=1` to opt in to write-flavored prompts; per-prompt criteria thread into the judge prompt as a case-specific addendum so failure modes get caught even when the response otherwise reads fine.
+
+### Changed
+- **`/audit` page persists snapshots with full PassItem structure, not just `{action, impact}` text.** Apply cards need `actionType`, `campaignId`, `adGroupId`, `targetId`, etc. to dispatch. Old snapshots without these fields render text-only; a re-run of the audit regenerates them with the structured fields.
+
 ## [0.3.0.7] - 2026-04-26
 
 ### Added

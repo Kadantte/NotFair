@@ -313,9 +313,18 @@ export async function getAuditDetails(days: number = 30) {
 
     const auditResult = computeAuditScore(auditInput);
 
-    // Fire-and-forget: persist snapshot for dev dashboard
-    saveAuditSnapshot(session.customerId, session.userId ?? null, auditResult, auditInput).catch((e) => {
+    // Persist snapshot AND get its id back so the audit page can wire Apply
+    // buttons to the new /api/chat/recommendations/apply route. ~50ms over
+    // the cold path; cheap relative to the surrounding GAQL fan-out. If the
+    // insert fails the audit still renders — Apply buttons just won't appear.
+    const snapshotResult = await saveAuditSnapshot(
+      session.customerId,
+      session.userId ?? null,
+      auditResult,
+      auditInput,
+    ).catch((e) => {
       console.error("audit snapshot save failed", e);
+      return { snapshotId: null as number | null };
     });
 
     // Fire-and-forget: save an anonymized copy to the user's audit history
@@ -330,7 +339,14 @@ export async function getAuditDetails(days: number = 30) {
       console.error("audit history save failed", e);
     });
 
-    return { auditResult };
+    // applyEnabled mirrors FEATURE_AUDIT_APPLY (the same env var the apply
+    // route gates on) so the client can render text-only fallback when the
+    // feature is disabled, without a separate runtime probe.
+    return {
+      auditResult,
+      snapshotId: snapshotResult.snapshotId,
+      applyEnabled: (process.env.FEATURE_AUDIT_APPLY ?? "").toLowerCase() === "true",
+    };
   });
 }
 

@@ -118,7 +118,7 @@ Rules:
 - Never make write changes without explicit user confirmation. Always show what you plan to change, the current value, and the new value before executing.
 - After every write, tell the user the changeId so they can undo within 7 days.
 - Guardrails are server-side: bid changes >25% and budget changes >50% will be rejected.
-- Onboarding: if the current thread has no prior assistant messages AND the user's first message is a generic greeting or explicitly asks for an audit, your FIRST tool call MUST be \`audit\`. After it returns, summarize the top 3 proposed actions with dollar impact and ask the user which they'd like to apply.
+- Onboarding: if the current thread has no prior assistant messages AND the user's first message is a generic greeting or explicitly asks for an audit, run an account audit by calling \`runScript\` with a parallel GAQL fan-out across campaigns, search terms, quality scores, and change events (the \`gaqlParallel\` example in the MCP server instructions). Summarize the top 3 proposed actions with dollar impact and tell the user they can also see and apply audit recommendations directly at /audit.
 - Do NOT auto-run audit when the user's first message is a specific question (e.g., "bump budget on campaign X", "what's my CTR?") — answer that question directly.
 - IMPORTANT: Always end your response with a text summary. Never stop after tool calls without explaining the results to the user.`,
     tools,
