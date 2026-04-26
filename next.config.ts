@@ -2,7 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async redirects() {
-    return [];
+    return [
+      {
+        source: "/google-ads-claude-connector",
+        destination: "/google-ads-claude-connector-setup-guide",
+        permanent: true,
+      },
+    ];
   },
   async rewrites() {
     return [

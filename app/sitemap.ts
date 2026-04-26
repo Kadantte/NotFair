@@ -8,7 +8,9 @@ const publicMarketingRoutes = [
   "/",
   "/google-ads-audit",
   "/google-ads-claude",
-  "/google-ads-claude-connector",
+  "/google-ads-claude-connector-setup-guide",
+  "/google-ads-claude-code-plugin-setup-guide",
+  "/google-ads-codex-mcp-setup-guide",
   "/google-ads-mcp-server",
   "/impact",
   "/privacy",
@@ -17,7 +19,7 @@ const publicMarketingRoutes = [
   ...allLandingPages.map((page) => `/${page.slug}`),
 ];
 
-const highPriorityRoutes = new Set(["/", "/google-ads-audit", "/google-ads-claude", "/google-ads-claude-connector", "/google-ads-mcp-server"]);
+const highPriorityRoutes = new Set(["/", "/google-ads-audit", "/google-ads-claude", "/google-ads-claude-connector-setup-guide", "/google-ads-claude-code-plugin-setup-guide", "/google-ads-codex-mcp-setup-guide", "/google-ads-mcp-server"]);
 const seoLandingRoutes = new Set([
   "/ai-google-ads-agent",
   "/google-ads-mcp",

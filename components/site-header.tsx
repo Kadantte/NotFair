@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Star } from "lucide-react";
 import { AuditCTA } from "@/components/marketing/audit-cta";
+import { SetupGuidesMenu } from "@/components/setup-guides-menu";
 
 function formatStars(count: number): string {
     if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -52,7 +53,8 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
                     <NavLink href="/pricing" label="Pricing" className="hidden sm:inline" />
-                    <NavLink href="/google-ads-claude-connector" label="Google Ads Claude Connector Setup Guide" className="hidden lg:inline" />
+                    <NavLink href="/google-ads-claude-connector-setup-guide" label="Google Ads Claude Connector Setup Guide" className="hidden lg:inline" />
+                    <SetupGuidesMenu className="hidden md:flex" />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"

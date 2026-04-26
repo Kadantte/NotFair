@@ -1,12 +1,27 @@
 import Link from "next/link";
-import { allLandingPages } from "@/lib/marketing-pages";
 import { DiscordLink } from "@/components/discord-link";
 
+const setupGuideLinks = [
+    {
+        href: "/google-ads-claude-connector-setup-guide",
+        label: "Google Ads Claude Connector Setup Guide",
+    },
+    {
+        href: "/google-ads-claude-code-plugin-setup-guide",
+        label: "Google Ads Claude Code Plugin Setup Guide",
+    },
+    {
+        href: "/google-ads-codex-mcp-setup-guide",
+        label: "Google Ads Codex MCP Setup Guide",
+    },
+    {
+        href: "/google-ads-mcp",
+        label: "Google Ads MCP Server (any client)",
+    },
+];
+
 export function SiteFooter() {
-    const articleLinks = allLandingPages.map((page) => ({
-        href: `/${page.slug}`,
-        label: page.title,
-    }));
+    const articleLinks = setupGuideLinks;
 
     return (
         <footer className="border-t border-[#3D3C36] bg-[#1A1917]">

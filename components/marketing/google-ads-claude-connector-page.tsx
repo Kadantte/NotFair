@@ -376,7 +376,7 @@ function ConnectButton({
 }) {
   const handleClick = useCallback(() => {
     trackEvent("cta_clicked", {
-      page: "google-ads-claude-connector",
+      page: "google-ads-claude-connector-setup-guide",
       cta: connected ? "open_connector_setup" : "sign_in_with_google",
       destination: "/connect/claude-connector",
       requires_auth: !connected,

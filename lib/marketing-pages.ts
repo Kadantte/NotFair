@@ -9,7 +9,6 @@ export type MarketingLink = {
 export type LandingPageContent = {
   slug:
   | "ai-google-ads-agent"
-  | "google-ads-mcp"
   | "connect-google-ads-to-claude"
   | "connect-google-ads-to-chatgpt"
   | "ai-google-ads-optimization";
@@ -91,72 +90,6 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         href: "/google-ads-mcp",
         title: "Google Ads MCP",
         description: "See how AdsAgent works as a Google Ads MCP server.",
-      },
-    ],
-  },
-  "google-ads-mcp": {
-    slug: "google-ads-mcp",
-    title: "Google Ads MCP",
-    description:
-      "AdsAgent gives you a Google Ads MCP server so Claude, OpenClaw, and other MCP-compatible AI workflows can analyze campaigns and help manage changes.",
-    keywords: [
-      "Google Ads MCP",
-      "Google Ads MCP server",
-      "MCP Google Ads",
-      "Google Ads for Claude MCP",
-    ],
-    heroTitle: "A Google Ads MCP server for AI-native campaign workflows",
-    heroDescription:
-      "If you want to connect Google Ads to an AI client without building a custom integration, AdsAgent gives you the MCP layer, campaign context, and a product flow built for optimization work.",
-    highlights: [
-      "Connect Google Ads to Claude, OpenClaw, and similar MCP clients",
-      "Skip custom middleware just to expose campaign data to AI",
-      "Move from analysis to tracked changes in one workflow",
-    ],
-    sections: [
-      {
-        title: "Why Google Ads MCP matters",
-        body:
-          "MCP gives AI tools a cleaner way to read campaign context and trigger approved actions. AdsAgent focuses that pattern specifically on Google Ads so teams can ask for performance analysis and optimization help in natural language.",
-      },
-      {
-        title: "What you can do once connected",
-        body:
-          "Typical workflows include campaign health reviews, wasted-spend analysis, negative keyword recommendations, and safer bid or budget adjustments with human approval.",
-      },
-    ],
-    faq: [
-      {
-        question: "What is Google Ads MCP?",
-        answer:
-          "It is an MCP integration layer that lets an AI client interact with Google Ads data and approved management actions in a structured way.",
-      },
-      {
-        question: "Who is this page for?",
-        answer:
-          "Teams using Claude, OpenClaw, or other MCP-compatible AI tools who want live Google Ads context without building their own integration stack.",
-      },
-      {
-        question: "Is AdsAgent only for read access?",
-        answer:
-          "No. AdsAgent supports analysis plus controlled optimization workflows, with change history and impact tracking designed to keep the process reviewable.",
-      },
-    ],
-    relatedLinks: [
-      {
-        href: "/google-ads-claude",
-        title: "Google Ads + Claude",
-        description: "The Claude-specific setup guide — connect in under 2 minutes.",
-      },
-      {
-        href: "/connect-google-ads-to-claude",
-        title: "Connect Google Ads to Claude",
-        description: "See the Claude-specific setup and workflow fit.",
-      },
-      {
-        href: "/ai-google-ads-agent",
-        title: "AI Google Ads agent",
-        description: "Start with the higher-level product overview.",
       },
     ],
   },
