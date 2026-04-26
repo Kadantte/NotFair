@@ -892,7 +892,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
-                        <p className="mt-0.5 text-sm text-[#C4C0B6]">Connect Google Ads and get the setup prompt for Claude Code.</p>
+                        <p className="mt-0.5 text-sm text-[#C4C0B6]">Connect Google Ads and set up AdsAgent in Claude Code, Claude Web, or Codex.</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-3">
                         <a
