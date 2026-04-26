@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
 import { ensureDemoOAuthClient } from "@/lib/demo/seed";
+import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -164,53 +165,3 @@ export async function GET(request: Request) {
   return NextResponse.redirect(url.toString());
 }
 
-/**
- * RFC 8252 §7.3 — for loopback redirect URIs the authorization server MUST
- * allow any port. We also tolerate cross-host matching among the loopback
- * variants (`127.0.0.1`, `::1`, `localhost`): Codex registers a redirect_uri
- * via DCR using `127.0.0.1`, but Vercel's edge normalizes the hostname in
- * `request.url` to `localhost` before the handler sees it, so the same
- * conceptual loopback target arrives in two different forms.
- *
- * Non-loopback redirect_uris still require an exact match.
- */
-function redirectUriMatches(requested: string, registered: string[]): boolean {
-  let req: URL;
-  try {
-    req = new URL(requested);
-  } catch {
-    return false;
-  }
-
-  for (const candidate of registered) {
-    if (candidate === requested) return true;
-
-    let reg: URL;
-    try {
-      reg = new URL(candidate);
-    } catch {
-      continue;
-    }
-
-    if (!isLoopbackHost(reg.hostname) || !isLoopbackHost(req.hostname)) continue;
-
-    if (
-      reg.protocol === req.protocol &&
-      reg.pathname === req.pathname &&
-      reg.search === req.search
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function isLoopbackHost(hostname: string): boolean {
-  return (
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]" ||
-    hostname === "::1" ||
-    hostname === "localhost"
-  );
-}

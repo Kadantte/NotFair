@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
+import { redirectUriEquivalent } from "@/lib/oauth/redirect-uri";
 
 /**
  * OAuth 2.0 Token Endpoint for Claude Connector.
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (authCode.redirectUri !== redirectUri) {
+  if (!redirectUriEquivalent(authCode.redirectUri, redirectUri)) {
     return NextResponse.json(
       { error: "invalid_grant", error_description: "redirect_uri mismatch" },
       { status: 400 },
