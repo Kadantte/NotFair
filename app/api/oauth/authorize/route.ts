@@ -78,7 +78,16 @@ export async function GET(request: Request) {
   if (client.sessionId === null) {
     if (!client.redirectUris || !redirectUriMatches(redirectUri, client.redirectUris)) {
       return NextResponse.json(
-        { error: "invalid_request", error_description: "redirect_uri is not registered for this client" },
+        {
+          error: "invalid_request",
+          error_description: "redirect_uri is not registered for this client",
+          debug: {
+            requested: redirectUri,
+            registered: client.redirectUris,
+            registered_type: Array.isArray(client.redirectUris) ? "array" : typeof client.redirectUris,
+            matcher_version: 2,
+          },
+        },
         { status: 400 },
       );
     }
