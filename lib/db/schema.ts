@@ -132,7 +132,13 @@ export const oauthClients = pgTable("oauth_clients", {
   clientSecret: text("client_secret").notNull(),
   clientSecretHash: text("client_secret_hash").notNull(),
   oauthAccessToken: text("oauth_access_token"),
-  sessionId: integer("session_id").notNull(),
+  // Pre-bound for the in-app Claude Connector flow (`/api/oauth/clients`).
+  // Null for clients minted via RFC 7591 Dynamic Client Registration
+  // (`/api/oauth/register`) — those resolve the session from the user's
+  // cookie at /authorize time.
+  sessionId: integer("session_id"),
+  redirectUris: jsonb("redirect_uris").$type<string[]>(),
+  clientName: text("client_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

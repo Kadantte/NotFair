@@ -1,22 +1,31 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
+import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
 import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 
 /**
- * OAuth 2.0 Authorization Endpoint for Claude Connector.
+ * OAuth 2.0 Authorization Endpoint.
  *
- * Claude redirects users here with the client_id they configured.
- * We look up the client_id → find the linked MCP session → generate
- * an authorization code → redirect back to Claude.
+ * Two flavors of client land here:
  *
- * No browser login is needed because the client_id already identifies
- * the user (they generated it on adsagent.org while logged in).
+ * 1. **Pre-bound clients** (in-app Claude Connector flow via
+ *    `/api/oauth/clients`): `oauth_clients.session_id` is set at registration
+ *    time, so we just resolve that session and skip user authentication.
+ *    The user already proved who they were when they minted the credentials.
+ *
+ * 2. **DCR clients** (RFC 7591 via `/api/oauth/register`, e.g. Codex CLI):
+ *    `session_id` is null. We must authenticate the user mid-flow via the
+ *    `adsagent_token` cookie and bind the auth code to that session. If
+ *    there's no cookie, we redirect to sign-in with `next` set so the user
+ *    lands back here after Google OAuth completes.
  */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams } = requestUrl;
 
   const clientId = searchParams.get("client_id");
   const redirectUri = searchParams.get("redirect_uri");
@@ -45,10 +54,11 @@ export async function GET(request: Request) {
     await ensureDemoOAuthClient();
   }
 
-  // Look up the OAuth client → linked MCP session
+  // Look up the OAuth client
   const [client] = await db()
     .select({
       sessionId: schema.oauthClients.sessionId,
+      redirectUris: schema.oauthClients.redirectUris,
     })
     .from(schema.oauthClients)
     .where(eq(schema.oauthClients.clientId, clientId))
@@ -56,29 +66,81 @@ export async function GET(request: Request) {
 
   if (!client) {
     return NextResponse.json(
-      { error: "invalid_client", error_description: "Unknown client_id. Generate credentials at www.adsagent.org." },
+      { error: "invalid_client", error_description: "Unknown client_id. Register via /api/oauth/register or generate credentials at www.adsagent.org." },
       { status: 401 },
     );
   }
 
-  // Verify the linked MCP session is still valid
-  const [session] = await db()
-    .select({ id: schema.mcpSessions.id })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.id, client.sessionId),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        sql`${schema.mcpSessions.customerId} <> ''`,
-      ),
-    )
-    .limit(1);
+  // For DCR clients, the requested redirect_uri must match one that was
+  // registered. (Pre-bound clients skip this — they trust whatever the
+  // in-app form posted at registration time.)
+  if (client.sessionId === null) {
+    if (!client.redirectUris || !client.redirectUris.includes(redirectUri)) {
+      return NextResponse.json(
+        { error: "invalid_request", error_description: "redirect_uri is not registered for this client" },
+        { status: 400 },
+      );
+    }
+  }
 
-  if (!session) {
-    return NextResponse.json(
-      { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at www.adsagent.org and generate new credentials." },
-      { status: 403 },
-    );
+  // Resolve which mcp_session the auth code should be bound to.
+  let resolvedSessionId: number | null = null;
+
+  if (client.sessionId !== null) {
+    // Pre-bound (Claude Connector) flow: trust the registration-time binding.
+    const [session] = await db()
+      .select({ id: schema.mcpSessions.id })
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.id, client.sessionId),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+          sql`${schema.mcpSessions.customerId} <> ''`,
+        ),
+      )
+      .limit(1);
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at www.adsagent.org and generate new credentials." },
+        { status: 403 },
+      );
+    }
+    resolvedSessionId = session.id;
+  } else {
+    // DCR flow: identify the user from the cookie and bind to their session.
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
+
+    if (!sessionToken) {
+      // Send the user through Google sign-in, then back to this exact URL.
+      const signinUrl = new URL("/api/auth/signin", requestUrl);
+      signinUrl.searchParams.set(
+        "next",
+        `${requestUrl.pathname}${requestUrl.search}`,
+      );
+      return NextResponse.redirect(signinUrl.toString());
+    }
+
+    const [session] = await db()
+      .select({ id: schema.mcpSessions.id })
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.accessToken, sessionToken),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+          sql`${schema.mcpSessions.customerId} <> ''`,
+        ),
+      )
+      .limit(1);
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "access_denied", error_description: "No active Google Ads session. Reconnect at www.adsagent.org and try again." },
+        { status: 403 },
+      );
+    }
+    resolvedSessionId = session.id;
   }
 
   // Generate authorization code
@@ -87,7 +149,7 @@ export async function GET(request: Request) {
 
   await db().insert(schema.authorizationCodes).values({
     code: authCode,
-    sessionId: session.id,
+    sessionId: resolvedSessionId,
     redirectUri,
     clientId,
     codeChallenge,

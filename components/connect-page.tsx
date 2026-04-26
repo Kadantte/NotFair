@@ -574,71 +574,22 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
     );
 }
 
-function CodexSection({ token }: { token: string }) {
+function CodexSection({ token: _token }: { token: string }) {
     const serverUrl = 'https://adsagent.org/api/mcp';
+    const oneLiner = `codex mcp add adsagent --url ${serverUrl} && codex mcp login adsagent`;
     return (
-        <div className="w-full space-y-6 text-left">
-            <div className="rounded-lg border border-[#3D3C36] bg-[#24231F]/50 p-4 text-sm text-[#C4C0B6]">
-                ChatGPT and Codex authenticate with a bearer token instead of OAuth. Use the MCP URL and your API key below.
-            </div>
-
-            {/* Step 1 */}
-            <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">1</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Copy your credentials</p>
-                </div>
-                <div className="ml-8 space-y-3">
-                    <CredentialField
-                        label="MCP Server URL"
-                        value={serverUrl}
-                        onCopyTracked={() => trackEvent('connector_credential_copied', { setup_tab: 'codex', field: 'server_url' })}
-                    />
-                    <CredentialField
-                        label="Bearer Token (API Key)"
-                        value={token}
-                        mono
-                        onCopyTracked={() => trackEvent('connector_credential_copied', { setup_tab: 'codex', field: 'bearer_token' })}
-                    />
-                    <p className="text-xs text-[#C4C0B6]/60">
-                        This is your personal access token. Don&apos;t share it publicly.
-                    </p>
-                </div>
-            </div>
-
-            {/* Step 2 — ChatGPT */}
-            <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">2</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Add to ChatGPT</p>
-                </div>
-                <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#C4C0B6]">
-                        In ChatGPT, open <strong className="text-[#E8E4DD]">Settings → Connectors → Advanced → Developer mode</strong>, then add a custom connector. Paste the <strong className="text-[#E8E4DD]">MCP Server URL</strong> above, choose <strong className="text-[#E8E4DD]">Custom auth</strong>, and paste your <strong className="text-[#E8E4DD]">Bearer Token</strong> as the value.
-                    </p>
-                </div>
-            </div>
-
-            {/* Step 3 — Codex CLI */}
-            <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">3</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Or add to Codex CLI</p>
-                </div>
-                <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#C4C0B6]">
-                        Add this block to <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">~/.codex/config.toml</code>:
-                    </p>
-                    <SetupCodeBlock
-                        content={`[mcp_servers.adsagent]\nurl = "${serverUrl}"\nbearer_token = "${token}"`}
-                        copied={false}
-                        onCopy={() => {
-                            navigator.clipboard.writeText(`[mcp_servers.adsagent]\nurl = "${serverUrl}"\nbearer_token = "${token}"`);
-                            trackEvent('install_command_copied', { setup_tab: 'codex', step: 'codex_config' });
-                        }}
-                    />
-                </div>
-            </div>
+        <div className="w-full space-y-4 text-left">
+            <p className="text-sm text-[#C4C0B6]">
+                Run this once in your terminal. Codex registers itself, opens a browser to AdsAgent, and finishes when you sign in.
+            </p>
+            <SetupCodeBlock
+                content={oneLiner}
+                copied={false}
+                onCopy={() => {
+                    navigator.clipboard.writeText(oneLiner);
+                    trackEvent('install_command_copied', { setup_tab: 'codex', step: 'codex_oneliner' });
+                }}
+            />
         </div>
     );
 }
@@ -676,14 +627,14 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
                     Claude Cowork / Web
                 </Link>
                 <Link
-                    href="/connect/chatgpt-codex"
+                    href="/connect/codex"
                     prefetch
                     className={`flex-1 whitespace-nowrap rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'codex'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
                             : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
                         }`}
                 >
-                    ChatGPT / Codex
+                    Codex
                 </Link>
             </div>
 

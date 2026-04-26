@@ -15,10 +15,11 @@ export async function GET(request: Request) {
     issuer: origin,
     authorization_endpoint: `${origin}/api/oauth/authorize`,
     token_endpoint: `${origin}/api/oauth/token`,
+    registration_endpoint: `${origin}/api/oauth/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256", "plain"],
-    token_endpoint_auth_methods_supported: ["client_secret_post"],
+    token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
   });
 }
 

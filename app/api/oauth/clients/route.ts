@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 
@@ -35,6 +35,9 @@ export async function GET() {
     return NextResponse.json({ exists: false });
   }
 
+  // Only surface Connector-minted rows here. DCR clients (RFC 7591, Codex)
+  // also live in oauth_clients with the same sessionId once they complete a
+  // token exchange — but they're identified by having `redirect_uris` set.
   const [existing] = await db()
     .select({
       clientId: schema.oauthClients.clientId,
@@ -42,7 +45,12 @@ export async function GET() {
       createdAt: schema.oauthClients.createdAt,
     })
     .from(schema.oauthClients)
-    .where(eq(schema.oauthClients.sessionId, session.id))
+    .where(
+      and(
+        eq(schema.oauthClients.sessionId, session.id),
+        isNull(schema.oauthClients.redirectUris),
+      ),
+    )
     .limit(1);
 
   if (!existing) {
@@ -79,10 +87,18 @@ export async function POST() {
   const clientSecret = randomBytes(32).toString("hex");
   const clientSecretHash = createHash("sha256").update(clientSecret).digest("hex");
 
-  // Delete any existing client for this session (one active client per session)
+  // Delete any existing Connector-minted client for this session. DCR
+  // clients (Codex et al.) carry `redirect_uris` and are scoped out so
+  // regenerating Connector credentials doesn't wipe out a user's Codex
+  // registration.
   await db()
     .delete(schema.oauthClients)
-    .where(eq(schema.oauthClients.sessionId, session.id));
+    .where(
+      and(
+        eq(schema.oauthClients.sessionId, session.id),
+        isNull(schema.oauthClients.redirectUris),
+      ),
+    );
 
   await db().insert(schema.oauthClients).values({
     clientId,

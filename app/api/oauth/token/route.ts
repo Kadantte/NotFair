@@ -25,9 +25,32 @@ export async function POST(request: Request) {
   const grantType = params.get("grant_type");
   const code = params.get("code");
   const redirectUri = params.get("redirect_uri");
-  const clientId = params.get("client_id");
-  const clientSecret = params.get("client_secret");
+  let clientId = params.get("client_id");
+  let clientSecret = params.get("client_secret");
   const codeVerifier = params.get("code_verifier");
+
+  // RFC 6749 §2.3.1 — client may also authenticate via HTTP Basic.
+  // Codex CLI defaults to this for confidential clients. If the body
+  // didn't include client_id/client_secret, fall back to the Authorization
+  // header.
+  if (!clientId || !clientSecret) {
+    const authHeader = request.headers.get("authorization") ?? "";
+    if (authHeader.toLowerCase().startsWith("basic ")) {
+      try {
+        const decoded = Buffer.from(authHeader.slice(6).trim(), "base64").toString("utf8");
+        const idx = decoded.indexOf(":");
+        if (idx >= 0) {
+          const basicId = decodeURIComponent(decoded.slice(0, idx));
+          const basicSecret = decodeURIComponent(decoded.slice(idx + 1));
+          if (!clientId) clientId = basicId;
+          if (!clientSecret) clientSecret = basicSecret;
+        }
+      } catch {
+        // fall through — invalid base64 will be caught by the missing-cred check below
+      }
+    }
+  }
+
 
   if (grantType !== "authorization_code") {
     return NextResponse.json(
@@ -165,9 +188,13 @@ export async function POST(request: Request) {
   // Issue a dedicated OAuth access token (independent of the MCP session token)
   const oauthAccessToken = `oat_${randomBytes(32).toString("hex")}`;
 
+  // Bind the access token to the resolved mcp_session. For DCR clients
+  // (RFC 7591) `oauth_clients.session_id` was null at registration; we set
+  // it now so the MCP request handler can resolve `oat_…` tokens via its
+  // existing `oauth_clients.session_id → mcp_sessions.id` join.
   await db()
     .update(schema.oauthClients)
-    .set({ oauthAccessToken })
+    .set({ oauthAccessToken, sessionId: authCode.sessionId })
     .where(eq(schema.oauthClients.clientId, clientId));
 
   const expiresIn = Math.max(
