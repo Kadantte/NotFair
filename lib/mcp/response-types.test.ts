@@ -152,24 +152,27 @@ describe("response-types — registry completeness", () => {
 // ─── safeTypedHandler runtime behaviour ──────────────────────────────
 
 describe("safeTypedHandler", () => {
-  it("wraps the return value via typedResult", async () => {
+  it("wraps the return value via typedResult — JSON in text channel", async () => {
     const handler = safeTypedHandler(async (_args: { id: string }) => ({
       name: "Acme",
       budget: 100,
     }));
     const result = await handler({ id: "1" });
-    expect(result.structuredContent).toEqual({ name: "Acme", budget: 100 });
-    expect(result.content[0]).toEqual({ type: "text", text: "2 fields" });
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content[0]).toEqual({
+      type: "text",
+      text: JSON.stringify({ name: "Acme", budget: 100 }, null, 2),
+    });
   });
 
-  it("applies a custom summary when provided", async () => {
+  it("applies a custom summary when provided, replacing the JSON dump", async () => {
     const handler = safeTypedHandler(
       async () => [1, 2, 3],
       (value) => `${value.length} campaigns loaded`,
     );
     const result = await handler(undefined);
     expect(result.content[0]).toEqual({ type: "text", text: "3 campaigns loaded" });
-    expect(result.structuredContent).toEqual({ items: [1, 2, 3] });
+    expect(result.structuredContent).toBeUndefined();
   });
 
   it("catches thrown errors and returns an MCP error response", async () => {
@@ -181,7 +184,7 @@ describe("safeTypedHandler", () => {
     expect(result.content[0]).toEqual({ type: "text", text: "upstream failure" });
   });
 
-  it("propagates null results as structuredContent: undefined", async () => {
+  it("propagates null results as 'null' text", async () => {
     const handler = safeTypedHandler(async (): Promise<null> => null);
     const result = await handler(undefined);
     expect(result.structuredContent).toBeUndefined();
@@ -200,6 +203,9 @@ describe("safeTypedHandler", () => {
       active: 7,
     }));
     const result = await handler();
-    expect(result.structuredContent).toEqual({ total: 10, active: 7 });
+    expect(result.content[0]).toEqual({
+      type: "text",
+      text: JSON.stringify({ total: 10, active: 7 }, null, 2),
+    });
   });
 });

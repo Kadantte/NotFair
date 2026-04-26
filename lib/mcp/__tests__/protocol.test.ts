@@ -145,7 +145,7 @@ describe("MCP protocol — tools/list", () => {
 describe("MCP protocol — tools/call", () => {
   beforeEach(resetMocks);
 
-  it("calls a read tool and returns structuredContent over the wire", async () => {
+  it("calls a read tool and returns the JSON payload in content[0].text over the wire", async () => {
     mockQuery.mockResolvedValueOnce([
       {
         recommendation: {
@@ -160,11 +160,13 @@ describe("MCP protocol — tools/call", () => {
     try {
       const result = await client.callTool({ name: "getRecommendations", arguments: {} });
       expect(result.isError).toBeFalsy();
-      const structured = result.structuredContent as {
+      const content = (result.content as Array<{ type: string; text: string }>)[0];
+      expect(content.type).toBe("text");
+      const parsed = JSON.parse(content.text) as {
         recommendations: Array<{ type: string; campaignId: string }>;
       };
-      expect(structured.recommendations).toHaveLength(1);
-      expect(structured.recommendations[0].campaignId).toBe("42");
+      expect(parsed.recommendations).toHaveLength(1);
+      expect(parsed.recommendations[0].campaignId).toBe("42");
     } finally {
       await cleanup();
     }

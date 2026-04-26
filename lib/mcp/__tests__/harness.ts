@@ -140,16 +140,29 @@ export const TEST_AUTH: AuthContext = {
 
 /**
  * Assert a CallToolResult is a successful `typedResult`-shaped response.
- * Returns the decoded structuredContent for further assertions.
+ * Parses the JSON-serialised payload out of `content[0].text` and returns
+ * it for further assertions. (typedResult writes the full payload to text
+ * — see lib/mcp/types.ts.)
  */
 export function expectOk(result: CallToolResult): Record<string, unknown> {
   if (result.isError) {
     const text = result.content?.[0]?.type === "text" ? result.content[0].text : JSON.stringify(result);
     throw new Error(`Expected ok result, got error: ${text}`);
   }
-  const structured = result.structuredContent as Record<string, unknown> | undefined;
-  if (!structured) throw new Error("Expected structuredContent, got none");
-  return structured;
+  const first = result.content?.[0];
+  if (!first || first.type !== "text") {
+    throw new Error(`Expected text content, got ${JSON.stringify(result)}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(first.text);
+  } catch {
+    throw new Error(`Expected JSON-serialised text payload, got: ${first.text.slice(0, 200)}`);
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Expected an object payload, got: ${typeof parsed}`);
+  }
+  return parsed as Record<string, unknown>;
 }
 
 /**

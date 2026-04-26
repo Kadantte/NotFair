@@ -13,42 +13,28 @@ export type ToolRegistrar = (
 ) => void;
 
 /**
- * Wrap a typed value as an MCP tool response with `structuredContent` as the
- * primary payload channel. The `content[0].text` field carries only a short
- * human-readable summary for clients that don't render structured content.
+ * Wrap a typed value as an MCP tool response. The full payload is JSON-
+ * serialized into `content[0].text` — this is the channel Claude.ai's
+ * connector actually surfaces to the model.
  *
- * Consumers should read `result.structuredContent` directly — the text field
- * is no longer the source of truth.
+ * An earlier design split the data into typed `structuredContent` plus a
+ * short summary in text, but in practice Claude only reads text reliably,
+ * so unsummarised tools showed up as "N fields" in chat with the real data
+ * stranded in `structuredContent`. We now put everything in text.
  *
- * `structuredContent` on the MCP wire is constrained to a JSON object, so:
- *  - arrays are wrapped as `{ items: [...] }`
- *  - primitives are wrapped as `{ value }`
- *  - `null`/`undefined` omits `structuredContent` entirely
- *  - plain objects pass through unchanged
+ * If a tool prefers a hand-written human-readable string instead of the raw
+ * JSON dump (e.g. "Created campaign 12345"), pass it as `summary`.
  */
 export function typedResult<T>(value: T, summary?: string): CallToolResult {
-  const text = summary ?? defaultSummary(value);
-  const structured = toStructuredContent(value);
-  return structured === undefined
-    ? { content: [{ type: "text", text }] }
-    : { content: [{ type: "text", text }], structuredContent: structured };
+  const text = summary ?? defaultText(value);
+  return { content: [{ type: "text", text }] };
 }
 
-function toStructuredContent(value: unknown): Record<string, unknown> | undefined {
-  if (value == null) return undefined;
-  if (Array.isArray(value)) return { items: value };
-  if (typeof value === "object") return value as Record<string, unknown>;
-  return { value };
-}
-
-function defaultSummary(value: unknown): string {
+function defaultText(value: unknown): string {
   if (value == null) return "null";
-  if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? "item" : "items"}`;
-  if (typeof value === "object") {
-    const keys = Object.keys(value as object).length;
-    return `${keys} ${keys === 1 ? "field" : "fields"}`;
-  }
-  return String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value, null, 2);
 }
 
 /** Wrap an error as an MCP error response with the actual error message. */
