@@ -22,5 +22,13 @@
   {
     "id": "account-health-casual",
     "prompt": "how is my google ads account doing in the last 7 days"
+  },
+  {
+    "id": "yoy-comparison",
+    "prompt": "How does my account performance this quarter compare to the same quarter last year? Spend, conversions, CPA, ROAS — break it down."
+  },
+  {
+    "id": "conversion-tracking-doctor",
+    "prompt": "Is my conversion tracking actually working? Look at the conversion actions, the volume, and any signals that suggest tracking is broken or miscalibrated."
   }
 ]

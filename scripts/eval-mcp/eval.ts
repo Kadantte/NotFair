@@ -67,7 +67,15 @@ type RunMetrics = {
   input_tokens: number;
   output_tokens: number;
   final_text: string;
-  scores?: { specificity: number; actionability: number; coverage: number; prioritization: number; overall: number };
+  scores?: {
+    faithfulness: number;
+    specificity: number;
+    actionability: number;
+    insight: number;
+    prioritization: number;
+    honesty: number;
+    overall: number;
+  };
   judge_notes?: string;
   error?: string;
   ts: string;
@@ -75,17 +83,32 @@ type RunMetrics = {
 };
 
 // ─── Rubric (judge prompt) ─────────────────────────────────────────────
-const RUBRIC = `You are evaluating the quality of a Google Ads audit produced by an AI agent using MCP tools.
+// Loaded from .claude/skills/eval-mcp/rubric.md so the headless runner and the
+// /eval-mcp skill grade against the same bar. If the file is missing, the
+// fallback below is the abbreviated 7-dim rubric.
+function loadRubric(): string {
+  const rubricPath = resolve(__dirname, "../../.claude/skills/eval-mcp/rubric.md");
+  if (existsSync(rubricPath)) {
+    return readFileSync(rubricPath, "utf-8");
+  }
+  return FALLBACK_RUBRIC;
+}
 
-Rate the response 1-10 on each dimension:
+const FALLBACK_RUBRIC = `You are evaluating the quality of a Google Ads audit produced by an AI agent using MCP tools.
 
-- **specificity** (1-10): Does it cite real numbers/names from the account (campaigns, keywords, spend, CPA, CTR), or is it generic boilerplate? 10 = every claim backed by a number, 1 = generic advice with no data.
-- **actionability** (1-10): Are next steps concrete and immediately doable (e.g. "pause keyword X in campaign Y"), or vague (e.g. "consider optimizing")? 10 = explicit operations, 1 = vague suggestions.
-- **coverage** (1-10): Does it span the relevant surface (campaigns, ad groups, keywords, search terms, negatives, budgets, conversion tracking) appropriate to the prompt? 10 = thorough, 1 = narrow.
-- **prioritization** (1-10): Does it lead with the biggest problem / highest-leverage fix, or is it a flat list? 10 = clearly ranked by impact, 1 = unranked.
-- **overall** (1-10): Holistic quality, accounting for tradeoffs.
+Rate the response 1-10 on each dimension. Be strict — 10 means "could not be improved", not "decent".
 
-Also give 1-2 sentences of notes on what would push this to a 10.`;
+- **faithfulness** (1-10): Are the cited numbers and resource names real, or fabricated? Tells of fabrication: suspiciously round numbers, generic names ("Campaign A"), internal contradictions, claims with no number. Faithfulness is a quality floor — if ≤4, overall cannot exceed faithfulness+1.
+- **specificity** (1-10): Does every claim have a number AND a named resource, or is it generic boilerplate?
+- **actionability** (1-10): Are next steps concrete enough to execute today (named resource + operation + value), or vague?
+- **insight** (1-10): Does it surface a non-obvious pattern / connect surfaces / find root cause, or just describe what's on the screen?
+- **prioritization** (1-10): Does it lead with the single biggest lever (and explain why), or is it a flat list?
+- **honesty** (1-10): Does it acknowledge data gaps and refuse to invent recommendations when data is thin, or paper over uncertainty?
+- **overall** (1-10): Holistic judgment. Not an average — accounts for tradeoffs. Faithfulness floor applies.
+
+Notes: 2-4 sentences on the 1-2 concrete things that would push this to a 10.`;
+
+const RUBRIC = loadRubric();
 
 // ─── Run claude -p and parse stream-json ────────────────────────────────
 type ParsedRun = {
@@ -97,13 +120,16 @@ type ParsedRun = {
   error?: string;
 };
 
-async function runPrompt(prompt: string, url: string, model: string, bearerToken: string): Promise<ParsedRun> {
+async function runPrompt(prompt: string, url: string, model: string, bearerToken: string | null): Promise<ParsedRun> {
+  // When no bearer token is provided, omit the Authorization header so the dev
+  // server's DEV_LOCAL_EMAIL bypass kicks in (see app/api/[transport]/route.ts).
+  // Real prod evals or sessions where DEV_LOCAL_EMAIL is unset must pass a token.
   const mcpConfig = {
     mcpServers: {
       "adsagent-local": {
         type: "http",
         url,
-        headers: { Authorization: `Bearer ${bearerToken}` },
+        ...(bearerToken ? { headers: { Authorization: `Bearer ${bearerToken}` } } : {}),
       },
     },
   };
@@ -199,10 +225,12 @@ async function runPrompt(prompt: string, url: string, model: string, bearerToken
 
 // ─── Judge ─────────────────────────────────────────────────────────────
 type Score = {
+  faithfulness: number;
   specificity: number;
   actionability: number;
-  coverage: number;
+  insight: number;
   prioritization: number;
+  honesty: number;
   overall: number;
   notes: string;
 };
@@ -210,14 +238,16 @@ type Score = {
 const SCORE_SCHEMA = {
   type: "object",
   properties: {
+    faithfulness: { type: "integer", minimum: 1, maximum: 10 },
     specificity: { type: "integer", minimum: 1, maximum: 10 },
     actionability: { type: "integer", minimum: 1, maximum: 10 },
-    coverage: { type: "integer", minimum: 1, maximum: 10 },
+    insight: { type: "integer", minimum: 1, maximum: 10 },
     prioritization: { type: "integer", minimum: 1, maximum: 10 },
+    honesty: { type: "integer", minimum: 1, maximum: 10 },
     overall: { type: "integer", minimum: 1, maximum: 10 },
     notes: { type: "string" },
   },
-  required: ["specificity", "actionability", "coverage", "prioritization", "overall", "notes"],
+  required: ["faithfulness", "specificity", "actionability", "insight", "prioritization", "honesty", "overall", "notes"],
   additionalProperties: false,
 } as const;
 
@@ -267,11 +297,29 @@ function judge(prompt: string, output: string): Promise<Score> {
 // ─── Main ──────────────────────────────────────────────────────────────
 async function main() {
   const args = parseArgs();
-  const bearer = process.env.MCP_BEARER_TOKEN;
-  if (!bearer) {
-    console.error("Missing MCP_BEARER_TOKEN env var. Sign in at /connect to get one, or it's set in .env.local.");
+  const bearer = process.env.MCP_BEARER_TOKEN ?? null;
+  const devLocalEmail = process.env.DEV_LOCAL_EMAIL;
+
+  if (!bearer && !devLocalEmail) {
+    console.error(
+      "Need either MCP_BEARER_TOKEN or DEV_LOCAL_EMAIL.\n" +
+      "  · Set DEV_LOCAL_EMAIL=<your-google-email> in .env.local for the dev bypass (recommended for local iteration).\n" +
+      "  · Or set MCP_BEARER_TOKEN=<token> for explicit auth (required for --url pointing at prod).",
+    );
     process.exit(1);
   }
+  if (bearer) {
+    console.log("Auth: bearer token (explicit)");
+  } else {
+    console.log(`Auth: dev bypass via DEV_LOCAL_EMAIL=${devLocalEmail}`);
+  }
+
+  // Pre-flight: confirm `claude` CLI itself is logged in. Both the runner and
+  // the judge spawn `claude -p` subprocesses, and an unauthenticated CLI fails
+  // silently (the subprocess just returns "Not logged in" as its output).
+  // Catch it here so the user gets one clear error instead of 8 mystifying
+  // judge errors.
+  await preflightClaudeLogin();
 
   const promptsPath = resolve(__dirname, "prompts.json");
   const allPrompts: Prompt[] = JSON.parse(readFileSync(promptsPath, "utf-8"));
@@ -294,7 +342,7 @@ async function main() {
     for (let i = 0; i < args.runs; i++) {
       process.stdout.write(`▶ ${p.id} (run ${i + 1}/${args.runs})... `);
       const run = await runPrompt(p.prompt, args.url, args.model, bearer);
-      let scores: z.infer<typeof ScoreSchema> | undefined;
+      let scores: Score | undefined;
       if (!run.error && run.final_text) {
         try {
           scores = await judge(p.prompt, run.final_text);
@@ -313,7 +361,17 @@ async function main() {
         input_tokens: run.input_tokens,
         output_tokens: run.output_tokens,
         final_text: run.final_text,
-        scores: scores ? { specificity: scores.specificity, actionability: scores.actionability, coverage: scores.coverage, prioritization: scores.prioritization, overall: scores.overall } : undefined,
+        scores: scores
+          ? {
+              faithfulness: scores.faithfulness,
+              specificity: scores.specificity,
+              actionability: scores.actionability,
+              insight: scores.insight,
+              prioritization: scores.prioritization,
+              honesty: scores.honesty,
+              overall: scores.overall,
+            }
+          : undefined,
         judge_notes: scores?.notes,
         error: run.error,
         ts: new Date().toISOString(),
@@ -344,11 +402,43 @@ function printSummary(rows: RunMetrics[]) {
   console.log(`Input tokens:   ${avg((r) => r.input_tokens).toFixed(0)}`);
   console.log(`Output tokens:  ${avg((r) => r.output_tokens).toFixed(0)}`);
   console.log(`Scores (avg):`);
+  console.log(`  faithfulness:   ${avg((r) => r.scores!.faithfulness).toFixed(2)}  ← anti-hallucination floor`);
   console.log(`  specificity:    ${avg((r) => r.scores!.specificity).toFixed(2)}`);
   console.log(`  actionability:  ${avg((r) => r.scores!.actionability).toFixed(2)}`);
-  console.log(`  coverage:       ${avg((r) => r.scores!.coverage).toFixed(2)}`);
+  console.log(`  insight:        ${avg((r) => r.scores!.insight).toFixed(2)}`);
   console.log(`  prioritization: ${avg((r) => r.scores!.prioritization).toFixed(2)}`);
+  console.log(`  honesty:        ${avg((r) => r.scores!.honesty).toFixed(2)}`);
   console.log(`  overall:        ${avg((r) => r.scores!.overall).toFixed(2)}`);
+
+  const fabricationFails = ok.filter((r) => r.scores!.faithfulness <= 4);
+  if (fabricationFails.length > 0) {
+    console.log(`\n⚠ FABRICATION FAILURES (faithfulness ≤ 4) — fix these first:`);
+    for (const r of fabricationFails) {
+      console.log(`  · ${r.prompt_id} (faithfulness=${r.scores!.faithfulness}, overall=${r.scores!.overall})`);
+      if (r.judge_notes) console.log(`    notes: ${r.judge_notes.slice(0, 200)}`);
+    }
+  }
+}
+
+async function preflightClaudeLogin(): Promise<void> {
+  const out = await new Promise<string>((resolveProbe) => {
+    const child = spawn(
+      "claude",
+      ["-p", "say ok", "--output-format", "text", "--no-session-persistence", "--bare"],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let stdout = "";
+    child.stdout.on("data", (c: Buffer) => (stdout += c.toString()));
+    child.on("close", () => resolveProbe(stdout));
+  });
+  if (/not logged in|please run \/login/i.test(out)) {
+    console.error(
+      "\nclaude CLI is not authenticated. The eval spawns `claude -p` for runners and judges,\n" +
+      "and they need their own auth (interactive Claude Code sessions don't share auth with subprocesses).\n\n" +
+      "Fix: run `claude` in a terminal, then `/login`. After that, every `npm run eval:mcp` works.\n",
+    );
+    process.exit(1);
+  }
 }
 
 async function getGitSha(): Promise<string | undefined> {

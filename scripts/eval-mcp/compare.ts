@@ -11,6 +11,16 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+type Scores = {
+  faithfulness: number;
+  specificity: number;
+  actionability: number;
+  insight: number;
+  prioritization: number;
+  honesty: number;
+  overall: number;
+};
+
 type Row = {
   label: string;
   prompt_id: string;
@@ -19,9 +29,11 @@ type Row = {
   tool_call_total: number;
   input_tokens: number;
   output_tokens: number;
-  scores?: { specificity: number; actionability: number; coverage: number; prioritization: number; overall: number };
+  scores?: Scores;
   error?: string;
 };
+
+type Agg = Scores & { wall_ms: number; tools: number; tokens: number; n: number };
 
 function load(label: string): Row[] {
   const path = resolve(__dirname, "results", `${label}.jsonl`);
@@ -31,25 +43,27 @@ function load(label: string): Row[] {
     .map((l) => JSON.parse(l));
 }
 
-function aggByPrompt(rows: Row[]) {
+function aggByPrompt(rows: Row[]): Map<string, Agg> {
   const ok = rows.filter((r) => !r.error && r.scores);
   const byId = new Map<string, Row[]>();
   for (const r of ok) {
     if (!byId.has(r.prompt_id)) byId.set(r.prompt_id, []);
     byId.get(r.prompt_id)!.push(r);
   }
-  const agg = new Map<string, { wall_ms: number; tools: number; tokens: number; overall: number; specificity: number; actionability: number; coverage: number; prioritization: number; n: number }>();
+  const agg = new Map<string, Agg>();
   for (const [id, list] of byId.entries()) {
     const avg = (f: (r: Row) => number) => list.reduce((s, r) => s + f(r), 0) / list.length;
     agg.set(id, {
       wall_ms: avg((r) => r.wall_ms),
       tools: avg((r) => r.tool_call_total),
       tokens: avg((r) => r.input_tokens + r.output_tokens),
-      overall: avg((r) => r.scores!.overall),
+      faithfulness: avg((r) => r.scores!.faithfulness),
       specificity: avg((r) => r.scores!.specificity),
       actionability: avg((r) => r.scores!.actionability),
-      coverage: avg((r) => r.scores!.coverage),
+      insight: avg((r) => r.scores!.insight),
       prioritization: avg((r) => r.scores!.prioritization),
+      honesty: avg((r) => r.scores!.honesty),
+      overall: avg((r) => r.scores!.overall),
       n: list.length,
     });
   }
@@ -75,40 +89,44 @@ function main() {
 
   const ids = Array.from(new Set([...base.keys(), ...cand.keys()])).sort();
   console.log(`\n${baselineLabel} → ${candidateLabel}\n`);
-  console.log("prompt_id         overall  specif.  action.  coverage prior.   wall(s)  tools    tokens");
-  console.log("─".repeat(100));
+  console.log("prompt_id           overall Δ        faith Δ          spec Δ           action Δ         insight Δ        prior Δ          honest Δ         wall(s) Δ        tools Δ          tokens Δ");
+  console.log("─".repeat(180));
 
   for (const id of ids) {
     const b = base.get(id);
     const c = cand.get(id);
     if (!b || !c) {
-      console.log(`${id.padEnd(18)} (missing in ${!b ? baselineLabel : candidateLabel})`);
+      console.log(`${id.padEnd(20)} (missing in ${!b ? baselineLabel : candidateLabel})`);
       continue;
     }
     console.log(
-      `${id.padEnd(18)} ` +
+      `${id.padEnd(20)}` +
       `${c.overall.toFixed(2).padStart(5)} ${fmtDelta(b.overall, c.overall).padStart(14)}  ` +
+      `${fmtDelta(b.faithfulness, c.faithfulness).padStart(14)}  ` +
       `${fmtDelta(b.specificity, c.specificity).padStart(14)}  ` +
       `${fmtDelta(b.actionability, c.actionability).padStart(14)}  ` +
-      `${fmtDelta(b.coverage, c.coverage).padStart(14)}  ` +
+      `${fmtDelta(b.insight, c.insight).padStart(14)}  ` +
       `${fmtDelta(b.prioritization, c.prioritization).padStart(14)}  ` +
+      `${fmtDelta(b.honesty, c.honesty).padStart(14)}  ` +
       `${(c.wall_ms / 1000).toFixed(1).padStart(5)} ${fmtDelta(b.wall_ms / 1000, c.wall_ms / 1000, 1, true).padStart(14)}  ` +
       `${fmtDelta(b.tools, c.tools, 1, true).padStart(14)}  ` +
       `${fmtDelta(b.tokens, c.tokens, 0, true).padStart(14)}`
     );
   }
 
-  // Aggregate across prompts
-  const mean = (m: Map<string, ReturnType<typeof aggByPrompt>["get"] extends (k: string) => infer V | undefined ? V : never>, f: (v: NonNullable<ReturnType<typeof m.get>>) => number) => {
+  const meanField = (m: Map<string, Agg>, f: (v: Agg) => number) => {
     const vals = Array.from(m.values()).map(f);
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
-  console.log("─".repeat(100));
-  const overallDelta = mean(cand, (v) => v.overall) - mean(base, (v) => v.overall);
-  const wallDelta = (mean(cand, (v) => v.wall_ms) - mean(base, (v) => v.wall_ms)) / 1000;
-  const tokensDelta = mean(cand, (v) => v.tokens) - mean(base, (v) => v.tokens);
+
+  console.log("─".repeat(180));
+  const overallDelta = meanField(cand, (v) => v.overall) - meanField(base, (v) => v.overall);
+  const faithDelta = meanField(cand, (v) => v.faithfulness) - meanField(base, (v) => v.faithfulness);
+  const wallDelta = (meanField(cand, (v) => v.wall_ms) - meanField(base, (v) => v.wall_ms)) / 1000;
+  const tokensDelta = meanField(cand, (v) => v.tokens) - meanField(base, (v) => v.tokens);
   console.log(
-    `MEAN               overall Δ=${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(2)}   ` +
+    `MEAN                 overall Δ=${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(2)}   ` +
+    `faithfulness Δ=${faithDelta >= 0 ? "+" : ""}${faithDelta.toFixed(2)}   ` +
     `wall Δ=${wallDelta >= 0 ? "+" : ""}${wallDelta.toFixed(1)}s   ` +
     `tokens Δ=${tokensDelta >= 0 ? "+" : ""}${tokensDelta.toFixed(0)}`
   );

@@ -1,6 +1,6 @@
 ---
 name: eval-mcp
-description: Run a fast MCP eval to measure tool-selection behavior on the adsagent MCP server. Default mode is a tight 3-prompt loop (~45s wall clock) that spawns runner subagents capped at 3 tool calls per run, captures which tools they picked, and flags runScript adoption. Use `--full` to run the 6-prompt + judge eval (~8 min) when you need quality scores before shipping. By default hits the **local dev server** (`mcp__adsagent-local__*`) so you measure your uncommitted changes; pass `--prod` to hit production. Invoke this skill whenever the user says "run eval", "eval the mcp", "test mcp changes", "did my mcp changes help", "run /eval-mcp", "benchmark mcp", "check mcp quality", "measure mcp", or anything about evaluating/scoring/measuring MCP output speed or quality.
+description: Run a fast MCP eval to measure tool-selection behavior on the adsagent MCP server. Default mode is a tight 3-prompt loop (~45s wall clock) that spawns runner subagents capped at 3 tool calls per run, captures which tools they picked, and flags runScript adoption. Use `--full` to run the 8-prompt + judge eval (~8 min) when you need quality scores before shipping — judges grade on 7 dimensions including faithfulness (anti-hallucination), insight, and honesty. By default hits the **local dev server** (`mcp__adsagent-local__*`) so you measure your uncommitted changes; pass `--prod` to hit production. Invoke this skill whenever the user says "run eval", "eval the mcp", "test mcp changes", "did my mcp changes help", "run /eval-mcp", "benchmark mcp", "check mcp quality", "measure mcp", or anything about evaluating/scoring/measuring MCP output speed or quality.
 ---
 
 # eval-mcp
@@ -113,30 +113,43 @@ Keeping fast history separate prevents polluting the quality trend line in `hist
 
 ## Full mode (`--full`, ~6-8 min)
 
-Six prompts, no tool-call cap, judge subagent per runner scoring on a 5-dim rubric. Use this before committing a description change that passed fast mode, so the history.jsonl has a quality data point.
+Eight prompts, no tool-call cap, judge subagent per runner scoring on a 7-dim rubric (faithfulness, specificity, actionability, insight, prioritization, honesty, overall). This is the **quality benchmark** — run it before committing a description change that passed fast mode, so `history.jsonl` has a real quality data point.
 
 ### Procedure
 
-1. Read `scripts/eval-mcp/prompts.json` (the original 6 prompts).
+1. Read `scripts/eval-mcp/prompts.json` (8 prompts).
 2. Read `.claude/skills/eval-mcp/rubric.md`.
-3. Spawn 6 runners in parallel using the original (uncapped) template (substitute `{NAMESPACE}`):
+3. Spawn N runners in parallel (one per prompt) using the **quality-emphasis** template (substitute `{NAMESPACE}`):
 
 > You are a Google Ads account user. Use the `{NAMESPACE}*` tools to accomplish this task — no other tools.
 >
 > **Task:** {{prompt}}
 >
-> Gather evidence with MCP tools, then produce a final written response that:
-> 1. Leads with the most important finding.
-> 2. Cites specific numbers from the account (spend, CPA, CTR, conversion rate, names).
-> 3. Gives 3–5 concrete actions the user can take today.
-> 4. Covers the relevant surface area from the data.
+> Gather evidence with MCP tools, then produce a final written response that meets these quality bars:
 >
-> Keep the response under ~800 words. No preamble. At the end, after two newlines: `---METADATA--- tools_called=<comma-separated>`.
+> 1. **Lead with the single biggest finding.** No preamble, no "I analyzed your account and found..." — just the finding.
+> 2. **Every claim has a number AND a name.** "Campaign X has high CPA" is bad. "Tukwila Grooming Search has a $187 CPA on $4,200 spend, 3.2× the account average" is good. Use real campaign / keyword / ad group names from the data — never "Campaign A" or "your search campaign".
+> 3. **Three to five concrete actions** the user can execute today. Each action names the resource and the operation. "Pause keyword 'dog boarding seattle' in 'Ballard-Search'" beats "consider pausing underperforming keywords."
+> 4. **Be honest about what you don't know.** If conversion tracking looks broken, say so and refuse to compute a meaningful CPA. If you only have 6 days of data when the user asked for 7, say so. Do NOT fabricate numbers to fill gaps. Honesty is graded.
+> 5. **Find the non-obvious thing.** A surface read summarizes data. A good response surfaces a pattern the user wouldn't have spotted — a tracking misconfiguration, a budget pacing issue, a keyword that's profitable in one ad group and a money pit in another.
+>
+> Keep the response under ~800 words. Tight beats sprawling.
+>
+> **Required appendix.** After your final paragraph, add two newlines and then a `## Data sources` section listing the most important numbers you cited and which MCP tool returned each one. Format: `- <number/name> (from <toolName>)`. Cap at 8 entries. This appendix lets the response be audited for fabrication — every number in your main response should appear here.
+>
+> At the very end, after two more newlines, add: `---METADATA--- tools_called=<comma-separated unique MCP tool names you called>`.
 
-4. Write `runner.json` per prompt (same shape as fast mode + full response).
-5. Spawn 6 judges in parallel. Each judge gets no MCP tools, just the prompt + response + rubric. Parse the judge's JSON response into `judge.json`.
-6. Compute means, write `meta.json` (include `server_mode`), append to `scripts/eval-mcp/results/history.jsonl` (include `server_mode`).
-7. Print the full 5-dim table with `↑/↓/=` deltas vs the previous full-mode run **with the same `server_mode`** (same `git_sha` on main + same mode = baseline). Mixing dev vs prod baselines would show noise, not real quality drift.
+4. Write `runner.json` per prompt (full response + tools_called + duration + token usage).
+5. Spawn one judge per runner in parallel. Each judge gets no MCP tools, just the prompt + response + rubric. The judge must return the JSON shape from rubric.md exactly — parse into `judge.json`. If parsing fails, retry the judge once with a stricter "JSON only, no fence" reminder.
+6. Compute means across all 7 dimensions, write `meta.json` (include `server_mode` and per-dim means), append to `scripts/eval-mcp/results/history.jsonl` (include `server_mode` and all 7 dim means).
+7. Print the full 7-dim table with `↑/↓/=` deltas vs the previous full-mode run **with the same `server_mode`** (same baseline rules apply — never mix dev and prod baselines).
+8. **Quality call-out.** After the table, list the bottom-2 dimensions across the run with one sentence each on what to fix. Then list every prompt where `faithfulness ≤ 4` — these are the fabrication failures and should be the top fix priority regardless of overall score.
+
+### Reading the report
+
+- **Faithfulness mean** is the headline. Anything below 7 means the MCP is letting the model fabricate; tighten tool descriptions or add result-size guidance.
+- **Insight mean** is the ceiling. Below 6 means the MCP returns data but doesn't help the model see patterns; consider returning correlated context (e.g., bundle quality score with cost when listing keywords).
+- **Honesty mean** below 7 means the model invents recommendations to fill space; consider adding "if data is insufficient, say so" to MCP instructions.
 
 ### When to use which
 

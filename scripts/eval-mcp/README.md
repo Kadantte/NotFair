@@ -1,49 +1,61 @@
 # MCP eval harness
 
-Measures the quality and speed of your MCP server's output when driven by a real LLM agent. Use it to A/B changes to tool descriptions, tool responses, playbooks, or system prompts.
+Measures the quality and speed of your MCP server's output when driven by a real LLM agent. Use it to A/B changes to tool descriptions, tool responses, playbooks, or system prompts — without going through Claude Code's interactive OAuth flow.
 
 ## How it works
 
 ```
-prompts.json → claude -p (with local MCP) → stream-json trace → LLM judge → results/<label>.jsonl
+prompts.json → claude -p (with local MCP via bearer token) → stream-json trace → LLM judge → results/<label>.jsonl
 ```
 
 For each prompt, the harness:
-1. Spawns `claude -p` with your local MCP wired in (strict config, only `mcp__adsagent-local__*` tools allowed).
+1. Spawns `claude -p` with your local MCP wired in (strict config, only `mcp__adsagent-local__*` tools allowed). Auth is a long-lived **bearer token**, not interactive OAuth.
 2. Parses `stream-json` output to capture tool calls, token usage, wall time, and final assistant text.
-3. Feeds the final text + the original prompt to Claude Opus (temp 0) with a rubric that scores on 4 dimensions.
+3. Spawns a second `claude -p` (always Opus) as the judge, scoring on the 7-dim rubric in `.claude/skills/eval-mcp/rubric.md`. The judge has no MCP tools — it only sees the prompt + response + rubric.
 4. Appends one row per run to `results/<label>.jsonl`.
 
-Baseline vs candidate = two labels; `compare.ts` diffs them.
+Baseline vs candidate = two labels; `compare.ts` diffs them across all 7 dimensions.
 
-## Setup
+## One-time setup (do this once, then never again)
 
 **1. Start the Next.js dev server** so `http://localhost:3000/api/mcp` is live:
 ```bash
 npm run dev
 ```
 
-**2. Get an MCP bearer token.** Sign in at `http://localhost:3000/connect` and copy your direct token, or pull one from the `mcp_sessions` table in Supabase for a test user.
-
-**3. Export env vars:**
+**2. Set `DEV_LOCAL_EMAIL` in `.env.local`** to your Google email (the one you used to sign in at `/connect` at least once):
 ```bash
-export MCP_BEARER_TOKEN=<your token>
-export ANTHROPIC_API_KEY=<your Anthropic key>  # needed for the judge
+echo "DEV_LOCAL_EMAIL=you@example.com" >> .env.local
 ```
+
+That's it. The MCP route (`app/api/[transport]/route.ts`) has a triple-gated dev bypass: when `NODE_ENV=development`, `DEV_LOCAL_EMAIL` is set, and the request has no `Authorization` header, it auto-resolves to your most recent valid `mcp_sessions` row for that email. No token-fishing, no OAuth dance, no DCR.
+
+Pre-condition: there must be at least one valid `mcp_sessions` row for that email — sign in at `http://localhost:3000/connect` once with Google to create it. The session lasts a year+, so this is genuinely a one-time thing.
+
+**Need explicit auth instead?** (e.g., for `--url` pointing at prod) Set `MCP_BEARER_TOKEN`:
+```bash
+# Pull from Supabase
+psql ... -c "SELECT access_token FROM mcp_sessions WHERE google_email = 'you@example.com' ORDER BY created_at DESC LIMIT 1;"
+echo "MCP_BEARER_TOKEN=<token>" >> .env.local
+```
+When both are set, the explicit bearer token wins.
+
+> No `ANTHROPIC_API_KEY` needed. Both the agent and the judge use your local `claude` CLI install.
 
 ## Running
 
 ```bash
 # Baseline: snapshot current behavior
-npx tsx scripts/eval-mcp/eval.ts --label baseline
+npm run eval:mcp -- --label baseline
 
 # Make MCP changes (edit tool descriptions, response shapes, etc.)
+# Restart npm run dev to pick up the changes.
 
 # Candidate: measure after
-npx tsx scripts/eval-mcp/eval.ts --label my-change
+npm run eval:mcp -- --label my-change
 
 # Diff
-npx tsx scripts/eval-mcp/compare.ts baseline my-change
+npm run eval:mcp:compare -- baseline my-change
 ```
 
 ### Flags
@@ -62,20 +74,31 @@ Each row in `results/<label>.jsonl`:
   "prompt_id": "audit-full",
   "wall_ms": 42130,
   "tool_call_total": 12,
-  "tool_calls": [{"name": "mcp__adsagent-local__audit", "count": 1}, ...],
+  "tool_calls": [{"name": "mcp__adsagent-local__runScript", "count": 1}, ...],
   "input_tokens": 18542,
   "output_tokens": 2104,
   "final_text": "...",
-  "scores": { "specificity": 7, "actionability": 8, "coverage": 7, "prioritization": 6, "overall": 7 },
+  "scores": {
+    "faithfulness": 8,    // anti-hallucination — quality floor
+    "specificity": 7,     // numbers + named resources
+    "actionability": 8,   // can the user execute today
+    "insight": 6,         // beyond surface read
+    "prioritization": 7,  // led with biggest lever
+    "honesty": 9,         // acknowledged data gaps
+    "overall": 7          // holistic, with faithfulness floor
+  },
   "judge_notes": "Would be a 10 if it ranked waste by dollar amount..."
 }
 ```
 
-**`compare.ts`** prints a per-prompt table of deltas (green = improvement, red = regression). Mean line at the bottom shows overall score delta, wall time delta, and token delta.
+**Watch faithfulness first.** If `faithfulness ≤ 4` on any prompt, that's a fabrication failure — the model invented numbers the MCP didn't return. The summary surfaces these explicitly. Fix these before chasing other dimensions.
+
+**`compare.ts`** prints a per-prompt table of 7-dim deltas (green = improvement, red = regression). Mean line at the bottom shows overall and faithfulness deltas, wall time, and tokens.
 
 ## What it tests
 
 Signal it catches that manual testing misses:
+- **Hallucinated numbers** — faithfulness scoring catches confident-sounding fabrication that ad-hoc inspection misses.
 - **Regressions on prompts you're not currently testing** — e.g. the "audit" prompt still works but you broke "find wasted keywords".
 - **Silent quality drops** — fewer tool calls may mean thinner output, not efficiency gains.
 - **Token/latency bloat** — new verbose tool responses show up as token increase without quality gain.
@@ -83,8 +106,10 @@ Signal it catches that manual testing misses:
 
 ## Editing the rubric
 
-The rubric lives inline in `eval.ts` (`RUBRIC` constant). Change it to match what *you* care about — e.g. add a "correctness" dimension that penalizes hallucinated numbers, or a "conciseness" dimension if outputs are too long.
+The rubric is at `.claude/skills/eval-mcp/rubric.md` — single source of truth. Both this headless harness and the `/eval-mcp` skill load from there. Substantive rubric changes shift historical scores; if you make one, start a new history file.
 
 ## Editing prompts
 
-`prompts.json` is the eval set. Add prompts that represent real user asks you care about. Keep the id stable so historical results compare cleanly.
+`prompts.json` is the eval set. Add prompts that represent real user asks you care about. Keep the `id` stable so historical results compare cleanly.
+
+`prompts-fast.json` is for the `/eval-mcp` skill's fast mode (tool-selection only, no judge) — not used by this headless runner.

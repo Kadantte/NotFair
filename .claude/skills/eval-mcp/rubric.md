@@ -2,13 +2,36 @@
 
 You are judging the quality of a Google Ads audit / analysis produced by an AI agent using MCP tools. Score each dimension on a 1–10 integer scale. Be a strict but fair grader — a score of 10 means "genuinely could not be improved", not "this is decent."
 
+A response that *sounds* polished but lacks specificity, leads with the wrong issue, or fabricates numbers is a **bad response**. Quality means the user can act on it tomorrow morning and trust the numbers. Grade accordingly.
+
 ## Dimensions
+
+### faithfulness (1–10) — anti-hallucination
+
+Does the response cite numbers and resource names that look like real account data, or does it look fabricated?
+
+This is the most important dimension. A confident-sounding response built on hallucinated numbers is worse than no response at all — it actively misleads the user.
+
+Tells of fabrication:
+- Suspiciously round numbers ($5,000, exactly 12.5% CTR, exactly 50 conversions)
+- Generic resource names ("Campaign A", "your search campaign", "the underperforming ad group") instead of real names
+- Internal contradictions (CTR of 8% with CPC of $0.50 and 100 clicks but spend of $5,000)
+- Claims with no number attached at all ("CTR is low", "conversions dropped significantly")
+- "Approximately" / "around" / "roughly" used heavily — a real query returns exact numbers
+- Numbers that are too clean for a real account (every CPA is exactly $X.00)
+
+- **10** — Every number is precise (cents, decimals, three significant figures). Every named resource sounds like a real campaign/keyword/ad group name. No internal contradictions. The response could only have been written by an agent that actually read the data.
+- **7** — Mostly grounded, but 1–2 suspiciously round numbers or one generic resource reference.
+- **4** — Mix of specific and generic. Some numbers feel fabricated, some real.
+- **1** — Reads like the agent never looked at the account. Round numbers, generic names, vibes.
 
 ### specificity (1–10)
 
 Does the response cite real numbers and names from the account, or is it generic boilerplate?
 
-- **10** — Every claim is backed by a specific number (spend, CPA, CTR, conversion rate) and names the specific resource it applies to (campaign name, keyword text, ad group name).
+Different from faithfulness: faithfulness asks "are the numbers real?", specificity asks "are there enough numbers and names?". A response can be faithful but sparse, or specific but fabricated.
+
+- **10** — Every claim is backed by a specific number (spend, CPA, CTR, conversion rate) and names the specific resource it applies to (campaign name, keyword text, ad group name). Numbers cover the relevant breadth.
 - **7** — Most claims have numbers, but some are qualitative ("high waste"). Names are present but inconsistent.
 - **4** — Numbers appear occasionally; most claims are general statements that could apply to any account.
 - **1** — Generic advice with no data from the account. Could have been written without ever calling any MCP tool.
@@ -22,35 +45,66 @@ Are next steps concrete enough that the user can execute them today without furt
 - **4** — Recommendations are directional ("optimize underperforming campaigns") without specifying which or how.
 - **1** — Vague guidance with no named targets ("improve quality scores").
 
-### coverage (1–10)
+### insight (1–10) — beyond surface reading
 
-Does the response span the relevant surface area for the prompt? Not whether it covered everything — whether it covered what was appropriate.
+Does the response surface a non-obvious pattern, or just describe what's on the screen?
 
-Relevant surfaces may include (depending on prompt): campaigns, ad groups, keywords/search terms, negatives, budgets, bidding strategies, conversion tracking setup, landing pages, network settings, audience segments, assets.
+A surface read tells you "Campaign X spent $500 with 0 conversions." An insightful read tells you "Campaign X spent $500 with 0 conversions, but its conversion tracking only fires on `/thank-you` and the actual booking flow ends on `/booking-confirmed` — the campaign may be converting and you're not seeing it." Insight = pattern recognition + domain expertise + connecting surfaces the user wouldn't have connected.
 
-- **10** — Covers every surface that could move the needle on the prompt, in rough proportion to impact.
-- **7** — Covers the major surfaces but misses one that would meaningfully change the conclusion.
-- **4** — Narrow focus on one or two surfaces when the prompt invited a broader sweep.
-- **1** — Addresses only a surface tangential to the prompt, or misses the prompt entirely.
+- **10** — Multiple non-obvious findings. Connects two or more surfaces in a way the user wouldn't have. Surfaces a root cause, not just a symptom. Reframes the problem if the prompt was off-base.
+- **7** — One real insight beyond the surface read. Mostly descriptive otherwise.
+- **4** — Reads the data competently. No real insight — anyone with the same data would say the same things.
+- **1** — Surface-level summary. Could have been generated by piping `SELECT *` into a markdown formatter.
 
 ### prioritization (1–10)
 
 Is the response ordered by impact, or is it a flat list?
 
-- **10** — Leads with the single biggest lever, explains *why* it's the biggest, then descends through smaller issues. Reader knows what to do first without re-reading.
+- **10** — Leads with the single biggest lever, explains *why* it's the biggest (in dollar or % terms), then descends through smaller issues. Reader knows what to do first without re-reading.
 - **7** — Top issue is right, but the ordering after it is roughly unordered.
 - **4** — Flat list with no ranking. Reader has to figure out priority themselves.
 - **1** — Wrong priority — leads with a minor issue while the biggest one is buried or missing.
 
+### honesty (1–10) — calibrated confidence
+
+Does the response acknowledge what it doesn't know, or paper over uncertainty?
+
+- **10** — Explicit about data limitations ("conversion tracking is misconfigured — real CPA can't be computed reliably"). Distinguishes high-confidence findings from speculation. Refuses to invent a recommendation when the data doesn't support one.
+- **7** — Mostly honest, occasionally over-claims minor points.
+- **4** — Treats inferences as facts. Invents recommendations to fill space.
+- **1** — Confident throughout regardless of data quality. Hides every limitation.
+
 ### overall (1–10)
 
-Your holistic judgment. This is not an average — it accounts for tradeoffs. A response that scores 9 on everything but buries the one thing the user actually needs to know is not a 9 overall. A response that scores 6 across the board but leads with the right action at the right target may be a 7 overall.
+Your holistic judgment. This is not an average — it accounts for tradeoffs.
 
-Use the "notes" field to explain what would push this to a 10 — not platitudes, but the one or two concrete things missing. This is the most actionable signal for improving the MCP surface.
+A response that scores 9 on everything but buries the one thing the user actually needs to know is not a 9 overall. A response that scores 6 across the board but leads with the right action at the right target may be a 7 overall. A response with great prioritization but a 3 on faithfulness is a 3 overall — fabricated guidance is worse than no guidance.
+
+**Faithfulness is a quality floor.** If faithfulness ≤ 4, overall cannot exceed faithfulness + 1. A response built on fabricated numbers cannot be "good" no matter how well it reads.
+
+Use the `notes` field to explain what would push this to a 10 — not platitudes, but the one or two concrete things missing. This is the most actionable signal for improving the MCP surface.
+
+## Output format
+
+Return exactly this JSON shape, no markdown fence, no preamble:
+
+```json
+{
+  "faithfulness": 1-10,
+  "specificity": 1-10,
+  "actionability": 1-10,
+  "insight": 1-10,
+  "prioritization": 1-10,
+  "honesty": 1-10,
+  "overall": 1-10,
+  "notes": "<2-4 sentences naming the 1-2 concrete things that would push this to a 10>"
+}
+```
 
 ## Reminders
 
 - Judge only on what's in the response. Don't speculate about what tools the agent called or whether it "could have" done better.
 - Don't reward verbosity. A tight 600-word response that nails the top 3 issues beats a sprawling 1200-word response that mentions 10 things.
 - Don't penalize honesty. If the agent says "the conversion tracking looks miscalibrated — real CPA is uncertain," that's a strength, not a weakness. Hallucinating precise CPA numbers to seem confident is worse.
-- Return exactly the JSON shape requested — no markdown fence, no preamble, no trailing commentary.
+- A response with no numbers cannot score above 4 on specificity, regardless of how well-written it is.
+- A response with fabricated numbers cannot score above 3 on faithfulness, regardless of how confident it sounds.
