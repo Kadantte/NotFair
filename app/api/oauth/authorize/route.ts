@@ -77,19 +77,7 @@ export async function GET(request: Request) {
   if (client.sessionId === null) {
     if (!client.redirectUris || !redirectUriMatches(redirectUri, client.redirectUris)) {
       return NextResponse.json(
-        {
-          error: "invalid_request",
-          error_description: "redirect_uri is not registered for this client",
-          // Temporary: surface what the server sees so we can diagnose mismatches in
-          // the wild (DCR clients on machines we don't control).
-          debug: {
-            requested: redirectUri,
-            registered: client.redirectUris,
-            registered_type: Array.isArray(client.redirectUris)
-              ? "array"
-              : typeof client.redirectUris,
-          },
-        },
+        { error: "invalid_request", error_description: "redirect_uri is not registered for this client" },
         { status: 400 },
       );
     }
@@ -177,11 +165,14 @@ export async function GET(request: Request) {
 }
 
 /**
- * RFC 8252 §7.3 — for loopback redirect URIs (`127.0.0.1`, `::1`), the
- * authorization server MUST allow any port. Native OAuth clients like Codex
- * bind to an ephemeral port at flow time, so the port registered via DCR
- * almost never matches what comes back on /authorize. Match scheme + host +
- * path for loopback registrations; require an exact match otherwise.
+ * RFC 8252 §7.3 — for loopback redirect URIs the authorization server MUST
+ * allow any port. We also tolerate cross-host matching among the loopback
+ * variants (`127.0.0.1`, `::1`, `localhost`): Codex registers a redirect_uri
+ * via DCR using `127.0.0.1`, but Vercel's edge normalizes the hostname in
+ * `request.url` to `localhost` before the handler sees it, so the same
+ * conceptual loopback target arrives in two different forms.
+ *
+ * Non-loopback redirect_uris still require an exact match.
  */
 function redirectUriMatches(requested: string, registered: string[]): boolean {
   let req: URL;
@@ -205,7 +196,6 @@ function redirectUriMatches(requested: string, registered: string[]): boolean {
 
     if (
       reg.protocol === req.protocol &&
-      reg.hostname === req.hostname &&
       reg.pathname === req.pathname &&
       reg.search === req.search
     ) {
@@ -217,5 +207,10 @@ function redirectUriMatches(requested: string, registered: string[]): boolean {
 }
 
 function isLoopbackHost(hostname: string): boolean {
-  return hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
+  return (
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1" ||
+    hostname === "localhost"
+  );
 }
