@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AuthContext } from "@/lib/google-ads";
 import { registerReadTools } from "./read-tools";
 import { registerWriteTools } from "./write-tools";
+import { registerCodeModeTools } from "./code-mode";
 import { withMcpTelemetry } from "./telemetry";
 
 /**
@@ -59,5 +60,10 @@ export function collectAdsTools(currentAuth: () => AuthContext): CollectedTool[]
   withMcpTelemetry(collector);
   registerReadTools(collector as unknown as McpServer, currentAuth);
   registerWriteTools(collector as unknown as McpServer, currentAuth);
+  // `runScript` lets the chat agent fan out GAQL queries the same way the
+  // MCP server does. Without it, chat loses access to anything not exposed
+  // as a dedicated point-query tool — and the read surface was deliberately
+  // trimmed in favor of runScript (see commit c1eb981).
+  registerCodeModeTools(collector as unknown as McpServer, currentAuth);
   return collector.tools;
 }
