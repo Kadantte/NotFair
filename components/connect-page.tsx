@@ -579,18 +579,21 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
 function CodexSection({ token: _token }: { token: string }) {
     const serverUrl = 'https://adsagent.org/api/mcp';
     const oneLiner = `codex mcp add adsagent --url ${serverUrl}`;
+    const [copied, setCopied] = useState(false);
     return (
         <div className="w-full space-y-4 text-left">
             <p className="text-sm text-[#C4C0B6]">
-                Run this in your terminal — Codex finishes setup on first use.
+                Run this command in your terminal — it will guide you through the OAuth flow and set up the AdsAgent MCP in your Codex automatically.
             </p>
             <SetupCodeBlock
                 content={oneLiner}
-                copied={false}
+                copied={copied}
                 showTokenWarning={false}
                 onCopy={() => {
                     navigator.clipboard.writeText(oneLiner);
+                    setCopied(true);
                     trackEvent('install_command_copied', { setup_tab: 'codex', step: 'codex_oneliner' });
+                    setTimeout(() => setCopied(false), 2000);
                 }}
             />
         </div>

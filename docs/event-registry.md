@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-23.
+> Source of truth for all analytics events. Last updated: 2026-04-26.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -336,17 +336,19 @@ No properties.
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks the Copy button on any Claude Code setup code block on the connect page — both the auto-prompt block in the "Let Claude set it up" subtab and each individual command in the "Install manually" subtab.
-**Hypothesis:** We believe tracking this with a `step` property tells us which point in the manual install flow users actually reach (marketplace add → plugin install → /ads → API key paste). It lets us pinpoint where setup falls apart and whether users prefer the auto-prompt path over manual.
+**Trigger:** Fires when a user clicks the Copy button on any setup code block on the connect page. Covers all three setup paths: the Claude Code auto-prompt block ("Let Claude set it up" subtab), each individual command in the Claude Code "Install manually" subtab, and the single Codex one-liner block (`/connect/codex`).
+**Hypothesis:** We believe tracking this with `setup_tab` + `step` tells us which install path users pick (Claude Code auto vs manual vs Codex) and which point in the manual install flow they actually reach. Pair with `account_connected` and downstream `ai_change_executed` (`client_name: "codex"` vs `"claude-code"`) to compute path-specific activation rates and decide where to invest onboarding effort.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `setup_tab` | string | `"claude-code"` | Which AI client setup tab was active |
-| `step` | string | `"plugin_install"` | Which command was copied. Enum: `install` (auto-prompt block), `marketplace_add`, `plugin_install`, `ads_command`, `api_key` |
+| `setup_tab` | string | `"codex"` | Which AI client setup tab was active. Enum: `claude-code`, `codex`. (`connector` does not fire this event — it uses `connector_credential_copied` instead.) |
+| `step` | string | `"codex_oneliner"` | Which command was copied. Enum (when `setup_tab="claude-code"`): `install` (auto-prompt block), `marketplace_add`, `plugin_install`, `ads_command`, `api_key`. Enum (when `setup_tab="codex"`): `codex_oneliner` (the `codex mcp add adsagent --url …` block). |
 
 ```json
-{ "event": "install_command_copied", "properties": { "setup_tab": "claude-code", "step": "plugin_install" } }
+{ "event": "install_command_copied", "properties": { "setup_tab": "codex", "step": "codex_oneliner" } }
 ```
+
+**Notes:** Codex tab view itself is captured by `$pageview` with `path: "/connect/codex"` — no separate `*_viewed` event is wired, by design.
 
 **Files:** `components/connect-page.tsx`
 
