@@ -40,6 +40,17 @@ Pre-built GAQL strings (sync, no RPC cost):
 Sync helpers: ads.helpers.getDateRange(days), formatDate, micros, toMicros, normalizeCustomerId, daysBetween, extractChangedFields, generateBrandVariants
 Constants: ads.constants.RESOURCE_CHANGE_OP, CHANGE_RESOURCE_TYPE, CHANGE_CLIENT_TYPE (numeric enum → label maps)
 
+── DATE LITERALS (GAQL only supports a fixed set) ──
+
+Valid \`DURING\` literals: TODAY, YESTERDAY, LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS, THIS_MONTH, LAST_MONTH, LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_MON_TODAY, THIS_WEEK_SUN_TODAY. **There is no LAST_60_DAYS, LAST_90_DAYS, LAST_180_DAYS, THIS_YEAR, or LAST_YEAR.** For windows >30 days, use a custom range:
+
+  const { start, end } = ads.helpers.getDateRange(90);
+  const q = \`SELECT campaign.id, metrics.cost_micros FROM campaign WHERE segments.date BETWEEN '\${start}' AND '\${end}'\`;
+
+(As a backstop, the server auto-rewrites unsupported \`DURING LAST_N_DAYS\`/\`THIS_YEAR\`/\`LAST_YEAR\` to BETWEEN, but writing it correctly is faster and clearer.)
+
+Note: \`change_event\` only supports the last 30 days regardless of how you express the range.
+
 Rules: top-level await works; no fetch/require/process/fs; return value must be JSON-serializable; defaults are 30s timeout (max 45s), 500KB return cap, 100K log chars.
 
 ── CANONICAL AUDIT (one call, wide net, filter in-script) ──

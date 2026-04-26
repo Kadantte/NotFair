@@ -2,6 +2,18 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.6] - 2026-04-25
+
+### Fixed
+- **`updateConversionAction` no longer fails silently on read-only conversion actions.** When an agent tried to demote a Google Analytics 4 import, Firebase action, Floodlight, manager-inherited, or other read-only conversion action, Google returned a cryptic `mutate_error=9: Mutates are not allowed for the requested resource` and the agent had no way to know why. We now pre-flight check `conversion_action.type` and `conversion_action.owner_customer` and return a clear, actionable error like *"Conversion action 7453416887 has type GOOGLE_ANALYTICS_4_PURCHASE and is read-only via the API. Modify it in the Google Ads UI or in its source system."* This was responsible for ~12 failed mutates per day in production.
+- **`updateConversionAction` no longer issues an empty mutate when only `primaryForGoal` is being changed.** Previously the function unconditionally called `mutateResources` with a resource containing only `resource_name`, which Google rejects (the google-ads-api library doesn't strip snake_case `resource_name` from the derived field mask). Now it skips the bare mutate and goes straight to `setPrimaryForGoal`. When `primaryForGoal` is the only requested change and the underlying mutate fails, it surfaces a hard error instead of a silent warning.
+
+### Changed
+- **`runScript` GAQL queries auto-rewrite invalid `DURING` literals.** GAQL only supports a fixed set of date literals (TODAY, YESTERDAY, LAST_7/14/30_DAYS, THIS_MONTH, LAST_MONTH, LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_MON_TODAY, THIS_WEEK_SUN_TODAY) — agents routinely emit `LAST_60_DAYS`, `LAST_90_DAYS`, `LAST_180_DAYS`, `THIS_YEAR`, or `LAST_YEAR`, and Google rejects them with `Invalid date literal supplied for DURING operator`. The server now translates these to a deterministic `BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` clause before sending to Google. This was responsible for ~91 failed `runScript` calls per day in production (~53% of all `runScript` errors).
+- **`runScript` tool description documents the supported date literals.** Added an explicit "DATE LITERALS" section that enumerates the 12 valid `DURING` values, names the common invalid ones, and shows the `ads.helpers.getDateRange(90)` + `BETWEEN` pattern for windows >30 days.
+- **GAQL error messages now include self-correcting hints.** On `query_error=32` ("Unrecognized field"), the error appends *"call `getResourceMetadata('<resource>')` for the valid field list"*. On `query_error=49` (metric/resource incompatibility), it suggests trying a different `FROM` resource. On `query_error=22` (invalid date literal), it lists the supported set and points to `BETWEEN`. Agents self-correct on retry instead of repeating the same broken query.
+- **The prebuilt `ads.queries.conversionActions` query now selects `conversion_action.owner_customer`.** Lets `runScript` agents filter out manager-inherited conversion actions client-side before attempting any mutation.
+
 ## [0.3.0.5] - 2026-04-25
 
 ### Changed

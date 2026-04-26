@@ -1654,13 +1654,85 @@ const SEGMENT_WHERE_SELECT_EXEMPTIONS = new Set([
   "segments.year",
 ]);
 
+/**
+ * GAQL only supports a fixed set of `DURING` date literals (TODAY, YESTERDAY,
+ * LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS, THIS_MONTH, LAST_MONTH,
+ * LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_*).
+ * Agents routinely emit invalid literals like `LAST_90_DAYS`, `LAST_60_DAYS`,
+ * or `THIS_YEAR` — Google rejects these with `Invalid date literal supplied
+ * for DURING operator` (query_error=22), and the agent has to retry.
+ *
+ * Auto-translate the most common invalid literals to a `BETWEEN '<start>' AND
+ * '<end>'` clause so the query just works. We translate any `LAST_N_DAYS`
+ * outside the supported set (7/14/30), plus `THIS_YEAR`/`LAST_YEAR`.
+ */
+export function rewriteInvalidDateLiterals(query: string, today: Date = new Date()): string {
+  let out = query;
+
+  // LAST_N_DAYS where N is not 7, 14, or 30 — translate to a rolling window
+  // ending today. The window is N days long, matching Google's semantics
+  // (LAST_30_DAYS = today + 29 prior days).
+  out = out.replace(
+    /\bDURING\s+LAST_(\d+)_DAYS\b/gi,
+    (match, nStr: string) => {
+      const n = Number(nStr);
+      if (!Number.isFinite(n) || n <= 0) return match;
+      if (n === 7 || n === 14 || n === 30) return match;
+      const end = new Date(today);
+      const start = new Date(today);
+      start.setDate(end.getDate() - (n - 1));
+      return `BETWEEN '${formatDate(start)}' AND '${formatDate(end)}'`;
+    },
+  );
+
+  // THIS_YEAR — Jan 1 of current year through today.
+  out = out.replace(/\bDURING\s+THIS_YEAR\b/gi, () => {
+    const start = new Date(today.getFullYear(), 0, 1);
+    return `BETWEEN '${formatDate(start)}' AND '${formatDate(today)}'`;
+  });
+
+  // LAST_YEAR — Jan 1 through Dec 31 of the previous calendar year.
+  out = out.replace(/\bDURING\s+LAST_YEAR\b/gi, () => {
+    const y = today.getFullYear() - 1;
+    const start = new Date(y, 0, 1);
+    const end = new Date(y, 11, 31);
+    return `BETWEEN '${formatDate(start)}' AND '${formatDate(end)}'`;
+  });
+
+  return out;
+}
+
+/**
+ * Append a self-correcting hint to specific Google Ads errors so the agent's
+ * next attempt has a clear path forward. Currently covers:
+ *
+ *   - query_error=32 ("Unrecognized field"): point to getResourceMetadata.
+ *   - query_error=49 ("metric ... incompatible with FROM clause"): hint to
+ *     switch the FROM resource (the metric usually lives on a different one).
+ *   - query_error=22 ("Invalid date literal"): name the supported set and
+ *     direct callers to BETWEEN — a backstop for literals our rewriter
+ *     doesn't catch (e.g. typos like LAST_THIRTY_DAYS).
+ */
+export function enrichGaqlError(message: string): string {
+  if (/Unrecognized fields? in the query/i.test(message)) {
+    return `${message} Tip: call getResourceMetadata('<resource>') to discover valid fields before retrying.`;
+  }
+  if (/incompatible with the resource in the FROM clause/i.test(message)) {
+    return `${message} Tip: this metric is not selectable on that resource. Try a different FROM (e.g. metrics.cost_micros lives on campaign/ad_group/keyword_view, not on conversion_action).`;
+  }
+  if (/Invalid date literal supplied for DURING operator/i.test(message)) {
+    return `${message} Tip: only LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS, TODAY, YESTERDAY, THIS_MONTH, LAST_MONTH, LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_MON_TODAY, THIS_WEEK_SUN_TODAY are valid. For longer windows use \`segments.date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'\`.`;
+  }
+  return message;
+}
+
 export async function runSafeGaqlReport(
   auth: AuthContext,
   rawQuery: string,
   limit: number = DEFAULT_GAQL_LIMIT,
   options: RunSafeGaqlOptions = {},
 ): Promise<GaqlReport> {
-  let query = rawQuery.trim();
+  let query = rewriteInvalidDateLiterals(rawQuery.trim());
   let normalized = query.toUpperCase();
 
   // Accept any whitespace after SELECT (newlines, tabs, spaces) — multi-line
@@ -1704,7 +1776,7 @@ export async function runSafeGaqlReport(
     const customer = getCachedCustomer(auth);
     fetched = (await customer.query(queryToRun)) as any[];
   } catch (error) {
-    throw new Error(`GAQL query failed: ${extractErrorMessage(error)}`);
+    throw new Error(`GAQL query failed: ${enrichGaqlError(extractErrorMessage(error))}`);
   }
 
   const rowTruncated = fetched.length > effectiveLimit;
