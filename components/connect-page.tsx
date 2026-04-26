@@ -576,7 +576,7 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
 
 function CodexSection({ token: _token }: { token: string }) {
     const serverUrl = 'https://adsagent.org/api/mcp';
-    const oneLiner = `codex mcp add adsagent --url ${serverUrl} && codex mcp login adsagent`;
+    const oneLiner = `codex mcp add adsagent --url ${serverUrl}`;
     return (
         <div className="w-full space-y-4 text-left">
             <p className="text-sm text-[#C4C0B6]">
