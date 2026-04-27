@@ -4,4 +4,4 @@
  * and the subscription resolver (`lib/subscription.ts`) can read it without
  * pulling the other's dependencies.
  */
-export const DEV_EMAILS: string[] = ["tongchen92@gmail.com"]; // "izhongyuting@gmail.com"
+export const DEV_EMAILS: string[] = ["tongchen92@gmail.com", "izhongyuting@gmail.com"];
