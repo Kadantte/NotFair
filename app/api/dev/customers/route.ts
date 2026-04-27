@@ -3,6 +3,7 @@ import { sql, desc, inArray, isNotNull } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { devEmailSqlList } from "@/lib/dev-ops-filter";
 import { parseCustomerIds } from "@/lib/google-ads";
+import { getUsdRates, getCurrencyInfo, toUsd } from "@/lib/currency";
 
 // Single-tenant admin cache: dev dashboard is hit by a tiny set of authorized
 // users, and the underlying data (sessions, ops counts, account snapshots)
@@ -47,11 +48,11 @@ export async function GET(request: Request) {
     return { ...c, accounts };
   });
 
-  // Batch-fetch account snapshots, operation counts, and contacts (for
-  // outreach status) in parallel. Gmail draft recipients are deferred to
-  // /api/dev/customers/drafts so the table can render without waiting on
+  // Batch-fetch account snapshots, operation counts, contacts (for outreach
+  // status), and FX rates in parallel. Gmail draft recipients are deferred
+  // to /api/dev/customers/drafts so the table can render without waiting on
   // multi-second Gmail round-trips.
-  const [snapshots, opsCounts, contactsByEmail] = await Promise.all([
+  const [snapshots, opsCounts, contactsByEmail, usdRates] = await Promise.all([
     // Account snapshots (budgets, campaigns)
     (async () => {
       const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
@@ -113,6 +114,7 @@ export async function GET(request: Request) {
       }
       return map;
     })(),
+    getUsdRates(),
   ]);
 
   const result = parsed.map((c) => {
@@ -120,6 +122,7 @@ export async function GET(request: Request) {
     let totalReads = 0;
     let totalWrites = 0;
     let lastOp: string | null = null;
+    let totalDailyBudgetUsd: number | null = null;
     const accounts = c.accounts.map((a) => {
       const ops = opsCounts.get(a.id);
       if (ops) {
@@ -127,9 +130,17 @@ export async function GET(request: Request) {
         totalWrites += ops.writes;
         if (ops.lastOp && (!lastOp || ops.lastOp > lastOp)) lastOp = ops.lastOp;
       }
+      const snap = snapshots.get(a.id);
+      const dailyBudgetUsd =
+        snap?.dailyBudget != null ? toUsd(snap.dailyBudget, snap.currencyCode, usdRates) : null;
+      if (dailyBudgetUsd != null) totalDailyBudgetUsd = (totalDailyBudgetUsd ?? 0) + dailyBudgetUsd;
+      const info = getCurrencyInfo(snap?.currencyCode);
       return {
         ...a,
-        ...(snapshots.get(a.id) ?? {}),
+        ...(snap ?? {}),
+        dailyBudgetUsd,
+        country: info?.country ?? null,
+        flag: info?.flag ?? null,
       };
     });
 
@@ -156,6 +167,7 @@ export async function GET(request: Request) {
       reads: totalReads,
       writes: totalWrites,
       totalOps: totalReads + totalWrites,
+      dailyBudgetUsd: totalDailyBudgetUsd,
       outreachStatus,
       lastContactedAt: contact?.lastContactedAt ?? null,
     };

@@ -40,6 +40,12 @@ Pre-built GAQL strings (sync, no RPC cost):
 Sync helpers: ads.helpers.getDateRange(days), formatDate, micros, toMicros, normalizeCustomerId, daysBetween, extractChangedFields, generateBrandVariants
 Constants: ads.constants.RESOURCE_CHANGE_OP, CHANGE_RESOURCE_TYPE, CHANGE_CLIENT_TYPE (numeric enum → label maps)
 
+── HUMANIZED RESPONSES (every gaql/gaqlParallel row) ──
+
+Rows are augmented post-fetch so you can read the LLM-friendly form directly:
+- Enum integer fields get a sibling \`<field>_name\` (canonical Google Ads enum name). Read \`bidding_strategy_type_name === "MAXIMIZE_CONVERSIONS"\`, not the integer 10. Avoids the BiddingStrategyType landmines (10=MAX_CONVERSIONS, 11=MAX_CONVERSION_VALUE, 9=TARGET_SPEND/MaxClicks, 15=TARGET_IMPRESSION_SHARE).
+- Money fields ending \`_micros\` get a sibling \`<base>_value\` in major units (\`cost_micros: 11_000_000\` ⇒ \`cost_value: 11\`). Currency-agnostic — works for USD/EUR/JPY. Raw \`_micros\` is preserved.
+
 ── DATE LITERALS (GAQL only supports a fixed set) ──
 
 Valid \`DURING\` literals: TODAY, YESTERDAY, LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS, THIS_MONTH, LAST_MONTH, LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_MON_TODAY, THIS_WEEK_SUN_TODAY. **There is no LAST_60_DAYS, LAST_90_DAYS, LAST_180_DAYS, THIS_YEAR, or LAST_YEAR.** For windows >30 days, use a custom range:

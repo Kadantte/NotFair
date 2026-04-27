@@ -4,7 +4,10 @@ import { after } from "next/server";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
-import { getSessionAuth } from "@/lib/session";
+import { getSessionAuth, getAuthContext } from "@/lib/session";
+import type { AuthContext } from "@/lib/google-ads";
+import { getAccountBudgetSummary } from "@/lib/google-ads/reads";
+import { getCurrencyInfo, getUsdRates, toUsd } from "@/lib/currency";
 import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 import { getUsageInfo, getDailyUsage } from "@/lib/mcp/rate-limit";
@@ -676,6 +679,40 @@ async function postToSlack(text: string) {
     if (!res.ok) throw new Error(`Slack webhook failed: ${res.status}`);
 }
 
+// Best-effort: any failure yields an empty array so the support ping still fires.
+async function getAccountSummaryLines(auth: AuthContext | null): Promise<string[]> {
+    if (!auth) return [];
+    try {
+        const [budget, rates] = await Promise.all([
+            getAccountBudgetSummary(auth),
+            getUsdRates(),
+        ]);
+        const lines: string[] = [];
+        const country = getCurrencyInfo(budget.currencyCode)?.country;
+        if (country) {
+            lines.push(`*Country:* ${country}${budget.currencyCode ? ` (${budget.currencyCode})` : ''}`);
+        } else if (budget.currencyCode) {
+            lines.push(`*Currency:* ${budget.currencyCode}`);
+        }
+        if (budget.totalDailyBudget > 0) {
+            const usd = toUsd(budget.totalDailyBudget, budget.currencyCode, rates);
+            const native = `${budget.currencyCode ? `${budget.currencyCode} ` : ''}${budget.totalDailyBudget.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+            const usdStr = usd != null && budget.currencyCode !== 'USD'
+                ? ` (≈ $${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })} USD)`
+                : '';
+            const campaignsLabel = budget.activeCampaigns === 1 ? 'campaign' : 'campaigns';
+            lines.push(`*Daily budget:* ${native}/day${usdStr} across ${budget.activeCampaigns} active ${campaignsLabel}`);
+        } else if (budget.activeCampaigns > 0) {
+            lines.push(`*Daily budget:* none set across ${budget.activeCampaigns} active campaigns`);
+        } else {
+            lines.push(`*Daily budget:* no active campaigns`);
+        }
+        return lines;
+    } catch {
+        return [];
+    }
+}
+
 export async function submitFeedback(message: string) {
     const auth = await getSessionAuth();
     const email = auth?.googleEmail ?? 'anonymous';
@@ -688,17 +725,19 @@ export async function requestSetupHelp(context: {
     pathname: string;
     connected: boolean;
 }) {
-    const auth = await getSessionAuth();
-    const email = auth?.googleEmail ?? 'anonymous';
+    const { auth, session } = await getAuthContext();
+    const email = session.googleEmail ?? 'anonymous';
     const setupPath =
         context.activeTab === 'claude-code'
             ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
             : 'Claude Connector (Web / Cowork)';
+    const summaryLines = await getAccountSummaryLines(context.connected ? auth : null);
     await postToSlack([
         ':sos: *Setup help requested*',
         `*User:* <mailto:${email}|${email}>`,
         `*Setup path:* ${setupPath}`,
         `*Account connected:* ${context.connected ? 'yes' : 'no'}`,
+        ...summaryLines,
         `*Page:* ${context.pathname}`,
     ].join('\n'));
 }
@@ -710,8 +749,8 @@ export async function notifyHelpClicked(context: {
     connected: boolean;
     source?: string;
 }) {
-    const auth = await getSessionAuth().catch(() => null);
-    const email = auth?.googleEmail ?? 'anonymous';
+    const ctx = await getAuthContext().catch(() => null);
+    const email = ctx?.session.googleEmail ?? 'anonymous';
     const setupPath =
         context.activeTab === 'claude-code'
             ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
@@ -720,11 +759,13 @@ export async function notifyHelpClicked(context: {
                 : context.activeTab === 'codex'
                     ? 'ChatGPT / Codex'
                     : null;
+    const summaryLines = await getAccountSummaryLines(context.connected && ctx ? ctx.auth : null);
     await postToSlack([
         ':sos: *Need help clicked* (cal link opened — not booked yet)',
         `*User:* <mailto:${email}|${email}>`,
         `*Account connected:* ${context.connected ? 'yes' : 'no'}`,
         setupPath ? `*Setup path:* ${setupPath}` : null,
+        ...summaryLines,
         `*Source:* ${context.source ?? 'connect_page'}`,
         `*Page:* ${context.pathname}`,
     ].filter(Boolean).join('\n'));

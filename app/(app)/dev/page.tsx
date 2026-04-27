@@ -86,17 +86,34 @@ type DevStats = {
     sources: UsageSource[];
 };
 
-function formatCurrency(amount: number, currencyCode?: string | null): string {
+function formatCurrency(amount: number, currencyCode?: string | null, opts: { compact?: boolean } = {}): string {
+    const fractionDigits = opts.compact ? 0 : 2;
     if (currencyCode) {
         try {
-            return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amount);
+            return new Intl.NumberFormat(undefined, {
+                style: 'currency',
+                currency: currencyCode,
+                minimumFractionDigits: fractionDigits,
+                maximumFractionDigits: fractionDigits,
+            }).format(amount);
         } catch { /* invalid currency code fallback */ }
     }
-    return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `$${amount.toLocaleString(undefined, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })}`;
 }
 
-function formatAccountBudget(a: CustomerAccount): string | null {
-    return a.dailyBudget != null ? formatCurrency(a.dailyBudget, a.currencyCode) : null;
+const DAYS_PER_YEAR = 365;
+
+function deriveBudgetDisplay(c: Customer) {
+    const acctWithCurrency = c.accounts.find((a) => a.currencyCode);
+    const totalLocalDaily = c.accounts.reduce((s, a) => s + (a.dailyBudget ?? 0), 0);
+    return {
+        hasBudget: c.accounts.some((a) => a.dailyBudget != null),
+        currency: acctWithCurrency?.currencyCode ?? null,
+        flag: acctWithCurrency?.flag ?? null,
+        country: acctWithCurrency?.country ?? null,
+        annualLocal: totalLocalDaily * DAYS_PER_YEAR,
+        annualUsd: c.dailyBudgetUsd != null ? c.dailyBudgetUsd * DAYS_PER_YEAR : null,
+    };
 }
 
 /** Parse a timestamp string (with or without trailing Z) into a Date */
@@ -137,8 +154,11 @@ type CustomerAccount = {
     id: string;
     name: string;
     dailyBudget?: number | null;
+    dailyBudgetUsd?: number | null;
     activeCampaigns?: number | null;
     currencyCode?: string | null;
+    country?: string | null;
+    flag?: string | null;
 };
 type Customer = {
     userId: string | null;
@@ -152,6 +172,7 @@ type Customer = {
     reads: number;
     writes: number;
     totalOps: number;
+    dailyBudgetUsd: number | null;
     outreachStatus: 'contacted' | 'drafted' | 'none';
     lastContactedAt: string | null;
 };
@@ -224,12 +245,10 @@ export default function DevPage() {
                 case 'operations':
                     cmp = a.totalOps - b.totalOps;
                     break;
-                case 'budget': {
-                    const aBudget = a.accounts.reduce((s, acc) => s + (acc.dailyBudget ?? 0), 0);
-                    const bBudget = b.accounts.reduce((s, acc) => s + (acc.dailyBudget ?? 0), 0);
-                    cmp = aBudget - bBudget;
+                case 'budget':
+                    // Sort on USD-normalized totals so EUR vs JPY accounts are comparable.
+                    cmp = (a.dailyBudgetUsd ?? 0) - (b.dailyBudgetUsd ?? 0);
                     break;
-                }
                 case 'firstSeen':
                     cmp = new Date(a.firstSeen).getTime() - new Date(b.firstSeen).getTime();
                     break;
@@ -698,7 +717,7 @@ export default function DevPage() {
                                     className="flex-1 bg-[#24231F] border border-[#3D3C36] rounded-md px-2 py-1.5 text-xs text-[#E8E4DD]"
                                 >
                                     <option value="operations">Operations</option>
-                                    <option value="budget">Daily Budget</option>
+                                    <option value="budget">Annual Budget (USD)</option>
                                     <option value="accounts">Accounts</option>
                                     <option value="lastActive">Last Active</option>
                                     <option value="firstSeen">First Seen</option>
@@ -715,9 +734,7 @@ export default function DevPage() {
                             </div>
                             <div className="sm:hidden space-y-2">
                                 {sortedCustomers.map((c) => {
-                                    const totalBudget = c.accounts.reduce((s, a) => s + (a.dailyBudget ?? 0), 0);
-                                    const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
-                                    const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
+                                    const { hasBudget, currency, flag, country, annualUsd, annualLocal } = deriveBudgetDisplay(c);
                                     return (
                                     <div key={c.userId ?? c.primaryAccountId} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
                                         <div className="flex items-center justify-between mb-2">
@@ -738,7 +755,10 @@ export default function DevPage() {
                                                 ) : (
                                                     <div className="text-sm text-[#E8E4DD] truncate">{c.userId || 'Unknown'}</div>
                                                 )}
-                                                <div className="text-xs text-[#C4C0B6]/60 font-mono">{c.primaryAccountId}</div>
+                                                <div className="flex items-center gap-1.5 text-xs text-[#C4C0B6]/60 font-mono">
+                                                    <span>{c.primaryAccountId}</span>
+                                                    {flag && <span className="text-[13px] leading-none" title={country ?? undefined}>{flag}</span>}
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
                                                 <button
@@ -757,8 +777,13 @@ export default function DevPage() {
                                         <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
                                             {hasBudget && (
                                                 <div className="flex-1">
-                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Daily Budget</div>
-                                                    <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">{formatCurrency(totalBudget, currency)}</div>
+                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Annual Budget</div>
+                                                    <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
+                                                        {annualUsd != null ? formatCurrency(annualUsd, 'USD', { compact: true }) : '—'}
+                                                    </div>
+                                                    {currency && currency !== 'USD' && (
+                                                        <div className="text-[10px] text-[#C4C0B6]/60 font-mono">≈ {formatCurrency(annualLocal, currency, { compact: true })}/yr</div>
+                                                    )}
                                                 </div>
                                             )}
                                             <div className={hasBudget ? '' : 'flex-1'}>
@@ -790,12 +815,15 @@ export default function DevPage() {
                                         {c.accounts.length > 0 && (
                                             <div className="mt-2 space-y-1">
                                                 {c.accounts.map((a) => {
-                                                    const budget = formatAccountBudget(a);
+                                                    const annualUsdAcct = a.dailyBudgetUsd != null ? a.dailyBudgetUsd * DAYS_PER_YEAR : null;
                                                     return (
                                                         <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#C4C0B6] font-mono">
-                                                            <span className="truncate mr-2">{a.name || a.id}</span>
-                                                            {budget && (
-                                                                <span className="text-[#4CAF6E] whitespace-nowrap">{budget}/d · {a.activeCampaigns ?? 0} campaigns</span>
+                                                            <span className="truncate mr-2 inline-flex items-center gap-1">
+                                                                {a.flag && <span title={a.country ?? undefined}>{a.flag}</span>}
+                                                                <span className="truncate">{a.name || a.id}</span>
+                                                            </span>
+                                                            {annualUsdAcct != null && (
+                                                                <span className="text-[#4CAF6E] whitespace-nowrap">{formatCurrency(annualUsdAcct, 'USD', { compact: true })}/yr · {a.activeCampaigns ?? 0} campaigns</span>
                                                             )}
                                                         </div>
                                                     );
@@ -816,7 +844,7 @@ export default function DevPage() {
                                                 { key: 'email' as const, label: 'Customer' },
                                                 { key: 'accounts' as const, label: 'Accounts' },
                                                 { key: 'operations' as const, label: 'Operations' },
-                                                { key: 'budget' as const, label: 'Daily Budget' },
+                                                { key: 'budget' as const, label: 'Annual Budget' },
                                                 { key: 'firstSeen' as const, label: 'First Seen' },
                                                 { key: 'lastActive' as const, label: 'Last Active' },
                                             ]).map((col) => (
@@ -840,10 +868,8 @@ export default function DevPage() {
                                     </thead>
                                     <tbody>
                                         {sortedCustomers.map((c) => {
-                                            const totalBudget = c.accounts.reduce((s, a) => s + (a.dailyBudget ?? 0), 0);
+                                            const { hasBudget, currency, flag, country, annualUsd, annualLocal } = deriveBudgetDisplay(c);
                                             const totalCampaigns = c.accounts.reduce((s, a) => s + (a.activeCampaigns ?? 0), 0);
-                                            const hasBudget = c.accounts.some((a) => a.dailyBudget != null);
-                                            const currency = c.accounts.find((a) => a.currencyCode)?.currencyCode;
                                             return (
                                             <tr
                                                 key={c.userId ?? c.primaryAccountId}
@@ -881,7 +907,12 @@ export default function DevPage() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-xs text-[#C4C0B6]/60 font-mono tabular-nums">{c.primaryAccountId}</div>
+                                                    <div className="flex items-center gap-1.5 text-xs text-[#C4C0B6]/60 font-mono tabular-nums">
+                                                        <span>{c.primaryAccountId}</span>
+                                                        {flag && (
+                                                            <span className="text-[13px] leading-none" title={country ?? undefined}>{flag}</span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2.5">
                                                     <div className="flex flex-wrap gap-1">
@@ -905,8 +936,14 @@ export default function DevPage() {
                                                 <td className="px-4 py-2.5">
                                                     {hasBudget ? (
                                                         <div>
-                                                            <div className="text-sm text-[#4CAF6E] font-mono tabular-nums">{formatCurrency(totalBudget, currency)}</div>
-                                                            <div className="text-[10px] text-[#C4C0B6]/60">{totalCampaigns} campaign{totalCampaigns !== 1 ? 's' : ''}</div>
+                                                            <div className="text-sm text-[#4CAF6E] font-mono tabular-nums" title={c.dailyBudgetUsd != null ? `${formatCurrency(c.dailyBudgetUsd, 'USD')}/day` : undefined}>
+                                                                {annualUsd != null ? formatCurrency(annualUsd, 'USD', { compact: true }) : '—'}
+                                                            </div>
+                                                            <div className="text-[10px] text-[#C4C0B6]/60 font-mono">
+                                                                {currency && currency !== 'USD'
+                                                                    ? `≈ ${formatCurrency(annualLocal, currency, { compact: true })}/yr · ${totalCampaigns} campaign${totalCampaigns !== 1 ? 's' : ''}`
+                                                                    : `${totalCampaigns} campaign${totalCampaigns !== 1 ? 's' : ''}`}
+                                                            </div>
                                                         </div>
                                                     ) : (
                                                         <span className="text-sm text-[#C4C0B6]/40">—</span>

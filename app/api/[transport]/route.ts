@@ -226,6 +226,11 @@ Tool-selection heuristic — pick ONE path per user question:
    write tools. Never wrap mutations in \`runScript\` — writes happen through
    dedicated tools with guardrails and change-tracking.
 
+Humanized response contract — applies to every \`runScript\` row:
+
+- Enum integer fields are augmented with a sibling \`<field>_name\` carrying the canonical Google Ads enum name. Read \`bidding_strategy_type_name\` (e.g. \`"MAXIMIZE_CONVERSIONS"\`), not the integer (\`10\`). Common landmines: BiddingStrategyType 10=MAXIMIZE_CONVERSIONS, 11=MAXIMIZE_CONVERSION_VALUE, 9=TARGET_SPEND (a.k.a. Maximize Clicks), 15=TARGET_IMPRESSION_SHARE — easy to swap if you read the integer.
+- Money fields ending in \`_micros\` get a sibling \`<base>_value\` (numeric, currency-agnostic major units — \`cost_micros: 11_000_000\` ⇒ \`cost_value: 11\`). Use \`_value\` for math and display; the raw \`_micros\` field is preserved for callers that need it (e.g. mutation tools that take micros).
+
 3. Specialized non-GAQL reads → dedicated tools (not \`runScript\`):
    - \`searchGeoTargets\` — geo target name lookup via GeoTargetConstantService.
    - \`getRecommendations\` — Google's recommendation engine.

@@ -1,5 +1,6 @@
 import type { AuthContext } from "@/lib/google-ads";
 import { runSafeGaqlReport } from "@/lib/google-ads";
+import { humanizeGaqlRows } from "@/lib/google-ads/humanize";
 import {
   formatDate,
   getDateRange,
@@ -89,9 +90,11 @@ export function buildAdsHost(
       ? DEFAULT_LIMIT
       : normalizeLimit(limitArg, DEFAULT_LIMIT, MAX_LIMIT);
     const options = normalizeGaqlOptions(isPlainObject(limitArg) ? limitArg : optionsArg);
-    return execRead(auth, targetId, "run_script_gaql", () =>
+    const report = await execRead(auth, targetId, "run_script_gaql", () =>
       runSafeGaqlReport(auth, query, limit, options),
     );
+    humanizeGaqlRows(report.rows as unknown[]);
+    return report;
   }
 
   async function gaqlParallel(queriesArg: unknown, optionsArg?: unknown) {
@@ -156,6 +159,7 @@ export function buildAdsHost(
     results.forEach((r, i) => {
       const name = tasks[i].name;
       if (r.status === "fulfilled") {
+        humanizeGaqlRows(r.value.rows as unknown[]);
         out[name] = r.value;
       } else {
         const message = r.reason instanceof Error ? r.reason.message : String(r.reason);

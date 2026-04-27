@@ -84,11 +84,11 @@ Use the `/api/dev/customers` endpoint or query `mcp_sessions` directly to get al
 **Option B — Use adsagent MCP tools:**
 Call `listConnectedAccounts` to see available accounts, then `getAccountInfo` for each.
 
-Then cross-reference against sent emails in Gmail:
+Then cross-reference against sent emails — use the `gws` CLI (Google Workspace CLI), not the Gmail MCP. See "Gmail tooling: use `gws`, not the MCP" below for why and the exact commands. Quick version:
+```bash
+gws gmail users messages list --params '{"userId":"me","maxResults":500,"q":"in:sent from:tongchen92@gmail.com newer_than:90d"}' --format json
 ```
-Search Gmail: "in:sent from:tongchen92@gmail.com" 
-```
-Compare recipient emails against connected user emails. Anyone not in sent = needs outreach.
+Pull the `To` headers from each message and compare to the connected user list. Anyone not in sent = needs outreach.
 
 ## Step 2: Pull Account Data
 
@@ -116,7 +116,7 @@ A generic Tier 1 email ("you're just getting started, the first month leaks mone
 
 The only legitimate case for a Tier 1 "raw/empty" email is when the audit itself shows the account is genuinely empty (no campaigns, no spend, no history) — that's a real finding, not an absence of data. Even then, mention something concrete from the audit (e.g., "your campaigns are paused" or "no conversion tracking is set up yet"), not generic "first month" boilerplate.
 
-You have THREE data sources, in priority order:
+You have THREE data sources, in priority order. Run the SQL queries below against the project Postgres directly — either via the `/api/dev/customers` endpoint (already wraps the DB), via `psql "$DATABASE_URL"`, or by spinning up a small `bunx tsx` script that uses the `postgres` package (see `scripts/trigger-audits.ts` for the existing pattern). Don't reach for a Supabase MCP — direct DB access from a script is faster, paginates correctly, and matches how the audit pipeline already runs.
 
 ### Source 1: `audit_snapshots` table (best — has actionable findings)
 ```sql
@@ -474,18 +474,75 @@ The Mode B close should leave the reader with a low-cost reply option: one speci
 
 ## Step 5: Create Gmail Draft
 
-Use `gmail_create_draft` to save each email as a draft. This lets Tong review and send from Gmail.
+Create the draft via the `gws` CLI (Google Workspace CLI), not the Gmail MCP. The MCP has hit two bugs in real sends that wasted significant cleanup time:
 
-```
-to: {user's google email}
-subject: {personalized subject}
-body: {plain text body}
+- **Pagination silently drops drafts.** `list_drafts` returns ~17 per page; if you're working through a batch of 30 you'll think you covered everyone but miss half. `gws` reliably returns 100/page and supports follow-up paging.
+- **MCP-created drafts get auto-merged into existing threads with the same recipient.** When you later delete the *original* draft in that thread, Gmail also drops the new one — so the recipient ends up with zero drafts and you don't notice until verification. With `gws` you control the request payload and can omit `threadId` to force a new thread.
+
+Also, the MCP has no update or delete; `gws` has both, which is what you need when revising drafts in place instead of the create-new-then-delete-old dance.
+
+### Create a draft
+
+The Gmail API takes a base64-url-encoded RFC 2822 message in `message.raw`. Build it once and pipe through `base64`:
+
+```bash
+RAW=$(printf 'To: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s' \
+  "user@example.com" "Subject line" "Body line 1.\r\n\r\nBody line 2." | base64)
+gws gmail users drafts create \
+  --params '{"userId":"me"}' \
+  --json "{\"message\":{\"raw\":\"$RAW\"}}" \
+  --format json
 ```
 
-Report to the user:
-- How many drafts created
+The response has `id` (the draft id, used for update/delete) and `message.threadId` (the thread it landed in).
+
+For batches, write a small shell loop or python script that reads (recipient, subject, body) tuples from a file and calls `gws` for each. Don't hand-write 20 separate `gws` invocations.
+
+### Update an existing draft (preferred over delete-then-recreate)
+
+If you need to revise wording across many drafts, update them in place. This avoids the "new draft swept along when old draft deleted" footgun entirely:
+
+```bash
+gws gmail users drafts update \
+  --params '{"userId":"me","id":"r5188422268195332473"}' \
+  --json "{\"message\":{\"raw\":\"$NEW_RAW\"}}" \
+  --format json
+```
+
+### List drafts (with full pagination)
+
+```bash
+gws gmail users drafts list \
+  --params '{"userId":"me","maxResults":100,"q":"newer_than:7d"}' \
+  --format json
+```
+
+Use the `q` parameter for Gmail-search-style filtering (e.g. `to:foo@bar.com`, `subject:"specific phrase"`, `newer_than:7d`). For more than 100 drafts, follow `nextPageToken`.
+
+### Delete a draft (only when revising via update isn't possible)
+
+```bash
+gws gmail users drafts delete --params '{"userId":"me","id":"<draftId>"}'
+```
+
+Note Gmail-side behavior: when a draft is the only message in its thread, deleting it removes the thread. Any *other* drafts that Gmail merged into that same thread (e.g. a new draft to the same recipient created via the MCP) will disappear too. If you must delete originals, verify each replacement still exists by querying `to:<recipient> newer_than:1d` after the deletes.
+
+### Why not the Gmail MCP
+
+Concrete failure modes hit during a real outreach revision (Apr 2026):
+
+1. MCP `list_drafts` returned 17/30 drafts in the same time window with `pageSize:50`. The other 13 only surfaced via `gws gmail users drafts list` with `maxResults:100`. If we'd shipped based on the MCP's view we would have rewritten 17 drafts and silently left 13 with the old phrasing.
+2. MCP `create_draft` for recipients who already had a draft caused Gmail to auto-bundle the new draft into the same thread. Deleting the original later removed both.
+3. MCP exposes no update/delete, forcing a create-new-then-delete-old pattern which is exactly what trips footgun #2.
+
+`gws` doesn't fix #2 by itself (Gmail's threading is server-side), but combined with `update` instead of `delete+create`, the bug becomes unreachable.
+
+### Report to the user
+
+- How many drafts created (and verified by recipient lookup, not just creation-call count)
 - For each: recipient, subject, tier classification, key finding
 - Any accounts you couldn't audit (errors, access issues)
+- Any drafts that needed re-creation after a thread-collision delete
 
 ## Batch Processing
 
