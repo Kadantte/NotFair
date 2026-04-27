@@ -1,3 +1,4 @@
+import { enums } from "google-ads-api";
 import { getCachedCustomer, getClient, getCustomer, MATCH_TYPE_NAME } from "./client";
 import { readOnlyConversionActionReason } from "./campaign-ops";
 import { extractErrorMessage, formatDate, getDateRange, micros, normalizeCustomerId, safeEntityId } from "./helpers";
@@ -1440,8 +1441,12 @@ export async function getRecommendations(
       const rec = row.recommendation ?? {};
       // resource_name format: customers/{cid}/campaigns/{id} — extract last segment
       const campId = rec.campaign ? (rec.campaign.match(/\/campaigns\/(\d+)$/)?.[1] ?? null) : null;
+      // GAQL returns enum as numeric code; map to its name via the lib's enum.
+      const typeName = typeof rec.type === "number"
+        ? (enums.RecommendationType[rec.type] ?? "UNKNOWN")
+        : (typeof rec.type === "string" ? rec.type : "UNKNOWN");
       return {
-        type: String(rec.type ?? "UNKNOWN"),
+        type: typeName,
         campaignId: campId ?? null,
       };
     });
