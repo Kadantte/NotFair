@@ -38,6 +38,7 @@ import {
   updateCampaignGoalConfig,
   createConversionAction,
   updateConversionAction,
+  removeConversionAction,
   uploadClickConversions,
   pausePmaxAssetGroup,
   enablePmaxAssetGroup,
@@ -1062,7 +1063,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("updateConversionAction", {
-    description: "Update an existing conversion action's settings — promote secondary to primary, change value, toggle status. Use getConversionActions to find the conversionActionId first. Returns changeId.",
+    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename. Call getConversionActions first and only pass IDs where `mutable: true`; conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, and manager-inherited actions are read-only via the API. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       conversionActionId: z.string().describe("Conversion action ID (query conversion_action via runScript)"),
@@ -1077,8 +1078,8 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       countingType: z.enum(["ONE_PER_CLICK", "MANY_PER_CLICK"]).optional(),
       defaultValue: z.number().optional().describe("Default conversion value in account currency"),
       alwaysUseDefaultValue: z.boolean().optional(),
-      status: z.enum(["ENABLED", "REMOVED"]).optional()
-        .describe("ENABLED = active, REMOVED = permanently delete"),
+      status: z.enum(["ENABLED"]).optional()
+        .describe("ENABLED = active. To delete, use removeConversionAction instead — Google rejects status=REMOVED on update."),
       primaryForGoal: z.boolean().optional()
         .describe("true = primary (included in Conversions column for bidding), false = secondary (observation only)"),
       enhancedConversionsForLeads: z.boolean().optional()
@@ -1094,6 +1095,21 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue,
         status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
       }),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("removeConversionAction", {
+    description: "Permanently delete a conversion action. Not undoable. Use this instead of updateConversionAction with status=REMOVED — Google rejects that with request_error=18. Read-only conversion actions (GA4/UA/Floodlight imports, Smart Campaign auto-actions, manager-owned, etc.) cannot be removed via the API; modify them in the source system. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      conversionActionId: z.string().describe("Conversion action ID to permanently delete"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, conversionActionId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () =>
+      removeConversionAction(targetAuth, conversionActionId),
     );
     return typedResult(result);
   }));
@@ -1679,16 +1695,22 @@ export async function executeUndoForChange(
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous name was not recorded" };
       return renameAdGroup(auth, change.campaignId ?? "", entityId, beforeValue);
     case "create_conversion_action":
-      // Undo creation by setting status to REMOVED
-      return updateConversionAction(auth, { conversionActionId: entityId, status: "REMOVED" });
+      // Undo creation via the canonical remove operation. Setting status=REMOVED
+      // through update is rejected by Google (request_error=18).
+      return removeConversionAction(auth, entityId);
     case "update_conversion_action": {
       if (!beforeValue) return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: previous conversion action state not recorded" };
       try {
         const prev = JSON.parse(beforeValue) as Record<string, unknown>;
+        // status=REMOVED is not settable via update — if the previous state was
+        // REMOVED, restoring it requires the remove operation. ENABLED is the
+        // only valid status mutation value, so coerce anything else to undefined
+        // and the caller's status field stays unchanged.
+        const prevStatus = typeof prev.status === "string" && prev.status === "ENABLED" ? "ENABLED" : undefined;
         return updateConversionAction(auth, {
           conversionActionId: entityId,
           name: prev.name as string | undefined,
-          status: prev.status as string | undefined,
+          status: prevStatus,
           category: prev.category as string | undefined,
           countingType: prev.countingType as string | undefined,
           defaultValue: prev.defaultValue as number | undefined,

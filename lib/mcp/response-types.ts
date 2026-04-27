@@ -127,6 +127,7 @@ export type MoveKeywordsResponse = WriteToolResponse;
 // Conversion actions
 export type CreateConversionActionResponse = WriteToolResponse;
 export type UpdateConversionActionResponse = WriteToolResponse;
+export type RemoveConversionActionResponse = WriteToolResponse;
 
 // Performance Max
 export type PausePmaxAssetGroupResponse = WriteToolResponse;
@@ -243,6 +244,7 @@ export interface McpToolResponseRegistry {
   updateCampaignSettings: UpdateCampaignSettingsResponse;
   createConversionAction: CreateConversionActionResponse;
   updateConversionAction: UpdateConversionActionResponse;
+  removeConversionAction: RemoveConversionActionResponse;
   uploadClickConversions: UploadClickConversionsResponse;
   setGuardrails: SetGuardrailsResponse;
   getGuardrails: GetGuardrailsResponse;

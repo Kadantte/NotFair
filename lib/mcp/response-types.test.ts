@@ -122,6 +122,7 @@ describe("response-types — registry completeness", () => {
       updateCampaignSettings: true,
       createConversionAction: true,
       updateConversionAction: true,
+      removeConversionAction: true,
       uploadClickConversions: true,
       setGuardrails: true,
       getGuardrails: true,

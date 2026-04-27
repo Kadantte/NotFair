@@ -1,5 +1,5 @@
 import { getCachedCustomer, getCustomer, AD_GROUP_TYPE, MATCH_TYPE, STATUS } from "./client";
-import { extractErrorMessage, extractPolicyDetails, isValidFinalUrl, normalizeCustomerId, rewriteRemovedResourceError, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
+import { extractErrorMessage, extractPolicyDetails, isValidFinalUrl, normalizeCustomerId, rewriteConversionActionMutateError, rewriteRemovedResourceError, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
 
 // ─── Create Campaign ─────────────────────────────────────────────────
@@ -764,7 +764,7 @@ const READ_ONLY_CONVERSION_ACTION_TYPES = new Map<number, string>([
  * GAQL may return either numeric protobuf values or string enum names depending
  * on the client version, so we accept both.
  */
-function readOnlyConversionActionReason(
+export function readOnlyConversionActionReason(
   cid: string,
   conversionActionId: string,
   rawType: unknown,
@@ -841,7 +841,7 @@ async function setPrimaryForGoal(
     ]);
     return null;
   } catch (error) {
-    return extractErrorMessage(error);
+    return rewriteConversionActionMutateError(extractErrorMessage(error), conversionActionId);
   }
 }
 
@@ -1149,7 +1149,85 @@ export async function updateConversionAction(
       entityId: params.conversionActionId,
       beforeValue,
       afterValue,
-      error: extractErrorMessage(error),
+      error: rewriteConversionActionMutateError(extractErrorMessage(error), params.conversionActionId),
+    };
+  }
+}
+
+/**
+ * Permanently remove a conversion action. Setting `status: REMOVED` via update
+ * is rejected by Google with `request_error=18` (UNUSABLE_ENUM_VALUE) — the
+ * canonical delete is the `remove` operation on ConversionActionService. This
+ * is not undoable: removed conversion actions are gone.
+ */
+export async function removeConversionAction(
+  auth: AuthContext,
+  conversionActionId: string,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+
+  // Snapshot type + owner so we (a) write a useful beforeValue for the audit
+  // trail and (b) can preempt the same read-only failure modes that update has.
+  let beforeValue = "";
+  let rawType: unknown;
+  let ownerCustomer: unknown;
+  try {
+    const current = await customer.query(`
+      SELECT
+        conversion_action.name,
+        conversion_action.status,
+        conversion_action.type,
+        conversion_action.owner_customer
+      FROM conversion_action
+      WHERE conversion_action.id = ${safeEntityId(conversionActionId, "conversion action")}
+      LIMIT 1
+    `);
+    const row = (current as any[])[0]?.conversion_action ?? {};
+    rawType = row.type;
+    ownerCustomer = row.owner_customer;
+    beforeValue = JSON.stringify({ name: row.name, status: row.status, type: row.type });
+  } catch (fetchError) {
+    return {
+      success: false,
+      action: "remove_conversion_action",
+      entityId: conversionActionId,
+      beforeValue: "",
+      afterValue: "",
+      error: `Could not read current conversion action before removing: ${extractErrorMessage(fetchError)}`,
+    };
+  }
+
+  const readOnlyReason = readOnlyConversionActionReason(cid, conversionActionId, rawType, ownerCustomer);
+  if (readOnlyReason) {
+    return {
+      success: false,
+      action: "remove_conversion_action",
+      entityId: conversionActionId,
+      beforeValue,
+      afterValue: "",
+      error: readOnlyReason,
+    };
+  }
+
+  const resourceName = `customers/${cid}/conversionActions/${conversionActionId}`;
+  try {
+    await customer.conversionActions.remove([resourceName]);
+    return {
+      success: true,
+      action: "remove_conversion_action",
+      entityId: conversionActionId,
+      beforeValue,
+      afterValue: "removed",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "remove_conversion_action",
+      entityId: conversionActionId,
+      beforeValue,
+      afterValue: "",
+      error: rewriteConversionActionMutateError(extractErrorMessage(error), conversionActionId),
     };
   }
 }

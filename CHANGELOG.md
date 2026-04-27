@@ -2,6 +2,16 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.11] - 2026-04-26
+
+### Added
+- **`removeConversionAction` MCP tool.** Permanently deletes a conversion action via the canonical `ConversionActionService.remove` operation. Replaces the old "set status to REMOVED via update" pattern, which Google rejects with `request_error=18` (UNUSABLE_ENUM_VALUE). Telemetry over the last 30 days showed 9 of 71 `updateConversionAction` errors were agents trying this exact pattern; they now have a tool that works. Read-only conversion actions (GA4/UA/Floodlight imports, Smart Campaign auto-actions, manager-owned, etc.) are pre-flight rejected with the same friendly message used by `updateConversionAction`.
+- **`mutable` and `readOnlyReason` fields on `getConversionActions` response.** Each row now reports whether `updateConversionAction` / `removeConversionAction` will accept it, and if not, why ("Conversion action X has type GOOGLE_ANALYTICS_4_PURCHASE and is read-only via the API. Modify it in the Google Ads UI or its source system."). Agents can filter `mutable: true` before bulk demote/promote sweeps instead of fan-out-and-discover. The pattern showed up in telemetry as one user firing 24 distinct mutate calls in 10 hours and another firing 10 in 10 seconds, all hitting read-only conversion actions.
+
+### Changed
+- **`updateConversionAction` schema drops `status: "REMOVED"`.** Google rejects this combination, so accepting it in the schema only routed agents to a guaranteed failure. Tool description now points agents at `removeConversionAction` for deletes and tells them to filter `getConversionActions` on `mutable: true` first.
+- **Catch-side rewriter for `mutate_error=9` on conversion actions.** The type-based pre-flight in `updateConversionAction` (PR #72) catches the obvious read-only types but cannot detect every case, e.g. auto-generated `WEBPAGE_ONCLICK` lead-form conversions. When Google rejects with the cryptic `Mutates are not allowed for the requested resource. (mutate_error=9)`, we now wrap it with the same actionable explanation the pre-flight uses, while preserving the underlying error code for telemetry/grep. Verified empirically with `validate_only: true` against real GA-imported, GoogleHosted, StoreVisits, and lead-form conversion actions in `scripts/test-conversion-action-mutability.ts`.
+
 ## [0.3.0.10] - 2026-04-26
 
 ### Changed

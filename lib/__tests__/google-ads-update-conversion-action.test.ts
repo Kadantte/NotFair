@@ -16,7 +16,7 @@ vi.mock("google-ads-api", () => ({
   },
 }));
 
-import { updateConversionAction } from "@/lib/google-ads";
+import { removeConversionAction, updateConversionAction } from "@/lib/google-ads";
 
 const auth = {
   refreshToken: "refresh-token",
@@ -186,6 +186,109 @@ describe("updateConversionAction", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Setting primary_for_goal failed/);
+    expect(result.error).toMatch(/mutate_error=9/);
+  });
+
+  it("rewrites mutate_error=9 from Google into a read-only friendly message even for types not in the preflight list", async () => {
+    // Type 29 WEBPAGE_ONCLICK isn't in our READ_ONLY list, so preflight passes,
+    // but Google still rejects (e.g. auto-generated Lead Form conversion action).
+    // The catch-side rewriter must turn the cryptic mutate_error=9 into a
+    // useful, agent-actionable message.
+    setRow({
+      name: "Lead form - Submit",
+      type: 29,
+      owner_customer: "customers/1301265570",
+    });
+    mockMutateResources.mockRejectedValueOnce(new Error("Mutates are not allowed for the requested resource. (mutate_error=9)"));
+
+    const result = await updateConversionAction(auth, {
+      conversionActionId: "2222",
+      primaryForGoal: false,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Conversion action 2222 is read-only via the Google Ads API/);
+    expect(result.error).toMatch(/Lead Form|GA4|Floodlight/);
+    // The original error code is preserved for log analysis.
+    expect(result.error).toMatch(/mutate_error=9/);
+  });
+});
+
+describe("removeConversionAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCustomerFactory.mockReturnValue({
+      mutateResources: mockMutateResources,
+      query: mockQuery,
+      conversionActions: { remove: vi.fn().mockResolvedValue({}) },
+    });
+  });
+
+  it("calls the remove operation on the conversion_action service for mutable actions", async () => {
+    setRow({
+      name: "Mutable action",
+      status: 2,
+      type: 7, // UPLOAD_CLICKS — mutable
+      owner_customer: "customers/1301265570",
+    });
+    const removeMock = vi.fn().mockResolvedValue({});
+    mockCustomerFactory.mockReturnValue({
+      mutateResources: mockMutateResources,
+      query: mockQuery,
+      conversionActions: { remove: removeMock },
+    });
+
+    const result = await removeConversionAction(auth, "1111");
+
+    expect(result.success).toBe(true);
+    expect(result.action).toBe("remove_conversion_action");
+    expect(removeMock).toHaveBeenCalledWith([
+      "customers/1301265570/conversionActions/1111",
+    ]);
+  });
+
+  it("refuses to remove read-only conversion actions (e.g. GA4 imports) without calling Google", async () => {
+    setRow({
+      name: "GA4 Purchase",
+      status: 2,
+      type: 41, // GOOGLE_ANALYTICS_4_PURCHASE — read-only
+      owner_customer: "customers/1301265570",
+    });
+    const removeMock = vi.fn();
+    mockCustomerFactory.mockReturnValue({
+      mutateResources: mockMutateResources,
+      query: mockQuery,
+      conversionActions: { remove: removeMock },
+    });
+
+    const result = await removeConversionAction(auth, "9999");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/GOOGLE_ANALYTICS_4_PURCHASE/);
+    expect(result.error).toMatch(/read-only/i);
+    expect(removeMock).not.toHaveBeenCalled();
+  });
+
+  it("rewrites mutate_error=9 from the remove call into a friendly message", async () => {
+    setRow({
+      name: "Lead form - Submit",
+      status: 2,
+      type: 29, // WEBPAGE_ONCLICK — passes preflight, Google rejects anyway
+      owner_customer: "customers/1301265570",
+    });
+    const removeMock = vi.fn().mockRejectedValue(
+      new Error("Mutates are not allowed for the requested resource. (mutate_error=9)"),
+    );
+    mockCustomerFactory.mockReturnValue({
+      mutateResources: mockMutateResources,
+      query: mockQuery,
+      conversionActions: { remove: removeMock },
+    });
+
+    const result = await removeConversionAction(auth, "8888");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Conversion action 8888 is read-only/);
     expect(result.error).toMatch(/mutate_error=9/);
   });
 });
