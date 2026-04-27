@@ -5,13 +5,13 @@ const {
   mockSelectLimit,
   mockUpdateWhere,
   mockDeleteWhere,
-  mockListAccessibleCustomers,
+  mockListConnectableAccounts,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectLimit: vi.fn(),
   mockUpdateWhere: vi.fn(),
   mockDeleteWhere: vi.fn(),
-  mockListAccessibleCustomers: vi.fn(),
+  mockListConnectableAccounts: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -31,7 +31,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 vi.mock("@/lib/google-ads", () => ({
-  listAccessibleCustomers: mockListAccessibleCustomers,
+  listConnectableAccounts: mockListConnectableAccounts,
   deriveCustomerName: vi.fn((raw: string | null | undefined) => {
     if (!raw) return "Google Ads Account";
     try {
@@ -131,10 +131,13 @@ describe("Select account route — POST", () => {
     ]);
     mockUpdateWhere.mockResolvedValue(undefined);
     mockDeleteWhere.mockResolvedValue(undefined);
-    mockListAccessibleCustomers.mockResolvedValue([
-      { id: "1234567890", name: "Existing Account", isManager: false },
-      { id: "0987654321", name: "New Account", isManager: false },
-    ]);
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        { id: "1234567890", name: "Existing Account" },
+        { id: "0987654321", name: "New Account" },
+      ],
+      managers: [],
+    });
   });
 
   // ─── Non-pending (account switcher) flow ─────────────────────────────
@@ -149,7 +152,7 @@ describe("Select account route — POST", () => {
       }),
     );
 
-    expect(mockListAccessibleCustomers).toHaveBeenCalledWith("refresh-token");
+    expect(mockListConnectableAccounts).toHaveBeenCalledWith("refresh-token");
     expect(mockUpdateWhere).toHaveBeenCalled();
     expect(mockDeleteWhere).toHaveBeenCalled();
     expect(response.status).toBe(200);
@@ -169,9 +172,10 @@ describe("Select account route — POST", () => {
   });
 
   it("returns 403 when selected account is not accessible", async () => {
-    mockListAccessibleCustomers.mockResolvedValue([
-      { id: "1234567890", name: "Existing Account", isManager: false },
-    ]);
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [{ id: "1234567890", name: "Existing Account" }],
+      managers: [],
+    });
 
     const response = await POST(
       makeRequest({
@@ -203,7 +207,7 @@ describe("Select account route — POST", () => {
 
       expect(response.status).toBe(200);
       // Must NOT have called listAccessibleCustomers — pre-validated skips Google re-query
-      expect(mockListAccessibleCustomers).not.toHaveBeenCalled();
+      expect(mockListConnectableAccounts).not.toHaveBeenCalled();
 
       // The DB update should include loginCustomerId from the stored server-side data
       expect(mockUpdateWhere).toHaveBeenCalled();
@@ -225,7 +229,7 @@ describe("Select account route — POST", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockListAccessibleCustomers).not.toHaveBeenCalled();
+      expect(mockListConnectableAccounts).not.toHaveBeenCalled();
     });
 
     it("returns 403 when a selected account is not in the server-stored pre-validated set", async () => {
@@ -240,33 +244,37 @@ describe("Select account route — POST", () => {
       expect(response.status).toBe(403);
       const body = await response.json();
       expect(body.error).toContain("FORGED_ID");
-      expect(mockListAccessibleCustomers).not.toHaveBeenCalled();
+      expect(mockListConnectableAccounts).not.toHaveBeenCalled();
     });
 
-    it("returns 400 when selected accounts span different manager accounts", async () => {
-      // Store accounts with different loginCustomerIds (two different managers)
-      const crossManagerAccounts = JSON.stringify([
-        { id: "1111111111", name: "Client A", loginCustomerId: "9999999999" },
-        { id: "2222222222", name: "Client B", loginCustomerId: "8888888888" }, // different manager
+    it("accepts accounts from different sources and persists per-account loginCustomerId", async () => {
+      // Mixed: a direct account + clients under two different managers.
+      const mixedSourceAccounts = JSON.stringify([
+        { id: "1111111111", name: "Direct" },
+        { id: "2222222222", name: "Client A", loginCustomerId: "9999999999" },
+        { id: "3333333333", name: "Client B", loginCustomerId: "8888888888" },
       ]);
       mockSelectLimit.mockResolvedValue([
-        makePendingSession({ customerIds: crossManagerAccounts }),
+        makePendingSession({ customerIds: mixedSourceAccounts }),
       ]);
 
       const response = await POST(
         makeRequest({
           pendingToken: "pending-token-abc",
           accounts: [
-            { id: "1111111111", name: "Client A" },
-            { id: "2222222222", name: "Client B" },
+            { id: "1111111111", name: "Direct" },
+            { id: "2222222222", name: "Client A" },
+            { id: "3333333333", name: "Client B" },
           ],
           next: "/connect",
         }),
       );
 
-      expect(response.status).toBe(400);
-      const body = await response.json();
-      expect(body.error).toContain("different manager");
+      expect(response.status).toBe(200);
+      // Verify that each manager-routed account kept its loginCustomerId in the
+      // stored customerIds JSON (so authForAccount can pick the right manager
+      // per tool call). Direct accounts have no loginCustomerId field.
+      expect(mockUpdateWhere).toHaveBeenCalled();
     });
 
     it("does NOT trust loginCustomerId from the request body — reads from server-stored data", async () => {

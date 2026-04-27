@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockGetSessionAuth,
-  mockListAccessibleCustomers,
+  mockListConnectableAccounts,
 } = vi.hoisted(() => ({
   mockGetSessionAuth: vi.fn(),
-  mockListAccessibleCustomers: vi.fn(),
+  mockListConnectableAccounts: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({
@@ -13,13 +13,7 @@ vi.mock("@/lib/session", () => ({
 }));
 
 vi.mock("@/lib/google-ads", () => ({
-  listAccessibleCustomers: mockListAccessibleCustomers,
-  getUsableAccounts: <T extends { isManager: boolean }>(
-    customers: Array<T | { error: string }>,
-  ) => customers.filter((c): c is T => !("error" in c) && !c.isManager),
-  hasManagerAccount: <T extends { isManager: boolean }>(
-    customers: Array<T | { error: string }>,
-  ) => customers.some((c) => !("error" in c) && c.isManager),
+  listConnectableAccounts: mockListConnectableAccounts,
   parseCustomerIds: vi.fn((raw: string | null | undefined) => {
     if (!raw) return [];
     try {
@@ -60,10 +54,13 @@ describe("Add account route — GET", () => {
       googleEmail: "user@example.com",
     });
 
-    mockListAccessibleCustomers.mockResolvedValue([
-      { id: "1234567890", name: "Existing Account", isManager: false },
-      { id: "0987654321", name: "New Account", isManager: false },
-    ]);
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        { id: "1234567890", name: "Existing Account" },
+        { id: "0987654321", name: "New Account" },
+      ],
+      managers: [],
+    });
 
   });
 
@@ -71,7 +68,7 @@ describe("Add account route — GET", () => {
     const response = await GET();
 
     expect(mockGetSessionAuth).toHaveBeenCalled();
-    expect(mockListAccessibleCustomers).toHaveBeenCalledWith("refresh-token");
+    expect(mockListConnectableAccounts).toHaveBeenCalledWith("refresh-token");
 
     expect(response.status).toBe(307);
 
@@ -81,6 +78,50 @@ describe("Add account route — GET", () => {
     expect(location).toContain("selected=");
     expect(decodeURIComponent(location)).toContain('"1234567890"');
     expect(decodeURIComponent(location)).toContain("New Account");
+  });
+
+  it("includes manager-routed clients with loginCustomerId in the redirect", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        { id: "1234567890", name: "Direct Account" },
+        {
+          id: "5555555555",
+          name: "Client A",
+          loginCustomerId: "9999999999",
+          loginCustomerName: "Acme MCC",
+        },
+      ],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const response = await GET();
+    const location = response.headers.get("location") ?? "";
+    const decoded = decodeURIComponent(location);
+
+    expect(decoded).toContain('"loginCustomerId":"9999999999"');
+    expect(decoded).toContain('"loginCustomerName":"Acme MCC"');
+  });
+
+  it("returns NO_CLIENT_ACCOUNTS error when only managers exist with no clients", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [],
+      managers: [{ id: "9999999999", name: "Empty MCC" }],
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("No%20client%20accounts%20found");
+  });
+
+  it("returns NO_ACCOUNTS error when no accounts at all", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [],
+      managers: [],
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("doesn%27t%20have%20a%20Google%20Ads%20account");
   });
 
   it("redirects back to connect with an error when session auth is unavailable", async () => {

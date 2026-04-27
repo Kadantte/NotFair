@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
-import { getUsableAccounts, hasManagerAccount, listAccessibleCustomers, parseCustomerIds } from "@/lib/google-ads";
+import { listConnectableAccounts, parseCustomerIds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth-errors";
 
@@ -21,12 +21,11 @@ function describeError(error: unknown) {
 export async function GET() {
   try {
     const session = await getSessionAuth();
-    const customers = await listAccessibleCustomers(session.refreshToken);
-    const usableAccounts = getUsableAccounts(customers);
+    const { accounts: usableAccounts, managers } = await listConnectableAccounts(session.refreshToken);
 
     if (usableAccounts.length === 0) {
       return redirectWithError(
-        hasManagerAccount(customers)
+        managers.length > 0
           ? AUTH_ERROR_MESSAGES.NO_CLIENT_ACCOUNTS
           : AUTH_ERROR_MESSAGES.NO_ACCOUNTS,
       );
@@ -34,7 +33,11 @@ export async function GET() {
 
     const accountsParam = encodeURIComponent(
       JSON.stringify(
-        usableAccounts.map((account) => ({ id: account.id, name: account.name })),
+        usableAccounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          ...(a.loginCustomerId ? { loginCustomerId: a.loginCustomerId, loginCustomerName: a.loginCustomerName } : {}),
+        })),
       ),
     );
     const selectedParam = encodeURIComponent(

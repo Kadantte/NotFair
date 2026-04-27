@@ -88,18 +88,6 @@ export async function getAccountBudgetSummary(auth: AuthContext) {
   };
 }
 
-export function getUsableAccounts<T extends { isManager: boolean }>(
-  customers: Array<T | { error: string }>,
-): T[] {
-  return customers.filter((c): c is T => !("error" in c) && !c.isManager);
-}
-
-export function hasManagerAccount<T extends { isManager: boolean }>(
-  customers: Array<T | { error: string }>,
-): boolean {
-  return customers.some((c) => !("error" in c) && c.isManager);
-}
-
 export async function listAccessibleCustomers(refreshToken: string) {
   const client = getClient();
   const response = (await client.listAccessibleCustomers(refreshToken)) as {
@@ -125,6 +113,81 @@ export async function listAccessibleCustomers(refreshToken: string) {
       }
     }),
   );
+}
+
+/**
+ * Account that the user can connect — flat list combining direct-access
+ * accounts and clients reachable through a manager (MCC) account.
+ *
+ * `loginCustomerId` is set when the only path to the account is via a
+ * manager; the API requires this header for cross-account calls.
+ */
+export type ConnectableAccount = {
+  id: string;
+  name: string;
+  loginCustomerId?: string;
+  loginCustomerName?: string;
+};
+
+/** Cap concurrent manager expansions to avoid quota / latency blow-ups. */
+const MAX_MANAGERS_TO_EXPAND = 10;
+
+/**
+ * Resolve the full set of accounts the user can connect to: direct-access
+ * accounts plus every active client account reachable via any manager (MCC)
+ * the user has direct access to. Direct-access wins on dedup so we don't
+ * carry an unnecessary `login_customer_id` on every API call.
+ */
+export async function listConnectableAccounts(
+  refreshToken: string,
+): Promise<{
+  accounts: ConnectableAccount[];
+  managers: { id: string; name: string }[];
+}> {
+  const customers = await listAccessibleCustomers(refreshToken);
+
+  const direct: ConnectableAccount[] = [];
+  const managers: { id: string; name: string }[] = [];
+  for (const c of customers) {
+    if ("error" in c) continue;
+    if (c.isManager) {
+      managers.push({ id: c.id, name: c.name || `Manager ${c.id}` });
+    } else {
+      direct.push({ id: c.id, name: c.name || "" });
+    }
+  }
+
+  const managersToExpand = managers.slice(0, MAX_MANAGERS_TO_EXPAND);
+  const expansions = await Promise.all(
+    managersToExpand.map(async (mgr) => {
+      try {
+        const clients = await listClientAccountsUnderManager(refreshToken, mgr.id);
+        return clients.map((c) => ({
+          id: c.id,
+          name: c.name || "Untitled account",
+          loginCustomerId: mgr.id,
+          loginCustomerName: mgr.name,
+        }));
+      } catch (err) {
+        console.warn(`[listConnectableAccounts] Failed to expand manager ${mgr.id}:`, err);
+        return [] as ConnectableAccount[];
+      }
+    }),
+  );
+
+  // Direct wins on dedup so we don't carry an unnecessary login_customer_id on
+  // every API call. Within manager-routed accounts, first manager wins.
+  const seen = new Set(direct.map((a) => a.id));
+  const managerRouted: ConnectableAccount[] = [];
+  for (const list of expansions) {
+    for (const account of list) {
+      if (seen.has(account.id)) continue;
+      seen.add(account.id);
+      managerRouted.push(account);
+    }
+  }
+
+  return { accounts: [...direct, ...managerRouted], managers };
 }
 
 /**

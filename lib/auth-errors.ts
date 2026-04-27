@@ -40,8 +40,6 @@ export const AUTH_ERROR_MESSAGES = {
     "This Google account doesn't have a Google Ads account. Sign in with a Google account that has access to at least one Google Ads account, or create one at ads.google.com first.",
   NO_CLIENT_ACCOUNTS:
     "No client accounts found under your manager account. Make sure you have at least one active Google Ads client account.",
-  MANAGER_ONLY_UNSUPPORTED:
-    "No Google Ads client accounts found. You only have manager (MCC) accounts, which aren't supported yet — connect with a Google account that has access to a regular Google Ads account.",
 } as const;
 
 // Error-string signals from google-ads-api's ListAccessibleCustomers RPC

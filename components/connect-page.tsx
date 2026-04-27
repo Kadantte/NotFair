@@ -735,24 +735,53 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     const customerName = urlCustomerName || (session.connected ? session.customerName : null);
     const actionBtnClass = 'flex items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-2 text-sm text-[#C4C0B6] transition-all hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]';
 
-    const accounts = useMemo(() => {
-        if (!accountsParam) return [] as { id: string; name: string }[];
+    type SelectableAccount = {
+        id: string;
+        name: string;
+        loginCustomerId?: string;
+        loginCustomerName?: string;
+    };
+
+    const accounts = useMemo<SelectableAccount[]>(() => {
+        if (!accountsParam) return [];
         try {
             const parsed = JSON.parse(accountsParam);
-            if (!Array.isArray(parsed)) return [] as { id: string; name: string }[];
+            if (!Array.isArray(parsed)) return [];
             return parsed.filter(
-                (account: unknown): account is { id: string; name: string } =>
+                (account: unknown): account is SelectableAccount =>
                     typeof account === 'object' &&
                     account !== null &&
                     'id' in account &&
-                    typeof account.id === 'string' &&
+                    typeof (account as { id: unknown }).id === 'string' &&
                     'name' in account &&
-                    typeof account.name === 'string',
+                    typeof (account as { name: unknown }).name === 'string',
             );
         } catch {
-            return [] as { id: string; name: string }[];
+            return [];
         }
     }, [accountsParam]);
+
+    // Group accounts: direct first, then by manager. Used to render section
+    // headers ("Via manager: Acme MCC") so users see the manager grouping.
+    const accountGroups = useMemo(() => {
+        const groups = new Map<string, { key: string; label: string; isManager: boolean; accounts: SelectableAccount[] }>();
+        for (const a of accounts) {
+            const key = a.loginCustomerId ?? '__direct__';
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    label: a.loginCustomerId
+                        ? a.loginCustomerName || `Manager ${a.loginCustomerId}`
+                        : 'Direct access',
+                    isManager: !!a.loginCustomerId,
+                    accounts: [],
+                });
+            }
+            groups.get(key)!.accounts.push(a);
+        }
+        return Array.from(groups.values());
+    }, [accounts]);
+
 
     const preselectedAccountIds = useMemo(() => {
         if (!selectedParam) return [] as string[];
@@ -833,12 +862,9 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     }
 
     function toggleAccount(accountId: string) {
-        setSelectedAccounts(prev => {
-            if (prev.includes(accountId)) {
-                return prev.filter(id => id !== accountId);
-            }
-            return [...prev, accountId];
-        });
+        setSelectedAccounts(prev =>
+            prev.includes(accountId) ? prev.filter(id => id !== accountId) : [...prev, accountId],
+        );
     }
 
     async function submitSelectedAccounts() {
@@ -983,30 +1009,48 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                             <p className="max-w-md text-lg text-[#C4C0B6]">
                                 Which Google Ads accounts do you want to manage?
                             </p>
-                            <div className="w-full max-w-md space-y-3">
-                                {accounts.map(account => {
-                                    const isSelected = selectedAccounts.includes(account.id);
-                                    return (
-                                        <button
-                                            key={account.id}
-                                            onClick={() => toggleAccount(account.id)}
-                                            disabled={selecting}
-                                            className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${isSelected
-                                                    ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
-                                                    : 'border-[#3D3C36] bg-[#24231F] hover:border-[#C4C0B6]/40 hover:bg-[#2E2D28]'
-                                                }`}
-                                        >
-                                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#C4C0B6]/40'
-                                                }`}>
-                                                {isSelected && <Check className="h-3 w-3 text-[#1A1917]" />}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-[#E8E4DD]">{account.name}</p>
-                                                <p className="mt-0.5 text-sm text-[#C4C0B6]">{account.id}</p>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                            <div className="w-full max-w-md space-y-5">
+                                {accountGroups.map(group => (
+                                    <div key={group.key} className="space-y-2">
+                                        <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#C4C0B6]/80">
+                                            {group.isManager ? (
+                                                <>
+                                                    <span>Via manager</span>
+                                                    <span className="rounded-md border border-[#3D3C36] bg-[#1A1917] px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-[#E8E4DD]">
+                                                        {group.label}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <span>Direct access</span>
+                                            )}
+                                        </div>
+                                        <div className="space-y-3">
+                                            {group.accounts.map(account => {
+                                                const isSelected = selectedAccounts.includes(account.id);
+                                                return (
+                                                    <button
+                                                        key={account.id}
+                                                        onClick={() => toggleAccount(account.id)}
+                                                        disabled={selecting}
+                                                        className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${isSelected
+                                                                ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
+                                                                : 'border-[#3D3C36] bg-[#24231F] hover:border-[#C4C0B6]/40 hover:bg-[#2E2D28]'
+                                                            }`}
+                                                    >
+                                                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#C4C0B6]/40'
+                                                            }`}>
+                                                            {isSelected && <Check className="h-3 w-3 text-[#1A1917]" />}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-[#E8E4DD]">{account.name}</p>
+                                                            <p className="mt-0.5 text-sm text-[#C4C0B6]">{account.id}</p>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                             {selectedAccounts.length > 0 && (
                                 <p className="text-sm text-[#C4C0B6]">

@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { clearSessionCookies, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
-import { deriveCustomerName, getUsableAccounts, hasManagerAccount, listAccessibleCustomers, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
+import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
@@ -145,7 +145,7 @@ function popupErrorResponse(origin: string, message: string) {
 }
 
 function popupAccountSelectionResponse(
-  accounts: { id: string; name: string }[],
+  accounts: ConnectableAccount[],
   pendingToken: string,
   origin: string,
 ) {
@@ -160,9 +160,13 @@ function popupAccountSelectionResponse(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family: system-ui, sans-serif; background: #09090b; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .container { max-width: 360px; width: 100%; padding: 24px; text-align: center; }
+    .container { max-width: 380px; width: 100%; padding: 24px; text-align: center; }
     h2 { font-size: 20px; margin-bottom: 8px; }
     p { color: #a1a1aa; font-size: 14px; margin-bottom: 16px; }
+    .group { margin-bottom: 16px; text-align: left; }
+    .group-header { display: flex; align-items: center; gap: 6px; margin: 12px 4px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #a1a1aa; }
+    .group-header.manager { color: #c4c0b6; }
+    .badge { display: inline-block; padding: 2px 6px; background: #27272a; border-radius: 6px; font-size: 10px; font-weight: 500; color: #d4d4d8; text-transform: none; letter-spacing: 0; }
     .account { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; margin-bottom: 8px; background: #18181b; border: 1px solid #27272a; border-radius: 12px; color: #fff; text-align: left; cursor: pointer; font-size: 14px; transition: all 0.15s; }
     .account:hover { background: #27272a; border-color: #3f3f46; }
     .account.selected { border-color: #22c55e; background: #052e16; }
@@ -206,43 +210,75 @@ function popupAccountSelectionResponse(
     if (!window.opener) { document.querySelector('p').textContent = 'This page must be opened from the app.'; }
     else {
       const container = document.getElementById('accounts');
-      accounts.forEach(a => {
-        const div = document.createElement('div');
-        div.className = 'account';
-        div.dataset.id = a.id;
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        const info = document.createElement('div');
-        info.className = 'account-info';
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'name';
-        nameDiv.textContent = a.name;
-        const idDiv = document.createElement('div');
-        idDiv.className = 'id';
-        idDiv.textContent = a.id;
-        info.appendChild(nameDiv);
-        info.appendChild(idDiv);
-        div.appendChild(cb);
-        div.appendChild(info);
-        div.onclick = (e) => {
-          if (e.target === cb) return;
-          cb.checked = !cb.checked;
-          if (cb.checked) selected.add(a.id); else selected.delete(a.id);
-          updateUI();
-        };
-        cb.onchange = () => {
-          if (cb.checked) selected.add(a.id); else selected.delete(a.id);
-          updateUI();
-        };
-        container.appendChild(div);
-      });
+
+      // Group accounts: direct first, then by manager
+      const groups = new Map();
+      for (const a of accounts) {
+        const key = a.loginCustomerId || '__direct__';
+        const label = a.loginCustomerId ? a.loginCustomerName || ('Manager ' + a.loginCustomerId) : 'Direct access';
+        if (!groups.has(key)) groups.set(key, { label, isManager: !!a.loginCustomerId, accounts: [] });
+        groups.get(key).accounts.push(a);
+      }
+
+      for (const [, group] of groups) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'group';
+
+        const header = document.createElement('div');
+        header.className = 'group-header' + (group.isManager ? ' manager' : '');
+        if (group.isManager) {
+          const labelText = document.createElement('span');
+          labelText.textContent = 'Via manager:';
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = group.label;
+          header.appendChild(labelText);
+          header.appendChild(badge);
+        } else {
+          header.textContent = group.label;
+        }
+        groupDiv.appendChild(header);
+
+        group.accounts.forEach(a => {
+          const div = document.createElement('div');
+          div.className = 'account';
+          div.dataset.id = a.id;
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          const info = document.createElement('div');
+          info.className = 'account-info';
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'name';
+          nameDiv.textContent = a.name || 'Untitled account';
+          const idDiv = document.createElement('div');
+          idDiv.className = 'id';
+          idDiv.textContent = a.id;
+          info.appendChild(nameDiv);
+          info.appendChild(idDiv);
+          div.appendChild(cb);
+          div.appendChild(info);
+          div.onclick = (e) => {
+            if (e.target === cb) return;
+            cb.checked = !cb.checked;
+            if (cb.checked) selected.add(a.id); else selected.delete(a.id);
+            updateUI();
+          };
+          cb.onchange = () => {
+            if (cb.checked) selected.add(a.id); else selected.delete(a.id);
+            updateUI();
+          };
+          groupDiv.appendChild(div);
+        });
+
+        container.appendChild(groupDiv);
+      }
 
       document.getElementById('connectBtn').onclick = () => {
         const selectedAccounts = accounts.filter(a => selected.has(a.id));
         window.opener.postMessage({
           type: "GOOGLE_ADS_AUTH_SUCCESS",
           pendingToken,
-          accounts: selectedAccounts,
+          accounts: selectedAccounts.map(a => ({ id: a.id, name: a.name })),
           customerId: selectedAccounts[0].id,
           customerName: selectedAccounts[0].name,
         }, origin);
@@ -271,10 +307,10 @@ async function createOrRedirectGoogleAdsSession({
   popup: boolean;
   next: string;
 }) {
-  let customers;
+  let connectable;
 
   try {
-    customers = await listAccessibleCustomers(refreshToken);
+    connectable = await listConnectableAccounts(refreshToken);
   } catch (error) {
     console.error("[auth] Failed to load Google Ads accounts:", error);
     const msg = classifyAccountLoadError(describeError(error));
@@ -283,11 +319,12 @@ async function createOrRedirectGoogleAdsSession({
       : redirectWithError(origin, msg);
   }
 
-  const usableAccounts = getUsableAccounts(customers);
+  const usableAccounts = connectable.accounts;
+  const hasManager = connectable.managers.length > 0;
 
   if (usableAccounts.length === 0) {
-    const msg = hasManagerAccount(customers)
-      ? AUTH_ERROR_MESSAGES.MANAGER_ONLY_UNSUPPORTED
+    const msg = hasManager
+      ? AUTH_ERROR_MESSAGES.NO_CLIENT_ACCOUNTS
       : AUTH_ERROR_MESSAGES.NO_ACCOUNTS;
     const response = popup
       ? popupErrorResponse(origin, msg)
@@ -313,13 +350,18 @@ async function createOrRedirectGoogleAdsSession({
   if (usableAccounts.length === 1) {
     const account = usableAccounts[0];
     const accessToken = randomBytes(32).toString("hex");
-    const customerIds = JSON.stringify([{ id: account.id, name: account.name || "" }]);
+    // Emit loginCustomerId explicitly (string | null) so authForAccount can
+    // distinguish "direct" from "legacy fallback" for this entry.
+    const customerIds = JSON.stringify([
+      { id: account.id, name: account.name || "", loginCustomerId: account.loginCustomerId ?? null },
+    ]);
 
     await db().insert(schema.mcpSessions).values({
       accessToken,
       refreshToken,
       customerId: account.id,
       customerIds,
+      loginCustomerId: account.loginCustomerId ?? null,
       userId,
       googleEmail,
       expiresAt: expiresAt.toISOString(),
@@ -366,25 +408,38 @@ async function createOrRedirectGoogleAdsSession({
 
   const pendingToken = randomBytes(32).toString("hex");
 
+  // Pre-validated accounts stored on the pending session so /api/auth/select-account
+  // can verify the user's pick without a second round-trip to Google. Always emit
+  // loginCustomerId explicitly (string | null) so authForAccount has a clean signal
+  // for direct vs manager-routed instead of guessing from key absence.
+  const accountsList = usableAccounts.map((account) => ({
+    id: account.id,
+    name: account.name,
+    loginCustomerId: account.loginCustomerId ?? null,
+  }));
+
   await db().insert(schema.mcpSessions).values({
     accessToken: pendingToken,
     refreshToken,
     customerId: "",
+    customerIds: JSON.stringify(accountsList),
     userId,
     googleEmail,
     expiresAt: expiresAt.toISOString(),
   });
 
-  const accountsList = usableAccounts.map((account) => ({
-    id: account.id,
-    name: account.name,
-  }));
-
   if (popup) {
-    return popupAccountSelectionResponse(accountsList, pendingToken, origin);
+    return popupAccountSelectionResponse(usableAccounts, pendingToken, origin);
   }
 
-  const accountsParam = encodeURIComponent(JSON.stringify(accountsList));
+  // Send the full ConnectableAccount shape (including loginCustomerName for
+  // the manager group label) to the connect page UI.
+  const accountsForUi = usableAccounts.map((a) => ({
+    id: a.id,
+    name: a.name,
+    ...(a.loginCustomerId ? { loginCustomerId: a.loginCustomerId, loginCustomerName: a.loginCustomerName } : {}),
+  }));
+  const accountsParam = encodeURIComponent(JSON.stringify(accountsForUi));
   const nextParam = next !== "/connect" ? `&next=${encodeURIComponent(next)}` : "";
   return NextResponse.redirect(
     `${origin}/connect?pending=${pendingToken}&accounts=${accountsParam}${nextParam}`,

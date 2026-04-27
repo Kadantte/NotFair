@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
-import { listAccessibleCustomers, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
+import { listConnectableAccounts, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
@@ -94,34 +94,47 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify all selected account IDs are accessible.
-  // For pending sessions, we stored pre-validated accounts (including manager-routed ones)
-  // in customerIds during the OAuth callback — verify against those to avoid re-querying Google.
-  // For existing sessions (account switcher), fall back to listAccessibleCustomers.
+  // Verify all selected account IDs are accessible AND resolve loginCustomerId
+  // for any manager-routed selections.
+  //
+  // For pending sessions: the OAuth callback stored a pre-validated list
+  // (with loginCustomerId per account) in customerIds — trust that.
+  //
+  // For existing sessions (account switcher / add-account flow): re-query
+  // the user's connectable accounts (which expands managers into their
+  // clients) so we can validate manager-routed picks too.
   const storedAccounts = parseCustomerIds(session.customerIds ?? "[]");
   const isPreValidated = pendingToken && storedAccounts.length > 0;
 
+  type AuthorizedAccount = { id: string; name: string; loginCustomerId?: string };
+  let authorized: AuthorizedAccount[];
+
   if (isPreValidated) {
-    const storedIds = new Set(storedAccounts.map((a) => a.id));
-    const inaccessible = validAccounts.filter((a) => !storedIds.has(a.id));
-    if (inaccessible.length > 0) {
-      return NextResponse.json(
-        { error: `Account(s) not in authorized set: ${inaccessible.map((a) => a.id).join(", ")}` },
-        { status: 403 },
-      );
+    try {
+      authorized = JSON.parse(session.customerIds!) as AuthorizedAccount[];
+    } catch {
+      authorized = [];
     }
   } else {
-    const accessible = await listAccessibleCustomers(session.refreshToken);
-    const accessibleIds = new Set(
-      accessible.filter((c) => !("error" in c)).map((c) => c.id),
+    const { accounts } = await listConnectableAccounts(session.refreshToken);
+    authorized = accounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      ...(a.loginCustomerId ? { loginCustomerId: a.loginCustomerId } : {}),
+    }));
+  }
+
+  const authorizedById = new Map(authorized.map((a) => [a.id, a]));
+  const inaccessible = validAccounts.filter((a) => !authorizedById.has(a.id));
+  if (inaccessible.length > 0) {
+    return NextResponse.json(
+      {
+        error: isPreValidated
+          ? `Account(s) not in authorized set: ${inaccessible.map((a) => a.id).join(", ")}`
+          : `Account(s) not accessible: ${inaccessible.map((a) => a.id).join(", ")}`,
+      },
+      { status: 403 },
     );
-    const inaccessible = validAccounts.filter((a) => !accessibleIds.has(a.id));
-    if (inaccessible.length > 0) {
-      return NextResponse.json(
-        { error: `Account(s) not accessible: ${inaccessible.map((a) => a.id).join(", ")}` },
-        { status: 403 },
-      );
-    }
   }
 
   // Keep the current primary account if it remains selected; otherwise use the first selected account.
@@ -129,34 +142,26 @@ export async function POST(request: Request) {
     validAccounts.find((account) => account.id === session.customerId) ??
     validAccounts[0];
 
-  // For manager-routed accounts: look up loginCustomerId from the server-stored pre-validated
-  // data — do NOT trust loginCustomerId from the request body (client strips it, and it could
-  // be forged). Also enforce that all selected accounts belong to the same manager account.
-  let loginCustomerId: string | null = null;
-  if (isPreValidated && session.customerIds) {
-    try {
-      const stored: Array<{ id: string; name: string; loginCustomerId?: string }> = JSON.parse(
-        session.customerIds,
-      );
-      const managerIds = new Set(
-        validAccounts
-          .map((a) => stored.find((s) => s.id === a.id)?.loginCustomerId)
-          .filter((id): id is string => !!id),
-      );
-      if (managerIds.size > 1) {
-        return NextResponse.json(
-          { error: "Cannot connect accounts from different manager accounts in a single session." },
-          { status: 400 },
-        );
-      }
-      loginCustomerId = stored.find((s) => s.id === primaryAccount.id)?.loginCustomerId ?? null;
-    } catch {
-      // Malformed stored data — proceed without loginCustomerId
-    }
-  }
+  // Per-account loginCustomerId — always read from server-side authorized data,
+  // never trust the request body (a forged loginCustomerId could let a user act
+  // as a manager they don't have access to). Persisting it per-account here is
+  // what lets `authForAccount` swap the manager context per tool call, so a
+  // single session can mix direct-access and manager-routed accounts.
   const customerIds = JSON.stringify(
-    validAccounts.map((a) => ({ id: a.id, name: a.name || "" })),
+    validAccounts.map((a) => {
+      const authorized = authorizedById.get(a.id);
+      return {
+        id: a.id,
+        name: a.name || "",
+        loginCustomerId: authorized?.loginCustomerId ?? null,
+      };
+    }),
   );
+
+  // Session-level loginCustomerId tracks the primary account so legacy code
+  // paths that read `auth.loginCustomerId` directly (without going through
+  // `authForAccount`) still work for the default account.
+  const loginCustomerId = authorizedById.get(primaryAccount.id)?.loginCustomerId ?? null;
 
   await db()
     .update(schema.mcpSessions)

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockSignInWithIdToken,
   mockInsertValues,
-  mockListAccessibleCustomers,
+  mockListConnectableAccounts,
   mockSelectRows,
   mockUpdateWhere,
   mockCookieGet,
@@ -12,7 +12,7 @@ const {
 } = vi.hoisted(() => ({
   mockSignInWithIdToken: vi.fn(),
   mockInsertValues: vi.fn(),
-  mockListAccessibleCustomers: vi.fn(),
+  mockListConnectableAccounts: vi.fn(),
   mockSelectRows: vi.fn(),
   mockUpdateWhere: vi.fn(),
   mockCookieGet: vi.fn(),
@@ -55,13 +55,7 @@ vi.mock("@/lib/google-ads", () => ({
       return "Google Ads Account";
     }
   }),
-  listAccessibleCustomers: mockListAccessibleCustomers,
-  getUsableAccounts: <T extends { isManager: boolean }>(
-    customers: Array<T | { error: string }>,
-  ) => customers.filter((c): c is T => !("error" in c) && !c.isManager),
-  hasManagerAccount: <T extends { isManager: boolean }>(
-    customers: Array<T | { error: string }>,
-  ) => customers.some((c) => !("error" in c) && c.isManager),
+  listConnectableAccounts: mockListConnectableAccounts,
   syncAccountSnapshots: vi.fn(async () => {}),
   parseCustomerIds: vi.fn((raw: string | null | undefined) => {
     if (!raw) return [];
@@ -146,13 +140,10 @@ describe("Auth callback route — GET", () => {
       data: { user: { id: "user-123", email: "user@example.com" }, session: null },
       error: null,
     });
-    mockListAccessibleCustomers.mockResolvedValue([
-      {
-        id: "1234567890",
-        name: "Test Account",
-        isManager: false,
-      },
-    ]);
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [{ id: "1234567890", name: "Test Account" }],
+      managers: [],
+    });
 
     vi.stubGlobal(
       "fetch",
@@ -246,7 +237,7 @@ describe("Auth callback route — GET", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/tools");
     expect(mockInsertValues).toHaveBeenCalled();
-    expect(mockListAccessibleCustomers).toHaveBeenCalledWith("google-refresh-token");
+    expect(mockListConnectableAccounts).toHaveBeenCalledWith("google-refresh-token");
   });
 
   it("redirects to /campaigns by default after successful connect", async () => {
@@ -260,10 +251,13 @@ describe("Auth callback route — GET", () => {
   });
 
   it("redirects to account selection when multiple accounts are available", async () => {
-    mockListAccessibleCustomers.mockResolvedValue([
-      { id: "1234567890", name: "Account 1", isManager: false },
-      { id: "0987654321", name: "Account 2", isManager: false },
-    ]);
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        { id: "1234567890", name: "Account 1" },
+        { id: "0987654321", name: "Account 2" },
+      ],
+      managers: [],
+    });
 
     const state = encodeState();
     const response = await GET(
@@ -272,6 +266,82 @@ describe("Auth callback route — GET", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/connect?pending=");
+  });
+
+  it("persists loginCustomerId on the session for a single manager-routed client", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        {
+          id: "5555555555",
+          name: "Client A",
+          loginCustomerId: "9999999999",
+          loginCustomerName: "Acme MCC",
+        },
+      ],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const state = encodeState();
+    await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    expect(mockInsertValues).toHaveBeenCalled();
+    const insertedRow = mockInsertValues.mock.calls[0][0];
+    expect(insertedRow.customerId).toBe("5555555555");
+    expect(insertedRow.loginCustomerId).toBe("9999999999");
+  });
+
+  it("stores pre-validated accounts (with loginCustomerId) on the pending session for multi-account flow", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        { id: "1111111111", name: "Direct Account" },
+        {
+          id: "2222222222",
+          name: "Client B",
+          loginCustomerId: "9999999999",
+          loginCustomerName: "Acme MCC",
+        },
+      ],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const state = encodeState();
+    const response = await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    expect(response.headers.get("location")).toContain("/connect?pending=");
+    expect(mockInsertValues).toHaveBeenCalled();
+    const insertedRow = mockInsertValues.mock.calls[0][0];
+    expect(insertedRow.customerId).toBe("");
+    expect(insertedRow.customerIds).toBeTruthy();
+    const stored = JSON.parse(insertedRow.customerIds);
+    // Both entries carry an explicit loginCustomerId — null for direct, manager
+    // id for manager-routed. authForAccount relies on the field being present
+    // (not just truthy) to distinguish direct from legacy fallback.
+    expect(stored).toEqual([
+      { id: "1111111111", name: "Direct Account", loginCustomerId: null },
+      { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+    ]);
+
+    const decoded = decodeURIComponent(response.headers.get("location") ?? "");
+    expect(decoded).toContain('"loginCustomerName":"Acme MCC"');
+  });
+
+  it("returns NO_CLIENT_ACCOUNTS error when only managers exist with no clients", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const state = encodeState();
+    const response = await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("No%20client%20accounts%20found");
   });
 
   it("reuses an existing connected session for the same user", async () => {
@@ -293,7 +363,7 @@ describe("Auth callback route — GET", () => {
     expect(response.headers.get("location")).toContain("/tools");
     expect(mockUpdateWhere).toHaveBeenCalled();
     expect(mockInsertValues).not.toHaveBeenCalled();
-    expect(mockListAccessibleCustomers).not.toHaveBeenCalled();
+    expect(mockListConnectableAccounts).not.toHaveBeenCalled();
     expect(response.cookies.get("adsagent_token")?.value).toBe("existing-token");
   });
 });

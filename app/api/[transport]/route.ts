@@ -77,6 +77,9 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
     return {
       refreshToken: s.refreshToken,
       customerId: s.customerId,
+      // Synthesize a customerIds entry for legacy sessions where the column is empty.
+      // Omit loginCustomerId on the synthesized entry so authForAccount falls back
+      // to the session-level value (the only source of truth for legacy data).
       customerIds: customerIds.length > 0 ? customerIds : [{ id: s.customerId, name: "" }],
       loginCustomerId: s.loginCustomerId ?? null,
       userId: s.userId ?? null,

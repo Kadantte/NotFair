@@ -3,7 +3,14 @@
 export type ConnectedAccount = {
   id: string;
   name: string;
-  loginCustomerId?: string;
+  /**
+   * Manager (MCC) account id required to reach this account. Three states:
+   *   - string: account is reached via that manager.
+   *   - null: explicit direct-access; clears session-level loginCustomerId for this account.
+   *   - undefined (key absent): legacy data — fall back to session-level loginCustomerId.
+   * Writers of new sessions should always emit string|null, never omit.
+   */
+  loginCustomerId?: string | null;
 };
 
 /** Parse a JSON-encoded customer_ids string into ConnectedAccount[]. */
@@ -64,10 +71,31 @@ export function resolveAccountId(auth: AuthContext, accountId?: string): string 
   );
 }
 
-/** Build an AuthContext targeting a specific account (for per-tool targeting). */
+/**
+ * Build an AuthContext targeting a specific account (for per-tool targeting).
+ *
+ * Resolves `loginCustomerId` per-account from `customerIds` so a session can
+ * mix direct-access and manager-routed accounts. Three cases for the target:
+ *   - Field present, string: account is reached via that manager — use it.
+ *   - Field present, null: explicit direct-access — clear session-level so we
+ *     don't accidentally inherit the primary account's manager in a mixed
+ *     session.
+ *   - Field ABSENT (legacy data): fall back to session-level. Older sessions
+ *     wrote customerIds without the field; their session-level loginCustomerId
+ *     is the only source of truth, so honoring it keeps those sessions working.
+ *
+ * The absent-vs-null distinction is what makes new mixed-source sessions safe
+ * AND legacy single-account-with-manager sessions keep working.
+ */
 export function authForAccount(auth: AuthContext, accountId?: string): AuthContext {
   const targetId = resolveAccountId(auth, accountId);
-  return { ...auth, customerId: targetId };
+  const target = auth.customerIds?.find((a) => a.id === targetId);
+  const hasExplicitLoginCustomerId =
+    target !== undefined && "loginCustomerId" in target;
+  const loginCustomerId = hasExplicitLoginCustomerId
+    ? target!.loginCustomerId ?? null
+    : auth.loginCustomerId ?? null;
+  return { ...auth, customerId: targetId, loginCustomerId };
 }
 
 export type Guardrails = {
