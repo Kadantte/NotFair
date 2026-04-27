@@ -83,6 +83,12 @@ export interface PricingSectionProps {
   scheduledCancelAt: string | null;
   currentPeriodEnd: string | null;
   hasStripeCustomer: boolean;
+  /**
+   * Whether this user qualifies for the 7-day Growth trial. True for visitors
+   * with no Stripe history; false once they've had any Growth subscription.
+   * Drives CTA copy only — server-side checkout is the authoritative gate.
+   */
+  trialEligible: boolean;
   page: PricingPage;
 }
 
@@ -122,6 +128,7 @@ export function PricingCards({
   scheduledCancelAt,
   currentPeriodEnd,
   hasStripeCustomer,
+  trialEligible,
   page,
 }: PricingSectionProps) {
   const [interval, setInterval] = useState<Interval>("year");
@@ -385,7 +392,7 @@ export function PricingCards({
                   "Redirecting…"
                 ) : (
                   <>
-                    {connected ? "Upgrade to Growth" : "Get Started"}
+                    {trialEligible ? "Start 7-day free trial" : "Upgrade to Growth"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}

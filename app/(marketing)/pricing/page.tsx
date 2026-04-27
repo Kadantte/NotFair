@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
+import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 import { PricingPage } from "@/components/marketing/pricing-page";
 
 export const metadata = {
@@ -12,6 +13,9 @@ export default async function Pricing() {
   const subscription = session.connected && session.userId
     ? await getUserSubscription(session.userId)
     : null;
+  const trialEligible = subscription?.stripeCustomerId
+    ? await isGrowthTrialEligible(subscription.stripeCustomerId)
+    : true;
 
   return (
     <PricingPage
@@ -22,6 +26,7 @@ export default async function Pricing() {
       scheduledCancelAt={subscription?.scheduledCancelAt?.toISOString() ?? null}
       currentPeriodEnd={subscription?.currentPeriodEnd?.toISOString() ?? null}
       hasStripeCustomer={!!subscription?.stripeCustomerId}
+      trialEligible={trialEligible}
     />
   );
 }

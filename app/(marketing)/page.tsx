@@ -3,6 +3,7 @@ import { buildHomepageJsonLd, buildFaqJsonLd, buildMetadata } from "@/lib/seo";
 import { homepageFaq } from "@/lib/marketing-pages";
 import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
+import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 
 export const metadata = buildMetadata({
   title: "AI Google Ads Operator for Claude | AdsAgent",
@@ -44,6 +45,10 @@ export default async function Home() {
       : Promise.resolve(null),
   ]);
 
+  const trialEligible = subscription?.stripeCustomerId
+    ? await isGrowthTrialEligible(subscription.stripeCustomerId)
+    : true;
+
   const pricing = {
     connected: session.connected,
     email: session.connected ? session.googleEmail : null,
@@ -52,6 +57,7 @@ export default async function Home() {
     scheduledCancelAt: subscription?.scheduledCancelAt?.toISOString() ?? null,
     currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
     hasStripeCustomer: !!subscription?.stripeCustomerId,
+    trialEligible,
   };
 
   return (

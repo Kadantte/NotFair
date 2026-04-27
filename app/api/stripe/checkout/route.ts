@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { stripe } from "@/lib/stripe/client";
 import { getGrowthMonthlyPriceId, getGrowthYearlyPriceId, stripeMode } from "@/lib/stripe/config";
+import { isGrowthTrialEligible, TRIAL_PERIOD_DAYS } from "@/lib/stripe/trial";
 import { getUserSubscription } from "@/lib/subscription";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
@@ -58,6 +59,10 @@ export async function POST(request: Request) {
       });
   }
 
+  // 7-day trial on Growth, gated to customers who have never had a Growth
+  // subscription. Stripe is the source of truth — see lib/stripe/trial.ts.
+  const trialEligible = await isGrowthTrialEligible(customerId);
+
   const checkout = await stripe().checkout.sessions.create({
     mode: "subscription",
     payment_method_types: ["card"],
@@ -69,6 +74,7 @@ export async function POST(request: Request) {
     metadata: { userId: session.userId },
     subscription_data: {
       metadata: { userId: session.userId },
+      ...(trialEligible ? { trial_period_days: TRIAL_PERIOD_DAYS } : {}),
     },
     allow_promotion_codes: true,
   }, {
