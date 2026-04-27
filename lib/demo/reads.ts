@@ -64,6 +64,7 @@ export function demoListCampaigns(options: { limit?: number; includeRemoved?: bo
       biddingStrategy: c.biddingStrategy,
       networkDisplayEnabled: c.networkDisplayEnabled,
       trackingTemplate: c.trackingTemplate,
+      currencyCode: 'USD' as string | null,
       impressions: t.impressions,
       clicks: t.clicks,
       cost: t.cost,

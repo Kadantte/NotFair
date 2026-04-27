@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getClient, parseCustomerIds, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
+import { getCustomer, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
 import { getSessionAuth, getAuthContext } from "@/lib/session";
 import type { AuthContext } from "@/lib/google-ads";
 import { getAccountBudgetSummary } from "@/lib/google-ads/reads";
@@ -137,6 +137,38 @@ function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     });
 }
 
+/**
+ * Surfaces the underlying Google Ads API failure to the user instead of a
+ * generic "Failed to ..." message. The google-ads-api client throws
+ * GoogleAdsFailure shaped `{ errors: [{ message, error_code }], request_id }`;
+ * pull the first error and map the most common operator-actionable cases
+ * (auth/access) to a clearer hint. Other messages are surfaced verbatim —
+ * Google Ads users are advertisers and the API's wording is usually more
+ * useful than a generic fallback.
+ */
+function describeGoogleAdsError(error: unknown, fallback: string): string {
+    const failures =
+        (error as { errors?: Array<{ message?: string; error_code?: Record<string, unknown> }> } | null)
+            ?.errors;
+    const first = failures?.[0];
+    const apiMessage = first?.message ?? (error instanceof Error ? error.message : "");
+    if (!apiMessage) return fallback;
+
+    // Auth/access detection: prefer the typed error_code (oneof — exactly one
+    // category key is populated), with a phrase-anchored regex as fallback for
+    // versions of the client that don't surface the code on the thrown shape.
+    const code = first?.error_code ?? {};
+    const isAuthIssue =
+        "authorization_error" in code ||
+        "authentication_error" in code ||
+        /user doesn[’']?t have permission to access customer/i.test(apiMessage) ||
+        /login-customer-id\b[^.]*\b(missing|required|must be set|header)/i.test(apiMessage);
+    if (isAuthIssue) {
+        return "We couldn't access this Google Ads account. Reconnect it from Settings, or pick a different account.";
+    }
+    return apiMessage;
+}
+
 export async function getChangesAction(options: { limit?: number; offset?: number; campaignId?: string } = {}) {
     return requireAuth(async () => {
         const { customerId } = await getSessionAuth();
@@ -146,18 +178,14 @@ export async function getChangesAction(options: { limit?: number; offset?: numbe
 
 export async function undoChangeAction(changeId: number) {
     return requireAuth(async () => {
-        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
+        const { auth, session } = await getAuthContext();
+        const { customerId } = auth;
+        const { userId } = session;
 
         const check = await getUndoableChange(customerId, changeId);
         if ("error" in check) {
             throw new Error(check.error);
         }
-
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
 
         const undoResult = await executeUndoForChange(auth, check.change);
         if (!undoResult.success) {
@@ -200,13 +228,15 @@ function mapCampaigns(response: Awaited<ReturnType<typeof listCampaigns>>) {
         biddingStrategy: normalizeBiddingStrategy(campaign.biddingStrategy),
         networkDisplayEnabled: campaign.networkDisplayEnabled ?? false,
         trackingTemplate: campaign.trackingTemplate ?? null,
+        currencyCode: campaign.currencyCode ?? null,
     }));
 }
 
 export async function listCampaignsAction(options?: { skipCache?: boolean }) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds } = await getSessionAuth();
+        const { auth } = await getAuthContext();
+        const { customerId } = auth;
 
         if (!options?.skipCache) {
             const cached = campaignsCache.get(customerId);
@@ -217,12 +247,6 @@ export async function listCampaignsAction(options?: { skipCache?: boolean }) {
             campaignsCache.delete(customerId);
         }
 
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
-
         const response = await listCampaigns(auth, { limit: 100 });
         const campaigns = mapCampaigns(response);
 
@@ -231,7 +255,7 @@ export async function listCampaignsAction(options?: { skipCache?: boolean }) {
         return campaigns;
     } catch (error) {
         console.error("List Campaigns Error:", error);
-        throw new Error("Failed to list campaigns.");
+        throw new Error(describeGoogleAdsError(error, "Failed to list campaigns."));
     }
     });
 }
@@ -243,12 +267,7 @@ export async function invalidateCampaignsCache() {
 export async function getConversionActionsAction() {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth } = await getAuthContext();
         return await getConversionActions(auth);
     } catch (error) {
         console.error("Get Conversion Actions Error:", error);
@@ -260,12 +279,7 @@ export async function getConversionActionsAction() {
 export async function getImpressionShareAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth } = await getAuthContext();
         return await getImpressionShare(auth, campaignId, 30);
     } catch (error) {
         console.error("Get Impression Share Error:", error);
@@ -277,12 +291,7 @@ export async function getImpressionShareAction(campaignId: string) {
 export async function getSearchTermReportAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth } = await getAuthContext();
         const result = await getSearchTermReport(auth, campaignId, 30, 20);
         return result.searchTerms;
     } catch (error) {
@@ -295,12 +304,9 @@ export async function getSearchTermReportAction(campaignId: string) {
 export async function pauseCampaignAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth, session } = await getAuthContext();
+        const { customerId } = auth;
+        const { userId } = session;
 
         const result = await pauseCampaign(auth, campaignId);
         if (!result.success) {
@@ -313,7 +319,7 @@ export async function pauseCampaignAction(campaignId: string) {
         return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Pause Campaign Error:", error);
-        throw new Error("Failed to pause campaign.");
+        throw new Error(describeGoogleAdsError(error, "Failed to pause campaign."));
     }
     });
 }
@@ -321,12 +327,9 @@ export async function pauseCampaignAction(campaignId: string) {
 export async function enableCampaignAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth, session } = await getAuthContext();
+        const { customerId } = auth;
+        const { userId } = session;
 
         const result = await enableCampaign(auth, campaignId);
         if (!result.success) {
@@ -339,7 +342,7 @@ export async function enableCampaignAction(campaignId: string) {
         return { success: true, campaignId, afterValue: result.afterValue ?? null };
     } catch (error) {
         console.error("Enable Campaign Error:", error);
-        throw new Error("Failed to enable campaign.");
+        throw new Error(describeGoogleAdsError(error, "Failed to enable campaign."));
     }
     });
 }
@@ -347,12 +350,9 @@ export async function enableCampaignAction(campaignId: string) {
 export async function removeCampaignAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds, userId } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth, session } = await getAuthContext();
+        const { customerId } = auth;
+        const { userId } = session;
 
         const result = await removeCampaign(auth, campaignId);
         if (!result.success) {
@@ -365,7 +365,7 @@ export async function removeCampaignAction(campaignId: string) {
         return { success: true, campaignId };
     } catch (error) {
         console.error("Remove Campaign Error:", error);
-        throw new Error("Failed to delete campaign.");
+        throw new Error(describeGoogleAdsError(error, "Failed to delete campaign."));
     }
     });
 }
@@ -376,7 +376,8 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
 
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId } = await getSessionAuth();
+        const { auth } = await getAuthContext();
+        const { customerId } = auth;
         if (isDemoCustomerId(customerId)) {
             const perf = demoGetCampaignPerformance(campaignId, { startDate: effectiveStartDate, endDate: effectiveEndDate });
             return perf.daily.map((d) => ({
@@ -389,10 +390,7 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
                 conversions: d.conversions,
             }));
         }
-        const customer = getClient().Customer({
-            customer_id: customerId,
-            refresh_token: refreshToken,
-        });
+        const customer = getCustomer(auth);
 
         const response = await customer.query(`
             SELECT
@@ -420,7 +418,7 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
         }));
     } catch (error) {
         console.error("Get Campaign History Error:", error);
-        throw new Error("Failed to fetch campaign history.");
+        throw new Error(describeGoogleAdsError(error, "Failed to fetch campaign history."));
     }
     });
 }
@@ -431,7 +429,8 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
 
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId } = await getSessionAuth();
+        const { auth } = await getAuthContext();
+        const { customerId } = auth;
         if (isDemoCustomerId(customerId)) {
             const result = demoGetKeywords(campaignId, 30, 50);
             return result.keywords.map((k) => ({
@@ -446,10 +445,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
                 averageCpc: k.averageCpc,
             }));
         }
-        const customer = getClient().Customer({
-            customer_id: customerId,
-            refresh_token: refreshToken,
-        });
+        const customer = getCustomer(auth);
 
         const response = await customer.query(`
             SELECT
@@ -482,7 +478,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
         }));
     } catch (error) {
         console.error("Get Campaign Keywords Error:", error);
-        throw new Error("Failed to fetch campaign keywords.");
+        throw new Error(describeGoogleAdsError(error, "Failed to fetch campaign keywords."));
     }
     });
 }
@@ -490,12 +486,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
 export async function getCampaignAdsAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { refreshToken, customerId, customerIds } = await getSessionAuth();
-        const auth = {
-            refreshToken,
-            customerId,
-            customerIds: parseCustomerIds(customerIds),
-        };
+        const { auth } = await getAuthContext();
         const result = await listAds(auth, campaignId);
         return result.ads.map((ad) => ({
             adId: ad.adId,
@@ -512,7 +503,7 @@ export async function getCampaignAdsAction(campaignId: string) {
         }));
     } catch (error) {
         console.error("Get Campaign Ads Error:", error);
-        throw new Error("Failed to fetch campaign ads.");
+        throw new Error(describeGoogleAdsError(error, "Failed to fetch campaign ads."));
     }
     });
 }
@@ -598,8 +589,7 @@ Keep it concise and data-driven. Use specific numbers from the data.`;
 export async function getSmartCampaignAdsAction(campaignId: string) {
     return requireAuth(async () => {
         try {
-            const { refreshToken, customerId, customerIds } = await getSessionAuth();
-            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            const { auth } = await getAuthContext();
             const result = await getSmartCampaignAds(auth, campaignId);
             console.log("[getSmartCampaignAdsAction] returned", result.length, "ads");
             return result;
@@ -613,8 +603,7 @@ export async function getSmartCampaignAdsAction(campaignId: string) {
 export async function getCampaignKeywordThemesAction(campaignId: string) {
     return requireAuth(async () => {
         try {
-            const { refreshToken, customerId, customerIds } = await getSessionAuth();
-            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            const { auth } = await getAuthContext();
             return await getSmartCampaignKeywordThemes(auth, campaignId);
         } catch (error) {
             console.error("Get Smart Campaign Keyword Themes Error:", error);
@@ -626,8 +615,7 @@ export async function getCampaignKeywordThemesAction(campaignId: string) {
 export async function getSmartCampaignSearchTermsAction(campaignId: string) {
     return requireAuth(async () => {
         try {
-            const { refreshToken, customerId, customerIds } = await getSessionAuth();
-            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            const { auth } = await getAuthContext();
             return await getSmartCampaignSearchTerms(auth, campaignId);
         } catch (error) {
             console.error("Get Smart Campaign Search Terms Error:", error);
@@ -639,8 +627,7 @@ export async function getSmartCampaignSearchTermsAction(campaignId: string) {
 export async function getSmartCampaignSettingAction(campaignId: string) {
     return requireAuth(async () => {
         try {
-            const { refreshToken, customerId, customerIds } = await getSessionAuth();
-            const auth = { refreshToken, customerId, customerIds: parseCustomerIds(customerIds) };
+            const { auth } = await getAuthContext();
             return await getSmartCampaignSetting(auth, campaignId);
         } catch (error) {
             console.error("Get Smart Campaign Setting Error:", error);

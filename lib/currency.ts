@@ -125,3 +125,68 @@ export function toUsd(
   if (rate == null) return null;
   return amount * rate;
 }
+
+/**
+ * Format a monetary amount for display.
+ *
+ * - When `currencyCode` is a valid ISO 4217 code, uses Intl.NumberFormat with
+ *   `style: 'currency'` so symbols match the locale (e.g. CA$, €, ₹, ¥).
+ * - When the code is missing or rejected by Intl as invalid, falls back to a
+ *   plain `$`-prefixed string. The fallback is intentionally dumb — better to
+ *   show *something* than throw on an unrecognized code.
+ * - `compact: true` produces "1.2k" / "1.2M" style output (used in dense
+ *   audit-style displays). With a valid code it routes through Intl's
+ *   `notation: 'compact'` so the currency symbol is preserved (e.g. "CA$1.2K").
+ */
+export function formatMoney(
+  amount: number,
+  currencyCode: string | null | undefined,
+  opts: { fractionDigits?: number; compact?: boolean } = {},
+): string {
+  const compact = opts.compact === true;
+  // Default to *currency-natural* digits when the caller hasn't asked: USD→2,
+  // JPY→0, KWD→3. Forcing a constant 2 made "¥1,234.00" appear in JP accounts.
+  const explicitDigits = opts.fractionDigits;
+  const code = currencyCode ? currencyCode.toUpperCase() : null;
+
+  if (code) {
+    try {
+      if (compact) {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: code,
+          notation: "compact",
+          maximumFractionDigits: 1,
+        }).format(amount);
+      }
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: code,
+        ...(explicitDigits != null && {
+          minimumFractionDigits: explicitDigits,
+          maximumFractionDigits: explicitDigits,
+        }),
+      }).format(amount);
+    } catch (err) {
+      // Intl throws RangeError for malformed codes (wrong length, bad chars).
+      // Well-formed-but-unassigned codes like "FOO" are accepted by Intl, so
+      // they never reach this fallback in practice — only truly broken input.
+      if (!(err instanceof RangeError)) throw err;
+    }
+  }
+
+  // Fallback: no code, or Intl rejected the code as malformed.
+  const fallbackDigits = explicitDigits ?? 2;
+  if (compact) {
+    const abs = Math.abs(amount);
+    const sign = amount < 0 ? "-" : "";
+    if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}k`;
+    return `${sign}$${Math.round(abs).toLocaleString()}`;
+  }
+  const sign = amount < 0 ? "-" : "";
+  return `${sign}$${Math.abs(amount).toLocaleString(undefined, {
+    minimumFractionDigits: fallbackDigits,
+    maximumFractionDigits: fallbackDigits,
+  })}`;
+}

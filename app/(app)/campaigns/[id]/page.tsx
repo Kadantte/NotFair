@@ -27,6 +27,7 @@ import {
     AreaChart,
     Area
 } from 'recharts';
+import { formatMoney } from '@/lib/currency';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ interface CampaignInfo {
     biddingStrategy: string;
     networkDisplayEnabled: boolean;
     trackingTemplate: string | null;
+    currencyCode: string | null;
 }
 
 interface ConversionAction {
@@ -138,8 +140,9 @@ function diagnoseCampaign(opts: {
     impressionShare: ImpressionShareData | null;
     searchTerms: SearchTermRow[];
     trend: { cpaCurrent: number | null; cpaPrevious: number | null; conversionsCurrent: number; conversionsPrevious: number };
+    currencyCode: string | null;
 }): DiagnosisItem[] {
-    const { totals, conversionActions, campaign, keywords, impressionShare, searchTerms, trend } = opts;
+    const { totals, conversionActions, campaign, keywords, impressionShare, searchTerms, trend, currencyCode } = opts;
     const items: DiagnosisItem[] = [];
 
     if (!campaign || campaign.status !== 'ENABLED') return items;
@@ -185,7 +188,7 @@ function diagnoseCampaign(opts: {
             items.push({
                 severity: 'warning',
                 title: `CPA up ${Math.round(cpaChange * 100)}% vs previous period`,
-                explanation: `Cost per conversion rose from $${trend.cpaPrevious.toFixed(2)} to $${trend.cpaCurrent.toFixed(2)}. Check if new search terms are draining budget or if competition has increased.`,
+                explanation: `Cost per conversion rose from ${formatMoney(trend.cpaPrevious, currencyCode)} to ${formatMoney(trend.cpaCurrent, currencyCode)}. Check if new search terms are draining budget or if competition has increased.`,
             });
         }
     }
@@ -227,8 +230,8 @@ function diagnoseCampaign(opts: {
             const topTerms = nonConverting.sort((a, b) => b.cost - a.cost).slice(0, 3);
             items.push({
                 severity: 'warning',
-                title: `$${wastedSpend.toFixed(0)} spent on non-converting search terms`,
-                explanation: `Top non-converting terms: ${topTerms.map(t => `"${t.searchTerm}" ($${t.cost.toFixed(0)})`).join(', ')}. Consider adding these as negative keywords.`,
+                title: `${formatMoney(wastedSpend, currencyCode, { fractionDigits: 0 })} spent on non-converting search terms`,
+                explanation: `Top non-converting terms: ${topTerms.map(t => `"${t.searchTerm}" (${formatMoney(t.cost, currencyCode, { fractionDigits: 0 })})`).join(', ')}. Consider adding these as negative keywords.`,
             });
         }
     }
@@ -376,6 +379,7 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
     const convRate = totals.clicks > 0 ? totals.conversions / totals.clicks : 0;
 
     const isSmartCampaign = campaignInfo?.type === 'SMART';
+    const currencyCode = campaignInfo?.currencyCode ?? null;
 
     const diagnosis = useMemo(() => diagnoseCampaign({
         totals,
@@ -385,7 +389,8 @@ export default function CampaignDetailsPage({ params }: { params: Promise<{ id: 
         impressionShare,
         searchTerms,
         trend,
-    }), [totals, conversionActions, campaignInfo, keywords, impressionShare, searchTerms, trend]);
+        currencyCode,
+    }), [totals, conversionActions, campaignInfo, keywords, impressionShare, searchTerms, trend, currencyCode]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -466,7 +471,7 @@ const CustomTooltip = ({ active, payload, label }: {
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                         <span>{entry.name}:</span>
                         <span className="font-mono text-[#E8E4DD]">
-                            {entry.name === 'Cost' ? `$${Number(entry.value).toFixed(2)}`
+                            {entry.name === 'Cost' ? formatMoney(Number(entry.value), currencyCode)
                                 : entry.name === 'Conversions' ? Number(entry.value).toFixed(1)
                                 : entry.value.toLocaleString()}
                         </span>
@@ -548,7 +553,7 @@ const CustomTooltip = ({ active, payload, label }: {
                                                     : verdictColor === 'danger' ? 'text-[#C45D4A]'
                                                     : 'text-[#E8E4DD]'
                                             }`}>
-                                                ${cpa.toFixed(2)}
+                                                {formatMoney(cpa, currencyCode)}
                                             </p>
                                             {trend.cpaCurrent !== null && trend.cpaPrevious !== null && trend.cpaPrevious > 0 && (
                                                 <span className={`flex items-center gap-0.5 text-xs font-medium ${
@@ -607,10 +612,10 @@ const CustomTooltip = ({ active, payload, label }: {
                                         Cost
                                     </div>
                                     <p className="text-3xl font-semibold text-[#E8E4DD] tabular-nums font-mono">
-                                        ${totals.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {formatMoney(totals.cost, currencyCode)}
                                     </p>
                                     <p className="text-xs text-[#C4C0B6] mt-1 tabular-nums">
-                                        ${totals.clicks > 0 ? (totals.cost / totals.clicks).toFixed(2) : '0.00'} avg CPC
+                                        {formatMoney(totals.clicks > 0 ? totals.cost / totals.clicks : 0, currencyCode)} avg CPC
                                     </p>
                                 </div>
 
@@ -792,7 +797,7 @@ const CustomTooltip = ({ active, payload, label }: {
                                                     {[
                                                         { label: 'Impr.', value: ad.impressions.toLocaleString() },
                                                         { label: 'Clicks', value: ad.clicks.toLocaleString() },
-                                                        { label: 'Cost', value: `$${ad.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+                                                        { label: 'Cost', value: formatMoney(ad.cost, currencyCode) },
                                                         { label: 'Conv.', value: ad.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }) },
                                                     ].map(({ label, value }) => (
                                                         <div key={label} className="flex flex-col">
@@ -835,7 +840,7 @@ const CustomTooltip = ({ active, payload, label }: {
                                                     <td className="px-6 py-3 font-medium text-[#E8E4DD]">{term.searchTerm}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{term.impressions.toLocaleString()}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{term.clicks.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${term.cost.toFixed(2)}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">{formatMoney(term.cost, currencyCode)}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{term.impressions > 0 ? ((term.clicks / term.impressions) * 100).toFixed(2) : '0.00'}%</td>
                                                 </tr>
                                             ))}
@@ -946,8 +951,8 @@ const CustomTooltip = ({ active, payload, label }: {
                                                             <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{keyword.impressions.toLocaleString()}</td>
                                                             <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{keyword.clicks.toLocaleString()}</td>
                                                             <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{(keyword.ctr * 100).toFixed(2)}%</td>
-                                                            <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">${keyword.averageCpc.toFixed(2)}</td>
-                                                            <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">${keyword.cost.toFixed(2)}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums text-[#C4C0B6]">{formatMoney(keyword.averageCpc, currencyCode)}</td>
+                                                            <td className="px-6 py-3 text-right tabular-nums font-medium text-[#E8E4DD]">{formatMoney(keyword.cost, currencyCode)}</td>
                                                         </tr>
                                                     ))
                                                 )}

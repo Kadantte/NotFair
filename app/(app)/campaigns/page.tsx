@@ -7,6 +7,7 @@ import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircl
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { listCampaignsAction, pauseCampaignAction, enableCampaignAction, removeCampaignAction } from '@/app/actions';
+import { formatMoney } from '@/lib/currency';
 
 interface Campaign {
     id: string;
@@ -20,6 +21,7 @@ interface Campaign {
     biddingStrategy: string;
     networkDisplayEnabled: boolean;
     trackingTemplate: string | null;
+    currencyCode: string | null;
 }
 
 type HealthWarning = {
@@ -90,7 +92,12 @@ export default function CampaignsPage() {
             cachedCampaigns = data;
         } catch (err) {
             console.error(err);
-            if (!background) setError('Failed to fetch campaigns. Please try again.');
+            if (!background) {
+                const message = err instanceof Error && err.message
+                    ? err.message
+                    : 'Failed to fetch campaigns. Please try again.';
+                setError(message);
+            }
         } finally {
             setLoading(false);
             isRefreshing.current = false;
@@ -317,7 +324,7 @@ export default function CampaignsPage() {
                                                             <DollarSign className="w-3 h-3" />
                                                             Cost
                                                         </div>
-                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">${(campaign.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                        <p className="text-sm font-semibold text-[#E8E4DD] tabular-nums">{formatMoney(campaign.cost || 0, campaign.currencyCode)}</p>
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-1.5 text-[#C4C0B6] text-xs mb-1">
