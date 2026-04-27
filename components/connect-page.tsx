@@ -11,6 +11,7 @@ import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 import { BOOK_DEMO_URL } from '@/lib/links';
 import { notifyHelpClicked } from '@/app/actions';
+import { AuditHelpPanel } from '@/components/audit/audit-help-panel';
 
 function imageKeyFromSrc(src: string): string {
     const file = src.split('/').pop() ?? src;
@@ -698,14 +699,14 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
 }
 
 function parseSlug(slug?: string[]): { activeTab: SetupTab; codeSubTab: ClaudeCodeSubTab } {
-    if (!slug || slug.length === 0) return { activeTab: 'connector', codeSubTab: 'manual' };
+    if (!slug || slug.length === 0) return { activeTab: 'claude-code', codeSubTab: 'manual' };
     if (slug[0] === 'claude-connector') return { activeTab: 'connector', codeSubTab: 'manual' };
     if (slug[0] === 'chatgpt-codex' || slug[0] === 'codex') return { activeTab: 'codex', codeSubTab: 'manual' };
     if (slug[0] === 'claude-code') {
         const sub = slug[1] === 'auto' ? 'auto' : 'manual';
         return { activeTab: 'claude-code', codeSubTab: sub };
     }
-    return { activeTab: 'connector', codeSubTab: 'manual' };
+    return { activeTab: 'claude-code', codeSubTab: 'manual' };
 }
 
 function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
@@ -1076,6 +1077,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     )}
                 </div>
             </div>
+            <AuditHelpPanel />
             {/* Rotate API Key confirmation modal */}
             {showRotateConfirm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

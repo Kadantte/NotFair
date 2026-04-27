@@ -2,6 +2,12 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.13] - 2026-04-27
+
+### Changed
+- **`/connect` defaults to the Claude Code tab.** New users landing on the bare `/connect` URL (post-OAuth signup, sidebar nav, demo-banner CTA) now see the Claude Code setup path instead of the Claude.ai connector. Last-7-day analysis showed Claude Code accounts for 65.6% of first-time-user operations vs 29.0% for the Claude.ai/Claude-Desktop connector — and Claude Code first-time users write at 72% vs 53% for the connector. Defaulting to the higher-converting surface aligns onboarding with where new users actually do their work. Explicit deep links (`/connect/claude-connector`, `/connect/codex`) are unchanged. See `docs/analysis/2026-04-27_first-time-user-surface-mix.md` for the full data.
+- **`AuditHelpPanel` now renders on `/connect`** to give stuck setup users the same email/book-demo escape hatches available on `/audit`. The panel's `onChatClick` prop is now optional so the chat-agent button only renders where a chat surface exists (audit drawer); on `/connect` the panel shows email and book-demo only.
+
 ## [0.3.0.12] - 2026-04-27
 
 ### Added

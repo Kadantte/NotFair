@@ -17,7 +17,7 @@ const EMAIL = "tong.chen@adsagent.org";
 const CONNECTOR_URL = "/connect/claude-connector";
 const STORAGE_KEY = "audit-help-panel-collapsed";
 
-export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
+export function AuditHelpPanel({ onChatClick }: { onChatClick?: () => void }) {
   const [collapsed, setCollapsed] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
@@ -129,26 +129,28 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick: () => void }) {
           external
           onClick={() => trackHelpAction("book_demo")}
         />
-        <button
-          type="button"
-          onClick={() => {
-            trackHelpAction("chat_agent");
-            onChatClick();
-          }}
-          className="group flex w-full items-start gap-3 rounded-md border border-[#3D3C36] bg-[#1A1917] p-3 text-left transition hover:border-[#4CAF6E]/50 hover:bg-[#2E2D28]"
-        >
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#3D3C36] bg-[#24231F] group-hover:border-[#4CAF6E]/40">
-            <MessageCircle className="h-3.5 w-3.5 text-[#4CAF6E]" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[12px] font-semibold text-[#E8E4DD]">
-              Chat with our Agentic AI
+        {onChatClick && (
+          <button
+            type="button"
+            onClick={() => {
+              trackHelpAction("chat_agent");
+              onChatClick();
+            }}
+            className="group flex w-full items-start gap-3 rounded-md border border-[#3D3C36] bg-[#1A1917] p-3 text-left transition hover:border-[#4CAF6E]/50 hover:bg-[#2E2D28]"
+          >
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#3D3C36] bg-[#24231F] group-hover:border-[#4CAF6E]/40">
+              <MessageCircle className="h-3.5 w-3.5 text-[#4CAF6E]" />
             </span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-[#C4C0B6]">
-              Ask questions about this audit and get instant answers.
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12px] font-semibold text-[#E8E4DD]">
+                Chat with our Agentic AI
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-[#C4C0B6]">
+                Ask questions about this audit and get instant answers.
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
+        )}
       </div>
     </aside>
   );
