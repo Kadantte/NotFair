@@ -2238,14 +2238,6 @@ export async function searchGeoTargets(
 
 // ─── Keyword Ideas (KeywordPlanIdeaService) ───────────────────────
 
-const COMPETITION_NAMES: Record<number, string> = {
-  0: "UNSPECIFIED",
-  1: "UNKNOWN",
-  2: "LOW",
-  3: "MEDIUM",
-  4: "HIGH",
-};
-
 export async function getKeywordIdeas(
   auth: AuthContext,
   keywords: string[],
@@ -2291,22 +2283,27 @@ export async function getKeywordIdeas(
       ...seed,
     });
 
-    const results = response?.results ?? [];
+    // google-ads-api unwraps the gax tuple to its first element — the
+    // auto-paginated IGenerateKeywordIdeaResult[] itself, not a wrapper object.
+    // Slice since gax merges all pages and ignores per-call page_size.
+    const all: any[] = Array.isArray(response) ? response : (response?.results ?? []);
+    const results = all.slice(0, effectivePageSize);
 
     return {
       keywords: results.map((r: any) => {
         const m = r.keyword_idea_metrics ?? r.keywordIdeaMetrics ?? {};
+        const comp = m.competition ?? "UNSPECIFIED";
         return {
           keyword: r.text ?? null,
           avgMonthlySearches: m.avg_monthly_searches ?? m.avgMonthlySearches ?? null,
-          competition: COMPETITION_NAMES[m.competition ?? 0] ?? "UNKNOWN",
+          competition: typeof comp === "string" ? comp : "UNKNOWN",
           competitionIndex: m.competition_index ?? m.competitionIndex ?? null,
           averageCpc: micros(m.average_cpc_micros ?? m.averageCpcMicros),
           lowTopOfPageBid: micros(m.low_top_of_page_bid_micros ?? m.lowTopOfPageBidMicros),
           highTopOfPageBid: micros(m.high_top_of_page_bid_micros ?? m.highTopOfPageBidMicros),
         };
       }),
-      totalSize: response?.total_size ?? response?.totalSize ?? results.length,
+      totalSize: all.length,
     };
   } catch (error) {
     throw new Error(`Keyword ideas failed: ${extractErrorMessage(error)}`);
