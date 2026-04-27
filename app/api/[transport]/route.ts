@@ -232,6 +232,7 @@ Humanized response contract — applies to every \`runScript\` row:
 - Money fields ending in \`_micros\` get a sibling \`<base>_value\` (numeric, currency-agnostic major units — \`cost_micros: 11_000_000\` ⇒ \`cost_value: 11\`). Use \`_value\` for math and display; the raw \`_micros\` field is preserved for callers that need it (e.g. mutation tools that take micros).
 
 3. Specialized non-GAQL reads → dedicated tools (not \`runScript\`):
+   - \`summarizeAccountSetup\` — canonical "what is this account configured to do?" snapshot (currency, time zone, every campaign with named bidding strategy + tCPA/tROAS in major units, every conversion action with category + primary_for_goal). Call this ONCE at the start of any strategic conversation BEFORE \`runScript\` — it pre-shapes the conversion hierarchy and bidding posture so you don't misread enum integers (the BiddingStrategyType landmines: 10=MAXIMIZE_CONVERSIONS, 11=MAXIMIZE_CONVERSION_VALUE, 9=TARGET_SPEND, 15=TARGET_IMPRESSION_SHARE) or treat micros as dollars.
    - \`searchGeoTargets\` — geo target name lookup via GeoTargetConstantService.
    - \`getRecommendations\` — Google's recommendation engine.
    - \`getKeywordIdeas\` — Keyword Planner search-volume data.

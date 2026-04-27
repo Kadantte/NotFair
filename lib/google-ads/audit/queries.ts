@@ -194,7 +194,8 @@ export function queryConversionActions(): string {
   // here lets a script skip them client-side instead of probing one at a time.
   return `
       SELECT
-        conversion_action.name, conversion_action.type,
+        conversion_action.id, conversion_action.name,
+        conversion_action.category, conversion_action.type,
         conversion_action.status, conversion_action.counting_type,
         conversion_action.include_in_conversions_metric,
         conversion_action.primary_for_goal,

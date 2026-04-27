@@ -758,6 +758,21 @@ const READ_ONLY_CONVERSION_ACTION_TYPES = new Map<number, string>([
 ]);
 
 /**
+ * True when a conversion action's `owner_customer` resource name (e.g.
+ * "customers/1234567890") points at a different customer than `cid` —
+ * meaning it's inherited from a manager (MCC) account and read-only from
+ * this account's API.
+ */
+export function isManagerOwnedConversionAction(
+  cid: string,
+  ownerCustomer: unknown,
+): boolean {
+  if (typeof ownerCustomer !== "string" || ownerCustomer.length === 0) return false;
+  const ownerCid = ownerCustomer.split("/").pop();
+  return !!ownerCid && ownerCid !== cid;
+}
+
+/**
  * Classify whether a conversion action can be mutated. Returns a human-readable
  * reason string when read-only, or null when mutation is allowed.
  *
@@ -770,14 +785,9 @@ export function readOnlyConversionActionReason(
   rawType: unknown,
   ownerCustomer: unknown,
 ): string | null {
-  // Manager-owned conversion actions are inherited and cannot be modified
-  // from the child account. owner_customer is a resource_name like
-  // "customers/123456". We compare against the current customer.
-  if (typeof ownerCustomer === "string" && ownerCustomer.length > 0) {
-    const ownerCid = ownerCustomer.split("/").pop();
-    if (ownerCid && ownerCid !== cid) {
-      return `Conversion action ${conversionActionId} is owned by a manager account (${ownerCid}). Inherited conversion actions are read-only from this account; modify it in the manager account or in the Google Ads UI.`;
-    }
+  if (isManagerOwnedConversionAction(cid, ownerCustomer)) {
+    const ownerCid = (ownerCustomer as string).split("/").pop();
+    return `Conversion action ${conversionActionId} is owned by a manager account (${ownerCid}). Inherited conversion actions are read-only from this account; modify it in the manager account or in the Google Ads UI.`;
   }
 
   if (typeof rawType === "number" && READ_ONLY_CONVERSION_ACTION_TYPES.has(rawType)) {

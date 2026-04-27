@@ -110,7 +110,8 @@ exports[`audit queries > queryChangeEvents — uses >= / <= (BETWEEN not support
 exports[`audit queries > queryConversionActions — ORDER BY name 1`] = `
 "
       SELECT
-        conversion_action.name, conversion_action.type,
+        conversion_action.id, conversion_action.name,
+        conversion_action.category, conversion_action.type,
         conversion_action.status, conversion_action.counting_type,
         conversion_action.include_in_conversions_metric,
         conversion_action.primary_for_goal,

@@ -6,6 +6,7 @@ import {
   searchGeoTargets,
   getKeywordIdeas,
   listKeywords,
+  getAccountSummary,
   type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
@@ -155,6 +156,23 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         limit,
       }),
       campaignId,
+    );
+    return typedResult(result);
+  }));
+
+  // ─── Account Setup Snapshot ──────────────────────────────────────────
+
+  server.registerTool("summarizeAccountSetup", {
+    description:
+      "One-shot, human-readable snapshot of how the account is configured: currency + time zone, every non-removed campaign with its bidding strategy and tCPA/tROAS in major units, every conversion action with category + primary_for_goal flag, plus diagnostic notes when the setup is unusual (no primary conversion action, mixed optimization modes). Call this FIRST in any strategic conversation — it gives you the conversion hierarchy and bidding posture as named strings so you don't misread enum integers (the BiddingStrategyType landmines: 10=MAXIMIZE_CONVERSIONS, 11=MAXIMIZE_CONVERSION_VALUE, 9=TARGET_SPEND, 15=TARGET_IMPRESSION_SHARE) or treat micros as dollars. Replaces 3+ runScript calls (account info + campaigns + conversion actions) for the canonical setup question.",
+    inputSchema: {
+      accountId: accountIdParam,
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "summarize_account_setup", () =>
+      getAccountSummary(targetAuth),
     );
     return typedResult(result);
   }));

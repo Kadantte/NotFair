@@ -2,6 +2,15 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.12] - 2026-04-27
+
+### Added
+- **`summarizeAccountSetup` MCP tool.** One-shot, human-readable snapshot of how the account is configured: currency + time zone, every non-removed campaign with its named bidding strategy and tCPA/tROAS in major units, every conversion action with category + `primary_for_goal` flag, plus diagnostic notes when the setup is unusual (no primary conversion action, mixed value-mode/count-mode bidding). Designed to be the FIRST tool an agent calls in any strategic conversation, before reaching for `runScript` — the LLM gets the conversion hierarchy and bidding posture as named strings up front, eliminating the BiddingStrategyType integer-translation step that has historically caused misreads (10=MAXIMIZE_CONVERSIONS, 11=MAXIMIZE_CONVERSION_VALUE, 9=TARGET_SPEND, 15=TARGET_IMPRESSION_SHARE — easy to swap when reading raw integers). Replaces what would otherwise be 3+ `runScript` round-trips for the canonical setup question. Tool description and MCP server-level routing instructions both promote it as the entry point for "how is my account configured?" / "what's my bidding strategy?" / "what conversion actions am I optimizing for?" questions.
+
+### Changed
+- **`queryConversionActions()` audit query selects `id` + `category`.** The shared GAQL builder in `audit/queries.ts` now returns the conversion action ID (so agents can reference actions stably) and the category enum (PURCHASE / SUBMIT_LEAD_FORM / DEFAULT / etc.) — previously only `name`/`type`/`status`/`counting_type` were selected, so agents had to issue a follow-up GAQL to recover category. The audit engine and the new `summarizeAccountSetup` tool both consume this widened query.
+- **Extracted `isManagerOwnedConversionAction(cid, ownerCustomer)` helper** in `lib/google-ads/campaign-ops.ts`. The "is this conversion action inherited from a manager account?" check (resource-name compare against `customers/<cid>`) is now reused by both `readOnlyConversionActionReason` and `summarizeAccountSetup` instead of being inlined twice.
+
 ## [0.3.0.11] - 2026-04-26
 
 ### Added
