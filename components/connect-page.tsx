@@ -315,7 +315,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     return (
         <section className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
-                <div className="mx-auto max-w-2xl">
+                <div className="mx-auto max-w-4xl">
                     {error && (
                         <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-5">
                             <div className="flex items-start gap-3">

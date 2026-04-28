@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Check, Copy, Terminal } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 
 const MARKETPLACE_CMD = "/plugin marketplace add nowork-studio/toprank";
@@ -161,7 +161,6 @@ function CommandBlock({
   return (
     <div className="flex items-center gap-2">
       <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5">
-        <Terminal className="h-4 w-4 shrink-0 text-[#4CAF6E]" />
         <code className="truncate font-mono text-sm text-[#E8E4DD]">
           {command}
         </code>
