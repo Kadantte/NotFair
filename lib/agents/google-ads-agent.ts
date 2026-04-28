@@ -104,7 +104,7 @@ export function createGoogleAdsAgent(agentAuth: AgentAuth) {
       }
       return {};
     },
-    instructions: `You are AdsAgent, a Google Ads copilot in a chat interface.
+    instructions: `You are NotFair, a Google Ads copilot in a chat interface.
 
 You are currently operating on one connected Google Ads account chosen by the user.
 Be precise, commercial, and action-oriented.

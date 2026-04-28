@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Sparkles, Mail, Calendar, MessageCircle, ArrowUpRight, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { BOOK_DEMO_URL } from "@/lib/links";
+import { BRAND_NAME, OUTREACH_EMAIL } from "@/lib/brand";
 
 type HelpAction = "connect_claude" | "join_discord" | "email_expert" | "book_demo" | "chat_agent";
 
@@ -13,7 +14,7 @@ function trackHelpAction(action: HelpAction) {
 }
 
 const DISCORD_URL = "https://discord.gg/5nzUggmVdG";
-const EMAIL = "tong.chen@adsagent.org";
+const EMAIL = OUTREACH_EMAIL;
 const CONNECTOR_URL = "/connect/claude-connector";
 const STORAGE_KEY = "audit-help-panel-collapsed";
 
@@ -96,7 +97,7 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick?: () => void }) {
           icon={<ClaudeIcon />}
           iconWrapperClass="border-transparent bg-[#D97757] group-hover:border-transparent"
           title="Connect to Claude"
-          description="Add AdsAgent to Claude.ai and let Claude fix issues directly."
+          description={`Add ${BRAND_NAME} to Claude.ai and let Claude fix issues directly.`}
           external={false}
           onClick={() => trackHelpAction("connect_claude")}
         />
@@ -111,7 +112,7 @@ export function AuditHelpPanel({ onChatClick }: { onChatClick?: () => void }) {
         />
         <HelpItem
           href={`https://mail.google.com/mail/?view=cm&fs=1&to=${EMAIL}&su=${encodeURIComponent(
-            "AdsAgent account help"
+            `${BRAND_NAME} account help`
           )}&body=${encodeURIComponent(
             "Hi Tong,\n\nI'd like help fixing issues in my Google Ads account."
           )}`}

@@ -170,7 +170,7 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
 // decisions that would otherwise get baked into individual tool descriptions
 // (and rot on every refactor). Keep it short, outcome-framed, and tool-neutral
 // where possible — named tools referenced here must exist.
-const MCP_INSTRUCTIONS = `AdsAgent is an MCP for Google Ads API. You are an expert Paid Ads specialist whose goal is to assist the user in understanding and managing their Google Ads account.
+const MCP_INSTRUCTIONS = `NotFair is an MCP for Google Ads API. You are an expert Paid Ads specialist whose goal is to assist the user in understanding and managing their Google Ads account.
 
 Tool-selection heuristic — pick ONE path per user question:
 
@@ -239,7 +239,7 @@ Humanized response contract — applies to every \`runScript\` row:
    - \`searchGeoTargets\` — geo target name lookup via GeoTargetConstantService.
    - \`getRecommendations\` — Google's recommendation engine.
    - \`getKeywordIdeas\` — Keyword Planner search-volume data.
-   - \`getChanges\` / \`reviewChangeImpact\` — AdsAgent's own change log + impact analysis.
+   - \`getChanges\` / \`reviewChangeImpact\` — NotFair's own change log + impact analysis.
    - \`getResourceMetadata\` / \`listQueryableResources\` — GAQL schema discovery (use before writing an unfamiliar query).
 
 Handling write rejections — important:
@@ -261,6 +261,7 @@ const mcpHandler = createMcpHandler(
     // ─── Session management tools (registered in app layer) ─────
     server.registerTool("listConnectedAccounts", {
       description: "List Google Ads accounts connected to this session. Returns accountIds for use with all other tools.",
+      inputSchema: {},
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

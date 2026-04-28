@@ -13,7 +13,7 @@ async function main() {
   console.log(`  client_id:     ${result.clientId}`);
   console.log(`  client_secret: ${result.clientSecret}`);
   console.log(`  session_id:    ${result.sessionId}`);
-  console.log(`  server_url:    https://adsagent.org/api/mcp`);
+  console.log(`  server_url:    https://notfair.co/api/mcp`);
 }
 
 main()

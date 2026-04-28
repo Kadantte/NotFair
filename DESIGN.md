@@ -1,4 +1,4 @@
-# Design System — AdsAgent
+# Design System — NotFair
 
 ## Product Context
 - **What this is:** Open-core MCP server that connects Google Ads to AI tools (Claude Coworker, Cursor, etc.). Users connect their Google Ads account, then their AI agent reads campaigns, adjusts bids, and surfaces performance insights.
@@ -38,7 +38,7 @@
 - **Dark-first.** Light mode deferred.
 
 ### Color Philosophy
-Green = brand = growth = positive. The accent color IS the positive signal because AdsAgent's entire promise is growth. Differentiate interactive elements from metrics through shape and context, not color. Use a softer green (`#5DBE82`) for success alerts/toasts to distinguish feedback from interactive elements.
+Green = brand = growth = positive. The accent color IS the positive signal because NotFair's entire promise is growth. Differentiate interactive elements from metrics through shape and context, not color. Use a softer green (`#5DBE82`) for success alerts/toasts to distinguish feedback from interactive elements.
 
 ### Dark Mode (primary)
 | Role | Hex | Usage |

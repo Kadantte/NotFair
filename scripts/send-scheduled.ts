@@ -75,7 +75,7 @@ async function main() {
     console.log(`  Sending to ${contact.email} (${contact.company})...`);
 
     const { error } = await resend.emails.send({
-      from: "Tong from AdsAgent <tong.chen@adsagent.org>",
+      from: "Tong from NotFair <tong.chen@adsagent.org>",
       to: contact.email,
       subject: contact.draftSubject,
       replyTo: "tong.chen@adsagent.org",

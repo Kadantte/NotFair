@@ -48,7 +48,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     slug: "ecommerce",
     industry: "Ecommerce Stores",
     industryShort: "Ecommerce",
-    title: "Google Ads Audit for Ecommerce Stores — Free in 5 Minutes | AdsAgent",
+    title: "Google Ads Audit for Ecommerce Stores — Free in 5 Minutes | NotFair",
     description:
       "Free Google Ads audit for ecommerce. AI reviews Shopping, PMAX, product feed health, ROAS by SKU, and wasted spend — with a 3-step fix list. No credit card.",
     keywords: [
@@ -124,7 +124,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     slug: "legal",
     industry: "Law Firms",
     industryShort: "Legal",
-    title: "Google Ads Audit for Law Firms — Free in 5 Minutes | AdsAgent",
+    title: "Google Ads Audit for Law Firms — Free in 5 Minutes | NotFair",
     description:
       "Free Google Ads audit for law firms. AI reviews PI, criminal, family, and practice-area campaigns for jurisdiction waste, negative keyword gaps, and lead quality.",
     keywords: [
@@ -200,7 +200,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     slug: "home-services",
     industry: "Home Services",
     industryShort: "Home Services",
-    title: "Google Ads Audit for Home Services — Free in 5 Minutes | AdsAgent",
+    title: "Google Ads Audit for Home Services — Free in 5 Minutes | NotFair",
     description:
       "Free Google Ads audit for HVAC, plumbing, roofing, and electricians. AI checks geo-targeting, call tracking, emergency-query coverage, and wasted spend.",
     keywords: [
@@ -257,7 +257,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
       {
         question: "I run ads myself between jobs — can I act on the findings?",
         answer:
-          "Yes — the output is a 3-step prioritized fix list with exact keywords, geo rules, and negative keyword recommendations. Most owners can apply the top fixes in 20–30 minutes inside Google Ads. If you want help, the same recommendations can be executed through AdsAgent's approval-based workflow.",
+          "Yes — the output is a 3-step prioritized fix list with exact keywords, geo rules, and negative keyword recommendations. Most owners can apply the top fixes in 20–30 minutes inside Google Ads. If you want help, the same recommendations can be executed through NotFair's approval-based workflow.",
       },
       {
         question: "What if my call tracking is through a different tool?",
@@ -276,7 +276,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     slug: "healthcare",
     industry: "Healthcare & Dental Practices",
     industryShort: "Healthcare",
-    title: "Google Ads Audit for Healthcare & Dental Practices — Free | AdsAgent",
+    title: "Google Ads Audit for Healthcare & Dental Practices — Free | NotFair",
     description:
       "Free Google Ads audit for dental, medical, and healthcare practices. HIPAA-aware review of conversion tracking, new-patient lead cost, and practice-area waste.",
     keywords: [
@@ -352,7 +352,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     slug: "insurance",
     industry: "Insurance Agents",
     industryShort: "Insurance",
-    title: "Google Ads Audit for Insurance Agents — Free in 5 Minutes | AdsAgent",
+    title: "Google Ads Audit for Insurance Agents — Free in 5 Minutes | NotFair",
     description:
       "Free Google Ads audit for independent insurance agents. AI reviews auto, home, life, and commercial campaigns for lead farms, brand defense, and CPC waste.",
     keywords: [
@@ -428,7 +428,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     slug: "saas",
     industry: "B2B SaaS",
     industryShort: "B2B SaaS",
-    title: "Google Ads Audit for B2B SaaS — Free in 5 Minutes | AdsAgent",
+    title: "Google Ads Audit for B2B SaaS — Free in 5 Minutes | NotFair",
     description:
       "Free Google Ads audit for B2B SaaS. AI reviews MQL/SQL tracking, LTV-based bidding, competitor campaigns, and pipeline waste — with a 3-step fix list.",
     keywords: [

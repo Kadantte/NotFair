@@ -7,6 +7,7 @@ import { OpportunitiesSection } from "./components/opportunities-section";
 import { RecentChanges } from "./components/recent-changes";
 import { Loader2 } from "lucide-react";
 import type { DashboardOverview, DashboardDetails } from "./actions";
+import { BRAND_NAME } from "@/lib/brand";
 
 export function DashboardContent({
   overview,
@@ -20,7 +21,7 @@ export function DashboardContent({
     return (
       <div className="flex h-full items-center justify-center bg-[#1A1917]">
         <div className="text-center max-w-sm">
-          <div className="text-[16px] font-medium text-[#E8E4DD]">Welcome to AdsAgent</div>
+          <div className="text-[16px] font-medium text-[#E8E4DD]">Welcome to {BRAND_NAME}</div>
           <div className="mt-2 text-[13px] text-[#C4C0B6]">
             Connect your Google Ads account to see your dashboard. Data will appear once your campaigns are active.
           </div>

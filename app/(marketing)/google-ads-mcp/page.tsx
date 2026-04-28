@@ -20,7 +20,7 @@ export const metadata = buildMetadata({
 
 const faqItems = [
   {
-    question: "What is the AdsAgent Google Ads MCP server?",
+    question: "What is the NotFair Google Ads MCP server?",
     answer:
       "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context; write tools propose changes that you approve in chat.",
   },
@@ -32,12 +32,12 @@ const faqItems = [
   {
     question: "Do I need to self-host anything?",
     answer:
-      "No. The server is hosted at https://adsagent.org/api/mcp. You just point your client at it and authenticate.",
+      "No. The server is hosted at https://notfair.co/api/mcp. You just point your client at it and authenticate.",
   },
   {
     question: "How does authentication work?",
     answer:
-      "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at adsagent.org/connect.",
+      "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect.",
   },
   {
     question: "Is the MCP server free?",
@@ -56,7 +56,7 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "AdsAgent — Google Ads MCP Server",
+    name: "NotFair — Google Ads MCP Server",
     applicationCategory: "DeveloperApplication",
     applicationSubCategory: "Model Context Protocol Server",
     operatingSystem: "Web",
@@ -69,7 +69,7 @@ const jsonLd = [
     },
     url: new URL("/google-ads-mcp", SITE_URL).toString(),
     featureList: [
-      "Hosted MCP server at https://adsagent.org/api/mcp",
+      "Hosted MCP server at https://notfair.co/api/mcp",
       "Streamable HTTP transport (MCP 2025-03-26)",
       "OAuth 2.0 with PKCE",
       "Bearer token authentication",
@@ -80,14 +80,14 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "WebAPI",
-    name: "AdsAgent Google Ads MCP API",
+    name: "NotFair Google Ads MCP API",
     description:
       "Model Context Protocol API for Google Ads. Compatible with Claude, Codex, Cursor, and any MCP-compatible client.",
     documentation: new URL("/google-ads-mcp", SITE_URL).toString(),
     termsOfService: new URL("/terms", SITE_URL).toString(),
     provider: {
       "@type": "Organization",
-      name: "AdsAgent",
+      name: "NotFair",
       url: SITE_URL,
     },
   },

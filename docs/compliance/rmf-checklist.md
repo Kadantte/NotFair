@@ -1,4 +1,4 @@
-# Google Ads RMF Compliance Checklist — AdsAgent
+# Google Ads RMF Compliance Checklist — NotFair
 
 **Tool classification:** Full-Service Tool (creates and manages Google Ads campaigns for third-party advertisers via the MCP-driven chat agent).
 
@@ -88,7 +88,7 @@
 
 We only create and manage **Search campaigns** via `createSearchCampaign`. Other tables in the RMF policy are therefore non-binding:
 
-| Feature list | Applies to AdsAgent? |
+| Feature list | Applies to NotFair? |
 |---|---|
 | Full-service Tool Feature List (Search / generic) | ✅ — this is our primary coverage (tables above) |
 | App campaign Feature List | n/a — we do not create app campaigns |
@@ -105,4 +105,4 @@ Only one item remains before the compliance reply is ready:
 
 1. **Verify the chat confirmation step** actually renders a preview+Confirm UI for every write tool (especially `updateBid`, `updateCampaignBudget`, `updateCampaignBidding`, `createBiddingStrategy`, `updateBiddingStrategy`). Record a screen capture as evidence for the submission.
 
-Once the chat confirmation step is documented, AdsAgent is fully RMF-compliant for a Full-Service Tool with Standard access — no disclosed gaps, no past-due items, no open policy violations.
+Once the chat confirmation step is documented, NotFair is fully RMF-compliant for a Full-Service Tool with Standard access — no disclosed gaps, no past-due items, no open policy violations.

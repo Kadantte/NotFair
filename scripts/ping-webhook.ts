@@ -21,7 +21,7 @@ async function main() {
   const secret = process.env.STRIPE_WEBHOOK_SECRET_LIVE;
   if (!secret) throw new Error("STRIPE_WEBHOOK_SECRET_LIVE not set");
 
-  const url = process.argv[2] ?? "https://adsagent.org/api/stripe/webhook";
+  const url = process.argv[2] ?? "https://notfair.co/api/stripe/webhook";
 
   // Use an event type our handler explicitly skips so this is a DB no-op.
   const payload = JSON.stringify({

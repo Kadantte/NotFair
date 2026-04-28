@@ -6,7 +6,7 @@
  *     --to "info@example.com" \
  *     --subject "Your subject line" \
  *     --body "<p>HTML body here</p>" \
- *     --from "Tong from AdsAgent <outreach@adsagent.org>" \
+ *     --from "Tong from NotFair <outreach@adsagent.org>" \
  *     --reply-to "tong.chen@adsagent.org"
  *
  * The script will:
@@ -57,7 +57,7 @@ async function main() {
   const to = args.to;
   const subject = args.subject;
   const body = args.body;
-  const from = args.from || "Tong from AdsAgent <tong.chen@adsagent.org>";
+  const from = args.from || "Tong from NotFair <tong.chen@adsagent.org>";
   const replyTo = args["reply-to"] || "tong.chen@adsagent.org";
 
   if (!to || !subject || !body) {

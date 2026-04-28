@@ -4,7 +4,7 @@ import { buildMetadata } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Impact Tracker for Google Ads Changes",
   description:
-    "Review AdsAgent change history, before and after context, and attribution notes for Google Ads optimization work.",
+    "Review NotFair change history, before and after context, and attribution notes for Google Ads optimization work.",
   path: "/impact",
   keywords: [
     "Google Ads impact tracking",

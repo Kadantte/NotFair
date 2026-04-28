@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import { BRAND_NAME, BRAND_URL } from "@/lib/brand";
 
-export const SITE_NAME = "AdsAgent";
-export const SITE_URL = "https://adsagent.org";
+export const SITE_NAME = BRAND_NAME;
+export const SITE_URL = BRAND_URL;
 export const DEFAULT_OG_IMAGE = "/opengraph-image";
-export const SITE_DESCRIPTION =
-  "AdsAgent is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude Cowork and let AI analyze campaigns, optimize spend, and manage changes.";
+export const SITE_DESCRIPTION = `${BRAND_NAME} is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude Cowork and let AI analyze campaigns, optimize spend, and manage changes.`;
 export const SITE_KEYWORDS = [
   "Google Ads MCP server",
   "Google Ads MCP",

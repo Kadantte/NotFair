@@ -1,7 +1,7 @@
 /**
  * Private auto-save for the shared_audits table (Phase 1).
  *
- * Every time a signed-in user runs an audit on adsagent.org, we save the
+ * Every time a signed-in user runs an audit on notfair.co, we save the
  * anonymized result here under `visibility='private'` so they can browse
  * their history. Phase 2 (public sharing) will read the same row once
  * visibility is flipped — the anonymizer already ran, so no data leaks

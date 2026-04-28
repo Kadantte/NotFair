@@ -152,7 +152,7 @@ export function ModelSelector({
             </span>
             <div className="min-w-0">
               <div className="text-sm font-medium text-white">Connect to Your Claude</div>
-              <div className="mt-0.5 text-[11px] text-[#C4C0B6]">Use AdsAgent inside Claude app, Claude Cowork, and Claude Code</div>
+              <div className="mt-0.5 text-[11px] text-[#C4C0B6]">Use NotFair inside Claude app, Claude Cowork, and Claude Code</div>
             </div>
           </Link>
         </div>

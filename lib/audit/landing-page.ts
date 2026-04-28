@@ -53,7 +53,7 @@ export async function analyzeLandingPage(url: string): Promise<LandingPageAnalys
       signal: controller.signal,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; AdsAgentAudit/1.0; +https://www.adsagent.org)",
+          "Mozilla/5.0 (compatible; AdsAgentAudit/1.0; +https://www.notfair.co)",
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",

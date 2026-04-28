@@ -2,9 +2,9 @@ import { GoogleAdsCodexMcpSetupPage } from "@/components/marketing/google-ads-co
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Google Ads Codex MCP — Setup Guide for AdsAgent in OpenAI Codex",
+  title: "Google Ads Codex MCP — Setup Guide for NotFair in OpenAI Codex",
   description:
-    "Step-by-step guide to add AdsAgent to OpenAI's Codex CLI as an MCP server. One terminal command wires up Google Ads access in under a minute — manage campaigns through Codex chat.",
+    "Step-by-step guide to add NotFair to OpenAI's Codex CLI as an MCP server. One terminal command wires up Google Ads access in under a minute — manage campaigns through Codex chat.",
   path: "/google-ads-codex-mcp-setup-guide",
   keywords: [
     "google ads codex mcp",
@@ -19,19 +19,19 @@ export const metadata = buildMetadata({
 
 const faqItems = [
   {
-    question: "What is the AdsAgent Codex MCP integration?",
+    question: "What is the NotFair Codex MCP integration?",
     answer:
       "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — and propose changes you approve in chat.",
   },
   {
     question: "How is this different from the Claude setup guides?",
     answer:
-      "Same backend, different client. The Codex CLI calls the AdsAgent MCP server using OpenAI's MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic's clients. Capabilities are identical.",
+      "Same backend, different client. The Codex CLI calls the NotFair MCP server using OpenAI's MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic's clients. Capabilities are identical.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "Under a minute. Run a single `codex mcp add adsagent --url https://adsagent.org/api/mcp` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.",
+      "Under a minute. Run a single `codex mcp add notfair --url https://notfair.co/api/mcp` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.",
   },
   {
     question: "Do I need to write any code?",
@@ -41,7 +41,7 @@ const faqItems = [
   {
     question: "Is the integration free?",
     answer:
-      "Yes. Adding AdsAgent to Codex and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
+      "Yes. Adding NotFair to Codex and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
   },
   {
     question: "Can Codex actually change my Google Ads account?",
@@ -55,9 +55,9 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to add the AdsAgent MCP to OpenAI Codex CLI",
+    name: "How to add the NotFair MCP to OpenAI Codex CLI",
     description:
-      "Add AdsAgent to OpenAI's Codex CLI as an MCP server with a single terminal command — Codex walks you through OAuth and registers the integration automatically.",
+      "Add NotFair to OpenAI's Codex CLI as an MCP server with a single terminal command — Codex walks you through OAuth and registers the integration automatically.",
     totalTime: "PT1M",
     step: [
       {
@@ -70,15 +70,15 @@ const jsonLd = [
       {
         "@type": "HowToStep",
         position: 2,
-        name: "Add the AdsAgent MCP",
-        text: "Run codex mcp add adsagent --url https://adsagent.org/api/mcp in your terminal. Codex walks you through the OAuth flow and registers the AdsAgent MCP server automatically.",
+        name: "Add the NotFair MCP",
+        text: "Run codex mcp add notfair --url https://notfair.co/api/mcp in your terminal. Codex walks you through the OAuth flow and registers the NotFair MCP server automatically.",
         url: new URL("/google-ads-codex-mcp-setup-guide#step-2", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 3,
         name: "Ask Codex about your ads",
-        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Codex calls AdsAgent tools and answers with live data.",
+        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Codex calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-codex-mcp-setup-guide#step-3", SITE_URL).toString(),
       },
     ],
@@ -86,12 +86,12 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "AdsAgent — Google Ads Codex MCP",
+    name: "NotFair — Google Ads Codex MCP",
     applicationCategory: "BusinessApplication",
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "macOS, Linux, Windows",
     description:
-      "MCP server that gives OpenAI's Codex CLI live access to your Google Ads account through AdsAgent.",
+      "MCP server that gives OpenAI's Codex CLI live access to your Google Ads account through NotFair.",
     offers: {
       "@type": "Offer",
       price: "0",

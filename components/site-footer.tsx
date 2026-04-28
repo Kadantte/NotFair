@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { DiscordLink } from "@/components/discord-link";
+import { BrandLockup } from "@/components/brand-lockup";
+import { BRAND_NAME } from "@/lib/brand";
 
 const setupGuideLinks = [
     {
@@ -28,9 +30,7 @@ export function SiteFooter() {
             <div className="container mx-auto px-4 py-10 md:px-8">
                 <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
                     <div className="max-w-sm space-y-3">
-                        <h2 className="text-base font-semibold text-[#E8E4DD]">
-                            AdsAgent
-                        </h2>
+                        <BrandLockup size="md" />
                         <p className="text-sm leading-relaxed text-[#C4C0B6]">
                             AI-powered Google Ads management that finds wasted
                             spend and optimizes your campaigns automatically.
@@ -81,7 +81,7 @@ export function SiteFooter() {
 
                 <div className="mt-8 border-t border-[#3D3C36] pt-6">
                     <p className="text-sm text-[#C4C0B6]">
-                        © {new Date().getFullYear()} AdsAgent. All rights reserved.
+                        © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
                     </p>
                 </div>
             </div>

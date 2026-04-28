@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DeltaBadge } from '@/components/delta-badge';
 import { formatAction, formatValue, ENTITY_BADGE_COLORS } from '@/lib/operations-format';
 import { getChangesAction, undoChangeAction } from '@/app/actions';
+import { BRAND_NAME } from '@/lib/brand';
 
 type Change = {
     id: number;
@@ -142,7 +143,7 @@ export default function OperationsPage() {
                     <Activity className="w-10 h-10 text-[#C4C0B6]/20 mx-auto mb-4" />
                     <h3 className="text-base font-medium text-[#E8E4DD]/60">No operations yet</h3>
                     <p className="text-[#C4C0B6] max-w-sm mx-auto mt-2 text-sm">
-                        Connect AdsAgent via MCP and ask it to make changes. Every write operation will appear here.
+                        Connect {BRAND_NAME} via MCP and ask it to make changes. Every write operation will appear here.
                     </p>
                 </div>
             ) : (

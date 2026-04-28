@@ -3,10 +3,10 @@ import { buildMetadata } from "@/lib/seo";
 export const metadata = buildMetadata({
     title: "Terms of Service",
     description:
-        "Review the AdsAgent terms covering use of the AI Google Ads agent, Google Ads integrations, service limitations, and account responsibilities.",
+        "Review the NotFair terms covering use of the AI Google Ads agent, Google Ads integrations, service limitations, and account responsibilities.",
     path: "/terms",
     keywords: [
-        "AdsAgent terms of service",
+        "NotFair terms of service",
         "Google Ads agent terms",
         "Google Ads MCP terms",
     ],
@@ -21,14 +21,14 @@ export default function TermsPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">1. Introduction</h2>
                 <p>
-                    Welcome to AdsAgent (&quot;Service&quot;). By accessing or using our Service, you agree to comply with and be bound by these Terms of Service. If you do not agree, you must not use the Service.
+                    Welcome to NotFair (&quot;Service&quot;). By accessing or using our Service, you agree to comply with and be bound by these Terms of Service. If you do not agree, you must not use the Service.
                 </p>
             </section>
 
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">2. License to Use</h2>
                 <p>
-                    AdsAgent grants you a revocable, non-exclusive, non-transferable, limited license to access and use the Service strictly in accordance with these Terms. You agree not to:
+                    NotFair grants you a revocable, non-exclusive, non-transferable, limited license to access and use the Service strictly in accordance with these Terms. You agree not to:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
                     <li>Modify, adapt, translate, reverse engineer, or decompile any portion of the Service.</li>
@@ -48,7 +48,7 @@ export default function TermsPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">4. Intellectual Property</h2>
                 <p>
-                    All content, features, and functionality of the Service, including but not limited to design, text, graphics, and logos, are the exclusive property of AdsAgent and its licensors.
+                    All content, features, and functionality of the Service, including but not limited to design, text, graphics, and logos, are the exclusive property of NotFair and its licensors.
                 </p>
             </section>
 

@@ -1,8 +1,8 @@
 # Audit Recommendation Apply — boil-the-ocean plan
 
-**Goal:** make AdsAgent the only place where audit findings turn into changes — diagnose, decide, execute, verify, prove ROI — all in one surface.
+**Goal:** make NotFair the only place where audit findings turn into changes — diagnose, decide, execute, verify, prove ROI — all in one surface.
 
-**Why:** Apr 25 cohort analysis. 12/30 read-only chat users typed explicit apply intent ("YES FETCH NOW", "Fill and propose", "fill A TABLE WITH exact current→proposed plan"). The assistant looped on clarifying questions while users were ready to execute. adsagent-chat has 71% read-only stickiness vs 27% for claude-code. This is the highest-leverage D0 Write Users lever. Closing the apply loop also unlocks downstream features (auto-apply policies, cross-account fix-everywhere, value-loop email) that turn AdsAgent from copilot to autopilot.
+**Why:** Apr 25 cohort analysis. 12/30 read-only chat users typed explicit apply intent ("YES FETCH NOW", "Fill and propose", "fill A TABLE WITH exact current→proposed plan"). The assistant looped on clarifying questions while users were ready to execute. adsagent-chat has 71% read-only stickiness vs 27% for claude-code. This is the highest-leverage D0 Write Users lever. Closing the apply loop also unlocks downstream features (auto-apply policies, cross-account fix-everywhere, value-loop email) that turn NotFair from copilot to autopilot.
 
 ---
 
@@ -369,7 +369,7 @@ Set `feature.audit_apply` → false. Cards stop rendering. In-flight applies com
 ## Long-term trajectory
 
 This v1.0 unlocks (all 1-PR adds, no rewrite):
-- **Auto-apply policies** ("auto-apply all add_negative under $20/mo per account") — flips AdsAgent from copilot to autopilot
+- **Auto-apply policies** ("auto-apply all add_negative under $20/mo per account") — flips NotFair from copilot to autopilot
 - **Apply marketplace** — share top-performing audit fixes as templates across customers (anonymized)
 - **Cross-account fix-everywhere** — same negative wasting spend on 3 of 5 accounts → one click fixes all 3
 - **Apply impact bar** — "Last week's applied changes saved $X" in chat header — turns retention into a value-loop metric
@@ -492,7 +492,7 @@ Effort: human ~5 days / CC ~5 hours (saved a day vs the MCP-tool approach: no to
 - `AuditChatDrawer` already wires `contextPrefix` into chat — just extend the prefix to carry `snapshotId`
 
 ## Dream state delta
-**12-month ideal:** every audit recommendation that's safe to apply auto-applies under user-defined policy ("auto-apply all negatives under $20/mo, never auto-apply campaign pauses"). Users get a weekly "Here's what AdsAgent did" digest. Manual apply exists but is the exception, not the rule.
+**12-month ideal:** every audit recommendation that's safe to apply auto-applies under user-defined policy ("auto-apply all negatives under $20/mo, never auto-apply campaign pauses"). Users get a weekly "Here's what NotFair did" digest. Manual apply exists but is the exception, not the rule.
 
 This v1.0 is the foundation: structured recommendations + apply path + attribution. Auto-apply, marketplace, cross-account are 1-PR adds on the same schema.
 

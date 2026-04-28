@@ -20,6 +20,10 @@ export async function GET(request: Request) {
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256", "plain"],
     token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
+    service_documentation: `${origin}/google-ads-claude-connector-setup-guide`,
+    op_policy_uri: `${origin}/privacy`,
+    op_tos_uri: `${origin}/terms`,
+    logo_uri: `${origin}/icon.svg`,
   });
 }
 

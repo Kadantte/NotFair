@@ -1,0 +1,350 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import { ArrowRight, Check, Copy, Eye, EyeOff, Key, Lock, RotateCw } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
+import { MCP_SERVER_URL } from "@/lib/brand";
+
+type Surface = "marketing" | "in_app";
+
+const TOKEN_PLACEHOLDER = "YOUR_ADSAGENT_API_KEY";
+
+const OAUTH_CONFIG = `{
+  "mcpServers": {
+    "notfair": {
+      "url": "${MCP_SERVER_URL}"
+    }
+  }
+}`;
+
+function bearerConfigFor(token: string) {
+  return `{
+  "mcpServers": {
+    "notfair": {
+      "url": "${MCP_SERVER_URL}",
+      "headers": {
+        "Authorization": "Bearer ${token}"
+      }
+    }
+  }
+}`;
+}
+
+export function AnyMcpClientSetup({
+  apiKey,
+  onSignIn,
+  onRotated,
+  surface,
+}: {
+  apiKey: string | null;
+  onSignIn?: () => void;
+  onRotated?: () => Promise<void> | void;
+  surface: Surface;
+}) {
+  return (
+    <div className="space-y-10">
+      <ConfigBlock
+        id="oauth"
+        title="OAuth 2.0 (recommended)"
+        subtitle="Drop into ~/.cursor/mcp.json (Cursor), the Cline settings JSON, or any client that takes the standard MCP config schema. The client opens a browser for sign-in."
+      >
+        <CodeBlock
+          code={OAUTH_CONFIG}
+          language="json"
+          trackingStep="oauth_json"
+          surface={surface}
+        />
+      </ConfigBlock>
+
+      <ConfigBlock
+        id="bearer"
+        title="Bearer token (for clients without OAuth)"
+        subtitle="Pass an Authorization header instead. The token below is your personal API key."
+        footer={
+          <span className="inline-flex items-center gap-1.5">
+            <Lock className="h-3.5 w-3.5 text-[#C4C0B6]" />
+            Treat the API key like a password — don&apos;t commit it to source control.
+          </span>
+        }
+      >
+        <div className="space-y-4">
+          {apiKey ? (
+            <ApiKeyDisplay apiKey={apiKey} onRotated={onRotated} surface={surface} />
+          ) : (
+            <ApiKeyCta onSignIn={onSignIn} surface={surface} />
+          )}
+          <CodeBlock
+            code={apiKey ? bearerConfigFor(apiKey) : bearerConfigFor(TOKEN_PLACEHOLDER)}
+            language="json"
+            trackingStep="bearer_json"
+            surface={surface}
+          />
+        </div>
+      </ConfigBlock>
+    </div>
+  );
+}
+
+function ConfigBlock({
+  id,
+  title,
+  subtitle,
+  children,
+  footer,
+}: {
+  id: string;
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <div id={id} className="scroll-mt-24 rounded-xl border border-[#3D3C36] bg-[#24231F]">
+      <div className="border-b border-[#3D3C36] px-5 py-4 text-left">
+        <h3 className="text-base font-semibold text-[#E8E4DD]">{title}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">{subtitle}</p>
+      </div>
+      <div className="p-5 text-left">{children}</div>
+      {footer && (
+        <div className="border-t border-[#3D3C36] px-5 py-3 text-left text-xs leading-relaxed text-[#C4C0B6]">
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CodeBlock({
+  code,
+  language,
+  trackingStep,
+  surface,
+}: {
+  code: string;
+  language: string;
+  trackingStep: string;
+  surface: Surface;
+}) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    trackEvent("install_command_copied", {
+      setup_tab: "any-mcp",
+      surface,
+      step: trackingStep,
+    });
+    setTimeout(() => setCopied(false), 2000);
+  }, [code, trackingStep, surface]);
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-[#3D3C36] bg-[#1A1917]">
+      <div className="flex items-center justify-between border-b border-[#3D3C36] px-4 py-2">
+        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#C4C0B6]/80">
+          {language}
+        </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#3D3C36] bg-[#24231F] px-2.5 py-1 text-xs text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
+        >
+          {copied ? (
+            <>
+              <Check className="h-3.5 w-3.5 text-[#4CAF6E]" />
+              <span className="text-[#4CAF6E]">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="overflow-x-auto p-4 font-mono text-sm leading-relaxed text-[#E8E4DD]">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function ApiKeyDisplay({
+  apiKey,
+  onRotated,
+  surface,
+}: {
+  apiKey: string;
+  onRotated?: () => Promise<void> | void;
+  surface: Surface;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(apiKey);
+    setCopied(true);
+    trackEvent("api_key_copied", { surface });
+    setTimeout(() => setCopied(false), 2000);
+  }, [apiKey, surface]);
+
+  async function rotate() {
+    setRotating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/rotate-token", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setError(data.error || "Failed to rotate API key");
+        return;
+      }
+      trackEvent("api_key_rotated", { surface });
+      await onRotated?.();
+    } catch {
+      setError("Failed to rotate API key");
+    } finally {
+      setRotating(false);
+      setShowConfirm(false);
+    }
+  }
+
+  const masked = revealed ? apiKey : `${apiKey.slice(0, 8)}${"•".repeat(Math.max(apiKey.length - 12, 16))}${apiKey.slice(-4)}`;
+
+  return (
+    <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/[0.06] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10">
+          <Key className="h-4 w-4 text-[#4CAF6E]" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[#E8E4DD]">Your personal API key</p>
+          <p className="mt-1 text-xs text-[#C4C0B6]">
+            Already substituted into the Bearer config below. Use Copy or paste this directly.
+          </p>
+
+          <div className="mt-3 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]">
+              {masked}
+            </code>
+            <button
+              type="button"
+              onClick={() => {
+                setRevealed(v => {
+                  const next = !v;
+                  if (next) trackEvent("api_key_revealed", { surface });
+                  return next;
+                });
+              }}
+              className="shrink-0 rounded-md border border-[#3D3C36] bg-[#24231F] p-2 text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
+              aria-label={revealed ? "Hide API key" : "Reveal API key"}
+            >
+              {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#4CAF6E] px-3 py-1.5 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copied" : "Copy API Key"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                trackEvent("api_key_rotate_intent", { surface });
+                setShowConfirm(true);
+              }}
+              disabled={rotating}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#3D3C36] bg-[#24231F] px-3 py-1.5 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-50"
+            >
+              <RotateCw className={`h-4 w-4 ${rotating ? "animate-spin" : ""}`} />
+              {rotating ? "Rotating..." : "Rotate"}
+            </button>
+          </div>
+
+          {error && (
+            <p className="mt-2 text-xs text-[#C45D4A]">{error}</p>
+          )}
+        </div>
+      </div>
+
+      {showConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => !rotating && setShowConfirm(false)}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl border border-[#3D3C36] bg-[#24231F] p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-[#E8E4DD]">Rotate API key?</h3>
+            <p className="mt-2 text-sm text-[#C4C0B6]">
+              This will invalidate your current API key immediately. Any integrations using
+              the old key will stop working until you update them with the new one.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                disabled={rotating}
+                className="rounded-lg border border-[#3D3C36] px-4 py-2 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={rotate}
+                disabled={rotating}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#C45D4A] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#B04E3D] disabled:opacity-50"
+              >
+                <RotateCw className={`h-4 w-4 ${rotating ? "animate-spin" : ""}`} />
+                {rotating ? "Rotating..." : "Rotate API Key"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ApiKeyCta({
+  onSignIn,
+  surface,
+}: {
+  onSignIn?: () => void;
+  surface: Surface;
+}) {
+  const handleClick = useCallback(() => {
+    trackEvent("api_key_cta_clicked", { surface });
+    onSignIn?.();
+  }, [onSignIn, surface]);
+
+  return (
+    <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/[0.06] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10">
+          <Key className="h-4 w-4 text-[#4CAF6E]" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[#E8E4DD]">Get your API key</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
+            Sign in with Google to generate your personal API key. We&apos;ll
+            substitute it into the Bearer config below automatically.
+          </p>
+          <button
+            type="button"
+            onClick={handleClick}
+            className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+          >
+            Sign in with Google
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

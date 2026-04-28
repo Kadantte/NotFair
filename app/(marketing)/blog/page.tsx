@@ -3,12 +3,12 @@ import { allBlogPosts } from "@/lib/blog-posts";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Blog — AdsAgent",
+  title: "Blog — NotFair",
   description:
-    "Guides and explainers on MCP, Google Ads automation, and AI-driven campaign management from the AdsAgent team.",
+    "Guides and explainers on MCP, Google Ads automation, and AI-driven campaign management from the NotFair team.",
   path: "/blog",
   keywords: [
-    "AdsAgent blog",
+    "NotFair blog",
     "MCP guides",
     "Google Ads AI",
     "Google Ads MCP",

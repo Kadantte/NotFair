@@ -90,10 +90,10 @@ function newAccountInput(): AuditInput {
       { searchTerm: "skillshop", impressions: 9, clicks: 0, cost: 0, conversions: 0, campaignName: "Test Campaign", campaignId: "1", adGroupName: "AG1" },
     ],
     ads: [
-      { adId: "1", type: 15, headlines: ["AI Google Ads Agent", "Google Ads MCP Server", "Free Setup", "Stop Wasting Ad Spend"], descriptions: ["Connect Google Ads to AI."], finalUrls: ["https://www.adsagent.org"], impressions: 22, clicks: 2, cost: 1.38, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 },
+      { adId: "1", type: 15, headlines: ["AI Google Ads Agent", "Google Ads MCP Server", "Free Setup", "Stop Wasting Ad Spend"], descriptions: ["Connect Google Ads to AI."], finalUrls: ["https://www.notfair.co"], impressions: 22, clicks: 2, cost: 1.38, conversions: 0, adGroupId: "1", adGroupName: "AG1", status: 2 },
     ],
     landingPages: [
-      { url: "https://www.adsagent.org", ok: true, https: true, statusCode: 200, title: "AdsAgent - AI Google Ads", metaDescription: null, h1: "AI Google Ads Agent", hasForm: false, hasMobileViewport: true, loadTimeMs: 800, errorReason: null },
+      { url: "https://www.notfair.co", ok: true, https: true, statusCode: 200, title: "NotFair - AI Google Ads", metaDescription: null, h1: "AI Google Ads Agent", hasForm: false, hasMobileViewport: true, loadTimeMs: 800, errorReason: null },
     ],
     impressionShare: [
       { campaignName: "Test Campaign", impressionShare: 0.33, budgetLostIS: 0.23, rankLostIS: 0.44, totalImpressions: 22, totalCost: 1.38 },

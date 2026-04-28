@@ -1,10 +1,13 @@
 import "server-only";
 
 import type Stripe from "stripe";
+import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
 import { resolvePrice, stripeMode } from "@/lib/stripe/config";
 import { DEV_EMAILS } from "@/lib/dev-emails";
+
+const DEV_GROWTH_OVERRIDE_COOKIE = "dev_growth_override";
 
 // ─── Plan registry ────────────────────────────────────────────────────
 //
@@ -197,6 +200,20 @@ async function maybeDevOverride(
   base: UserSubscription,
 ): Promise<UserSubscription | null> {
   if (!(await isDevUser(userId))) return null;
+  // Per-session opt-out: when the cookie is "off", the override is disabled
+  // and the caller falls back to whatever the DB says (passed in as `base`).
+  // Note this whole function is only called when `base.plan === "free"`, so
+  // a real paid Stripe sub already wins regardless of this toggle — turning
+  // override off only matters for devs without a real subscription, who
+  // then see the free-plan UX (paywalls, rate limits).
+  // `cookies()` throws when called outside a request context (e.g.
+  // background jobs, generateMetadata) — in that case keep override on.
+  try {
+    const store = await cookies();
+    if (store.get(DEV_GROWTH_OVERRIDE_COOKIE)?.value === "off") return null;
+  } catch {
+    /* not in a request context — fall through to override on */
+  }
   return { ...base, plan: "growth", status: "active" };
 }
 

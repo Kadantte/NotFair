@@ -17,7 +17,7 @@ export const DEMO_CUSTOMER_NAME = "Threadline Apparel (Demo)";
 /**
  * Fixed OAuth client credentials for the permanent demo account. These are
  * intentionally public so external reviewers (e.g. Anthropic's MCP review
- * team) can pair AdsAgent to Claude via the Connector flow without needing
+ * team) can pair NotFair to Claude via the Connector flow without needing
  * a Google account. The secret only unlocks the simulated demo account:
  * all writes are no-ops, and no real Google Ads data is accessible.
  */

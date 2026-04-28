@@ -22,6 +22,7 @@ import { pauseCampaignAction, addNegativeKeywordAction, pauseKeywordAction } fro
 import type { AuditResult, PassItem, QsSubLabel } from "@/lib/audit/scoring";
 import { trackEvent } from "@/lib/analytics";
 import { RecommendationApply, applyBatch } from "@/components/audit/recommendation-card";
+import { BRAND_NAME } from "@/lib/brand";
 
 // ─── Time Range ──────────────────────────────────────────────────────
 
@@ -1163,7 +1164,7 @@ export function AuditContent({
                   Ready to ship these fixes?
                 </div>
                 <p className="mt-1 text-[13px] leading-relaxed text-[#C4C0B6]">
-                  Connect AdsAgent to Claude. Every action above becomes a one-command fix — nothing auto-runs without your approval.
+                  Connect {BRAND_NAME} to Claude. Every action above becomes a one-command fix — nothing auto-runs without your approval.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5 self-center text-[13px] font-medium text-[#4CAF6E] group-hover:text-[#6BC58A]">

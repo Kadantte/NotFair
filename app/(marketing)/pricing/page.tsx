@@ -4,7 +4,7 @@ import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 import { PricingPage } from "@/components/marketing/pricing-page";
 
 export const metadata = {
-  title: "Pricing — AdsAgent",
+  title: "Pricing — NotFair",
   description: "Plans for solo founders and growing teams. Connect Google Ads to your AI tools, then ship campaigns faster.",
 };
 

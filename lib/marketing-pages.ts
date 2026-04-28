@@ -31,7 +31,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "ai-google-ads-agent",
     title: "AI Google Ads Agent",
     description:
-      "Use AdsAgent as an AI Google Ads agent to inspect campaigns, surface waste, recommend optimizations, and keep changes reviewable.",
+      "Use NotFair as an AI Google Ads agent to inspect campaigns, surface waste, recommend optimizations, and keep changes reviewable.",
     keywords: [
       "AI Google Ads agent",
       "Google Ads AI agent",
@@ -40,7 +40,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "An AI Google Ads agent that works with your existing workflow",
     heroDescription:
-      "AdsAgent connects your Google Ads account to MCP-compatible AI clients so you can ask better questions, spot wasted spend faster, and keep campaign changes traceable.",
+      "NotFair connects your Google Ads account to MCP-compatible AI clients so you can ask better questions, spot wasted spend faster, and keep campaign changes traceable.",
     highlights: [
       "Inspect campaigns and search terms without exporting reports by hand",
       "Use AI to find quick wins before you touch bids, budgets, or negatives",
@@ -48,9 +48,9 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     sections: [
       {
-        title: "What makes AdsAgent different from a generic chatbot",
+        title: "What makes NotFair different from a generic chatbot",
         body:
-          "AdsAgent is not just a prompt template. It is the connection layer between Google Ads and an MCP-compatible AI workflow, so your agent can work with live campaign context instead of screenshots or copied tables.",
+          "NotFair is not just a prompt template. It is the connection layer between Google Ads and an MCP-compatible AI workflow, so your agent can work with live campaign context instead of screenshots or copied tables.",
       },
       {
         title: "Where teams use it first",
@@ -65,14 +65,14 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
           "It is a workflow where an AI system can inspect campaign data, answer account questions, and recommend or execute approved optimizations with better context than a standalone chatbot.",
       },
       {
-        question: "Does AdsAgent replace Google Ads specialists?",
+        question: "Does NotFair replace Google Ads specialists?",
         answer:
           "No. It is best used to speed up analysis, reporting, and optimization workflows while a human still reviews strategy and approves changes.",
       },
       {
-        question: "Can AdsAgent make changes safely?",
+        question: "Can NotFair make changes safely?",
         answer:
-          "AdsAgent is designed around reviewable workflows and impact tracking so teams can see what changed and judge whether it helped.",
+          "NotFair is designed around reviewable workflows and impact tracking so teams can see what changed and judge whether it helped.",
       },
     ],
     relatedLinks: [
@@ -89,7 +89,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         href: "/google-ads-mcp",
         title: "Google Ads MCP",
-        description: "See how AdsAgent works as a Google Ads MCP server.",
+        description: "See how NotFair works as a Google Ads MCP server.",
       },
     ],
   },
@@ -97,7 +97,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "connect-google-ads-to-claude",
     title: "Connect Google Ads to Claude",
     description:
-      "Use AdsAgent to connect Google Ads to Claude through MCP so Claude can inspect campaigns, surface wasted spend, and guide approved changes.",
+      "Use NotFair to connect Google Ads to Claude through MCP so Claude can inspect campaigns, surface wasted spend, and guide approved changes.",
     keywords: [
       "connect Google Ads to Claude",
       "Claude Google Ads",
@@ -106,7 +106,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "Connect Google Ads to Claude without building the plumbing yourself",
     heroDescription:
-      "AdsAgent is the shortest path to getting Claude working with live Google Ads context through MCP, so you can move from account questions to optimization decisions faster.",
+      "NotFair is the shortest path to getting Claude working with live Google Ads context through MCP, so you can move from account questions to optimization decisions faster.",
     highlights: [
       "Connect Google Ads once and use Claude with live campaign context",
       "Ask for account summaries, waste analysis, and prioritized fixes",
@@ -119,21 +119,21 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
           "Common prompts include top spenders, zero-conversion waste, search term issues, and quick-win opportunities worth reviewing before anything changes in the account.",
       },
       {
-        title: "Why AdsAgent fits Claude workflows",
+        title: "Why NotFair fits Claude workflows",
         body:
-          "Claude is strongest when it has structured tools and context. AdsAgent provides the Google Ads connection layer plus a focused product flow for setup, change tracking, and account review.",
+          "Claude is strongest when it has structured tools and context. NotFair provides the Google Ads connection layer plus a focused product flow for setup, change tracking, and account review.",
       },
     ],
     faq: [
       {
-        question: "Can Claude directly manage Google Ads through AdsAgent?",
+        question: "Can Claude directly manage Google Ads through NotFair?",
         answer:
-          "Claude can analyze account context and help drive approved workflows once AdsAgent is connected through MCP.",
+          "Claude can analyze account context and help drive approved workflows once NotFair is connected through MCP.",
       },
       {
         question: "What do I need before connecting Claude?",
         answer:
-          "You need a Google Ads account and an MCP-compatible Claude workflow. AdsAgent handles the Google Ads side of the connection and setup flow.",
+          "You need a Google Ads account and an MCP-compatible Claude workflow. NotFair handles the Google Ads side of the connection and setup flow.",
       },
       {
         question: "What is the fastest first use case?",
@@ -163,7 +163,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "connect-google-ads-to-chatgpt",
     title: "Connect Google Ads to ChatGPT Workflows",
     description:
-      "AdsAgent is built for teams trying to connect Google Ads to ChatGPT-style AI workflows through MCP-compatible tooling, with reviewable optimization and tracking.",
+      "NotFair is built for teams trying to connect Google Ads to ChatGPT-style AI workflows through MCP-compatible tooling, with reviewable optimization and tracking.",
     keywords: [
       "connect Google Ads to ChatGPT",
       "ChatGPT Google Ads",
@@ -172,7 +172,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "A cleaner path for Google Ads in ChatGPT-style AI workflows",
     heroDescription:
-      "If you are searching for a way to connect Google Ads to ChatGPT, the real need is usually live campaign context inside an AI workflow. AdsAgent handles that connection through MCP-compatible tooling and keeps the optimization flow reviewable.",
+      "If you are searching for a way to connect Google Ads to ChatGPT, the real need is usually live campaign context inside an AI workflow. NotFair handles that connection through MCP-compatible tooling and keeps the optimization flow reviewable.",
     highlights: [
       "Built for teams that want live Google Ads context inside AI chat workflows",
       "Useful when you want less copying, fewer exports, and more structured analysis",
@@ -182,24 +182,24 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         title: "Important positioning",
         body:
-          "AdsAgent is centered on MCP-compatible clients and agent workflows. If your ChatGPT setup supports that model or you use a nearby MCP client, AdsAgent gives you the Google Ads connection layer you are actually looking for.",
+          "NotFair is centered on MCP-compatible clients and agent workflows. If your ChatGPT setup supports that model or you use a nearby MCP client, NotFair gives you the Google Ads connection layer you are actually looking for.",
       },
       {
         title: "What people usually mean by this query",
         body:
-          "Most teams want to ask an AI system about campaign performance, waste, search terms, and recommended actions without manually stitching together data. That is the workflow AdsAgent is built to support.",
+          "Most teams want to ask an AI system about campaign performance, waste, search terms, and recommended actions without manually stitching together data. That is the workflow NotFair is built to support.",
       },
     ],
     faq: [
       {
-        question: "Does AdsAgent claim native ChatGPT-only support?",
+        question: "Does NotFair claim native ChatGPT-only support?",
         answer:
-          "AdsAgent is designed around MCP-compatible AI workflows. This page targets the broader user intent of bringing Google Ads into an AI chat workflow while staying accurate about the connection model.",
+          "NotFair is designed around MCP-compatible AI workflows. This page targets the broader user intent of bringing Google Ads into an AI chat workflow while staying accurate about the connection model.",
       },
       {
         question: "Why keep this page if the tooling varies?",
         answer:
-          "Because the underlying problem is consistent: teams want Google Ads context inside an AI workflow. AdsAgent solves the connection and review layer around that need.",
+          "Because the underlying problem is consistent: teams want Google Ads context inside an AI workflow. NotFair solves the connection and review layer around that need.",
       },
       {
         question: "What is the safer way to use AI here?",
@@ -211,7 +211,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         href: "/google-ads-mcp",
         title: "Google Ads MCP",
-        description: "See the integration model AdsAgent is built around.",
+        description: "See the integration model NotFair is built around.",
       },
       {
         href: "/connect-google-ads-to-claude",
@@ -229,7 +229,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "ai-google-ads-optimization",
     title: "AI Google Ads Optimization",
     description:
-      "Use AdsAgent for AI-assisted Google Ads optimization, from wasted-spend analysis and search term review to change tracking and impact review.",
+      "Use NotFair for AI-assisted Google Ads optimization, from wasted-spend analysis and search term review to change tracking and impact review.",
     keywords: [
       "AI Google Ads optimization",
       "Google Ads optimization AI",
@@ -238,7 +238,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "Use AI for Google Ads optimization without giving up control",
     heroDescription:
-      "AdsAgent helps teams use AI to identify wasted spend, review campaign issues, and move toward approved optimizations with better context and cleaner tracking.",
+      "NotFair helps teams use AI to identify wasted spend, review campaign issues, and move toward approved optimizations with better context and cleaner tracking.",
     highlights: [
       "Spot wasted spend and weak search terms faster",
       "Prioritize budget, bid, and negative keyword opportunities",
@@ -248,7 +248,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         title: "The right role for AI in Google Ads optimization",
         body:
-          "AI is most useful when it accelerates analysis and prioritization, not when it replaces judgment. AdsAgent is built to surface what matters and keep the path to action visible.",
+          "AI is most useful when it accelerates analysis and prioritization, not when it replaces judgment. NotFair is built to surface what matters and keep the path to action visible.",
       },
       {
         title: "What optimization workflows fit best",
@@ -268,9 +268,9 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
           "Most teams start with high-spend zero-conversion areas, weak search terms, budget misallocation, and obvious campaign structure issues.",
       },
       {
-        question: "How does AdsAgent help after changes are made?",
+        question: "How does NotFair help after changes are made?",
         answer:
-          "AdsAgent keeps a record of changes and before/after context so teams can review whether a change helped instead of guessing later.",
+          "NotFair keeps a record of changes and before/after context so teams can review whether a change helped instead of guessing later.",
       },
     ],
     relatedLinks: [
@@ -282,7 +282,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         href: "/ai-google-ads-agent",
         title: "AI Google Ads agent",
-        description: "Start with the broader AdsAgent positioning.",
+        description: "Start with the broader NotFair positioning.",
       },
       {
         href: "/google-ads-mcp",
@@ -301,27 +301,27 @@ export function getLandingPage(slug: string) {
 
 export const homepageFaq: FaqItem[] = [
   {
-    question: "What is AdsAgent?",
+    question: "What is NotFair?",
     answer:
-      "AdsAgent is a Google Ads MCP server built for Claude. It connects your Google Ads account to Claude Code, Claude Cowork, and other MCP-compatible AI clients so you can analyze campaigns, optimize spend, and manage changes through natural conversation.",
+      "NotFair is a Google Ads MCP server built for Claude. It connects your Google Ads account to Claude Code, Claude Cowork, and other MCP-compatible AI clients so you can analyze campaigns, optimize spend, and manage changes through natural conversation.",
   },
   {
-    question: "Who is AdsAgent built for?",
+    question: "Who is NotFair built for?",
     answer:
-      "Teams and founders who use Claude to manage their business and want to extend it to Google Ads. Instead of manually exporting CSVs and pasting them into chat, AdsAgent gives Claude live access to your campaign data.",
+      "Teams and founders who use Claude to manage their business and want to extend it to Google Ads. Instead of manually exporting CSVs and pasting them into chat, NotFair gives Claude live access to your campaign data.",
   },
   {
-    question: "What can Claude do with AdsAgent?",
+    question: "What can Claude do with NotFair?",
     answer:
       "Claude can pull campaign performance, analyze search terms, find wasted spend, recommend negative keywords, adjust bids, pause underperforming campaigns, and track the impact of every change — all through natural language with your approval at each step.",
   },
   {
-    question: "Does AdsAgent work with other AI tools?",
+    question: "Does NotFair work with other AI tools?",
     answer:
-      "Yes. AdsAgent uses the open MCP protocol, so it works with any MCP-compatible client including Cursor, Windsurf, and custom agents built with the Claude Agent SDK. Claude Code and Claude Cowork are the recommended primary clients.",
+      "Yes. NotFair uses the open MCP protocol, so it works with any MCP-compatible client including Cursor, Windsurf, and custom agents built with the Claude Agent SDK. Claude Code and Claude Cowork are the recommended primary clients.",
   },
   {
-    question: "Why does AdsAgent use MCP?",
+    question: "Why does NotFair use MCP?",
     answer:
       "MCP (Model Context Protocol) is the open standard created by Anthropic for connecting AI to external tools. It gives Claude structured access to Google Ads data and actions without custom integrations — one protocol that works everywhere.",
   },

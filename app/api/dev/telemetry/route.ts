@@ -5,7 +5,7 @@ import { excludeDevOpsFilter, devEmailSqlList } from "@/lib/dev-ops-filter";
 
 /**
  * Dev-gated telemetry endpoint. Returns aggregate views over the operations
- * table that answer "how are users using AdsAgent?": top tools with p50/p95
+ * table that answer "how are users using NotFair?": top tools with p50/p95
  * latency, top arg-shape buckets, a funnel of reads vs writes by day, and
  * the last 50 raw calls with their args. Full args are gated to DEV_EMAILS
  * so the payload never leaks outside the admin group.

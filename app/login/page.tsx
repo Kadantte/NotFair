@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Mail } from "lucide-react";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { AUTH_ERROR_REASON } from "@/lib/auth-errors";
+import { BRAND_NAME } from "@/lib/brand";
 
 export default function LoginPage() {
   return (
@@ -96,7 +97,7 @@ function LoginForm() {
   return (
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-[#E8E4DD]">Sign in to AdsAgent</h1>
+        <h1 className="text-3xl font-bold text-[#E8E4DD]">Sign in to {BRAND_NAME}</h1>
         <p className="text-[#C4C0B6] text-sm">
           Manage your Google Ads with AI
         </p>

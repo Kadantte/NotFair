@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { BRAND_NAME } from '@/lib/brand';
 
 function buildScript(apiKey: string): string {
   return `#!/usr/bin/env bash
@@ -7,7 +8,7 @@ set -eo pipefail
 API_KEY="${apiKey}"
 SKILL_DIR="$HOME/.claude/skills/toprank"
 
-echo "Installing AdsAgent..."
+echo "Installing ${BRAND_NAME}..."
 
 # Clone or update toprank
 if [ -d "$SKILL_DIR/.git" ]; then
@@ -26,7 +27,7 @@ export function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');
 
   if (!token) {
-    return new Response('echo "Error: missing token. Visit your AdsAgent connect page to get your install command."', {
+    return new Response(`echo "Error: missing token. Visit your ${BRAND_NAME} connect page to get your install command."`, {
       status: 400,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });

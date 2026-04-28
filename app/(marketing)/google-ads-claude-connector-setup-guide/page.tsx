@@ -2,9 +2,9 @@ import { GoogleAdsClaudeConnectorPage } from "@/components/marketing/google-ads-
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Google Ads Claude Connector — Use AdsAgent in Claude.ai (Web & Cowork)",
+  title: "Google Ads Claude Connector — Use NotFair in Claude.ai (Web & Cowork)",
   description:
-    "Step-by-step guide to install the Google Ads Claude Connector. Add AdsAgent as a custom MCP connector inside Claude.ai Web or Claude Cowork in under 2 minutes — manage Google Ads campaigns through chat.",
+    "Step-by-step guide to install the Google Ads Claude Connector. Add NotFair as a custom MCP connector inside Claude.ai Web or Claude Cowork in under 2 minutes — manage Google Ads campaigns through chat.",
   path: "/google-ads-claude-connector-setup-guide",
   keywords: [
     "google ads claude connector",
@@ -28,22 +28,22 @@ const faqItems = [
   {
     question: "Where does this connector work?",
     answer:
-      "Anywhere you use Claude.ai with custom connector support: Claude.ai on the web and Claude Cowork. If you use Claude Code instead, AdsAgent ships as a plugin — see the Claude Code setup guide.",
+      "Anywhere you use Claude.ai with custom connector support: Claude.ai on the web and Claude Cowork. If you use Claude Code instead, NotFair ships as a plugin — see the Claude Code setup guide.",
   },
   {
     question: "Do I need to write any code?",
     answer:
-      "No. Setup is entirely point-and-click inside claude.ai/customize/connectors. You sign in with Google to generate your Client ID and Secret, paste them into Claude's custom connector dialog, and click Add.",
+      "No. Setup is entirely point-and-click inside claude.ai/customize/connectors. Paste the NotFair server URL, click Add, and Claude opens a browser tab to sign you in — no Client ID or Secret to copy.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Open the Connectors page in Claude, paste the AdsAgent server URL, sign in with your Google Ads account to generate credentials, paste them into Claude, and you're done.",
+      "Under 2 minutes. Open the Connectors page in Claude, paste the NotFair server URL, click Add, and sign in with your Google Ads account in the browser tab Claude opens for you.",
   },
   {
     question: "Is the connector free?",
     answer:
-      "Yes. Adding the AdsAgent connector and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
+      "Yes. Adding the NotFair connector and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
   },
   {
     question: "Can Claude actually change my Google Ads account through the connector?",
@@ -51,7 +51,7 @@ const faqItems = [
       "Only with your explicit approval. Claude can propose pausing campaigns, adjusting bids, adding negative keywords, or writing new ads — but every write action is shown to you first and requires confirmation. Read access is unrestricted; write access is gated.",
   },
   {
-    question: "What data does Claude see when the AdsAgent connector is enabled?",
+    question: "What data does Claude see when the NotFair connector is enabled?",
     answer:
       "Live campaign performance, keyword bids and Quality Scores, search term reports, ad copy, spend, impression share, and conversion tracking status — pulled directly from the Google Ads API in real time.",
   },
@@ -64,7 +64,7 @@ const jsonLd = [
     "@type": "HowTo",
     name: "How to add the Google Ads Claude Connector to Claude.ai",
     description:
-      "Install AdsAgent as a custom MCP connector inside Claude.ai Web or Claude Cowork to give Claude live access to your Google Ads account.",
+      "Install NotFair as a custom MCP connector inside Claude.ai Web or Claude Cowork to give Claude live access to your Google Ads account.",
     totalTime: "PT2M",
     step: [
       {
@@ -78,28 +78,28 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 2,
         name: "Configure the connector",
-        text: "Enter the name AdsAgent, paste the Remote MCP Server URL, expand Advanced Settings, then sign in with your Google Ads account on AdsAgent to generate your Client ID and Client Secret.",
+        text: "Enter the name NotFair, paste the Remote MCP Server URL, click Add, and verify NotFair appears in your Connectors list with all available tools. Claude opens a browser tab to sign you in — no Client ID or Secret needed.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-2", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 3,
-        name: "Add the connector",
-        text: "Click Add. The AdsAgent connector appears in your Connectors list with all available tools.",
+        name: "Install the toprank plugin on Claude Desktop App",
+        text: "In the Claude Desktop App's Customize panel, open Personal plugins, click +, choose Browse plugins, paste the toprank GitHub URL into Add marketplace, and click Sync. Plugins are not available on Claude web.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-3", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 4,
-        name: "Enable AdsAgent in a chat",
-        text: "Open a new chat on Claude.ai, click the + button, go to Connectors, and toggle AdsAgent on.",
+        name: "Enable NotFair in a chat",
+        text: "Open a new chat on Claude.ai, click the + button, go to Connectors, and toggle NotFair on.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-4", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 5,
         name: "Ask Claude about your Google Ads",
-        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Claude calls AdsAgent tools and answers with live data.",
+        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Claude calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-5", SITE_URL).toString(),
       },
     ],
@@ -107,12 +107,12 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "AdsAgent — Google Ads Claude Connector",
+    name: "NotFair — Google Ads Claude Connector",
     applicationCategory: "BusinessApplication",
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "Web",
     description:
-      "Custom MCP connector that gives Claude.ai Web and Claude Cowork live access to your Google Ads account through AdsAgent.",
+      "Custom MCP connector that gives Claude.ai Web and Claude Cowork live access to your Google Ads account through NotFair.",
     offers: {
       "@type": "Offer",
       price: "0",

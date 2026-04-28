@@ -61,7 +61,7 @@ export async function GET() {
     exists: true,
     client_id: existing.clientId,
     client_secret: existing.clientSecret,
-    mcp_server_url: "https://adsagent.org/api/mcp",
+    mcp_server_url: "https://notfair.co/api/mcp",
   });
 }
 
@@ -110,6 +110,6 @@ export async function POST() {
   return NextResponse.json({
     client_id: clientId,
     client_secret: clientSecret,
-    mcp_server_url: "https://adsagent.org/api/mcp",
+    mcp_server_url: "https://notfair.co/api/mcp",
   });
 }
