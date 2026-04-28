@@ -32,12 +32,12 @@ const faqItems = [
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Sign in with Google to get your API key, run two slash commands inside Claude Code to add the marketplace and install the plugin, then run /ads and paste your key when prompted.",
+      "Under 2 minutes. Run three slash commands inside Claude Code to add the marketplace, install the plugin, and reload, then run /ads — Claude will open your browser to sign in with Google. No API key to copy.",
   },
   {
     question: "Do I need to write any code?",
     answer:
-      "No. Setup is entirely slash-command driven inside Claude Code. You'll paste two commands and one API key — no JSON config edits, no environment variables, no scripts.",
+      "No. Setup is entirely slash-command driven inside Claude Code. You'll paste a few commands — no JSON config edits, no environment variables, no scripts, no API keys.",
   },
   {
     question: "Is the plugin free?",
@@ -76,30 +76,23 @@ const jsonLd = [
       {
         "@type": "HowToStep",
         position: 2,
-        name: "Add the toprank marketplace",
-        text: "Run the slash command /plugin marketplace add nowork-studio/toprank inside Claude Code to register the toprank plugin marketplace.",
+        name: "Install the toprank plugin",
+        text: "In Claude Code, run /plugin marketplace add nowork-studio/toprank, then /plugin install toprank@nowork-studio, then /reload-plugins to register the marketplace, install the NotFair plugin, and pick up the new commands.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-2", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 3,
-        name: "Install the plugin",
-        text: "Run /plugin install toprank@nowork-studio to install the NotFair plugin and its bundled Google Ads skills.",
+        name: "Run /ads",
+        text: "Run /ads in Claude Code. It opens your browser to sign in with Google and connect NotFair — no API key to copy. If the command doesn't appear, restart Claude Code first.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-3", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 4,
-        name: "Run /ads",
-        text: "Restart Claude Code and run /ads. Claude will ask for your NotFair API key — grab it in the next step.",
+        name: "Ask Claude about your Google Ads",
+        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Claude calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-4", SITE_URL).toString(),
-      },
-      {
-        "@type": "HowToStep",
-        position: 5,
-        name: "Get your NotFair API key",
-        text: "Sign in with your Google Ads account at notfair.co/connect/claude-code/manual to generate your personal API key, then paste it into Claude Code when prompted.",
-        url: new URL("/google-ads-claude-code-plugin-setup-guide#step-5", SITE_URL).toString(),
       },
     ],
   },

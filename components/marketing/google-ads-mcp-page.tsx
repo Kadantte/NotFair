@@ -1,38 +1,19 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Copy, ExternalLink, Key, Lock } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/components/session-provider";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
 import { fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
+import { AnyMcpClientSetup } from "@/components/any-mcp-client-setup";
+import { MCP_SERVER_URL } from "@/lib/brand";
 import type { FaqItem } from "@/lib/seo";
 
-const SERVER_URL = "https://notfair.co/api/mcp";
-
-const CURSOR_CONFIG = `{
-  "mcpServers": {
-    "adsagent": {
-      "url": "${SERVER_URL}"
-    }
-  }
-}`;
-
-const BEARER_CONFIG = `{
-  "mcpServers": {
-    "adsagent": {
-      "url": "${SERVER_URL}",
-      "headers": {
-        "Authorization": "Bearer YOUR_ADSAGENT_API_KEY"
-      }
-    }
-  }
-}`;
+const SERVER_URL = MCP_SERVER_URL;
 
 const VISIBLE_TOOLS = 6;
 
@@ -101,8 +82,6 @@ const RELATED_LINKS = [
 ];
 
 export function GoogleAdsMcpPage() {
-    const session = useSession();
-
     return (
         <div className="bg-[#1A1917] text-[#E8E4DD]">
             {/* ── Hero ── */}
@@ -180,41 +159,11 @@ export function GoogleAdsMcpPage() {
                         </p>
                     </motion.div>
 
-                    <div className="space-y-10">
-                        <ConfigBlock
-                            id="oauth"
-                            title="OAuth 2.0 (recommended)"
-                            subtitle="Drop into ~/.cursor/mcp.json (Cursor), the Cline settings JSON, or any client that takes the standard MCP config schema. The client opens a browser for sign-in."
-                        >
-                            <CodeBlock
-                                code={CURSOR_CONFIG}
-                                language="json"
-                                trackingStep="oauth_json"
-                            />
-                        </ConfigBlock>
-
-                        <ConfigBlock
-                            id="bearer"
-                            title="Bearer token (for clients without OAuth)"
-                            subtitle="Pass an Authorization header instead. Generate the API key on the connect page."
-                            footer={
-                                <span className="inline-flex items-center gap-1.5">
-                                    <Lock className="h-3.5 w-3.5 text-[#C4C0B6]" />
-                                    Treat the API key like a password — don&apos;t commit
-                                    it to source control.
-                                </span>
-                            }
-                        >
-                            <div className="space-y-4">
-                                <ApiKeyCta connected={session.connected} />
-                                <CodeBlock
-                                    code={BEARER_CONFIG}
-                                    language="json"
-                                    trackingStep="bearer_json"
-                                />
-                            </div>
-                        </ConfigBlock>
-                    </div>
+                    <AnyMcpClientSetup
+                        apiKey={null}
+                        onSignIn={() => startGoogleConnect("/connect/any-mcp")}
+                        surface="marketing"
+                    />
                 </div>
             </section>
 
@@ -319,7 +268,19 @@ export function GoogleAdsMcpPage() {
                             paste a config above into your MCP client.
                         </p>
                         <div className="mt-6 flex flex-col items-center gap-3">
-                            <ConnectButton connected={session.connected} large />
+                            <Button
+                                onClick={() => {
+                                    trackEvent("cta_clicked", {
+                                        page: "google-ads-mcp",
+                                        cta: "open_connect_page",
+                                        destination: "/connect/any-mcp",
+                                    });
+                                    startGoogleConnect("/connect/any-mcp");
+                                }}
+                                className="h-12 rounded-lg bg-[#4CAF6E] px-6 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+                            >
+                                Sign in with Google to continue
+                            </Button>
                             <Link
                                 href="/google-ads-claude-connector-setup-guide"
                                 className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
@@ -349,165 +310,3 @@ export function GoogleAdsMcpPage() {
     );
 }
 
-/* ─────────────────────────────────────────────────── helpers ────────────── */
-
-function ConfigBlock({
-    id,
-    title,
-    subtitle,
-    children,
-    footer,
-}: {
-    id: string;
-    title: string;
-    subtitle: string;
-    children: React.ReactNode;
-    footer?: React.ReactNode;
-}) {
-    return (
-        <div id={id} className="scroll-mt-24 rounded-xl border border-[#3D3C36] bg-[#24231F]">
-            <div className="border-b border-[#3D3C36] px-5 py-4">
-                <h3 className="text-base font-semibold text-[#E8E4DD]">{title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">{subtitle}</p>
-            </div>
-            <div className="p-5">{children}</div>
-            {footer && (
-                <div className="border-t border-[#3D3C36] px-5 py-3 text-xs leading-relaxed text-[#C4C0B6]">
-                    {footer}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function CodeBlock({
-    code,
-    language,
-    trackingStep,
-}: {
-    code: string;
-    language: string;
-    trackingStep: string;
-}) {
-    const [copied, setCopied] = useState(false);
-    const handleCopy = useCallback(() => {
-        navigator.clipboard.writeText(code);
-        setCopied(true);
-        trackEvent("install_command_copied", {
-            setup_tab: "google-ads-mcp-page",
-            surface: "marketing",
-            step: trackingStep,
-        });
-        setTimeout(() => setCopied(false), 2000);
-    }, [code, trackingStep]);
-
-    return (
-        <div className="relative overflow-hidden rounded-lg border border-[#3D3C36] bg-[#1A1917]">
-            <div className="flex items-center justify-between border-b border-[#3D3C36] px-4 py-2">
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#C4C0B6]/80">
-                    {language}
-                </span>
-                <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-[#3D3C36] bg-[#24231F] px-2.5 py-1 text-xs text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-                >
-                    {copied ? (
-                        <>
-                            <Check className="h-3.5 w-3.5 text-[#4CAF6E]" />
-                            <span className="text-[#4CAF6E]">Copied</span>
-                        </>
-                    ) : (
-                        <>
-                            <Copy className="h-3.5 w-3.5" />
-                            <span>Copy</span>
-                        </>
-                    )}
-                </button>
-            </div>
-            <pre className="overflow-x-auto p-4 font-mono text-sm leading-relaxed text-[#E8E4DD]">
-                <code>{code}</code>
-            </pre>
-        </div>
-    );
-}
-
-function ApiKeyCta({ connected }: { connected: boolean }) {
-    const handleClick = useCallback(() => {
-        trackEvent("cta_clicked", {
-            page: "google-ads-mcp",
-            cta: connected ? "open_api_key_page" : "sign_in_for_api_key",
-            destination: "/connect/claude-code/manual",
-            requires_auth: !connected,
-        });
-        startGoogleConnect("/connect/claude-code/manual");
-    }, [connected]);
-
-    return (
-        <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/5 p-4">
-            <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10">
-                    <Key className="h-4 w-4 text-[#4CAF6E]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#E8E4DD]">
-                        {connected ? "Open your API key page" : "Get your API key"}
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
-                        {connected
-                            ? "Open the connect page to copy your personal API key."
-                            : "Sign in with Google. We'll redirect you to the connect page where you can copy your API key."}
-                    </p>
-                    <Button
-                        onClick={handleClick}
-                        className="mt-3 h-10 rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
-                    >
-                        {connected ? (
-                            <>
-                                Open API key page
-                                <ExternalLink className="ml-1.5 h-4 w-4" />
-                            </>
-                        ) : (
-                            "Sign in with Google"
-                        )}
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ConnectButton({
-    connected,
-    large = false,
-}: {
-    connected: boolean;
-    large?: boolean;
-}) {
-    const handleClick = useCallback(() => {
-        trackEvent("cta_clicked", {
-            page: "google-ads-mcp",
-            cta: connected ? "open_connect_page" : "sign_in_with_google",
-            destination: "/connect",
-            requires_auth: !connected,
-        });
-        startGoogleConnect("/connect");
-    }, [connected]);
-
-    const sizeClass = large ? "h-12 px-6 text-base" : "h-11 px-5 text-sm";
-
-    return (
-        <Button
-            onClick={handleClick}
-            className={`${sizeClass} rounded-lg bg-[#4CAF6E] font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]`}
-        >
-            {connected ? (
-                <>
-                    Open connect page <ExternalLink className="ml-1.5 h-4 w-4" />
-                </>
-            ) : (
-                "Sign in with Google to continue"
-            )}
-        </Button>
-    );
-}

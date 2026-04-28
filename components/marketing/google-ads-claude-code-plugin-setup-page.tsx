@@ -1,21 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Copy, ExternalLink, Key, Terminal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useSession } from "@/components/session-provider";
-import { startGoogleConnect } from "@/lib/google-oauth";
+import { ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
+import { ClaudeCodePluginSteps } from "@/components/claude-code-plugin-steps";
 import type { FaqItem } from "@/lib/seo";
-
-const MARKETPLACE_CMD = "/plugin marketplace add nowork-studio/toprank";
-const INSTALL_CMD = "/plugin install toprank@nowork-studio";
-const ADS_CMD = "/ads";
 
 const FAQ_ITEMS: FaqItem[] = [
   {
@@ -31,12 +24,12 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Sign in with Google to get your API key, run two slash commands inside Claude Code to add the marketplace and install the plugin, then run /ads and paste your key when prompted.",
+      "Under 2 minutes. Run three slash commands inside Claude Code to add the marketplace, install the plugin, and reload, then run /ads — Claude will open your browser to sign in with Google. No API key to copy.",
   },
   {
     question: "Do I need to write any code?",
     answer:
-      "No. Setup is entirely slash-command driven inside Claude Code. You'll paste two commands and one API key — no JSON config edits, no environment variables, no scripts.",
+      "No. Setup is entirely slash-command driven inside Claude Code. You'll paste a few commands — no JSON config edits, no environment variables, no scripts, no API keys.",
   },
   {
     question: "Is the plugin free?",
@@ -77,8 +70,6 @@ const RELATED_LINKS = [
 ];
 
 export function GoogleAdsClaudeCodePluginSetupPage() {
-  const session = useSession();
-
   return (
     <div className="bg-[#1A1917] text-[#E8E4DD]">
       {/* ── Hero ── */}
@@ -121,152 +112,14 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
               How to install
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Add NotFair to Claude Code in 5 steps
+              Add NotFair to Claude Code in 4 steps
             </h2>
+            <p className="mt-3 text-sm text-[#C4C0B6]">
+              Free · No credit card · No API key to copy
+            </p>
           </motion.div>
 
-          <div className="space-y-10">
-            {/* Step 1 */}
-            <div id="step-1" className="space-y-3 scroll-mt-24">
-              <div className="flex items-baseline gap-3">
-                <StepNumber n={1} />
-                <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Open Claude Code
-                </h3>
-              </div>
-              <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Open a terminal and start{" "}
-                  <a
-                    href="https://docs.claude.com/en/docs/claude-code"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
-                  >
-                    Claude Code
-                  </a>
-                  . If you don&apos;t have it installed, follow Anthropic&apos;s
-                  install guide first.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div id="step-2" className="space-y-3 scroll-mt-24">
-              <div className="flex items-baseline gap-3">
-                <StepNumber n={2} />
-                <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Add the toprank marketplace
-                </h3>
-              </div>
-              <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  In Claude Code, run this slash command to register the{" "}
-                  <a
-                    href="https://github.com/nowork-studio/toprank"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
-                  >
-                    toprank
-                  </a>{" "}
-                  plugin marketplace:
-                </p>
-                <CommandBlock
-                  command={MARKETPLACE_CMD}
-                  trackingStep="marketplace_add"
-                />
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div id="step-3" className="space-y-3 scroll-mt-24">
-              <div className="flex items-baseline gap-3">
-                <StepNumber n={3} />
-                <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Install the plugin
-                </h3>
-              </div>
-              <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Install the NotFair plugin from the toprank marketplace. It
-                  ships with pre-made Google Ads and SEO skills that teach
-                  Claude how to audit and optimize your campaigns.
-                </p>
-                <CommandBlock
-                  command={INSTALL_CMD}
-                  trackingStep="plugin_install"
-                />
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div id="step-4" className="space-y-3 scroll-mt-24">
-              <div className="flex items-baseline gap-3">
-                <StepNumber n={4} />
-                <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Run /ads
-                </h3>
-              </div>
-              <div className="ml-11 space-y-3">
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Restart Claude Code, then run:
-                </p>
-                <CommandBlock command={ADS_CMD} trackingStep="ads_command" />
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Claude will ask for your NotFair API key — grab it in the
-                  next step.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 5 */}
-            <div id="step-5" className="space-y-3 scroll-mt-24">
-              <div className="flex items-baseline gap-3">
-                <StepNumber n={5} />
-                <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Get your NotFair API key
-                </h3>
-              </div>
-              <div className="ml-11 space-y-4">
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Sign in with your Google Ads account to generate your personal
-                  API key, then paste it into Claude Code when prompted.
-                </p>
-                <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/5 p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10">
-                      <Key className="h-4 w-4 text-[#4CAF6E]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-[#E8E4DD]">
-                        {session.connected
-                          ? "Open your API key page"
-                          : "Sign in to generate your API key"}
-                      </p>
-                      <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
-                        {session.connected
-                          ? "Open your NotFair setup page to copy your API key."
-                          : "Sign in with Google. We'll redirect you to the setup page where you can copy your API key."}
-                      </p>
-                      <div className="mt-4">
-                        <ConnectButton connected={session.connected} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Once Claude has your key, try a prompt like{" "}
-                  <em className="text-[#E8E4DD]">
-                    &ldquo;Audit my connected Google Ads account and tell me
-                    the 3 biggest optimization opportunities.&rdquo;
-                  </em>{" "}
-                  Claude will call NotFair tools to read your account and
-                  respond with specific, data-backed insights.
-                </p>
-              </div>
-            </div>
-          </div>
+          <ClaudeCodePluginSteps surface="marketing" />
         </div>
       </section>
 
@@ -284,11 +137,25 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
               Ready to install the plugin?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#C4C0B6]">
-              Sign in with Google to grab your API key, then run two slash
-              commands in Claude Code. Setup takes under 2 minutes.
+              Run three slash commands in Claude Code, then{" "}
+              <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-sm text-[#4CAF6E]">/ads</code>{" "}
+              to sign in. Setup takes under 2 minutes — no API key.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3">
-              <ConnectButton connected={session.connected} large />
+              <Link
+                href="/connect/claude-code"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#4CAF6E] px-6 py-3 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+                onClick={() =>
+                  trackEvent("cta_clicked", {
+                    page: "google-ads-claude-code-plugin-setup-guide",
+                    cta: "open_in_app_setup",
+                    destination: "/connect/claude-code",
+                  })
+                }
+              >
+                Open in-app setup
+                <ArrowRight className="h-4 w-4" />
+              </Link>
               <Link
                 href="/google-ads-claude-connector-setup-guide"
                 className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
@@ -318,97 +185,3 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
   );
 }
 
-/* ─────────────────────────────────────────────────── helpers ────────────── */
-
-function StepNumber({ n }: { n: number }) {
-  return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-sm font-semibold text-[#4CAF6E]">
-      {n}
-    </span>
-  );
-}
-
-function CommandBlock({
-  command,
-  trackingStep,
-}: {
-  command: string;
-  trackingStep: string;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(command);
-    setCopied(true);
-    trackEvent("install_command_copied", {
-      setup_tab: "claude-code",
-      surface: "marketing",
-      step: trackingStep,
-    });
-    setTimeout(() => setCopied(false), 2000);
-  }, [command, trackingStep]);
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5">
-        <Terminal className="h-4 w-4 shrink-0 text-[#4CAF6E]" />
-        <code className="truncate font-mono text-sm text-[#E8E4DD]">
-          {command}
-        </code>
-      </div>
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#3D3C36] bg-[#24231F] px-3 py-2.5 text-sm text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-        aria-label={`Copy ${command}`}
-      >
-        {copied ? (
-          <>
-            <Check className="h-4 w-4 text-[#4CAF6E]" />
-            <span className="text-[#4CAF6E]">Copied</span>
-          </>
-        ) : (
-          <>
-            <Copy className="h-4 w-4" />
-            <span>Copy</span>
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
-
-function ConnectButton({
-  connected,
-  large = false,
-}: {
-  connected: boolean;
-  large?: boolean;
-}) {
-  const handleClick = useCallback(() => {
-    trackEvent("cta_clicked", {
-      page: "google-ads-claude-code-plugin-setup-guide",
-      cta: connected ? "open_api_key_page" : "sign_in_with_google",
-      destination: "/connect/claude-code/manual",
-      requires_auth: !connected,
-    });
-    startGoogleConnect("/connect/claude-code/manual");
-  }, [connected]);
-
-  const sizeClass = large ? "h-12 px-6 text-base" : "h-11 px-5 text-sm";
-
-  return (
-    <Button
-      onClick={handleClick}
-      className={`${sizeClass} rounded-lg bg-[#4CAF6E] font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]`}
-    >
-      {connected ? (
-        <>
-          Open API key page <ExternalLink className="ml-1.5 h-4 w-4" />
-        </>
-      ) : (
-        "Sign in with Google to continue"
-      )}
-    </Button>
-  );
-}

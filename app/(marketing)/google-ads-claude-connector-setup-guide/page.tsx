@@ -33,12 +33,12 @@ const faqItems = [
   {
     question: "Do I need to write any code?",
     answer:
-      "No. Setup is entirely point-and-click inside claude.ai/customize/connectors. You sign in with Google to generate your Client ID and Secret, paste them into Claude's custom connector dialog, and click Add.",
+      "No. Setup is entirely point-and-click inside claude.ai/customize/connectors. Paste the NotFair server URL, click Add, and Claude opens a browser tab to sign you in — no Client ID or Secret to copy.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Open the Connectors page in Claude, paste the NotFair server URL, sign in with your Google Ads account to generate credentials, paste them into Claude, and you're done.",
+      "Under 2 minutes. Open the Connectors page in Claude, paste the NotFair server URL, click Add, and sign in with your Google Ads account in the browser tab Claude opens for you.",
   },
   {
     question: "Is the connector free?",
@@ -78,14 +78,14 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 2,
         name: "Configure the connector",
-        text: "Enter the name NotFair, paste the Remote MCP Server URL, expand Advanced Settings, then sign in with your Google Ads account on NotFair to generate your Client ID and Client Secret.",
+        text: "Enter the name NotFair, paste the Remote MCP Server URL, click Add, and verify NotFair appears in your Connectors list with all available tools. Claude opens a browser tab to sign you in — no Client ID or Secret needed.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-2", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 3,
-        name: "Add the connector",
-        text: "Click Add. The NotFair connector appears in your Connectors list with all available tools.",
+        name: "Install the toprank plugin on Claude Desktop App",
+        text: "In the Claude Desktop App's Customize panel, open Personal plugins, click +, choose Browse plugins, paste the toprank GitHub URL into Add marketplace, and click Sync. Plugins are not available on Claude web.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-3", SITE_URL).toString(),
       },
       {

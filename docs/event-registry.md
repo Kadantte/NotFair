@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-26.
+> Source of truth for all analytics events. Last updated: 2026-04-28.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -138,6 +138,106 @@
 
 ---
 
+## api_key_copied
+
+**Phase:** 1
+**Category:** activation
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the "Copy API Key" button in the bearer-token section of the "Any MCP Client" setup. Wired in both the in-app `/connect/any-mcp` tab and the public `/google-ads-mcp-server` marketing page (both render `<AnyMcpClientSetup>`).
+**Hypothesis:** We believe tracking this tells us how many users actually paste their API key into a custom MCP client. Pair with downstream `ai_read_executed` / `ai_change_executed` (`auth_method: "direct"`) to measure activation rate of the bearer-token path vs the OAuth path.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app`, `marketing`. |
+
+```json
+{ "event": "api_key_copied", "properties": { "surface": "in_app" } }
+```
+
+**Files:** `components/any-mcp-client-setup.tsx`
+
+---
+
+## api_key_cta_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when an unauthenticated user clicks the "Sign in with Google" CTA inside the bearer-token section of the "Any MCP Client" setup (when no apiKey is present). Triggers Google OAuth.
+**Hypothesis:** We believe tracking this tells us how many users intend to use the bearer-token path before they even have an API key. Pair with `account_connected` to measure the bearer-token CTA's auth completion rate.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `surface` | string | `"marketing"` | Where the click happened. Enum: `in_app`, `marketing`. |
+
+```json
+{ "event": "api_key_cta_clicked", "properties": { "surface": "marketing" } }
+```
+
+**Files:** `components/any-mcp-client-setup.tsx`
+
+---
+
+## api_key_revealed
+
+**Phase:** 2
+**Category:** ambient
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the eye icon to reveal the masked API key in the bearer-token section. Fires on each transition from masked → revealed, not on hide.
+**Hypothesis:** We believe tracking this tells us whether users are actively inspecting their token (intent to use) vs casually browsing the page. Low-priority signal — useful only if we're investigating bearer-token usability.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app`, `marketing`. (`marketing` is currently impossible — marketing surface never has an apiKey — but kept for schema consistency.) |
+
+```json
+{ "event": "api_key_revealed", "properties": { "surface": "in_app" } }
+```
+
+**Files:** `components/any-mcp-client-setup.tsx`
+
+---
+
+## api_key_rotate_intent
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the "Rotate" button in the API key panel — opens the confirm modal. Fires on intent, not on success. The downstream success event is `api_key_rotated`. Difference between the two is the cancel/abandon rate.
+**Hypothesis:** We believe tracking intent-vs-success tells us whether the rotate confirm modal is doing its job (catching accidental clicks) or whether users are deliberately rotating. If `intent ≈ rotated`, the modal is friction we could trim. If `intent >> rotated`, users are exploring and bailing — fine.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app`, `marketing`. |
+
+```json
+{ "event": "api_key_rotate_intent", "properties": { "surface": "in_app" } }
+```
+
+**Files:** `components/any-mcp-client-setup.tsx`
+
+---
+
+## api_key_rotated
+
+**Phase:** 1
+**Category:** quality_signal
+**Platform:** PostHog (client)
+**Trigger:** Fires after a successful POST to `/api/auth/rotate-token` (the user confirmed the rotate-key modal and the new token has been issued). Does NOT fire on rotation failures.
+**Hypothesis:** We believe tracking this tells us how often users rotate keys — a signal of either security hygiene or token compromise. Spike investigation: a sudden uptick implies an incident or a leaked key in public docs.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `surface` | string | `"in_app"` | Where the rotation happened. Enum: `in_app`, `marketing`. (`marketing` is currently impossible.) |
+
+```json
+{ "event": "api_key_rotated", "properties": { "surface": "in_app" } }
+```
+
+**Files:** `components/any-mcp-client-setup.tsx`
+
+---
+
 ## audit_help_action_clicked
 
 **Phase:** 1
@@ -244,18 +344,21 @@ No properties.
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks the copy button on any field inside the in-app Claude Connector tab (`/connect/claude-connector`).
-**Hypothesis:** We believe tracking this tells us how far users get inside the connector configuration step. The Client ID/Secret copies in particular indicate that the user has seen the generated credentials and is actively pasting them into Claude — a strong activation signal that the connector funnel will complete.
+**Trigger:** Fires when a user clicks the copy button on any field inside the Claude Connector setup steps. Wired in both the in-app `/connect/claude-connector` tab and the public `/google-ads-claude-connector-setup-guide` marketing page (both render `<ConnectorSetupSteps>`).
+**Hypothesis:** We believe tracking this tells us how far users get inside the connector configuration step. The `server_url` and `plugin_marketplace_url` copies in particular indicate that the user is actively pasting values into Claude — a strong activation signal that the connector funnel will complete. The OAuth flow no longer requires Client ID/Secret, so those enum values are deprecated.
+
+> **Schema change 2026-04-28.** The Client ID/Secret credential generation step was removed when the connector switched to in-Claude OAuth. New `surface` property added to distinguish marketing vs in-app copies. New `plugin_marketplace_url` enum value added when the toprank plugin step was merged into the connector setup.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `field` | string | `"client_secret"` | Which credential field was copied. Enum: `name`, `server_url`, `client_id`, `client_secret` |
+| `field` | string | `"server_url"` | Which credential field was copied. Enum: `name`, `server_url`, `plugin_marketplace_url`. Deprecated values still in older PostHog data: `client_id`, `client_secret` (removed 2026-04-28). |
+| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app`, `marketing`. |
 
 ```json
-{ "event": "connector_credential_copied", "properties": { "field": "client_secret" } }
+{ "event": "connector_credential_copied", "properties": { "field": "server_url", "surface": "in_app" } }
 ```
 
-**Files:** `components/connect-page.tsx`
+**Files:** `components/connector-setup-steps.tsx`
 
 ---
 
@@ -269,14 +372,14 @@ No properties.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `image` | string | `"02_configure"` | Which screenshot was opened. Derived from the file name. Enum: `01_add`, `02_configure`, `03_saved`, `04_enable_in_chat`, `05_use_in_chat` |
-| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app` (logged-in `/connect/claude-connector`), `marketing` (public `/google-ads-claude-connector`) |
+| `image` | string | `"02_configure"` | Which screenshot was opened. Derived from the file name. Enum: `01_add`, `02_configure`, `03_saved`, `04a_browse_plugins`, `04b_add_marketplace`, `04_enable_in_chat`, `05_use_in_chat`. (`04a_browse_plugins` and `04b_add_marketplace` were added 2026-04-28 when the toprank plugin step was merged into the connector setup.) |
+| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app` (logged-in `/connect/claude-connector`), `marketing` (public `/google-ads-claude-connector-setup-guide`) |
 
 ```json
 { "event": "connector_screenshot_expanded", "properties": { "image": "02_configure", "surface": "marketing" } }
 ```
 
-**Files:** `components/connect-page.tsx`, `components/marketing/google-ads-claude-connector-page.tsx`
+**Files:** `components/connector-setup-steps.tsx`
 
 ---
 
@@ -285,20 +388,21 @@ No properties.
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks the "Need help with setup?" button on the connect page. Also triggers a Slack notification to the team (`requestSetupHelp` in `app/actions.ts`) carrying the same context.
-**Hypothesis:** We believe tracking this tells us when users hit a wall during Claude Code / Claude Connector setup — a direct signal of setup friction. Volume per `active_tab` / `code_sub_tab` tells us which path is hardest; the ratio vs `install_command_copied` / `connector_credential_copied` tells us whether users are asking for help instead of completing setup.
+**Trigger:** Fires when a user clicks the floating "Need help?" CTA on the connect page. Also calls `notifyHelpClicked` in `app/actions.ts`, which posts a Slack notification carrying the same context.
+**Hypothesis:** We believe tracking this tells us when users hit a wall during connect-page setup — a direct signal of setup friction. Volume per `active_tab` tells us which path is hardest; the ratio vs `install_command_copied` / `connector_credential_copied` tells us whether users are asking for help instead of completing setup.
 
 > **Replaces `chat_opened_from_connect`** (retired 2026-04-22). Analysis of the Apr 21–22 cohort showed the chat fallback was catching setup-frustrated users who then bounced at 0% D0 write rate — routing them to human help via Slack is higher-leverage.
+>
+> **Schema change 2026-04-28.** The Claude Code sub-tab UI ("manual" vs "auto") was removed; `code_sub_tab` property is no longer fired. New `any-mcp` value added to `active_tab` enum when the "Any MCP Client" tab was introduced.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `active_tab` | string | `"claude-code"` | Which setup path the user was on at click time. Enum: `claude-code`, `connector` |
-| `code_sub_tab` | string | `"auto"` | Claude Code sub-tab at click time. Enum: `manual`, `auto`. Always populated; ignore when `active_tab="connector"`. |
+| `active_tab` | string | `"claude-code"` | Which setup tab the user was on at click time. Enum: `claude-code`, `connector`, `codex`, `any-mcp`. |
 | `connected` | boolean | `true` | Whether the user already has a Google Ads session (token) at click time. Distinguishes "stuck on OAuth" from "stuck on client wiring". |
-| `pathname` | string | `"/connect/claude-code/auto"` | Exact pathname when the button was clicked. |
+| `pathname` | string | `"/connect/any-mcp"` | Exact pathname when the button was clicked. |
 
 ```json
-{ "event": "setup_help_requested", "properties": { "active_tab": "claude-code", "code_sub_tab": "auto", "connected": true, "pathname": "/connect/claude-code/auto" } }
+{ "event": "setup_help_requested", "properties": { "active_tab": "any-mcp", "connected": true, "pathname": "/connect/any-mcp" } }
 ```
 
 **Files:** `components/connect-page.tsx`, `app/actions.ts`
@@ -336,21 +440,24 @@ No properties.
 **Phase:** 1
 **Category:** activation
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks the Copy button on any setup code block on the connect page. Covers all three setup paths: the Claude Code auto-prompt block ("Let Claude set it up" subtab), each individual command in the Claude Code "Install manually" subtab, and the single Codex one-liner block (`/connect/codex`).
-**Hypothesis:** We believe tracking this with `setup_tab` + `step` tells us which install path users pick (Claude Code auto vs manual vs Codex) and which point in the manual install flow they actually reach. Pair with `account_connected` and downstream `ai_change_executed` (`client_name: "codex"` vs `"claude-code"`) to compute path-specific activation rates and decide where to invest onboarding effort.
+**Trigger:** Fires when a user clicks the Copy button on any setup code/command block. Covers the Claude Code plugin steps, the Codex one-liner, and the Any-MCP-Client OAuth + Bearer JSON configs. Wired in both in-app (`/connect/...` tabs) and the marketing setup-guide pages — both render the same shared step components (`ClaudeCodePluginSteps`, `CodexSetupSteps`, `AnyMcpClientSetup`).
+**Hypothesis:** We believe tracking this with `setup_tab` + `step` + `surface` tells us which install path users pick and which point in the flow they actually reach. Pair with `account_connected` and downstream `ai_change_executed` (`client_name: "codex"` vs `"claude-code"`) to compute path-specific activation rates and decide where to invest onboarding effort.
+
+> **Schema change 2026-04-28.** Surface tag added to distinguish marketing-page copies from in-app connect-page copies. New `any-mcp` setup tab added when the "Any MCP Client" tab was introduced. Claude Code plugin step now includes `/reload-plugins` (new `reload_plugins` step). Auto-prompt subtab removed — `install` and `api_key` step values are deprecated.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `setup_tab` | string | `"codex"` | Which AI client setup tab was active. Enum: `claude-code`, `codex`. (`connector` does not fire this event — it uses `connector_credential_copied` instead.) |
-| `step` | string | `"codex_oneliner"` | Which command was copied. Enum (when `setup_tab="claude-code"`): `install` (auto-prompt block), `marketplace_add`, `plugin_install`, `ads_command`, `api_key`. Enum (when `setup_tab="codex"`): `codex_oneliner` (the `codex mcp add notfair --url …` block). |
+| `setup_tab` | string | `"any-mcp"` | Which AI client setup tab was active. Enum: `claude-code`, `codex`, `any-mcp`. (`connector` does not fire this event — it uses `connector_credential_copied` instead.) |
+| `surface` | string | `"in_app"` | Where the click happened. Enum: `in_app`, `marketing`. |
+| `step` | string | `"reload_plugins"` | Which command was copied. Enum varies by `setup_tab`. **`claude-code`**: `marketplace_add`, `plugin_install`, `reload_plugins`, `ads_command`. **`codex`**: `codex_oneliner`. **`any-mcp`**: `oauth_json`, `bearer_json`. Deprecated values still in older PostHog data: `install`, `api_key` (removed 2026-04-28). |
 
 ```json
-{ "event": "install_command_copied", "properties": { "setup_tab": "codex", "step": "codex_oneliner" } }
+{ "event": "install_command_copied", "properties": { "setup_tab": "any-mcp", "surface": "in_app", "step": "bearer_json" } }
 ```
 
-**Notes:** Codex tab view itself is captured by `$pageview` with `path: "/connect/codex"` — no separate `*_viewed` event is wired, by design.
+**Notes:** Tab view itself is captured by `$pageview` with `path: "/connect/<tab>"` — no separate `*_viewed` event is wired, by design.
 
-**Files:** `components/connect-page.tsx`
+**Files:** `components/claude-code-plugin-steps.tsx`, `components/codex-setup-steps.tsx`, `components/any-mcp-client-setup.tsx`
 
 ---
 

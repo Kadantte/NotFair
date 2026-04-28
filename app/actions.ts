@@ -730,7 +730,7 @@ export async function requestSetupHelp(context: {
 }
 
 export async function notifyHelpClicked(context: {
-    activeTab?: 'claude-code' | 'connector' | 'codex';
+    activeTab?: 'claude-code' | 'connector' | 'codex' | 'any-mcp';
     pathname: string;
     connected: boolean;
     source?: string;
@@ -744,7 +744,9 @@ export async function notifyHelpClicked(context: {
                 ? 'Claude Connector (Web / Cowork)'
                 : context.activeTab === 'codex'
                     ? 'ChatGPT / Codex'
-                    : null;
+                    : context.activeTab === 'any-mcp'
+                        ? 'Any MCP Client'
+                        : null;
     const summaryLines = await getAccountSummaryLines(context.connected && ctx ? ctx.auth : null);
     await postToSlack([
         ':sos: *Need help clicked* (cal link opened — not booked yet)',
