@@ -731,7 +731,6 @@ export async function requestSetupHelp(context: {
 
 export async function notifyHelpClicked(context: {
     activeTab?: 'claude-code' | 'connector' | 'codex';
-    codeSubTab?: 'manual' | 'auto';
     pathname: string;
     connected: boolean;
     source?: string;
@@ -740,7 +739,7 @@ export async function notifyHelpClicked(context: {
     const email = ctx?.session.googleEmail ?? 'anonymous';
     const setupPath =
         context.activeTab === 'claude-code'
-            ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
+            ? 'Claude Code'
             : context.activeTab === 'connector'
                 ? 'Claude Connector (Web / Cowork)'
                 : context.activeTab === 'codex'

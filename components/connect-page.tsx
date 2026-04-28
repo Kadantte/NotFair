@@ -19,26 +19,6 @@ function imageKeyFromSrc(src: string): string {
     return file.replace(/\.[^.]+$/, '').replace(/-/g, '_');
 }
 
-function buildSetupPrompt(token: string): string {
-    return `Set up ${BRAND_NAME} for Claude Code:
-
-1. Add your API key to ~/.claude/settings.json:
-
-{
-  "env": {
-    "ADSAGENT_API_KEY": "${token}"
-  }
-}
-
-2. Run these commands in Claude Code:
-
-/plugin marketplace add nowork-studio/toprank
-/plugin install toprank@nowork-studio
-/reload-plugins
-
-3. Use /ads to manage your Google Ads.`;
-}
-
 const emptySession: Session = { connected: false };
 
 async function readServerSession(): Promise<Session> {
@@ -502,9 +482,8 @@ function SetupScreenshot({ src, alt }: { src: string; alt: string }) {
 }
 
 type SetupTab = 'claude-code' | 'connector' | 'codex';
-type ClaudeCodeSubTab = 'auto' | 'manual';
 
-function ClaudeCodeManualSection({ token }: { token: string }) {
+function ClaudeCodeManualSection() {
     return (
         <div className="w-full space-y-6 text-left">
             {/* Step 1 */}
@@ -530,6 +509,13 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                                 onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'plugin_install' })}
                             />
                         </div>
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/reload-plugins</code>
+                            <CopyButton
+                                text="/reload-plugins"
+                                onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'reload_plugins' })}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -538,10 +524,12 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">2</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Run /ads</p>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Run /ads command</p>
                 </div>
                 <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#C4C0B6]">Restart Claude Code and run:</p>
+                    <p className="text-sm text-[#C4C0B6]">
+                        Run <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code> in Claude Code. It will open your browser to sign in and connect NotFair. If the command doesn&apos;t appear, restart Claude Code first.
+                    </p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">/ads</code>
                         <CopyButton
@@ -549,29 +537,6 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
                             onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'ads_command' })}
                         />
                     </div>
-                </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">3</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Paste your API key</p>
-                </div>
-                <div className="ml-8 space-y-2">
-                    <p className="text-sm text-[#C4C0B6]">
-                        Claude will ask you for your API key. Paste it into Claude Code:
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-sm text-[#E8E4DD]/80">{token}</code>
-                        <CopyButton
-                            text={token}
-                            onCopyTracked={() => trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'api_key' })}
-                        />
-                    </div>
-                    <p className="text-xs text-[#C4C0B6]/60">
-                        This is your personal access token. Don&apos;t share it publicly.
-                    </p>
                 </div>
             </div>
         </div>
@@ -602,20 +567,16 @@ function CodexSection({ token: _token }: { token: string }) {
     );
 }
 
-function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
-    prompt: string;
-    copied: boolean;
-    onCopy: () => void;
+function SetupTabs({ token, activeTab }: {
     token: string;
     activeTab: SetupTab;
-    codeSubTab: ClaudeCodeSubTab;
 }) {
     return (
         <div className="flex flex-col items-center space-y-8 text-center">
             {/* Tab switcher */}
             <div className="flex w-full max-w-2xl rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
                 <Link
-                    href="/connect/claude-code/manual"
+                    href="/connect/claude-code"
                     prefetch
                     className={`flex-1 rounded-md px-4 py-2.5 text-center text-sm font-medium transition-all duration-150 ${activeTab === 'claude-code'
                             ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
@@ -648,47 +609,7 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
 
             {/* Tab content */}
             {activeTab === 'claude-code' ? (
-                <>
-                    {/* Sub-tab switcher */}
-                    <div className="flex w-full max-w-xs rounded-md border border-[#3D3C36]/60 bg-[#1A1917]/60 p-0.5">
-                        <Link
-                            href="/connect/claude-code/manual"
-                            prefetch
-                            className={`flex-1 rounded px-3 py-1.5 text-center text-xs font-medium transition-all duration-150 ${codeSubTab === 'manual'
-                                    ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
-                                    : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
-                                }`}
-                        >
-                            Install manually
-                        </Link>
-                        <Link
-                            href="/connect/claude-code/auto"
-                            prefetch
-                            className={`flex-1 rounded px-3 py-1.5 text-center text-xs font-medium transition-all duration-150 ${codeSubTab === 'auto'
-                                    ? 'bg-[#2E2D28] text-[#E8E4DD] shadow-sm'
-                                    : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
-                                }`}
-                        >
-                            Let Claude set it up
-                        </Link>
-                    </div>
-
-                    {codeSubTab === 'auto' ? (
-                        <>
-                            <p className="max-w-md text-sm text-[#C4C0B6]">
-                                Copy this prompt and paste it into Claude Code. It will install the toprank plugin and configure your API key automatically.
-                            </p>
-                            <SetupCodeBlock content={prompt} copied={copied} onCopy={onCopy} />
-                            <p className="max-w-md text-sm text-[#C4C0B6]">
-                                After setup, restart Claude Code and run{' '}
-                                <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-xs text-[#4CAF6E]">/ads</code>{' '}
-                                to start managing your Google Ads.
-                            </p>
-                        </>
-                    ) : (
-                        <ClaudeCodeManualSection token={token} />
-                    )}
-                </>
+                <ClaudeCodeManualSection />
             ) : activeTab === 'connector' ? (
                 <ClaudeConnectorSection />
             ) : (
@@ -699,19 +620,15 @@ function SetupTabs({ prompt, copied, onCopy, token, activeTab, codeSubTab }: {
     );
 }
 
-function parseSlug(slug?: string[]): { activeTab: SetupTab; codeSubTab: ClaudeCodeSubTab } {
-    if (!slug || slug.length === 0) return { activeTab: 'claude-code', codeSubTab: 'manual' };
-    if (slug[0] === 'claude-connector') return { activeTab: 'connector', codeSubTab: 'manual' };
-    if (slug[0] === 'chatgpt-codex' || slug[0] === 'codex') return { activeTab: 'codex', codeSubTab: 'manual' };
-    if (slug[0] === 'claude-code') {
-        const sub = slug[1] === 'auto' ? 'auto' : 'manual';
-        return { activeTab: 'claude-code', codeSubTab: sub };
-    }
-    return { activeTab: 'claude-code', codeSubTab: 'manual' };
+function parseSlug(slug?: string[]): { activeTab: SetupTab } {
+    if (!slug || slug.length === 0) return { activeTab: 'claude-code' };
+    if (slug[0] === 'claude-connector') return { activeTab: 'connector' };
+    if (slug[0] === 'chatgpt-codex' || slug[0] === 'codex') return { activeTab: 'codex' };
+    return { activeTab: 'claude-code' };
 }
 
 function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
-    const { activeTab, codeSubTab } = parseSlug(slug);
+    const { activeTab } = parseSlug(slug);
     const searchParams = useSearchParams();
     const router = useRouter();
     const urlToken = searchParams.get('token');
@@ -725,7 +642,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
     const [session, setSession] = useState<Session>(initialSession);
     const [error, setError] = useState<string | null>(urlError);
-    const [copied, setCopied] = useState(false);
     const [selecting, setSelecting] = useState(false);
     const [rotating, setRotating] = useState(false);
     const [showRotateConfirm, setShowRotateConfirm] = useState(false);
@@ -799,7 +715,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         if (urlToken) {
             // account_connected is now fired centrally from PostHogProvider
             // via the gads_connect_event cookie set by the auth callback.
-            window.history.replaceState({}, '', '/connect/claude-code/manual');
+            window.history.replaceState({}, '', '/connect/claude-code');
             return;
         }
 
@@ -826,8 +742,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         );
         setSelectedAccounts(accessiblePreselected);
     }, [pendingToken, selectionMode, accounts, preselectedAccountIds]);
-
-    const prompt = token ? buildSetupPrompt(token) : '';
 
     async function beginGoogleSignIn() {
         setError(null);
@@ -903,7 +817,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 setError(data.error || 'Failed to rotate token');
                 return;
             }
-            setCopied(false);
             const nextSession = await readServerSession();
             setSession(nextSession);
             router.refresh();
@@ -933,11 +846,9 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                     connected: Boolean(token),
                                     pathname,
                                     active_tab: activeTab,
-                                    code_sub_tab: codeSubTab,
                                 });
                                 void notifyHelpClicked({
                                     activeTab,
-                                    codeSubTab,
                                     pathname,
                                     connected: Boolean(token),
                                     source: 'connect_header',
@@ -1107,17 +1018,8 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                         </div>
                     ) : (
                         <SetupTabs
-                            prompt={prompt}
-                            copied={copied}
-                            onCopy={() => {
-                                navigator.clipboard.writeText(prompt);
-                                setCopied(true);
-                                trackEvent('install_command_copied', { setup_tab: 'claude-code', step: 'install' });
-                                setTimeout(() => setCopied(false), 2000);
-                            }}
                             token={token}
                             activeTab={activeTab}
-                            codeSubTab={codeSubTab}
                         />
                     )}
                 </div>

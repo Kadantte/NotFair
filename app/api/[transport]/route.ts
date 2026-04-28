@@ -261,6 +261,7 @@ const mcpHandler = createMcpHandler(
     // ─── Session management tools (registered in app layer) ─────
     server.registerTool("listConnectedAccounts", {
       description: "List Google Ads accounts connected to this session. Returns accountIds for use with all other tools.",
+      inputSchema: {},
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
