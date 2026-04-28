@@ -31,9 +31,9 @@ export const AUTH_ERROR_MESSAGES = {
   CONSENT_DENIED:
     "You need to approve access to continue. Please try again and click \"Allow\" on the Google consent screen.",
   SCOPE_DENIED:
-    "Google Ads permission was not granted. NotFair needs access to your Google Ads account to work. Please try again and make sure the \"Google Ads\" checkbox stays checked on the consent screen.",
+    "NotFair needs Google Ads access to work — without it, we can't read your campaigns or make changes for you. When you continue, please keep the \"Google Ads\" permission checked on Google's consent screen.",
   SCOPE_INSUFFICIENT:
-    "Google Ads access was not granted. Please try again and make sure to approve all permissions on the Google consent screen.",
+    "NotFair needs Google Ads access to work. Please try again and make sure every permission on Google's consent screen stays checked.",
   LOAD_ACCOUNTS_GENERIC:
     "Failed to load Google Ads accounts. Please try again.",
   NO_ACCOUNTS:

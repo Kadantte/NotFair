@@ -2,11 +2,24 @@
 
 import { UTM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
 
-function buildAuthUrl(next: string, popup: boolean) {
+export type GoogleConnectOptions = {
+  /**
+   * Override Google's `prompt` param. Defaults to "consent". Pass
+   * "select_account consent" to force the account picker — useful when
+   * retrying after a no-accounts failure where the same identity would
+   * just fail again.
+   */
+  prompt?: "consent" | "select_account" | "select_account consent";
+};
+
+function buildAuthUrl(next: string, popup: boolean, options?: GoogleConnectOptions) {
   const url = new URL("/api/auth/signin", window.location.origin);
   url.searchParams.set("next", next);
   if (popup) {
     url.searchParams.set("popup", "1");
+  }
+  if (options?.prompt) {
+    url.searchParams.set("prompt", options.prompt);
   }
   // Forward UTM params — prefer current URL, fall back to sessionStorage
   const currentParams = new URLSearchParams(window.location.search);
@@ -21,18 +34,18 @@ function buildAuthUrl(next: string, popup: boolean) {
   return url.toString();
 }
 
-export async function startGoogleConnect(next = "/connect") {
-  window.location.assign(buildAuthUrl(next, false));
+export async function startGoogleConnect(next = "/connect", options?: GoogleConnectOptions) {
+  window.location.assign(buildAuthUrl(next, false, options));
 }
 
-export async function startGoogleConnectPopup(next = "/connect") {
+export async function startGoogleConnectPopup(next = "/connect", options?: GoogleConnectOptions) {
   const width = 600;
   const height = 700;
   const left = window.screen.width / 2 - width / 2;
   const top = window.screen.height / 2 - height / 2;
 
   window.open(
-    buildAuthUrl(next, true),
+    buildAuthUrl(next, true, options),
     "Google Ads Auth",
     `width=${width},height=${height},top=${top},left=${left}`,
   );

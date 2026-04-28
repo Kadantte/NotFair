@@ -31,9 +31,16 @@ async function readServerSession(): Promise<Session> {
 type ConnectPageProps = {
     initialSession?: Session;
     slug?: string[];
+    /**
+     * Email of the Google identity that just failed an OAuth attempt (no Ads
+     * accounts, no client accounts, etc.). Read server-side from the
+     * `adsagent_last_attempt_email` cookie. Used in the no-account error
+     * banners so users immediately see "I signed in with the wrong account."
+     */
+    lastAttemptEmail?: string | null;
 };
 
-export function ConnectPage({ initialSession = emptySession, slug }: ConnectPageProps) {
+export function ConnectPage({ initialSession = emptySession, slug, lastAttemptEmail = null }: ConnectPageProps) {
     return (
         <Suspense
             fallback={
@@ -42,9 +49,72 @@ export function ConnectPage({ initialSession = emptySession, slug }: ConnectPage
                 </div>
             }
         >
-            <ConnectContent initialSession={initialSession} slug={slug} />
+            <ConnectContent initialSession={initialSession} slug={slug} lastAttemptEmail={lastAttemptEmail} />
         </Suspense>
     );
+}
+
+const GOOGLE_ADS_HOME_URL = 'https://ads.google.com/';
+
+type ErrorReason = 'scope_denied' | 'scope_denied_retry' | 'no_accounts' | 'no_client_accounts' | 'load_accounts_failed' | 'session_error' | 'generic';
+
+type ErrorCopy = {
+    headline: string;
+    body: string;
+    /** Optional second paragraph with concrete instructions. */
+    helper?: string;
+    primaryCta: {
+        label: string;
+        /** Pass to startGoogleConnect — switches Google's `prompt` param. */
+        prompt?: 'consent' | 'select_account' | 'select_account consent';
+    };
+    /** Optional secondary CTA. External link opens in a new tab. */
+    secondaryCta?: { label: string; href: string };
+};
+
+function getErrorCopy(reason: ErrorReason, opts: { fallbackMessage?: string | null; attemptedEmail?: string | null }): ErrorCopy {
+    const email = opts.attemptedEmail?.trim() || null;
+    switch (reason) {
+        case 'scope_denied':
+        case 'scope_denied_retry':
+            return {
+                headline: 'Google Ads access is required',
+                body: "NotFair can't read your campaigns or make changes without the Google Ads permission. When you continue, please keep that permission checked on Google's consent screen.",
+                helper: "Look for the checkbox labelled \"See, edit, create, and delete your Google Ads accounts and data.\" If you uncheck it, NotFair has no way to see your campaigns.",
+                primaryCta: { label: 'Continue and allow Google Ads access', prompt: 'consent' },
+            };
+        case 'no_accounts':
+            return {
+                headline: email ? `No Google Ads accounts found for ${email}` : 'No Google Ads accounts found',
+                body: email
+                    ? `${email} isn't connected to any Google Ads customer. The most common cause is signing in with the wrong Google account — try the one your team uses for Google Ads.`
+                    : "This Google account isn't connected to any Google Ads customer. The most common cause is signing in with the wrong Google account.",
+                primaryCta: { label: 'Use a different Google account', prompt: 'select_account consent' },
+                secondaryCta: { label: 'Create a Google Ads account', href: GOOGLE_ADS_HOME_URL },
+            };
+        case 'no_client_accounts':
+            return {
+                headline: 'No client accounts under this manager',
+                body: email
+                    ? `We found a manager (MCC) account for ${email}, but it doesn't have any client accounts linked yet. Either switch to a Google account that has direct access, or link a client to your manager in Google Ads.`
+                    : "We found a manager (MCC) account, but it doesn't have any client accounts linked yet. Either switch to a Google account that has direct access, or link a client to your manager in Google Ads.",
+                primaryCta: { label: 'Use a different Google account', prompt: 'select_account consent' },
+                secondaryCta: { label: 'Open Google Ads to link a client', href: GOOGLE_ADS_HOME_URL },
+            };
+        case 'load_accounts_failed':
+        case 'session_error':
+        case 'generic':
+        default:
+            return {
+                headline: "We couldn't finish connecting your account",
+                body: opts.fallbackMessage?.trim() || 'Something went wrong on our end. Please try again — if it keeps failing, reach out and we can help.',
+                primaryCta: { label: 'Try again with Google' },
+            };
+    }
+}
+
+function isKnownReason(value: string | null | undefined): value is ErrorReason {
+    return value === 'scope_denied' || value === 'scope_denied_retry' || value === 'no_accounts' || value === 'no_client_accounts' || value === 'load_accounts_failed' || value === 'session_error';
 }
 
 
@@ -134,13 +204,14 @@ function parseSlug(slug?: string[]): { activeTab: SetupTab } {
     return { activeTab: 'claude-code' };
 }
 
-function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
+function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSession: Session; slug?: string[]; lastAttemptEmail: string | null }) {
     const { activeTab } = parseSlug(slug);
     const searchParams = useSearchParams();
     const router = useRouter();
     const urlToken = searchParams.get('token');
     const urlCustomerName = searchParams.get('customer_name');
     const urlError = searchParams.get('error');
+    const urlErrorReason = searchParams.get('reason');
     const pendingToken = searchParams.get('pending');
     const selectionMode = searchParams.get('mode');
     const accountsParam = searchParams.get('accounts');
@@ -149,6 +220,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
     const [session, setSession] = useState<Session>(initialSession);
     const [error, setError] = useState<string | null>(urlError);
+    const [errorReason, setErrorReason] = useState<string | null>(urlErrorReason);
     const [selecting, setSelecting] = useState(false);
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
@@ -246,10 +318,11 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         setSelectedAccounts(accessiblePreselected);
     }, [pendingToken, selectionMode, accounts, preselectedAccountIds]);
 
-    async function beginGoogleSignIn() {
+    async function beginGoogleSignIn(prompt?: 'consent' | 'select_account' | 'select_account consent') {
         setError(null);
+        setErrorReason(null);
         try {
-            await startGoogleConnect('/connect');
+            await startGoogleConnect('/connect', prompt ? { prompt } : undefined);
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
         }
@@ -260,6 +333,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         if (demoStarting) return;
         setDemoStarting(true);
         setError(null);
+        setErrorReason(null);
         try {
             const res = await fetch('/api/demo/start', {
                 method: 'POST',
@@ -316,28 +390,43 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         <section className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
                 <div className="mx-auto max-w-4xl">
-                    {error && (
-                        <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-5">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#C45D4A]" />
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium text-[#C45D4A]">{error}</p>
-                                    {error.toLowerCase().includes("permission") && (
-                                        <p className="text-xs text-[#C45D4A]/80">
-                                            NotFair needs Google Ads access to manage your campaigns. On the Google consent screen, make sure the &quot;Google Ads&quot; checkbox stays checked.
-                                        </p>
+                    {(error || isKnownReason(errorReason)) && (() => {
+                        const reason: ErrorReason = isKnownReason(errorReason) ? errorReason : 'generic';
+                        const copy = getErrorCopy(reason, { fallbackMessage: error, attemptedEmail: lastAttemptEmail });
+                        return (
+                            <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-5">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#C45D4A]" />
+                                    <div className="space-y-2">
+                                        <p className="text-sm font-semibold text-[#C45D4A]">{copy.headline}</p>
+                                        <p className="text-sm text-[#C45D4A]">{copy.body}</p>
+                                        {copy.helper && (
+                                            <p className="text-xs text-[#C45D4A]/80">{copy.helper}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="mt-4 ml-8 flex flex-wrap items-center gap-3">
+                                    <Button
+                                        onClick={() => beginGoogleSignIn(copy.primaryCta.prompt)}
+                                        className="bg-[#C45D4A] text-white hover:bg-[#B04D3A] font-medium"
+                                        size="sm"
+                                    >
+                                        {copy.primaryCta.label}
+                                    </Button>
+                                    {copy.secondaryCta && (
+                                        <a
+                                            href={copy.secondaryCta.href}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm font-medium text-[#C45D4A] underline-offset-4 hover:underline"
+                                        >
+                                            {copy.secondaryCta.label}
+                                        </a>
                                     )}
                                 </div>
                             </div>
-                            <Button
-                                onClick={beginGoogleSignIn}
-                                className="mt-4 ml-8 bg-[#C45D4A] text-white hover:bg-[#B04D3A] font-medium"
-                                size="sm"
-                            >
-                                Try again with Google
-                            </Button>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {(pendingToken || selectionMode === 'update') && accounts.length > 0 ? (
                         <div className="flex flex-col items-center space-y-6 text-center">
@@ -414,7 +503,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                             </p>
                             <Button
                                 size="lg"
-                                onClick={beginGoogleSignIn}
+                                onClick={() => beginGoogleSignIn()}
                                 className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
                             >
                                 Sign in with Google <ExternalLink className="ml-2 h-5 w-5" />

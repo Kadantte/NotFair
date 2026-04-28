@@ -12,6 +12,20 @@ function getSafeNext(next: string | null) {
   return next;
 }
 
+// Narrow allowlist — anything outside this falls back to "consent" so a
+// crafted ?prompt= can't smuggle arbitrary values into Google's OAuth URL.
+const ALLOWED_PROMPTS = new Set([
+  "consent",
+  "select_account",
+  "select_account consent",
+]);
+
+function getSafePrompt(prompt: string | null): string {
+  if (!prompt) return "consent";
+  const normalized = prompt.replace(/\+/g, " ").trim();
+  return ALLOWED_PROMPTS.has(normalized) ? normalized : "consent";
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const popup = searchParams.get("popup") === "1";
@@ -56,7 +70,8 @@ export async function GET(request: Request) {
     ...(signupReferrer ? { signup_referrer: signupReferrer } : {}),
   })).toString("base64url");
 
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
+  const prompt = getSafePrompt(searchParams.get("prompt"));
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=${encodeURIComponent(prompt)}&state=${encodeURIComponent(state)}`;
 
   const response = NextResponse.redirect(url);
   response.cookies.set("oauth_nonce", nonce, {

@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { listConnectableAccounts, parseCustomerIds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
-import { AUTH_ERROR_MESSAGES } from "@/lib/auth-errors";
 
-function redirectWithError(message: string) {
-  return NextResponse.redirect(
-    `${getAppOrigin()}/connect?error=${encodeURIComponent(message)}`,
-  );
+function redirectWithError(reason: string, message?: string) {
+  const params = new URLSearchParams({ reason });
+  if (message) params.set("error", message);
+  return NextResponse.redirect(`${getAppOrigin()}/connect?${params.toString()}`);
 }
 
 function describeError(error: unknown) {
@@ -24,11 +23,7 @@ export async function GET() {
     const { accounts: usableAccounts, managers } = await listConnectableAccounts(session.refreshToken);
 
     if (usableAccounts.length === 0) {
-      return redirectWithError(
-        managers.length > 0
-          ? AUTH_ERROR_MESSAGES.NO_CLIENT_ACCOUNTS
-          : AUTH_ERROR_MESSAGES.NO_ACCOUNTS,
-      );
+      return redirectWithError(managers.length > 0 ? "no_client_accounts" : "no_accounts");
     }
 
     const accountsParam = encodeURIComponent(
@@ -49,6 +44,7 @@ export async function GET() {
     );
   } catch (error) {
     return redirectWithError(
+      "load_accounts_failed",
       `Failed to prepare account selection: ${describeError(error)}`,
     );
   }

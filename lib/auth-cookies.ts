@@ -19,7 +19,32 @@ export const COOKIE_NAMES = {
    * info on subsequent requests without re-querying Supabase.
    */
   profile: "adsagent_profile",
+  /**
+   * Email of the Google identity that just failed an OAuth attempt (no Ads
+   * accounts, no client accounts under MCC, etc.). Read once on /connect to
+   * surface "No accounts found for foo@example.com" so the user can self-
+   * diagnose "I used the wrong Google account." Short-lived; never carries
+   * authority — purely for display.
+   */
+  lastAttemptEmail: "adsagent_last_attempt_email",
 } as const;
+
+const LAST_ATTEMPT_EMAIL_OPTIONS = {
+  httpOnly: true, // Read server-side in /connect's server component, passed as prop
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 300, // 5 minutes — long enough to render, short enough to not stick around
+};
+
+export function setLastAttemptEmailCookie(response: NextResponse, email: string | null) {
+  if (!email) return;
+  response.cookies.set(COOKIE_NAMES.lastAttemptEmail, email, LAST_ATTEMPT_EMAIL_OPTIONS);
+}
+
+export function clearLastAttemptEmailCookie(response: NextResponse) {
+  response.cookies.delete(COOKIE_NAMES.lastAttemptEmail);
+}
 
 export interface ProfileCookie {
   name?: string | null;

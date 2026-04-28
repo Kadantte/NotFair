@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
-import { clearSessionCookies, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
+import { clearSessionCookies, setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +14,7 @@ import { getClientIp } from "@/lib/request-ip";
 import { UTM_KEYS, type UtmParams } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyAccountLoadError, classifyGoogleError } from "@/lib/auth-errors";
+import { evaluateScopeGrant } from "@/lib/oauth-scope-retry";
 
 /**
  * Delete all Supabase `sb-*` cookies from the response.
@@ -98,10 +99,16 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
   }
 }
 
-function redirectWithError(origin: string, message: string) {
-  return NextResponse.redirect(
-    `${origin}/connect?error=${encodeURIComponent(message)}`,
-  );
+/**
+ * Redirect to /connect with a reason code. Connect-page renders copy keyed
+ * by reason — keep English out of the URL so it's stable across i18n,
+ * shareable in support tickets, and refresh-safe. The optional `message`
+ * is a backwards-compat fallback for old links and unmapped reasons.
+ */
+function redirectWithError(origin: string, reason: string, message?: string) {
+  const params = new URLSearchParams({ reason });
+  if (message) params.set("error", message);
+  return NextResponse.redirect(`${origin}/connect?${params.toString()}`);
 }
 
 function describeError(error: unknown) {
@@ -313,10 +320,20 @@ async function createOrRedirectGoogleAdsSession({
     connectable = await listConnectableAccounts(refreshToken);
   } catch (error) {
     console.error("[auth] Failed to load Google Ads accounts:", error);
-    const msg = classifyAccountLoadError(describeError(error));
-    return popup
-      ? popupErrorResponse(origin, msg)
-      : redirectWithError(origin, msg);
+    const raw = describeError(error);
+    const msg = classifyAccountLoadError(raw);
+    const reason =
+      msg === AUTH_ERROR_MESSAGES.SCOPE_INSUFFICIENT
+        ? AUTH_ERROR_REASON.SCOPE_DENIED
+        : msg === AUTH_ERROR_MESSAGES.NO_ACCOUNTS
+          ? "no_accounts"
+          : "load_accounts_failed";
+    if (popup) return popupErrorResponse(origin, msg);
+    const response = redirectWithError(origin, reason);
+    if (reason === "no_accounts") {
+      setLastAttemptEmailCookie(response, googleEmail);
+    }
+    return response;
   }
 
   const usableAccounts = connectable.accounts;
@@ -326,12 +343,11 @@ async function createOrRedirectGoogleAdsSession({
     const msg = hasManager
       ? AUTH_ERROR_MESSAGES.NO_CLIENT_ACCOUNTS
       : AUTH_ERROR_MESSAGES.NO_ACCOUNTS;
-    const response = popup
-      ? popupErrorResponse(origin, msg)
-      : redirectWithError(origin, msg);
-    if (!popup) {
-      clearSessionCookies(response);
-    }
+    const reason = hasManager ? "no_client_accounts" : "no_accounts";
+    if (popup) return popupErrorResponse(origin, msg);
+    const response = redirectWithError(origin, reason);
+    setLastAttemptEmailCookie(response, googleEmail);
+    clearSessionCookies(response);
     return response;
   }
 
@@ -623,39 +639,41 @@ export async function GET(request: Request) {
   }
 
   // Verify the adwords scope was actually granted (Google granular permissions
-  // let users uncheck individual scopes on the consent screen).
-  // Per RFC 6749 §5.1, scope may be omitted when it matches the request — treat that as granted.
-  if (typeof tokenData.scope === "string") {
-    const grantedScopes = tokenData.scope.split(" ");
-    if (!grantedScopes.includes("https://www.googleapis.com/auth/adwords")) {
-      // Auto-retry once: if this is the first scope denial, silently redirect
-      // back to OAuth. Users may have unchecked the scope accidentally.
-      if (!state.scope_retry) {
-        console.log("[auth/callback] Ads scope denied — auto-retrying once");
-        trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED_RETRY, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: false });
-        const retryUrl = `${origin}/api/auth/signin?next=${encodeURIComponent(next)}&scope_retry=1${popup ? "&popup=1" : ""}`;
-        const retryResponse = NextResponse.redirect(retryUrl);
-        retryResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
-        return retryResponse;
-      }
+  // let users uncheck individual scopes on the consent screen). Decision logic
+  // is in lib/oauth-scope-retry.ts so it can be unit-tested without standing
+  // up Next/Supabase/Google.
+  const scopeDecision = evaluateScopeGrant({
+    grantedScopesParam: typeof tokenData.scope === "string" ? tokenData.scope : undefined,
+    hasScopeRetry: state.scope_retry === true,
+    origin,
+    next,
+    popup,
+  });
 
-      // Second denial — user deliberately unchecked it. Show the error.
-      console.error("[auth/callback] Ads scope denied after retry");
-      trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: true });
-      const msg = AUTH_ERROR_MESSAGES.SCOPE_DENIED;
-      const scopeResponse = popup
-        ? popupErrorResponse(origin, msg)
-        : redirectWithError(origin, msg);
-      // Clean up cookies even on scope failure to avoid 431 errors
-      scopeResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
-      const requestCookiesForCleanup = (await cookies()).getAll();
-      for (const { name } of requestCookiesForCleanup) {
-        if (name.startsWith("sb-")) {
-          scopeResponse.cookies.set(name, "", { maxAge: 0, path: "/" });
-        }
+  if (scopeDecision.outcome === "retry") {
+    console.log("[auth/callback] Ads scope denied — auto-retrying once");
+    trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED_RETRY, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: false });
+    const retryResponse = NextResponse.redirect(scopeDecision.retryUrl);
+    retryResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
+    return retryResponse;
+  }
+
+  if (scopeDecision.outcome === "fail") {
+    console.error("[auth/callback] Ads scope denied after retry");
+    trackServerEvent(null, "auth_error", { reason: AUTH_ERROR_REASON.SCOPE_DENIED, step: AUTH_ERROR_STEP.SCOPE_CHECK, is_retry: true });
+    const msg = AUTH_ERROR_MESSAGES.SCOPE_DENIED;
+    const scopeResponse = popup
+      ? popupErrorResponse(origin, msg)
+      : redirectWithError(origin, AUTH_ERROR_REASON.SCOPE_DENIED);
+    // Clean up cookies even on scope failure to avoid 431 errors
+    scopeResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
+    const requestCookiesForCleanup = (await cookies()).getAll();
+    for (const { name } of requestCookiesForCleanup) {
+      if (name.startsWith("sb-")) {
+        scopeResponse.cookies.set(name, "", { maxAge: 0, path: "/" });
       }
-      return scopeResponse;
     }
+    return scopeResponse;
   }
 
   const supabase = await createClient();
@@ -716,7 +734,7 @@ export async function GET(request: Request) {
     console.error("[auth/callback] Failed to create Google Ads session:", sessionError);
     response = popup
       ? popupErrorResponse(origin, describeError(sessionError))
-      : redirectWithError(origin, describeError(sessionError));
+      : redirectWithError(origin, "session_error", describeError(sessionError));
   }
 
   // Track signup event with UTM attribution in PostHog
