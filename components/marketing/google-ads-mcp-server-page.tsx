@@ -24,7 +24,7 @@ const tools = [
   { name: "runScript", category: "Read", description: "Sandboxed JS with GAQL fan-out — every analytical read goes through this one tool" },
   { name: "getRecommendations", category: "Read", description: "Google's optimization suggestions with estimated impact" },
   { name: "getKeywordIdeas", category: "Read", description: "Keyword Planner search volume, competition, and CPC" },
-  { name: "getChanges", category: "Read", description: "AdsAgent's own change log, undoable with one call" },
+  { name: "getChanges", category: "Read", description: "NotFair's own change log, undoable with one call" },
   { name: "reviewChangeImpact", category: "Read", description: "Before/after impact analysis on recent edits" },
   { name: "getResourceMetadata", category: "Read", description: "GAQL schema discovery for custom queries" },
   { name: "updateBid", category: "Write", description: "Adjust keyword or ad group bids — reviewable" },
@@ -41,7 +41,7 @@ const steps = [
   {
     num: "2",
     title: "Connect Google Ads via OAuth",
-    desc: "One-click at adsagent.org. Read-only until you explicitly approve a change — your account stays safe.",
+    desc: "One-click at notfair.co. Read-only until you explicitly approve a change — your account stays safe.",
   },
   {
     num: "3",
@@ -86,7 +86,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 <span className="text-[#4CAF6E]">access.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                AdsAgent is a production-ready Model Context Protocol server for
+                NotFair is a production-ready Model Context Protocol server for
                 Google Ads. Drop it into Claude Desktop, Claude Code, or any
                 MCP-compatible client — and your AI gets live campaign data plus
                 the ability to take reviewed actions.
@@ -263,7 +263,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
           <div className="grid gap-6 sm:grid-cols-3">
             {[
               { icon: Eye, title: "Read-only by default", body: "Your agent sees everything but changes nothing until you approve each action explicitly." },
-              { icon: Shield, title: "OAuth 2.0 auth", body: "Google's standard OAuth. Your credentials never touch AdsAgent's servers — tokens stay local." },
+              { icon: Shield, title: "OAuth 2.0 auth", body: "Google's standard OAuth. Your credentials never touch NotFair's servers — tokens stay local." },
               { icon: Zap, title: "Production-ready", body: "Not a demo. Proper error handling, pagination, and MCP protocol compliance out of the box." },
             ].map(({ icon: Icon, title, body }, i) => (
               <motion.div

@@ -14,7 +14,7 @@ import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
 import type { FaqItem } from "@/lib/seo";
 
-const SERVER_URL = "https://adsagent.org/api/mcp";
+const SERVER_URL = "https://notfair.co/api/mcp";
 
 const FAQ_ITEMS: FaqItem[] = [
   {
@@ -25,7 +25,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Where does this connector work?",
     answer:
-      "Anywhere you use Claude.ai with custom connector support: Claude.ai on the web and Claude Cowork. If you use Claude Code instead, AdsAgent ships as a plugin — see the Claude Code setup guide.",
+      "Anywhere you use Claude.ai with custom connector support: Claude.ai on the web and Claude Cowork. If you use Claude Code instead, NotFair ships as a plugin — see the Claude Code setup guide.",
   },
   {
     question: "Do I need to write any code?",
@@ -35,12 +35,12 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Open the Connectors page in Claude, paste the AdsAgent server URL, sign in with your Google Ads account to generate credentials, paste them into Claude, and you're done.",
+      "Under 2 minutes. Open the Connectors page in Claude, paste the NotFair server URL, sign in with your Google Ads account to generate credentials, paste them into Claude, and you're done.",
   },
   {
     question: "Is the connector free?",
     answer:
-      "Yes. Adding the AdsAgent connector and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
+      "Yes. Adding the NotFair connector and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
   },
   {
     question: "Can Claude actually change my Google Ads account through the connector?",
@@ -48,7 +48,7 @@ const FAQ_ITEMS: FaqItem[] = [
       "Only with your explicit approval. Claude can propose pausing campaigns, adjusting bids, adding negative keywords, or writing new ads — but every write action is shown to you first and requires confirmation. Read access is unrestricted; write access is gated.",
   },
   {
-    question: "What data does Claude see when the AdsAgent connector is enabled?",
+    question: "What data does Claude see when the NotFair connector is enabled?",
     answer:
       "Live campaign performance, keyword bids and Quality Scores, search term reports, ad copy, spend, impression share, and conversion tracking status — pulled directly from the Google Ads API in real time.",
   },
@@ -59,13 +59,13 @@ const RELATED_LINKS = [
     href: "/google-ads-claude",
     title: "Claude for Google Ads",
     description:
-      "Overview of how AdsAgent connects Claude to your Google Ads account — works with Claude Desktop, Code, and Cowork.",
+      "Overview of how NotFair connects Claude to your Google Ads account — works with Claude Desktop, Code, and Cowork.",
   },
   {
     href: "/google-ads-mcp-server",
     title: "Google Ads MCP Server",
     description:
-      "Full reference for the AdsAgent MCP server — every read and write tool exposed to Claude and other MCP clients.",
+      "Full reference for the NotFair MCP server — every read and write tool exposed to Claude and other MCP clients.",
   },
   {
     href: "/google-ads-audit",
@@ -95,7 +95,7 @@ export function GoogleAdsClaudeConnectorPage() {
               Google Ads Claude Connector
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
-              Add AdsAgent as a custom MCP connector inside Claude.ai Web or
+              Add NotFair as a custom MCP connector inside Claude.ai Web or
               Claude Cowork in under 2 minutes. Once installed, Claude reads
               your Google Ads campaigns in real time and helps you audit,
               optimize, and manage them through chat.
@@ -132,7 +132,7 @@ export function GoogleAdsClaudeConnectorPage() {
               How to install
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Add AdsAgent to Claude in 5 steps
+              Add NotFair to Claude in 5 steps
             </h2>
           </motion.div>
 
@@ -179,7 +179,7 @@ export function GoogleAdsClaudeConnectorPage() {
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Fill in the connector form:
                 </p>
-                <StaticField label="Name" value="AdsAgent" />
+                <StaticField label="Name" value="NotFair" />
                 <StaticField label="Remote MCP Server URL" value={SERVER_URL} />
 
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
@@ -202,7 +202,7 @@ export function GoogleAdsClaudeConnectorPage() {
                       </p>
                       <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
                         {session.connected
-                          ? "Open your AdsAgent connector setup page to copy your credentials."
+                          ? "Open your NotFair connector setup page to copy your credentials."
                           : "Sign in with Google. We'll redirect you to the connector setup page where you can generate and copy your credentials."}
                       </p>
                       <div className="mt-4">
@@ -235,12 +235,12 @@ export function GoogleAdsClaudeConnectorPage() {
               <div className="ml-11 space-y-3">
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Click <strong className="text-[#E8E4DD]">Add</strong>. The{" "}
-                  <strong className="text-[#E8E4DD]">AdsAgent</strong> connector will
+                  <strong className="text-[#E8E4DD]">NotFair</strong> connector will
                   appear in your Connectors list with all available tools.
                 </p>
                 <SetupScreenshot
                   src="/connector-setup/03-saved.png"
-                  alt="AdsAgent connector saved and listed under Connectors with its tool permissions"
+                  alt="NotFair connector saved and listed under Connectors with its tool permissions"
                 />
               </div>
             </div>
@@ -250,7 +250,7 @@ export function GoogleAdsClaudeConnectorPage() {
               <div className="flex items-baseline gap-3">
                 <StepNumber n={4} />
                 <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Enable AdsAgent in a chat
+                  Enable NotFair in a chat
                 </h3>
               </div>
               <div className="ml-11 space-y-3">
@@ -259,11 +259,11 @@ export function GoogleAdsClaudeConnectorPage() {
                   <strong className="text-[#E8E4DD]">claude.ai</strong>, click the{" "}
                   <strong className="text-[#E8E4DD]">+</strong> button, go to{" "}
                   <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle{" "}
-                  <strong className="text-[#E8E4DD]">AdsAgent</strong> on.
+                  <strong className="text-[#E8E4DD]">NotFair</strong> on.
                 </p>
                 <SetupScreenshot
                   src="/connector-setup/04-enable-in-chat.png"
-                  alt="In a Claude chat, open the + menu and toggle the AdsAgent connector on"
+                  alt="In a Claude chat, open the + menu and toggle the NotFair connector on"
                 />
               </div>
             </div>
@@ -283,12 +283,12 @@ export function GoogleAdsClaudeConnectorPage() {
                     &ldquo;Audit my connected Google Ads account and tell me
                     the 3 biggest optimization opportunities.&rdquo;
                   </em>{" "}
-                  Claude will call AdsAgent tools to read your account and
+                  Claude will call NotFair tools to read your account and
                   respond with specific, data-backed insights.
                 </p>
                 <SetupScreenshot
                   src="/connector-setup/05-use-in-chat.png"
-                  alt="Claude using the AdsAgent connector to audit a Google Ads account in a chat"
+                  alt="Claude using the NotFair connector to audit a Google Ads account in a chat"
                 />
               </div>
             </div>
@@ -330,14 +330,14 @@ export function GoogleAdsClaudeConnectorPage() {
       {/* ── FAQ ── */}
       <FaqSection
         title="FAQ — Google Ads Claude Connector"
-        intro="Everything you need to know about installing and using the AdsAgent custom connector inside Claude.ai."
+        intro="Everything you need to know about installing and using the NotFair custom connector inside Claude.ai."
         items={FAQ_ITEMS}
       />
 
       {/* ── Related Pages ── */}
       <LandingLinksSection
         title="Related guides"
-        intro="Explore the rest of the AdsAgent + Claude workflow."
+        intro="Explore the rest of the NotFair + Claude workflow."
         links={RELATED_LINKS}
       />
     </div>

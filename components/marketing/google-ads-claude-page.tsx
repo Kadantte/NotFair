@@ -66,13 +66,13 @@ const tools = [
 const steps = [
   {
     num: "1",
-    title: "Add AdsAgent to your MCP config",
+    title: "Add NotFair to your MCP config",
     desc: "Paste the config snippet into Claude Desktop, Claude Code, or Claude Cowork. One entry, no API keys needed at this step.",
   },
   {
     num: "2",
     title: "Connect your Google Ads account",
-    desc: "OAuth in one click at adsagent.org. Read permissions only until you approve a specific change — your account stays safe.",
+    desc: "OAuth in one click at notfair.co. Read permissions only until you approve a specific change — your account stays safe.",
   },
   {
     num: "3",
@@ -95,7 +95,7 @@ const capabilities = [
   {
     icon: Eye,
     title: "Every change is reviewable",
-    body: "AdsAgent never commits a change without your explicit approval. Claude shows you what it wants to do, you say yes or no. Human always in control.",
+    body: "NotFair never commits a change without your explicit approval. Claude shows you what it wants to do, you say yes or no. Human always in control.",
   },
   {
     icon: Terminal,
@@ -106,34 +106,34 @@ const capabilities = [
 
 const FAQ_ITEMS: FaqItem[] = [
   {
-    question: "How do I use Claude for Google Ads with AdsAgent?",
+    question: "How do I use Claude for Google Ads with NotFair?",
     answer:
-      "Add AdsAgent to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at adsagent.org, and Claude immediately gains live access to your campaigns. You can then ask Claude to audit your account, find wasted spend, adjust bids, write ad copy, or pause underperformers — all in natural conversation.",
+      "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude to audit your account, find wasted spend, adjust bids, write ad copy, or pause underperformers — all in natural conversation.",
   },
   {
-    question: "Does AdsAgent work with Claude Desktop, Claude Code, and Claude Cowork?",
+    question: "Does NotFair work with Claude Desktop, Claude Code, and Claude Cowork?",
     answer:
-      "Yes. AdsAgent is a standard MCP server, so it works with any MCP-compatible Claude client. Add the same config snippet to Claude Desktop settings, your Claude Code MCP config, or Claude Cowork — it works identically in all three.",
+      "Yes. NotFair is a standard MCP server, so it works with any MCP-compatible Claude client. Add the same config snippet to Claude Desktop settings, your Claude Code MCP config, or Claude Cowork — it works identically in all three.",
   },
   {
-    question: "What Google Ads data can Claude see through AdsAgent?",
+    question: "What Google Ads data can Claude see through NotFair?",
     answer:
       "Claude gets live access to campaign performance, keyword bids and Quality Scores, search term reports, ad copy, spend data, impression share, and conversion tracking status. It reads your actual account data in real time — no exports or manual uploads needed.",
   },
   {
     question: "Can Claude make changes to my Google Ads account?",
     answer:
-      "Yes, but only with your explicit approval at each step. Claude can propose bid changes, pause campaigns, add negative keywords, and write new ads — but every action is shown to you before it executes. You review and confirm. AdsAgent also logs every change so you can track impact.",
+      "Yes, but only with your explicit approval at each step. Claude can propose bid changes, pause campaigns, add negative keywords, and write new ads — but every action is shown to you before it executes. You review and confirm. NotFair also logs every change so you can track impact.",
   },
   {
     question: "Is this an official Google or Anthropic integration?",
     answer:
-      "AdsAgent is an independent product built on Anthropic's open Model Context Protocol (MCP) standard and the Google Ads API. It is not an official Google product. MCP is the open standard Anthropic created for connecting AI to external tools — any developer can build MCP servers, and AdsAgent is one focused entirely on Google Ads.",
+      "NotFair is an independent product built on Anthropic's open Model Context Protocol (MCP) standard and the Google Ads API. It is not an official Google product. MCP is the open standard Anthropic created for connecting AI to external tools — any developer can build MCP servers, and NotFair is one focused entirely on Google Ads.",
   },
   {
     question: "What does setup actually take?",
     answer:
-      "Under 2 minutes. Paste one JSON snippet into your MCP config, open adsagent.org, click Connect Google Ads, complete the OAuth flow. That's it — Claude can now access your campaigns.",
+      "Under 2 minutes. Paste one JSON snippet into your MCP config, open notfair.co, click Connect Google Ads, complete the OAuth flow. That's it — Claude can now access your campaigns.",
   },
   {
     question: "Do I need to know how to code to use this?",
@@ -153,11 +153,11 @@ const RELATED_LINKS = [
     href: "/google-ads-mcp-server",
     title: "Google Ads MCP Server",
     description:
-      "Learn how AdsAgent's MCP server exposes your Google Ads data and actions to any MCP-compatible AI client.",
+      "Learn how NotFair's MCP server exposes your Google Ads data and actions to any MCP-compatible AI client.",
   },
   {
     href: "/",
-    title: "AdsAgent Home",
+    title: "NotFair Home",
     description:
       "The AI-powered Google Ads agent — connect your account and let Claude manage campaigns through conversation.",
   },
@@ -193,7 +193,7 @@ export function GoogleAdsClaudePage() {
                 <span className="text-[#4CAF6E]">live data, 2-minute setup.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                AdsAgent is a Google Ads MCP server for Claude. Connect once and
+                NotFair is a Google Ads MCP server for Claude. Connect once and
                 Claude gets live access to your campaigns, keywords, spend, and
                 ad copy — then helps you audit, optimize, and manage through
                 natural conversation.
@@ -243,7 +243,7 @@ export function GoogleAdsClaudePage() {
                     href="/"
                     className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
                   >
-                    adsagent.org
+                    notfair.co
                   </Link>
                   .
                 </p>
@@ -375,7 +375,7 @@ export function GoogleAdsClaudePage() {
               What Claude can read and change.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
-              AdsAgent exposes a focused set of MCP tools. Read tools give
+              NotFair exposes a focused set of MCP tools. Read tools give
               Claude live account context. Write tools let Claude propose
               changes — each requiring your explicit approval before execution.
             </p>
@@ -507,7 +507,7 @@ export function GoogleAdsClaudePage() {
       {/* ── Related Pages ── */}
       <LandingLinksSection
         title="Related pages"
-        intro="Explore the full AdsAgent workflow for Google Ads and Claude."
+        intro="Explore the full NotFair workflow for Google Ads and Claude."
         links={RELATED_LINKS}
       />
 

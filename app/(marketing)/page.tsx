@@ -6,7 +6,7 @@ import { getUserSubscription } from "@/lib/subscription";
 import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 
 export const metadata = buildMetadata({
-  title: "AI Google Ads Operator for Claude | AdsAgent",
+  title: "AI Google Ads Operator for Claude | NotFair",
   description:
     "Connect Google Ads to Claude. Ask what is working, what is wasting spend, and approve fixes across campaigns, keywords, budgets, and ads.",
   path: "/",

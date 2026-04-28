@@ -131,7 +131,7 @@ export function BlogPostPage({ post }: { post: BlogPost }) {
                 Try MCP with Google Ads
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#C4C0B6]">
-                Connect your Google Ads account to AdsAgent in 30 seconds and
+                Connect your Google Ads account to NotFair in 30 seconds and
                 start querying campaigns from Claude.
               </p>
             </div>

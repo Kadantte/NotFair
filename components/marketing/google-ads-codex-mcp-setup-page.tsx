@@ -13,25 +13,25 @@ import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
 import type { FaqItem } from "@/lib/seo";
 
-const SERVER_URL = "https://adsagent.org/api/mcp";
-const ONE_LINER = `codex mcp add adsagent --url ${SERVER_URL}`;
+const SERVER_URL = "https://notfair.co/api/mcp";
+const ONE_LINER = `codex mcp add notfair --url ${SERVER_URL}`;
 const AUDIT_PROMPT = "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
 
 const FAQ_ITEMS: FaqItem[] = [
   {
-    question: "What is the AdsAgent Codex MCP integration?",
+    question: "What is the NotFair Codex MCP integration?",
     answer:
       "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — and propose changes you approve in chat.",
   },
   {
     question: "How is this different from the Claude setup guides?",
     answer:
-      "Same backend, different client. The Codex CLI calls the AdsAgent MCP server using OpenAI's MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic's clients. Capabilities are identical.",
+      "Same backend, different client. The Codex CLI calls the NotFair MCP server using OpenAI's MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic's clients. Capabilities are identical.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "Under a minute. Run a single `codex mcp add adsagent --url https://adsagent.org/api/mcp` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.",
+      "Under a minute. Run a single `codex mcp add notfair --url https://notfair.co/api/mcp` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.",
   },
   {
     question: "Do I need to write any code?",
@@ -41,7 +41,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Is the integration free?",
     answer:
-      "Yes. Adding AdsAgent to Codex and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
+      "Yes. Adding NotFair to Codex and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
   },
   {
     question: "Can Codex actually change my Google Ads account?",
@@ -55,13 +55,13 @@ const RELATED_LINKS = [
     href: "/google-ads-claude-connector-setup-guide",
     title: "Google Ads Claude Connector",
     description:
-      "If you use Claude.ai Web, Desktop, or Cowork, install AdsAgent as a custom MCP connector in under 2 minutes.",
+      "If you use Claude.ai Web, Desktop, or Cowork, install NotFair as a custom MCP connector in under 2 minutes.",
   },
   {
     href: "/google-ads-claude-code-plugin-setup-guide",
     title: "Google Ads Claude Code Plugin",
     description:
-      "For Claude Code in your terminal — install AdsAgent via the toprank plugin marketplace.",
+      "For Claude Code in your terminal — install NotFair via the toprank plugin marketplace.",
   },
   {
     href: "/google-ads-audit",
@@ -91,7 +91,7 @@ export function GoogleAdsCodexMcpSetupPage() {
               Google Ads Codex MCP
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
-              Add AdsAgent to OpenAI&apos;s Codex CLI in under a minute. One
+              Add NotFair to OpenAI&apos;s Codex CLI in under a minute. One
               terminal command wires up the MCP server and walks you through
               OAuth — Codex then has live access to your Google Ads account.
             </p>
@@ -116,7 +116,7 @@ export function GoogleAdsCodexMcpSetupPage() {
               How to install
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Add AdsAgent to Codex in 3 steps
+              Add NotFair to Codex in 3 steps
             </h2>
           </motion.div>
 
@@ -151,13 +151,13 @@ export function GoogleAdsCodexMcpSetupPage() {
               <div className="flex items-baseline gap-3">
                 <StepNumber n={2} />
                 <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Add the AdsAgent MCP
+                  Add the NotFair MCP
                 </h3>
               </div>
               <div className="ml-11 space-y-3">
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
                   Run this one-liner. Codex will walk you through the OAuth
-                  flow and register the AdsAgent MCP server automatically.
+                  flow and register the NotFair MCP server automatically.
                 </p>
                 <CommandBlock command={ONE_LINER} trackingStep="codex_oneliner" />
               </div>
@@ -181,7 +181,7 @@ export function GoogleAdsCodexMcpSetupPage() {
                   </p>
                 </div>
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Codex will call AdsAgent tools to read your account and
+                  Codex will call NotFair tools to read your account and
                   respond with specific, data-backed insights.
                 </p>
               </div>
@@ -204,7 +204,7 @@ export function GoogleAdsCodexMcpSetupPage() {
               Ready to wire up Codex?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#C4C0B6]">
-              Sign in with Google to set up your AdsAgent account, then run the
+              Sign in with Google to set up your NotFair account, then run the
               one-liner in your terminal. Setup takes under a minute.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3">
@@ -223,15 +223,15 @@ export function GoogleAdsCodexMcpSetupPage() {
 
       {/* ── FAQ ── */}
       <FaqSection
-        title="FAQ — AdsAgent for Codex"
-        intro="Everything you need to know about installing and using the AdsAgent MCP inside OpenAI's Codex CLI."
+        title="FAQ — NotFair for Codex"
+        intro="Everything you need to know about installing and using the NotFair MCP inside OpenAI's Codex CLI."
         items={FAQ_ITEMS}
       />
 
       {/* ── Related Pages ── */}
       <LandingLinksSection
         title="Related guides"
-        intro="Explore the rest of the AdsAgent setup options."
+        intro="Explore the rest of the NotFair setup options."
         links={RELATED_LINKS}
       />
     </div>

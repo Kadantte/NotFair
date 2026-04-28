@@ -62,7 +62,7 @@ export function ImpactPage() {
             Impact Tracker
           </h1>
           <p className="text-lg text-zinc-400">
-            Every change AdsAgent makes is logged here with before and after
+            Every change NotFair makes is logged here with before and after
             context so you can review what moved and what did not.
           </p>
         </div>
@@ -78,7 +78,7 @@ export function ImpactPage() {
               No changes yet
             </h2>
             <p className="mx-auto max-w-md text-zinc-500">
-              Connect AdsAgent to your Google Ads account via MCP and start making
+              Connect NotFair to your Google Ads account via MCP and start making
               changes. Every action will appear here with its recorded impact.
             </p>
           </div>

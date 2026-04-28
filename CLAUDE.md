@@ -61,18 +61,18 @@ These are mandatory patterns for all frontend components. Follow them by default
 
 ## Deploy Configuration (configured by /setup-deploy)
 - Platform: Vercel
-- Production URL: https://www.adsagent.org
+- Production URL: https://www.notfair.co
 - Deploy workflow: auto-deploy on push (Vercel Git integration)
 - Deploy status command: HTTP health check
 - Merge method: squash
 - Project type: web app (Next.js)
-- Post-deploy health check: https://www.adsagent.org/api/health
+- Post-deploy health check: https://www.notfair.co/api/health
 
 ### Custom deploy hooks
 - Pre-merge: none
 - Deploy trigger: automatic on push to main (Vercel)
-- Deploy status: poll https://www.adsagent.org/api/health for 200
-- Health check: https://www.adsagent.org/api/health
+- Deploy status: poll https://www.notfair.co/api/health for 200
+- Health check: https://www.notfair.co/api/health
 
 ## Skill routing
 

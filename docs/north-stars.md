@@ -1,6 +1,6 @@
-# AdsAgent North Star Metrics
+# NotFair North Star Metrics
 
-AdsAgent has **two** north-star metrics, agreed 2026-04-19. Both anchor on the **successful write op** because writes are the only first-session behavior that causally predicts retention (+30pp gap in the Apr 19 retention analysis) and because writes are the product's value promise (AI takes action on Google Ads).
+NotFair has **two** north-star metrics, agreed 2026-04-19. Both anchor on the **successful write op** because writes are the only first-session behavior that causally predicts retention (+30pp gap in the Apr 19 retention analysis) and because writes are the product's value promise (AI takes action on Google Ads).
 
 **1. Growth north star — Weekly Active Writers (WAW)**
 - Definition: unique users with ≥1 `operations` row where `op_type=1 AND success=1` in a rolling 7-day window.

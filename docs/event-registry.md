@@ -342,7 +342,7 @@ No properties.
 | Property | Type | Example | Description |
 |---|---|---|---|
 | `setup_tab` | string | `"codex"` | Which AI client setup tab was active. Enum: `claude-code`, `codex`. (`connector` does not fire this event — it uses `connector_credential_copied` instead.) |
-| `step` | string | `"codex_oneliner"` | Which command was copied. Enum (when `setup_tab="claude-code"`): `install` (auto-prompt block), `marketplace_add`, `plugin_install`, `ads_command`, `api_key`. Enum (when `setup_tab="codex"`): `codex_oneliner` (the `codex mcp add adsagent --url …` block). |
+| `step` | string | `"codex_oneliner"` | Which command was copied. Enum (when `setup_tab="claude-code"`): `install` (auto-prompt block), `marketplace_add`, `plugin_install`, `ads_command`, `api_key`. Enum (when `setup_tab="codex"`): `codex_oneliner` (the `codex mcp add notfair --url …` block). |
 
 ```json
 { "event": "install_command_copied", "properties": { "setup_tab": "codex", "step": "codex_oneliner" } }
@@ -437,12 +437,12 @@ No properties.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `$current_url` | string | `"https://adsagent.org/connect"` | Full URL at capture time (PostHog reserved property) |
+| `$current_url` | string | `"https://notfair.co/connect"` | Full URL at capture time (PostHog reserved property) |
 | `path` | string | `"/connect"` | Pathname without query/host |
 | `referrer` | string | `"https://google.com"` | Document referrer |
 
 ```json
-{ "event": "$pageview", "properties": { "$current_url": "https://adsagent.org/connect", "path": "/connect", "referrer": "https://google.com" } }
+{ "event": "$pageview", "properties": { "$current_url": "https://notfair.co/connect", "path": "/connect", "referrer": "https://google.com" } }
 ```
 
 **Files:** `components/posthog-provider.tsx`, `lib/analytics.ts`

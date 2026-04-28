@@ -19,14 +19,14 @@ const ADS_CMD = "/ads";
 
 const FAQ_ITEMS: FaqItem[] = [
   {
-    question: "What is the AdsAgent Claude Code plugin?",
+    question: "What is the NotFair Claude Code plugin?",
     answer:
       "It's a Claude Code plugin (distributed through the toprank marketplace) that gives Claude Code live access to your Google Ads account. Once installed, /ads connects Claude to your campaigns, keywords, search terms, and spend so you can audit and optimize through chat in your terminal.",
   },
   {
     question: "How is this different from the Claude Connector?",
     answer:
-      "The plugin is for Claude Code — Anthropic's terminal-based coding agent. The Claude Connector is for Claude.ai Web and Claude Cowork. Both surfaces use the same AdsAgent backend, so the data and capabilities are identical; the install flow is just different.",
+      "The plugin is for Claude Code — Anthropic's terminal-based coding agent. The Claude Connector is for Claude.ai Web and Claude Cowork. Both surfaces use the same NotFair backend, so the data and capabilities are identical; the install flow is just different.",
   },
   {
     question: "How long does setup take?",
@@ -51,7 +51,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What does toprank ship with the plugin?",
     answer:
-      "Pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the AdsAgent MCP tools to give Claude domain expertise out of the box.",
+      "Pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the NotFair MCP tools to give Claude domain expertise out of the box.",
   },
 ];
 
@@ -60,13 +60,13 @@ const RELATED_LINKS = [
     href: "/google-ads-claude-connector-setup-guide",
     title: "Google Ads Claude Connector",
     description:
-      "If you use Claude.ai Web or Claude Cowork instead of Claude Code, install AdsAgent as a custom MCP connector in under 2 minutes.",
+      "If you use Claude.ai Web or Claude Cowork instead of Claude Code, install NotFair as a custom MCP connector in under 2 minutes.",
   },
   {
     href: "/google-ads-claude",
     title: "Claude for Google Ads",
     description:
-      "Overview of how AdsAgent connects Claude to your Google Ads account — works with Claude Code, Claude Web, and Claude Cowork.",
+      "Overview of how NotFair connects Claude to your Google Ads account — works with Claude Code, Claude Web, and Claude Cowork.",
   },
   {
     href: "/google-ads-audit",
@@ -96,7 +96,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
               Google Ads Claude Code Plugin
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
-              Install the AdsAgent plugin in Claude Code in under 2 minutes.
+              Install the NotFair plugin in Claude Code in under 2 minutes.
               Claude reads your Google Ads campaigns in real time and helps you
               audit, optimize, and manage them — right from your terminal.
             </p>
@@ -121,7 +121,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
               How to install
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Add AdsAgent to Claude Code in 5 steps
+              Add NotFair to Claude Code in 5 steps
             </h2>
           </motion.div>
 
@@ -189,7 +189,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
               </div>
               <div className="ml-11 space-y-3">
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Install the AdsAgent plugin from the toprank marketplace. It
+                  Install the NotFair plugin from the toprank marketplace. It
                   ships with pre-made Google Ads and SEO skills that teach
                   Claude how to audit and optimize your campaigns.
                 </p>
@@ -214,7 +214,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
                 </p>
                 <CommandBlock command={ADS_CMD} trackingStep="ads_command" />
                 <p className="text-base leading-relaxed text-[#C4C0B6]">
-                  Claude will ask for your AdsAgent API key — grab it in the
+                  Claude will ask for your NotFair API key — grab it in the
                   next step.
                 </p>
               </div>
@@ -225,7 +225,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
               <div className="flex items-baseline gap-3">
                 <StepNumber n={5} />
                 <h3 className="text-lg font-semibold text-[#E8E4DD]">
-                  Get your AdsAgent API key
+                  Get your NotFair API key
                 </h3>
               </div>
               <div className="ml-11 space-y-4">
@@ -246,7 +246,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
                       </p>
                       <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
                         {session.connected
-                          ? "Open your AdsAgent setup page to copy your API key."
+                          ? "Open your NotFair setup page to copy your API key."
                           : "Sign in with Google. We'll redirect you to the setup page where you can copy your API key."}
                       </p>
                       <div className="mt-4">
@@ -261,7 +261,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
                     &ldquo;Audit my connected Google Ads account and tell me
                     the 3 biggest optimization opportunities.&rdquo;
                   </em>{" "}
-                  Claude will call AdsAgent tools to read your account and
+                  Claude will call NotFair tools to read your account and
                   respond with specific, data-backed insights.
                 </p>
               </div>
@@ -303,15 +303,15 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
 
       {/* ── FAQ ── */}
       <FaqSection
-        title="FAQ — AdsAgent for Claude Code"
-        intro="Everything you need to know about installing and using the AdsAgent plugin inside Claude Code."
+        title="FAQ — NotFair for Claude Code"
+        intro="Everything you need to know about installing and using the NotFair plugin inside Claude Code."
         items={FAQ_ITEMS}
       />
 
       {/* ── Related Pages ── */}
       <LandingLinksSection
         title="Related guides"
-        intro="Explore the rest of the AdsAgent + Claude workflow."
+        intro="Explore the rest of the NotFair + Claude workflow."
         links={RELATED_LINKS}
       />
     </div>

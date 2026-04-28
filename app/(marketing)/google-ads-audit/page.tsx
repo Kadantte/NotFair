@@ -2,7 +2,7 @@ import { buildMetadata, buildFaqJsonLd } from "@/lib/seo";
 import { GoogleAdsAuditPage } from "./google-ads-audit-page";
 
 export const metadata = buildMetadata({
-  title: "Free Google Ads Audit — Results in 5 Minutes | AdsAgent",
+  title: "Free Google Ads Audit — Results in 5 Minutes | NotFair",
   description:
     "Get a free Google Ads audit instantly. AI finds wasted spend, missed opportunities, and structural issues — then gives you a prioritized 3-step fix list. No credit card. No agency.",
   path: "/google-ads-audit",
@@ -21,7 +21,7 @@ const faqSchema = buildFaqJsonLd([
   {
     question: "What does a Google Ads audit check?",
     answer:
-      "AdsAgent's Google Ads audit checks conversion tracking, keyword health, search term quality, campaign structure, ad copy, impression share, and spend efficiency. Results are organized into 3 action passes (Stop Wasting, Capture More, Fix Fundamentals) with 3 pulse metrics you can track over time: waste rate, demand captured, and CPA.",
+      "NotFair's Google Ads audit checks conversion tracking, keyword health, search term quality, campaign structure, ad copy, impression share, and spend efficiency. Results are organized into 3 action passes (Stop Wasting, Capture More, Fix Fundamentals) with 3 pulse metrics you can track over time: waste rate, demand captured, and CPA.",
   },
   {
     question: "Is the Google Ads audit really free?",

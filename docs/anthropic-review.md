@@ -1,4 +1,4 @@
-# AdsAgent MCP Server — Anthropic Review Credentials
+# NotFair MCP Server — Anthropic Review Credentials
 
 Ready-to-paste answers for the MCP server review form at
 <https://buildwith.anthropic.com/directory>.
@@ -22,7 +22,7 @@ No 2FA, no Google account, no sign-up required.
 Same as production:
 
 ```
-https://adsagent.org/api/mcp
+https://notfair.co/api/mcp
 ```
 
 ## Test Account Setup Instructions
@@ -30,12 +30,12 @@ https://adsagent.org/api/mcp
 1. Open <https://claude.ai/customize/connectors>.
 2. Click **+ → Add custom connector**.
 3. Fill in the form:
-   - **Name**: `AdsAgent Demo`
-   - **Remote MCP Server URL**: `https://adsagent.org/api/mcp`
+   - **Name**: `NotFair Demo`
+   - **Remote MCP Server URL**: `https://notfair.co/api/mcp`
    - Expand **Advanced Settings** and paste the `client_id` + `client_secret` above.
 4. Click **Add**. Claude will complete the OAuth handshake automatically —
    no browser redirect, no Google account required.
-5. In a new Claude chat, open **+ → Connectors** and toggle **AdsAgent Demo** on.
+5. In a new Claude chat, open **+ → Connectors** and toggle **NotFair Demo** on.
 6. Try any of these prompts to exercise the server:
    - *"List all campaigns in my Google Ads account."* → `listCampaigns`
    - *"Show me the daily performance for Threadline — Brand Search over the last 14 days."* → `getCampaignPerformance`

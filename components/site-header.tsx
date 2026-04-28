@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Star } from "lucide-react";
 import { AuditCTA } from "@/components/marketing/audit-cta";
 import { SetupGuidesMenu } from "@/components/setup-guides-menu";
+import { BrandLockup } from "@/components/brand-lockup";
 
 function formatStars(count: number): string {
     if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -42,11 +42,8 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
             <div className="container mx-auto flex h-14 items-center justify-between gap-6 px-4 md:px-6">
                 {/* Left: brand + nav */}
                 <div className="flex items-center gap-8">
-                    <Link href="/" className="flex items-center gap-2.5">
-                        <Image src="/logo.svg" alt="AdsAgent" width={26} height={26} className="h-[26px] w-[26px]" />
-                        <span className="font-display text-[15px] font-semibold tracking-tight text-[#E8E4DD]">
-                            AdsAgent
-                        </span>
+                    <Link href="/" className="flex items-center">
+                        <BrandLockup size="md" />
                     </Link>
                 </div>
 

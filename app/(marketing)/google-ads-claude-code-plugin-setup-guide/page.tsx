@@ -2,9 +2,9 @@ import { GoogleAdsClaudeCodePluginSetupPage } from "@/components/marketing/googl
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Google Ads Claude Code Plugin — Setup Guide for AdsAgent",
+  title: "Google Ads Claude Code Plugin — Setup Guide for NotFair",
   description:
-    "Step-by-step guide to install the AdsAgent plugin in Claude Code. Add the toprank marketplace, install the plugin, and run /ads to manage your Google Ads campaigns from the terminal — under 2 minutes, no config edits.",
+    "Step-by-step guide to install the NotFair plugin in Claude Code. Add the toprank marketplace, install the plugin, and run /ads to manage your Google Ads campaigns from the terminal — under 2 minutes, no config edits.",
   path: "/google-ads-claude-code-plugin-setup-guide",
   keywords: [
     "google ads claude code plugin",
@@ -20,14 +20,14 @@ export const metadata = buildMetadata({
 
 const faqItems = [
   {
-    question: "What is the AdsAgent Claude Code plugin?",
+    question: "What is the NotFair Claude Code plugin?",
     answer:
       "It's a Claude Code plugin (distributed through the toprank marketplace) that gives Claude Code live access to your Google Ads account. Once installed, /ads connects Claude to your campaigns, keywords, search terms, and spend so you can audit and optimize through chat in your terminal.",
   },
   {
     question: "How is this different from the Claude Connector?",
     answer:
-      "The plugin is for Claude Code — Anthropic's terminal-based coding agent. The Claude Connector is for Claude.ai Web and Claude Cowork. Both surfaces use the same AdsAgent backend, so the data and capabilities are identical; the install flow is just different.",
+      "The plugin is for Claude Code — Anthropic's terminal-based coding agent. The Claude Connector is for Claude.ai Web and Claude Cowork. Both surfaces use the same NotFair backend, so the data and capabilities are identical; the install flow is just different.",
   },
   {
     question: "How long does setup take?",
@@ -52,7 +52,7 @@ const faqItems = [
   {
     question: "What does toprank ship with the plugin?",
     answer:
-      "Pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the AdsAgent MCP tools to give Claude domain expertise out of the box.",
+      "Pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the NotFair MCP tools to give Claude domain expertise out of the box.",
   },
 ];
 
@@ -61,9 +61,9 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to install the AdsAgent plugin in Claude Code",
+    name: "How to install the NotFair plugin in Claude Code",
     description:
-      "Install the AdsAgent plugin in Claude Code via the toprank marketplace to give Claude live access to your Google Ads account from the terminal.",
+      "Install the NotFair plugin in Claude Code via the toprank marketplace to give Claude live access to your Google Ads account from the terminal.",
     totalTime: "PT2M",
     step: [
       {
@@ -84,21 +84,21 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 3,
         name: "Install the plugin",
-        text: "Run /plugin install toprank@nowork-studio to install the AdsAgent plugin and its bundled Google Ads skills.",
+        text: "Run /plugin install toprank@nowork-studio to install the NotFair plugin and its bundled Google Ads skills.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-3", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 4,
         name: "Run /ads",
-        text: "Restart Claude Code and run /ads. Claude will ask for your AdsAgent API key — grab it in the next step.",
+        text: "Restart Claude Code and run /ads. Claude will ask for your NotFair API key — grab it in the next step.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-4", SITE_URL).toString(),
       },
       {
         "@type": "HowToStep",
         position: 5,
-        name: "Get your AdsAgent API key",
-        text: "Sign in with your Google Ads account at adsagent.org/connect/claude-code/manual to generate your personal API key, then paste it into Claude Code when prompted.",
+        name: "Get your NotFair API key",
+        text: "Sign in with your Google Ads account at notfair.co/connect/claude-code/manual to generate your personal API key, then paste it into Claude Code when prompted.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-5", SITE_URL).toString(),
       },
     ],
@@ -106,12 +106,12 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "AdsAgent — Google Ads Claude Code Plugin",
+    name: "NotFair — Google Ads Claude Code Plugin",
     applicationCategory: "BusinessApplication",
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "macOS, Linux, Windows",
     description:
-      "Claude Code plugin that gives Anthropic's terminal coding agent live access to your Google Ads account through AdsAgent.",
+      "Claude Code plugin that gives Anthropic's terminal coding agent live access to your Google Ads account through NotFair.",
     offers: {
       "@type": "Offer",
       price: "0",

@@ -160,7 +160,7 @@ Resolver logic:
 
 ```
 Free trial ended {N} days ago. Upgrade to Growth ($79/mo or $950/yr) to keep writing:
-https://adsagent.org/upgrade. Reads still work — only writes require Growth.
+https://notfair.co/upgrade. Reads still work — only writes require Growth.
 ```
 
 ### Step 2 — Wire up enforcement

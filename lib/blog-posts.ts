@@ -45,7 +45,7 @@ export const blogPosts: Record<string, BlogPost> = {
     publishedAt: "2026-04-07",
     updatedAt: "2026-04-07",
     author: {
-      name: "AdsAgent Team",
+      name: "NotFair Team",
       role: "AI ads infrastructure",
     },
     content: [
@@ -76,7 +76,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "Tools like AdsAgent implement this as an MCP server — a Model Context Protocol server that lets AI assistants like Claude connect to external systems and call structured tools against live data.",
+          "Tools like NotFair implement this as an MCP server — a Model Context Protocol server that lets AI assistants like Claude connect to external systems and call structured tools against live data.",
       },
       {
         type: "heading",
@@ -134,7 +134,7 @@ export const blogPosts: Record<string, BlogPost> = {
         items: [
           "Google Smart Campaigns / Performance Max: reads data, takes action automatically, does not explain reasoning, limited human control",
           "Rule-based automation: reads data, takes action by predefined rules, no explanation, campaign-level control",
-          "AI Agent (AdsAgent): reads data, takes action only with approval, explains reasoning, full account scope, natural language interface",
+          "AI Agent (NotFair): reads data, takes action only with approval, explains reasoning, full account scope, natural language interface",
         ],
       },
       {
@@ -149,7 +149,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "The AdsAgent approach implements review-first workflow: the AI audits and recommends, you approve. You can ask it to execute directly on lower-stakes changes (adding a negative keyword) while keeping approval gates on higher-stakes changes (bid strategy changes, budget adjustments). That trust is earned incrementally through consistent, accurate recommendations.",
+          "The NotFair approach implements review-first workflow: the AI audits and recommends, you approve. You can ask it to execute directly on lower-stakes changes (adding a negative keyword) while keeping approval gates on higher-stakes changes (bid strategy changes, budget adjustments). That trust is earned incrementally through consistent, accurate recommendations.",
       },
       {
         type: "heading",
@@ -159,8 +159,8 @@ export const blogPosts: Record<string, BlogPost> = {
         type: "list",
         content: "",
         items: [
-          "Use AdsAgent: connects your Google Ads account and gives you an AI interface immediately. No setup beyond authentication. Run a free audit to see what AI finds in your account.",
-          "Use Claude with MCP: Anthropic's Claude supports Model Context Protocol, which AdsAgent uses. You get a conversational interface to your account data — ask questions, get analysis, approve actions.",
+          "Use NotFair: connects your Google Ads account and gives you an AI interface immediately. No setup beyond authentication. Run a free audit to see what AI finds in your account.",
+          "Use Claude with MCP: Anthropic's Claude supports Model Context Protocol, which NotFair uses. You get a conversational interface to your account data — ask questions, get analysis, approve actions.",
           "Build with the Google Ads API directly: for developers or agencies managing many accounts. The main costs are API authentication complexity and maintenance over time.",
         ],
       },
@@ -197,7 +197,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         question: "Can an AI agent actually make changes to my Google Ads account?",
         answer:
-          "Yes, if the tool has API write access. AdsAgent can pause keywords, add negative keywords, adjust bids, and create ad variations. The question is whether it does so autonomously or with your approval. Review-first mode is safer for most use cases.",
+          "Yes, if the tool has API write access. NotFair can pause keywords, add negative keywords, adjust bids, and create ad variations. The question is whether it does so autonomously or with your approval. Review-first mode is safer for most use cases.",
       },
       {
         question: "How accurate is AI spend analysis?",
@@ -207,7 +207,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         question: "Do I need technical skills to use a Google Ads AI agent?",
         answer:
-          "For managed tools like AdsAgent: no. Authentication is handled through OAuth and the interface is conversational. For building a custom agent with the Google Ads API directly: yes, developer skills are required.",
+          "For managed tools like NotFair: no. Authentication is handled through OAuth and the interface is conversational. For building a custom agent with the Google Ads API directly: yes, developer skills are required.",
       },
       {
         question: "Is AI Google Ads management worth it for small accounts?",
@@ -262,7 +262,7 @@ export const blogPosts: Record<string, BlogPost> = {
     publishedAt: "2026-04-05",
     updatedAt: "2026-04-05",
     author: {
-      name: "AdsAgent Team",
+      name: "NotFair Team",
       role: "AI ads infrastructure",
     },
     content: [
@@ -379,7 +379,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "To make this concrete, here is how MCP works in practice with AdsAgent, a Google Ads MCP server. Instead of exporting CSV reports from Google Ads and pasting them into ChatGPT, or building a custom integration to feed campaign data into an AI workflow, you connect AdsAgent as an MCP server to your AI client.",
+          "To make this concrete, here is how MCP works in practice with NotFair, a Google Ads MCP server. Instead of exporting CSV reports from Google Ads and pasting them into ChatGPT, or building a custom integration to feed campaign data into an AI workflow, you connect NotFair as an MCP server to your AI client.",
       },
       {
         type: "text",
@@ -413,7 +413,7 @@ export const blogPosts: Record<string, BlogPost> = {
           "Data and analytics — Google Sheets, Notion databases, web scraping and browser automation",
           "Communication — Slack, email, calendar integrations",
           "Cloud infrastructure — AWS, GCP, Docker, Kubernetes management",
-          "Advertising and marketing — Google Ads (AdsAgent), search console integrations, analytics platforms",
+          "Advertising and marketing — Google Ads (NotFair), search console integrations, analytics platforms",
           "Vertical SaaS — CRM systems, e-commerce platforms, payment processors",
         ],
       },
@@ -431,7 +431,7 @@ export const blogPosts: Record<string, BlogPost> = {
         content: "",
         items: [
           "Confusing MCP with a specific product — MCP is a protocol, not a product. Claude uses MCP, but MCP is not Claude-specific. Any AI client can implement the MCP client specification.",
-          "Thinking MCP replaces human oversight — MCP gives AI tools access to take actions, but well-built MCP servers (and clients) include approval flows. AdsAgent, for example, requires human confirmation before making campaign changes.",
+          "Thinking MCP replaces human oversight — MCP gives AI tools access to take actions, but well-built MCP servers (and clients) include approval flows. NotFair, for example, requires human confirmation before making campaign changes.",
           "Assuming MCP is only for developers — Setting up an MCP server often requires a one-time config step, but using it afterward is pure natural language. The whole point is removing the need to write code for every AI-tool interaction.",
           "Ignoring auth and security — MCP servers handle their own authentication. A Google Ads MCP server manages OAuth with Google. The AI model never sees your credentials directly. But you should still evaluate each server's security model before granting access.",
           "Expecting MCP to fix bad AI reasoning — MCP provides the connection layer. If the underlying AI model hallucinates or gives bad advice, MCP does not fix that. Choose an AI client with strong reasoning capabilities, especially for high-stakes domains like ad spend management.",
@@ -450,7 +450,7 @@ export const blogPosts: Record<string, BlogPost> = {
         type: "list",
         content: "",
         items: [
-          "For Google Ads — AdsAgent gives you a ready-to-use MCP server. Connect your Google Ads account at www.adsagent.org/connect, add the server to your MCP client config, and start querying campaigns in natural language.",
+          "For Google Ads — NotFair gives you a ready-to-use MCP server. Connect your Google Ads account at www.notfair.co/connect, add the server to your MCP client config, and start querying campaigns in natural language.",
           "For development tools — Claude Desktop and Cursor ship with built-in MCP server support for file systems and common dev tools. Check your client's documentation for what is available out of the box.",
           "For other tools — Search the MCP server registries (Smithery, mcp.so) for your specific tool. Most servers include setup instructions that take under five minutes.",
           "For building your own — The MCP specification is open. Anthropic publishes SDKs for TypeScript and Python. If your tool has an API, you can wrap it in an MCP server to make it accessible to any MCP client.",
@@ -485,7 +485,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         question: "Is MCP safe to use with sensitive data like ad accounts?",
         answer:
-          "MCP servers handle their own authentication and authorization. A well-built server like AdsAgent manages OAuth securely and supports approval flows before taking actions. Always evaluate a server's security practices before connecting sensitive accounts.",
+          "MCP servers handle their own authentication and authorization. A well-built server like NotFair manages OAuth securely and supports approval flows before taking actions. Always evaluate a server's security practices before connecting sensitive accounts.",
       },
     ],
     relatedLinks: [
@@ -493,7 +493,7 @@ export const blogPosts: Record<string, BlogPost> = {
         href: "/google-ads-mcp",
         title: "Google Ads MCP Server",
         description:
-          "See AdsAgent's MCP server — connect Google Ads to Claude and other MCP clients.",
+          "See NotFair's MCP server — connect Google Ads to Claude and other MCP clients.",
       },
       {
         href: "/ai-google-ads-agent",

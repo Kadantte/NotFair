@@ -40,7 +40,7 @@ export default function OpenGraphImage() {
               textTransform: "uppercase",
             }}
           >
-            AdsAgent
+            {SITE_NAME}
           </div>
           <div
             style={{

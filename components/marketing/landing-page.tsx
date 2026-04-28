@@ -10,7 +10,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
         <div className="container mx-auto max-w-5xl">
           <div className="max-w-3xl">
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              AdsAgent
+              NotFair
             </p>
             <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#E8E4DD] md:text-6xl">
               {page.heroTitle}
@@ -79,7 +79,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
 
       <LandingLinksSection
         title="Related pages"
-        intro="Use these pages to move from the exact search intent into the broader AdsAgent workflow."
+        intro="Use these pages to move from the exact search intent into the broader NotFair workflow."
         links={page.relatedLinks}
       />
     </>

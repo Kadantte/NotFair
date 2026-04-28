@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     }
 
     const { error } = await resend.emails.send({
-      from: "Tong from AdsAgent <tong.chen@adsagent.org>",
+      from: "Tong from NotFair <tong.chen@adsagent.org>",
       to: contact.email,
       subject: contact.draftSubject,
       replyTo: "tong.chen@adsagent.org",

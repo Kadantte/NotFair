@@ -1,6 +1,6 @@
 ---
 name: cold-outreach
-description: "Draft and send personalized cold outreach emails to leads in the AdsAgent contacts database. Invoke this skill whenever the user wants to write outreach emails, draft cold emails, reach out to leads, send emails to contacts, prepare email campaigns, or says things like 'email the leads', 'draft outreach', 'write emails for our contacts', 'cold email', or 'reach out to prospects'. Also trigger when the user asks to check for replies from leads."
+description: "Draft and send personalized cold outreach emails to leads in the NotFair contacts database. Invoke this skill whenever the user wants to write outreach emails, draft cold emails, reach out to leads, send emails to contacts, prepare email campaigns, or says things like 'email the leads', 'draft outreach', 'write emails for our contacts', 'cold email', or 'reach out to prospects'. Also trigger when the user asks to check for replies from leads."
 ---
 
 # Cold Outreach Drafter
@@ -14,7 +14,7 @@ Most cold email fails because it's a pitch disguised as a conversation. These em
 **Core principles:**
 - **Brevity is king.** 2-4 sentences. 50-75 words max. If you're over 75 words, you're explaining too much. The best cold emails look like they took 30 seconds to write.
 - **Optimize for replies, not clicks.** A reply means engagement. A link click means nothing. The CTA should invite a reply ("mind if I send over...?") not point to a URL.
-- **Create curiosity, not clarity.** Don't explain what AdsAgent does. Hint at a result. Make them want to ask "how?" The moment you fully explain, there's no reason to reply.
+- **Create curiosity, not clarity.** Don't explain what NotFair does. Hint at a result. Make them want to ask "how?" The moment you fully explain, there's no reason to reply.
 - **One email, one idea.** Don't stack pain points, features, or angles. Pick ONE sharp hook per email.
 - **Plain text only.** No HTML, no formatting, no links wrapped in anchor tags. Plain text lands in Primary inbox, not Promotions. One bare URL max (and only if essential — often zero is better).
 - **Sound human, not polished.** Use contractions, casual phrasing, even the occasional "btw" or "lmk." If it reads like marketing copy, rewrite it. If it reads like a quick text to a colleague, you're close.
@@ -30,7 +30,7 @@ Pick the ONE pain that fits this specific lead. Never mention more than one.
 - **"Agency math doesn't work at my spend level"** — Spending $1-3k/month on ads, can't justify another $2k for an agency. Stuck.
 - **"Google's automation just spends my money"** — Smart Campaigns and Performance Max optimize for Google's revenue, not theirs.
 
-## The AdsAgent Pitch (Internal Reference)
+## The NotFair Pitch (Internal Reference)
 
 Use these to inform your writing, but NEVER dump them into the email. Pick ONE angle and hint at it.
 
@@ -85,10 +85,10 @@ Total length: 2-4 sentences, 50-75 words. Three short paragraphs max.
 
 **Body (1-2 sentences):**
 - Bridge pain → curiosity in the tightest possible space.
-- Lead with the RESULT, not the mechanism. Don't explain what AdsAgent is or how it works. Hint at what it does for them.
+- Lead with the RESULT, not the mechanism. Don't explain what NotFair is or how it works. Hint at what it does for them.
 - Good: "We've been helping injury firms cut their wasted ad spend by about 30% — figured it might be relevant."
 - Good: "Built something that manages Google Ads inside Claude. A few solo attorneys are using it instead of an agency."
-- Bad: "We built AdsAgent — it turns Claude (the AI) into a full-time Google Ads manager that handles keywords, bids, ad copy, and waste cutting, and you can ask it questions from your phone." (way too much — this is a pitch deck paragraph)
+- Bad: "We built NotFair — it turns Claude (the AI) into a full-time Google Ads manager that handles keywords, bids, ad copy, and waste cutting, and you can ask it questions from your phone." (way too much — this is a pitch deck paragraph)
 
 **CTA (1 sentence):**
 - Optimize for the LOWEST friction reply. Don't ask them to visit a URL — ask a question they can answer with one sentence.
@@ -101,7 +101,7 @@ Total length: 2-4 sentences, 50-75 words. Three short paragraphs max.
   4. "Want me to send a 2-min video of how it works for firms like yours?" — specific deliverable
 
 **Style B: Free Audit CTAs** (for audit campaigns — use when user requests audit-style outreach)
-  The offer: a free Google Ads audit. The actual process requires them to connect their Google Ads account at adsagent.org/google-ads-audit (read-only, ~2 minutes). But NEVER put the URL in the cold email — that kills deliverability and feels spammy. Instead, the cold email just gets the reply. Once they reply "yes," Tong sends a warm follow-up with the link.
+  The offer: a free Google Ads audit. The actual process requires them to connect their Google Ads account at notfair.co/google-ads-audit (read-only, ~2 minutes). But NEVER put the URL in the cold email — that kills deliverability and feels spammy. Instead, the cold email just gets the reply. Once they reply "yes," Tong sends a warm follow-up with the link.
 
   **Cold email CTAs (no URL — just get the reply):**
   1. "I can run a free audit on your Google Ads — takes about 2 minutes on your end. Want me to send over how it works?" — specific, low commitment
@@ -113,14 +113,14 @@ Total length: 2-4 sentences, 50-75 words. Three short paragraphs max.
   ```
   Awesome — here's how it works:
 
-  Connect your account at adsagent.org/google-ads-audit (read-only access, takes about 2 minutes, no credit card). You'll get a full breakdown of what's working and where budget is leaking.
+  Connect your account at notfair.co/google-ads-audit (read-only access, takes about 2 minutes, no credit card). You'll get a full breakdown of what's working and where budget is leaking.
 
   Let me know if you have any questions.
 
   - Tong
   ```
 
-- Avoid: bare URLs with no question ("check it out: www.adsagent.org"), "Would love to connect", calendar links
+- Avoid: bare URLs with no question ("check it out: www.notfair.co"), "Would love to connect", calendar links
 
 **Sign-off:**
 - Just "Tong" on its own line, or "- Tong" for slightly more casual feel.
@@ -254,7 +254,7 @@ npx tsx scripts/send-email.ts \
   --to "<email>" \
   --subject "<subject line>" \
   --body "<plain text body>" \
-  --from "Tong from AdsAgent <tong.chen@adsagent.org>" \
+  --from "Tong from NotFair <tong.chen@adsagent.org>" \
   --reply-to "tong.chen@adsagent.org"
 ```
 
@@ -317,7 +317,7 @@ Each agent's prompt must include:
 Here is the **exact prompt template** for each agent:
 
 ```
-You are drafting cold outreach emails for AdsAgent. For each lead below, you will:
+You are drafting cold outreach emails for NotFair. For each lead below, you will:
 1. Research their website (try https://{email_domain} or https://www.{email_domain})
 2. Draft a short, personalized cold email (50-75 words max, plain text)
 3. Save the draft using: npx tsx scripts/save-draft.ts --to "<email>" --subject "<subject>" --body "<body>"
@@ -329,7 +329,7 @@ You are drafting cold outreach emails for AdsAgent. For each lead below, you wil
 - Body: 1-2 sentences bridging one pain point to curiosity. Lead with RESULT, not mechanism.
 - CTA: permission-based question ("Mind if I send over how it works?", "Worth a look?", etc.)
 - Sign off: just "- Tong"
-- NEVER exceed 75 words. NEVER explain what AdsAgent does in detail. NEVER use "came across [company]" pattern. NEVER list features. NEVER use exclamation marks. NEVER use bullet points.
+- NEVER exceed 75 words. NEVER explain what NotFair does in detail. NEVER use "came across [company]" pattern. NEVER list features. NEVER use exclamation marks. NEVER use bullet points.
 
 ## Pain points (pick ONE per lead)
 - "I'm wasting money and can't tell"
@@ -338,7 +338,7 @@ You are drafting cold outreach emails for AdsAgent. For each lead below, you wil
 - "I'm scared to touch anything"
 - "Agency math doesn't work at my spend level"
 
-## AdsAgent pitch angles (pick ONE, hint obliquely)
+## NotFair pitch angles (pick ONE, hint obliquely)
 - Claude becomes your Google Ads manager
 - Free to try, no credit card
 - No incentive to inflate spend (unlike agencies)
@@ -389,7 +389,7 @@ If the user asks about a specific lead or a small number (< 5), skip the batch f
 
 - **NEVER exceed 75 words** in the email body (excluding sign-off)
 - **NEVER use the same opening pattern** for consecutive leads in a batch
-- **NEVER explain what AdsAgent is** in detail — hint, don't tell
+- **NEVER explain what NotFair is** in detail — hint, don't tell
 - **NEVER use "came across [company] while looking at [X] firms running ads in [Y]"** — this is the #1 AI-cold-email tell
 - **NEVER list features** — not even two
 - **NEVER use "I hope this finds you well"**, "I came across your company and was impressed", "Would love to connect", or "My name is..."
@@ -398,4 +398,4 @@ If the user asks about a specific lead or a small number (< 5), skip the batch f
 - **NEVER use bullet points** in the email body
 - **NEVER start with the founder's name/title** — they see it in the signature
 - **NEVER sound like a SaaS landing page** — no "handles keywords, bids, ad copy, and waste cutting" feature stacking
-- **NEVER use "we built"** followed by a feature list — the "we built AdsAgent — it does X, Y, Z" pattern is a dead giveaway
+- **NEVER use "we built"** followed by a feature list — the "we built NotFair — it does X, Y, Z" pattern is a dead giveaway

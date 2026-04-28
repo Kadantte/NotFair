@@ -147,12 +147,12 @@ const audienceCards = [
 
 const faqs = [
   {
-    q: "Will AdsAgent make changes without approval?",
+    q: "Will NotFair make changes without approval?",
     a: "No. Claude can analyze freely, but write actions are shown before they run. You approve the changes.",
   },
   {
     q: "Do I need to know Google Ads?",
-    a: "No. Ask plain-English questions. AdsAgent handles the Google Ads API details behind Claude.",
+    a: "No. Ask plain-English questions. NotFair handles the Google Ads API details behind Claude.",
   },
   {
     q: "Is this for agencies or business owners?",
@@ -303,7 +303,7 @@ function HeroMockup() {
             <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
               <Image src="/claude-icon.svg" alt="" width={10} height={10} className="h-2.5 w-2.5 brightness-0 invert" />
             </span>
-            <span>Claude + AdsAgent</span>
+            <span>Claude + NotFair</span>
             <span className="text-[#5A5852]">·</span>
             <span className="text-[#4CAF6E]">demo</span>
           </div>
@@ -380,7 +380,7 @@ function HeroMockup() {
               <div className="rounded-xl border border-[#E8B931]/30 bg-[#E8B931]/[0.04] p-3">
                 <p className="text-xs leading-relaxed text-[#C4C0B6]">
                   <SmoothLine>
-                    <span className="font-semibold text-[#E8E4DD]">AdsAgent</span> wants to run{" "}
+                    <span className="font-semibold text-[#E8E4DD]">NotFair</span> wants to run{" "}
                     <span className="font-mono-jb text-[#E8B931]">bulkPauseKeywords</span>
                   </SmoothLine>
                   <SmoothLine delay={0.12}>
@@ -420,7 +420,7 @@ function HeroMockup() {
                     transition={{ duration: 0.25, ease: "easeOut" }}
                     className="inline-block"
                   >
-                    {inputText || "Ask AdsAgent anything"}
+                    {inputText || "Ask NotFair anything"}
                   </motion.span>
                 </AnimatePresence>
                 {!sent && (
@@ -430,8 +430,8 @@ function HeroMockup() {
               <div className="mt-3 flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-[11px] font-medium text-[#4CAF6E]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
-                  <span className="sm:hidden">AdsAgent MCP</span>
-                  <span className="hidden sm:inline">AdsAgent · Google Ads MCP</span>
+                  <span className="sm:hidden">NotFair MCP</span>
+                  <span className="hidden sm:inline">NotFair · Google Ads MCP</span>
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]">
@@ -571,7 +571,7 @@ export function HomePage({
                 Stop guessing where your ad spend goes.
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#C4C0B6] lg:mx-0">
-                Ask Claude what is working, what is wasting money, and what to fix next. AdsAgent connects Claude to your ads data and executes approved changes.
+                Ask Claude what is working, what is wasting money, and what to fix next. NotFair connects Claude to your ads data and executes approved changes.
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">

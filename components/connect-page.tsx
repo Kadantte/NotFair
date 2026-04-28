@@ -12,6 +12,7 @@ import { trackEvent } from '@/lib/analytics';
 import { BOOK_DEMO_URL } from '@/lib/links';
 import { notifyHelpClicked } from '@/app/actions';
 import { AuditHelpPanel } from '@/components/audit/audit-help-panel';
+import { BRAND_NAME, MCP_SERVER_URL } from '@/lib/brand';
 
 function imageKeyFromSrc(src: string): string {
     const file = src.split('/').pop() ?? src;
@@ -19,7 +20,7 @@ function imageKeyFromSrc(src: string): string {
 }
 
 function buildSetupPrompt(token: string): string {
-    return `Set up AdsAgent for Claude Code:
+    return `Set up ${BRAND_NAME} for Claude Code:
 
 1. Add your API key to ~/.claude/settings.json:
 
@@ -205,7 +206,7 @@ function ClaudeConnectorSection() {
         return () => { cancelled = true; };
     }, [generateCredentials]);
 
-    const serverUrl = credentials?.mcp_server_url ?? 'https://adsagent.org/api/mcp';
+    const serverUrl = credentials?.mcp_server_url ?? MCP_SERVER_URL;
 
     return (
         <div className="w-full space-y-6 text-left">
@@ -252,7 +253,7 @@ function ClaudeConnectorSection() {
                     <p className="text-sm text-[#C4C0B6]">Fill in the connector form:</p>
                     <CredentialField
                         label="Name"
-                        value="AdsAgent"
+                        value={BRAND_NAME}
                         onCopyTracked={() => trackEvent('connector_credential_copied', { field: 'name' })}
                     />
                     <CredentialField
@@ -347,11 +348,11 @@ function ClaudeConnectorSection() {
                 </div>
                 <div className="ml-8 space-y-3">
                     <p className="text-sm text-[#C4C0B6]">
-                        Click <strong className="text-[#E8E4DD]">Add</strong>. The <strong className="text-[#E8E4DD]">AdsAgent</strong> connector will appear in your Connectors list with all available tools.
+                        Click <strong className="text-[#E8E4DD]">Add</strong>. The <strong className="text-[#E8E4DD]">NotFair</strong> connector will appear in your Connectors list with all available tools.
                     </p>
                     <SetupScreenshot
                         src="/connector-setup/03-saved.png"
-                        alt="AdsAgent connector saved and listed under Connectors with its tool permissions"
+                        alt="NotFair connector saved and listed under Connectors with its tool permissions"
                     />
                 </div>
             </div>
@@ -373,7 +374,7 @@ function ClaudeConnectorSection() {
                         >
                             toprank
                         </a>{' '}
-                        repo URL into the <strong className="text-[#E8E4DD]">Add marketplace</strong> dialog and click <strong className="text-[#E8E4DD]">Sync</strong>. Toprank ships with pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage your campaigns alongside the AdsAgent connector.
+                        repo URL into the <strong className="text-[#E8E4DD]">Add marketplace</strong> dialog and click <strong className="text-[#E8E4DD]">Sync</strong>. Toprank ships with pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage your campaigns alongside the NotFair connector.
                     </p>
                     <CredentialField
                         label="Marketplace URL"
@@ -395,15 +396,15 @@ function ClaudeConnectorSection() {
             <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF6E]/12 text-xs font-semibold text-[#4CAF6E]">5</span>
-                    <p className="text-sm font-medium text-[#E8E4DD]">Enable AdsAgent in a chat</p>
+                    <p className="text-sm font-medium text-[#E8E4DD]">Enable NotFair in a chat</p>
                 </div>
                 <div className="ml-8 space-y-3">
                     <p className="text-sm text-[#C4C0B6]">
-                        Open a new chat on <strong className="text-[#E8E4DD]">claude.ai</strong>, click the <strong className="text-[#E8E4DD]">+</strong> button, go to <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle <strong className="text-[#E8E4DD]">AdsAgent</strong> on.
+                        Open a new chat on <strong className="text-[#E8E4DD]">claude.ai</strong>, click the <strong className="text-[#E8E4DD]">+</strong> button, go to <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle <strong className="text-[#E8E4DD]">NotFair</strong> on.
                     </p>
                     <SetupScreenshot
                         src="/connector-setup/04-enable-in-chat.png"
-                        alt="In a Claude chat, open the + menu and toggle the AdsAgent connector on"
+                        alt="In a Claude chat, open the + menu and toggle the NotFair connector on"
                     />
                 </div>
             </div>
@@ -416,11 +417,11 @@ function ClaudeConnectorSection() {
                 </div>
                 <div className="ml-8 space-y-3">
                     <p className="text-sm text-[#C4C0B6]">
-                        Try a prompt like <em className="text-[#E8E4DD]">&ldquo;Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.&rdquo;</em> Claude will call AdsAgent tools to read your account and respond with insights.
+                        Try a prompt like <em className="text-[#E8E4DD]">&ldquo;Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.&rdquo;</em> Claude will call NotFair tools to read your account and respond with insights.
                     </p>
                     <SetupScreenshot
                         src="/connector-setup/05-use-in-chat.png"
-                        alt="Claude using the AdsAgent connector to audit a Google Ads account in a chat"
+                        alt="Claude using the NotFair connector to audit a Google Ads account in a chat"
                     />
                 </div>
             </div>
@@ -578,13 +579,13 @@ function ClaudeCodeManualSection({ token }: { token: string }) {
 }
 
 function CodexSection({ token: _token }: { token: string }) {
-    const serverUrl = 'https://adsagent.org/api/mcp';
-    const oneLiner = `codex mcp add adsagent --url ${serverUrl}`;
+    const serverUrl = MCP_SERVER_URL;
+    const oneLiner = `codex mcp add notfair --url ${serverUrl}`;
     const [copied, setCopied] = useState(false);
     return (
         <div className="w-full space-y-4 text-left">
             <p className="text-sm text-[#C4C0B6]">
-                Run this command in your terminal — it will guide you through the OAuth flow and set up the AdsAgent MCP in your Codex automatically.
+                Run this command in your terminal — it will guide you through the OAuth flow and set up the NotFair MCP in your Codex automatically.
             </p>
             <SetupCodeBlock
                 content={oneLiner}
@@ -919,7 +920,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 <div className="flex w-full items-center justify-between gap-4 px-6 py-4">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight text-[#E8E4DD]">Connect</h1>
-                        <p className="mt-0.5 text-sm text-[#C4C0B6]">Connect Google Ads and set up AdsAgent in Claude Code, Claude Web, or Codex.</p>
+                        <p className="mt-0.5 text-sm text-[#C4C0B6]">Connect Google Ads and set up NotFair in Claude Code, Claude Web, or Codex.</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-3">
                         <a
@@ -984,7 +985,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                     <p className="text-sm font-medium text-[#C45D4A]">{error}</p>
                                     {error.toLowerCase().includes("permission") && (
                                         <p className="text-xs text-[#C45D4A]/80">
-                                            AdsAgent needs Google Ads access to manage your campaigns. On the Google consent screen, make sure the &quot;Google Ads&quot; checkbox stays checked.
+                                            NotFair needs Google Ads access to manage your campaigns. On the Google consent screen, make sure the &quot;Google Ads&quot; checkbox stays checked.
                                         </p>
                                     )}
                                 </div>
@@ -1087,7 +1088,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                             </div>
                             <div className="flex flex-col items-center space-y-2">
                                 <p className="max-w-md text-sm text-[#C4C0B6]">
-                                    Don&apos;t have a Google Ads account yet? Try AdsAgent with sample data.
+                                    Don&apos;t have a Google Ads account yet? Try NotFair with sample data.
                                 </p>
                                 <Button
                                     onClick={startDemoSession}

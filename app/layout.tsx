@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [
       {
-        url: "/logo.svg",
+        url: "/notfiar_logo/notfair-mark-dark.svg",
         alt: `${SITE_NAME} logo`,
       },
     ],
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${SITE_NAME} | AI Google Ads Agent & MCP Server`,
     description: SITE_DESCRIPTION,
-    images: ["/logo.svg"],
+    images: ["/notfiar_logo/notfair-mark-dark.svg"],
   },
   robots: {
     index: true,

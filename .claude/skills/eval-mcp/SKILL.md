@@ -14,7 +14,7 @@ There are two modes. **Default is fast mode** for tight iteration on tool descri
 The iteration loop is: edit code → restart local dev server → run eval → see if selection moved. So this skill **defaults to the local dev MCP server** exposed as the `mcp__adsagent-local__*` tool family (backed by `http://localhost:3000/api/mcp`). Your uncommitted edits to `MCP_INSTRUCTIONS` or tool descriptions take effect immediately on restart — no deploy needed.
 
 - Default (no flag): `NAMESPACE = mcp__adsagent-local__` — hits dev. Requires `npm run dev` to be running.
-- `--prod`: `NAMESPACE = mcp__adsagent__` — hits the deployed server at `adsagent.org`. Use this to confirm a change landed and production matches.
+- `--prod`: `NAMESPACE = mcp__adsagent__` — hits the deployed server at `notfair.co`. Use this to confirm a change landed and production matches.
 
 Resolve `NAMESPACE` once at the top of the run and thread it through every prompt template and the surface check below. Store `server_mode` (`"dev"` or `"prod"`) in `meta.json` and in the history line so trend comparisons don't silently mix environments.
 

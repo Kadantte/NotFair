@@ -13,7 +13,7 @@ import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
 import type { FaqItem } from "@/lib/seo";
 
-const SERVER_URL = "https://adsagent.org/api/mcp";
+const SERVER_URL = "https://notfair.co/api/mcp";
 
 const CURSOR_CONFIG = `{
   "mcpServers": {
@@ -40,7 +40,7 @@ const TOOLS: { name: string; category: "Read" | "Write"; description: string }[]
     { name: "runScript", category: "Read", description: "Sandboxed JS with GAQL fan-out — every analytical read goes through this one tool." },
     { name: "getRecommendations", category: "Read", description: "Google's optimization suggestions with estimated impact." },
     { name: "getKeywordIdeas", category: "Read", description: "Keyword Planner search volume, competition, and CPC estimates." },
-    { name: "getChanges", category: "Read", description: "AdsAgent's own change log — undoable with one call." },
+    { name: "getChanges", category: "Read", description: "NotFair's own change log — undoable with one call." },
     { name: "reviewChangeImpact", category: "Read", description: "Before/after impact analysis on recent edits." },
     { name: "getResourceMetadata", category: "Read", description: "GAQL schema discovery for custom queries." },
     { name: "updateBid", category: "Write", description: "Adjust keyword or ad group bids — reviewable before apply." },
@@ -51,7 +51,7 @@ const TOOLS: { name: string; category: "Read" | "Write"; description: string }[]
 
 const FAQ_ITEMS: FaqItem[] = [
     {
-        question: "What is the AdsAgent Google Ads MCP server?",
+        question: "What is the NotFair Google Ads MCP server?",
         answer:
             "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context; write tools propose changes that you approve in chat.",
     },
@@ -63,12 +63,12 @@ const FAQ_ITEMS: FaqItem[] = [
     {
         question: "Do I need to self-host anything?",
         answer:
-            "No. The server is hosted at https://adsagent.org/api/mcp. You just point your client at it and authenticate.",
+            "No. The server is hosted at https://notfair.co/api/mcp. You just point your client at it and authenticate.",
     },
     {
         question: "How does authentication work?",
         answer:
-            "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at adsagent.org/connect.",
+            "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect.",
     },
     {
         question: "Is the MCP server free?",
@@ -86,17 +86,17 @@ const RELATED_LINKS = [
     {
         href: "/google-ads-claude-connector-setup-guide",
         title: "Claude Connector setup guide",
-        description: "Install AdsAgent as a custom MCP connector inside Claude.ai Web, Desktop, or Cowork.",
+        description: "Install NotFair as a custom MCP connector inside Claude.ai Web, Desktop, or Cowork.",
     },
     {
         href: "/google-ads-claude-code-plugin-setup-guide",
         title: "Claude Code plugin setup guide",
-        description: "Install AdsAgent in Claude Code via the toprank plugin marketplace.",
+        description: "Install NotFair in Claude Code via the toprank plugin marketplace.",
     },
     {
         href: "/google-ads-codex-mcp-setup-guide",
         title: "Codex MCP setup guide",
-        description: "One-line install of the AdsAgent MCP for OpenAI's Codex CLI.",
+        description: "One-line install of the NotFair MCP for OpenAI's Codex CLI.",
     },
 ];
 
@@ -120,7 +120,7 @@ export function GoogleAdsMcpPage() {
                             Hosted Google Ads MCP server
                         </h1>
                         <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
-                            AdsAgent ships a hosted{" "}
+                            NotFair ships a hosted{" "}
                             <a
                                 href="https://modelcontextprotocol.io/"
                                 target="_blank"
@@ -334,8 +334,8 @@ export function GoogleAdsMcpPage() {
 
             {/* ── FAQ ── */}
             <FaqSection
-                title="FAQ — AdsAgent MCP server"
-                intro="Common questions about authenticating, configuring, and using the AdsAgent Google Ads MCP server."
+                title="FAQ — NotFair MCP server"
+                intro="Common questions about authenticating, configuring, and using the NotFair Google Ads MCP server."
                 items={FAQ_ITEMS}
             />
 

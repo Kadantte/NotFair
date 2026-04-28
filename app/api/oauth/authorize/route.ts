@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 
   if (!client) {
     return NextResponse.json(
-      { error: "invalid_client", error_description: "Unknown client_id. Register via /api/oauth/register or generate credentials at www.adsagent.org." },
+      { error: "invalid_client", error_description: "Unknown client_id. Register via /api/oauth/register or generate credentials at www.notfair.co." },
       { status: 401 },
     );
   }
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
 
     if (!session) {
       return NextResponse.json(
-        { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at www.adsagent.org and generate new credentials." },
+        { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at www.notfair.co and generate new credentials." },
         { status: 403 },
       );
     }
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
 
     if (!session) {
       return NextResponse.json(
-        { error: "access_denied", error_description: "No active Google Ads session. Reconnect at www.adsagent.org and try again." },
+        { error: "access_denied", error_description: "No active Google Ads session. Reconnect at www.notfair.co and try again." },
         { status: 403 },
       );
     }

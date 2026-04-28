@@ -1,6 +1,6 @@
-# AdsAgent MCP — 10x Dashboard Redesign (Execution Prompt)
+# NotFair MCP — 10x Dashboard Redesign (Execution Prompt)
 
-You are a senior TypeScript engineer implementing a comprehensive redesign of the AdsAgent MCP server. Your goal is to make Claude 10x better and faster at building live Google Ads dashboards by removing friction at the MCP contract layer.
+You are a senior TypeScript engineer implementing a comprehensive redesign of the NotFair MCP server. Your goal is to make Claude 10x better and faster at building live Google Ads dashboards by removing friction at the MCP contract layer.
 
 This document is self-contained. Read it end-to-end before writing code. Do **not** ask clarifying questions until you have completed Section 2 (orientation).
 
@@ -10,7 +10,7 @@ This document is self-contained. Read it end-to-end before writing code. Do **no
 
 **Repository:** `/Users/tongchen/Documents/Projects/ads-agent` — Next.js 16 App Router, TypeScript strict, Drizzle ORM, Vercel deploy, `@modelcontextprotocol/sdk` via `mcp-handler`.
 
-**Primary deploy target:** `https://www.adsagent.org` — auto-deploy on push to `main`. Health check at `/api/health`.
+**Primary deploy target:** `https://www.notfair.co` — auto-deploy on push to `main`. Health check at `/api/health`.
 
 **Read-first files (mandatory before any code change):**
 - `CLAUDE.md` — project conventions, frontend perf patterns, deploy config

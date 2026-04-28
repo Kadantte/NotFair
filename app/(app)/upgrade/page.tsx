@@ -3,9 +3,10 @@ import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
 import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 import { CheckoutStatusBanner, PricingSection } from "@/components/marketing/pricing-cards";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata = {
-  title: "Upgrade — AdsAgent",
+  title: `Upgrade — ${BRAND_NAME}`,
 };
 
 export default async function UpgradePage() {

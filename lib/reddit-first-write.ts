@@ -15,7 +15,7 @@ export function _resetFirstWriteCacheForTests(): void {
 
 /**
  * Fire a Reddit `Lead` conversion on the user's first-ever successful write.
- * D0-write is AdsAgent's activation north star — the primary conversion for
+ * D0-write is NotFair's activation north star — the primary conversion for
  * Reddit ad optimization. Uses a stable `first-write-${userId}` conversion_id
  * so concurrent bulk-write races dedupe on Reddit's side.
  */

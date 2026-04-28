@@ -123,9 +123,9 @@ export class RateLimitError extends Error {
   ) {
     super(
       `Monthly operation limit reached (${used}/${limit}). ` +
-      `Upgrade to Growth for unlimited operations: https://adsagent.org/upgrade. ` +
+      `Upgrade to Growth for unlimited operations: https://notfair.co/upgrade. ` +
       `Otherwise your limit resets in ${formatResetHint()} (first of next month, UTC). ` +
-      `Check your usage at https://adsagent.org/usage.`,
+      `Check your usage at https://notfair.co/usage.`,
     );
     this.name = "RateLimitError";
   }

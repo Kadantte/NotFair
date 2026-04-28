@@ -1,11 +1,11 @@
 ---
 name: user-outreach
-description: "Draft personalized outreach emails to AdsAgent users who connected their Google Ads accounts. Uses real audit data from their accounts to write hyper-relevant emails. Supports two modes: cold outreach with a cal.com CTA (for users who signed up but haven't engaged), and warm feedback/sharing outreach (for users already using AdsAgent — opens a feedback loop instead of pushing a call). Invoke this skill whenever the user wants to email new signups, reach out to connected users, draft onboarding emails, write welcome/thank-you emails, gather product feedback from active users, share account findings, or says things like 'email new users', 'reach out to signups', 'draft outreach for connected accounts', 'gather feedback from users', 'thank users', 'share what I found', 'onboard new users', or 'who haven't I emailed yet'. Also trigger when the user asks to check which users need outreach, or wants to write emails that feel like sharing/feedback rather than pitching."
+description: "Draft personalized outreach emails to NotFair users who connected their Google Ads accounts. Uses real audit data from their accounts to write hyper-relevant emails. Supports two modes: cold outreach with a cal.com CTA (for users who signed up but haven't engaged), and warm feedback/sharing outreach (for users already using NotFair — opens a feedback loop instead of pushing a call). Invoke this skill whenever the user wants to email new signups, reach out to connected users, draft onboarding emails, write welcome/thank-you emails, gather product feedback from active users, share account findings, or says things like 'email new users', 'reach out to signups', 'draft outreach for connected accounts', 'gather feedback from users', 'thank users', 'share what I found', 'onboard new users', or 'who haven't I emailed yet'. Also trigger when the user asks to check which users need outreach, or wants to write emails that feel like sharing/feedback rather than pitching."
 ---
 
 # User Outreach: Personalized Emails from Real Audit Data
 
-This skill drafts outreach emails to AdsAgent users who have connected their Google Ads accounts. Unlike cold outreach to strangers, these emails are hyper-relevant because you have access to their actual account data via the adsagent MCP tools.
+This skill drafts outreach emails to NotFair users who have connected their Google Ads accounts. Unlike cold outreach to strangers, these emails are hyper-relevant because you have access to their actual account data via the adsagent MCP tools.
 
 The goal: make the user feel like a senior Google Ads expert personally reviewed their account and found something worth sharing. Because that's exactly what's happening.
 
@@ -25,8 +25,8 @@ Two dead giveaways that an email was AI-drafted:
 
 2. **Hedged closes that aren't real questions.** "Curious if this matches what you're seeing" and "mostly sharing as feedback" sound polite but don't *ask* anything, so people don't reply. Every email must end with a single **literal question mark**. It makes replying feel like an answer, not a favor.
    - Bad: "Curious if this matches what you're seeing, or if there's anything I'm missing."
-   - Good: "One thing that'd make AdsAgent more useful for you?"
-   - Good: "Any suggestions to make AdsAgent better?"
+   - Good: "One thing that'd make NotFair more useful for you?"
+   - Good: "Any suggestions to make NotFair better?"
    - Good: "What's the biggest thing missing for you?"
 
 Other small things that read human: lowercase "adsagent" sometimes, contractions ("that'd", "thats" without the apostrophe occasionally), starting sentences with "Also" or "Two things.", the occasional comma splice. Don't over-polish.
@@ -37,7 +37,7 @@ Every email comes from Tong. Here's who he is — use this naturally, not as a t
 
 - Former Meta data scientist
 - Quit to buy a dog daycare in Seattle, now runs 3 locations (pawsvip.com)
-- Built AdsAgent because he needed it for his own business
+- Built NotFair because he needed it for his own business
 - Manages his own Google Ads — speaks from experience, not theory
 - Casual, direct, no fluff. Writes like a founder texting a friend, not a salesperson drafting a pitch.
 
@@ -47,7 +47,7 @@ Before drafting, decide which mode the email is in. Different user, different mo
 
 ### Mode A — Cold Outreach (cal.com CTA)
 
-**Use when:** user signed up, connected their account, but you have no signal they've actually used AdsAgent (no MCP tool calls, no engagement). The goal is to get them on a 20-min free setup call so Tong can show them Claude + AdsAgent.
+**Use when:** user signed up, connected their account, but you have no signal they've actually used NotFair (no MCP tool calls, no engagement). The goal is to get them on a 20-min free setup call so Tong can show them Claude + NotFair.
 
 **Close with:** a concrete, low-friction cal.com link inline.
 
@@ -58,8 +58,8 @@ Before drafting, decide which mode the email is in. Different user, different mo
 **Use when:** user is actively using the product (tool calls in `mcp_sessions`, you've already emailed them once and want to re-engage, or they're a sophisticated operator / agency that would feel condescended-to by a "free setup call" pitch).
 
 **Differences from Mode A:**
-- **Opener thanks them for using AdsAgent.** "Thanks for using AdsAgent, really appreciate it" before the finding. This reads as warmth, not flattery, and signals you know they're engaged, not cold.
-- **Close asks for product feedback with a direct question.** "One thing that'd make AdsAgent more useful for you?" or "Any suggestions to make AdsAgent better?" Forward-framed, ends in a `?`. Do NOT use "rough or missing" style phrasing, it hedges and people skip it.
+- **Opener thanks them for using NotFair.** "Thanks for using NotFair, really appreciate it" before the finding. This reads as warmth, not flattery, and signals you know they're engaged, not cold.
+- **Close asks for product feedback with a direct question.** "One thing that'd make NotFair more useful for you?" or "Any suggestions to make NotFair better?" Forward-framed, ends in a `?`. Do NOT use "rough or missing" style phrasing, it hedges and people skip it.
 - **No cal.com link.** Including one in feedback mode breaks the tone, it reads as bait-and-switch.
 - **Keep findings direct, not apologetic.** "Two things worth sharing" is fine. Avoid performative phrases like "mostly sharing as feedback" or "I'd guess your team's across this already", they pad word count and signal insecurity.
 
@@ -227,7 +227,7 @@ Subject: Figuring out google ads?
 
 Hey Luke,
 
-Thanks for signing up for AdsAgent!
+Thanks for signing up for NotFair!
 
 I'm Tong, founder — former Meta data scientist, now running a multi-location dog daycare in Seattle.
 
@@ -255,13 +255,13 @@ Tong
 ```
 Subject: Fix Fireplace conversion tracking for google ads
 
-Hey there, I built AdsAgent. Saw you connected your account so I took a look.
+Hey there, I built NotFair. Saw you connected your account so I took a look.
 
 The biggest thing I noticed: your conversion tracking has too many events firing at once (form submits, page views, button clicks all counted as conversions). Google's bidding algorithm picks one to optimize toward and ignores the rest — so your reported "cost per conversion" is misleading, and the algorithm is probably chasing the wrong action. The fix is picking ONE primary conversion (usually a qualified lead form submit), marking it as primary, and demoting the rest to secondary. That alone usually cleans up CPA reporting and lets Google bid against the action that actually matters to your business.
 
 A bit about me — I was a data scientist at Meta, quit my job and bought a dog daycare in Seattle in 2025, and since then it's grown to 3 locations (pawsvip.com). Almost all my traffic comes from organic and Google Ads, so I've spent a lot of time figuring out what actually moves the needle.
 
-Hope this is useful either way. If you want, I can show you how to fix it inside Claude with the AdsAgent plugin in a few minutes.
+Hope this is useful either way. If you want, I can show you how to fix it inside Claude with the NotFair plugin in a few minutes.
 
 Tong
 ```
@@ -272,11 +272,11 @@ Subject: quick thing on your google ads
 
 Hey there,
 
-I'm Tong — built AdsAgent, run a dog daycare in Seattle, manage my own google ads. Took a quick look at your account.
+I'm Tong — built NotFair, run a dog daycare in Seattle, manage my own google ads. Took a quick look at your account.
 
 One thing jumped out: you're capturing about 10% of the searches you could show up for. Of the 90% you're missing, only 3% is budget — the other 87% is quality score. So it's not a money problem, it's a relevance problem. Tightening ad copy and landing pages to match your top keywords more directly is usually where the fix lives.
 
-AdsAgent isn't an agency — it turns Claude into your ads manager, so you can ask it to find your weakest keywords and rewrite them on the spot.
+NotFair isn't an agency — it turns Claude into your ads manager, so you can ask it to find your weakest keywords and rewrite them on the spot.
 
 Hope that's useful either way.
 
@@ -289,13 +289,13 @@ Subject: Conversion tracking for plumbingarmy
 
 Hey there,
 
-Thanks for signing up for AdsAgent! Quick intro — I'm Tong, the founder. I also run a multi-location dog daycare business here in Seattle, so I know firsthand how important it is to get real leads from Google Ads without overpaying for clicks that go nowhere.
+Thanks for signing up for NotFair! Quick intro — I'm Tong, the founder. I also run a multi-location dog daycare business here in Seattle, so I know firsthand how important it is to get real leads from Google Ads without overpaying for clicks that go nowhere.
 
 I took a look at your account — your campaigns are still early, and Google Ads is definitely the right channel for plumbing services.
 
 The biggest thing I'd recommend right now: set up conversion tracking. This tells Google which clicks actually turned into real leads, so it can find you more of them. It's the foundation everything else builds on.
 
-Quick note on how AdsAgent works — we're not a traditional agency. We turn Claude into your Google Ads manager. With a Claude subscription, it can audit your account, set up conversions, manage campaigns, and more. AdsAgent itself is free for most users, and based on your current setup, the free tier should cover you easily.
+Quick note on how NotFair works — we're not a traditional agency. We turn Claude into your Google Ads manager. With a Claude subscription, it can audit your account, set up conversions, manage campaigns, and more. NotFair itself is free for most users, and based on your current setup, the free tier should cover you easily.
 
 Happy to help you get conversion tracking set up — just let me know.
 
@@ -308,7 +308,7 @@ Tong
 **Email approach:**
 - Compliment first — genuinely. "Top 10%" for 60+, "top 5%" for 70+. Don't be shy.
 - Then mention the ONE thing you noticed — but **frame it as a positive opportunity, not a problem to fix**. "86% lost to budget" → "you can probably get more conversions at similar cost if you increase budget", not "you're losing 86% of impressions". Same data, opposite vibe. Congratulatory, not prescriptive.
-- Position AdsAgent as "pull stuff like this on demand" — a power tool for someone already doing well, not a fix for someone who's broken.
+- Position NotFair as "pull stuff like this on demand" — a power tool for someone already doing well, not a fix for someone who's broken.
 - Always include cal.com link inline: https://cal.com/tong-chen-uuovdl/30min
 - **Subject: keep it boring.** "{business} google ads" beats any clever hook. No em dashes, no "top 10% account", no "one easy unlock". Tong's actual sends use 3-word lowercase subjects like "batchy google ads".
 
@@ -316,11 +316,11 @@ Tong
 ```
 Subject: batchy google ads
 
-I'm Tong — built AdsAgent, run a dog daycare in Seattle. Yours is top 5% of accounts I've reviewed.
+I'm Tong — built NotFair, run a dog daycare in Seattle. Yours is top 5% of accounts I've reviewed.
 
 $1.82 CPA is crazy low. You're losing 86% of impressions to budget — not a bad thing. It means you can likely get a lot more conversions at similar CPA by raising the budget.
 
-AdsAgent turns Claude into your ads manager, so you can pull stuff like this on demand.
+NotFair turns Claude into your ads manager, so you can pull stuff like this on demand.
 
 Happy to do a quick free 20-min walkthrough: https://cal.com/tong-chen-uuovdl/30min
 
@@ -378,7 +378,7 @@ For each user, compose the email with:
 - Lowercase is fine, casual
 - NOT generic ("welcome to adsagent" is terrible)
 - NOT self-referential about tool usage ("you've been busy on adsagent" sounds fake)
-- Safe default when unsure: "AdsAgent + {company name}"
+- Safe default when unsure: "NotFair + {company name}"
 - Good: "Figuring out google ads?", "Conversion tracking for {business}", "{name} — your google ads"
 - Great: references the specific finding like "Fix {company} conversion tracking for google ads"
 
@@ -387,7 +387,7 @@ For each user, compose the email with:
 - Include Tong's background naturally — it builds credibility
 - Reference specific numbers from the audit (impression share %, number of conversion events, etc.)
 - **Deliver the insight in the email itself. Never gate it behind a meeting or reply.** The reader should finish the email knowing what's wrong and roughly how to fix it, even if they never write back.
-- Explain AdsAgent's value prop briefly — "not an agency, turns Claude into your ads manager"
+- Explain NotFair's value prop briefly — "not an agency, turns Claude into your ads manager"
 - End with a low-friction, non-gated CTA.
 - Plain text, no HTML formatting
 - Sign off with just "Tong" or "Best,\n\nTong"
@@ -397,7 +397,7 @@ For each user, compose the email with:
 **STRICT WORD LIMIT: under 100 words total (body only, excluding subject and signature).** This is non-negotiable. Count the words before sending. If you're at 110, cut. If you're at 90, ship. The reason: founder-to-operator notes that get read are short. The moment an email looks like it'll take more than 20 seconds to read, people archive. Every sentence has to earn its place.
 
 How to hit <100 words:
-- **One insight. One number. One next step.** That's the whole email. No "why it matters" paragraph, no "here's how it works" explainer, no three-sentence intro about who Tong is (one short clause is enough — "I'm Tong, built AdsAgent").
+- **One insight. One number. One next step.** That's the whole email. No "why it matters" paragraph, no "here's how it works" explainer, no three-sentence intro about who Tong is (one short clause is enough — "I'm Tong, built NotFair").
 - **Cut any sentence that doesn't contain a specific fact about their account or a concrete offer.** Filler like "hope this is useful either way" is fine as a closer but shouldn't appear mid-email.
 - **Merge sentences.** "You're capturing 10% of searches. 87% of the misses are quality score, not budget." → "You're capturing ~10% of searches — 87% of the misses are quality score, not budget."
 - **Delete the credentials paragraph if tight on budget.** "Former Meta data scientist, runs a dog daycare" is nice but optional. The finding is the credential.
@@ -429,16 +429,16 @@ The shift is: you've already given them the value. The CTA is optional follow-up
 - Don't include screenshots unless the finding truly benefits from one
 - Don't oversell — if their account is a mess, say so gently. If it's great, say so honestly.
 - For strong accounts, use percentile language: "top 10%" or "top 25% of accounts we've audited" — this is more compelling than listing specific metrics. **Score calibration (real distribution from our audits):** 60+ is genuinely very healthy and should be treated as Tier 3 / top 10% — most accounts score in the 30s-50s. 70+ is exceptional / top 5%. 50-59 is Tier 2 (functional but real issues). Below 50 is Tier 2 with clear problems or Tier 1 if empty. Don't undersell a 60+ account by calling it "decent" or "OK" — it's actually strong, lead with that.
-- Don't pitch AdsAgent features in a salesy way. The CTA should feel like a genuine offer to help, not a product demo. The formula: [specific value you already delivered] + [soft availability] + [single ask].
+- Don't pitch NotFair features in a salesy way. The CTA should feel like a genuine offer to help, not a product demo. The formula: [specific value you already delivered] + [soft availability] + [single ask].
 
 **The CTA depends on the mode you picked.** Mode A (cold) optimizes for the cal.com call; Mode B (warm feedback) optimizes for a product-feedback reply. Never stack both.
 
-**The Mode A goal: book a free setup call.** For cold users, the point of outreach is to get them on a quick call where Tong shows them how to use Claude + AdsAgent so they can find issues and have AI fix them on their own. The audit finding in the email is the hook — the call is the conversion. Make the offer concrete, free, and low-commitment.
+**The Mode A goal: book a free setup call.** For cold users, the point of outreach is to get them on a quick call where Tong shows them how to use Claude + NotFair so they can find issues and have AI fix them on their own. The audit finding in the email is the hook — the call is the conversion. Make the offer concrete, free, and low-commitment.
 
-**The Mode B goal: get them talking.** For warm users (active MCP usage, agencies, sophisticated operators, Tier 3 exceptional accounts, or follow-up contacts), the point is to deepen the relationship and extract product feedback. The audit finding is the gift; the ask is "what's rough about AdsAgent?" Any response — positive, negative, or a random feature request — is the win.
+**The Mode B goal: get them talking.** For warm users (active MCP usage, agencies, sophisticated operators, Tier 3 exceptional accounts, or follow-up contacts), the point is to deepen the relationship and extract product feedback. The audit finding is the gift; the ask is "what's rough about NotFair?" Any response — positive, negative, or a random feature request — is the win.
 
 **Good Mode A CTAs (pick one, don't stack). All assume the finding is already in the email:**
-- "Happy to hop on a quick call and get you set up — I'll show you how to use Claude + AdsAgent to find stuff like this and have AI fix it for you. Free, takes about 20 min: https://cal.com/tong-chen-uuovdl/30min"
+- "Happy to hop on a quick call and get you set up — I'll show you how to use Claude + NotFair to find stuff like this and have AI fix it for you. Free, takes about 20 min: https://cal.com/tong-chen-uuovdl/30min"
 - "If you want, I can walk you through it on a quick free setup call — I'll show you how to use Claude to find issues like this and fix them with AI. https://cal.com/tong-chen-uuovdl/30min"
 - "Want me to show you how? I do free 20-min setup calls — you'll leave knowing how to spot stuff like this and have Claude fix it for you. https://cal.com/tong-chen-uuovdl/30min"
 - (Tier 3 only, when a finding is borderline) "Open to a 15-min call to walk through what else I noticed? https://cal.com/tong-chen-uuovdl/30min"
@@ -446,20 +446,20 @@ The shift is: you've already given them the value. The CTA is optional follow-up
 The Mode A CTA should feel like a friendly offer ("happy to show you how"), not a sales pitch ("book a demo"). Always include the cal.com link inline so it's one click to schedule.
 
 **Good Mode B closes (pick one, don't stack). Every close ends with a literal `?`. No cal.com link in Mode B:**
-- "One thing that'd make AdsAgent more useful for you?" (strongest default, single concrete ask, forward-framed)
-- "Any suggestions to make AdsAgent better?"
+- "One thing that'd make NotFair more useful for you?" (strongest default, single concrete ask, forward-framed)
+- "Any suggestions to make NotFair better?"
 - "What's the biggest thing missing for you?"
 - "One thing you'd add or fix?"
-- (Agency) "One thing AdsAgent could do to make managing multiple accounts easier?" (agency-flavored, still a product-feedback ask)
+- (Agency) "One thing NotFair could do to make managing multiple accounts easier?" (agency-flavored, still a product-feedback ask)
 - (Agency) "What's the biggest pain in managing these accounts right now?" (surfaces a pain we could solve)
 
-Avoid hedged non-questions: "rough or missing", "curious if this matches what you're seeing", "I'd guess your team's across this already", "does this pattern hold across your portfolio?" All of these are polite-but-skippable. The last one especially: it asks the reader to mentally review their portfolio and agree/disagree with an observation *I* made, which is real work and yields zero product signal. Stay focused on AdsAgent itself, that's what we actually want feedback on.
+Avoid hedged non-questions: "rough or missing", "curious if this matches what you're seeing", "I'd guess your team's across this already", "does this pattern hold across your portfolio?" All of these are polite-but-skippable. The last one especially: it asks the reader to mentally review their portfolio and agree/disagree with an observation *I* made, which is real work and yields zero product signal. Stay focused on NotFair itself, that's what we actually want feedback on.
 
 The Mode B close should leave the reader with a low-cost reply option: one specific improvement idea. Any answer is a win. The worst outcome is no response, and hedged non-questions are what make "no response" the default.
 
 **Good-question test (apply before shipping):**
 1. Can a busy reader answer it in 5-10 seconds with a single thought? If it requires recalling data or scanning their portfolio first, rewrite.
-2. Does the answer give us product signal about AdsAgent? If the best possible answer is "yes" / "no" / "interesting observation", you're asking the wrong thing.
+2. Does the answer give us product signal about NotFair? If the best possible answer is "yes" / "no" / "interesting observation", you're asking the wrong thing.
 3. Is the subject of the question *them and their needs*, or *me and my observation*? The former gets replies. The latter flatters you and gets archived.
 
 **Why no cal.com in Mode B:** when someone is already using the product, the biggest risk isn't that they don't schedule a call — it's that they churn silently because the product fell short somewhere and they never told you. A product-feedback ask opens that channel; a setup-call CTA closes it by signaling "I want something from you" rather than "I want to hear from you." Don't mix these signals.

@@ -15,7 +15,7 @@ This is the DEFAULT tool for any open-ended analytical question about a Google A
 - Any question where you would otherwise fire 3+ read tools back-to-back
 - Any question that benefits from correlating surfaces (spend + search terms + quality scores + change events) in a single pass
 
-runScript owns EVERY read of Google Ads data. There are no point-query read tools anymore — if the caller asks for spend, CPA, search terms, keywords, ads, impression share, or anything else expressible in GAQL, you write a runScript that queries it. The only non-runScript reads are for specialized services that aren't GAQL-expressible: searchGeoTargets, getRecommendations, getChanges (AdsAgent's own change log), reviewChangeImpact, getKeywordIdeas. For schema discovery before a query, use getResourceMetadata and listQueryableResources.
+runScript owns EVERY read of Google Ads data. There are no point-query read tools anymore — if the caller asks for spend, CPA, search terms, keywords, ads, impression share, or anything else expressible in GAQL, you write a runScript that queries it. The only non-runScript reads are for specialized services that aren't GAQL-expressible: searchGeoTargets, getRecommendations, getChanges (NotFair's own change log), reviewChangeImpact, getKeywordIdeas. For schema discovery before a query, use getResourceMetadata and listQueryableResources.
 
 ── BATCHING DISCIPLINE (read this first) ──
 

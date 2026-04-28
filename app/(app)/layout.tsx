@@ -13,8 +13,10 @@ import { DemoBanner } from '@/components/demo-banner';
 import { onThreadEvent } from '@/lib/thread-events';
 import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
+import { BrandLockup } from '@/components/brand-lockup';
 import { trackEvent } from '@/lib/analytics';
 import { getUsageSummaryAction } from '@/app/actions';
+import { BRAND_NAME } from '@/lib/brand';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -215,14 +217,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     function renderSidebar(isCollapsed: boolean, isMobile: boolean) { return (
         <>
             {/* Header */}
-            <div className={`flex h-14 shrink-0 items-center px-2 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+            <div className={`group/header flex h-14 shrink-0 items-center px-2 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!isCollapsed && (
                     <Link
                         href="/"
                         className="flex items-center rounded-lg px-3 py-1 transition hover:bg-[#E8E4DD]/5"
                     >
-                        <Image src="/logo.svg" alt="AdsAgent" width={18} height={18} className="shrink-0" />
-                        <span className="ml-3 text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
+                        <BrandLockup size="xs" />
                     </Link>
                 )}
                 {isMobile ? (
@@ -235,6 +236,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     >
                         <X className="h-4 w-4" />
                     </Button>
+                ) : isCollapsed ? (
+                    <div className="relative h-8 w-8">
+                        <Image
+                            src="/notfiar_logo/notfair-mark-dark.svg"
+                            alt={BRAND_NAME}
+                            width={20}
+                            height={20}
+                            className="absolute inset-0 m-auto h-5 w-auto transition-opacity duration-150 group-hover/header:opacity-0"
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={toggleCollapsed}
+                            aria-label="Expand sidebar"
+                            className="absolute inset-0 rounded-lg text-[#C4C0B6] opacity-0 transition-opacity duration-150 hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD] group-hover/header:opacity-100 focus-visible:opacity-100"
+                        >
+                            <PanelLeftOpen className="h-4 w-4" />
+                        </Button>
+                    </div>
                 ) : (
                     <Button
                         type="button"
@@ -243,7 +264,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         onClick={toggleCollapsed}
                         className="rounded-lg text-[#C4C0B6] hover:bg-[#E8E4DD]/8 hover:text-[#E8E4DD]"
                     >
-                        {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                        <PanelLeftClose className="h-4 w-4" />
                     </Button>
                 )}
             </div>
@@ -394,9 +415,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-full flex-col md:flex-row bg-[#1A1917]">
             {/* Mobile header */}
             <header className="flex md:hidden h-12 shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F] px-4">
-                <Link href="/" className="flex items-center gap-2">
-                    <Image src="/logo.svg" alt="AdsAgent" width={16} height={16} />
-                    <span className="text-[13px] font-semibold text-[#E8E4DD] tracking-tight">AdsAgent</span>
+                <Link href="/" className="flex items-center">
+                    <BrandLockup size="xs" />
                 </Link>
                 <Button
                     type="button"

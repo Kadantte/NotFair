@@ -70,7 +70,7 @@ const GUIDES: Guide[] = [
     {
         href: "/google-ads-claude-connector-setup-guide",
         title: "Claude Cowork, Desktop, Web",
-        description: "Install AdsAgent as a custom MCP connector inside Claude.ai.",
+        description: "Install NotFair as a custom MCP connector inside Claude.ai.",
         icon: ClaudeIcon,
         iconColor: "text-[#D97757]",
     },
@@ -84,7 +84,7 @@ const GUIDES: Guide[] = [
     {
         href: "/google-ads-codex-mcp-setup-guide",
         title: "Codex",
-        description: "Add the AdsAgent MCP to OpenAI's Codex CLI with one command.",
+        description: "Add the NotFair MCP to OpenAI's Codex CLI with one command.",
         icon: OpenAIIcon,
         iconColor: "text-white",
     },
@@ -165,10 +165,10 @@ export function SetupGuidesMenu({ className = "" }: { className?: string }) {
                 <div className="overflow-hidden rounded-xl border border-[#3D3C36] bg-[#24231F] shadow-2xl shadow-black/40">
                     <div className="border-b border-[#3D3C36] px-4 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4CAF6E]">
-                            More AdsAgent Setup Guides
+                            More NotFair Setup Guides
                         </p>
                         <p className="mt-1 text-xs text-[#C4C0B6]">
-                            Access Google Ads in all AI platforms via AdsAgent MCP.
+                            Access Google Ads in all AI platforms via NotFair MCP.
                         </p>
                     </div>
                     <ul className="p-1.5">
