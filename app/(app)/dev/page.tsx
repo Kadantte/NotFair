@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Activity, Check, Copy } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Activity, Check, Copy, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -217,6 +217,41 @@ export default function DevPage() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [usageSource, setUsageSource] = useState<string>('all');
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+    const [growthOverride, setGrowthOverride] = useState<'on' | 'off' | null>(null);
+    const [togglingGrowthOverride, setTogglingGrowthOverride] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/dev/growth-override', { credentials: 'include' })
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+                if (cancelled || !data) return;
+                setGrowthOverride(data.state === 'off' ? 'off' : 'on');
+            })
+            .catch(() => { /* dev-only endpoint, fine if it 403s */ });
+        return () => { cancelled = true; };
+    }, []);
+
+    async function toggleGrowthOverride() {
+        if (growthOverride === null) return;
+        const next = growthOverride === 'on' ? 'off' : 'on';
+        setTogglingGrowthOverride(true);
+        try {
+            const res = await fetch('/api/dev/growth-override', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ enabled: next === 'on' }),
+            });
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            setGrowthOverride(data.state === 'off' ? 'off' : 'on');
+        } catch {
+            setError('Failed to toggle growth override');
+        } finally {
+            setTogglingGrowthOverride(false);
+        }
+    }
 
     const handleCopyEmail = useCallback((email: string, e: React.MouseEvent) => {
         e.preventDefault();
@@ -544,6 +579,28 @@ export default function DevPage() {
                         <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                        {growthOverride !== null && (
+                            <Button
+                                onClick={toggleGrowthOverride}
+                                disabled={togglingGrowthOverride}
+                                variant="outline"
+                                size="sm"
+                                title={growthOverride === 'on'
+                                    ? 'Growth override is ON — synthetic Growth plan granted. Click to turn off and use your real subscription state from the DB.'
+                                    : 'Growth override is OFF — your real subscription state from the DB applies. Click to re-enable the override.'}
+                                className={`gap-1.5 ${growthOverride === 'on'
+                                    ? 'border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] text-[#4CAF6E] hover:bg-[#4CAF6E]/[0.14]'
+                                    : 'border-[#D4882A]/40 bg-[#D4882A]/[0.08] text-[#D4882A] hover:bg-[#D4882A]/[0.14]'
+                                }`}
+                            >
+                                {togglingGrowthOverride
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : <Sparkles className="w-3.5 h-3.5" />}
+                                <span className="hidden sm:inline">
+                                    Growth override: {growthOverride === 'on' ? 'ON' : 'OFF'}
+                                </span>
+                            </Button>
+                        )}
                         <Link href="/dev/telemetry" prefetch>
                             <Button
                                 variant="outline"
