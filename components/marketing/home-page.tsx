@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Check,
   Clock3,
-  Eye,
   Layers,
   Loader2,
   Shield,
@@ -71,7 +70,7 @@ function ConnectClaudeCTA({
         </span>
       ) : (
         <>
-          {label ?? "Start now"}
+          {label ?? "Connect Google Ads"}
           {!label && <ArrowRight className="ml-1 h-5 w-5" />}
         </>
       )}
@@ -81,86 +80,86 @@ function ConnectClaudeCTA({
 
 const useCases = [
   {
-    prompt: "Where did we waste money this week?",
-    answer: "$1,847 went to search terms with zero conversions. Add 23 negatives and lower 4 bids.",
+    prompt: "Move these keywords into tighter ad groups.",
+    answer: "Drafted 4 ad groups, 80 exact-match keywords, and matching negatives. Review before applying.",
   },
   {
-    prompt: "Which clients need attention today?",
-    answer: "3 accounts are over CPA target. Two are search-term drift; one has a broken landing page.",
+    prompt: "Create ads for these new service pages.",
+    answer: "Generated responsive search ads, callouts, final URLs, and tracking checks for each page.",
   },
   {
-    prompt: "What is actually driving booked jobs?",
-    answer: "Campaign A has cheap leads, but Campaign C creates 41% more closed revenue from CRM data.",
+    prompt: "Clean up last week's search terms.",
+    answer: "Built a negative list, queued 23 keyword changes, and estimated the impact before approval.",
   },
 ];
 
 const flowSteps = [
   {
     title: "Connect",
-    desc: "Google Ads first. Add GA4, Search Console, or CRM when ready.",
+    desc: "Connect Google Ads once. Add GA4, Search Console, or CRM when you want revenue-level context.",
     visual: "sources",
   },
   {
-    title: "Ask",
-    desc: "Use Claude like your ads analyst: performance, waste, budget, copy, clients.",
+    title: "Instruct",
+    desc: "Tell Claude the campaign work you want done: keywords, negatives, ads, budgets, scripts, or analysis.",
     visual: "prompts",
   },
   {
     title: "Approve",
-    desc: "Claude proposes fixes. You approve before anything changes.",
+    desc: "NotFair drafts the changes. Nothing writes to Google Ads until you approve.",
     visual: "approve",
   },
 ] as const;
 
 const capabilityCards = [
   {
-    icon: Eye,
-    title: "Know anything",
-    desc: "Campaigns, search terms, CPA, ROAS, budgets, quality score, change impact.",
+    icon: Zap,
+    title: "Operate faster",
+    desc: "Bulk keyword edits, negatives, ads, ad groups, budgets, and scripts without clicking through Google Ads.",
   },
   {
-    icon: Zap,
-    title: "Optimize tirelessly",
-    desc: "Find waste, add negatives, adjust bids, draft ads, monitor drift.",
+    icon: Shield,
+    title: "Approve every write",
+    desc: "Claude can draft campaign changes, but NotFair keeps the final write reviewable and explicit.",
   },
   {
     icon: Layers,
-    title: "Connect the stack",
-    desc: "See which ad clicks become real leads, pipeline, bookings, and revenue.",
+    title: "Scale across accounts",
+    desc: "Use the same operating layer for one local business, a portfolio of lead-gen sites, or agency clients.",
   },
 ];
 
 const audienceCards = [
   {
-    icon: Briefcase,
-    title: "Agencies",
-    desc: "Give every client the attention your best strategist gives your biggest accounts.",
-    bullets: ["Weekly audits in minutes", "Consistent playbook", "More accounts per strategist"],
+    icon: Store,
+    title: "Hands-on operators",
+    desc: "For founders and marketers who already manage Google Ads and want Claude as their execution layer.",
+    bullets: ["Bulk campaign work in minutes", "No Google Ads UI maze", "Final approval stays with you"],
   },
   {
-    icon: Store,
-    title: "Small business owners",
-    desc: "Finally know whether Google is helping you grow or quietly burning cash.",
-    bullets: ["No PPC dashboard to learn", "Plain-English answers", "No retainer required"],
+    icon: Briefcase,
+    title: "Agencies and portfolio builders",
+    desc: "For teams managing multiple accounts, vertical sites, or local-service clients who need more execution leverage.",
+    bullets: ["Repeatable playbooks", "More accounts per strategist", "Reviewable change history"],
   },
 ];
 
 const faqs = [
   {
     q: "Will NotFair make changes without approval?",
-    a: "No. Claude can analyze freely, but write actions are shown before they run. You approve the changes.",
+    a: "No. NotFair can analyze freely, but write actions are shown before they run. You approve every campaign change.",
   },
   {
     q: "Do I need to know Google Ads?",
-    a: "No. Ask plain-English questions. NotFair handles the Google Ads API details behind Claude.",
+    a: "You should know what outcome you want. NotFair handles the Google Ads API details so Claude can draft the actual campaign edits.",
   },
   {
-    q: "Is this for agencies or business owners?",
-    a: "Both. Agencies use it to scale high-quality analysis across accounts. Owners use it to understand and improve their own spend without hiring a full agency.",
+    q: "Who is this built for?",
+    a: "AI-native founders, marketers, agencies, and portfolio builders who actively operate Google Ads accounts and want to turn plain-English strategy into safe campaign execution.",
   },
   {
-    q: "What systems can it analyze together?",
-    a: "Google Ads today, with workflows built around GA4, Search Console, CRM, landing pages, and other MCP-compatible tools.",
+    q: "What can Claude change through NotFair?",
+    a: "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, scripts, and reporting workflows — with approval-gated writes.",
   },
 ];
 
@@ -233,8 +232,8 @@ const lineTransition = {
   ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
 };
 
-const initialQuestion = "Where did we waste money this week?";
-const followUpQuestion = "How can I fix $1,847 going to search terms with zero conversions?";
+const initialQuestion = "Move these keywords into tighter ad groups and add missing negatives.";
+const followUpQuestion = "Apply the approved keyword and negative list changes.";
 
 function ChatReveal({ show, children }: { show: boolean; children: ReactNode }) {
   return (
@@ -322,7 +321,7 @@ function HeroMockup() {
             <ChatReveal show={has("intro")}>
               <p className="text-sm leading-relaxed text-[#E8E4DD]">
                 <SmoothLine>
-                  Let me pull your search terms and campaign performance for the last 7 days.
+                  I’ll inspect the current structure, search terms, and matching rules before drafting changes.
                 </SmoothLine>
               </p>
             </ChatReveal>
@@ -332,20 +331,20 @@ function HeroMockup() {
                 <div className="space-y-1.5 font-mono-jb text-[11px] leading-5">
                   <ToolLine
                     name="getSearchTermReport"
-                    args="last 7d"
+                    args="last 30d"
                     done={has("tool1Done")}
                   />
                   <ChatReveal show={has("tool2")}>
                     <ToolLine
-                      name="getCampaignPerformance"
-                      args="cost + conv"
+                      name="bulkAddKeywords"
+                      args="draft only"
                       done={has("tool2Done")}
                     />
                   </ChatReveal>
                   <ChatReveal show={has("toolSummary")}>
                     <div className="flex items-center gap-2 text-[#9B9689]">
                       <Check className="h-3 w-3 shrink-0 text-[#4CAF6E]" />
-                      <span className="truncate">Analyzed 247 search terms across 4 campaigns</span>
+                      <span className="truncate">Drafted 80 keyword changes across 4 campaigns</span>
                     </div>
                   </ChatReveal>
                 </div>
@@ -356,21 +355,21 @@ function HeroMockup() {
               <div className="space-y-2">
                 <p className="text-sm leading-relaxed text-[#E8E4DD]">
                   <SmoothLine>
-                    Found <span className="font-semibold">3 issues</span> worth fixing this week:
+                    Drafted <span className="font-semibold">3 changes</span> for review:
                   </SmoothLine>
                 </p>
                 <ul className="space-y-1.5 pl-1 text-sm leading-relaxed text-[#C4C0B6]">
                   <SmoothListItem delay={0.12} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">$1,847</span> to search terms with zero conversions</span>
+                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">80</span> keywords moved into tighter ad groups</span>
                   </SmoothListItem>
                   <SmoothListItem delay={0.24} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">23</span> negatives to add across 4 campaigns</span>
+                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">23</span> negatives added to block mismatched queries</span>
                   </SmoothListItem>
                   <SmoothListItem delay={0.36} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">4</span> budgets to rebalance</span>
+                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">4</span> ad groups ready for review</span>
                   </SmoothListItem>
                 </ul>
               </div>
@@ -381,10 +380,10 @@ function HeroMockup() {
                 <p className="text-xs leading-relaxed text-[#C4C0B6]">
                   <SmoothLine>
                     <span className="font-semibold text-[#E8E4DD]">NotFair</span> wants to run{" "}
-                    <span className="font-mono-jb text-[#E8B931]">bulkPauseKeywords</span>
+                    <span className="font-mono-jb text-[#E8B931]">bulkAddKeywords</span>
                   </SmoothLine>
                   <SmoothLine delay={0.12}>
-                    to pause 23 keywords with zero conversions
+                    to apply 80 keyword edits and 23 negatives
                   </SmoothLine>
                 </p>
                 <motion.div
@@ -488,7 +487,7 @@ function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }
   if (visual === "prompts") {
     return (
       <div className="space-y-2 text-sm">
-        {["What changed?", "Why did CPA spike?", "Which client needs help?"].map((item) => (
+        {["Move these keywords", "Create ads for this page", "Clean up search terms"].map((item) => (
           <div key={item} className="rounded-full border border-[#3D3C36] bg-[#1A1917] px-3 py-2 text-[#C4C0B6]">
             {item}
           </div>
@@ -501,8 +500,8 @@ function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }
     <div className="rounded-2xl border border-[#4CAF6E]/30 bg-[#4CAF6E]/5 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[#E8E4DD]">Pause 12 keywords?</p>
-          <p className="mt-1 text-xs text-[#C4C0B6]">Projected waste removed: $640/mo</p>
+          <p className="text-sm font-semibold text-[#E8E4DD]">Apply 103 campaign edits?</p>
+          <p className="mt-1 text-xs text-[#C4C0B6]">80 keywords · 23 negatives · fully reviewable</p>
         </div>
         <span className="rounded-full bg-[#4CAF6E] px-3 py-1 text-xs font-semibold text-[#1A1917]">
           Approve
@@ -551,7 +550,7 @@ export function HomePage({
                 }}
               />
               <span className="text-[#E8E4DD]">
-                Open-source Claude Code skills for SEO, SEM &amp; Google Ads — live on GitHub
+                Run Google Ads from Claude — approval-gated writes, live on GitHub
               </span>
               <GitHubStarBadge stars={githubStars} />
             </a>
@@ -565,13 +564,13 @@ export function HomePage({
               className="text-center lg:text-left"
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                Google Ads MCP - Let Claude Manage Your Ads
+                Google Ads execution layer for Claude
               </p>
               <h1 className="font-display mx-auto mt-4 max-w-3xl text-5xl font-bold leading-[0.98] tracking-tight text-[#E8E4DD] sm:text-6xl lg:mx-0 lg:text-7xl">
-                Stop guessing where your ad spend goes.
+                Stop clicking through Google Ads.
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#C4C0B6] lg:mx-0">
-                Ask Claude what is working, what is wasting money, and what to fix next. NotFair connects Claude to your ads data and executes approved changes.
+                Tell Claude what you want to change. NotFair drafts the campaign edits and executes them only after you approve.
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
@@ -587,9 +586,9 @@ export function HomePage({
                   />
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-[#C4C0B6] lg:justify-start">
-                  <span>Free to start</span>
-                  <span>Read-only first</span>
-                  <span>No credit card</span>
+                  <span>Bulk edits in minutes</span>
+                  <span>Review every write</span>
+                  <span>Claude, Cursor, MCP</span>
                 </div>
               </div>
             </motion.div>
@@ -612,7 +611,7 @@ export function HomePage({
               Examples
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] sm:text-4xl">
-              Ask the questions dashboards never answer.
+              Tell Claude what to change. Review the draft.
             </h2>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -621,7 +620,7 @@ export function HomePage({
                 <p className="text-sm font-medium text-[#4CAF6E]">You ask</p>
                 <p className="mt-2 text-lg font-semibold leading-snug text-[#E8E4DD]">“{item.prompt}”</p>
                 <div className="mt-5 rounded-2xl bg-[#1A1917] p-4">
-                  <p className="text-sm font-medium text-[#C4C0B6]">Claude answers</p>
+                  <p className="text-sm font-medium text-[#C4C0B6]">NotFair answers</p>
                   <p className="mt-2 text-sm leading-relaxed text-[#E8E4DD]">{item.answer}</p>
                 </div>
               </div>
@@ -637,7 +636,7 @@ export function HomePage({
               How it works
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] sm:text-4xl">
-              Connect. Ask. Approve.
+              Connect. Instruct. Approve.
             </h2>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -708,8 +707,8 @@ export function HomePage({
           <div className="grid gap-5 md:grid-cols-3">
             {[
               { icon: Shield, title: "You approve writes", desc: "No silent campaign changes." },
-              { icon: Clock3, title: "Always watching", desc: "Catch drift between check-ins." },
-              { icon: TrendingUp, title: "Impact tracked", desc: "See what changed after fixes." },
+              { icon: Clock3, title: "Manual work compressed", desc: "Turn repetitive campaign edits into one reviewed workflow." },
+              { icon: TrendingUp, title: "Impact tracked", desc: "See what changed after every approved edit." },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -765,10 +764,10 @@ export function HomePage({
       <section className="px-4 pb-24">
         <div className="container mx-auto max-w-5xl rounded-[32px] border border-[#4CAF6E]/25 bg-[#4CAF6E]/5 p-8 text-center sm:p-12">
           <h2 className="font-display text-3xl font-bold tracking-tight text-[#E8E4DD] sm:text-5xl">
-            Know what to fix before more budget disappears.
+            Run your next Google Ads change from Claude.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[#C4C0B6]">
-            Start now. Ask Claude where spend is leaking and approve the first fixes.
+            Connect your account, ask for a campaign edit, and approve the drafted changes.
           </p>
           <div className="mt-8 flex justify-center">
             <ConnectClaudeCTA session={session} position="final" />

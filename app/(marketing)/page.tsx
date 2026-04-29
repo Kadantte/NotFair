@@ -6,18 +6,17 @@ import { getUserSubscription } from "@/lib/subscription";
 import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 
 export const metadata = buildMetadata({
-  title: "AI Google Ads Operator for Claude | NotFair",
+  title: "Run Google Ads from Claude | NotFair",
   description:
-    "Connect Google Ads to Claude. Ask what is working, what is wasting spend, and approve fixes across campaigns, keywords, budgets, and ads.",
+    "Tell Claude what to change. NotFair drafts Google Ads edits for keywords, ads, budgets, and negatives, then executes only after approval.",
   path: "/",
   keywords: [
-    "Google Ads MCP server",
-    "Google Ads MCP",
-    "connect Google Ads to Claude",
+    "run Google Ads from Claude",
     "Claude Google Ads",
-    "AI Google Ads agent",
-    "Claude Code Google Ads",
-    "Google Ads AI optimization",
+    "Google Ads MCP",
+    "AI Google Ads operator",
+    "Google Ads campaign automation",
+    "Google Ads approval workflow",
   ],
 });
 

@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.16] - 2026-04-28
+
+### Changed
+- **Marketing site repositions NotFair from "ask Claude about your ads" to "run Google Ads from Claude."** Homepage hero, examples, flow steps, capability cards, audience cards, FAQ, pricing copy, and footer all shift the value prop from analysis-and-questions toward execution-with-approval. Hero subhead becomes "Tell Claude what you want to change. NotFair drafts the campaign edits and executes them only after you approve." Use cases now show concrete operator workflows (move keywords into tighter ad groups, create ads for new service pages, clean up search terms) instead of analytic prompts. Audience cards reorder hands-on operators ahead of agencies. Pricing header reframes the free tier around finding waste and the paid tier around approval-gated execution. Site metadata, marketing-page FAQ, and footer tagline updated in lockstep so the open-graph/SEO surface matches.
+
 ## [0.3.0.13] - 2026-04-27
 
 ### Changed

@@ -4,7 +4,7 @@ import { BRAND_NAME, BRAND_URL } from "@/lib/brand";
 export const SITE_NAME = BRAND_NAME;
 export const SITE_URL = BRAND_URL;
 export const DEFAULT_OG_IMAGE = "/opengraph-image";
-export const SITE_DESCRIPTION = `${BRAND_NAME} is the Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Claude Cowork and let AI analyze campaigns, optimize spend, and manage changes.`;
+export const SITE_DESCRIPTION = `${BRAND_NAME} is the Google Ads execution layer for Claude. Connect your ad account, draft campaign edits in natural language, and approve every write before it reaches Google Ads.`;
 export const SITE_KEYWORDS = [
   "Google Ads MCP server",
   "Google Ads MCP",
@@ -103,7 +103,7 @@ export function buildHomepageJsonLd() {
       applicationSubCategory: "Google Ads Management Software",
       operatingSystem: "Web",
       description:
-        "The Google Ads MCP server built for Claude. Connect your ad account to Claude Code or Cowork and let AI analyze campaigns, optimize spend, and manage changes.",
+        "The Google Ads execution layer for Claude. Draft keyword, ad, budget, and negative changes in natural language, then approve every write before it reaches Google Ads.",
       offers: {
         "@type": "Offer",
         price: "0",

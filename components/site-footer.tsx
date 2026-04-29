@@ -32,8 +32,8 @@ export function SiteFooter() {
                     <div className="max-w-sm space-y-3">
                         <BrandLockup size="md" />
                         <p className="text-sm leading-relaxed text-[#C4C0B6]">
-                            AI-powered Google Ads management that finds wasted
-                            spend and optimizes your campaigns automatically.
+                            AI-powered Google Ads execution for Claude. Draft
+                            keywords, ads, budgets, and negatives — then approve every write.
                         </p>
                     </div>
 

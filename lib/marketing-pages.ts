@@ -303,26 +303,26 @@ export const homepageFaq: FaqItem[] = [
   {
     question: "What is NotFair?",
     answer:
-      "NotFair is a Google Ads MCP server built for Claude. It connects your Google Ads account to Claude Code, Claude Cowork, and other MCP-compatible AI clients so you can analyze campaigns, optimize spend, and manage changes through natural conversation.",
+      "NotFair is a Google Ads execution layer for Claude and other MCP-compatible AI clients. It lets AI inspect your account, draft campaign edits, and run approved changes through the Google Ads API.",
   },
   {
     question: "Who is NotFair built for?",
     answer:
-      "Teams and founders who use Claude to manage their business and want to extend it to Google Ads. Instead of manually exporting CSVs and pasting them into chat, NotFair gives Claude live access to your campaign data.",
+      "NotFair is built for AI-native founders, marketers, agencies, and portfolio builders who actively operate Google Ads accounts and want more execution leverage without giving up final approval.",
   },
   {
-    question: "What can Claude do with NotFair?",
+    question: "What can NotFair do?",
     answer:
-      "Claude can pull campaign performance, analyze search terms, find wasted spend, recommend negative keywords, adjust bids, pause underperforming campaigns, and track the impact of every change — all through natural language with your approval at each step.",
+      "NotFair can pull campaign performance, analyze search terms, create and pause keywords, manage negatives, adjust bids and budgets, draft ads and ad groups, run scripts, and track approved changes.",
   },
   {
-    question: "Does NotFair work with other AI tools?",
+    question: "Does NotFair work with Claude and other AI tools?",
     answer:
-      "Yes. NotFair uses the open MCP protocol, so it works with any MCP-compatible client including Cursor, Windsurf, and custom agents built with the Claude Agent SDK. Claude Code and Claude Cowork are the recommended primary clients.",
+      "Yes. NotFair uses the open MCP protocol, so it works with Claude Code, Claude Cowork, Cursor, Windsurf, and other MCP-compatible AI clients.",
   },
   {
-    question: "Why does NotFair use MCP?",
+    question: "Will NotFair change campaigns automatically?",
     answer:
-      "MCP (Model Context Protocol) is the open standard created by Anthropic for connecting AI to external tools. It gives Claude structured access to Google Ads data and actions without custom integrations — one protocol that works everywhere.",
+      "No. NotFair is designed around approval-gated writes. It can analyze and draft freely, but campaign changes are shown for review before anything is written to Google Ads.",
   },
 ];

@@ -41,17 +41,17 @@ export function CheckoutStatusBanner() {
 export const FREE_FEATURES = [
   "300 Google Ads operations per month",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
-  "Read campaign performance, search terms, and recommendations",
-  "Make bid and budget edits with guardrails",
+  "Run read-only analysis and draft campaign changes",
+  "Preview bid, budget, keyword, and ad edits before approval",
   "Community support",
 ];
 
 export const GROWTH_FEATURES = [
   "Unlimited Google Ads operations",
   "Everything in Free",
+  "Approval-gated writes for campaign changes",
+  "Bulk keyword, ad, budget, and script workflows",
   "Latest OpenAI and Anthropic model support in chat (GPT-5.4, Claude Opus 4.7)",
-  "Priority support",
-  "Early access to new features",
   "Cancel any time — no contracts",
 ];
 
@@ -111,10 +111,10 @@ export function PricingHeader() {
         Pricing
       </p>
       <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-        We don&apos;t manage ads. We build growth engines.
+        Upgrade when Claude becomes your ads operator.
       </h2>
       <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-        Website, ad creative, and Claude — wired together into one system.
+        Built for people who actively change campaigns, not just read reports.
       </p>
     </div>
   );
@@ -280,7 +280,7 @@ export function PricingCards({
               starter
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">Kick the tires risk-free.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">Start with live account context.</p>
           <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
             <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
               {PRICING.freeMonthly}
@@ -342,7 +342,7 @@ export function PricingCards({
               unlimited
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">For serious advertisers.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">For operators making real campaign changes.</p>
           <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
             {interval === "month" ? (
               <>
