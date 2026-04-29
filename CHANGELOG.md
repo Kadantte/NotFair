@@ -2,6 +2,12 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.19] - 2026-04-29
+
+### Changed
+- **Connect Claude is now a prominent CTA at the top of the in-app sidebar** instead of a small footer link. Users land in `/campaigns` or `/audit` and can immediately see how to wire up their Claude client. The header "Start now" button also routes logged-in users to `/connect` instead of `/audit`, so connection setup stays discoverable post-login.
+- **Marketing `AuditCTA` now accepts `connectedDestination` / `disconnectedDestination` props** so callers can target routes other than `/audit` without forking the component.
+
 ## [0.3.0.18] - 2026-04-29
 
 ### Changed

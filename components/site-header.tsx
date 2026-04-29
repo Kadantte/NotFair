@@ -66,6 +66,8 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                         size="sm"
                         connectedLabel="Start now"
                         disconnectedLabel="Start now"
+                        connectedDestination="/connect"
+                        disconnectedDestination="/connect"
                     />
                 </div>
             </div>
