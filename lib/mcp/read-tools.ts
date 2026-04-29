@@ -10,6 +10,7 @@ import {
   type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
+import { getChangeIntervention, listChangeInterventions, evaluateChangeIntervention } from "@/lib/db/interventions";
 import { MIN_AFTER_DAYS_FOR_DIRECTION } from "@/lib/db/impact";
 import { execRead } from "@/lib/tools/execute";
 import { getEnv } from "@/lib/env";
@@ -112,6 +113,59 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "review_change_impact", () =>
       reviewChangeImpact(targetId, { days, limit }),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("listChangeInterventions", {
+    description: "List Impact Monitor interventions grouped at the campaign episode level. Returns campaign-scoped write bundles with status, summary, requestIds, operation counts, and the latest evaluation if one exists.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().optional(),
+      status: z.enum(["watching", "ready_for_review", "needs_attention", "reviewed", "archived"]).optional(),
+      limit: z.number().int().min(1).max(100).default(20),
+      offset: z.number().int().min(0).default(0),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, status, limit, offset }) => {
+    const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "list_change_interventions", () =>
+      listChangeInterventions(targetId, { campaignId, status, limit, offset }),
+      campaignId,
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("getChangeIntervention", {
+    description: "Get one Impact Monitor intervention with its linked operations and latest evaluation.",
+    inputSchema: {
+      accountId: accountIdParam,
+      changeInterventionId: z.number().int().positive(),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, changeInterventionId }) => {
+    const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "get_change_intervention", async () => {
+      const intervention = await getChangeIntervention(targetId, changeInterventionId);
+      if (!intervention) throw new Error("Change intervention not found.");
+      return intervention;
+    });
+    return typedResult(result);
+  }));
+
+  server.registerTool("evaluateChangeIntervention", {
+    description: "Run the server-side observational evaluation for one Impact Monitor intervention. Compares the campaign's 7-day before window vs the post-change window, counts same-campaign confounders, stores an evaluation row, and returns a conservative verdict.",
+    inputSchema: {
+      accountId: accountIdParam,
+      changeInterventionId: z.number().int().positive(),
+      baselineWindowDays: z.number().int().min(1).max(30).default(7),
+      afterWindowDays: z.number().int().min(1).max(30).default(7),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, changeInterventionId, baselineWindowDays, afterWindowDays }) => {
+    const { auth, targetId } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "evaluate_change_intervention", () =>
+      evaluateChangeIntervention(targetId, changeInterventionId, { baselineWindowDays, afterWindowDays }),
     );
     return typedResult(result);
   }));

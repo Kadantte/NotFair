@@ -6,8 +6,8 @@
  *     --to "info@example.com" \
  *     --subject "Your subject line" \
  *     --body "<p>HTML body here</p>" \
- *     --from "Tong from NotFair <outreach@adsagent.org>" \
- *     --reply-to "tong.chen@adsagent.org"
+ *     --from "Tong from NotFair <tong@notfair.co>" \
+ *     --reply-to "tong@notfair.co"
  *
  * The script will:
  * 1. Send the email via Resend
@@ -21,6 +21,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
 import * as schema from "../lib/db/schema";
+import { OUTREACH_EMAIL, OUTREACH_FROM } from "../lib/brand";
 
 // Load .env.local
 function loadEnvLocal() {
@@ -57,8 +58,8 @@ async function main() {
   const to = args.to;
   const subject = args.subject;
   const body = args.body;
-  const from = args.from || "Tong from NotFair <tong.chen@adsagent.org>";
-  const replyTo = args["reply-to"] || "tong.chen@adsagent.org";
+  const from = args.from || OUTREACH_FROM;
+  const replyTo = args["reply-to"] || OUTREACH_EMAIL;
 
   if (!to || !subject || !body) {
     console.error("Required: --to, --subject, --body");

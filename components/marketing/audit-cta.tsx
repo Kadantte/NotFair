@@ -19,6 +19,8 @@ export function AuditCTA({
   position,
   connectedLabel = "View Your Audit",
   disconnectedLabel = "Audit Now",
+  connectedDestination = "/audit",
+  disconnectedDestination = "/audit",
 }: {
   session: { connected: boolean };
   page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server" | "header";
@@ -27,24 +29,27 @@ export function AuditCTA({
   position?: string;
   connectedLabel?: string;
   disconnectedLabel?: string;
+  connectedDestination?: string;
+  disconnectedDestination?: string;
 }) {
   const [loading, setLoading] = useState(false);
 
   function handleCTA() {
     if (loading) return;
     setLoading(true);
+    const destination = session.connected ? connectedDestination : disconnectedDestination;
     trackEvent("cta_clicked", {
       page,
       cta: session.connected ? "view_audit" : "audit_now",
       position,
       variant,
-      destination: "/audit",
+      destination,
       requires_auth: !session.connected,
     });
     if (session.connected) {
-      window.location.assign("/audit");
+      window.location.assign(destination);
     } else {
-      startGoogleConnect("/audit");
+      startGoogleConnect(destination);
     }
   }
 

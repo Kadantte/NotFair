@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from "@/lib/brand";
 import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
@@ -90,7 +91,7 @@ export default function TermsPage() {
             <section className="space-y-4 mb-8">
                 <h2 className="text-2xl font-semibold text-white">10. Contact Us</h2>
                 <p>
-                    If you have any questions about these Terms, please contact us at: <a href="mailto:support@adsagent.org" className="text-blue-400 hover:underline">support@adsagent.org</a>
+                    If you have any questions about these Terms, please contact us at: <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-400 hover:underline">{SUPPORT_EMAIL}</a>
                 </p>
             </section>
         </div>

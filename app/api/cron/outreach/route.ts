@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db";
 import { and, lte, asc, eq } from "drizzle-orm";
 import { getResend } from "@/lib/resend";
 import { markContactStatusUpgrade } from "@/lib/outreach-contacts";
+import { OUTREACH_EMAIL, OUTREACH_FROM } from "@/lib/brand";
 
 /**
  * Send scheduled outreach emails that are due.
@@ -49,10 +50,10 @@ export async function GET(request: Request) {
     }
 
     const { error } = await resend.emails.send({
-      from: "Tong from NotFair <tong.chen@adsagent.org>",
+      from: OUTREACH_FROM,
       to: contact.email,
       subject: contact.draftSubject,
-      replyTo: "tong.chen@adsagent.org",
+      replyTo: OUTREACH_EMAIL,
       text: contact.draftBody,
     });
 

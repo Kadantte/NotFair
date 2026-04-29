@@ -8,6 +8,216 @@
       "when": 1774554876541,
       "tag": "0000_windy_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774554876542,
+      "tag": "0001_add_rolled_back",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774554876543,
+      "tag": "0002_rename_changes_to_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774554876544,
+      "tag": "0003_add_google_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774554876545,
+      "tag": "0004_add_label_to_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774554876546,
+      "tag": "0004_add_oauth_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774554876547,
+      "tag": "0005_add_client_secret_plain",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774554876548,
+      "tag": "0006_add_oauth_access_token",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774554876549,
+      "tag": "0007_add_outreach_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774554876550,
+      "tag": "0008_add_lead_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774554876551,
+      "tag": "0009_add_draft_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774554876552,
+      "tag": "0010_add_bounce_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1774554876553,
+      "tag": "0011_add_login_customer_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774554876554,
+      "tag": "0012_add_chat_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1774554876555,
+      "tag": "0013_add_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1774554876556,
+      "tag": "0014_subscriptions_refactor",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1774554876557,
+      "tag": "0015_slim_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1774554876558,
+      "tag": "0016_add_audit_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1774554876559,
+      "tag": "0017_add_gmail_draft_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774554876560,
+      "tag": "0018_add_contact_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1774554876561,
+      "tag": "0019_add_tool_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1774554876562,
+      "tag": "0020_subscriptions_env",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1774554876563,
+      "tag": "0021_add_success_to_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1774554876564,
+      "tag": "0022_add_telemetry_to_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1774554876565,
+      "tag": "0023_add_created_at_brin_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1774554876566,
+      "tag": "0024_cost_micros_to_bigint",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1774554876567,
+      "tag": "0025_add_shared_audits",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1774554876568,
+      "tag": "0026_add_oauth_dcr",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1774554876569,
+      "tag": "0027_add_audit_applies",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1774554876570,
+      "tag": "0028_add_oauth_access_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1774554876571,
+      "tag": "0029_add_change_interventions",
+      "breakpoints": true
     }
   ]
 }

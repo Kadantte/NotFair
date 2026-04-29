@@ -717,7 +717,7 @@ export async function requestSetupHelp(context: {
     const setupPath =
         context.activeTab === 'claude-code'
             ? `Claude Code / ${context.codeSubTab === 'auto' ? 'Let Claude set it up' : 'Install manually'}`
-            : 'Claude Connector (Web / Cowork)';
+            : 'Claude Connector (Desktop / Web / Cowork)';
     const summaryLines = await getAccountSummaryLines(context.connected ? auth : null);
     await postToSlack([
         ':sos: *Setup help requested*',
@@ -741,7 +741,7 @@ export async function notifyHelpClicked(context: {
         context.activeTab === 'claude-code'
             ? 'Claude Code'
             : context.activeTab === 'connector'
-                ? 'Claude Connector (Web / Cowork)'
+                ? 'Claude Connector (Desktop / Web / Cowork)'
                 : context.activeTab === 'codex'
                     ? 'ChatGPT / Codex'
                     : context.activeTab === 'any-mcp'

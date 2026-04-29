@@ -15,6 +15,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, and, lte } from "drizzle-orm";
 import * as schema from "../lib/db/schema";
+import { OUTREACH_EMAIL, OUTREACH_FROM } from "../lib/brand";
 
 function loadEnvLocal() {
   try {
@@ -75,10 +76,10 @@ async function main() {
     console.log(`  Sending to ${contact.email} (${contact.company})...`);
 
     const { error } = await resend.emails.send({
-      from: "Tong from NotFair <tong.chen@adsagent.org>",
+      from: OUTREACH_FROM,
       to: contact.email,
       subject: contact.draftSubject,
-      replyTo: "tong.chen@adsagent.org",
+      replyTo: OUTREACH_EMAIL,
       text: contact.draftBody,
     });
 

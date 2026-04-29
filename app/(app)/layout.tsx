@@ -269,10 +269,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
             </div>
 
+            {/* Connect Claude — primary CTA */}
+            <div className="shrink-0 px-2 pb-2">
+                <Link href="/connect" prefetch>
+                    <Button
+                        type="button"
+                        className={`h-10 rounded-lg border border-[#4CAF6E] bg-[#4CAF6E]/12 text-[#4CAF6E] shadow-[0_0_0_3px_rgba(76,175,110,0.10)] transition-all duration-200 ease-out hover:bg-[#4CAF6E]/20 hover:text-[#4CAF6E] ${
+                            pathname === '/connect' ? 'bg-[#4CAF6E]/20' : ''
+                        } ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start px-3'}`}
+                    >
+                        <PlugZap className="h-[18px] w-[18px] shrink-0" />
+                        <span
+                            className={`overflow-hidden whitespace-nowrap text-[14px] font-semibold transition-all duration-200 ease-out ${
+                                isCollapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
+                            }`}
+                        >
+                            Connect Claude
+                        </span>
+                    </Button>
+                </Link>
+            </div>
+
             {/* Nav items */}
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
                 <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} />
                 <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} />
+                <NavItem href="/impact-monitor" icon={Gauge} label="Impact Monitor" active={pathname.startsWith('/impact-monitor')} collapsed={isCollapsed} />
                 <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} />
                 <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} collapsed={isCollapsed} />
             </nav>
@@ -383,7 +405,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem href="/connect" icon={PlugZap} label="Connect Claude" active={pathname === '/connect'} collapsed={isCollapsed} />
                 <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} />
                 <NavItem
                     href="/upgrade"
@@ -563,7 +584,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <MobileNavItem href="/dashboard" icon={Home} label="Home" active={pathname === '/dashboard'} />
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} />
                 <MobileNavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} />
-                <MobileNavItem href="/operations" icon={Activity} label="Ops" active={pathname === '/operations'} />
+                <MobileNavItem href="/impact-monitor" icon={Gauge} label="Impact" active={pathname.startsWith('/impact-monitor')} />
                 <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} />
             </nav>
         </div>

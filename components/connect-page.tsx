@@ -14,7 +14,6 @@ import { ClaudeCodePluginSteps } from '@/components/claude-code-plugin-steps';
 import { ConnectorSetupSteps } from '@/components/connector-setup-steps';
 import { CodexSetupSteps } from '@/components/codex-setup-steps';
 import { AnyMcpClientSetup } from '@/components/any-mcp-client-setup';
-import { MCP_SERVER_URL } from '@/lib/brand';
 
 const emptySession: Session = { connected: false };
 
@@ -129,6 +128,20 @@ function ClaudeConnectorSection() {
 
 type SetupTab = 'claude-code' | 'connector' | 'codex' | 'any-mcp';
 
+function connectPathForTab(tab: SetupTab): string {
+    switch (tab) {
+        case 'connector':
+            return '/connect/claude-connector';
+        case 'codex':
+            return '/connect/codex';
+        case 'any-mcp':
+            return '/connect/any-mcp';
+        case 'claude-code':
+        default:
+            return '/connect/claude-code';
+    }
+}
+
 function ClaudeCodeManualSection() {
     return (
         <div className="w-full max-w-3xl text-left">
@@ -151,30 +164,91 @@ function SetupTabs({ activeTab, apiKey, onSignIn, onTokenRotated }: {
     onSignIn: () => void;
     onTokenRotated: () => Promise<void>;
 }) {
+    const tabs: Array<{
+        id: SetupTab;
+        href: string;
+        title: string;
+        description: string;
+        badge?: string;
+    }> = [
+        {
+            id: 'connector',
+            href: '/connect/claude-connector',
+            title: 'Claude Desktop / Web / Cowork',
+            description: 'Recommended for most users',
+            badge: 'Recommended',
+        },
+        {
+            id: 'claude-code',
+            href: '/connect/claude-code',
+            title: 'Claude Code',
+            description: 'Terminal-based coding agent',
+        },
+        {
+            id: 'codex',
+            href: '/connect/codex',
+            title: 'Codex',
+            description: 'OpenAI CLI + ChatGPT connector',
+        },
+        {
+            id: 'any-mcp',
+            href: '/connect/any-mcp',
+            title: 'Any MCP Client',
+            description: 'Cursor, Windsurf, custom apps, more',
+        },
+    ];
+
     const tabBtn = (active: boolean) =>
-        `flex-1 whitespace-nowrap rounded-md px-3 py-2.5 text-center text-sm font-medium transition-all duration-150 ${active
-            ? 'bg-[#24231F] text-[#E8E4DD] shadow-sm'
-            : 'text-[#C4C0B6] hover:text-[#E8E4DD]'
+        `group rounded-xl border p-4 text-left transition-all duration-150 ${active
+            ? 'border-[#4CAF6E]/60 bg-[#24231F] shadow-[0_0_0_1px_rgba(76,175,110,0.25)]'
+            : 'border-[#3D3C36] bg-[#1A1917] hover:border-[#C4C0B6]/40 hover:bg-[#24231F]'
         }`;
     return (
-        <div className="flex flex-col items-center space-y-8 text-center">
-            {/* Tab switcher */}
-            <div className="flex w-full max-w-3xl rounded-lg border border-[#3D3C36] bg-[#1A1917] p-1">
-                <Link href="/connect/claude-code" prefetch className={tabBtn(activeTab === 'claude-code')}>
-                    Claude Code
-                </Link>
-                <Link href="/connect/claude-connector" prefetch className={tabBtn(activeTab === 'connector')}>
-                    Claude Cowork / Web
-                </Link>
-                <Link href="/connect/codex" prefetch className={tabBtn(activeTab === 'codex')}>
-                    Codex
-                </Link>
-                <Link href="/connect/any-mcp" prefetch className={tabBtn(activeTab === 'any-mcp')}>
-                    Any MCP Client
-                </Link>
+        <div className="flex w-full flex-col items-center space-y-8 text-center">
+            <div className="w-full max-w-4xl space-y-3 text-left">
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4CAF6E]">
+                        Choose your client
+                    </p>
+                    <h2 className="text-xl font-semibold text-[#E8E4DD] sm:text-2xl">
+                        Where do you want to use NotFair?
+                    </h2>
+                    <p className="text-sm text-[#C4C0B6]">
+                        Pick one setup path below. The instructions underneath update for that client.
+                    </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {tabs.map(tab => {
+                        const active = activeTab === tab.id;
+                        return (
+                            <Link
+                                key={tab.id}
+                                href={tab.href}
+                                prefetch
+                                className={tabBtn(active)}
+                                aria-current={active ? 'page' : undefined}
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className={`text-sm font-semibold ${active ? 'text-[#E8E4DD]' : 'text-[#C4C0B6] group-hover:text-[#E8E4DD]'}`}>
+                                            {tab.title}
+                                        </div>
+                                        <div className={`mt-1 text-xs leading-relaxed ${active ? 'text-[#C4C0B6]' : 'text-[#C4C0B6]/80 group-hover:text-[#C4C0B6]'}`}>
+                                            {tab.description}
+                                        </div>
+                                    </div>
+                                    {tab.badge && (
+                                        <span className="rounded-full border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4CAF6E]">
+                                            {tab.badge}
+                                        </span>
+                                    )}
+                                </div>
+                            </Link>
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* Tab content */}
             {activeTab === 'claude-code' ? (
                 <ClaudeCodeManualSection />
             ) : activeTab === 'connector' ? (
@@ -197,7 +271,7 @@ function SetupTabs({ activeTab, apiKey, onSignIn, onTokenRotated }: {
 }
 
 function parseSlug(slug?: string[]): { activeTab: SetupTab } {
-    if (!slug || slug.length === 0) return { activeTab: 'claude-code' };
+    if (!slug || slug.length === 0) return { activeTab: 'connector' };
     if (slug[0] === 'claude-connector') return { activeTab: 'connector' };
     if (slug[0] === 'chatgpt-codex' || slug[0] === 'codex') return { activeTab: 'codex' };
     if (slug[0] === 'any-mcp') return { activeTab: 'any-mcp' };
@@ -209,14 +283,14 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
     const searchParams = useSearchParams();
     const router = useRouter();
     const urlToken = searchParams.get('token');
-    const urlCustomerName = searchParams.get('customer_name');
     const urlError = searchParams.get('error');
     const urlErrorReason = searchParams.get('reason');
     const pendingToken = searchParams.get('pending');
     const selectionMode = searchParams.get('mode');
     const accountsParam = searchParams.get('accounts');
     const selectedParam = searchParams.get('selected');
-    const nextAfterConnect = searchParams.get('next') ?? '/connect';
+    const currentConnectPath = connectPathForTab(activeTab);
+    const nextAfterConnect = searchParams.get('next') ?? currentConnectPath;
 
     const [session, setSession] = useState<Session>(initialSession);
     const [error, setError] = useState<string | null>(urlError);
@@ -225,8 +299,6 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
     const token = urlToken || (session.connected ? session.token : null);
-    const customerName = urlCustomerName || (session.connected ? session.customerName : null);
-
     type SelectableAccount = {
         id: string;
         name: string;
@@ -290,7 +362,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
         if (urlToken) {
             // account_connected is now fired centrally from PostHogProvider
             // via the gads_connect_event cookie set by the auth callback.
-            window.history.replaceState({}, '', '/connect/claude-code');
+            window.history.replaceState({}, '', currentConnectPath);
             return;
         }
 
@@ -304,7 +376,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
         return () => {
             cancelled = true;
         };
-    }, [urlToken]);
+    }, [currentConnectPath, urlToken]);
 
     useEffect(() => {
         if ((!pendingToken && selectionMode !== 'update') || accounts.length === 0) {
@@ -322,7 +394,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
         setError(null);
         setErrorReason(null);
         try {
-            await startGoogleConnect('/connect', prompt ? { prompt } : undefined);
+            await startGoogleConnect(currentConnectPath, prompt ? { prompt } : undefined);
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
         }
@@ -499,7 +571,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
                         <div className="flex flex-col items-center space-y-6 pt-12 text-center">
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect Google Ads</h2>
                             <p className="max-w-md text-lg text-[#C4C0B6]">
-                                Sign in with your Google Ads account. You&apos;ll get a setup prompt to paste into Claude Code.
+                                Sign in with your Google Ads account, then choose the Claude or MCP client you want to set up.
                             </p>
                             <Button
                                 size="lg"

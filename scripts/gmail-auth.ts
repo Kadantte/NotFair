@@ -8,8 +8,8 @@
  * a dedicated "Desktop app" OAuth client (separate from the Ads OAuth client
  * so user-facing sign-in is untouched). The script spins up a localhost
  * callback on port 53682, opens your browser, and after you sign in as
- * tongchen92@gmail.com prints a GMAIL_REFRESH_TOKEN line to paste into
- * .env.local and `vercel env add GMAIL_REFRESH_TOKEN`.
+ * the mailbox you want NotFair to send from it prints a GMAIL_REFRESH_TOKEN
+ * line to paste into .env.local and `vercel env add GMAIL_REFRESH_TOKEN`.
  *
  * Desktop clients implicitly allow http://localhost loopback redirects, so no
  * redirect URI whitelisting is needed. The OAuth consent screen must have the

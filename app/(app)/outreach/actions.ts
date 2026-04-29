@@ -13,6 +13,7 @@ import {
   findDraftForEmail,
   type GmailThreadSummary,
 } from "@/lib/gmail";
+import { OUTREACH_EMAIL, OUTREACH_FROM } from "@/lib/brand";
 import { reconcileContactFromThreads } from "@/lib/outreach-reconcile";
 import {
   markContactStatusUpgrade,
@@ -399,10 +400,10 @@ export async function sendOutreachAction(contactId: number) {
   const resend = getResend();
 
   const { error } = await resend.emails.send({
-    from: "Tong from NotFair <tong.chen@adsagent.org>",
+    from: OUTREACH_FROM,
     to: contact.email,
     subject: contact.draftSubject,
-    replyTo: "tong.chen@adsagent.org",
+    replyTo: OUTREACH_EMAIL,
     text: contact.draftBody,
   });
 

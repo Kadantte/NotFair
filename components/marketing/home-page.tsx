@@ -23,6 +23,7 @@ import { fadeInUp, AuditCTA } from "@/components/marketing/audit-cta";
 import { GitHubStarBadge } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
+import { CONTACT_EMAIL } from "@/lib/brand";
 import { trackEvent } from "@/lib/analytics";
 import { PricingSection, type PricingSectionProps } from "./pricing-cards";
 
@@ -730,12 +731,12 @@ export function HomePage({
           <p className="mt-6 text-sm text-[#C4C0B6]">
             Spending $50K+/mo?{" "}
             <Link
-              href="mailto:tong@adsagent.org"
+              href={`mailto:${CONTACT_EMAIL}`}
               onClick={() =>
                 trackEvent("cta_clicked", {
                   page: "homepage",
                   cta: "high_spend_lead",
-                  destination: "mailto:tong@adsagent.org",
+                  destination: `mailto:${CONTACT_EMAIL}`,
                   requires_auth: false,
                 })
               }

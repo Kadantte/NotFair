@@ -30,7 +30,7 @@ const emptyAccount: StoredAccount = {
 const primaryPrompt = "Run an audit on my account and suggest the 3 biggest fixes with dollar impact.";
 const secondaryPrompts = [
   "List my top 10 campaigns by spend and explain which are inefficient.",
-  "For campaign 123456789, summarize the last 30 days and what to change.",
+  "For campaign 123456789, diagnose the last 30 days and recommend fixes.",
   "Write a GAQL report showing CTR, CPC, conversions, then explain it.",
 ];
 
@@ -63,11 +63,6 @@ export default function ChatPage() {
   const [account, setAccount] = useState<StoredAccount>(emptyAccount);
   const [isHydrated, setIsHydrated] = useState(false);
   const [modelId, setModelId] = useState<ModelId>("gpt-5-mini");
-  useEffect(() => {
-    modelIdRef.current = modelId;
-  }, [modelId]);
-
-  const modelIdRef = useRef<ModelId>("gpt-5-mini");
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -78,11 +73,11 @@ export default function ChatPage() {
             messageId,
             trigger,
             messages,
-            modelId: modelIdRef.current,
+            modelId,
           },
         }),
       }),
-    [],
+    [modelId],
   );
 
   const { messages, sendMessage, setMessages, status, error, stop, addToolApprovalResponse } =

@@ -1,4 +1,5 @@
 import { logChange, logRead, ERROR_CLASS, type CallTelemetry, type ErrorClass } from "@/lib/db/tracking";
+import { autoTrackChangeIntervention } from "@/lib/db/interventions";
 import { authForAccount, extractErrorMessage, invalidateCache } from "@/lib/google-ads";
 import type { ConnectedAccount, WriteResult } from "@/lib/google-ads";
 import { enforceRateLimit, recordOperation, RateLimitError } from "@/lib/mcp/rate-limit";
@@ -166,6 +167,13 @@ export async function execWrite(
     user_agent: auth.userAgent ?? null,
     latency_ms: latencyMs,
   });
+  if (change && result.success) {
+    try {
+      await autoTrackChangeIntervention({ operation: change });
+    } catch (error) {
+      console.warn(`[impact-monitor] Failed to attach operation ${change.id} to a change intervention:`, error);
+    }
+  }
   await refreshAccountSnapshotIfNeeded(auth, accountId, result);
   return { ...result, changeId: change?.id ?? null };
 }

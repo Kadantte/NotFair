@@ -5,6 +5,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/impact-monitor",
+      "schedule": "30 6 * * *"
+    },
+    {
       "path": "/api/cron/outreach",
       "schedule": "*/10 13-23 * * *"
     },
