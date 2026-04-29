@@ -269,14 +269,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
             </div>
 
-            {/* Connect Claude — primary CTA */}
             <div className="shrink-0 px-2 pb-2">
                 <Link href="/connect" prefetch>
                     <Button
                         type="button"
                         className={`h-10 rounded-lg border border-[#4CAF6E] bg-[#4CAF6E]/12 text-[#4CAF6E] shadow-[0_0_0_3px_rgba(76,175,110,0.10)] transition-all duration-200 ease-out hover:bg-[#4CAF6E]/20 hover:text-[#4CAF6E] ${
-                            pathname === '/connect' ? 'bg-[#4CAF6E]/20' : ''
-                        } ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start px-3'}`}
+                            isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start px-3'
+                        }`}
                     >
                         <PlugZap className="h-[18px] w-[18px] shrink-0" />
                         <span
