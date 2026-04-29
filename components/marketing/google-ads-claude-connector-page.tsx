@@ -14,22 +14,22 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is the Google Ads Claude Connector?",
     answer:
-      "It's a custom MCP (Model Context Protocol) connector you add inside Claude.ai Web or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
+      "It's a custom MCP (Model Context Protocol) connector you add inside Claude Desktop, Claude.ai Web, or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
   },
   {
     question: "Where does this connector work?",
     answer:
-      "Anywhere you use Claude.ai with custom connector support: Claude.ai on the web and Claude Cowork. If you use Claude Code instead, NotFair ships as a plugin — see the Claude Code setup guide.",
+      "Anywhere Claude supports remote custom connectors: Claude Desktop, Claude.ai on the web, and Claude Cowork. If you use Claude Code instead, NotFair ships as a plugin — see the Claude Code setup guide.",
   },
   {
     question: "Do I need to write any code?",
     answer:
-      "No. Setup is entirely point-and-click inside claude.ai/customize/connectors. Paste the NotFair server URL, click Add, and Claude opens a browser tab to sign you in — no Client ID or Secret to copy.",
+      "No. Setup is entirely point-and-click inside Claude Connectors. Open the Add custom connector flow, paste the NotFair server URL, click Add, and Claude opens a browser tab to sign you in — no Client ID or Secret to copy.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Open the Connectors page in Claude, paste the NotFair server URL, click Add, and sign in with your Google Ads account in the browser tab Claude opens for you.",
+      "Under 2 minutes. Open the Add custom connector flow in Claude, paste the NotFair server URL, click Add, and sign in with your Google Ads account in the browser tab Claude opens for you.",
   },
   {
     question: "Is the connector free?",
@@ -81,20 +81,20 @@ export function GoogleAdsClaudeConnectorPage() {
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              Setup guide · Claude.ai Web &amp; Claude Cowork
+              Setup guide · Claude Desktop, Web &amp; Cowork
             </p>
             <h1 className="font-display mx-auto mt-4 max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-[56px]">
               Google Ads Claude Connector
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
-              Add NotFair as a custom MCP connector inside Claude.ai Web or
-              Claude Cowork in under 2 minutes. Once installed, Claude reads
+              Add NotFair as a custom MCP connector inside Claude Desktop,
+              Claude.ai Web, or Claude Cowork in under 2 minutes. Once installed, Claude reads
               your Google Ads campaigns in real time and helps you diagnose,
               optimize, and manage them through chat.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3">
               <a
-                href="https://claude.ai/customize/connectors"
+                href="https://claude.ai/settings/connectors?modal=add-custom-connector"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-[#4CAF6E] px-6 py-3 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
@@ -153,14 +153,14 @@ export function GoogleAdsClaudeConnectorPage() {
             </p>
             <div className="mt-6 flex flex-col items-center gap-3">
               <a
-                href="https://claude.ai/customize/connectors"
+                href="https://claude.ai/settings/connectors?modal=add-custom-connector"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() =>
                   trackEvent("cta_clicked", {
                     page: "google-ads-claude-connector-setup-guide",
                     cta: "open_claude_connectors",
-                    destination: "https://claude.ai/customize/connectors",
+                    destination: "https://claude.ai/settings/connectors?modal=add-custom-connector",
                   })
                 }
                 className="inline-flex items-center gap-2 rounded-lg bg-[#4CAF6E] px-6 py-3 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
@@ -183,7 +183,7 @@ export function GoogleAdsClaudeConnectorPage() {
       {/* ── FAQ ── */}
       <FaqSection
         title="FAQ — Google Ads Claude Connector"
-        intro="Everything you need to know about installing and using the NotFair custom connector inside Claude.ai."
+        intro="Everything you need to know about installing and using the NotFair custom connector inside Claude."
         items={FAQ_ITEMS}
       />
 

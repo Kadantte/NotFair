@@ -2,6 +2,14 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.18] - 2026-04-29
+
+### Changed
+- **Claude connector onboarding now defaults back to the Claude Desktop / Cowork path.** Bare `/connect` now resolves to `/connect/claude-connector` again, while explicit setup routes (`/connect/claude-code`, `/connect/codex`, etc.) now preserve the user’s chosen tab through OAuth/account-selection instead of snapping everyone back to the connector flow. The pre-connect copy no longer implies Claude Code is the primary setup path.
+- **Claude connector setup now deep-links into Claude Desktop and the add-connector modal.** Step 1 offers an explicit `claude://claude.ai/settings/connectors?modal=add-custom-connector` CTA for users with Claude Desktop installed, plus a direct web fallback to `https://claude.ai/settings/connectors?modal=add-custom-connector`.
+- **The `/connect` client chooser is now much more explicit.** The old thin tab strip has been replaced with larger selection cards, short descriptions, and a recommended badge on the Claude Desktop / Cowork path so users can tell they need to choose a client before following the steps.
+- **Claude connector marketing/setup copy now includes Claude Desktop.** The public setup guide, FAQ, CTA links, and support-notification labels now refer to Claude Desktop alongside Claude.ai Web and Claude Cowork, keeping the copy aligned with the actual supported surfaces.
+
 ## [0.3.0.17] - 2026-04-29
 
 ### Fixed

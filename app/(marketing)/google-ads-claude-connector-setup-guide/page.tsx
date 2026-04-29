@@ -2,9 +2,9 @@ import { GoogleAdsClaudeConnectorPage } from "@/components/marketing/google-ads-
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Google Ads Claude Connector — Use NotFair in Claude.ai (Web & Cowork)",
+  title: "Google Ads Claude Connector — Use NotFair in Claude Desktop, Web & Cowork",
   description:
-    "Step-by-step guide to install the Google Ads Claude Connector. Add NotFair inside Claude.ai Web or Claude Cowork in under 2 minutes — diagnose issues and manage approved Google Ads changes through chat.",
+    "Step-by-step guide to install the Google Ads Claude Connector. Add NotFair inside Claude Desktop, Claude.ai Web, or Claude Cowork in under 2 minutes — diagnose issues and manage approved Google Ads changes through chat.",
   path: "/google-ads-claude-connector-setup-guide",
   keywords: [
     "google ads claude connector",
@@ -23,22 +23,22 @@ const faqItems = [
   {
     question: "What is the Google Ads Claude Connector?",
     answer:
-      "It's a custom MCP (Model Context Protocol) connector you add inside Claude.ai Web or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
+      "It's a custom MCP (Model Context Protocol) connector you add inside Claude Desktop, Claude.ai Web, or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
   },
   {
     question: "Where does this connector work?",
     answer:
-      "Anywhere you use Claude.ai with custom connector support: Claude.ai on the web and Claude Cowork. If you use Claude Code instead, NotFair ships as a plugin — see the Claude Code setup guide.",
+      "Anywhere Claude supports remote custom connectors: Claude Desktop, Claude.ai on the web, and Claude Cowork. If you use Claude Code instead, NotFair ships as a plugin — see the Claude Code setup guide.",
   },
   {
     question: "Do I need to write any code?",
     answer:
-      "No. Setup is entirely point-and-click inside claude.ai/customize/connectors. Paste the NotFair server URL, click Add, and Claude opens a browser tab to sign you in — no Client ID or Secret to copy.",
+      "No. Setup is entirely point-and-click inside Claude Connectors. Open the Add custom connector flow, paste the NotFair server URL, click Add, and Claude opens a browser tab to sign you in — no Client ID or Secret to copy.",
   },
   {
     question: "How long does setup take?",
     answer:
-      "Under 2 minutes. Open the Connectors page in Claude, paste the NotFair server URL, click Add, and sign in with your Google Ads account in the browser tab Claude opens for you.",
+      "Under 2 minutes. Open the Add custom connector flow in Claude, paste the NotFair server URL, click Add, and sign in with your Google Ads account in the browser tab Claude opens for you.",
   },
   {
     question: "Is the connector free?",
@@ -62,16 +62,16 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to add the Google Ads Claude Connector to Claude.ai",
+    name: "How to add the Google Ads Claude Connector to Claude",
     description:
-      "Install NotFair as a custom MCP connector inside Claude.ai Web or Claude Cowork to give Claude live access to diagnose and manage your Google Ads account.",
+      "Install NotFair as a custom MCP connector inside Claude Desktop, Claude.ai Web, or Claude Cowork to give Claude live access to diagnose and manage your Google Ads account.",
     totalTime: "PT2M",
     step: [
       {
         "@type": "HowToStep",
         position: 1,
         name: "Open Claude Connectors",
-        text: "Go to claude.ai/customize/connectors, click the + icon, and choose Add custom connector.",
+        text: "Open Claude Desktop if you have it installed, or open Claude on the web, then jump straight to Add custom connector.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-1", SITE_URL).toString(),
       },
       {
@@ -92,7 +92,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 4,
         name: "Enable NotFair in a chat",
-        text: "Open a new chat on Claude.ai, click the + button, go to Connectors, and toggle NotFair on.",
+        text: "Open a new Claude chat, click the + button, go to Connectors, and toggle NotFair on.",
         url: new URL("/google-ads-claude-connector-setup-guide#step-4", SITE_URL).toString(),
       },
       {
@@ -110,9 +110,9 @@ const jsonLd = [
     name: "NotFair — Google Ads Claude Connector",
     applicationCategory: "BusinessApplication",
     applicationSubCategory: "Google Ads Management Software",
-    operatingSystem: "Web",
+    operatingSystem: "Web, macOS, Windows",
     description:
-      "Custom MCP connector that gives Claude.ai Web and Claude Cowork live access to diagnose and manage your Google Ads account through NotFair.",
+      "Custom MCP connector that gives Claude Desktop, Claude.ai Web, and Claude Cowork live access to diagnose and manage your Google Ads account through NotFair.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -120,8 +120,8 @@ const jsonLd = [
     },
     url: new URL("/google-ads-claude-connector-setup-guide", SITE_URL).toString(),
     featureList: [
-      "Custom MCP connector for Claude.ai",
-      "Works in Claude.ai Web and Claude Cowork",
+      "Custom MCP connector for Claude",
+      "Works in Claude Desktop, Claude.ai Web, and Claude Cowork",
       "Live Google Ads account access",
       "Diagnose, optimize, and manage approved campaign changes through chat",
       "Read-only by default; writes require human approval",
