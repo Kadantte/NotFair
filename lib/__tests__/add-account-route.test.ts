@@ -110,7 +110,9 @@ describe("Add account route — GET", () => {
 
     const response = await GET();
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("No%20client%20accounts%20found");
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/connect");
+    expect(location.searchParams.get("reason")).toBe("no_client_accounts");
   });
 
   it("returns NO_ACCOUNTS error when no accounts at all", async () => {
@@ -121,7 +123,9 @@ describe("Add account route — GET", () => {
 
     const response = await GET();
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("doesn%27t%20have%20a%20Google%20Ads%20account");
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/connect");
+    expect(location.searchParams.get("reason")).toBe("no_accounts");
   });
 
   it("redirects back to connect with an error when session auth is unavailable", async () => {
@@ -130,8 +134,11 @@ describe("Add account route — GET", () => {
     const response = await GET();
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain(
-      "/connect?error=Failed%20to%20prepare%20account%20selection%3A%20Not%20authenticated",
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/connect");
+    expect(location.searchParams.get("reason")).toBe("load_accounts_failed");
+    expect(location.searchParams.get("error")).toBe(
+      "Failed to prepare account selection: Not authenticated",
     );
   });
 });

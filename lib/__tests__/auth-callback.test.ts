@@ -341,7 +341,9 @@ describe("Auth callback route — GET", () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("No%20client%20accounts%20found");
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/connect");
+    expect(location.searchParams.get("reason")).toBe("no_client_accounts");
   });
 
   it("reuses an existing connected session for the same user", async () => {
