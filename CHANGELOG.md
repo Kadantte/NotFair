@@ -8,6 +8,9 @@ All notable changes to AdsAgent will be documented in this file.
 - **Connect Claude is now a prominent CTA at the top of the in-app sidebar** instead of a small footer link. Users land in `/campaigns` or `/audit` and can immediately see how to wire up their Claude client. The header "Start now" button also routes logged-in users to `/connect` instead of `/audit`, so connection setup stays discoverable post-login.
 - **Marketing `AuditCTA` now accepts `connectedDestination` / `disconnectedDestination` props** so callers can target routes other than `/audit` without forking the component.
 
+### Fixed
+- **Public `/connect` no longer throws background auth errors for signed-out users.** The shared app shell was still calling `/api/subscription` and `getUsageSummaryAction()` on the unauthenticated Claude connector page, which produced noisy 401s plus a background `POST /connect/claude-connector` 500 from `getSessionAuth()` throwing inside `getUsageSummaryAction`. The app layout and user menu now gate subscription/usage fetches on an authenticated session, so signed-out onboarding traffic loads cleanly without server-action failures.
+
 ## [0.3.0.18] - 2026-04-29
 
 ### Changed

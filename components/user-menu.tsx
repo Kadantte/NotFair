@@ -50,16 +50,7 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
-function sidebarLabel(name: string | null | undefined, email: string | null | undefined): string {
-  if (name && name.trim()) return titleCase(name);
-  if (email) {
-    const at = email.indexOf("@");
-    return at > 0 ? email.slice(0, at) : email;
-  }
-  return "Account";
-}
-
-export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
+export function UserMenu() {
   const router = useRouter();
   const [session, setSession] = useState<SessionShape | null>(null);
   const [sub, setSub] = useState<SubscriptionShape | null>(null);
@@ -68,10 +59,12 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
   useEffect(() => {
     fetch("/api/auth/session", { credentials: "include" })
       .then((r) => r.json())
-      .then((s) => setSession(s))
-      .catch(() => {});
-    fetch("/api/subscription", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => {
+        setSession(s);
+        if (!s?.connected) return null;
+        return fetch("/api/subscription", { credentials: "include" })
+          .then((r) => (r.ok ? r.json() : null));
+      })
       .then((s) => {
         if (s) setSub({ hasStripeCustomer: !!s.stripeCustomerId });
       })
@@ -110,7 +103,6 @@ export function UserMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
   const displayName = rawDisplayName ? titleCase(rawDisplayName) : null;
   const picture = session?.picture ?? null;
   const initialChar = initial(displayName, email);
-  const label = sidebarLabel(displayName, email);
   const canManage = !!sub?.hasStripeCustomer;
   const [imgFailed, setImgFailed] = useState(false);
 

@@ -121,6 +121,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [sidebarThreads, setSidebarThreads] = useState<{ id: string; title: string; updatedAt: string }[]>([]);
     const isOnChat = pathname.startsWith('/chat');
     const [isDev, setIsDev] = useState(false);
+    const [authLoaded, setAuthLoaded] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [plan, setPlan] = useState<string | null>(null);
     const isFree = plan === 'free';
     const planLoaded = plan !== null;
@@ -150,8 +152,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // Close mobile menu on navigation
     useEffect(() => {
-        setMobileMenuOpen(false);
-    }, [pathname]);
+        if (!mobileMenuOpen) return;
+        const id = requestAnimationFrame(() => setMobileMenuOpen(false));
+        return () => cancelAnimationFrame(id);
+    }, [mobileMenuOpen, pathname]);
 
     // Lock body scroll and handle Escape key when mobile menu is open
     useEffect(() => {
@@ -168,19 +172,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         fetch('/api/auth/session', { credentials: 'include' })
             .then(r => r.json())
-            .then(s => { if (s.connected && s.isDev) setIsDev(true); })
-            .catch(() => {});
+            .then(s => {
+                const connected = Boolean(s?.connected);
+                setIsAuthenticated(connected);
+                setIsDev(Boolean(connected && s?.isDev));
+                if (!connected) {
+                    setPlan(null);
+                    setUsageExceeded(false);
+                    setUsageNearLimit(false);
+                }
+            })
+            .catch(() => {
+                setIsAuthenticated(false);
+                setIsDev(false);
+                setPlan(null);
+                setUsageExceeded(false);
+                setUsageNearLimit(false);
+            })
+            .finally(() => setAuthLoaded(true));
     }, []);
 
     useEffect(() => {
+        if (!authLoaded || !isAuthenticated) return;
+
         fetch('/api/subscription', { credentials: 'include' })
             .then(r => (r.ok ? r.json() : null))
             .then(sub => setPlan(sub?.plan ?? 'free'))
-            .catch(() => {});
-    }, []);
+            .catch(() => setPlan('free'));
+    }, [authLoaded, isAuthenticated]);
 
     useEffect(() => {
-        if (plan !== 'free') return;
+        if (!authLoaded || !isAuthenticated || plan !== 'free') return;
+
         getUsageSummaryAction()
             .then(info => {
                 const exceeded = !info.unlimited && info.remaining !== null && info.remaining <= 0;
@@ -192,8 +215,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setUsageExceeded(exceeded);
                 setUsageNearLimit(nearLimit);
             })
-            .catch(() => {});
-    }, [plan]);
+            .catch(() => {
+                setUsageExceeded(false);
+                setUsageNearLimit(false);
+            });
+    }, [authLoaded, isAuthenticated, plan]);
 
     function toggleCollapsed() {
         localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
@@ -530,7 +556,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 </Button>
                             </Link>
                         )}
-                        <UserMenu isCollapsed={false} />
+                        <UserMenu />
                     </div>
                 </div>
                 {/* Usage-exceeded banner — shown below the header on < lg screens where the inline pill is hidden */}
