@@ -174,7 +174,7 @@ function SetupTabs({ activeTab, apiKey, onSignIn, onTokenRotated }: {
         {
             id: 'connector',
             href: '/connect/claude-connector',
-            title: 'Claude Desktop / Web / Cowork',
+            title: 'Claude Desktop, Web & Cowork',
             description: 'Recommended for most users',
             badge: 'Recommended',
         },
@@ -225,23 +225,21 @@ function SetupTabs({ activeTab, apiKey, onSignIn, onTokenRotated }: {
                                 key={tab.id}
                                 href={tab.href}
                                 prefetch
-                                className={tabBtn(active)}
+                                className={`${tabBtn(active)} flex h-full flex-col`}
                                 aria-current={active ? 'page' : undefined}
                             >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <div className={`text-sm font-semibold ${active ? 'text-[#E8E4DD]' : 'text-[#C4C0B6] group-hover:text-[#E8E4DD]'}`}>
-                                            {tab.title}
-                                        </div>
-                                        <div className={`mt-1 text-xs leading-relaxed ${active ? 'text-[#C4C0B6]' : 'text-[#C4C0B6]/80 group-hover:text-[#C4C0B6]'}`}>
-                                            {tab.description}
-                                        </div>
-                                    </div>
+                                <div className="flex h-4 items-center">
                                     {tab.badge && (
                                         <span className="rounded-full border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4CAF6E]">
                                             {tab.badge}
                                         </span>
                                     )}
+                                </div>
+                                <div className={`mt-2 text-sm font-semibold ${active ? 'text-[#E8E4DD]' : 'text-[#C4C0B6] group-hover:text-[#E8E4DD]'}`}>
+                                    {tab.title}
+                                </div>
+                                <div className={`mt-1 text-xs leading-relaxed ${active ? 'text-[#C4C0B6]' : 'text-[#C4C0B6]/80 group-hover:text-[#C4C0B6]'}`}>
+                                    {tab.description}
                                 </div>
                             </Link>
                         );

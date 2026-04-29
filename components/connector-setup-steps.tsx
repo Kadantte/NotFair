@@ -10,7 +10,6 @@ type Surface = "marketing" | "in_app";
 
 const TOPRANK_REPO = "https://github.com/nowork-studio/toprank";
 const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/settings/connectors?modal=add-custom-connector";
-const CLAUDE_CONNECTORS_DESKTOP_URL = "claude://claude.ai/settings/connectors?modal=add-custom-connector";
 
 export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
   return (
@@ -25,9 +24,10 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            If you have Claude Desktop installed, open the connector flow there.
-            Otherwise use Claude on the web. Both buttons land directly on{" "}
+            Open Claude&apos;s connector settings on the web — the button below
+            lands directly on{" "}
             <strong className="text-[#E8E4DD]">Add custom connector</strong>.
+            Connectors set up here apply to both Claude Desktop and Claude on the web.
           </p>
           <OpenClaudeConnectorsCtas />
           <SetupScreenshot
@@ -192,24 +192,17 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
 function OpenClaudeConnectorsCtas() {
   return (
     <div className="space-y-2">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <a
-          href={CLAUDE_CONNECTORS_DESKTOP_URL}
-          className="inline-flex items-center justify-center rounded-lg bg-[#4CAF6E] px-4 py-2.5 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
-        >
-          Open in Claude Desktop
-        </a>
-        <a
-          href={CLAUDE_CONNECTORS_WEB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-2.5 text-sm font-semibold text-[#E8E4DD] transition hover:border-[#C4C0B6]/40 hover:bg-[#2E2D28]"
-        >
-          Open in Claude Web
-        </a>
-      </div>
+      <a
+        href={CLAUDE_CONNECTORS_WEB_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center justify-center rounded-lg bg-[#4CAF6E] px-4 py-2.5 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+      >
+        Open Claude Connectors
+      </a>
       <p className="text-xs text-[#C4C0B6]/70">
-        Desktop button uses Claude&apos;s <span className="font-mono">claude://</span> deep link and opens the app if it&apos;s installed.
+        Prefer the desktop app? Open Claude Desktop and go to{" "}
+        <strong className="text-[#C4C0B6]">Settings → Connectors → Add custom connector</strong>.
       </p>
     </div>
   );

@@ -101,6 +101,15 @@ export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
             trackingStep="ads_command"
             surface={surface}
           />
+          <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/8 px-4 py-3">
+            <p className="text-sm leading-relaxed text-[#E8E4DD]">
+              <strong className="text-[#4CAF6E]">Important:</strong> sign in
+              with the{" "}
+              <strong className="text-[#E8E4DD]">same Google account</strong>{" "}
+              you use on NotFair. Otherwise Claude Code will connect to an
+              empty account and won&apos;t see your Google Ads data.
+            </p>
+          </div>
         </div>
       </div>
 

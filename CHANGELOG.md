@@ -2,6 +2,11 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.19] - 2026-04-29
+
+### Fixed
+- **Public `/connect` no longer throws background auth errors for signed-out users.** The shared app shell was still calling `/api/subscription` and `getUsageSummaryAction()` on the unauthenticated Claude connector page, which produced noisy 401s plus a background `POST /connect/claude-connector` 500 from `getSessionAuth()` throwing inside `getUsageSummaryAction`. The app layout and user menu now gate subscription/usage fetches on an authenticated session, so signed-out onboarding traffic loads cleanly without server-action failures.
+
 ## [0.3.0.18] - 2026-04-29
 
 ### Changed
