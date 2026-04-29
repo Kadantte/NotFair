@@ -170,32 +170,63 @@ export async function POST(request: Request) {
     .set({ used: true })
     .where(eq(schema.authorizationCodes.code, code));
 
-  // Look up the MCP session to check it's still valid
+  // LOAD-BEARING: the gte(expires_at, now) filter is what stops the retry
+  // loop. /authorize will pass with as little as 1s of validity left, so a
+  // session can tick past expiry between authorize and this token exchange.
+  // Without the filter we silently issue a token with expires_in=0; the
+  // request handler then 401s every MCP call, the client treats that as
+  // "token bad" and re-runs OAuth — tight 401 → re-authorize loop, with
+  // the same `state` and a fresh PKCE pair on each attempt.
+  //
+  // Returning invalid_grant (400) instead of issuing the dud token is what
+  // surfaces a real error to the client so it stops retrying.
   const [session] = await db()
     .select({
       expiresAt: schema.mcpSessions.expiresAt,
     })
     .from(schema.mcpSessions)
-    .where(eq(schema.mcpSessions.id, authCode.sessionId))
+    .where(
+      and(
+        eq(schema.mcpSessions.id, authCode.sessionId),
+        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+      ),
+    )
     .limit(1);
 
   if (!session) {
     return NextResponse.json(
-      { error: "server_error", error_description: "Session not found" },
-      { status: 500 },
+      {
+        error: "invalid_grant",
+        error_description:
+          "The Google Ads session bound to this authorization code has expired. Reconnect at www.notfair.co/connect to mint a new session.",
+      },
+      { status: 400 },
     );
   }
 
-  // Issue a dedicated OAuth access token (independent of the MCP session token)
+  // LOAD-BEARING: INSERT into oauth_access_tokens, do NOT UPDATE a column
+  // on oauth_clients. Two parallel code exchanges for the same client_id
+  // (Claude Desktop reconnect, shared pre-bound creds, etc.) both land
+  // here; the previous design rotated a single column so the second
+  // exchange silently invalidated the first issued token. Independent
+  // rows keep each issued token alive until its session expires.
+  //
+  // See lib/db/schema.ts → oauthAccessTokens for the invariant.
   const oauthAccessToken = `oat_${randomBytes(32).toString("hex")}`;
 
-  // Bind the access token to the resolved mcp_session. For DCR clients
-  // (RFC 7591) `oauth_clients.session_id` was null at registration; we set
-  // it now so the MCP request handler can resolve `oat_…` tokens via its
-  // existing `oauth_clients.session_id → mcp_sessions.id` join.
+  await db().insert(schema.oauthAccessTokens).values({
+    token: oauthAccessToken,
+    clientId,
+    sessionId: authCode.sessionId,
+  });
+
+  // For DCR clients (RFC 7591), record the session binding on the client row
+  // so subsequent /authorize calls can short-circuit through the pre-bound
+  // path instead of re-prompting for sign-in. Pre-bound clients already have
+  // session_id set at registration; this UPDATE is a no-op for them.
   await db()
     .update(schema.oauthClients)
-    .set({ oauthAccessToken, sessionId: authCode.sessionId })
+    .set({ sessionId: authCode.sessionId })
     .where(eq(schema.oauthClients.clientId, clientId));
 
   const expiresIn = Math.max(

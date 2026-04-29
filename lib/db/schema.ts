@@ -136,6 +136,21 @@ export const oauthClients = pgTable("oauth_clients", {
   clientId: text("client_id").notNull().unique(),
   clientSecret: text("client_secret").notNull(),
   clientSecretHash: text("client_secret_hash").notNull(),
+  /**
+   * @deprecated DO NOT READ OR WRITE THIS COLUMN.
+   *
+   * Tokens live in `oauth_access_tokens`. This column was a single-row
+   * UPDATE-rotated slot, which silently invalidated whichever token was
+   * issued first when two code exchanges for the same client_id ran
+   * concurrently (Claude Desktop reconnect, shared pre-bound creds, etc.).
+   * The result was a tight 401 → re-authorize retry loop on the affected
+   * client.
+   *
+   * Retained one release for rollback safety only. A future migration
+   * drops it. If you find yourself wanting to UPDATE this column in a
+   * new code path, you are reintroducing the bug — write to
+   * `oauth_access_tokens` instead.
+   */
   oauthAccessToken: text("oauth_access_token"),
   // Pre-bound for the in-app Claude Connector flow (`/api/oauth/clients`).
   // Null for clients minted via RFC 7591 Dynamic Client Registration
@@ -144,6 +159,32 @@ export const oauthClients = pgTable("oauth_clients", {
   sessionId: integer("session_id"),
   redirectUris: jsonb("redirect_uris").$type<string[]>(),
   clientName: text("client_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── OAuth Access Tokens (per-token storage) ────────────────────────
+//
+// LOAD-BEARING INVARIANT: one row per issued `oat_…` token, append-only.
+// Concurrent code exchanges for the same client_id MUST produce
+// independently-valid tokens. The previous design stored a single token
+// per client in `oauth_clients.oauth_access_token` and UPDATE-rotated it
+// on every exchange — two parallel exchanges silently invalidated each
+// other, producing a tight 401 → re-authorize loop on the affected
+// client.
+//
+// Token issuance: INSERT a new row in `app/api/oauth/token/route.ts`.
+// Token validation: SELECT joined to mcp_sessions in
+// `app/api/[transport]/route.ts`, with `mcp_sessions.expires_at >= now()`
+// enforcing validity.
+//
+// DO NOT add an UPDATE path that mutates `token` in place, and DO NOT
+// fold token storage back onto `oauth_clients`. Both reintroduce the
+// rotation race.
+
+export const oauthAccessTokens = pgTable("oauth_access_tokens", {
+  token: text("token").primaryKey(),
+  clientId: text("client_id").notNull(),
+  sessionId: integer("session_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

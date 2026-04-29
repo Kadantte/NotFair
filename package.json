@@ -1,6 +1,6 @@
 {
   "name": "norfair",
-  "version": "0.3.0.16",
+  "version": "0.3.0.17",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -2,6 +2,15 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.0.17] - 2026-04-29
+
+### Fixed
+- **OAuth token endpoint no longer issues tokens against expired sessions.** Previously `app/api/oauth/token/route.ts` only checked that the bound `mcp_session` row existed, not that it was still valid. When a session ticked past expiry between `/api/oauth/authorize` (which filters by `expires_at >= now()`) and the token exchange, the endpoint silently issued an `oat_…` token with `expires_in: 0` — the MCP request handler would then 401 every call, the client interpreted that as a bad token, and re-ran the OAuth dance. Tight retry loop on Claude Desktop reconnects, visible as repeated `GET /api/oauth/authorize ... 307` in dev server logs with the same `state` and a fresh PKCE pair on every attempt. The endpoint now requires `mcp_sessions.expires_at >= now()` and returns `invalid_grant` (400) with a clear "reconnect at /connect" message instead, so the client surfaces a real error instead of looping silently.
+- **OAuth access tokens no longer rotate-overwrite each other on concurrent exchanges.** The previous design stored one token per client in `oauth_clients.oauth_access_token`, UPDATE-rotated on every code exchange. Two concurrent exchanges for the same `client_id` (e.g. Claude Desktop reconnect spawning parallel OAuth flows, or Claude Desktop + Codex CLI sharing pre-bound credentials) would silently invalidate the earlier token. Tokens now live in a new `oauth_access_tokens` table — one row per issued token — so concurrent exchanges produce independently-valid tokens. The MCP request handler resolves `oat_…` bearer tokens via the new table joined to `mcp_sessions` for the expiry check. Migration `0028_add_oauth_access_tokens.sql` creates the table and backfills currently-set `oauth_clients.oauth_access_token` values so in-flight Claude Desktop sessions keep working across the deploy. `oauth_clients.oauth_access_token` is now deprecated and read by no code path; a follow-up migration will drop the column after one release.
+
+### Migration required
+- Run `npm run db:migrate` (or apply `drizzle/0028_add_oauth_access_tokens.sql` directly) before deploying. The new table is required by the request-handler read path; the backfill preserves currently-active tokens.
+
 ## [0.3.0.16] - 2026-04-28
 
 ### Changed

@@ -105,14 +105,21 @@ async function resolveAuth(request: Request): Promise<AuthContextWithSession> {
   let session;
 
   if (bearerToken.startsWith("oat_")) {
-    // OAuth access token from Claude Connector — join to resolve in one query
+    // OAuth access token from Claude Connector. LOAD-BEARING: resolve via
+    // oauth_access_tokens (per-token rows), NOT via oauth_clients. The
+    // per-token table is what lets concurrent code exchanges for the same
+    // client_id keep their tokens valid — folding this back onto a column
+    // on oauth_clients reintroduces the rotation race that produces a
+    // 401 → re-authorize retry loop.
+    //
+    // See lib/db/schema.ts → oauthAccessTokens for the invariant.
     const [row] = await db()
       .select({ session: schema.mcpSessions })
-      .from(schema.oauthClients)
-      .innerJoin(schema.mcpSessions, eq(schema.oauthClients.sessionId, schema.mcpSessions.id))
+      .from(schema.oauthAccessTokens)
+      .innerJoin(schema.mcpSessions, eq(schema.oauthAccessTokens.sessionId, schema.mcpSessions.id))
       .where(
         and(
-          eq(schema.oauthClients.oauthAccessToken, bearerToken),
+          eq(schema.oauthAccessTokens.token, bearerToken),
           gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
         ),
       )
