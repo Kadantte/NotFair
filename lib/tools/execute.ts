@@ -1,10 +1,11 @@
 import { logChange, logRead, ERROR_CLASS, type CallTelemetry, type ErrorClass } from "@/lib/db/tracking";
-import { extractErrorMessage, invalidateCache } from "@/lib/google-ads";
-import type { WriteResult } from "@/lib/google-ads";
+import { authForAccount, extractErrorMessage, invalidateCache } from "@/lib/google-ads";
+import type { ConnectedAccount, WriteResult } from "@/lib/google-ads";
 import { enforceRateLimit, recordOperation, RateLimitError } from "@/lib/mcp/rate-limit";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { getTelemetry, type ToolCallTelemetry } from "@/lib/mcp/telemetry";
 import { redactAndTruncate, sha256Hex, byteLengthOf } from "@/lib/db/redact";
+import { syncAccountSnapshot } from "@/lib/google-ads/sync-account";
 
 /**
  * Minimal auth needed for tool execution: refresh token, customer ID, and user ID.
@@ -22,7 +23,39 @@ export type ToolAuth = {
   userAgent?: string | null;
   /** mcp_sessions.id for MCP paths. Null for chat/agent paths. */
   sessionId?: number | null;
+  /** Connected accounts for sessions that can target more than one Google Ads customer. */
+  customerIds?: ConnectedAccount[];
+  /** Google Ads manager account header, when this customer is accessed through an MCC. */
+  loginCustomerId?: string | null;
 };
+
+const SNAPSHOT_REFRESH_ACTIONS = new Set([
+  "create_campaign",
+  "createCampaign",
+  "pause_campaign",
+  "pauseCampaign",
+  "enable_campaign",
+  "enableCampaign",
+  "remove_campaign",
+  "removeCampaign",
+  "update_budget",
+  "updateCampaignBudget",
+]);
+
+async function refreshAccountSnapshotIfNeeded(auth: ToolAuth, accountId: string, result: WriteResult) {
+  if (!result.success || !SNAPSHOT_REFRESH_ACTIONS.has(result.action)) return;
+
+  try {
+    const targetAuth = authForAccount(auth, accountId);
+    await syncAccountSnapshot({
+      refreshToken: targetAuth.refreshToken,
+      customerId: targetAuth.customerId,
+      loginCustomerId: targetAuth.loginCustomerId ?? undefined,
+    });
+  } catch (err) {
+    console.warn(`[sync-account] Failed to refresh snapshot after ${result.action} for ${accountId}:`, err);
+  }
+}
 
 /**
  * Snapshot the telemetry context while we're still inside the AsyncLocalStorage
@@ -133,6 +166,7 @@ export async function execWrite(
     user_agent: auth.userAgent ?? null,
     latency_ms: latencyMs,
   });
+  await refreshAccountSnapshotIfNeeded(auth, accountId, result);
   return { ...result, changeId: change?.id ?? null };
 }
 

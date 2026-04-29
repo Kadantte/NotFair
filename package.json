@@ -15,6 +15,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:backfill-operation-user-ids": "npx tsx scripts/backfill-operation-user-ids.ts",
+    "db:refresh-stale-account-snapshots": "npx tsx scripts/refresh-stale-account-snapshots.ts",
     "eval:mcp": "npx tsx scripts/eval-mcp/eval.ts",
     "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts"
   },

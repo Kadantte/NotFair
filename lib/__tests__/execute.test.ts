@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ToolAuth } from "@/lib/tools/execute";
 
 // ─── Hoisted mocks ─────────────────────────────────────────────────
 const {
@@ -8,6 +9,7 @@ const {
   mockLogRead,
   mockInvalidateCache,
   mockTrackServerEvent,
+  mockSyncAccountSnapshot,
 } = vi.hoisted(() => ({
   mockEnforceRateLimit: vi.fn(),
   mockRecordOperation: vi.fn(),
@@ -15,6 +17,7 @@ const {
   mockLogRead: vi.fn(),
   mockInvalidateCache: vi.fn(),
   mockTrackServerEvent: vi.fn(),
+  mockSyncAccountSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/mcp/rate-limit", async () => {
@@ -38,6 +41,7 @@ vi.mock("@/lib/db/tracking", () => ({
 }));
 
 vi.mock("@/lib/google-ads", () => ({
+  authForAccount: (auth: ToolAuth, accountId?: string) => ({ ...auth, customerId: accountId ?? auth.customerId }),
   invalidateCache: mockInvalidateCache,
   extractErrorMessage: (error: unknown) => {
     if (error instanceof Error) return error.message;
@@ -50,8 +54,11 @@ vi.mock("@/lib/analytics-server", () => ({
   trackServerEvent: mockTrackServerEvent,
 }));
 
+vi.mock("@/lib/google-ads/sync-account", () => ({
+  syncAccountSnapshot: mockSyncAccountSnapshot,
+}));
+
 import { execWrite, execRead } from "@/lib/tools/execute";
-import type { ToolAuth } from "@/lib/tools/execute";
 import type { WriteResult } from "@/lib/google-ads";
 import { RateLimitError } from "@/lib/mcp/rate-limit";
 
@@ -67,6 +74,7 @@ describe("execWrite", () => {
     vi.clearAllMocks();
     mockEnforceRateLimit.mockResolvedValue(undefined);
     mockLogChange.mockResolvedValue({ id: 42 });
+    mockSyncAccountSnapshot.mockResolvedValue(undefined);
   });
 
   it("success path: rate limit → fn → invalidate → log → return changeId", async () => {
@@ -102,8 +110,27 @@ describe("execWrite", () => {
       "user-1", "ai_change_executed",
       expect.objectContaining({ tool_name: "pause_campaign", account_id: "acct-1" }),
     );
+    expect(mockSyncAccountSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      refreshToken: "test-token",
+      customerId: "acct-1",
+    }));
     expect(result.success).toBe(true);
     expect(result.changeId).toBe(42);
+  });
+
+  it("does not refresh account snapshot for non-budget/campaign writes", async () => {
+    const writeResult: WriteResult = {
+      success: true,
+      action: "pause_keyword",
+      entityId: "kw-1",
+      beforeValue: "ENABLED",
+      afterValue: "PAUSED",
+    };
+    const fn = vi.fn().mockResolvedValue(writeResult);
+
+    await execWrite(auth, "acct-1", "camp-1", fn);
+
+    expect(mockSyncAccountSnapshot).not.toHaveBeenCalled();
   });
 
   it("failure path (success:false): logs + records op (overcount policy), does NOT invalidate cache", async () => {
