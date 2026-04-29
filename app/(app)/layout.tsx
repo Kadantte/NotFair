@@ -150,12 +150,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return unsub;
     }, [refreshThreads]);
 
-    // Close mobile menu on navigation
+    // Close mobile menu only when navigation changes the route.
     useEffect(() => {
-        if (!mobileMenuOpen) return;
-        const id = requestAnimationFrame(() => setMobileMenuOpen(false));
-        return () => cancelAnimationFrame(id);
-    }, [mobileMenuOpen, pathname]);
+        setMobileMenuOpen(false);
+    }, [pathname]);
 
     // Lock body scroll and handle Escape key when mobile menu is open
     useEffect(() => {
@@ -227,6 +225,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     function handleNewChat() {
+        setMobileMenuOpen(false);
         const newId = crypto.randomUUID();
         setSidebarThreads(prev => [{
             id: newId,
@@ -237,6 +236,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     function handleSelectThread(threadId: string) {
+        setMobileMenuOpen(false);
         router.push(`/chat/${threadId}`);
     }
 
@@ -247,6 +247,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {!isCollapsed && (
                     <Link
                         href="/"
+                        onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                         className="flex items-center rounded-lg px-3 py-1 transition hover:bg-[#E8E4DD]/5"
                     >
                         <BrandLockup size="xs" />
@@ -296,7 +297,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="shrink-0 px-2 pb-2">
-                <Link href="/connect" prefetch>
+                <Link href="/connect" prefetch onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}>
                     <Button
                         type="button"
                         className={`h-10 rounded-lg border border-[#4CAF6E] bg-[#4CAF6E]/12 text-[#4CAF6E] shadow-[0_0_0_3px_rgba(76,175,110,0.10)] transition-all duration-200 ease-out hover:bg-[#4CAF6E]/20 hover:text-[#4CAF6E] ${
@@ -317,11 +318,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Nav items */}
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
-                <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} />
-                <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} />
-                <NavItem href="/impact-monitor" icon={Gauge} label="Impact Monitor" active={pathname.startsWith('/impact-monitor')} collapsed={isCollapsed} />
-                <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} />
-                <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} collapsed={isCollapsed} />
+                <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem href="/impact-monitor" icon={Gauge} label="Impact Monitor" active={pathname.startsWith('/impact-monitor')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
             </nav>
 
             {isOnChat && (
@@ -430,16 +431,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} />
+                <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
                 <NavItem
                     href="/upgrade"
                     icon={Rocket}
                     label={isFree ? 'Upgrade' : 'Pricing'}
                     active={pathname === '/upgrade'}
                     collapsed={isCollapsed}
-                    onClick={() => trackEvent('upgrade_clicked', { location: 'sidebar', page: pathname })}
+                    onClick={() => {
+                        if (isMobile) setMobileMenuOpen(false);
+                        trackEvent('upgrade_clicked', { location: 'sidebar', page: pathname });
+                    }}
                 />
-                {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} />}
+                {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
                 <DiscordLink
                     location="sidebar"
                     className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
