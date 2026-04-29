@@ -24,6 +24,7 @@ import type {
   WriteResult,
 } from "@/lib/google-ads";
 import type { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
+import type { listChangeInterventions, getChangeIntervention, evaluateChangeIntervention } from "@/lib/db/interventions";
 
 // ─── Utility types ──────────────────────────────────────────────────
 
@@ -65,6 +66,9 @@ export type SearchGeoTargetsResponse = StructuredShape<Unwrap<typeof searchGeoTa
 export type GetRecommendationsResponse = StructuredShape<Unwrap<typeof getRecommendations>>;
 export type GetChangesResponse = StructuredShape<Unwrap<typeof getChanges>>;
 export type ReviewChangeImpactResponse = StructuredShape<Unwrap<typeof reviewChangeImpact>>;
+export type ListChangeInterventionsResponse = StructuredShape<Unwrap<typeof listChangeInterventions>>;
+export type GetChangeInterventionResponse = StructuredShape<Unwrap<typeof getChangeIntervention>>;
+export type EvaluateChangeInterventionResponse = StructuredShape<Unwrap<typeof evaluateChangeIntervention>>;
 export type GetResourceMetadataResponse = StructuredShape<Unwrap<typeof getResourceMetadata>>;
 export type ListQueryableResourcesResponse = StructuredShape<Unwrap<typeof listQueryableResources>>;
 export type GetKeywordIdeasResponse = StructuredShape<Unwrap<typeof getKeywordIdeas>>;
@@ -204,6 +208,9 @@ export interface McpToolResponseRegistry {
   getRecommendations: GetRecommendationsResponse;
   getChanges: GetChangesResponse;
   reviewChangeImpact: ReviewChangeImpactResponse;
+  listChangeInterventions: ListChangeInterventionsResponse;
+  getChangeIntervention: GetChangeInterventionResponse;
+  evaluateChangeIntervention: EvaluateChangeInterventionResponse;
   getResourceMetadata: GetResourceMetadataResponse;
   listQueryableResources: ListQueryableResourcesResponse;
   getKeywordIdeas: GetKeywordIdeasResponse;

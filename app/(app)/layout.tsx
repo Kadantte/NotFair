@@ -273,6 +273,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
                 <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} />
                 <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} />
+                <NavItem href="/impact-monitor" icon={Gauge} label="Impact Monitor" active={pathname.startsWith('/impact-monitor')} collapsed={isCollapsed} />
                 <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} />
                 <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} collapsed={isCollapsed} />
             </nav>
@@ -563,7 +564,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <MobileNavItem href="/dashboard" icon={Home} label="Home" active={pathname === '/dashboard'} />
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} />
                 <MobileNavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} />
-                <MobileNavItem href="/operations" icon={Activity} label="Ops" active={pathname === '/operations'} />
+                <MobileNavItem href="/impact-monitor" icon={Gauge} label="Impact" active={pathname.startsWith('/impact-monitor')} />
                 <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} />
             </nav>
         </div>

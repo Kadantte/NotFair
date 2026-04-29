@@ -129,6 +129,71 @@ export const performanceSnapshots = pgTable(
   ],
 );
 
+// ─── Impact Monitor ───────────────────────────────────────────────
+
+export const changeInterventions = pgTable("change_interventions", {
+  id: serial("id").primaryKey(),
+  accountId: text("account_id").notNull(),
+  campaignId: text("campaign_id").notNull(),
+  /** UTC day bucket for auto-merging same-campaign same-day write bursts. */
+  interventionDate: text("intervention_date").notNull(),
+  name: text("name").notNull(),
+  changeSummary: text("change_summary").notNull().default(""),
+  hypothesis: text("hypothesis"),
+  primaryMetric: text("primary_metric"),
+  goalDirection: text("goal_direction"),
+  triggerSource: text("trigger_source").notNull().default("write_flow_auto"),
+  status: text("status").notNull().default("watching"),
+  /** Distinct request IDs (approval/write batches) merged into this episode. */
+  requestIds: jsonb("request_ids").$type<string[]>().notNull().default([]),
+  startedAt: timestamp("started_at").notNull(),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("change_interventions_account_started_idx").on(table.accountId, table.startedAt),
+  index("change_interventions_account_status_started_idx").on(table.accountId, table.status, table.startedAt),
+  index("change_interventions_campaign_date_idx").on(table.accountId, table.campaignId, table.interventionDate),
+]);
+
+export const changeInterventionOperations = pgTable("change_intervention_operations", {
+  id: serial("id").primaryKey(),
+  changeInterventionId: integer("change_intervention_id").notNull(),
+  operationId: integer("operation_id").notNull(),
+  operationOrder: integer("operation_order").notNull().default(0),
+  requestId: text("request_id"),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityRef: text("entity_ref"),
+  label: text("label"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("change_intervention_operations_operation_idx").on(table.operationId),
+  index("change_intervention_operations_intervention_idx").on(table.changeInterventionId, table.operationOrder),
+]);
+
+export const changeInterventionEvaluations = pgTable("change_intervention_evaluations", {
+  id: serial("id").primaryKey(),
+  changeInterventionId: integer("change_intervention_id").notNull(),
+  evaluationVersion: integer("evaluation_version").notNull().default(1),
+  baselineWindowDays: integer("baseline_window_days").notNull().default(7),
+  afterWindowDays: integer("after_window_days").notNull().default(7),
+  daysSinceStart: integer("days_since_start").notNull().default(0),
+  confounderCountInternal: integer("confounder_count_internal").notNull().default(0),
+  confidence: text("confidence").notNull(),
+  resultLabel: text("result_label").notNull(),
+  primaryMetricName: text("primary_metric_name").notNull(),
+  primaryMetricBefore: doublePrecision("primary_metric_before"),
+  primaryMetricAfter: doublePrecision("primary_metric_after"),
+  primaryMetricDeltaPct: doublePrecision("primary_metric_delta_pct"),
+  supportingMetrics: jsonb("supporting_metrics").$type<Record<string, unknown>>().notNull().default({}),
+  reasonSummary: text("reason_summary").notNull(),
+  reasonCodes: jsonb("reason_codes").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("change_intervention_evaluations_intervention_created_idx").on(table.changeInterventionId, table.createdAt),
+]);
+
 // ─── OAuth Clients (per-user credentials for Claude Connector) ──────
 
 export const oauthClients = pgTable("oauth_clients", {

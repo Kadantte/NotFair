@@ -10,6 +10,7 @@ const {
   mockInvalidateCache,
   mockTrackServerEvent,
   mockSyncAccountSnapshot,
+  mockAutoTrackChangeIntervention,
 } = vi.hoisted(() => ({
   mockEnforceRateLimit: vi.fn(),
   mockRecordOperation: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockInvalidateCache: vi.fn(),
   mockTrackServerEvent: vi.fn(),
   mockSyncAccountSnapshot: vi.fn(),
+  mockAutoTrackChangeIntervention: vi.fn(),
 }));
 
 vi.mock("@/lib/mcp/rate-limit", async () => {
@@ -58,6 +60,10 @@ vi.mock("@/lib/google-ads/sync-account", () => ({
   syncAccountSnapshot: mockSyncAccountSnapshot,
 }));
 
+vi.mock("@/lib/db/interventions", () => ({
+  autoTrackChangeIntervention: mockAutoTrackChangeIntervention,
+}));
+
 import { execWrite, execRead } from "@/lib/tools/execute";
 import type { WriteResult } from "@/lib/google-ads";
 import { RateLimitError } from "@/lib/mcp/rate-limit";
@@ -75,6 +81,7 @@ describe("execWrite", () => {
     mockEnforceRateLimit.mockResolvedValue(undefined);
     mockLogChange.mockResolvedValue({ id: 42 });
     mockSyncAccountSnapshot.mockResolvedValue(undefined);
+    mockAutoTrackChangeIntervention.mockResolvedValue(9);
   });
 
   it("success path: rate limit → fn → invalidate → log → return changeId", async () => {
@@ -106,6 +113,7 @@ describe("execWrite", () => {
       }),
     }));
     expect(mockRecordOperation).toHaveBeenCalledWith("user-1");
+    expect(mockAutoTrackChangeIntervention).toHaveBeenCalledWith({ operation: expect.objectContaining({ id: 42 }) });
     expect(mockTrackServerEvent).toHaveBeenCalledWith(
       "user-1", "ai_change_executed",
       expect.objectContaining({ tool_name: "pause_campaign", account_id: "acct-1" }),
@@ -165,6 +173,7 @@ describe("execWrite", () => {
         error: "Google rejected: invalid criterion",
       }),
     );
+    expect(mockAutoTrackChangeIntervention).not.toHaveBeenCalled();
 
     expect(result.success).toBe(false);
     expect(result.changeId).toBe(42);
@@ -247,6 +256,7 @@ describe("execWrite", () => {
 
     const result = await execWrite(auth, "acct-1", null, fn);
     expect(result.changeId).toBeNull();
+    expect(mockAutoTrackChangeIntervention).not.toHaveBeenCalled();
   });
 });
 

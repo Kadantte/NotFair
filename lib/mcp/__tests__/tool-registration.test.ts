@@ -79,6 +79,9 @@ describe("MCP read tools — registration", () => {
     expect(names).toContain("getRecommendations");
     expect(names).toContain("getChanges");
     expect(names).toContain("reviewChangeImpact");
+    expect(names).toContain("listChangeInterventions");
+    expect(names).toContain("getChangeIntervention");
+    expect(names).toContain("evaluateChangeIntervention");
     expect(names).toContain("getResourceMetadata");
     expect(names).toContain("listQueryableResources");
     expect(names).toContain("getKeywordIdeas");
