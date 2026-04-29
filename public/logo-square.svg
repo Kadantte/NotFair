@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="AdsAgent">
-  <rect width="512" height="512" rx="96" ry="96" fill="#1A1917"/>
-  <g fill="none" stroke="#4CAF6E" stroke-width="48" stroke-linecap="square" stroke-linejoin="miter">
-    <path d="M128 400 L256 112"/>
-    <path d="M256 112 L384 400"/>
-    <path d="M180 290 L332 290"/>
-  </g>
-  <rect x="400" y="376" width="32" height="32" fill="#4CAF6E"/>
-</svg>
