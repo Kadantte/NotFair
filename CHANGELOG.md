@@ -4,6 +4,13 @@ All notable changes to AdsAgent will be documented in this file.
 
 ## [0.3.0.19] - 2026-04-29
 
+### Changed
+- **Connect Claude is now a prominent CTA at the top of the in-app sidebar** instead of a small footer link. Users land in `/campaigns` or `/audit` and can immediately see how to wire up their Claude client. The header "Start now" button also routes logged-in users to `/connect` instead of `/audit`, so connection setup stays discoverable post-login.
+- **Marketing `AuditCTA` now accepts `connectedDestination` / `disconnectedDestination` props** so callers can target routes other than `/audit` without forking the component.
+- **Removed the broken Claude Desktop deep link from the connector setup.** The `claude://claude.ai/settings/connectors?modal=add-custom-connector` URL only opened Claude Desktop to a generic view because the `claude://` scheme has no documented route to settings/connectors ([Anthropic docs](https://support.claude.com/en/articles/14729294-open-claude-desktop-with-a-link)). The setup now offers a single web CTA that lands directly on Add custom connector, plus inline instructions for users who prefer to navigate inside Claude Desktop manually. Connector setup is account-level, so the web flow configures it for both surfaces.
+- **Connector client picker now displays the "Recommended" badge above the title instead of beside it,** giving each card the full width for the title and keeping all four cards visually aligned. The Claude Desktop card title was also tightened from "Claude Desktop / Web / Cowork" to "Claude Desktop, Web & Cowork" so it no longer wraps into a narrow three-line column.
+- **Claude Code setup now warns users to sign in with the same Google account they use on NotFair** before running `/ads`, preventing the common mistake of connecting Claude Code to an empty account that can't see the user's Google Ads data.
+
 ### Fixed
 - **Public `/connect` no longer throws background auth errors for signed-out users.** The shared app shell was still calling `/api/subscription` and `getUsageSummaryAction()` on the unauthenticated Claude connector page, which produced noisy 401s plus a background `POST /connect/claude-connector` 500 from `getSessionAuth()` throwing inside `getUsageSummaryAction`. The app layout and user menu now gate subscription/usage fetches on an authenticated session, so signed-out onboarding traffic loads cleanly without server-action failures.
 
