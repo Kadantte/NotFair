@@ -4,7 +4,7 @@ import { GoogleAdsAuditPage } from "./google-ads-audit-page";
 export const metadata = buildMetadata({
   title: "Free Google Ads Audit — Results in 5 Minutes | NotFair",
   description:
-    "Get a free Google Ads audit instantly. AI finds wasted spend, missed opportunities, and structural issues — then gives you a prioritized 3-step fix list. No credit card. No agency.",
+    "Get a free Google Ads audit instantly. AI diagnoses wasted spend, missed opportunities, and structural issues — then gives you a prioritized 3-step fix list. No credit card. No agency.",
   path: "/google-ads-audit",
   keywords: [
     "Google Ads audit",
@@ -31,7 +31,7 @@ const faqSchema = buildFaqJsonLd([
   {
     question: "How long does the Google Ads audit take?",
     answer:
-      "The audit runs in under 5 minutes after you connect your Google Ads account. Results include your pulse metrics (waste rate, demand captured, CPA), a wasted spend breakdown, and a prioritized 3-pass action plan.",
+      "The audit runs in under 5 minutes after you connect your Google Ads account. Results include your pulse metrics (waste rate, demand captured, CPA), issue breakdowns, and a prioritized 3-pass action plan.",
   },
   {
     question: "Will the audit make changes to my Google Ads account?",

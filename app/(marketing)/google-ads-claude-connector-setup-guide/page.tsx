@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads Claude Connector — Use NotFair in Claude.ai (Web & Cowork)",
   description:
-    "Step-by-step guide to install the Google Ads Claude Connector. Add NotFair as a custom MCP connector inside Claude.ai Web or Claude Cowork in under 2 minutes — manage Google Ads campaigns through chat.",
+    "Step-by-step guide to install the Google Ads Claude Connector. Add NotFair inside Claude.ai Web or Claude Cowork in under 2 minutes — diagnose issues and manage approved Google Ads changes through chat.",
   path: "/google-ads-claude-connector-setup-guide",
   keywords: [
     "google ads claude connector",
@@ -23,7 +23,7 @@ const faqItems = [
   {
     question: "What is the Google Ads Claude Connector?",
     answer:
-      "It's a custom MCP (Model Context Protocol) connector you add inside Claude.ai Web or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — and propose changes you approve in chat.",
+      "It's a custom MCP (Model Context Protocol) connector you add inside Claude.ai Web or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
   },
   {
     question: "Where does this connector work?",
@@ -64,7 +64,7 @@ const jsonLd = [
     "@type": "HowTo",
     name: "How to add the Google Ads Claude Connector to Claude.ai",
     description:
-      "Install NotFair as a custom MCP connector inside Claude.ai Web or Claude Cowork to give Claude live access to your Google Ads account.",
+      "Install NotFair as a custom MCP connector inside Claude.ai Web or Claude Cowork to give Claude live access to diagnose and manage your Google Ads account.",
     totalTime: "PT2M",
     step: [
       {
@@ -112,7 +112,7 @@ const jsonLd = [
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "Web",
     description:
-      "Custom MCP connector that gives Claude.ai Web and Claude Cowork live access to your Google Ads account through NotFair.",
+      "Custom MCP connector that gives Claude.ai Web and Claude Cowork live access to diagnose and manage your Google Ads account through NotFair.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -123,7 +123,7 @@ const jsonLd = [
       "Custom MCP connector for Claude.ai",
       "Works in Claude.ai Web and Claude Cowork",
       "Live Google Ads account access",
-      "Audit, optimize, and manage campaigns through chat",
+      "Diagnose, optimize, and manage approved campaign changes through chat",
       "Read-only by default; writes require human approval",
     ],
   },

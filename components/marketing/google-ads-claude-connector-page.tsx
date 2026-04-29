@@ -14,7 +14,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is the Google Ads Claude Connector?",
     answer:
-      "It's a custom MCP (Model Context Protocol) connector you add inside Claude.ai Web or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — and propose changes you approve in chat.",
+      "It's a custom MCP (Model Context Protocol) connector you add inside Claude.ai Web or Claude Cowork. Once installed, Claude can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
   },
   {
     question: "Where does this connector work?",
@@ -65,7 +65,7 @@ const RELATED_LINKS = [
     href: "/google-ads-audit",
     title: "Free Google Ads Audit",
     description:
-      "Get a free AI audit of your Google Ads account — finds wasted spend and gives you a prioritized fix list in minutes.",
+      "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues in minutes.",
   },
 ];
 
@@ -89,7 +89,7 @@ export function GoogleAdsClaudeConnectorPage() {
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
               Add NotFair as a custom MCP connector inside Claude.ai Web or
               Claude Cowork in under 2 minutes. Once installed, Claude reads
-              your Google Ads campaigns in real time and helps you audit,
+              your Google Ads campaigns in real time and helps you diagnose,
               optimize, and manage them through chat.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3">

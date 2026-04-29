@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads Claude Code Plugin — Setup Guide for NotFair",
   description:
-    "Step-by-step guide to install the NotFair plugin in Claude Code. Add the toprank marketplace, install the plugin, and run /ads to manage your Google Ads campaigns from the terminal — under 2 minutes, no config edits.",
+    "Step-by-step guide to install the NotFair plugin in Claude Code. Run /ads to diagnose issues, recommend fixes, and manage approved Google Ads changes from the terminal — under 2 minutes, no config edits.",
   path: "/google-ads-claude-code-plugin-setup-guide",
   keywords: [
     "google ads claude code plugin",
@@ -22,7 +22,7 @@ const faqItems = [
   {
     question: "What is the NotFair Claude Code plugin?",
     answer:
-      "It's a Claude Code plugin (distributed through the toprank marketplace) that gives Claude Code live access to your Google Ads account. Once installed, /ads connects Claude to your campaigns, keywords, search terms, and spend so you can audit and optimize through chat in your terminal.",
+      "It's a Claude Code plugin (distributed through the toprank marketplace) that gives Claude Code live access to your Google Ads account. Once installed, /ads connects Claude to your campaigns, keywords, search terms, and spend so you can diagnose issues, recommend fixes, and optimize through chat in your terminal.",
   },
   {
     question: "How is this different from the Claude Connector?",
@@ -52,7 +52,7 @@ const faqItems = [
   {
     question: "What does toprank ship with the plugin?",
     answer:
-      "Pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the NotFair MCP tools to give Claude domain expertise out of the box.",
+      "Pre-made Google Ads and SEO skills that teach Claude how to diagnose, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the NotFair MCP tools to give Claude domain expertise out of the box.",
   },
 ];
 
@@ -63,7 +63,7 @@ const jsonLd = [
     "@type": "HowTo",
     name: "How to install the NotFair plugin in Claude Code",
     description:
-      "Install the NotFair plugin in Claude Code via the toprank marketplace to give Claude live access to your Google Ads account from the terminal.",
+      "Install the NotFair plugin in Claude Code via the toprank marketplace to give Claude live access to diagnose and manage your Google Ads account from the terminal.",
     totalTime: "PT2M",
     step: [
       {

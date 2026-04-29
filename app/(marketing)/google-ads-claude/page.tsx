@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads Claude MCP Server | NotFair",
   description:
-    "Connect Google Ads to Claude in 2 minutes with NotFair's MCP server. Claude gets live access to campaigns, spend, keywords, and ad copy. Free audit included.",
+    "Connect Google Ads to Claude in 2 minutes. Claude gets live campaign context to diagnose issues, recommend fixes, and execute approved Google Ads changes.",
   path: "/google-ads-claude",
   keywords: [
     "google ads claude",
@@ -21,7 +21,7 @@ const faqItems = [
   {
     question: "How do I use Claude for Google Ads with NotFair?",
     answer:
-      "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude to audit your account, find wasted spend, adjust bids, write ad copy, or pause underperformers — all in natural conversation.",
+      "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude what is wrong, why performance changed, what to fix next, or to draft approved bid, keyword, negative, and ad changes — all in natural conversation.",
   },
   {
     question: "Does NotFair work with Claude Desktop, Claude Code, and Claude Cowork?",
@@ -65,7 +65,7 @@ const jsonLd = [
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "Web",
     description:
-      "NotFair is a Google Ads MCP server for Claude. Connect your Google Ads account to Claude Desktop, Claude Code, or Claude Cowork and manage campaigns through natural conversation.",
+      "NotFair is a Google Ads MCP server for Claude. Connect your Google Ads account to Claude Desktop, Claude Code, or Claude Cowork so Claude can diagnose issues, recommend fixes, and manage approved campaign changes through natural conversation.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -74,9 +74,9 @@ const jsonLd = [
     url: new URL("/google-ads-claude", SITE_URL).toString(),
     featureList: [
       "Live Google Ads campaign data access",
-      "Natural language campaign audits",
-      "Wasted spend detection",
-      "Bid and keyword management via Claude",
+      "Natural language campaign diagnosis",
+      "Wasted spend and structural issue detection",
+      "Recommended bid, keyword, negative, and ad changes via Claude",
       "Works with Claude Desktop, Claude Code, Claude Cowork",
       "Reviewable changes with human approval",
     ],

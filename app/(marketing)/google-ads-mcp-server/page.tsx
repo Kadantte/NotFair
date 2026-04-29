@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads MCP Server | NotFair",
   description:
-    "The production-ready Google Ads MCP server for Claude and any MCP client. 9 live tools. OAuth auth. Connect in 2 minutes with npx. Free to start.",
+    "Production-ready Google Ads MCP server for Claude and any MCP client. Diagnose account issues, draft approved fixes, and connect in 2 minutes. Free to start.",
   path: "/google-ads-mcp-server",
   keywords: [
     "google ads mcp server",
@@ -45,7 +45,7 @@ const faqItems = [
   {
     question: "How is NotFair different from using the Google Ads API directly?",
     answer:
-      "The Google Ads API requires a developer token, OAuth setup, and writing GAQL queries by hand. NotFair wraps all of that into typed MCP tools your AI agent can call through natural language — no API knowledge required.",
+      "The Google Ads API requires a developer token, OAuth setup, and writing GAQL queries by hand. NotFair wraps all of that into typed MCP tools your AI agent can call through natural language for diagnosis, recommendations, and approved execution — no API knowledge required.",
   },
   {
     question: "What happens if a tool call fails?",
@@ -64,7 +64,7 @@ const jsonLd = [
     operatingSystem: "Any (Node.js runtime required)",
     url: new URL("/google-ads-mcp-server", SITE_URL).toString(),
     description:
-      "A production-ready Model Context Protocol server for Google Ads. Exposes live campaign data, keyword management, bid updates, and account audits as MCP tools for Claude and any MCP-compatible client.",
+      "A production-ready Model Context Protocol server for Google Ads. Exposes live campaign data, diagnosis workflows, keyword management, bid updates, and approved account actions as MCP tools for Claude and any MCP-compatible client.",
     downloadUrl: "https://www.npmjs.com/package/@adsagent/mcp",
     offers: {
       "@type": "Offer",
@@ -78,7 +78,7 @@ const jsonLd = [
       "getChanges & reviewChangeImpact — change log and before/after impact analysis",
       "updateBid — keyword and ad group bid management",
       "pauseCampaign — pause underperforming campaigns",
-      "addNegativeKeyword — block wasted search terms",
+      "addNegativeKeyword — block irrelevant search terms after review",
       "getResourceMetadata — GAQL schema discovery",
     ],
   },

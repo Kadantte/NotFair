@@ -140,11 +140,11 @@ export function GoogleAdsAuditPage() {
                 <br />
                 Audit — know exactly
                 <br />
-                <span className="text-[#4CAF6E]">where money leaks.</span>
+                <span className="text-[#4CAF6E]">what to fix next.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                AI audits your account in 5 minutes. See your waste rate, find
-                where money leaks, and get a 3-step fix list — free.
+                AI diagnoses your account in 5 minutes. See your waste rate,
+                missed opportunities, structural issues, and a 3-step fix list — free.
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3">

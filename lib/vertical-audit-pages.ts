@@ -50,7 +50,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     industryShort: "Ecommerce",
     title: "Google Ads Audit for Ecommerce Stores — Free in 5 Minutes | NotFair",
     description:
-      "Free Google Ads audit for ecommerce. AI reviews Shopping, PMAX, product feed health, ROAS by SKU, and wasted spend — with a 3-step fix list. No credit card.",
+      "Free Google Ads audit for ecommerce. AI diagnoses Shopping, PMAX, product feed health, ROAS by SKU, and wasted spend — with a 3-step fix list. No credit card.",
     keywords: [
       "Google Ads audit ecommerce",
       "ecommerce Google Ads audit",
@@ -63,7 +63,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     heroEyebrow: "For ecommerce stores · Free · 5 minutes",
     heroTitle: "Google Ads audit for ecommerce — fix Shopping, PMAX, and product feed leaks.",
     heroDescription:
-      "Most Shopify, WooCommerce, and BigCommerce stores leak 15–30% of their paid-search budget through disapproved feed items, PMAX cannibalizing brand traffic, and Shopping campaigns bidding on unprofitable SKUs. This free audit pulls live account data and tells you exactly where the money is going.",
+      "Most Shopify, WooCommerce, and BigCommerce stores leak 15–30% of their paid-search budget through disapproved feed items, PMAX cannibalizing brand traffic, and Shopping campaigns bidding on unprofitable SKUs. This free audit pulls live account data, diagnoses the leaks, and tells you what to fix first.",
     spendRange: "$1K–$20K/mo",
     cpcRange: "$0.50–$5",
     typicalWaste: "$300–$4,500/mo",
@@ -202,7 +202,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     industryShort: "Home Services",
     title: "Google Ads Audit for Home Services — Free in 5 Minutes | NotFair",
     description:
-      "Free Google Ads audit for HVAC, plumbing, roofing, and electricians. AI checks geo-targeting, call tracking, emergency-query coverage, and wasted spend.",
+      "Free Google Ads audit for HVAC, plumbing, roofing, and electricians. AI diagnoses geo-targeting, call tracking, emergency-query coverage, and wasted spend.",
     keywords: [
       "Google Ads audit HVAC",
       "plumbing Google Ads audit",
@@ -215,7 +215,7 @@ export const verticalAuditPages: Record<VerticalSlug, VerticalAuditPage> = {
     heroEyebrow: "For home services · Free · 5 minutes",
     heroTitle: "Google Ads audit for home services — HVAC, plumbing, roofing, electricians.",
     heroDescription:
-      "Home-services CPCs run $15–$80, and most owners run ads between jobs with no time to babysit a campaign. That means loose service-area radius, no call tracking, no LSA integration, and emergency queries mixed with informational ones. This free Google Ads audit reads your account in 5 minutes and shows exactly where your phone-lead dollars are being wasted.",
+      "Home-services CPCs run $15–$80, and most owners run ads between jobs with no time to babysit a campaign. That means loose service-area radius, no call tracking, no LSA integration, and emergency queries mixed with informational ones. This free Google Ads audit reads your account in 5 minutes and shows exactly what to fix first.",
     spendRange: "$1K–$10K/mo",
     cpcRange: "$15–$80",
     typicalWaste: "$400–$2,800/mo",

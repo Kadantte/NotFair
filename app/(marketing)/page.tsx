@@ -6,11 +6,12 @@ import { getUserSubscription } from "@/lib/subscription";
 import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 
 export const metadata = buildMetadata({
-  title: "Run Google Ads from Claude | NotFair",
+  title: "Find and Fix Google Ads Issues from Claude | NotFair",
   description:
-    "Tell Claude what to change. NotFair drafts Google Ads edits for keywords, ads, budgets, and negatives, then executes only after approval.",
+    "Give Claude live Google Ads access to diagnose issues, recommend fixes, and execute keyword, ad, budget, and negative changes only after approval.",
   path: "/",
   keywords: [
+    "find Google Ads issues with Claude",
     "run Google Ads from Claude",
     "Claude Google Ads",
     "Google Ads MCP",

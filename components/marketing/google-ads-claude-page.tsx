@@ -34,7 +34,7 @@ const tools = [
   {
     name: "getSearchTermReport",
     category: "Read",
-    description: "Find irrelevant queries burning budget with no conversions",
+    description: "Find irrelevant queries, weak match types, and budget leaks",
   },
   {
     name: "getCampaignPerformance",
@@ -77,20 +77,20 @@ const steps = [
   {
     num: "3",
     title: "Ask Claude anything about your campaigns",
-    desc: 'Try: "Which campaigns are wasting the most money?" Claude pulls live data and answers with specifics — no CSV exports, no copy-paste.',
+    desc: 'Try: "Why did CPA rise and what should I fix?" Claude pulls live data and answers with specifics — no CSV exports, no copy-paste.',
   },
 ];
 
 const capabilities = [
   {
     icon: MessageSquare,
-    title: "Campaign audits in natural language",
-    body: "Ask Claude to audit your account. It checks campaign structure, keyword health, search term quality, impression share, and ad copy — then gives you a prioritized fix list.",
+    title: "Campaign diagnosis in natural language",
+    body: "Ask Claude what is wrong. It checks campaign structure, keyword health, search term quality, impression share, and ad copy — then gives you a prioritized fix list.",
   },
   {
     icon: Zap,
-    title: "Find wasted spend in seconds",
-    body: 'In testing, accounts running for 6+ months typically have $1,000–5,000/month in identifiable waste. Asking "what\'s wasting budget?" surfaces it immediately.',
+    title: "Find the issues you did not know to ask for",
+    body: 'In testing, mature accounts often have clear problems hiding in search terms, structure, match types, and budget allocation. Asking "what should I fix?" surfaces them immediately.',
   },
   {
     icon: Eye,
@@ -108,7 +108,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "How do I use Claude for Google Ads with NotFair?",
     answer:
-      "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude to audit your account, find wasted spend, adjust bids, write ad copy, or pause underperformers — all in natural conversation.",
+      "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude what is wrong, why performance changed, what to fix next, or to draft approved bid, keyword, negative, and ad changes — all in natural conversation.",
   },
   {
     question: "Does NotFair work with Claude Desktop, Claude Code, and Claude Cowork?",
@@ -147,7 +147,7 @@ const RELATED_LINKS = [
     href: "/google-ads-audit",
     title: "Free Google Ads Audit",
     description:
-      "Get a free AI audit of your Google Ads account — finds wasted spend and gives you a prioritized fix list.",
+      "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues.",
   },
   {
     href: "/google-ads-mcp-server",
@@ -159,7 +159,7 @@ const RELATED_LINKS = [
     href: "/",
     title: "NotFair Home",
     description:
-      "The AI-powered Google Ads agent — connect your account and let Claude manage campaigns through conversation.",
+      "The AI-powered Google Ads agent — connect your account and let Claude diagnose issues, recommend fixes, and manage approved changes through conversation.",
   },
 ];
 
@@ -195,7 +195,7 @@ export function GoogleAdsClaudePage() {
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
                 NotFair is a Google Ads MCP server for Claude. Connect once and
                 Claude gets live access to your campaigns, keywords, spend, and
-                ad copy — then helps you audit, optimize, and manage through
+                ad copy — then helps you diagnose, optimize, and manage through
                 natural conversation.
               </p>
 
@@ -473,7 +473,7 @@ export function GoogleAdsClaudePage() {
               </h2>
               <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
                 Connect your Google Ads account and Claude immediately runs a
-                free audit — surfacing wasted spend, missed opportunities, and
+                free diagnosis — surfacing wasted spend, missed opportunities, and
                 structural issues with a prioritized fix list.
               </p>
             </div>

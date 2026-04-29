@@ -18,7 +18,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is the NotFair Codex MCP integration?",
     answer:
-      "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — and propose changes you approve in chat.",
+      "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
   },
   {
     question: "How is this different from the Claude setup guides?",
@@ -64,7 +64,7 @@ const RELATED_LINKS = [
     href: "/google-ads-audit",
     title: "Free Google Ads Audit",
     description:
-      "Get a free AI audit of your Google Ads account — finds wasted spend and gives you a prioritized fix list in minutes.",
+      "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues in minutes.",
   },
 ];
 
@@ -90,7 +90,7 @@ export function GoogleAdsCodexMcpSetupPage() {
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
               Add NotFair to OpenAI&apos;s Codex CLI in under a minute. One
               terminal command wires up the MCP server and walks you through
-              OAuth — Codex then has live access to your Google Ads account.
+              OAuth — Codex then has live access to diagnose and operate your Google Ads account.
             </p>
             <p className="mt-6 text-sm text-[#C4C0B6]">
               Free · No credit card · 1-minute setup

@@ -14,7 +14,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is the NotFair Claude Code plugin?",
     answer:
-      "It's a Claude Code plugin (distributed through the toprank marketplace) that gives Claude Code live access to your Google Ads account. Once installed, /ads connects Claude to your campaigns, keywords, search terms, and spend so you can audit and optimize through chat in your terminal.",
+      "It's a Claude Code plugin (distributed through the toprank marketplace) that gives Claude Code live access to your Google Ads account. Once installed, /ads connects Claude to your campaigns, keywords, search terms, and spend so you can diagnose issues, recommend fixes, and optimize through chat in your terminal.",
   },
   {
     question: "How is this different from the Claude Connector?",
@@ -44,7 +44,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What does toprank ship with the plugin?",
     answer:
-      "Pre-made Google Ads and SEO skills that teach Claude how to audit, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the NotFair MCP tools to give Claude domain expertise out of the box.",
+      "Pre-made Google Ads and SEO skills that teach Claude how to diagnose, optimize, and manage campaigns — plus slash commands like /ads. Skills are reusable workflows that pair with the NotFair MCP tools to give Claude domain expertise out of the box.",
   },
 ];
 
@@ -65,7 +65,7 @@ const RELATED_LINKS = [
     href: "/google-ads-audit",
     title: "Free Google Ads Audit",
     description:
-      "Get a free AI audit of your Google Ads account — finds wasted spend and gives you a prioritized fix list in minutes.",
+      "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues in minutes.",
   },
 ];
 
@@ -89,7 +89,7 @@ export function GoogleAdsClaudeCodePluginSetupPage() {
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
               Install the NotFair plugin in Claude Code in under 2 minutes.
               Claude reads your Google Ads campaigns in real time and helps you
-              audit, optimize, and manage them — right from your terminal.
+              diagnose, optimize, and manage them — right from your terminal.
             </p>
             <p className="mt-6 text-sm text-[#C4C0B6]">
               Free · No credit card · 2-minute setup

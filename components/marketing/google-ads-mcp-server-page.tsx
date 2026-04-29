@@ -29,7 +29,7 @@ const tools = [
   { name: "getResourceMetadata", category: "Read", description: "GAQL schema discovery for custom queries" },
   { name: "updateBid", category: "Write", description: "Adjust keyword or ad group bids — reviewable" },
   { name: "pauseCampaign", category: "Write", description: "Pause underperforming campaigns" },
-  { name: "addNegativeKeyword", category: "Write", description: "Block wasted search terms instantly" },
+  { name: "addNegativeKeyword", category: "Write", description: "Block irrelevant search terms after review" },
 ];
 
 const steps = [
@@ -46,7 +46,7 @@ const steps = [
   {
     num: "3",
     title: "Query your account in plain English",
-    desc: 'Ask "which campaigns are wasting money?" and get a specific answer backed by live data — no CSV exports.',
+    desc: 'Ask "why did CPA rise and what should I fix?" and get a specific answer backed by live data — no CSV exports.',
   },
 ];
 
@@ -54,7 +54,7 @@ const clients = ["Claude Desktop", "Claude Code", "Claude Cowork", "Any MCP stdi
 
 const relatedLinks = [
   { href: "/google-ads-claude", title: "Google Ads + Claude", description: "The full guide to using Claude with your Google Ads account." },
-  { href: "/google-ads-audit", title: "Free Google Ads Audit", description: "Run a free AI-powered audit — find wasted spend in 5 minutes." },
+  { href: "/google-ads-audit", title: "Free Google Ads Audit", description: "Run a free AI-powered diagnosis — find waste, missed opportunities, and structural issues in 5 minutes." },
   { href: "/blog/google-ads-ai-agent", title: "What Is a Google Ads AI Agent?", description: "What AI agents can actually do for campaign management." },
 ];
 
@@ -89,7 +89,7 @@ export function GoogleAdsMcpServerPage({ faqItems }: { faqItems: FaqItem[] }) {
                 NotFair is a production-ready Model Context Protocol server for
                 Google Ads. Drop it into Claude Desktop, Claude Code, or any
                 MCP-compatible client — and your AI gets live campaign data plus
-                the ability to take reviewed actions.
+                the ability to diagnose issues and take reviewed actions.
               </p>
               <div className="mt-8 flex flex-col items-start gap-3">
                 <AuditCTA session={session} page="google-ads-mcp-server" size="lg" />

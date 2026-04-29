@@ -31,7 +31,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "ai-google-ads-agent",
     title: "AI Google Ads Agent",
     description:
-      "Use NotFair as an AI Google Ads agent to inspect campaigns, surface waste, recommend optimizations, and keep changes reviewable.",
+      "Use NotFair as an AI Google Ads agent to inspect campaigns, diagnose issues, recommend optimizations, and execute approved changes.",
     keywords: [
       "AI Google Ads agent",
       "Google Ads AI agent",
@@ -40,11 +40,11 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "An AI Google Ads agent that works with your existing workflow",
     heroDescription:
-      "NotFair connects your Google Ads account to MCP-compatible AI clients so you can ask better questions, spot wasted spend faster, and keep campaign changes traceable.",
+      "NotFair connects your Google Ads account to MCP-compatible AI clients so Claude can diagnose performance issues, recommend fixes, and keep campaign changes traceable.",
     highlights: [
       "Inspect campaigns and search terms without exporting reports by hand",
-      "Use AI to find quick wins before you touch bids, budgets, or negatives",
-      "Keep a cleaner audit trail around optimization work",
+      "Use AI to diagnose what should change before you touch bids, budgets, or negatives",
+      "Turn recommendations into approved, traceable campaign edits",
     ],
     sections: [
       {
@@ -55,14 +55,14 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         title: "Where teams use it first",
         body:
-          "Most teams start by asking for wasted-spend analysis, campaign summaries, negative keyword ideas, and prioritized fixes they can approve before execution.",
+          "Most teams start by asking what is wrong: rising CPA, wasted search terms, weak campaign structure, missing negatives, or budget misallocation. From there, Claude can recommend fixes and draft the approved changes.",
       },
     ],
     faq: [
       {
         question: "What is an AI Google Ads agent?",
         answer:
-          "It is a workflow where an AI system can inspect campaign data, answer account questions, and recommend or execute approved optimizations with better context than a standalone chatbot.",
+          "It is a workflow where an AI system can inspect campaign data, diagnose account issues, recommend fixes, and execute approved optimizations with better context than a standalone chatbot.",
       },
       {
         question: "Does NotFair replace Google Ads specialists?",
@@ -84,7 +84,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         href: "/google-ads-audit",
         title: "Free Google Ads Audit",
-        description: "Find wasted spend and get a prioritized fix list in 5 minutes.",
+        description: "Find waste, missed opportunities, and structural issues in 5 minutes.",
       },
       {
         href: "/google-ads-mcp",
@@ -97,7 +97,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "connect-google-ads-to-claude",
     title: "Connect Google Ads to Claude",
     description:
-      "Use NotFair to connect Google Ads to Claude through MCP so Claude can inspect campaigns, surface wasted spend, and guide approved changes.",
+      "Use NotFair to connect Google Ads to Claude through MCP so Claude can inspect campaigns, diagnose issues, recommend fixes, and guide approved changes.",
     keywords: [
       "connect Google Ads to Claude",
       "Claude Google Ads",
@@ -106,17 +106,17 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "Connect Google Ads to Claude without building the plumbing yourself",
     heroDescription:
-      "NotFair is the shortest path to getting Claude working with live Google Ads context through MCP, so you can move from account questions to optimization decisions faster.",
+      "NotFair is the shortest path to getting Claude working with live Google Ads context through MCP, so you can move from vague account questions to specific approved fixes faster.",
     highlights: [
       "Connect Google Ads once and use Claude with live campaign context",
-      "Ask for account summaries, waste analysis, and prioritized fixes",
+      "Ask what is wrong, why performance changed, and what to fix next",
       "Keep the workflow reviewable instead of blindly automating changes",
     ],
     sections: [
       {
         title: "What teams usually ask Claude first",
         body:
-          "Common prompts include top spenders, zero-conversion waste, search term issues, and quick-win opportunities worth reviewing before anything changes in the account.",
+          "Common prompts include why CPA rose, what is wasting spend, which search terms need negatives, what campaign structure is weak, and what to fix before increasing budget.",
       },
       {
         title: "Why NotFair fits Claude workflows",
@@ -128,7 +128,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         question: "Can Claude directly manage Google Ads through NotFair?",
         answer:
-          "Claude can analyze account context and help drive approved workflows once NotFair is connected through MCP.",
+          "Claude can analyze account context, recommend fixes, draft changes, and help drive approved workflows once NotFair is connected through MCP.",
       },
       {
         question: "What do I need before connecting Claude?",
@@ -138,7 +138,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         question: "What is the fastest first use case?",
         answer:
-          "Most teams start by asking Claude to summarize campaign performance and identify obvious wasted spend before moving into optimization work.",
+          "Most teams start by asking Claude what is wrong with performance, then review its recommended fixes before moving into approved campaign changes.",
       },
     ],
     relatedLinks: [
@@ -176,7 +176,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     highlights: [
       "Built for teams that want live Google Ads context inside AI chat workflows",
       "Useful when you want less copying, fewer exports, and more structured analysis",
-      "Designed around reviewable recommendations instead of opaque auto-pilot",
+      "Designed around diagnosis, recommendations, and reviewable execution instead of opaque auto-pilot",
     ],
     sections: [
       {
@@ -187,7 +187,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       {
         title: "What people usually mean by this query",
         body:
-          "Most teams want to ask an AI system about campaign performance, waste, search terms, and recommended actions without manually stitching together data. That is the workflow NotFair is built to support.",
+          "Most teams want to ask an AI system what is wrong with campaign performance, which search terms or structures are causing it, and what actions to take without manually stitching together data. That is the workflow NotFair is built to support.",
       },
     ],
     faq: [
@@ -229,7 +229,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     slug: "ai-google-ads-optimization",
     title: "AI Google Ads Optimization",
     description:
-      "Use NotFair for AI-assisted Google Ads optimization, from wasted-spend analysis and search term review to change tracking and impact review.",
+      "Use NotFair for AI-assisted Google Ads optimization, from issue diagnosis and search term review to approved changes and impact review.",
     keywords: [
       "AI Google Ads optimization",
       "Google Ads optimization AI",
@@ -238,29 +238,29 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     heroTitle: "Use AI for Google Ads optimization without giving up control",
     heroDescription:
-      "NotFair helps teams use AI to identify wasted spend, review campaign issues, and move toward approved optimizations with better context and cleaner tracking.",
+      "NotFair helps teams use AI to diagnose wasted spend, review campaign issues, recommend fixes, and execute approved optimizations with better context and cleaner tracking.",
     highlights: [
-      "Spot wasted spend and weak search terms faster",
-      "Prioritize budget, bid, and negative keyword opportunities",
-      "Track what changed so optimization work stays accountable",
+      "Spot wasted spend, weak search terms, and structural issues faster",
+      "Prioritize budget, bid, negative keyword, and landing-page opportunities",
+      "Execute approved fixes and track what changed",
     ],
     sections: [
       {
         title: "The right role for AI in Google Ads optimization",
         body:
-          "AI is most useful when it accelerates analysis and prioritization, not when it replaces judgment. NotFair is built to surface what matters and keep the path to action visible.",
+          "AI is most useful when it accelerates diagnosis, prioritization, and execution without replacing judgment. NotFair is built to surface what matters and keep the path to action visible.",
       },
       {
         title: "What optimization workflows fit best",
         body:
-          "The strongest early use cases are campaign summaries, quick-win audits, negative keyword ideas, search term review, and change tracking after an optimization pass.",
+          "The strongest early use cases are performance diagnosis, quick-win audits, negative keyword ideas, search term review, campaign restructuring, and change tracking after an optimization pass.",
       },
     ],
     faq: [
       {
         question: "What does AI Google Ads optimization actually mean?",
         answer:
-          "In practice it means using AI to analyze campaign data, identify likely opportunities or waste, and help a human move through optimization work faster.",
+          "In practice it means using AI to analyze campaign data, diagnose likely issues, recommend fixes, and help a human move through approved optimization work faster.",
       },
       {
         question: "What should I optimize first?",
@@ -303,12 +303,12 @@ export const homepageFaq: FaqItem[] = [
   {
     question: "What is NotFair?",
     answer:
-      "NotFair is a Google Ads execution layer for Claude and other MCP-compatible AI clients. It lets AI inspect your account, draft campaign edits, and run approved changes through the Google Ads API.",
+      "NotFair is a Google Ads diagnosis and execution layer for Claude and other MCP-compatible AI clients. It lets AI inspect your account, recommend fixes, draft campaign edits, and run approved changes through the Google Ads API.",
   },
   {
     question: "Who is NotFair built for?",
     answer:
-      "NotFair is built for AI-native founders, marketers, agencies, and portfolio builders who actively operate Google Ads accounts and want more execution leverage without giving up final approval.",
+      "NotFair is built for AI-native founders, marketers, agencies, and portfolio builders who want Claude to find issues, recommend fixes, and execute approved Google Ads changes without giving up final approval.",
   },
   {
     question: "What can NotFair do?",

@@ -34,7 +34,7 @@ export const blogPosts: Record<string, BlogPost> = {
     title: "Google Ads AI Agent: What It Actually Does (and What It Can't)",
     seoTitle: "Google Ads AI Agent: What It Actually Does",
     description:
-      "Learn what a Google Ads AI agent can actually do — audit wasted spend, find negative keyword gaps, and optimize bids. Real examples, no hype.",
+      "Learn what a Google Ads AI agent can actually do — diagnose account issues, find negative keyword gaps, recommend fixes, and optimize bids. Real examples, no hype.",
     keywords: [
       "google ads ai agent",
       "ai google ads management",
@@ -52,7 +52,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "A Google Ads AI agent is software that can read your campaign data, identify problems, and take action — or recommend actions — using natural language instead of a manual workflow. Think of it as giving an AI access to your Google Ads account so it can audit spend, surface patterns, and make changes on your behalf or with your approval.",
+          "A Google Ads AI agent is software that can read your campaign data, identify problems, recommend fixes, and take approved action using natural language instead of a manual workflow. Think of it as giving an AI access to your Google Ads account so it can diagnose spend, surface patterns, and make changes on your behalf or with your approval.",
       },
       {
         type: "text",
@@ -66,7 +66,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "The term \"AI agent\" gets used loosely. For Google Ads, it means an AI system that can read live account data, reason about that data to identify waste patterns and missed opportunities, take actions like pausing keywords or adjusting bids, and communicate in plain language — you ask a question or give an instruction, it responds with findings or executes a task.",
+          "The term \"AI agent\" gets used loosely. For Google Ads, it means an AI system that can read live account data, reason about that data to diagnose waste patterns and missed opportunities, recommend fixes, take actions like pausing keywords or adjusting bids, and communicate in plain language — you ask a question or describe a problem, it responds with findings or executes an approved task.",
       },
       {
         type: "text",
@@ -84,12 +84,12 @@ export const blogPosts: Record<string, BlogPost> = {
       },
       {
         type: "subheading",
-        content: "Auditing for Wasted Spend",
+        content: "Diagnosing Wasted Spend and Structural Issues",
       },
       {
         type: "text",
         content:
-          "This is where AI earns its keep most clearly. A manual spend audit on a mid-size account — 10 campaigns, 50+ ad groups, several hundred keywords — typically takes 2–4 hours. An AI agent can do the same structural analysis in under a minute.",
+          "This is where AI earns its keep most clearly. A manual diagnosis on a mid-size account — 10 campaigns, 50+ ad groups, several hundred keywords — typically takes 2–4 hours. An AI agent can do the same structural analysis in under a minute, then translate the findings into recommended fixes.",
       },
       {
         type: "callout",
@@ -103,7 +103,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "Negative keywords are one of the highest-ROI activities in Google Ads management, and one of the most neglected. An AI agent can pull the full search terms report for any date range, identify terms that spent money without converting, group them by theme (brand, location, intent modifier), generate a negative keyword list with suggested match types, and add them directly to the campaign.",
+          "Negative keywords are one of the highest-ROI activities in Google Ads management, and one of the most neglected. An AI agent can pull the full search terms report for any date range, identify terms that spent money without converting, group them by theme (brand, location, intent modifier), generate a negative keyword list with suggested match types, and add them to the campaign after approval.",
       },
       {
         type: "text",
@@ -149,7 +149,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "The NotFair approach implements review-first workflow: the AI audits and recommends, you approve. You can ask it to execute directly on lower-stakes changes (adding a negative keyword) while keeping approval gates on higher-stakes changes (bid strategy changes, budget adjustments). That trust is earned incrementally through consistent, accurate recommendations.",
+          "The NotFair approach implements review-first workflow: the AI diagnoses and recommends, you approve. You can ask it to execute directly on lower-stakes changes (adding a negative keyword) while keeping approval gates on higher-stakes changes (bid strategy changes, budget adjustments). That trust is earned incrementally through consistent, accurate recommendations.",
       },
       {
         type: "heading",
@@ -159,7 +159,7 @@ export const blogPosts: Record<string, BlogPost> = {
         type: "list",
         content: "",
         items: [
-          "Use NotFair: connects your Google Ads account and gives you an AI interface immediately. No setup beyond authentication. Run a free audit to see what AI finds in your account.",
+          "Use NotFair: connects your Google Ads account and gives you an AI interface immediately. No setup beyond authentication. Run a free diagnosis to see what AI finds in your account.",
           "Use Claude with MCP: Anthropic's Claude supports Model Context Protocol, which NotFair uses. You get a conversational interface to your account data — ask questions, get analysis, approve actions.",
           "Build with the Google Ads API directly: for developers or agencies managing many accounts. The main costs are API authentication complexity and maintenance over time.",
         ],
@@ -167,7 +167,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "Start with a campaign audit focused on spend efficiency. Ask the agent to pull the search terms report for the last 30 days, identify keywords without negative lists that have over $100 in spend, and show the distribution of query match types. Those three data points will surface the highest-ROI quick wins in most accounts.",
+          "Start with a campaign diagnosis focused on spend efficiency. Ask the agent why performance changed, what is wasting spend, which keywords lack negative lists, and where query match types are too loose. Those data points surface the highest-ROI quick wins in most accounts.",
       },
       {
         type: "heading",
@@ -180,7 +180,7 @@ export const blogPosts: Record<string, BlogPost> = {
           "Treating AI output as automatically correct — AI agents read data accurately but can misinterpret context. A keyword with high CPA might be your highest-LTV acquisition channel. Always ask \"why\" before approving a change.",
           "Starting with autonomous mode — if a tool offers fully autonomous optimization, run it in recommendation-only mode for at least 30 days first. Establish a baseline for the quality of its judgment.",
           "Ignoring the search terms report — tools that can't show you specific queries driving waste are not analyzing your account. Generic advice without data access is a writing tool, not an agent.",
-          "Expecting AI to replace campaign strategy — AI agents are good at identifying waste and optimizing within an existing structure. They are poor at deciding whether to expand into a new product category or restructure your account.",
+          "Expecting AI to replace campaign strategy — AI agents are good at diagnosing waste, explaining likely causes, and optimizing within an existing structure. They are weaker at deciding whether to expand into a new product category or reposition the business.",
         ],
       },
       {
@@ -192,7 +192,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         question: "What's the difference between a Google Ads AI agent and Google's AI features?",
         answer:
-          "Google's AI features (Smart Bidding, Performance Max) optimize automatically within their defined scope and don't explain their decisions. An external AI agent reads your account data and reasons about it conversationally — you can ask 'what's wasting money?' and get a specific, auditable answer. The two can coexist: use Smart Bidding for bid execution, use an AI agent for account-level analysis and oversight.",
+          "Google's AI features (Smart Bidding, Performance Max) optimize automatically within their defined scope and don't explain their decisions. An external AI agent reads your account data and reasons about it conversationally — you can ask 'what is wrong and what should I fix?' and get a specific, auditable answer. The two can coexist: use Smart Bidding for bid execution, use an AI agent for account-level diagnosis, recommendations, and oversight.",
       },
       {
         question: "Can an AI agent actually make changes to my Google Ads account?",
@@ -229,12 +229,12 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         href: "/google-ads-audit",
         title: "Free Google Ads Audit",
-        description: "Run a free AI-powered audit — find wasted spend in 5 minutes.",
+        description: "Run a free AI-powered diagnosis — find waste, missed opportunities, and structural issues in 5 minutes.",
       },
       {
         href: "/google-ads-claude",
         title: "Google Ads + Claude",
-        description: "Connect Google Ads to Claude and manage campaigns in natural language.",
+        description: "Connect Google Ads to Claude to diagnose issues, recommend fixes, and manage approved changes in natural language.",
       },
       {
         href: "/google-ads-mcp-server",
@@ -499,7 +499,7 @@ export const blogPosts: Record<string, BlogPost> = {
         href: "/ai-google-ads-agent",
         title: "AI Google Ads Agent",
         description:
-          "Learn how AI agents use MCP to manage Google Ads campaigns.",
+          "Learn how AI agents use MCP to diagnose and manage Google Ads campaigns.",
       },
       {
         href: "/connect-google-ads-to-claude",

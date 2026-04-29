@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads Codex MCP — Setup Guide for NotFair in OpenAI Codex",
   description:
-    "Step-by-step guide to add NotFair to OpenAI's Codex CLI as an MCP server. One terminal command wires up Google Ads access in under a minute — manage campaigns through Codex chat.",
+    "Step-by-step guide to add NotFair to OpenAI's Codex CLI as an MCP server. One terminal command wires up Google Ads access in under a minute — diagnose issues and manage approved changes through Codex chat.",
   path: "/google-ads-codex-mcp-setup-guide",
   keywords: [
     "google ads codex mcp",
@@ -21,7 +21,7 @@ const faqItems = [
   {
     question: "What is the NotFair Codex MCP integration?",
     answer:
-      "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — and propose changes you approve in chat.",
+      "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
   },
   {
     question: "How is this different from the Claude setup guides?",
@@ -78,7 +78,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 3,
         name: "Ask Codex about your ads",
-        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Codex calls NotFair tools and answers with live data.",
+        text: "Try a prompt like 'Diagnose my connected Google Ads account and tell me the 3 biggest issues to fix.' Codex calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-codex-mcp-setup-guide#step-3", SITE_URL).toString(),
       },
     ],
@@ -91,7 +91,7 @@ const jsonLd = [
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "macOS, Linux, Windows",
     description:
-      "MCP server that gives OpenAI's Codex CLI live access to your Google Ads account through NotFair.",
+      "MCP server that gives OpenAI's Codex CLI live access to diagnose and manage your Google Ads account through NotFair.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -102,7 +102,7 @@ const jsonLd = [
       "MCP integration for OpenAI Codex CLI",
       "One-line terminal install",
       "Live Google Ads account access",
-      "Audit, optimize, and manage campaigns through chat",
+      "Diagnose, optimize, and manage approved campaign changes through chat",
       "Read-only by default; writes require human approval",
     ],
   },

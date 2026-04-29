@@ -41,7 +41,7 @@ export function CheckoutStatusBanner() {
 export const FREE_FEATURES = [
   "300 Google Ads operations per month",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
-  "Run read-only analysis and draft campaign changes",
+  "Diagnose account issues and draft campaign changes",
   "Preview bid, budget, keyword, and ad edits before approval",
   "Community support",
 ];
@@ -111,10 +111,10 @@ export function PricingHeader() {
         Pricing
       </p>
       <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-        Upgrade when Claude becomes your ads operator.
+        Upgrade when Claude becomes your ads strategist and operator.
       </h2>
       <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-        Built for people who actively change campaigns, not just read reports.
+        Built for people who want AI to find issues and turn approved recommendations into campaign changes.
       </p>
     </div>
   );

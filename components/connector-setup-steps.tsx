@@ -121,7 +121,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
             <strong className="text-[#E8E4DD]">Add marketplace</strong> dialog
             and click <strong className="text-[#E8E4DD]">Sync</strong>. Toprank
             ships with pre-made Google Ads and SEO skills that teach Claude how
-            to audit, optimize, and manage your campaigns alongside the NotFair
+            to diagnose, optimize, and manage your campaigns alongside the NotFair
             connector.
           </p>
           <CopyableField

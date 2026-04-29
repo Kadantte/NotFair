@@ -26,7 +26,7 @@ const TOOLS: { name: string; category: "Read" | "Write"; description: string }[]
     { name: "getResourceMetadata", category: "Read", description: "GAQL schema discovery for custom queries." },
     { name: "updateBid", category: "Write", description: "Adjust keyword or ad group bids — reviewable before apply." },
     { name: "pauseCampaign", category: "Write", description: "Pause underperforming campaigns." },
-    { name: "addNegativeKeyword", category: "Write", description: "Block wasted search terms instantly." },
+    { name: "addNegativeKeyword", category: "Write", description: "Block irrelevant search terms after review." },
     { name: "createAd", category: "Write", description: "Write and launch new ad copy through chat." },
 ];
 
@@ -34,7 +34,7 @@ const FAQ_ITEMS: FaqItem[] = [
     {
         question: "What is the NotFair Google Ads MCP server?",
         answer:
-            "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context; write tools propose changes that you approve in chat.",
+            "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools propose fixes that you approve in chat.",
     },
     {
         question: "Which MCP clients are supported?",
@@ -113,7 +113,7 @@ export function GoogleAdsMcpPage() {
                                 {SERVER_URL}
                             </code>
                             . Drop the generic config below into any
-                            MCP-compatible client — auth via OAuth or Bearer
+                            MCP-compatible client so your AI can diagnose issues and draft fixes — auth via OAuth or Bearer
                             token.
                         </p>
                         <p className="mt-6 text-sm text-[#C4C0B6]">

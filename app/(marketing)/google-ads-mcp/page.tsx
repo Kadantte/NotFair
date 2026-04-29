@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads MCP Server — Configurations for Claude, Codex, Cursor & More",
   description:
-    "Hosted Google Ads MCP server for AI clients. Copy-paste OAuth and Bearer-token configs for Claude.ai, Claude Code, OpenAI Codex CLI, Cursor, Cline, and any MCP-compatible client.",
+    "Hosted Google Ads MCP server for AI clients. Copy-paste configs so Claude, Codex, Cursor, and other MCP clients can diagnose issues and draft approved Google Ads fixes.",
   path: "/google-ads-mcp",
   keywords: [
     "google ads mcp",
@@ -22,7 +22,7 @@ const faqItems = [
   {
     question: "What is the NotFair Google Ads MCP server?",
     answer:
-      "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context; write tools propose changes that you approve in chat.",
+      "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools propose fixes that you approve in chat.",
   },
   {
     question: "Which MCP clients are supported?",
@@ -61,7 +61,7 @@ const jsonLd = [
     applicationSubCategory: "Model Context Protocol Server",
     operatingSystem: "Web",
     description:
-      "Hosted Google Ads MCP server for Claude.ai, Claude Code, OpenAI Codex, Cursor, Cline, and any MCP-compatible AI client. OAuth 2.0 + Bearer token auth.",
+      "Hosted Google Ads MCP server for Claude.ai, Claude Code, OpenAI Codex, Cursor, Cline, and any MCP-compatible AI client. Diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -74,6 +74,7 @@ const jsonLd = [
       "OAuth 2.0 with PKCE",
       "Bearer token authentication",
       "Live Google Ads account access",
+      "Diagnosis and recommendation workflows",
       "Read-only by default; writes require human approval",
     ],
   },
@@ -82,7 +83,7 @@ const jsonLd = [
     "@type": "WebAPI",
     name: "NotFair Google Ads MCP API",
     description:
-      "Model Context Protocol API for Google Ads. Compatible with Claude, Codex, Cursor, and any MCP-compatible client.",
+      "Model Context Protocol API for Google Ads diagnosis, recommendations, and approved execution. Compatible with Claude, Codex, Cursor, and any MCP-compatible client.",
     documentation: new URL("/google-ads-mcp", SITE_URL).toString(),
     termsOfService: new URL("/terms", SITE_URL).toString(),
     provider: {
