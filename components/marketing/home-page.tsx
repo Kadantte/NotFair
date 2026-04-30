@@ -291,7 +291,7 @@ function HeroMockup() {
       transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
       className="mx-auto w-full max-w-[480px]"
     >
-      <div className="flex h-[630px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
+      <div className="flex h-[760px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
         <div className="relative flex shrink-0 items-center px-4 py-3">
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-3 rounded-full bg-[#FF5F57]" />
