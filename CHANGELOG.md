@@ -2,6 +2,16 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.1.0] - 2026-04-29
+
+### Added
+- **29 new SEO blog posts covering the full Google-Ads-via-MCP keyword landscape.** Targets every cluster from the keyword research: setup pillar, MCP-server comparison, 8 GEO-citation FAQ pages, 5 job-to-be-done workflow pages, 4 head-to-head comparison pages (Claude vs ChatGPT, vs Gemini, best-for-PPC, agent landscape), 5 persona pages (agencies, small business, ecommerce, SaaS, solopreneurs), and 5 bridge/awareness pages for top-of-funnel queries. Every post is answer-first for AI snippet citation, has its own JSON-LD FAQ schema, links into 3 sibling posts plus `/connect`, and is rendered automatically by the existing `/blog/[slug]` route.
+- **`/blog/connect-google-ads-to-claude`** — pillar setup guide covering Claude Desktop, Claude Code, ChatGPT/Codex, and any MCP client.
+- **`/blog/google-ads-mcp-servers-compared`** — landscape comparison covering hosted, community open-source, and roll-your-own paths.
+
+### Fixed
+- **Stale internal link in the existing `/blog/what-is-mcp` post** — `/connect-google-ads-to-claude` corrected to `/blog/connect-google-ads-to-claude` now that the target post exists.
+
 ## [0.3.0.19] - 2026-04-29
 
 ### Changed
