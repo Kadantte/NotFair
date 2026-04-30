@@ -22,7 +22,7 @@ This directory adds that multi-site adaptive layer for OpenClaw **without replac
 signals -> diagnosis -> action -> follow-up measurement -> scoring -> learned priors -> better next action
 ```
 
-![Continuous SEO Improvement Loop](artifacts/visuals/continuous-seo-improvement-loop.webp)
+![Continuous SEO Improvement Loop](artifacts/visuals/continuous-seo-improvement-loop.jpg)
 
 In practice, this means OpenClaw can continuously work a portfolio of sites by reading live data, generating the next best move, revisiting outcomes later, and getting smarter from the result.
 
