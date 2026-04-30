@@ -134,19 +134,22 @@ export async function GET(request: Request) {
   }
 
   const accessTokenExpiresAt = new Date(Date.now() + longLived.expiresIn * 1000);
-  const platformMetadata = {
-    fb_user_id: metaUser.id,
-    fb_user_email: metaUser.email ?? null,
-    fb_user_name: metaUser.name ?? null,
-    granted_at: new Date().toISOString(),
-  };
 
-  // Preserve the user's existing active-account pick if it's still in the
-  // newly-enumerated list (re-OAuth shouldn't reset their selection just
-  // because they granted access to *more* accounts). Otherwise default to
-  // the first enumerated account, or null if the user has none.
+  // Two-tier account state (mirrors Google's mcp_sessions pattern):
+  //   - platform_metadata.available_account_ids = full Meta-side enumeration
+  //   - account_ids                              = user's curated subset
+  //   - active_account_id                        = default within the subset
+  //
+  // First-connect default: subset = full enumeration. On re-OAuth, preserve
+  // the user's curation by intersecting their existing subset with the new
+  // enumeration (keep what's still accessible, drop what they've lost
+  // access to upstream, surface newly-available accounts in the UI for them
+  // to opt into).
   const [existing] = await db()
-    .select({ activeAccountId: schema.adPlatformConnections.activeAccountId })
+    .select({
+      activeAccountId: schema.adPlatformConnections.activeAccountId,
+      accountIds: schema.adPlatformConnections.accountIds,
+    })
     .from(schema.adPlatformConnections)
     .where(
       and(
@@ -156,11 +159,31 @@ export async function GET(request: Request) {
     )
     .limit(1);
 
-  const accountIdSet = new Set(accounts.map((a) => a.id));
+  const enumeratedIdSet = new Set(accounts.map((a) => a.id));
+  const accountIdsForRow = existing?.accountIds && existing.accountIds.length > 0
+    // Re-OAuth: preserve the user's curated subset, but drop any ids that no
+    // longer appear in the upstream enumeration (revoked access, etc.).
+    ? existing.accountIds.filter((a) => enumeratedIdSet.has(a.id))
+    // First-connect: default subset = full enumeration. User can curate later
+    // on /connect-meta.
+    : accounts;
+
+  const subsetIdSet = new Set(accountIdsForRow.map((a) => a.id));
   const activeAccountId =
-    existing?.activeAccountId && accountIdSet.has(existing.activeAccountId)
+    existing?.activeAccountId && subsetIdSet.has(existing.activeAccountId)
       ? existing.activeAccountId
-      : (accounts[0]?.id ?? null);
+      : (accountIdsForRow[0]?.id ?? null);
+
+  const platformMetadata = {
+    fb_user_id: metaUser.id,
+    fb_user_email: metaUser.email ?? null,
+    fb_user_name: metaUser.name ?? null,
+    granted_at: new Date().toISOString(),
+    // Full Meta-side enumeration. Stored as the canonical "available
+    // accounts" set so the picker UI doesn't need to re-call Graph API
+    // every time the user lands on /connect-meta. Refreshed by re-OAuth.
+    available_account_ids: accounts,
+  };
 
   // UPSERT — re-OAuth for the same (user, platform) overwrites the existing
   // row rather than creating a duplicate. Drizzle's `onConflictDoUpdate`
@@ -173,7 +196,7 @@ export async function GET(request: Request) {
       refreshToken: longLived.accessToken,
       accessToken: longLived.accessToken,
       accessTokenExpiresAt,
-      accountIds: accounts,
+      accountIds: accountIdsForRow,
       activeAccountId,
       platformMetadata,
     })
@@ -183,7 +206,7 @@ export async function GET(request: Request) {
         refreshToken: longLived.accessToken,
         accessToken: longLived.accessToken,
         accessTokenExpiresAt,
-        accountIds: accounts,
+        accountIds: accountIdsForRow,
         activeAccountId,
         platformMetadata,
         updatedAt: new Date(),
