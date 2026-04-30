@@ -120,7 +120,7 @@ function isKnownReason(value: string | null | undefined): value is ErrorReason {
 
 function ClaudeConnectorSection() {
     return (
-        <div className="w-full max-w-3xl text-left">
+        <div className="w-full max-w-4xl text-left">
             <ConnectorSetupSteps surface="in_app" />
         </div>
     );
@@ -144,7 +144,7 @@ function connectPathForTab(tab: SetupTab): string {
 
 function ClaudeCodeManualSection() {
     return (
-        <div className="w-full max-w-3xl text-left">
+        <div className="w-full max-w-4xl text-left">
             <ClaudeCodePluginSteps surface="in_app" />
         </div>
     );
@@ -152,7 +152,7 @@ function ClaudeCodeManualSection() {
 
 function CodexSection() {
     return (
-        <div className="w-full max-w-3xl text-left">
+        <div className="w-full max-w-4xl text-left">
             <CodexSetupSteps surface="in_app" />
         </div>
     );
@@ -254,7 +254,7 @@ function SetupTabs({ activeTab, apiKey, onSignIn, onTokenRotated }: {
             ) : activeTab === 'codex' ? (
                 <CodexSection />
             ) : (
-                <div className="w-full max-w-3xl text-left">
+                <div className="w-full max-w-4xl text-left">
                     <AnyMcpClientSetup
                         apiKey={apiKey}
                         onSignIn={onSignIn}
