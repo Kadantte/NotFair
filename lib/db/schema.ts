@@ -217,7 +217,9 @@ export const oauthClients = pgTable("oauth_clients", {
    * `oauth_access_tokens` instead.
    */
   oauthAccessToken: text("oauth_access_token"),
-  // Pre-bound for the in-app Claude Connector flow (`/api/oauth/clients`).
+  // Pre-bound for the legacy in-app Claude Connector flow (the minting route
+  // /api/oauth/clients was removed in 2026-04 — DB rows from before that
+  // change still authenticate via the pre-bound branch in /api/oauth/authorize).
   // Null for clients minted via RFC 7591 Dynamic Client Registration
   // (`/api/oauth/register`) — those resolve the session from the user's
   // cookie at /authorize time.
@@ -250,6 +252,12 @@ export const oauthAccessTokens = pgTable("oauth_access_tokens", {
   token: text("token").primaryKey(),
   clientId: text("client_id").notNull(),
   sessionId: integer("session_id").notNull(),
+  /**
+   * RFC 8707 audience. Resource URL the token is bound to (e.g. `/api/mcp`,
+   * `/api/mcp/google`). NULL is treated as the legacy `/api/mcp` value so
+   * pre-multi-platform tokens keep authenticating against the Google MCP.
+   */
+  resourceUrl: text("resource_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -262,6 +270,13 @@ export const authorizationCodes = pgTable("authorization_codes", {
   clientId: text("client_id").notNull(),
   codeChallenge: text("code_challenge"),
   codeChallengeMethod: text("code_challenge_method"),
+  /**
+   * RFC 8707 resource the code was issued for. Carried through to the
+   * token-exchange step so the resulting `oauth_access_tokens` row is
+   * audience-stamped and prefix-stamped (oat_google_ads_*, oat_meta_ads_*,
+   * or legacy oat_* for /api/mcp). NULL is treated as `/api/mcp`.
+   */
+  resourceUrl: text("resource_url"),
   expiresAt: timestamp("expires_at").notNull(),
   used: boolean("used").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

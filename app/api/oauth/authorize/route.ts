@@ -7,16 +7,19 @@ import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
 import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
+import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
  *
  * Two flavors of client land here:
  *
- * 1. **Pre-bound clients** (in-app Claude Connector flow via
- *    `/api/oauth/clients`): `oauth_clients.session_id` is set at registration
- *    time, so we just resolve that session and skip user authentication.
- *    The user already proved who they were when they minted the credentials.
+ * 1. **Pre-bound clients** (legacy in-app Claude Connector flow): rows where
+ *    `oauth_clients.session_id` is set at registration time, so we just
+ *    resolve that session and skip user authentication. The route that minted
+ *    these (`/api/oauth/clients`) was removed in 2026-04 when the in-app UI
+ *    switched to RFC 7591 DCR; the branch is kept so any pre-bound rows
+ *    already in the DB continue to authenticate.
  *
  * 2. **DCR clients** (RFC 7591 via `/api/oauth/register`, e.g. Codex CLI):
  *    `session_id` is null. We must authenticate the user mid-flow via the
@@ -34,6 +37,19 @@ export async function GET(request: Request) {
   const responseType = searchParams.get("response_type");
   const codeChallenge = searchParams.get("code_challenge");
   const codeChallengeMethod = searchParams.get("code_challenge_method");
+  // RFC 8707 resource indicator. Tells us which MCP resource the requested
+  // token will be presented to. Absent → default to /api/mcp so already-
+  // registered Claude clients (which predate the multi-platform shape) keep
+  // working without modification.
+  const resourceParam = searchParams.get("resource");
+  const resolvedResource = resolveResourceFromUrl(resourceParam);
+  if (resourceParam && !resolvedResource) {
+    return NextResponse.json(
+      { error: "invalid_target", error_description: `Unknown resource: ${resourceParam}` },
+      { status: 400 },
+    );
+  }
+  const resourceUrlPath = resolvedResource?.path ?? DEFAULT_RESOURCE_PATH;
 
   if (responseType !== "code") {
     return NextResponse.json(
@@ -155,6 +171,7 @@ export async function GET(request: Request) {
     clientId,
     codeChallenge,
     codeChallengeMethod,
+    resourceUrl: resourceUrlPath,
     expiresAt: codeExpiresAt,
   });
 

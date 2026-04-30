@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { redirectUriEquivalent } from "@/lib/oauth/redirect-uri";
+import { DEFAULT_RESOURCE_PATH, findResource } from "@/lib/mcp/resources";
 
 /**
  * OAuth 2.0 Token Endpoint for Claude Connector.
@@ -212,12 +213,28 @@ export async function POST(request: Request) {
   // rows keep each issued token alive until its session expires.
   //
   // See lib/db/schema.ts → oauthAccessTokens for the invariant.
-  const oauthAccessToken = `oat_${randomBytes(32).toString("hex")}`;
+  //
+  // Token prefix is derived from the resource the auth code was issued
+  // against (RFC 8707). Auth codes minted by pre-multi-platform clients
+  // have NULL `resource_url` — those default to /api/mcp + legacy `oat_`
+  // prefix so existing Claude registrations keep working unchanged.
+  const resourceUrlPath = authCode.resourceUrl ?? DEFAULT_RESOURCE_PATH;
+  const resource = findResource(resourceUrlPath);
+  const tokenPrefix = resource && resourceUrlPath !== DEFAULT_RESOURCE_PATH
+    // Platform-explicit resource — stamp the new prefix.
+    ? resource.tokenPrefix
+    // Default `/api/mcp` keeps the legacy `oat_` prefix indefinitely so old
+    // tokens and new tokens issued at this path are indistinguishable to
+    // existing connectors. New Google connections that want the explicit
+    // prefix should request `resource=/api/mcp/google` at /authorize time.
+    : "oat_";
+  const oauthAccessToken = `${tokenPrefix}${randomBytes(32).toString("hex")}`;
 
   await db().insert(schema.oauthAccessTokens).values({
     token: oauthAccessToken,
     clientId,
     sessionId: authCode.sessionId,
+    resourceUrl: resourceUrlPath,
   });
 
   // For DCR clients (RFC 7591), record the session binding on the client row

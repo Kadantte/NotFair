@@ -1,5 +1,6 @@
 import { GoogleAdsMcpPage } from "@/components/marketing/google-ads-mcp-page";
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
+import { MCP_SERVER_URL } from "@/lib/brand";
 
 export const metadata = buildMetadata({
   title: "Google Ads MCP Server — Configurations for Claude, Codex, Cursor & More",
@@ -32,7 +33,7 @@ const faqItems = [
   {
     question: "Do I need to self-host anything?",
     answer:
-      "No. The server is hosted at https://notfair.co/api/mcp. You just point your client at it and authenticate.",
+      `No. The server is hosted at ${MCP_SERVER_URL}. You just point your client at it and authenticate.`,
   },
   {
     question: "How does authentication work?",
@@ -69,7 +70,7 @@ const jsonLd = [
     },
     url: new URL("/google-ads-mcp", SITE_URL).toString(),
     featureList: [
-      "Hosted MCP server at https://notfair.co/api/mcp",
+      `Hosted MCP server at ${MCP_SERVER_URL}`,
       "Streamable HTTP transport (MCP 2025-03-26)",
       "OAuth 2.0 with PKCE",
       "Bearer token authentication",

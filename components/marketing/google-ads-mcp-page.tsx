@@ -44,7 +44,7 @@ const FAQ_ITEMS: FaqItem[] = [
     {
         question: "Do I need to self-host anything?",
         answer:
-            "No. The server is hosted at https://notfair.co/api/mcp. You just point your client at it and authenticate.",
+            `No. The server is hosted at ${SERVER_URL}. You just point your client at it and authenticate.`,
     },
     {
         question: "How does authentication work?",
