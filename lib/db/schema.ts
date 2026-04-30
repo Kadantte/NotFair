@@ -251,11 +251,20 @@ export const oauthClients = pgTable("oauth_clients", {
 export const oauthAccessTokens = pgTable("oauth_access_tokens", {
   token: text("token").primaryKey(),
   clientId: text("client_id").notNull(),
-  sessionId: integer("session_id").notNull(),
+  /**
+   * Polymorphic connection FK — exactly one of `sessionId` / `connectionId`
+   * is non-null, enforced by `oauth_access_tokens_target_xor` CHECK
+   * constraint (migration 0032). Google Ads rows set `sessionId`
+   * (→ mcp_sessions.id); Meta and future-platform rows set `connectionId`
+   * (→ ad_platform_connections.id).
+   */
+  sessionId: integer("session_id"),
+  connectionId: integer("connection_id"),
   /**
    * RFC 8707 audience. Resource URL the token is bound to (e.g. `/api/mcp`,
-   * `/api/mcp/google`). NULL is treated as the legacy `/api/mcp` value so
-   * pre-multi-platform tokens keep authenticating against the Google MCP.
+   * `/api/mcp/google_ads`, `/api/mcp/meta_ads`). NULL is treated as the
+   * legacy `/api/mcp` value so pre-multi-platform tokens keep authenticating
+   * against the Google MCP.
    */
   resourceUrl: text("resource_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -265,7 +274,13 @@ export const oauthAccessTokens = pgTable("oauth_access_tokens", {
 
 export const authorizationCodes = pgTable("authorization_codes", {
   code: text("code").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  /**
+   * Polymorphic connection FK, mirrors oauth_access_tokens. Exactly one of
+   * sessionId / connectionId is non-null per row, enforced by
+   * `authorization_codes_target_xor` CHECK (migration 0032).
+   */
+  sessionId: integer("session_id"),
+  connectionId: integer("connection_id"),
   redirectUri: text("redirect_uri").notNull(),
   clientId: text("client_id").notNull(),
   codeChallenge: text("code_challenge"),

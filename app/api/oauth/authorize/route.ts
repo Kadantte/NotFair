@@ -12,20 +12,30 @@ import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resourc
 /**
  * OAuth 2.0 Authorization Endpoint.
  *
- * Two flavors of client land here:
+ * Three branches based on the requested resource and the OAuth client shape:
  *
- * 1. **Pre-bound clients** (legacy in-app Claude Connector flow): rows where
- *    `oauth_clients.session_id` is set at registration time, so we just
- *    resolve that session and skip user authentication. The route that minted
- *    these (`/api/oauth/clients`) was removed in 2026-04 when the in-app UI
- *    switched to RFC 7591 DCR; the branch is kept so any pre-bound rows
- *    already in the DB continue to authenticate.
+ * 1. **Google pre-bound clients** (legacy in-app Claude Connector flow):
+ *    rows where `oauth_clients.session_id` is set at registration time. We
+ *    resolve that session and skip user authentication. The route that
+ *    minted these (`/api/oauth/clients`) was removed in 2026-04 when the
+ *    in-app UI switched to RFC 7591 DCR; this branch is kept so any pre-
+ *    bound rows already in the DB continue to authenticate. Pre-bound
+ *    clients are Google-only by definition — Meta resources always require
+ *    DCR.
  *
- * 2. **DCR clients** (RFC 7591 via `/api/oauth/register`, e.g. Codex CLI):
- *    `session_id` is null. We must authenticate the user mid-flow via the
- *    `adsagent_token` cookie and bind the auth code to that session. If
- *    there's no cookie, we redirect to sign-in with `next` set so the user
- *    lands back here after Google OAuth completes.
+ * 2. **Google DCR clients** (RFC 7591 via `/api/oauth/register`, e.g. Codex
+ *    CLI hitting /api/mcp or /api/mcp/google_ads): identify the user from
+ *    the `adsagent_token` cookie, bind the auth code to their `mcp_sessions`
+ *    row via `session_id`.
+ *
+ * 3. **Meta DCR clients** (resource = /api/mcp/meta_ads): identify the user
+ *    via cookie, look up their `ad_platform_connections` row for
+ *    platform='meta_ads', bind the auth code via `connection_id`. If they
+ *    don't yet have a Meta connection, bounce through /api/oauth/meta/start
+ *    (Layer A) first — they'll come back here after consenting.
+ *
+ * In all three cases the auth code carries `resource_url` so the token
+ *  endpoint can stamp the right prefix and audience.
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -50,6 +60,7 @@ export async function GET(request: Request) {
     );
   }
   const resourceUrlPath = resolvedResource?.path ?? DEFAULT_RESOURCE_PATH;
+  const isMetaResource = resolvedResource?.platform === "meta_ads";
 
   if (responseType !== "code") {
     return NextResponse.json(
@@ -83,7 +94,7 @@ export async function GET(request: Request) {
 
   if (!client) {
     return NextResponse.json(
-      { error: "invalid_client", error_description: "Unknown client_id. Register via /api/oauth/register or generate credentials at www.notfair.co." },
+      { error: "invalid_client", error_description: "Unknown client_id. Register via /api/oauth/register." },
       { status: 401 },
     );
   }
@@ -100,11 +111,29 @@ export async function GET(request: Request) {
     }
   }
 
-  // Resolve which mcp_session the auth code should be bound to.
+  // Pre-bound clients are Google-only — `oauth_clients.session_id` points
+  // at an `mcp_sessions` row. Refusing them at the Meta resource avoids
+  // mismatched-target tokens (a Google session_id getting stamped onto a
+  // Meta-audience auth code, which would then violate the XOR CHECK).
+  if (client.sessionId !== null && isMetaResource) {
+    return NextResponse.json(
+      {
+        error: "invalid_target",
+        error_description:
+          "Pre-bound OAuth clients are Google-only. Re-register via /api/oauth/register to use the Meta resource.",
+      },
+      { status: 400 },
+    );
+  }
+
+  // Resolve which target the auth code binds to. Polymorphic: exactly one
+  // of (resolvedSessionId, resolvedConnectionId) is non-null. Enforced by
+  // the `authorization_codes_target_xor` CHECK constraint at INSERT time.
   let resolvedSessionId: number | null = null;
+  let resolvedConnectionId: number | null = null;
 
   if (client.sessionId !== null) {
-    // Pre-bound (Claude Connector) flow: trust the registration-time binding.
+    // 1. Google pre-bound flow: trust the registration-time binding.
     const [session] = await db()
       .select({ id: schema.mcpSessions.id })
       .from(schema.mcpSessions)
@@ -119,13 +148,15 @@ export async function GET(request: Request) {
 
     if (!session) {
       return NextResponse.json(
-        { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account at www.notfair.co and generate new credentials." },
+        { error: "access_denied", error_description: "Session expired. Reconnect your Google Ads account and try again." },
         { status: 403 },
       );
     }
     resolvedSessionId = session.id;
   } else {
-    // DCR flow: identify the user from the cookie and bind to their session.
+    // 2 + 3. DCR flow — identify the user from the cookie. Both Google and
+    // Meta resources need a NotFair session (the user identity); they
+    // diverge on which downstream connection table to bind to.
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
 
@@ -140,7 +171,7 @@ export async function GET(request: Request) {
     }
 
     const [session] = await db()
-      .select({ id: schema.mcpSessions.id })
+      .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
       .from(schema.mcpSessions)
       .where(
         and(
@@ -153,20 +184,77 @@ export async function GET(request: Request) {
 
     if (!session) {
       return NextResponse.json(
-        { error: "access_denied", error_description: "No active Google Ads session. Reconnect at www.notfair.co and try again." },
+        { error: "access_denied", error_description: "No active session. Sign in and try again." },
         { status: 403 },
       );
     }
-    resolvedSessionId = session.id;
+
+    if (isMetaResource) {
+      // 3. Meta DCR: bind to ad_platform_connections row, not mcp_sessions.
+      if (!session.userId) {
+        return NextResponse.json(
+          { error: "access_denied", error_description: "Session has no user_id; sign in again." },
+          { status: 403 },
+        );
+      }
+      const [conn] = await db()
+        .select({ id: schema.adPlatformConnections.id, activeAccountId: schema.adPlatformConnections.activeAccountId })
+        .from(schema.adPlatformConnections)
+        .where(
+          and(
+            eq(schema.adPlatformConnections.userId, session.userId),
+            eq(schema.adPlatformConnections.platform, "meta_ads"),
+          ),
+        )
+        .limit(1);
+
+      if (!conn) {
+        // No Meta connection yet — bounce through Layer A. /api/oauth/meta/start
+        // will return the user here after the upstream Meta consent.
+        const metaStartUrl = new URL("/api/oauth/meta/start", requestUrl);
+        metaStartUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
+        );
+        return NextResponse.redirect(metaStartUrl.toString());
+      }
+      if (!conn.activeAccountId) {
+        // Meta connection exists but no active ad account selected. The user
+        // probably has zero ad accounts on Meta, or the picker was bypassed.
+        return NextResponse.json(
+          {
+            error: "access_denied",
+            error_description:
+              "No active Meta ad account selected. Visit /connect to pick one and try again.",
+          },
+          { status: 403 },
+        );
+      }
+      resolvedConnectionId = conn.id;
+    } else {
+      // 2. Google DCR: bind to mcp_sessions (existing behavior).
+      resolvedSessionId = session.id;
+    }
   }
 
-  // Generate authorization code
+  // Generate authorization code. Exactly one of sessionId / connectionId is
+  // non-null per the XOR CHECK; we assert that here defensively.
+  if ((resolvedSessionId === null) === (resolvedConnectionId === null)) {
+    // Both null or both set — shouldn't happen given the branches above,
+    // but the CHECK constraint would also catch it.
+    return NextResponse.json(
+      { error: "server_error", error_description: "Internal binding error." },
+      { status: 500 },
+    );
+  }
+
   const authCode = randomBytes(32).toString("hex");
   const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
 
   await db().insert(schema.authorizationCodes).values({
     code: authCode,
     sessionId: resolvedSessionId,
+    connectionId: resolvedConnectionId,
     redirectUri,
     clientId,
     codeChallenge,
@@ -181,4 +269,3 @@ export async function GET(request: Request) {
 
   return NextResponse.redirect(url.toString());
 }
-

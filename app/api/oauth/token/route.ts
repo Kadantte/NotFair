@@ -171,36 +171,70 @@ export async function POST(request: Request) {
     .set({ used: true })
     .where(eq(schema.authorizationCodes.code, code));
 
-  // LOAD-BEARING: the gte(expires_at, now) filter is what stops the retry
-  // loop. /authorize will pass with as little as 1s of validity left, so a
-  // session can tick past expiry between authorize and this token exchange.
-  // Without the filter we silently issue a token with expires_in=0; the
-  // request handler then 401s every MCP call, the client treats that as
-  // "token bad" and re-runs OAuth — tight 401 → re-authorize loop, with
-  // the same `state` and a fresh PKCE pair on each attempt.
+  // LOAD-BEARING: validate the bound target still exists. /authorize will
+  // pass with as little as 1s of validity left, so a session/connection can
+  // tick past expiry between authorize and this token exchange. Without the
+  // check we silently issue a token whose connection is gone; the request
+  // handler then 401s every MCP call, the client treats that as "token bad"
+  // and re-runs OAuth — tight 401 → re-authorize retry loop.
   //
   // Returning invalid_grant (400) instead of issuing the dud token is what
   // surfaces a real error to the client so it stops retrying.
-  const [session] = await db()
-    .select({
-      expiresAt: schema.mcpSessions.expiresAt,
-    })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.id, authCode.sessionId),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .limit(1);
-
-  if (!session) {
+  //
+  // Polymorphic dispatch: the auth code carries either session_id (Google,
+  // → mcp_sessions) or connection_id (Meta+, → ad_platform_connections).
+  // Exactly one is non-null per the XOR CHECK constraint.
+  let expiresInSeconds: number;
+  if (authCode.sessionId !== null) {
+    const [session] = await db()
+      .select({ expiresAt: schema.mcpSessions.expiresAt })
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.id, authCode.sessionId),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        ),
+      )
+      .limit(1);
+    if (!session) {
+      return NextResponse.json(
+        {
+          error: "invalid_grant",
+          error_description:
+            "The Google Ads session bound to this authorization code has expired. Reconnect at notfair.co/connect to mint a new session.",
+        },
+        { status: 400 },
+      );
+    }
+    expiresInSeconds = Math.max(
+      0,
+      Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000),
+    );
+  } else if (authCode.connectionId !== null) {
+    const [conn] = await db()
+      .select({ expiresAt: schema.adPlatformConnections.accessTokenExpiresAt })
+      .from(schema.adPlatformConnections)
+      .where(eq(schema.adPlatformConnections.id, authCode.connectionId))
+      .limit(1);
+    if (!conn) {
+      return NextResponse.json(
+        {
+          error: "invalid_grant",
+          error_description:
+            "The platform connection bound to this authorization code no longer exists. Reconnect via /connect.",
+        },
+        { status: 400 },
+      );
+    }
+    // Meta long-lived tokens are valid for ~60 days; use the connection's
+    // accessTokenExpiresAt as a proxy for token validity. If the connection
+    // hasn't refreshed yet, default to 60 days from now.
+    const exp = conn.expiresAt ? new Date(conn.expiresAt).getTime() : Date.now() + 60 * 24 * 60 * 60 * 1000;
+    expiresInSeconds = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+  } else {
+    // Should never happen — XOR CHECK at INSERT time enforces exactly one.
     return NextResponse.json(
-      {
-        error: "invalid_grant",
-        error_description:
-          "The Google Ads session bound to this authorization code has expired. Reconnect at www.notfair.co/connect to mint a new session.",
-      },
+      { error: "invalid_grant", error_description: "Authorization code has no bound target." },
       { status: 400 },
     );
   }
@@ -233,23 +267,31 @@ export async function POST(request: Request) {
   await db().insert(schema.oauthAccessTokens).values({
     token: oauthAccessToken,
     clientId,
+    // Polymorphic FK: exactly one of these is non-null per the XOR CHECK.
+    // Carry over from the auth code so the token points at the same target.
     sessionId: authCode.sessionId,
+    connectionId: authCode.connectionId,
     resourceUrl: resourceUrlPath,
   });
 
-  // For DCR clients (RFC 7591), record the session binding on the client row
-  // so subsequent /authorize calls can short-circuit through the pre-bound
-  // path instead of re-prompting for sign-in. Pre-bound clients already have
-  // session_id set at registration; this UPDATE is a no-op for them.
-  await db()
-    .update(schema.oauthClients)
-    .set({ sessionId: authCode.sessionId })
-    .where(eq(schema.oauthClients.clientId, clientId));
+  // For Google DCR clients (RFC 7591), record the session binding on the
+  // client row so subsequent /authorize calls can short-circuit through the
+  // pre-bound path instead of re-prompting for sign-in. Pre-bound clients
+  // already have session_id set; this UPDATE is a no-op for them.
+  //
+  // SKIPPED for Meta tokens: `oauth_clients.session_id` is FK-pointing at
+  // mcp_sessions only. Writing a Meta `ad_platform_connections.id` here
+  // would corrupt the table. Meta DCR clients always re-resolve the user's
+  // Meta connection via cookie at /authorize time anyway, so the
+  // short-circuit isn't needed.
+  if (authCode.sessionId !== null) {
+    await db()
+      .update(schema.oauthClients)
+      .set({ sessionId: authCode.sessionId })
+      .where(eq(schema.oauthClients.clientId, clientId));
+  }
 
-  const expiresIn = Math.max(
-    0,
-    Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000),
-  );
+  const expiresIn = expiresInSeconds;
 
   return NextResponse.json({
     access_token: oauthAccessToken,

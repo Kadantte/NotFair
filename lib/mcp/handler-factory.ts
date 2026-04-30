@@ -176,47 +176,104 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
       // on oauth_clients reintroduces the rotation race that produces a
       // 401 → re-authorize retry loop.
       //
-      // Audience check: a token's `resource_url` must match this handler's
-      // resource path. NULL is treated as `/api/mcp` so legacy `oat_*`
-      // tokens (issued before the multi-platform shape existed) keep
-      // authenticating at the legacy resource without modification.
-      const [row] = await db()
-        .select({
-          session: schema.mcpSessions,
-          tokenResourceUrl: schema.oauthAccessTokens.resourceUrl,
-        })
-        .from(schema.oauthAccessTokens)
-        .innerJoin(schema.mcpSessions, eq(schema.oauthAccessTokens.sessionId, schema.mcpSessions.id))
-        .where(
-          and(
-            eq(schema.oauthAccessTokens.token, bearerToken),
-            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-          ),
-        )
-        .limit(1);
-      if (row) {
-        // Platform-scoped audience check. A token issued for any URL on this
-        // platform is accepted at any other URL on the same platform — both
-        // /api/mcp (legacy default) and /api/mcp/google_ads route to the same
-        // Google Ads handler, so cross-URL within a platform is safe. The
-        // boundary that *matters* — Google tokens cannot impersonate at the
-        // future /api/mcp/meta_ads — is enforced because that route's
-        // resource maps to a different platform.
-        //
-        // Strict per-URL audience proved too rigid for real-world clients:
-        // rmcp (Codex's MCP client) implements RFC 8414 but skips RFC 9728
-        // protected-resource discovery, so it never sends `resource=` on
-        // /authorize and the issued token defaults to /api/mcp. Without this
-        // relaxation, those tokens would 401 at any platform-explicit URL
-        // even though the user is authentic and the session is platform-bound.
-        const tokenResource = row.tokenResourceUrl ?? DEFAULT_RESOURCE_PATH;
-        const tokenPlatform = findResource(tokenResource)?.platform;
-        if (tokenPlatform !== config.platform) {
-          throw new Error(
-            `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${config.platform}.`,
-          );
+      // Polymorphic dispatch: Google tokens have session_id set (→ join to
+      // mcp_sessions); Meta tokens have connection_id set (→ join to
+      // ad_platform_connections). Branched on config.platform so the
+      // resolver only joins against the table relevant for this MCP.
+
+      if (config.platform === "meta_ads") {
+        const [row] = await db()
+          .select({
+            connection: schema.adPlatformConnections,
+            tokenResourceUrl: schema.oauthAccessTokens.resourceUrl,
+          })
+          .from(schema.oauthAccessTokens)
+          .innerJoin(
+            schema.adPlatformConnections,
+            eq(schema.oauthAccessTokens.connectionId, schema.adPlatformConnections.id),
+          )
+          .where(eq(schema.oauthAccessTokens.token, bearerToken))
+          .limit(1);
+
+        if (row) {
+          // Audience check (platform-scoped, same as Google branch).
+          const tokenResource = row.tokenResourceUrl ?? DEFAULT_RESOURCE_PATH;
+          const tokenPlatform = findResource(tokenResource)?.platform;
+          if (tokenPlatform !== config.platform) {
+            throw new Error(
+              `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${config.platform}.`,
+            );
+          }
+
+          // Build a Google-shaped AuthContext from the Meta connection. The
+          // tool surface is currently Google-only; when Stage 4 introduces
+          // real Meta tools, they'll consume Meta-specific fields and this
+          // mapping will be replaced with a proper MetaAuthContext. For
+          // Stage 3 (skeleton route, _skeleton_status only), the Google
+          // shape is sufficient — the auth context just has to exist.
+          const conn = row.connection;
+          const accounts = (conn.accountIds ?? []).map((a) => ({
+            id: a.id,
+            name: a.name ?? "",
+          }));
+          const userAgent = request.headers.get("user-agent") ?? null;
+          return {
+            refreshToken: conn.refreshToken,
+            customerId: conn.activeAccountId ?? "",
+            customerIds: accounts.length > 0
+              ? accounts
+              : (conn.activeAccountId ? [{ id: conn.activeAccountId, name: "" }] : []),
+            loginCustomerId: null,
+            userId: conn.userId,
+            clientName: null,
+            clientVersion: null,
+            authMethod: "oauth",
+            userAgent,
+            sessionToken: bearerToken,
+            sessionId: null,
+          };
         }
-        session = row.session;
+        // Token not found → fall through to the "session not found" throw below.
+      } else {
+        // Google path (existing).
+        const [row] = await db()
+          .select({
+            session: schema.mcpSessions,
+            tokenResourceUrl: schema.oauthAccessTokens.resourceUrl,
+          })
+          .from(schema.oauthAccessTokens)
+          .innerJoin(schema.mcpSessions, eq(schema.oauthAccessTokens.sessionId, schema.mcpSessions.id))
+          .where(
+            and(
+              eq(schema.oauthAccessTokens.token, bearerToken),
+              gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+            ),
+          )
+          .limit(1);
+        if (row) {
+          // Platform-scoped audience check. A token issued for any URL on this
+          // platform is accepted at any other URL on the same platform — both
+          // /api/mcp (legacy default) and /api/mcp/google_ads route to the same
+          // Google Ads handler, so cross-URL within a platform is safe. The
+          // boundary that *matters* — Google tokens cannot impersonate at the
+          // future /api/mcp/meta_ads — is enforced because that route's
+          // resource maps to a different platform.
+          //
+          // Strict per-URL audience proved too rigid for real-world clients:
+          // rmcp (Codex's MCP client) implements RFC 8414 but skips RFC 9728
+          // protected-resource discovery, so it never sends `resource=` on
+          // /authorize and the issued token defaults to /api/mcp. Without this
+          // relaxation, those tokens would 401 at any platform-explicit URL
+          // even though the user is authentic and the session is platform-bound.
+          const tokenResource = row.tokenResourceUrl ?? DEFAULT_RESOURCE_PATH;
+          const tokenPlatform = findResource(tokenResource)?.platform;
+          if (tokenPlatform !== config.platform) {
+            throw new Error(
+              `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${config.platform}.`,
+            );
+          }
+          session = row.session;
+        }
       }
     } else if (config.acceptDirectBearer) {
       // Direct MCP session token (pre-multi-platform flat bearer). Only the
