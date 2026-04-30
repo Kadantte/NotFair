@@ -21,7 +21,7 @@ When this skill runs, **you** — the model reading this skill in the user's cur
 - ❌ Running `npm run eval:mcp` (it shells out to `claude -p` per prompt)
 - ❌ Any subprocess wrapper that invokes a different model context
 
-**Why this matters.** The eval measures how a real agent (Claude Code, Claude Desktop, claude.ai) behaves with this MCP server. Subagents and `claude -p` subprocesses run in a *different* agent environment: different system prompt, different default tool-selection priors, different MCP tool surfacing, sometimes a different model. A description change that helps the real user can look like a regression in subagent-land, and vice versa. The user invoked this skill in their actual agent environment. **That** is the environment under test.
+**Why this matters.** The eval measures how a real agent (the Codex CLI session the user is in right now) behaves with this MCP server. Subagents and `claude -p` subprocesses run in a *different* agent environment: different system prompt, different default tool-selection priors, different MCP tool surfacing, sometimes a different model. A description change that helps the real user can look like a regression in subagent-land, and vice versa. The user invoked this skill in their actual agent environment. **That** is the environment under test.
 
 The only exception is the **judge** step in full mode (rubric scoring) — see "Full mode" below. The judge benefits from blinding, so it stays subprocess-based.
 
@@ -116,7 +116,7 @@ Pass/fail is empirical (did the expected tool fire? did call count stay ≤ 3?),
 
 ### Full mode (`--full`)
 
-Eight prompts from `scripts/eval-mcp/prompts.json`, no tool-call cap. **Runner is still you, in-session**, but now there's a judge step that scores your responses on the 7-dim rubric in `.claude/skills/eval-mcp/rubric.md` (faithfulness, specificity, actionability, insight, prioritization, honesty, overall).
+Eight prompts from `scripts/eval-mcp/prompts.json`, no tool-call cap. **Runner is still you, in-session**, but now there's a judge step that scores your responses on the 7-dim rubric in `.agents/skills/eval-mcp/rubric.md` (faithfulness, specificity, actionability, insight, prioritization, honesty, overall).
 
 #### Why the judge stays subprocess-based
 
@@ -124,7 +124,7 @@ The runner directive ("YOU make the calls") exists because tool-selection should
 
 #### Procedure
 
-1. Read `scripts/eval-mcp/prompts.json` and `.claude/skills/eval-mcp/rubric.md`.
+1. Read `scripts/eval-mcp/prompts.json` and `.agents/skills/eval-mcp/rubric.md`.
 2. For each prompt, run the in-session pass (same shape as fast mode but uncapped):
    - Read the prompt
    - Call MCP tools as needed, no call cap
@@ -138,7 +138,7 @@ The runner directive ("YOU make the calls") exists because tool-selection should
 3. Write `runner.json` per prompt with `{prompt, response, tools_called, transport, duration_ms_est}`.
 4. **Judge step (subprocess):** for each `runner.json`, spawn a `claude -p` judge that gets only `{prompt, response, rubric}` and returns the JSON shape from `rubric.md`. Invoke directly — do not depend on `eval.ts`, which couples runner+judge:
    ```bash
-   RUBRIC=$(cat .claude/skills/eval-mcp/rubric.md)
+   RUBRIC=$(cat .agents/skills/eval-mcp/rubric.md)
    PROMPT=$(jq -r '.prompt' "$RUNNER_JSON")
    RESPONSE=$(jq -r '.response' "$RUNNER_JSON")
    CRITERIA=$(jq -r '.criteria // ""' "$RUNNER_JSON")  # chat-followup only
@@ -207,7 +207,7 @@ When reading either file for "did quality move", filter to `runner=in-session` r
 - `scripts/eval-mcp/prompts-fast.json` — fast set. Three targeted prompts. Each entry has `id`, `prompt`, `expected`, `reason`. Keep ~3 prompts; if you add one, remove one. Include at least one **negative test** (a prompt that should NOT pick `runScript`) to guard against over-rotation.
 - `scripts/eval-mcp/prompts.json` — full set. Edit when adding a new user-ask shape to the quality benchmark. Keep `id` stable across edits.
 - `scripts/eval-mcp/prompts-chat.json` — chat set. `writes:true` prompts are gated behind `EVAL_ALLOW_WRITES=1`. Each carries a `criteria` field the judge applies on top of the standard rubric.
-- `.claude/skills/eval-mcp/rubric.md` — only affects `--full` runs. Substantive edits cause a level shift in scores; if you change the rubric materially, start a new history file (`history-v2.jsonl`).
+- `.agents/skills/eval-mcp/rubric.md` — only affects `--full` runs. Substantive edits cause a level shift in scores; if you change the rubric materially, start a new history file (`history-v2.jsonl`).
 
 ## Appendix: subagent / headless paths (secondary)
 

@@ -1,0 +1,23 @@
+{
+  "skill_name": "event-tracker",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I run a pet hotel booking app. Users sign up, browse services, and book overnight stays for their pets. I'm using Statsig and want to set up proper event tracking — what events should I log and how?",
+      "expected_output": "A complete event tracking plan including: NSM definition, proxy metric, Aha Moment hypothesis, event catalog with all 4 categories (Identity/Lifecycle, Value-Exchange, High-Intent Setup, Activation), and Statsig SDK code snippets with proper event anatomy (event_name, metadata properties).",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "We built a project management SaaS for small teams. Free trial to paid conversion is our main problem. Help me define a North Star Metric and set up event tracking in Mixpanel to figure out why people aren't converting.",
+      "expected_output": "NSM growth equation for a SaaS tool, input metrics constellation, proxy metric for trial conversion prediction, funnel event design (High-Intent Setup + Value-Exchange events with properties that enable funnel analysis), and Mixpanel implementation code. Should identify where conversion friction likely exists.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have a recipe app on iOS and Android. Users save recipes, plan meals, and generate grocery lists. I want to find our Aha Moment and track events in PostHog. Where do I start?",
+      "expected_output": "Structured approach to finding the Aha Moment (hypothesis + how to validate with data), NSM definition for a content/utility app, the 4 event categories applied to recipe app context, and PostHog SDK implementation with proper identify() + capture() calls.",
+      "files": []
+    }
+  ]
+}

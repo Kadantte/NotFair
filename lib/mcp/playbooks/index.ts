@@ -218,6 +218,208 @@ If no changes correlate with the cliff date, say so plainly: "No account edits c
 - Don't call \`runScript\` multiple times for related surfaces — the fan-out above already covers them. Combining them IS the point.
 `;
 
+const RUN_EXPERIMENT = `# Run a Google Ads experiment (drafts & trials)
+
+Use this when the user asks anything like "A/B test these ads", "compare TARGET_CPA vs MAX_CONV", "run an experiment on this campaign", "test a new bidding strategy", "split traffic between control and treatment", or "graduate the trial". The lifecycle has **two halves**: a sequence of dedicated MCP tools for **mutating** the experiment state, and \`runScript\` for **reading** experiment data and analyzing performance.
+
+Do not write GAQL to mutate experiments — Google's API uses dedicated services that the runScript sandbox cannot reach. Use the tools listed below.
+
+## When NOT to start an experiment
+
+1. Campaign has fewer than ~30 conversions per week. Stat-significance windows on Google's experiment platform are 14–28 days; with low conversion volume you'll never reach significance.
+2. The base campaign is itself paused or has spent <$0 in the last 7 days.
+3. The user wants to test a Performance Max or Demand Gen change. Those have separate experiment flows that we don't yet expose.
+
+## Lifecycle (5 mutating tool calls + 2 read passes)
+
+\`\`\`
+createExperiment        →  step 1: Experiment row in SETUP state
+addExperimentArms       →  step 2: 1 control + 1 treatment, traffic_split sums to 100
+                              ↳ returns inDesignCampaigns[0] — the trial campaign
+[apply mutation under test on the trial campaign]
+                              ↳ updateCampaignBidding | updateAd | addKeyword | etc.
+scheduleExperiment      →  step 3: starts forking (long-running)
+listExperimentAsyncErrors  →  step 4: confirm forking succeeded
+[wait ≥ 14 days, monitor with runScript]
+endExperiment | promoteExperiment | graduateExperiment   →  step 5
+\`\`\`
+
+### Step 1 — createExperiment
+
+Type \`SEARCH_CUSTOM\` for any test that mutates a single search campaign — covering ad copy, keywords, landing pages, AND RSA-asset-level A/B tests. Type \`SEARCH_AUTOMATED_BIDDING_STRATEGY\` to compare bidding strategies on the same base campaign. For RSA-asset-level tests specifically, prefer the \`createAdVariationExperiment\` shortcut described below, which bundles steps 1–4 (create + arms + find cloned RSA + patch assets) into one call.
+
+> Note: the proto exposes \`AD_VARIATION\` as a separate type, but no Google sample demonstrates it through \`ExperimentService.MutateExperiments\`, and the Help-Center-doc behavior of the Ad Variations UI (cross-campaign find/replace) doesn't fit \`experiment_arm.campaigns\` (max length 1). Stick with \`SEARCH_CUSTOM\` and patch the cloned RSA — the convenience tool does this for you.
+
+Suffix defaults to \`[experiment]\` and is appended to the trial campaign name. End date should be **at least 14 days** after start.
+
+### Step 2 — addExperimentArms (one atomic call)
+
+Both arms in a single call — Google rejects incremental adds because traffic_split must sum to exactly 100. Exactly one arm has \`control: true\` and references the existing campaign you're comparing against. The treatment arm has Google auto-spawn a trial campaign — its resource name comes back as \`inDesignCampaigns[0]\`.
+
+\`\`\`
+{ name: "control", control: true,  trafficSplit: 50, campaignId: "<base campaign id>" }
+{ name: "treatment", control: false, trafficSplit: 50 }
+\`\`\`
+
+### Critical step between 2 and 3 — apply the mutation under test
+
+Until you mutate the trial campaign, control and treatment are identical and the experiment is meaningless. Take \`inDesignCampaigns[0]\` from the addExperimentArms response and call the appropriate write tool ON THAT CAMPAIGN ID:
+
+- **Bidding test:** \`updateCampaignBidding\` on the trial campaign with the new strategy/target.
+- **Ad copy test:** \`createAd\` (new RSA on the trial) or \`updateAdAssets\`.
+- **Keyword test:** \`addKeyword\` / \`pauseKeyword\` on the trial.
+- **Landing page test:** \`updateAdFinalUrl\` on the trial's ads.
+
+Skipping this is the #1 cause of "experiment ran but nothing changed."
+
+### Step 3 — scheduleExperiment
+
+Returns immediately with an LRO operation name. Google forks the in-design campaign into a real serving campaign over the next 30–120 seconds.
+
+### Step 4 — listExperimentAsyncErrors
+
+ALWAYS call this 30–60 seconds after scheduleExperiment (and after promoteExperiment). An empty errors array means the LRO succeeded. A non-empty array means forking failed — the most common causes are an invalid budget on the base campaign, a conflicting bidding strategy, or a missing conversion action. Errors here do NOT show up in the scheduleExperiment response.
+
+### Step 5 — choose how to conclude
+
+- **endExperiment** — stop without applying any changes (the test was inconclusive or you don't want the changes).
+- **promoteExperiment** — copy the treatment changes back to the base campaign, then stop the trial. Long-running, follow up with \`listExperimentAsyncErrors\`.
+- **graduateExperiment** — keep the trial running as a permanent standalone campaign with its own budget. Provide the budget resource name; the tool resolves the trial campaign automatically.
+
+## RSA-asset A/B testing: \`createAdVariationExperiment\`
+
+Use this when the user asks "test a new headline", "A/B test this ad copy", "try a different landing page on this RSA", "compare 'Buy now' vs 'Buy today'", etc. Internally this is a \`SEARCH_CUSTOM\` experiment whose treatment-arm clone gets its RSA assets patched — same backend mechanism as a campaign-level test, just targeting an ad rather than the campaign. The shortcut bundles steps 1–4 of the lifecycle:
+
+\`\`\`
+createAdVariationExperiment({
+  name: "RSA call-to-action test",
+  baseCampaignId: "12345",
+  baseAdGroupId: "67890",
+  baseAdId: "11111",
+  // Provide at least one of: headlines, descriptions, finalUrl.
+  // RSA assets are atomic — when patching copy, supply BOTH headlines AND descriptions.
+  headlines: [{ text: "Book Today, Save 20%" }, { text: "Free Returns" }, { text: "Top-Rated 2026" }, ...],
+  descriptions: [{ text: "Free shipping on every order over $50." }, { text: "30-day money-back guarantee." }],
+  finalUrl: "https://example.com/lp/promo",
+  treatmentTrafficSplit: 50,    // 1–99, default 50
+  endDate: "2026-05-31",
+})
+\`\`\`
+
+Returns \`{ experimentResourceName, trialCampaignId, trialAdGroupId, trialAdId, readyToSchedule, patches }\`. When \`readyToSchedule: true\`, call \`scheduleExperiment\` with the returned \`experimentResourceName\` and you're done.
+
+If the shortcut fails partway (\`readyToSchedule: false\` with an \`experimentResourceName\` set), the experiment + arms exist but the asset patch didn't land. Recover by:
+1. Re-applying the patch with \`updateAdAssets\` (or \`updateAdFinalUrl\`) on the returned \`trialAdGroupId\` + \`trialAdId\`, OR
+2. Calling \`endExperiment\` to discard the experiment cleanly.
+
+The shortcut requires the base ad to be a Responsive Search Ad. Other ad types (call-only, image, app) aren't supported.
+
+### When the manual flow is better than the shortcut
+
+Use the granular tools (createExperiment + addExperimentArms + updateAdAssets + scheduleExperiment) instead of the shortcut when:
+
+- The base campaign has multiple RSAs in the same ad group with the same first headline (the shortcut's signature match is ambiguous and will refuse).
+- You want to vary multiple ads in the trial campaign in different ways.
+- You want to test something other than RSA assets within an AD_VARIATION experiment (e.g. expanded text changes, asset pinning shifts).
+
+For the manual RSA-asset flow, follow the regular 5-step lifecycle with \`type: "SEARCH_CUSTOM"\`. Between steps 2 and 3, query the trial campaign to find the cloned RSA's ID:
+
+\`\`\`js
+// Find the cloned RSA in the trial campaign so you can patch it.
+const trialId = "<from inDesignCampaigns[0]>";
+const r = await ads.gaql(\`
+  SELECT ad_group.id, ad_group.name,
+         ad_group_ad.ad.id,
+         ad_group_ad.ad.responsive_search_ad.headlines,
+         ad_group_ad.ad.responsive_search_ad.descriptions
+    FROM ad_group_ad
+    WHERE campaign.id = \${trialId}
+      AND ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD'
+\`);
+return r.rows;
+\`\`\`
+
+Then call \`updateAdAssets\` with the trial \`ad_group.id\` and \`ad_group_ad.ad.id\` and your replacement headlines/descriptions, followed by \`scheduleExperiment\`.
+
+## Reading experiment data with runScript
+
+\`runScript\` cannot mutate experiments, but it's the right tool for monitoring and final-call analysis. The \`experiment\` and \`experiment_arm\` resources are queryable; trial campaigns are normal \`campaign\` rows segmented by their resource name.
+
+\`\`\`js
+// List all experiments and their state
+const r = await ads.gaqlParallel([
+  { name: "experiments", query: \`
+    SELECT experiment.resource_name, experiment.name, experiment.type,
+           experiment.status, experiment.start_date, experiment.end_date,
+           experiment.suffix
+      FROM experiment
+      ORDER BY experiment.start_date DESC\`, limit: 50 },
+  { name: "arms", query: \`
+    SELECT experiment_arm.resource_name, experiment_arm.experiment,
+           experiment_arm.name, experiment_arm.control,
+           experiment_arm.traffic_split,
+           experiment_arm.campaigns,
+           experiment_arm.in_design_campaigns
+      FROM experiment_arm\` }
+]);
+return { experiments: r.experiments.rows, arms: r.arms.rows };
+\`\`\`
+
+To compare control vs. treatment performance, query the trial campaigns directly. Take the trial campaign IDs from \`experiment_arm.in_design_campaigns\` and the control's campaign IDs from \`experiment_arm.campaigns\`, then:
+
+\`\`\`js
+const r = await ads.gaqlParallel([
+  { name: "perCampaign", query: \`
+    SELECT campaign.id, campaign.name, segments.date,
+           metrics.cost_micros, metrics.conversions,
+           metrics.clicks, metrics.impressions
+      FROM campaign
+      WHERE campaign.id IN (<control_id>, <trial_id>)
+        AND segments.date DURING LAST_14_DAYS
+      ORDER BY segments.date\` }
+]);
+
+const rows = r.perCampaign.rows ?? [];
+const byCampaign = new Map();
+for (const row of rows) {
+  const key = String(row.campaign.id);
+  const acc = byCampaign.get(key) ?? { spend: 0, conv: 0, clicks: 0 };
+  acc.spend += (row.metrics.cost_micros || 0) / 1_000_000;
+  acc.conv  += row.metrics.conversions || 0;
+  acc.clicks += row.metrics.clicks || 0;
+  byCampaign.set(key, acc);
+}
+
+return [...byCampaign.entries()].map(([id, v]) => ({
+  campaignId: id,
+  spend: v.spend,
+  conversions: v.conv,
+  cpa: v.conv > 0 ? v.spend / v.conv : null,
+  cpc: v.clicks > 0 ? v.spend / v.clicks : null,
+}));
+\`\`\`
+
+## Decision rule for ending the experiment
+
+Don't recommend promote/graduate until **all four** of these are true:
+
+1. ≥ 14 days since scheduleExperiment.
+2. ≥ 30 conversions on each arm (otherwise CPA noise dominates).
+3. The CPA difference is ≥ 15% AND the lower-CPA arm also has ≥ the higher-CPA arm's conversion volume (so you're not just picking the arm that didn't spend).
+4. \`listExperimentAsyncErrors\` returns no errors for the most recent operation.
+
+If criteria 1–3 aren't met, recommend "wait — n more days OR n more conversions until decision." If criterion 4 fails, recommend re-creating the experiment after fixing the underlying campaign-config issue.
+
+## Don't
+
+- Don't try to mutate experiments via \`runScript\` / \`ads.gaql\`. The dedicated tools are required.
+- Don't add arms incrementally. Both arms in one \`addExperimentArms\` call.
+- Don't call \`scheduleExperiment\` before mutating the trial campaign — both arms will be identical and the test is meaningless.
+- Don't skip \`listExperimentAsyncErrors\` after schedule/promote — async failures are silent in the LRO response.
+- Don't confuse \`graduate\` (keep trial running standalone) with \`promote\` (copy changes back to base, stop trial). They're not interchangeable.
+- For AD_VARIATION tests, don't pass \`headlines\` without \`descriptions\` (or vice versa) — Google replaces the full RSA asset set, and validation rejects partial patches with "RSA requires 3-15 headlines, 2-4 descriptions."
+`;
+
 export const PLAYBOOKS: readonly Playbook[] = [
   {
     uri: "adsagent://playbooks/audit-account",
@@ -232,6 +434,13 @@ export const PLAYBOOKS: readonly Playbook[] = [
     description:
       "One runScript call that correlates the timeseries, per-campaign breakdown, change events, and emergent wasted search terms. Answers 'why did CPA go up' in a single pass.",
     content: ANALYST_MINDSET + EXPLAIN_REGRESSION,
+  },
+  {
+    uri: "adsagent://playbooks/run-experiment",
+    name: "Run a Google Ads experiment (drafts & trials)",
+    description:
+      "Five-step lifecycle for SEARCH_CUSTOM and SEARCH_AUTOMATED_BIDDING_STRATEGY experiments: createExperiment → addExperimentArms → mutate the trial → scheduleExperiment → listExperimentAsyncErrors → end | promote | graduate. Plus runScript queries to monitor and decide.",
+    content: ANALYST_MINDSET + RUN_EXPERIMENT,
   },
 ];
 

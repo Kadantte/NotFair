@@ -30,5 +30,9 @@
   {
     "id": "conversion-tracking-doctor",
     "prompt": "Is my conversion tracking actually working? Look at the conversion actions, the volume, and any signals that suggest tracking is broken or miscalibrated."
+  },
+  {
+    "id": "experiments-list",
+    "prompt": "Do I have any Google Ads experiments running, in setup, or graduated? Show me each one with its status, type, traffic split between control and treatment, start/end dates, and which campaigns are involved. If none exist, say so plainly and tell me what kinds of experiments you can set up."
   }
 ]

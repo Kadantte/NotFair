@@ -162,7 +162,6 @@ async function runPrompt(prompt: string, url: string, model: string, bearerToken
     "--model",
     model,
     "--no-session-persistence",
-    "--bare",
   ];
 
   const start = Date.now();
@@ -288,7 +287,6 @@ function judge(prompt: string, output: string, criteria?: string): Promise<Score
     "--tools",
     "",
     "--no-session-persistence",
-    "--bare",
   ];
 
   return new Promise((resolveJudge, rejectJudge) => {
@@ -468,7 +466,7 @@ async function preflightClaudeLogin(): Promise<void> {
   const out = await new Promise<string>((resolveProbe) => {
     const child = spawn(
       "claude",
-      ["-p", "say ok", "--output-format", "text", "--no-session-persistence", "--bare"],
+      ["-p", "say ok", "--output-format", "text", "--no-session-persistence"],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     let stdout = "";

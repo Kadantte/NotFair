@@ -1,0 +1,94 @@
+{
+  "skill_name": "analyze",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "how many photos were uploaded this week?",
+      "expected_output": "Concise report with verdict-first structure, specific upload counts from Supabase, saved to docs/analysis/ with timestamp",
+      "files": [],
+      "assertions": [
+        "Report starts with a one-sentence verdict as the first line (no preamble, no 'Great question', no 'I analyzed')",
+        "Report is saved to docs/analysis/ with a timestamped filename",
+        "Every Why bullet includes a specific number backed by data (not vague claims)",
+        "Report includes a Data sources section"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "which tools are staff using most?",
+      "expected_output": "Report explains Statsig data gap with root cause (environment misconfiguration), saved to docs/analysis/ with timestamp, includes fix steps",
+      "files": [],
+      "assertions": [
+        "Report starts with a one-sentence verdict as the first line (no preamble)",
+        "Report is saved to docs/analysis/ with a timestamped filename",
+        "Report explains the root cause of missing data (Statsig environment misconfiguration) rather than just reporting 0 events",
+        "Report includes actionable next steps (e.g., how to fix the environment)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "how many reservations do we have this week vs last week?",
+      "expected_output": "Verdict-first report comparing this week vs last week with specific numbers, efficient single SQL query, saved to docs/analysis/",
+      "files": [],
+      "assertions": [
+        "Report starts with a one-sentence verdict as the first line (no preamble)",
+        "Report is saved to docs/analysis/ with a timestamped filename",
+        "Report compares this week vs last week with specific numbers for both periods",
+        "Data is fetched with 1-3 SQL queries (not 4+)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Our signups dropped 60% last week compared to the week before. What happened? We use Mixpanel.",
+      "expected_output": "Should use parallel investigation agents (data quality, seasonality, product changes), run a skeptic challenge on findings, and produce a rigorous report with confidence tags.",
+      "files": [],
+      "assertions": [
+        "Spawns parallel investigation subagents (data quality, seasonality, product/external) rather than investigating sequentially",
+        "Runs a skeptic challenge agent on the synthesized findings before finalizing the report",
+        "Considers data quality as a possible explanation before concluding the drop is real",
+        "Includes confidence tags (High/Medium/Low) on findings",
+        "Does not present the 60% drop as a confirmed real behavioral change without evidence",
+        "Asks for Mixpanel credentials or uses existing ones to investigate"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "How is our onboarding funnel performing? We use Mixpanel.",
+      "expected_output": "Should frame sub-questions, ask for Mixpanel credentials, structure a funnel analysis plan, and include rigor checks in the approach.",
+      "files": [],
+      "assertions": [
+        "Frames the question into 2+ specific measurable sub-questions before fetching data",
+        "Asks for Mixpanel credentials (service account username and secret)",
+        "Plans to use breakdown queries rather than per-value filters",
+        "Includes data quality validation in the analysis approach"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Our daily active users dropped 35% this weekend vs Friday. Is something broken? We use Mixpanel.",
+      "expected_output": "Should recognize seasonality, spawn parallel agents to investigate, and not alarm the user.",
+      "files": [],
+      "assertions": [
+        "Recognizes the weekday-vs-weekend pattern as likely seasonality, not a real problem",
+        "Does not alarm the user or treat the 35% drop as a confirmed issue",
+        "Suggests comparing weekend-to-weekend (same day-of-week) instead of weekend-to-weekday",
+        "Mentions that 30-60% weekend drops are typical for B2B products or similar context",
+        "Uses parallel investigation path (Path B) since this is an investigative question about explaining a change"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Our checkout conversion rate dropped from 12% to 4% overnight two days ago. Revenue is down 65%. We need to figure out what happened ASAP. We use Mixpanel.",
+      "expected_output": "Should spawn all 3 parallel investigators + skeptic. Must check data quality first (is the checkout event still firing?), check for deploys, and not jump to a behavioral conclusion. The skeptic should challenge any premature conclusions.",
+      "files": [],
+      "assertions": [
+        "Spawns 3 parallel investigation agents simultaneously (not sequentially)",
+        "Data quality agent checks if checkout/payment events are still firing correctly",
+        "Product changes agent checks git history for recent deploys around the timing of the drop",
+        "Runs a skeptic challenge on findings before presenting the final report",
+        "Addresses or acknowledges skeptic challenges in the final report",
+        "Asks for Mixpanel credentials to actually investigate"
+      ]
+    }
+  ]
+}

@@ -91,11 +91,11 @@ function buildTelemetry(
  *
  * @returns The write result with a `changeId` attached (null if logging failed).
  */
-export async function execWrite(
+export async function execWrite<R extends WriteResult = WriteResult>(
   auth: ToolAuth,
   accountId: string,
   campaignId: string | null,
-  fn: () => Promise<WriteResult>,
+  fn: () => Promise<R>,
   reasoning?: string,
   // Bulk fan-out handlers call the real Google API once upstream, then invoke
   // execWrite N times with `fn = async () => result` to log per-item rows for
@@ -104,11 +104,11 @@ export async function execWrite(
   // API latency and threads it in here so every fan-out row carries the same
   // honest invocation latency.
   options?: { overrideLatencyMs?: number },
-): Promise<WriteResult & { changeId: number | null }> {
+): Promise<R & { changeId: number | null }> {
   await enforceRateLimit(auth.userId);
   const ctx = getTelemetry();
   const t0 = performance.now();
-  let result: WriteResult;
+  let result: R;
   try {
     result = await fn();
   } catch (error) {

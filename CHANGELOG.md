@@ -2,6 +2,20 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.2.0] - 2026-04-30
+
+### Added
+- **8 new MCP write tools for Google Ads experiments.** Agents can now run the full experiment lifecycle from a chat: `createExperiment`, `addExperimentArms`, `scheduleExperiment`, `endExperiment`, `promoteExperiment`, `graduateExperiment`, `listExperimentAsyncErrors`, and `createAdVariationExperiment` (RSA-asset variant). Each tool ships with status-precondition checks, structured rejections, and human-readable error rewrites mapped from Google's `experiment_error` codes.
+- **`createAdVariationExperiment`** — clones an existing Responsive Search Ad with patched headlines/descriptions and sets up a 50/50 control vs treatment arm in one call. Resolves the base RSA by signature (ad group + first headline + first description) with explicit ambiguous-match detection.
+- **`RUN_EXPERIMENT` runScript playbook** — agents discover existing experiments via GAQL on the `experiment` and `experiment_arm` resources, with a decision rule for when to use lifecycle tools vs the RSA-asset shortcut.
+
+### Changed
+- **`eval-mcp` skill rewrite.** Makes it explicit that the model in the user's session is the runner — no spawning Task subagents, no shelling out to `claude -p` for the runner step. Subagents and subprocesses run in a different agent environment than the one real users hit, so they measure the wrong thing. Full-mode judge stays subprocess-based for blinding (rubric scoring benefits from a fresh context). Mirrors to the codex variant at `.agents/skills/eval-mcp/`.
+- **`scripts/eval-mcp/eval.ts`** — removes `--bare` from runner/judge/preflight `claude -p` invocations. `--bare` requires `ANTHROPIC_API_KEY` and skips OAuth/keychain auth, which broke the eval harness for users who only auth via terminal `/login`.
+
+### Fixed
+- **Pre-existing `.Codex/` path bug in the codex eval-mcp skill mirror** — references now correctly point to `.agents/skills/eval-mcp/`.
+
 ## [0.3.1.0] - 2026-04-29
 
 ### Added

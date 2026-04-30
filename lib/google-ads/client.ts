@@ -67,6 +67,30 @@ function demoStubCustomer() {
     // library exposes these on real Customer objects; demo stubs swallow them.
     reportStream: async function* () {},
     search: async () => [],
+    // Experiment service surfaces. The experiments.ts helpers reach these
+    // through `customer.experiments.*` / `customer.experimentArms.*`; without
+    // a stub here demo reviewers would TypeError on `undefined.create(...)`.
+    experiments: {
+      create: async (resources: Array<Record<string, unknown>>) => ({
+        results: resources.map(() => ({ resource_name: "customers/0/experiments/demo" })),
+      }),
+      scheduleExperiment: async () => ({ name: "operations/demo-schedule", done: true }),
+      endExperiment: async () => ({}),
+      promoteExperiment: async () => ({ name: "operations/demo-promote", done: true }),
+      graduateExperiment: async () => ({}),
+      listExperimentAsyncErrors: async () => ({ errors: [], next_page_token: "" }),
+    },
+    experimentArms: {
+      create: async (resources: Array<Record<string, unknown>>) => ({
+        results: resources.map((r, i) => ({
+          resource_name: `customers/0/experimentArms/demo~${i + 1}`,
+          experiment_arm: {
+            ...r,
+            in_design_campaigns: r.control ? [] : ["customers/0/campaigns/demo-trial"],
+          },
+        })),
+      }),
+    },
   };
   // Cast through unknown so callers see the real type even though the stub
   // only implements a subset. Anything else they reach for returns undefined,

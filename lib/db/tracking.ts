@@ -67,6 +67,15 @@ export const TOOL_CODE = {
   get_campaign_settings: 34,
   get_recommendations: 35,
   review_change_impact: 43,
+  // Experiments (drafts & trials)
+  create_experiment: 44,
+  add_experiment_arms: 45,
+  schedule_experiment: 46,
+  end_experiment: 47,
+  promote_experiment: 48,
+  graduate_experiment: 49,
+  list_experiment_async_errors: 50,
+  create_ad_variation_experiment: 51,
 } as const;
 
 type ToolCode = (typeof TOOL_CODE)[keyof typeof TOOL_CODE];
