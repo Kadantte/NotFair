@@ -870,7 +870,7 @@ export default function DevPage() {
                                             </div>
                                         </div>
                                         {c.accounts.length > 0 && (
-                                            <div className="mt-2 space-y-1">
+                                            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
                                                 {c.accounts.map((a) => {
                                                     const annualUsdAcct = a.dailyBudgetUsd != null ? a.dailyBudgetUsd * DAYS_PER_YEAR : null;
                                                     return (
@@ -972,7 +972,7 @@ export default function DevPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-2.5">
-                                                    <div className="flex flex-wrap gap-1">
+                                                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                                                         {c.accounts.length === 0 ? (
                                                             <span className="text-sm text-[#C4C0B6]/40">—</span>
                                                         ) : c.accounts.map((a) => (
