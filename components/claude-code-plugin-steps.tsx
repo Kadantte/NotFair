@@ -7,7 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 const MARKETPLACE_CMD = "/plugin marketplace add nowork-studio/toprank";
 const INSTALL_CMD = "/plugin install toprank@nowork-studio";
 const RELOAD_CMD = "/reload-plugins";
-const ADS_CMD = "/ads";
+const ADS_CMD = "/google-ads";
 
 type Surface = "marketing" | "in_app";
 
@@ -84,13 +84,13 @@ export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
       <div id="step-3" className="space-y-3 scroll-mt-24">
         <div className="flex items-baseline gap-3">
           <StepNumber n={3} />
-          <h3 className="text-lg font-semibold text-[#E8E4DD]">Run /ads</h3>
+          <h3 className="text-lg font-semibold text-[#E8E4DD]">Run /google-ads</h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
             Run{" "}
             <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-sm text-[#4CAF6E]">
-              /ads
+              /google-ads
             </code>{" "}
             in Claude Code. It will open your browser to sign in and connect
             NotFair. If the command doesn&apos;t appear, restart Claude Code
