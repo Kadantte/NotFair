@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { Check, Copy } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
-import { BRAND_NAME, MCP_SERVER_URL } from "@/lib/brand";
+import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
@@ -52,7 +52,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
           </p>
           <CopyableField
             label="Name"
-            value={BRAND_NAME}
+            value={MCP_CONNECTOR_NAME}
             trackingField="name"
             surface={surface}
           />
@@ -74,7 +74,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
           />
 
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Verify <strong className="text-[#E8E4DD]">NotFair</strong> appears
+            Verify <strong className="text-[#E8E4DD]">{MCP_CONNECTOR_NAME}</strong> appears
             in your Connectors list with all available tools.
           </p>
           <SetupScreenshot
@@ -142,7 +142,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
         <div className="flex items-baseline gap-3">
           <StepNumber n={4} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Enable NotFair in a chat
+            Enable {MCP_CONNECTOR_NAME} in a chat
           </h3>
         </div>
         <div className="ml-11 space-y-3">
@@ -150,7 +150,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
             Open a new Claude chat, click the{" "}
             <strong className="text-[#E8E4DD]">+</strong> button, go to{" "}
             <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle{" "}
-            <strong className="text-[#E8E4DD]">NotFair</strong> on.
+            <strong className="text-[#E8E4DD]">{MCP_CONNECTOR_NAME}</strong> on.
           </p>
           <SetupScreenshot
             src="/connector-setup/04-enable-in-chat.png"

@@ -1,6 +1,6 @@
 import { GoogleAdsCodexMcpSetupPage } from "@/components/marketing/google-ads-codex-mcp-setup-page";
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
-import { MCP_SERVER_URL } from "@/lib/brand";
+import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 export const metadata = buildMetadata({
   title: "Google Ads Codex MCP — Setup Guide for NotFair in OpenAI Codex",
@@ -32,7 +32,7 @@ const faqItems = [
   {
     question: "How long does setup take?",
     answer:
-      `Under a minute. Run a single \`codex mcp add notfair --url ${MCP_SERVER_URL}\` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.`,
+      `Under a minute. Run a single \`codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}\` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.`,
   },
   {
     question: "Do I need to write any code?",
@@ -72,7 +72,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 2,
         name: "Add the NotFair MCP",
-        text: `Run codex mcp add notfair --url ${MCP_SERVER_URL} in your terminal. Codex walks you through the OAuth flow and registers the NotFair MCP server automatically.`,
+        text: `Run codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL} in your terminal. Codex walks you through the OAuth flow and registers the NotFair MCP server automatically.`,
         url: new URL("/google-ads-codex-mcp-setup-guide#step-2", SITE_URL).toString(),
       },
       {

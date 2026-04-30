@@ -14,6 +14,18 @@ export const BRAND_URL_WWW = `https://www.${BRAND_DOMAIN}`;
  */
 export const MCP_SERVER_URL = `${BRAND_URL}/api/mcp/google_ads`;
 
+/**
+ * Single name surfaced to users across every connector setup surface:
+ * - Claude.ai "Add custom connector" → display name pasted into the Name field.
+ * - Codex CLI → `codex mcp add NotFair-GoogleAds --url …`.
+ * - Any-MCP-client JSON config → `{ mcpServers: { "NotFair-GoogleAds": { … } } }`.
+ *
+ * Platform-suffixed for symmetry with the future `NotFair-MetaAds` connector
+ * once Meta ships. Token prefix and URL slug stay lowercase
+ * (`oat_google_ads_*`, `/api/mcp/google_ads`) per their respective conventions.
+ */
+export const MCP_CONNECTOR_NAME = "NotFair-GoogleAds";
+
 const EMAIL_DOMAIN = "notfair.co";
 export const SUPPORT_EMAIL = `tong@${EMAIL_DOMAIN}`;
 export const OUTREACH_EMAIL = `tong@${EMAIL_DOMAIN}`;

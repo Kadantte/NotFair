@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { ArrowRight, Check, Copy, Eye, EyeOff, Key, Lock, RotateCw } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
-import { MCP_SERVER_URL } from "@/lib/brand";
+import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
@@ -11,7 +11,7 @@ const TOKEN_PLACEHOLDER = "YOUR_ADSAGENT_API_KEY";
 
 const OAUTH_CONFIG = `{
   "mcpServers": {
-    "notfair": {
+    "${MCP_CONNECTOR_NAME}": {
       "url": "${MCP_SERVER_URL}"
     }
   }
@@ -20,7 +20,7 @@ const OAUTH_CONFIG = `{
 function bearerConfigFor(token: string) {
   return `{
   "mcpServers": {
-    "notfair": {
+    "${MCP_CONNECTOR_NAME}": {
       "url": "${MCP_SERVER_URL}",
       "headers": {
         "Authorization": "Bearer ${token}"

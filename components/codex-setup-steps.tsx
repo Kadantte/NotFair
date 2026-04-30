@@ -3,11 +3,11 @@
 import { useCallback, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
-import { MCP_SERVER_URL } from "@/lib/brand";
+import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
-const ONE_LINER = `codex mcp add notfair --url ${MCP_SERVER_URL}`;
+const ONE_LINER = `codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}`;
 const AUDIT_PROMPT =
   "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
 

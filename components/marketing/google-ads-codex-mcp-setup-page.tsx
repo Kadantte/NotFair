@@ -13,7 +13,7 @@ import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
 import { CodexSetupSteps } from "@/components/codex-setup-steps";
 import type { FaqItem } from "@/lib/seo";
-import { MCP_SERVER_URL } from "@/lib/brand";
+import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 const FAQ_ITEMS: FaqItem[] = [
   {
@@ -29,7 +29,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "How long does setup take?",
     answer:
-      `Under a minute. Run a single \`codex mcp add notfair --url ${MCP_SERVER_URL}\` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.`,
+      `Under a minute. Run a single \`codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}\` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.`,
   },
   {
     question: "Do I need to write any code?",
