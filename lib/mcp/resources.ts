@@ -56,9 +56,15 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     tokenPrefix: "oat_google_ads_",
     legacyTokenPrefixes: ["oat_"],
   },
-  // /api/mcp/meta_ads is reserved for the Meta build-out; no resource entry
-  // yet because issuing tokens for an unimplemented MCP would let Claude
-  // burn an OAuth dance against a 404 endpoint.
+  {
+    path: "/api/mcp/meta_ads",
+    platform: "meta_ads",
+    tokenPrefix: "oat_meta_ads_",
+    // Meta has no legacy prefixes — every token at this resource is issued
+    // through the new `resource`-aware OAuth flow and stamped with the
+    // platform-explicit prefix.
+    legacyTokenPrefixes: [],
+  },
 ] as const;
 
 /**
@@ -69,6 +75,7 @@ export const MCP_RESOURCES: readonly McpResource[] = [
 export const KNOWN_RESOURCE_PATHS: readonly string[] = [
   "/api/mcp",
   "/api/mcp/google_ads",
+  "/api/mcp/meta_ads",
 ];
 
 /** Default resource for callers that omit `?resource=` (back-compat). */

@@ -334,6 +334,47 @@ export const mcpSessions = pgTable("mcp_sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Multi-Platform Connections (non-Google MCPs) ────────────────────
+//
+// Houses Meta, TikTok, LinkedIn, etc. connections. Google Ads stays on
+// `mcp_sessions` for back-compat. One row per (user_id, platform); the
+// `account_ids` JSONB carries the enumerated ad accounts the user can
+// target, and `active_account_id` is the sticky-with-override pick used
+// by tools that don't take an explicit accountId.
+//
+// See drizzle/0031_add_ad_platform_connections.sql for the migration.
+
+export const adPlatformConnections = pgTable("ad_platform_connections", {
+  id: serial("id").primaryKey(),
+  /** NotFair user id (matches mcp_sessions.user_id). */
+  userId: text("user_id").notNull(),
+  /** Platform identifier — 'meta_ads' for now; 'tiktok_ads' / 'linkedin_ads' future. */
+  platform: text("platform").notNull(),
+  /** Long-lived refresh-equivalent token from the upstream platform. */
+  refreshToken: text("refresh_token").notNull(),
+  /** Short-lived access token cached from the most recent refresh. */
+  accessToken: text("access_token"),
+  /** When `accessToken` expires. NULL when never refreshed. */
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  /** Enumerated ad accounts. Shape: [{id, name, currency, timezone, business_id}, ...] */
+  accountIds: jsonb("account_ids").$type<Array<{
+    id: string;
+    name?: string;
+    currency?: string;
+    timezone?: string;
+    business_id?: string;
+  }>>().notNull().default([]),
+  /** Currently-selected ad account (sticky-with-override per design doc decision #5). */
+  activeAccountId: text("active_account_id"),
+  /** Platform-specific extras: Meta business_id, granted scopes, fb_user_id, etc. */
+  platformMetadata: jsonb("platform_metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("ad_platform_connections_user_platform_idx").on(table.userId, table.platform),
+  index("ad_platform_connections_platform_idx").on(table.platform),
+]);
+
 // ─── Account Snapshots ──────────────────────────────────────────────
 
 export const accounts = pgTable("accounts", {
