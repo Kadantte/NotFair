@@ -18,7 +18,6 @@ type TopTool = {
 type PrevTool = {
     toolName: string;
     calls: number;
-    errors: number;
 };
 
 type TopArgShape = {

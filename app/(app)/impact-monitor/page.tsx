@@ -100,6 +100,9 @@ function dayVerdict(items: ImpactMonitorListItem[]): { label: string; tone: stri
     if (label === "likely_improved") improved++;
     else if (label === "likely_worsened") worsened++;
     else if (label === "watching" || label === "too_new") watching++;
+    // inconclusive and highly_confounded count as "done but unclear"
+    else if (label === "inconclusive" || label === "highly_confounded") worsened++;
+    // rolled_back items are already resolved — don't show them as red (they're archived, not actionable)
   }
   if (worsened > 0) {
     return { label: `${worsened} need${worsened !== 1 ? "" : "s"} attention`, tone: "text-[#C45D4A] border-[#C45D4A]/30 bg-[#C45D4A]/10" };

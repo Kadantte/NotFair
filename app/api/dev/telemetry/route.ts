@@ -6,9 +6,10 @@ import { excludeDevOpsFilter, devEmailSqlList } from "@/lib/dev-ops-filter";
 /**
  * Dev-gated telemetry endpoint. Returns aggregate views over the operations
  * table that answer "how are users using NotFair?": top tools with p50/p95
- * latency, top arg-shape buckets, a funnel of reads vs writes by day, and
- * the last 50 raw calls with their args. Full args are gated to DEV_EMAILS
- * so the payload never leaks outside the admin group.
+ * latency, previous-period tool call counts for trend badges, top arg-shape
+ * buckets, a funnel of reads vs writes + errors by day, and the last 100 raw
+ * calls with args and error messages. Full args and error messages are gated to
+ * DEV_EMAILS so the payload never leaks outside the admin group.
  */
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
           ) t
         ), 0)::int`,
         avgBytes: sql<number>`coalesce(avg(${schema.operations.bytesOut}), 0)::int`,
-        errors: sql<number>`sum(case when ${schema.operations.errorClass} is not null then 1 else 0 end)::int`,
+        errors: sql<number>`count(distinct case when ${schema.operations.errorClass} is not null then coalesce(${schema.operations.requestId}, ${schema.operations.id}::text) end)::int`,
       })
       .from(schema.operations)
       .where(and(whereRecent, isNotNull(schema.operations.toolName)))
@@ -70,17 +71,17 @@ export async function GET(request: Request) {
       .limit(40),
 
     // Previous period tool stats for trend comparison (current period vs prev period).
+    // Only calls needed — trend badge is call-volume-only, not error-rate trend.
     db()
       .select({
         toolName: schema.operations.toolName,
         calls: sql<number>`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))::int`,
-        errors: sql<number>`sum(case when ${schema.operations.errorClass} is not null then 1 else 0 end)::int`,
       })
       .from(schema.operations)
       .where(and(wherePrev, isNotNull(schema.operations.toolName)))
       .groupBy(schema.operations.toolName)
       .orderBy(desc(sql`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))`))
-      .limit(40),
+      .limit(200),
 
     // Grouped call counts per (tool_name, args_sha256). Fan-out rows share
     // one args_sha256 within a request_id, so dedupe by request_id here too.
@@ -145,12 +146,12 @@ export async function GET(request: Request) {
     db()
       .select({
         errorClass: schema.operations.errorClass,
-        calls: sql<number>`count(*)::int`,
+        calls: sql<number>`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))::int`,
       })
       .from(schema.operations)
       .where(and(whereRecent, isNotNull(schema.operations.errorClass)))
       .groupBy(schema.operations.errorClass)
-      .orderBy(desc(sql`count(*)`)),
+      .orderBy(desc(sql`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))`)),
   ]);
 
   return Response.json({

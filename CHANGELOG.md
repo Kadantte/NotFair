@@ -3,6 +3,13 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.3.2] - 2026-05-01
+
+### Fixed
+- **Impact Monitor day badge no longer flags rolled-back interventions as needing attention.** Items with `rolled_back` status are archived and already resolved — they no longer appear as red in the day-level badge. Only `inconclusive` and `highly_confounded` results count toward the attention bucket.
+- **Telemetry error breakdown is now fan-out deduplicated.** The error class breakdown query now uses `count(distinct coalesce(request_id, id))` matching every other error metric, so bulk operations that fan out to multiple rows no longer inflate per-class error counts.
+- **Previous-period tool stats no longer include an unused `errors` field.** The `prevTopTools` query returned an error count that the UI never consumed; removed to reduce query payload. Trend-badge comparison limit raised from 40 to 200 to prevent established tools from appearing as "new".
+
 ## [0.3.3.1] - 2026-05-01
 
 ### Added
