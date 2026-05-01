@@ -1,5 +1,5 @@
 import { db, schema } from "@/lib/db";
-import { sql, desc, and, gte, isNotNull } from "drizzle-orm";
+import { sql, desc, and, gte, lt, isNotNull } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { excludeDevOpsFilter, devEmailSqlList } from "@/lib/dev-ops-filter";
 
@@ -19,12 +19,14 @@ export async function GET(request: Request) {
   const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 7;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const sinceIso = since.toISOString();
+  const prevSince = new Date(Date.now() - 2 * days * 24 * 60 * 60 * 1000);
 
   // Exclude ops attributed to dev users so internal testing doesn't skew telemetry.
   const notDev = excludeDevOpsFilter();
   const whereRecent = and(gte(schema.operations.createdAt, since), notDev);
+  const wherePrev = and(gte(schema.operations.createdAt, prevSince), lt(schema.operations.createdAt, since), notDev);
 
-  const [topTools, topArgShapes, recentCalls, dailyCounts, errorBreakdown] = await Promise.all([
+  const [topTools, prevTopTools, topArgShapes, recentCalls, dailyCounts, errorBreakdown] = await Promise.all([
     // Bulk write tools (bulkPauseKeywords, bulkAddKeywords, moveKeywords, ...)
     // fan out logging so each fan-out item lands as its own row. All rows from
     // one MCP invocation share `request_id`, so `COUNT(*)` inflated call counts
@@ -67,6 +69,19 @@ export async function GET(request: Request) {
       .orderBy(desc(sql`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))`))
       .limit(40),
 
+    // Previous period tool stats for trend comparison (current period vs prev period).
+    db()
+      .select({
+        toolName: schema.operations.toolName,
+        calls: sql<number>`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))::int`,
+        errors: sql<number>`sum(case when ${schema.operations.errorClass} is not null then 1 else 0 end)::int`,
+      })
+      .from(schema.operations)
+      .where(and(wherePrev, isNotNull(schema.operations.toolName)))
+      .groupBy(schema.operations.toolName)
+      .orderBy(desc(sql`count(distinct coalesce(${schema.operations.requestId}, ${schema.operations.id}::text))`))
+      .limit(40),
+
     // Grouped call counts per (tool_name, args_sha256). Fan-out rows share
     // one args_sha256 within a request_id, so dedupe by request_id here too.
     // The sample args are fetched via a lateral subquery — `array_agg(...
@@ -102,6 +117,7 @@ export async function GET(request: Request) {
         latencyMs: schema.operations.latencyMs,
         bytesOut: schema.operations.bytesOut,
         errorClass: schema.operations.errorClass,
+        errorMessage: schema.operations.errorMessage,
         opType: schema.operations.opType,
         args: schema.operations.args,
         createdAt: schema.operations.createdAt,
@@ -109,7 +125,7 @@ export async function GET(request: Request) {
       .from(schema.operations)
       .where(whereRecent)
       .orderBy(desc(schema.operations.createdAt))
-      .limit(50),
+      .limit(100),
 
     // Fan-out rows would double-count writes here, swamping the reads column
     // and making the read/write ratio meaningless. Dedupe by (op_type, request_id)
@@ -119,6 +135,7 @@ export async function GET(request: Request) {
         day: sql<string>`to_char(date_trunc('day', ${schema.operations.createdAt}), 'YYYY-MM-DD')`,
         reads: sql<number>`count(distinct case when ${schema.operations.opType} = 0 then coalesce(${schema.operations.requestId}, ${schema.operations.id}::text) end)::int`,
         writes: sql<number>`count(distinct case when ${schema.operations.opType} = 1 then coalesce(${schema.operations.requestId}, ${schema.operations.id}::text) end)::int`,
+        errors: sql<number>`count(distinct case when ${schema.operations.errorClass} is not null then coalesce(${schema.operations.requestId}, ${schema.operations.id}::text) end)::int`,
       })
       .from(schema.operations)
       .where(whereRecent)
@@ -139,6 +156,7 @@ export async function GET(request: Request) {
   return Response.json({
     days,
     topTools,
+    prevTopTools,
     topArgShapes,
     recentCalls,
     dailyCounts,

@@ -7,6 +7,10 @@ import { buildAdsHost } from "./ads-client";
 
 const RUN_SCRIPT_DESCRIPTION = `Run a JavaScript orchestration script in a sandboxed QuickJS runtime. This is a REPLACEMENT for chaining individual tool calls, not a supplement — one runScript call does what would otherwise take 10+ sequential tool invocations.
 
+── READ-ONLY (analytics and reporting only) ──
+
+runScript is a READ-ONLY analytics sandbox. ads.gaql() and ads.gaqlParallel() only execute SELECT GAQL queries — they cannot pause, update, create, or delete anything. To mutate the account (pause keywords, update bids, create campaigns, add negatives, etc.), call the dedicated mutation tools (pauseKeyword, updateBid, bulkPauseKeywords, pauseCampaign, createCampaign, addNegativeKeyword, etc.) directly. Never try to perform mutations inside a runScript call.
+
 ── WHEN TO USE THIS ──
 
 This is the DEFAULT tool for any open-ended analytical question about a Google Ads account. Reach for it first when you see:
@@ -100,7 +104,8 @@ Rules: top-level await works; no fetch/require/process/fs; return value must be 
 
 - Calling runScript 5+ times in sequence to fetch different surfaces — that's exactly what gaqlParallel replaces.
 - Using ads.gaql in a JS loop when the queries are independent — use gaqlParallel.
-- Returning entire GaqlReport.rows arrays — summarize, rank, or aggregate first.`;
+- Returning entire GaqlReport.rows arrays — summarize, rank, or aggregate first.
+- Passing non-SELECT statements to ads.gaql() — GAQL is read-only, the call will throw immediately. Mutations go through dedicated tools, not runScript.`;
 
 export const registerCodeModeTools: ToolRegistrar = (server, currentAuth) => {
   server.registerTool(

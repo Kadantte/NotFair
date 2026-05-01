@@ -1989,7 +1989,12 @@ export async function runSafeGaqlReport(
   // Accept any whitespace after SELECT (newlines, tabs, spaces) — multi-line
   // template-literal queries are the natural way agents format wide reports.
   if (!/^SELECT\s/i.test(query)) {
-    throw new Error("Only read-only SELECT GAQL queries are allowed.");
+    throw new Error(
+      "Only read-only SELECT GAQL queries are allowed in ads.gaql() / ads.gaqlParallel(). " +
+      "runScript is a read-only analytics sandbox — to mutate (pause keywords, update bids, create campaigns), " +
+      "call the dedicated mutation tools (pauseKeyword, updateBid, bulkPauseKeywords, pauseCampaign, createCampaign, etc.) " +
+      "directly, outside the script.",
+    );
   }
   if (query.includes(";")) {
     throw new Error("Semicolons are not allowed in GAQL queries.");

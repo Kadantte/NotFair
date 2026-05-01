@@ -50,6 +50,7 @@ vi.mock("@/lib/mcp", () => ({
   registerReadTools: vi.fn(),
   registerWriteTools: vi.fn(),
   registerCodeModeTools: vi.fn(),
+  registerAgentFeedbackTools: vi.fn(),
 }));
 
 vi.mock("@/lib/mcp/types", () => ({

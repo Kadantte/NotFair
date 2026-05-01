@@ -2,6 +2,17 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+
+## [0.3.3.1] - 2026-05-01
+
+### Added
+- **Developer telemetry dashboard tabs and trend context.** `/dev/telemetry` now separates Overview, By Tool, and Recent Calls, adds current-vs-previous tool call deltas, surfaces error-rate history, includes error messages on recent calls, and expands recent-call history to 100 entries.
+- **Impact Monitor maturity affordances.** `/impact-monitor` now groups interventions by attention/readiness, shows when immature interventions will have enough after-data, and supports day-level evaluation actions for items ready to review.
+
+### Changed
+- **`runScript` read-only guidance is explicit.** The MCP tool description and GAQL guard now tell agents that `ads.gaql()` / `ads.gaqlParallel()` are analytics-only and that account mutations must use dedicated write tools.
+- **Bundled AdsAgent plugin docs refreshed.** The Google Ads skill is split into focused reference playbooks for session checks, analysis heuristics, change tracking, and workflow recipes, with updated GAQL truncation guidance.
+
 ## [0.3.3.0] - 2026-05-01
 
 ### Added
