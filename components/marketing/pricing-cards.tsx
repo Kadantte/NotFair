@@ -39,7 +39,8 @@ export function CheckoutStatusBanner() {
 }
 
 export const FREE_FEATURES = [
-  "7-day free trial — then upgrade to continue",
+  "7 days of unlimited access — every feature, no caps",
+  "Then 300 operations per month, free forever",
   "No credit card required",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Diagnose account issues and draft campaign changes",
@@ -274,7 +275,7 @@ export function PricingCards({
               starter
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">Start with live account context.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">Unlimited access for 7 days. 300 free operations every month after.</p>
           <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
             <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
               {PRICING.freeMonthly}

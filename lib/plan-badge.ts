@@ -9,14 +9,16 @@
  *      The app-side `inTrial` flag is IGNORED for paid users by design —
  *      paying customers should never see "Free trial" copy in the nav.
  *   3. Free + in-trial → show "Free trial · Xd left" countdown.
- *   4. Free + trial expired → show "Trial ended".
+ *   4. Free + post-trial → show neutral "Free" pill. The 300-ops/30d cap
+ *      lives in the rate limiter; warning copy ("approaching" / "reached")
+ *      is rendered as a separate banner driven by usage info.
  */
 
 export type PlanBadge =
   | { kind: "none" }
   | { kind: "paid"; planName: string }
   | { kind: "trial"; daysLeft: number; endingSoon: boolean }
-  | { kind: "trial_expired" };
+  | { kind: "free" };
 
 export interface PlanBadgeInput {
   /** "free", "growth", or null when /api/subscription hasn't responded yet. */
@@ -52,5 +54,7 @@ export function computePlanBadge(input: PlanBadgeInput): PlanBadge {
     return { kind: "trial", daysLeft, endingSoon: daysLeft <= 3 };
   }
 
-  return { kind: "trial_expired" };
+  // Post-trial free. The pill itself is just "Free" — usage warnings come
+  // from getUsageInfo and render as a separate banner.
+  return { kind: "free" };
 }

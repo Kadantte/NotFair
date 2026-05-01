@@ -27,10 +27,10 @@ describe("computePlanBadge", () => {
       expect(badge.kind === "paid" && badge.planName).toBe("Growth");
     });
 
-    it("growth user with expired trialEndsAt → still paid badge, never 'Trial ended'", () => {
+    it("growth user with expired trialEndsAt → still paid badge, never the free pill", () => {
       // Same guarantee on the other side: a paying customer whose app-side
-      // trial window has lapsed is still paying. We must not strand them with
-      // a red "Trial ended" pill.
+      // trial window has lapsed is still paying. We must not strand them
+      // with a "Free" pill or a usage warning.
       const badge = computePlanBadge({
         plan: "growth",
         inTrial: false,
@@ -83,28 +83,29 @@ describe("computePlanBadge", () => {
     });
   });
 
-  describe("free + not in trial → expired badge", () => {
-    it("trialEndsAt in the past, inTrial=false → trial_expired", () => {
+  describe("free + not in trial → free badge (post-trial 300/30d regime)", () => {
+    it("trialEndsAt in the past, inTrial=false → free pill", () => {
       const badge = computePlanBadge({
         plan: "free",
         inTrial: false,
         trialEndsAt: fromNow(-DAY),
         now: NOW,
       });
-      expect(badge).toEqual({ kind: "trial_expired" });
+      expect(badge).toEqual({ kind: "free" });
     });
 
-    it("free user with no trialEndsAt set at all → trial_expired (defensive default)", () => {
-      // Backfill ensured every row has trial_ends_at, but if a future code
-      // path ever yields a free user without one, the safe behavior is to
-      // gate access (not silently grant it). This locks that in.
+    it("free user with no trialEndsAt set at all → free pill (legacy fallback)", () => {
+      // Behavior change from the original gate-everything model: post-trial
+      // free users now have a usable 300/30d quota, so the badge is just
+      // "Free" — usage warnings render separately when they approach/hit
+      // the cap.
       const badge = computePlanBadge({
         plan: "free",
         inTrial: false,
         trialEndsAt: null,
         now: NOW,
       });
-      expect(badge).toEqual({ kind: "trial_expired" });
+      expect(badge).toEqual({ kind: "free" });
     });
   });
 

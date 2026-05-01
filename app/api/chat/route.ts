@@ -3,7 +3,7 @@ import { createGoogleAdsAgent, type ChatModelId } from "@/lib/agents/google-ads-
 import { getSessionAuth } from "@/lib/session";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
-import { checkAccess, getUserSubscription, isPlanEntitled } from "@/lib/subscription";
+import { getUserSubscription, isPlanEntitled } from "@/lib/subscription";
 
 const PAID_MODELS = new Set<ChatModelId>(["gpt-5.4", "claude-opus-4.7"]);
 const ALL_MODELS = new Set<ChatModelId>(["gpt-5-mini", "gpt-5.4", "claude-opus-4.7"]);
@@ -19,17 +19,11 @@ export async function POST(request: Request) {
     return new Response("Missing Google Ads auth context.", { status: 400 });
   }
 
-  // Trial gate: free users past their 7-day window must upgrade before chat
-  // even loads. Paid users + in-trial users pass through.
-  if (session?.userId) {
-    const access = await checkAccess(session.userId).catch(() => null);
-    if (access && !access.ok) {
-      return new Response(
-        "Free trial ended. Upgrade to Growth to continue using NotFair: https://notfair.co/upgrade.",
-        { status: 402 },
-      );
-    }
-  }
+  // No route-level gate. Tool calls inside the chat go through
+  // enforceRateLimit, which throws RateLimitError once a post-trial free
+  // user hits 300 ops in their current 30-day period. Paid + in-trial
+  // users bypass that check entirely. Letting chat load (instead of 402)
+  // means a capped user can still read prior threads and read-only chat.
 
   const toolPermissions = session?.userId
     ? await getToolPermissions(session.userId).catch(() => ({}))

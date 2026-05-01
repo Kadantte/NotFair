@@ -253,23 +253,39 @@ export async function hasFeature(userId: string | null | undefined, feature: key
 }
 
 /**
- * Access gate. Paid plans always pass. Free users pass while in trial; once
- * the trial expires they have to upgrade. Returns the reason for the deny so
- * callers can render an appropriate message.
+ * Access tier. The rate limiter consumes this to decide whether to skip
+ * counting (paid/trial) or enforce the 300-ops-per-30-days free cap
+ * (free_post_trial).
+ *
+ *   - paid           → no caps, no DB hit
+ *   - trial          → no caps, no DB hit (within 7-day trial window)
+ *   - free_post_trial → subject to FREE_MONTHLY_OP_LIMIT, period anchored
+ *                       to trialEndsAt (or createdAt as a legacy fallback)
  */
 export type AccessDecision =
-  | { ok: true; reason: "paid" | "trial" | "dev" }
-  | { ok: false; reason: "trial_expired"; trialEndsAt: Date | null };
+  | { kind: "paid" }
+  | { kind: "trial"; trialEndsAt: Date }
+  | { kind: "free_post_trial"; quotaAnchor: Date };
 
 export async function checkAccess(userId: string | null | undefined): Promise<AccessDecision> {
   const sub = await getUserSubscription(userId);
+
+  // Paid + entitled (active / trialing / past_due) wins unconditionally —
+  // ignores the app-side trial fields. Stripe-trialing customers also land
+  // here because the resolver maps their plan to "growth".
   if (sub.plan !== "free" && isPlanEntitled(sub.status)) {
-    return { ok: true, reason: "paid" };
+    return { kind: "paid" };
   }
-  if (sub.inTrial) {
-    return { ok: true, reason: "trial" };
+
+  // App-side trial still in progress → unlimited until it ends.
+  if (sub.inTrial && sub.trialEndsAt) {
+    return { kind: "trial", trialEndsAt: sub.trialEndsAt };
   }
-  return { ok: false, reason: "trial_expired", trialEndsAt: sub.trialEndsAt };
+
+  // Post-trial free. The quota period is anchored to trialEndsAt; legacy
+  // rows without one fall back to "now" so the cap effectively starts
+  // counting from this request forward (conservative, never retroactive).
+  return { kind: "free_post_trial", quotaAnchor: sub.trialEndsAt ?? new Date() };
 }
 
 // ─── Pure helper for tests ────────────────────────────────────────────

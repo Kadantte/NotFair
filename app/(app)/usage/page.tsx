@@ -117,7 +117,7 @@ export default function UsagePage() {
                                 <div>
                                     <p className="text-[#E8E4DD] font-medium">Monthly limit reached</p>
                                     <p className="text-sm text-[#C4C0B6] mt-1">
-                                        You&apos;ve used all {data.limit} operations for this month. New operations will be available in <span className="text-[#E8E4DD] font-medium tabular-nums">{countdown}</span> when the limit resets on the first of next month (UTC).
+                                        You&apos;ve used all {data.limit} operations in this period. The cap resets in <span className="text-[#E8E4DD] font-medium tabular-nums">{countdown}</span> — or upgrade to Growth for unlimited operations.
                                     </p>
                                 </div>
                             </div>
@@ -164,7 +164,7 @@ export default function UsagePage() {
                                 <p className="text-2xl sm:text-3xl font-semibold text-[#E8E4DD] tabular-nums">
                                     {countdown}
                                 </p>
-                                <p className="text-xs text-[#C4C0B6] mt-1">1st of next month (UTC)</p>
+                                <p className="text-xs text-[#C4C0B6] mt-1">Resets every 30 days</p>
                             </div>
                             )}
                         </div>
@@ -239,8 +239,8 @@ export default function UsagePage() {
                         {/* Info */}
                         <p className="text-xs text-[#C4C0B6] leading-relaxed">
                             {isUnlimited
-                                ? 'Your Growth plan includes unlimited operations. The counter shown above tracks this month\'s activity and resets on the 1st of each month (UTC).'
-                                : 'Every tool call (reads and writes) from both the chat interface and MCP clients counts toward your monthly limit. The limit resets on the 1st of each month (UTC). Undo operations are not counted.'}
+                                ? 'You currently have unlimited operations. The counter above shows recent activity for context.'
+                                : 'Every tool call (reads and writes) from both the chat interface and MCP clients counts toward your free monthly limit. The cap renews 30 days after your trial ended, then every 30 days. Undo operations are not counted.'}
                         </p>
                     </div>
                 ) : null}

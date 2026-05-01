@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ─── DB mock ────────────────────────────────────────────────────────
-// mockWhere is the terminal call in the chain. Its RETURN VALUE is the DB result.
 const mockWhere = vi.fn().mockReturnValue([{ count: 0 }]);
 
 vi.mock("@/lib/db", () => ({
@@ -13,19 +11,22 @@ vi.mock("@/lib/db", () => ({
     }),
   }),
   schema: {
-    operations: { userId: "userId", createdAt: "createdAt" },
+    operations: { userId: "userId", createdAt: "createdAt", errorClass: "errorClass" },
   },
 }));
 
-// rate-limit.ts now consults checkAccess. Default to "in-trial → allowed"
-// so this file can stay focused on op-counting math (used by getUsageInfo)
-// and the trial-gate path is covered in rate-limit-subscription.test.ts.
+// Default to "free_post_trial with anchor in the recent past" so the gate
+// reaches the op-counting branch — that's what this test file is about.
+// The gate-decision branches (paid/trial bypass, fail-open) live in
+// rate-limit-subscription.test.ts.
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/subscription", () => ({
-  checkAccess: vi.fn().mockResolvedValue({ ok: true, reason: "trial" }),
+  checkAccess: vi.fn().mockResolvedValue({
+    kind: "free_post_trial",
+    quotaAnchor: new Date(Date.now() - 10 * 86_400_000),
+  }),
 }));
 
-// drizzle-orm operators are used inside rate-limit.ts but we just need them not to throw
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ["eq", ...args]),
   gte: vi.fn((...args: unknown[]) => ["gte", ...args]),
@@ -49,66 +50,82 @@ describe("rate-limit", () => {
     mockWhere.mockReturnValue([{ count: 0 }]);
   });
 
-  // ─── enforceRateLimit ─────────────────────────────────────────────
-
-  describe("enforceRateLimit", () => {
-    it("passes for an in-trial user", async () => {
+  describe("enforceRateLimit (op-counting path)", () => {
+    it("under cap → passes", async () => {
+      mockWhere.mockReturnValue([{ count: 50 }]);
       await expect(enforceRateLimit("user-1")).resolves.toBeUndefined();
     });
 
-    it("bypasses for null userId", async () => {
+    it("at cap (300) → throws RateLimitError", async () => {
+      mockWhere.mockReturnValue([{ count: 300 }]);
+      await expect(enforceRateLimit("user-at-limit")).rejects.toThrow(RateLimitError);
+    });
+
+    it("over cap → throws RateLimitError", async () => {
+      mockWhere.mockReturnValue([{ count: 500 }]);
+      await expect(enforceRateLimit("user-over-limit")).rejects.toThrow(RateLimitError);
+    });
+
+    it("bypasses gate for null userId (no DB hit)", async () => {
       await expect(enforceRateLimit(null)).resolves.toBeUndefined();
       expect(mockWhere).not.toHaveBeenCalled();
     });
 
-    it("bypasses for undefined userId", async () => {
-      await expect(enforceRateLimit(undefined)).resolves.toBeUndefined();
-      expect(mockWhere).not.toHaveBeenCalled();
+    it("excludes THROWN and RATE_LIMIT rows from the count (the SQL filter must NOT include them)", async () => {
+      mockWhere.mockReturnValue([{ count: 10 }]);
+      await enforceRateLimit("user-filter-probe");
+
+      expect(mockWhere).toHaveBeenCalled();
+      const whereArg = mockWhere.mock.calls[0][0] as [string, ...unknown[]];
+      expect(whereArg[0]).toBe("and");
+      const sqlFilter = whereArg[3] as { strings: readonly string[] };
+      const raw = sqlFilter.strings.join("");
+      expect(raw).toMatch(/IS NULL/);
+      expect(raw).toMatch(/WRITE_REJECTED/);
+      // Self-compounding-overage guard: rate-limited retries must NOT count.
+      expect(raw).not.toMatch(/THROWN/);
+      expect(raw).not.toMatch(/RATE_LIMIT/);
     });
   });
 
-  // ─── RateLimitError ────────────────────────────────────────────────
-
-  describe("RateLimitError", () => {
-    it("carries the trial end timestamp it was constructed with", () => {
-      const trialEndsAt = new Date("2026-05-01T00:00:00Z");
-      const err = new RateLimitError(trialEndsAt);
-      expect(err.trialEndsAt).toBe(trialEndsAt);
+  describe("RateLimitError shape", () => {
+    it("carries used, limit, resetsAt; message references the cap", () => {
+      const resetsAt = new Date("2026-06-01T00:00:00Z");
+      const err = new RateLimitError(300, 300, resetsAt);
+      expect(err.used).toBe(300);
+      expect(err.limit).toBe(300);
+      expect(err.resetsAt).toBe(resetsAt);
       expect(err.name).toBe("RateLimitError");
-      expect(err.message).toMatch(/trial ended/i);
-    });
-
-    it("accepts a null trialEndsAt", () => {
-      const err = new RateLimitError(null);
-      expect(err.trialEndsAt).toBeNull();
+      expect(err.message).toMatch(/300\/300/);
+      expect(err.message).toMatch(/upgrade/i);
     });
   });
-
-  // ─── recordOperation ──────────────────────────────────────────────
 
   describe("recordOperation", () => {
     it("does nothing for null userId", () => {
       expect(() => recordOperation(null)).not.toThrow();
     });
+
+    it("noop when no cache entry exists", () => {
+      expect(() => recordOperation("user-cold-cache")).not.toThrow();
+    });
   });
 
-  // ─── getUsageInfo ─────────────────────────────────────────────────
-
   describe("getUsageInfo", () => {
-    it("returns the raw monthly op count with unlimited flagged", async () => {
+    it("free post-trial → returns 300 cap with computed remaining", async () => {
       mockWhere.mockReturnValue([{ count: 100 }]);
       const info = await getUsageInfo("user-info-remaining");
       expect(info.used).toBe(100);
-      expect(info.limit).toBeNull();
-      expect(info.remaining).toBeNull();
-      expect(info.unlimited).toBe(true);
-      expect(info.resetsAt).toBeDefined();
+      expect(info.limit).toBe(300);
+      expect(info.remaining).toBe(200);
+      expect(info.tier).toBe("free_post_trial");
     });
 
-    it("returns zero for null userId without hitting the DB", async () => {
+    it("null userId → free defaults without hitting the DB", async () => {
       const info = await getUsageInfo(null);
       expect(info.used).toBe(0);
-      expect(info.unlimited).toBe(true);
+      expect(info.limit).toBe(300);
+      expect(info.remaining).toBe(300);
       expect(mockWhere).not.toHaveBeenCalled();
     });
   });
