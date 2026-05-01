@@ -9,7 +9,8 @@ import { startGoogleConnect } from '@/lib/google-oauth';
 import { trackEvent } from '@/lib/analytics';
 import { BOOK_DEMO_URL } from '@/lib/links';
 import { notifyHelpClicked } from '@/app/actions';
-import { McpSetupTabs, parseSetupSlug, type SetupTab } from '@/components/mcp-setup-tabs';
+import { McpSetupTabs, parseSetupSlug } from '@/components/mcp-setup-tabs';
+import { GoHighLevelConnectSurface } from '@/components/gohighlevel-connect-surface';
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from '@/lib/brand';
 
 const emptySession: Session = { connected: false };
@@ -115,6 +116,10 @@ function isKnownReason(value: string | null | undefined): value is ErrorReason {
 
 
 
+
+type SetupTab = 'claude-code' | 'connector' | 'codex' | 'any-mcp' | 'gohighlevel';
+
+
 function connectPathForTab(tab: SetupTab): string {
     switch (tab) {
         case 'connector':
@@ -123,14 +128,20 @@ function connectPathForTab(tab: SetupTab): string {
             return '/connect/codex';
         case 'any-mcp':
             return '/connect/any-mcp';
+        case 'gohighlevel':
+            return '/connect/gohighlevel';
         case 'claude-code':
         default:
             return '/connect/claude-code';
     }
 }
 
+
+
 function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSession: Session; slug?: string[]; lastAttemptEmail: string | null }) {
-    const { activeTab } = parseSetupSlug(slug);
+    const isGhl = slug?.[0] === 'gohighlevel' || slug?.[0] === 'go-high-level' || slug?.[0] === 'ghl';
+    const { activeTab: baseTab } = isGhl ? { activeTab: 'connector' as const } : parseSetupSlug(slug);
+    const activeTab: SetupTab = isGhl ? 'gohighlevel' : baseTab;
     const searchParams = useSearchParams();
     const router = useRouter();
     const urlToken = searchParams.get('token');
@@ -351,7 +362,9 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
                         );
                     })()}
 
-                    {(pendingToken || selectionMode === 'update') && accounts.length > 0 ? (
+                    {activeTab === 'gohighlevel' ? (
+                        <GoHighLevelConnectSurface session={session} />
+                    ) : (pendingToken || selectionMode === 'update') && accounts.length > 0 ? (
                         <div className="flex flex-col items-center space-y-6 text-center">
                             <div className="flex items-center gap-2 text-[#4CAF6E]">
                                 <CheckCircle2 className="h-5 w-5" />
@@ -458,7 +471,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
                         </div>
                     ) : (
                         <McpSetupTabs
-                            activeTab={activeTab}
+                            activeTab={activeTab as Exclude<SetupTab, 'gohighlevel'>}
                             apiKey={token}
                             onSignIn={beginGoogleSignIn}
                             onTokenRotated={async () => {
@@ -485,7 +498,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
                         active_tab: activeTab,
                     });
                     void notifyHelpClicked({
-                        activeTab,
+                        activeTab: activeTab === 'gohighlevel' ? undefined : activeTab,
                         pathname,
                         connected: Boolean(token),
                         source: 'connect_floating',

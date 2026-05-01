@@ -390,6 +390,38 @@ export const adPlatformConnections = pgTable("ad_platform_connections", {
   index("ad_platform_connections_platform_idx").on(table.platform),
 ]);
 
+// ─── GoHighLevel Connections ────────────────────────────────────────
+
+export const goHighLevelConnections = pgTable("gohighlevel_connections", {
+  id: serial("id").primaryKey(),
+  /** NotFair user id (matches mcp_sessions.user_id). */
+  userId: text("user_id").notNull(),
+  /** Stable app-side dedupe key: company:<companyId> or location:<companyId>:<locationId>. */
+  connectionKey: text("connection_key").notNull(),
+  /** HighLevel agency/company id. Present for both Company and Location tokens. */
+  companyId: text("company_id"),
+  /** HighLevel sub-account/location id. Null for agency-level installs until a location token is minted. */
+  locationId: text("location_id"),
+  /** Upstream token user type: Company or Location. */
+  userType: text("user_type").notNull(),
+  companyName: text("company_name"),
+  locationName: text("location_name"),
+  refreshToken: text("refresh_token").notNull(),
+  accessToken: text("access_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  /** Granted OAuth scopes from HighLevel. */
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  /** Raw install/token metadata for support and future location-token expansion. */
+  platformMetadata: jsonb("platform_metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("ghl_connections_user_idx").on(table.userId),
+  index("ghl_connections_company_idx").on(table.companyId),
+  index("ghl_connections_location_idx").on(table.locationId),
+  uniqueIndex("ghl_connections_user_connection_key_idx").on(table.userId, table.connectionKey),
+]);
+
 // ─── Account Snapshots ──────────────────────────────────────────────
 
 export const accounts = pgTable("accounts", {
