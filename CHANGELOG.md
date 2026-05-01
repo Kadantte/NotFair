@@ -2,6 +2,19 @@
 
 All notable changes to AdsAgent will be documented in this file.
 
+## [0.3.3.0] - 2026-05-01
+
+### Added
+- **`suggestImprovement` MCP tool — agent-as-informant feedback channel.** Lets the AI agent surface tool-design feedback (unclear descriptions, missing capabilities, ergonomic friction, unhelpful errors, workflow gaps, duplicate tools) that per-event telemetry can't reconstruct. Each call fires a `mcp_improvement_suggested` PostHog event and posts a formatted message to the team's Slack channel. Per-session rate-limited to 5 calls per hour. Registered on both Google Ads (`/api/mcp`, `/api/mcp/google_ads`) and Meta Ads (`/api/mcp/meta_ads`) routes.
+- **`mcp_improvement_suggested` PostHog event** documented in `docs/event-registry.md` with the full property schema (category, affected_tool, observation, suggestion, user_goal, client metadata, session_id, remaining_calls).
+
+### Changed
+- **Server-level MCP instructions** (Google + Meta) now mention `suggestImprovement` so the agent learns about the channel at handshake time. The tool description leads with the user-benefit framing ("help us make these tools better for the user you're helping right now") rather than abstract product-improvement language.
+- **Slack webhook helper extracted to `lib/slack.ts`** and reused by `app/actions.ts` (`submitFeedback`, `requestSetupHelp`, `notifyHelpClicked`, `submitManagedInquiry`) plus the new `suggestImprovement` tool. Removes the inline duplicate in `app/actions.ts`.
+
+### Security
+- **Slack mention escape on agent-supplied content.** All agent-supplied strings (`observation`, `suggestion`, `user_goal`, `affected_tool`) routed to Slack are escaped (`<`, `>`, `&` → HTML entities) before interpolation, neutralizing `<!channel>`, `<@USERID>`, `<#CHANNEL>` injection vectors. Static formatting tokens are unchanged.
+
 ## [0.3.2.0] - 2026-04-30
 
 ### Added

@@ -12,6 +12,7 @@ import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 import { getUsageInfo, getDailyUsage } from "@/lib/mcp/rate-limit";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
+import { postToSlack } from "@/lib/slack";
 import { isDemoCustomerId } from "@/lib/demo/constants";
 import { demoGetCampaignPerformance, demoGetKeywords } from "@/lib/demo/reads";
 
@@ -651,19 +652,6 @@ export async function getUsageAction() {
 export async function getUsageSummaryAction() {
     const auth = await getSessionAuth();
     return await getUsageInfo(auth.userId);
-}
-
-const SLACK_FEEDBACK_WEBHOOK =
-    'https://hooks.slack.com/services/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';
-
-async function postToSlack(text: string) {
-    const res = await fetch(SLACK_FEEDBACK_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-        signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) throw new Error(`Slack webhook failed: ${res.status}`);
 }
 
 // Best-effort: any failure yields an empty array so the support ping still fires.

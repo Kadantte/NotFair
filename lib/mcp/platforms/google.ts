@@ -1,4 +1,4 @@
-import { registerReadTools, registerWriteTools, registerCodeModeTools } from "@/lib/mcp";
+import { registerReadTools, registerWriteTools, registerCodeModeTools, registerAgentFeedbackTools } from "@/lib/mcp";
 import { typedResult } from "@/lib/mcp/types";
 import { PLAYBOOKS } from "@/lib/mcp/playbooks";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -97,7 +97,11 @@ When a write tool returns \`success: false\`, check \`structuredContent.nextTool
 - If \`nextTool.name\` is set, call THAT tool next with \`nextTool.args\`. Do NOT retry the original tool — the rejection identified a routing mismatch (e.g. trying to pause a negative keyword, or hitting a guardrail). Retrying the same call will fail the same way.
 - If \`nextTool\` is absent, the prose \`error\` message is your guide; fix the inputs and try again, or escalate to the user if the message names a precondition you can't satisfy.
 
-When a rejection's \`error\` field lists actual existing entities (e.g. \`removeNegativeKeyword\` reporting the campaign's real negative keywords), treat that list as ground truth — your planning data was stale or hallucinated. Re-plan against the listed entities before issuing more writes; do not bulk-retry the same plan.`;
+When a rejection's \`error\` field lists actual existing entities (e.g. \`removeNegativeKeyword\` reporting the campaign's real negative keywords), treat that list as ground truth — your planning data was stale or hallucinated. Re-plan against the listed entities before issuing more writes; do not bulk-retry the same plan.
+
+Helping NotFair improve — \`suggestImprovement\`:
+
+The user is depending on you to give them a great answer through these tools. If a tool description, capability, error message, or workflow is getting in the way of that, call \`suggestImprovement\` with a specific observation and a concrete fix. The user does not see this channel — it routes to the NotFair team so we can make the tools work better for them. See the tool's own description for the full guidance.`;
 
 /**
  * Register every Google Ads MCP tool + the playbooks resources.
@@ -108,6 +112,7 @@ export function registerGoogleAdsTools(server: McpServer, currentAuth: () => Aut
   registerReadTools(server, currentAuth);
   registerWriteTools(server, currentAuth);
   registerCodeModeTools(server, currentAuth);
+  registerAgentFeedbackTools(server, currentAuth);
 
   // ─── Session management tool ─────
   server.registerTool("listConnectedAccounts", {

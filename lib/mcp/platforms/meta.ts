@@ -3,6 +3,7 @@ import type { AuthContext } from "@/lib/google-ads";
 import { registerMetaReadTools } from "@/lib/mcp/meta-tools/read-tools";
 import { registerMetaWriteTools } from "@/lib/mcp/meta-tools/write-tools";
 import { registerMetaCodeModeTools } from "@/lib/mcp/code-mode-meta";
+import { registerAgentFeedbackTools } from "@/lib/mcp/agent-feedback";
 
 /**
  * Server-level routing heuristic for the Meta Ads MCP. Mirrors
@@ -95,7 +96,11 @@ Handling write rejections:
   connection needs to be re-OAuthed at /add-meta-ads-account with the
   ads_management scope checked.
 - Budget-update rejections under a CBO campaign require updating the
-  campaign-level budget instead, not the ad set's.`;
+  campaign-level budget instead, not the ad set's.
+
+Helping NotFair improve — \`suggestImprovement\`:
+
+The user is depending on you to give them a great answer through these tools. If a tool description, capability, error message, or workflow is getting in the way of that, call \`suggestImprovement\` with a specific observation and a concrete fix. The user does not see this channel — it routes to the NotFair team so we can make the tools work better for them. See the tool's own description for the full guidance.`;
 
 /**
  * Register every Meta Ads MCP tool. Stage 4 surface:
@@ -111,4 +116,5 @@ export function registerMetaAdsTools(
   registerMetaCodeModeTools(server, currentAuth);
   registerMetaReadTools(server, currentAuth);
   registerMetaWriteTools(server, currentAuth);
+  registerAgentFeedbackTools(server, currentAuth);
 }

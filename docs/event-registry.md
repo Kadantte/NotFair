@@ -663,6 +663,35 @@ No properties.
 
 ---
 
+## mcp_improvement_suggested
+
+**Phase:** 1
+**Category:** quality_signal
+**Platform:** PostHog (server)
+**Trigger:** Fires when an AI agent calls the `suggestImprovement` MCP tool to flag a tool-design issue (unclear description, missing capability, ergonomic friction, unhelpful error message, workflow gap, or duplicate tools). One event per call. Per-session rate-limited to 5 calls per hour; rate-limited calls are NOT tracked (the tool returns `recorded: false`).
+**Hypothesis:** We believe tracking this tells us how AI agents — our highest-volume "users" — perceive the NotFair tool surface, which lets us prioritize tool-description fixes, missing-capability roadmap items, and ergonomic improvements that per-event telemetry (`ai_change_failed`, etc.) cannot surface. Pairs with Slack notifications for real-time triage and a weekly digest grouped by `affected_tool` + `category` for pattern detection.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `category` | string | `"missing_capability"` | One of `description_unclear`, `missing_capability`, `ergonomic`, `error_message_unclear`, `workflow_gap`, `duplicate_tools`, `other`. |
+| `affected_tool` | string | `"addNegativeKeyword"` | Tool name the suggestion is about, or `"general"` for cross-cutting. |
+| `observation` | string | `"Calling addNegativeKeyword 200x for a single batch felt redundant; the description doesn't mention addKeywordToNegativeList exists."` | Truncated to 1000 chars. |
+| `suggestion` | string | `"Cross-reference the bulk variant in this tool's description, or surface a hint when called >5 times consecutively."` | Truncated to 1000 chars. |
+| `user_goal` | string \| null | `"Adding 12 negative keywords found in a search-term audit."` | Optional context — what the user was trying to accomplish. Truncated to 500 chars. |
+| `client_name` | string \| null | `"claude-code"` | MCP client name from the handshake. Same semantics as `ai_change_executed`. |
+| `client_version` | string \| null | `"1.2.3"` | MCP client version. |
+| `auth_method` | string \| null | `"oauth"` | `oauth`, `direct`, or `chat`. |
+| `session_id` | number \| null | `4231` | `mcp_sessions.id` for correlating to the surrounding session's tool calls. |
+| `remaining_calls` | number | `4` | Calls remaining in the current 1-hour rate-limit window for this session. |
+
+```json
+{ "event": "mcp_improvement_suggested", "properties": { "category": "duplicate_tools", "affected_tool": "addNegativeKeyword", "observation": "...", "suggestion": "...", "user_goal": null, "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "session_id": 4231, "remaining_calls": 4 } }
+```
+
+**Files:** `lib/mcp/agent-feedback.ts`
+
+---
+
 ## Phase 2 backlog
 
 Valid candidates that don't yet meet the "what would we do differently?" bar — defer until we have a concrete hypothesis or a question we can't answer with Phase 1 events.
