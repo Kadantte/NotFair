@@ -26,7 +26,7 @@ export type MetaConnection = {
   accessTokenExpiresAt: string | null;
 };
 
-export function ConnectMetaPage({
+export function AddMetaAdsAccountPage({
   initialConnection,
   userEmail,
 }: {
@@ -40,7 +40,7 @@ export function ConnectMetaPage({
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const handleConnect = useCallback(() => {
-    window.location.href = "/api/oauth/meta/start?next=%2Fconnect-meta";
+    window.location.href = "/api/oauth/meta/start?next=%2Fadd-meta-ads-account";
   }, []);
 
   const handleDisconnect = useCallback(async () => {

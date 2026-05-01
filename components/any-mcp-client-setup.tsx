@@ -9,19 +9,21 @@ type Surface = "marketing" | "in_app";
 
 const TOKEN_PLACEHOLDER = "YOUR_ADSAGENT_API_KEY";
 
-const OAUTH_CONFIG = `{
+function oauthConfigFor(connectorName: string, serverUrl: string) {
+  return `{
   "mcpServers": {
-    "${MCP_CONNECTOR_NAME}": {
-      "url": "${MCP_SERVER_URL}"
+    "${connectorName}": {
+      "url": "${serverUrl}"
     }
   }
 }`;
+}
 
-function bearerConfigFor(token: string) {
+function bearerConfigFor(connectorName: string, serverUrl: string, token: string) {
   return `{
   "mcpServers": {
-    "${MCP_CONNECTOR_NAME}": {
-      "url": "${MCP_SERVER_URL}",
+    "${connectorName}": {
+      "url": "${serverUrl}",
       "headers": {
         "Authorization": "Bearer ${token}"
       }
@@ -35,11 +37,15 @@ export function AnyMcpClientSetup({
   onSignIn,
   onRotated,
   surface,
+  serverUrl = MCP_SERVER_URL,
+  connectorName = MCP_CONNECTOR_NAME,
 }: {
   apiKey: string | null;
   onSignIn?: () => void;
   onRotated?: () => Promise<void> | void;
   surface: Surface;
+  serverUrl?: string;
+  connectorName?: string;
 }) {
   return (
     <div className="space-y-10">
@@ -49,7 +55,7 @@ export function AnyMcpClientSetup({
         subtitle="Drop into ~/.cursor/mcp.json (Cursor), the Cline settings JSON, or any client that takes the standard MCP config schema. The client opens a browser for sign-in."
       >
         <CodeBlock
-          code={OAUTH_CONFIG}
+          code={oauthConfigFor(connectorName, serverUrl)}
           language="json"
           trackingStep="oauth_json"
           surface={surface}
@@ -74,7 +80,11 @@ export function AnyMcpClientSetup({
             <ApiKeyCta onSignIn={onSignIn} surface={surface} />
           )}
           <CodeBlock
-            code={apiKey ? bearerConfigFor(apiKey) : bearerConfigFor(TOKEN_PLACEHOLDER)}
+            code={
+              apiKey
+                ? bearerConfigFor(connectorName, serverUrl, apiKey)
+                : bearerConfigFor(connectorName, serverUrl, TOKEN_PLACEHOLDER)
+            }
             language="json"
             trackingStep="bearer_json"
             surface={surface}

@@ -11,7 +11,15 @@ type Surface = "marketing" | "in_app";
 const TOPRANK_REPO = "https://github.com/nowork-studio/toprank";
 const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/settings/connectors?modal=add-custom-connector";
 
-export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
+export function ConnectorSetupSteps({
+  surface,
+  serverUrl = MCP_SERVER_URL,
+  connectorName = MCP_CONNECTOR_NAME,
+}: {
+  surface: Surface;
+  serverUrl?: string;
+  connectorName?: string;
+}) {
   return (
     <div className="space-y-10">
       {/* Step 1 */}
@@ -52,13 +60,13 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
           </p>
           <CopyableField
             label="Name"
-            value={MCP_CONNECTOR_NAME}
+            value={connectorName}
             trackingField="name"
             surface={surface}
           />
           <CopyableField
             label="Remote MCP Server URL"
-            value={MCP_SERVER_URL}
+            value={serverUrl}
             trackingField="server_url"
             surface={surface}
           />
@@ -74,7 +82,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
           />
 
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Verify <strong className="text-[#E8E4DD]">{MCP_CONNECTOR_NAME}</strong> appears
+            Verify <strong className="text-[#E8E4DD]">{connectorName}</strong> appears
             in your Connectors list with all available tools.
           </p>
           <SetupScreenshot
@@ -142,7 +150,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
         <div className="flex items-baseline gap-3">
           <StepNumber n={4} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Enable {MCP_CONNECTOR_NAME} in a chat
+            Enable {connectorName} in a chat
           </h3>
         </div>
         <div className="ml-11 space-y-3">
@@ -150,7 +158,7 @@ export function ConnectorSetupSteps({ surface }: { surface: Surface }) {
             Open a new Claude chat, click the{" "}
             <strong className="text-[#E8E4DD]">+</strong> button, go to{" "}
             <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle{" "}
-            <strong className="text-[#E8E4DD]">{MCP_CONNECTOR_NAME}</strong> on.
+            <strong className="text-[#E8E4DD]">{connectorName}</strong> on.
           </p>
           <SetupScreenshot
             src="/connector-setup/04-enable-in-chat.png"

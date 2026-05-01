@@ -444,7 +444,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     }}
                 />
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
-                {isDev && <NavItem href="/connect-meta" icon={PlugZap} label="Connect Meta" active={pathname.startsWith('/connect-meta')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
+                {isDev && <NavItem href="/add-google-ads-account" icon={PlugZap} label="Add Google Ads Account" active={pathname.startsWith('/add-google-ads-account')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
+                {isDev && <NavItem href="/add-meta-ads-account" icon={PlugZap} label="Add Meta Ads Account" active={pathname.startsWith('/add-meta-ads-account')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
+                {isDev && <NavItem href="/connect-meta-ads-mcp" icon={PlugZap} label="Meta Ads MCP" active={pathname.startsWith('/connect-meta-ads-mcp')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
                 <DiscordLink
                     location="sidebar"
                     className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}

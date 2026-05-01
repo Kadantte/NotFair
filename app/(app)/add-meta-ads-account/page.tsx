@@ -3,10 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getAuthContext } from "@/lib/session";
 import { DEV_EMAILS } from "@/lib/dev-emails";
-import { ConnectMetaPage } from "@/components/connect-meta-page";
+import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
 
 /**
- * Dev-gated page for connecting a NotFair user's Meta ad accounts.
+ * Dev-gated page for adding/managing Meta ad accounts.
  *
  * Two layers of protection:
  *   1. Sidebar link only renders when `isDev` is true (client-side filter).
@@ -17,7 +17,7 @@ import { ConnectMetaPage } from "@/components/connect-meta-page";
  * pending. Once App Review approves advanced access on `ads_management`,
  * this page becomes generally available and the gate is removed.
  */
-export default async function ConnectMetaPagePath() {
+export default async function AddMetaAdsAccountPagePath() {
   let realEmail: string | null = null;
   try {
     const ctx = await getAuthContext();
@@ -25,7 +25,7 @@ export default async function ConnectMetaPagePath() {
   } catch {
     // Not authenticated — bounce through Google sign-in. The /connect page
     // exists; layout handles the post-signin redirect.
-    redirect("/connect?next=%2Fconnect-meta");
+    redirect("/connect?next=%2Fadd-meta-ads-account");
   }
 
   if (!realEmail || !DEV_EMAILS.includes(realEmail)) {
@@ -97,5 +97,5 @@ export default async function ConnectMetaPagePath() {
     }
   }
 
-  return <ConnectMetaPage initialConnection={connection} userEmail={realEmail} />;
+  return <AddMetaAdsAccountPage initialConnection={connection} userEmail={realEmail} />;
 }

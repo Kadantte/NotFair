@@ -26,6 +26,14 @@ export const MCP_SERVER_URL = `${BRAND_URL}/api/mcp/google_ads`;
  */
 export const MCP_CONNECTOR_NAME = "NotFair-GoogleAds";
 
+/**
+ * Meta Ads MCP equivalents — surfaced on the dev-gated /connect-meta-ads-mcp
+ * page (Stage 3 Slice 2.5) so users can wire up Claude / Codex / etc against
+ * the Meta resource the same way they do Google.
+ */
+export const META_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/meta_ads`;
+export const META_MCP_CONNECTOR_NAME = "NotFair-MetaAds";
+
 const EMAIL_DOMAIN = "notfair.co";
 export const SUPPORT_EMAIL = `tong@${EMAIL_DOMAIN}`;
 export const OUTREACH_EMAIL = `tong@${EMAIL_DOMAIN}`;

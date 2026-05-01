@@ -7,11 +7,19 @@ import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
-const ONE_LINER = `codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}`;
 const AUDIT_PROMPT =
   "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
 
-export function CodexSetupSteps({ surface }: { surface: Surface }) {
+export function CodexSetupSteps({
+  surface,
+  serverUrl = MCP_SERVER_URL,
+  connectorName = MCP_CONNECTOR_NAME,
+}: {
+  surface: Surface;
+  serverUrl?: string;
+  connectorName?: string;
+}) {
+  const oneLiner = `codex mcp add ${connectorName} --url ${serverUrl}`;
   return (
     <div className="space-y-10">
       {/* Step 1 */}
@@ -53,7 +61,7 @@ export function CodexSetupSteps({ surface }: { surface: Surface }) {
             register the NotFair MCP server automatically.
           </p>
           <CommandBlock
-            command={ONE_LINER}
+            command={oneLiner}
             trackingStep="codex_oneliner"
             surface={surface}
           />
