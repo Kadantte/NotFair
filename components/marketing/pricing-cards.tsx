@@ -40,6 +40,7 @@ export function CheckoutStatusBanner() {
 
 export const FREE_FEATURES = [
   "7-day free trial — then upgrade to continue",
+  "No credit card required",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Diagnose account issues and draft campaign changes",
   "Preview bid, budget, keyword, and ad edits before approval",
@@ -321,6 +322,9 @@ export function PricingCards({
                 Get started free
               </button>
             )}
+            <p className="mt-3 text-center font-mono text-[11px] text-[#C4C0B6]">
+              No credit card required
+            </p>
           </div>
         </div>
 

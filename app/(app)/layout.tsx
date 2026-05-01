@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
@@ -512,16 +512,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             </span>
                         )}
                         {badge.kind === 'trial' && (
-                            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold tracking-wide ${
-                                badge.endingSoon
-                                    ? 'bg-[#D89344]/15 text-[#D89344]'
-                                    : 'bg-[#E8E4DD]/8 text-[#C4C0B6]'
-                            }`}>
-                                {badge.daysLeft === 0 ? 'Free trial ends today' : `Free trial · ${badge.daysLeft}d left`}
-                            </span>
+                            <Link
+                                href="/upgrade"
+                                prefetch
+                                onClick={() => trackEvent('upgrade_clicked', {
+                                    location: badge.endingSoon ? 'trial_ending_soon_pill' : 'trial_active_pill',
+                                    page: pathname,
+                                })}
+                                aria-label={badge.daysLeft === 0
+                                    ? 'Free trial ends today — upgrade to keep access'
+                                    : `Free trial · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left — upgrade to keep access`}
+                                className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold tracking-wide ring-1 ring-inset transition-colors ${
+                                    badge.endingSoon
+                                        ? 'bg-[#D4882A]/15 text-[#D4882A] ring-[#D4882A]/35 hover:bg-[#D4882A]/22'
+                                        : 'bg-[#E8E4DD]/10 text-[#E8E4DD] ring-[#3D3C36] hover:bg-[#E8E4DD]/15'
+                                }`}
+                            >
+                                {badge.endingSoon ? (
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                ) : (
+                                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                                )}
+                                <span>
+                                    {badge.daysLeft === 0
+                                        ? 'Free trial ends today'
+                                        : `Free trial · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left`}
+                                </span>
+                            </Link>
                         )}
                         {badge.kind === 'trial_expired' && (
-                            <span className="inline-flex h-5 items-center rounded-full bg-[#C45D4A]/15 px-2 text-[11px] font-semibold tracking-wide text-[#C45D4A]">
+                            <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#C45D4A]/15 px-3 text-[12px] font-semibold tracking-wide text-[#C45D4A] ring-1 ring-inset ring-[#C45D4A]/35">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                                 Trial ended
                             </span>
                         )}
@@ -547,7 +568,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 href="/upgrade"
                                 prefetch
                                 onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ending_soon_badge', page: pathname })}
-                                className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#D89344] bg-[#D89344] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(216,147,68,0.18)] transition-all hover:bg-[#C0823A] hover:shadow-[0_0_0_4px_rgba(216,147,68,0.28)]"
+                                className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#D4882A] bg-[#D4882A] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(212,136,42,0.18)] transition-all hover:bg-[#B8731F] hover:shadow-[0_0_0_4px_rgba(212,136,42,0.28)]"
                                 aria-label="Free trial ending soon — upgrade to Growth"
                             >
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -602,7 +623,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         href="/upgrade"
                         prefetch
                         onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ending_soon_banner', page: pathname })}
-                        className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#D89344]/60 bg-[#D89344] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#C0823A] lg:hidden"
+                        className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#D4882A]/60 bg-[#D4882A] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#B8731F] lg:hidden"
                         aria-label="Free trial ending soon — upgrade to Growth"
                     >
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
