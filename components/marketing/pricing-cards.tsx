@@ -40,7 +40,7 @@ export function CheckoutStatusBanner() {
 
 export const FREE_FEATURES = [
   "7 days of unlimited access — every feature, no caps",
-  "Then 300 operations per month, free forever",
+  "Then 300 MCP operations/mo, free forever",
   "No credit card required",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Diagnose account issues and draft campaign changes",

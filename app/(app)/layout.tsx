@@ -549,12 +549,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     page: pathname,
                                 })}
                                 aria-label={badge.daysLeft === 0
-                                    ? 'Free trial ends today — upgrade to keep access'
-                                    : `Free trial · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left — upgrade to keep access`}
+                                    ? 'Unlimited access ends today — upgrade to keep it'
+                                    : `Unlimited access · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left — upgrade to keep it`}
                                 className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold tracking-wide ring-1 ring-inset transition-colors ${
                                     badge.endingSoon
                                         ? 'bg-[#D4882A]/15 text-[#D4882A] ring-[#D4882A]/35 hover:bg-[#D4882A]/22'
-                                        : 'bg-[#E8E4DD]/10 text-[#E8E4DD] ring-[#3D3C36] hover:bg-[#E8E4DD]/15'
+                                        : 'bg-[#4CAF6E]/12 text-[#4CAF6E] ring-[#4CAF6E]/30 hover:bg-[#4CAF6E]/18'
                                 }`}
                             >
                                 {badge.endingSoon ? (
@@ -564,8 +564,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 )}
                                 <span>
                                     {badge.daysLeft === 0
-                                        ? 'Free trial ends today'
-                                        : `Free trial · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left`}
+                                        ? 'Unlimited access ends today'
+                                        : `Unlimited access · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left`}
                                 </span>
                             </Link>
                         )}
