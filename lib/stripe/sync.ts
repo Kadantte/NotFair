@@ -5,6 +5,7 @@ import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
 import { stripe as stripeClient } from "./client";
 import { stripeMode } from "./config";
+import { TRIAL_DURATION_MS } from "@/lib/trial-config";
 
 /**
  * Stripe → DB sync layer.
@@ -125,9 +126,14 @@ export async function syncStripeSubscription(
     updatedAt: now,
   };
 
+  // Insert path: webhook arrived before /api/subscription was ever called.
+  // Set the trial clock so this user gets the same 7-day window. On conflict
+  // we don't touch trial_ends_at — never reset an existing trial.
+  const trialEndsAt = new Date(now.getTime() + TRIAL_DURATION_MS);
+
   await database(deps)
     .insert(schema.subscriptions)
-    .values({ ...row, createdAt: now })
+    .values({ ...row, trialEndsAt, createdAt: now })
     .onConflictDoUpdate({
       target: [schema.subscriptions.userId, schema.subscriptions.env],
       set: row,

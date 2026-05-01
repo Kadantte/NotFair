@@ -75,10 +75,11 @@ import {
   getPlan,
   getUserPlan,
   getUserSubscription,
-  getUserPlanLimits,
   hasFeature,
   planFromSubscriptionRow,
   isPlanEntitled,
+  checkAccess,
+  TRIAL_DURATION_MS,
 } from "@/lib/subscription";
 
 // ─── Stripe.Subscription factory ──────────────────────────────────────
@@ -119,11 +120,17 @@ function row(opts: {
   data?: ReturnType<typeof makeSubData> | null;
   email?: string | null;
   stripeCustomerId?: string | null;
+  trialEndsAt?: Date | null;
 }) {
   return {
     email: opts.email ?? null,
     stripeCustomerId: opts.stripeCustomerId ?? "cus_123",
     data: opts.data === undefined ? makeSubData() : opts.data,
+    // Default: in-trial (signup ~1h ago, trial ends ~6 days from now). Tests
+    // that need expired or post-trial state pass an explicit trialEndsAt.
+    trialEndsAt: opts.trialEndsAt === undefined
+      ? new Date(Date.now() + TRIAL_DURATION_MS - 3_600_000)
+      : opts.trialEndsAt,
   };
 }
 
@@ -136,13 +143,11 @@ describe("subscription resolver", () => {
   });
 
   describe("PLANS registry", () => {
-    it("free plan caps at 300 ops/month", () => {
-      expect(PLANS.free.limits.monthlyOpLimit).toBe(300);
+    it("free plan does not grant unlimited operations", () => {
       expect(PLANS.free.features.unlimitedOperations).toBe(false);
     });
 
-    it("growth plan is unlimited", () => {
-      expect(PLANS.growth.limits.monthlyOpLimit).toBeNull();
+    it("growth plan grants unlimited operations", () => {
       expect(PLANS.growth.features.unlimitedOperations).toBe(true);
     });
 
@@ -287,19 +292,91 @@ describe("subscription resolver", () => {
     });
   });
 
-  describe("getUserPlan + getUserPlanLimits", () => {
-    it("free user gets 300/month", async () => {
+  describe("getUserPlan", () => {
+    it("free user resolves to the free plan", async () => {
       mockRow = undefined;
       const plan = await getUserPlan("user-free");
-      const limits = await getUserPlanLimits("user-free");
       expect(plan.key).toBe("free");
-      expect(limits.monthlyOpLimit).toBe(300);
     });
 
-    it("growth user gets unlimited", async () => {
+    it("growth user resolves to the growth plan", async () => {
       mockRow = row({ data: makeSubData({ status: "active" }) });
-      const limits = await getUserPlanLimits("user-growth");
-      expect(limits.monthlyOpLimit).toBeNull();
+      const plan = await getUserPlan("user-growth");
+      expect(plan.key).toBe("growth");
+    });
+  });
+
+  describe("trial window + checkAccess", () => {
+    it("free user with trial in the future is in trial", async () => {
+      mockRow = row({ data: null, trialEndsAt: new Date(Date.now() + 86_400_000) });
+      const sub = await getUserSubscription("user-free-in-trial");
+      expect(sub.plan).toBe("free");
+      expect(sub.inTrial).toBe(true);
+      const access = await checkAccess("user-free-in-trial");
+      expect(access.ok).toBe(true);
+      if (access.ok) expect(access.reason).toBe("trial");
+    });
+
+    it("free user with trial in the past is blocked", async () => {
+      mockRow = row({ data: null, trialEndsAt: new Date(Date.now() - 86_400_000) });
+      const sub = await getUserSubscription("user-trial-expired");
+      expect(sub.inTrial).toBe(false);
+      const access = await checkAccess("user-trial-expired");
+      expect(access.ok).toBe(false);
+      if (!access.ok) expect(access.reason).toBe("trial_expired");
+    });
+
+    it("growth user passes regardless of trial state", async () => {
+      mockRow = row({
+        data: makeSubData({ status: "active" }),
+        trialEndsAt: new Date(Date.now() - 86_400_000),
+      });
+      const access = await checkAccess("user-growth-expired-trial");
+      expect(access.ok).toBe(true);
+      if (access.ok) expect(access.reason).toBe("paid");
+    });
+
+    it("Stripe-trialing user with expired app-side trial is admitted as paid", async () => {
+      // Two trial concepts coexist here:
+      //   - Stripe-side: data.status === "trialing" (Growth subscription on
+      //     a Stripe-managed trial — entitled by isPlanEntitled).
+      //   - App-side: subscriptions.trial_ends_at — used to gate free users.
+      // For a Stripe-trialing customer we MUST NOT block them just because
+      // their separate app-side trial_ends_at row happens to be in the past.
+      // Regression guard for the issue this test was added to cover.
+      mockRow = row({
+        data: makeSubData({ status: "trialing" }),
+        trialEndsAt: new Date(Date.now() - 30 * 86_400_000),
+      });
+      const access = await checkAccess("user-stripe-trialing-expired-app-trial");
+      expect(access.ok).toBe(true);
+      if (access.ok) expect(access.reason).toBe("paid");
+    });
+
+    it("past_due Growth user with expired app-side trial is admitted as paid", async () => {
+      // past_due means Stripe is retrying the card; we keep them entitled.
+      // Same logic — paid wins over the app-side trial check.
+      mockRow = row({
+        data: makeSubData({ status: "past_due" }),
+        trialEndsAt: new Date(Date.now() - 86_400_000),
+      });
+      const access = await checkAccess("user-past-due-expired-app-trial");
+      expect(access.ok).toBe(true);
+      if (access.ok) expect(access.reason).toBe("paid");
+    });
+
+    it("canceled Growth user with expired app-side trial is blocked (back on free)", async () => {
+      // The mirror case: once Stripe drops them to canceled, isPlanEntitled is
+      // false, so the resolver maps them back to "free". With the app-side
+      // trial also expired, they correctly fail the gate. Locks in that the
+      // "paid wins" branch genuinely requires entitlement, not just any sub.
+      mockRow = row({
+        data: makeSubData({ status: "canceled" }),
+        trialEndsAt: new Date(Date.now() - 86_400_000),
+      });
+      const access = await checkAccess("user-canceled-expired-trial");
+      expect(access.ok).toBe(false);
+      if (!access.ok) expect(access.reason).toBe("trial_expired");
     });
   });
 
@@ -324,7 +401,6 @@ describe("subscription resolver", () => {
       const sub = await getUserSubscription("dev-user");
       expect(sub.plan).toBe("growth");
       expect(sub.status).toBe("active");
-      expect((await getUserPlanLimits("dev-user")).monthlyOpLimit).toBeNull();
       expect(await hasFeature("dev-user", "unlimitedOperations")).toBe(true);
     });
 

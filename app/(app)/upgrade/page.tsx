@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
-import { isGrowthTrialEligible } from "@/lib/stripe/trial";
 import { CheckoutStatusBanner, PricingSection } from "@/components/marketing/pricing-cards";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -14,9 +13,6 @@ export default async function UpgradePage() {
   const subscription = session.connected && session.userId
     ? await getUserSubscription(session.userId)
     : null;
-  const trialEligible = subscription?.stripeCustomerId
-    ? await isGrowthTrialEligible(subscription.stripeCustomerId)
-    : true;
 
   return (
     <section className="flex min-h-0 h-full flex-col overflow-hidden">
@@ -32,7 +28,6 @@ export default async function UpgradePage() {
           scheduledCancelAt={subscription?.scheduledCancelAt?.toISOString() ?? null}
           currentPeriodEnd={subscription?.currentPeriodEnd?.toISOString() ?? null}
           hasStripeCustomer={!!subscription?.stripeCustomerId}
-          trialEligible={trialEligible}
           page="upgrade"
         />
       </div>

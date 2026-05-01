@@ -9,18 +9,16 @@ import { DEV_EMAILS } from "@/lib/dev-emails";
 
 const DEV_GROWTH_OVERRIDE_COOKIE = "dev_growth_override";
 
+// Re-exported so existing callers can keep importing from @/lib/subscription.
+export { TRIAL_DURATION_MS } from "@/lib/trial-config";
+
 // ─── Plan registry ────────────────────────────────────────────────────
 //
 // Adding a new paid plan: add an entry to PLANS, drop the matching Stripe
 // price IDs into env, extend resolvePrice() in lib/stripe/config.ts, and
-// every gate built on hasFeature() / getPlanLimits() picks it up for free.
+// every gate built on hasFeature() picks it up for free.
 
 export type PlanKey = "free" | "growth";
-
-export interface PlanLimits {
-  /** Monthly Google Ads operation count. null = unlimited. */
-  monthlyOpLimit: number | null;
-}
 
 export interface PlanFeatures {
   unlimitedOperations: boolean;
@@ -33,7 +31,6 @@ export interface Plan {
   /** Monthly price in USD (display only — Stripe is source of truth). */
   priceMonthlyUsd: number;
   priceYearlyUsd: number;
-  limits: PlanLimits;
   features: PlanFeatures;
 }
 
@@ -43,7 +40,6 @@ export const PLANS: Record<PlanKey, Plan> = {
     name: "Free",
     priceMonthlyUsd: 0,
     priceYearlyUsd: 0,
-    limits: { monthlyOpLimit: 300 },
     features: { unlimitedOperations: false, prioritySupport: false },
   },
   growth: {
@@ -51,7 +47,6 @@ export const PLANS: Record<PlanKey, Plan> = {
     name: "Growth",
     priceMonthlyUsd: 99,
     priceYearlyUsd: 950,
-    limits: { monthlyOpLimit: null },
     features: { unlimitedOperations: true, prioritySupport: true },
   },
 };
@@ -75,7 +70,12 @@ export interface UserSubscription {
   cancelAt: Date | null;
   /** Computed: when the cancel will actually take effect, if scheduled. */
   scheduledCancelAt: Date | null;
+  /** Stripe-side trial end (legacy — left in place for any caller that reads it). */
   trialEnd: Date | null;
+  /** App-side trial cutoff. Set on subscription row creation = createdAt + 7d. */
+  trialEndsAt: Date | null;
+  /** True iff the user is currently within their app-side trial window. */
+  inTrial: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
 }
@@ -90,6 +90,8 @@ const FREE_SUBSCRIPTION: UserSubscription = {
   cancelAt: null,
   scheduledCancelAt: null,
   trialEnd: null,
+  trialEndsAt: null,
+  inTrial: false,
   stripeCustomerId: null,
   stripeSubscriptionId: null,
 };
@@ -152,6 +154,8 @@ function resolveFromStripeData(
     cancelAt,
     scheduledCancelAt,
     trialEnd,
+    trialEndsAt: null,
+    inTrial: false,
     stripeCustomerId,
     stripeSubscriptionId: data.id,
   };
@@ -179,16 +183,23 @@ export async function getUserSubscription(userId: string | null | undefined): Pr
       )
     : FREE_SUBSCRIPTION;
 
+  // Trial window comes from the row, NOT from Stripe. We track it ourselves
+  // so every signed-up user gets a uniform 7 days regardless of whether they
+  // ever hit checkout.
+  const trialEndsAt = row?.trialEndsAt ?? null;
+  const inTrial = !!trialEndsAt && trialEndsAt.getTime() > Date.now();
+  const withTrial: UserSubscription = { ...resolved, trialEndsAt, inTrial };
+
   // Dev-email override: if the account belongs to a developer and doesn't
   // already have a paid entitlement, grant a synthetic growth plan so rate
   // limits and feature gates behave as if they were on Growth. A real Stripe
   // subscription (if ever created) still wins.
-  if (resolved.plan === "free") {
-    const devOverride = await maybeDevOverride(userId, resolved);
+  if (withTrial.plan === "free") {
+    const devOverride = await maybeDevOverride(userId, withTrial);
     if (devOverride) return devOverride;
   }
 
-  return resolved;
+  return withTrial;
 }
 
 // Cache userId → isDev permanently. Dev-email membership is static for the
@@ -235,14 +246,30 @@ export async function getUserPlan(userId: string | null | undefined): Promise<Pl
   return getPlan(sub.plan);
 }
 
-export async function getUserPlanLimits(userId: string | null | undefined): Promise<PlanLimits> {
-  return (await getUserPlan(userId)).limits;
-}
-
 /** Generic feature gate. Use `hasFeature(userId, "unlimitedOperations")`. */
 export async function hasFeature(userId: string | null | undefined, feature: keyof PlanFeatures): Promise<boolean> {
   const plan = await getUserPlan(userId);
   return plan.features[feature];
+}
+
+/**
+ * Access gate. Paid plans always pass. Free users pass while in trial; once
+ * the trial expires they have to upgrade. Returns the reason for the deny so
+ * callers can render an appropriate message.
+ */
+export type AccessDecision =
+  | { ok: true; reason: "paid" | "trial" | "dev" }
+  | { ok: false; reason: "trial_expired"; trialEndsAt: Date | null };
+
+export async function checkAccess(userId: string | null | undefined): Promise<AccessDecision> {
+  const sub = await getUserSubscription(userId);
+  if (sub.plan !== "free" && isPlanEntitled(sub.status)) {
+    return { ok: true, reason: "paid" };
+  }
+  if (sub.inTrial) {
+    return { ok: true, reason: "trial" };
+  }
+  return { ok: false, reason: "trial_expired", trialEndsAt: sub.trialEndsAt };
 }
 
 // ─── Pure helper for tests ────────────────────────────────────────────

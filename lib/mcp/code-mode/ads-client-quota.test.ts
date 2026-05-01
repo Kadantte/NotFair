@@ -272,7 +272,7 @@ describe("runScript op counting", () => {
       const { RateLimitError } = await vi.importActual<
         typeof import("@/lib/mcp/rate-limit")
       >("@/lib/mcp/rate-limit");
-      mockEnforceRateLimit.mockRejectedValueOnce(new RateLimitError(300, 300));
+      mockEnforceRateLimit.mockRejectedValueOnce(new RateLimitError(null));
       const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
 
       await expect(host.ads.gaqlParallel(makeQueries(5))).rejects.toBeInstanceOf(
@@ -293,7 +293,7 @@ describe("runScript op counting", () => {
       mockExecRead.mockImplementation(
         async (_a: unknown, _t: unknown, _n: unknown, fn: () => Promise<unknown>) => {
           call += 1;
-          if (call === 2) throw new RateLimitError(300, 300);
+          if (call === 2) throw new RateLimitError(null);
           return fn();
         },
       );

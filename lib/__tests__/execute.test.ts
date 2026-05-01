@@ -233,7 +233,7 @@ describe("execWrite", () => {
   });
 
   it("rate limit exceeded: throws before calling fn", async () => {
-    mockEnforceRateLimit.mockRejectedValue(new RateLimitError(300, 300));
+    mockEnforceRateLimit.mockRejectedValue(new RateLimitError(null));
     const fn = vi.fn();
 
     await expect(execWrite(auth, "acct-1", "camp-1", fn)).rejects.toThrow(RateLimitError);
@@ -299,7 +299,7 @@ describe("execRead", () => {
   });
 
   it("rate limit exceeded: throws before calling fn", async () => {
-    mockEnforceRateLimit.mockRejectedValue(new RateLimitError(300, 300));
+    mockEnforceRateLimit.mockRejectedValue(new RateLimitError(null));
     const fn = vi.fn();
 
     await expect(execRead(auth, "acct-1", "list_campaigns", fn)).rejects.toThrow(RateLimitError);

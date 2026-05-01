@@ -39,7 +39,7 @@ export function CheckoutStatusBanner() {
 }
 
 export const FREE_FEATURES = [
-  "300 Google Ads operations per month",
+  "7-day free trial — then upgrade to continue",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Diagnose account issues and draft campaign changes",
   "Preview bid, budget, keyword, and ad edits before approval",
@@ -83,12 +83,6 @@ export interface PricingSectionProps {
   scheduledCancelAt: string | null;
   currentPeriodEnd: string | null;
   hasStripeCustomer: boolean;
-  /**
-   * Whether this user qualifies for the 7-day Growth trial. True for visitors
-   * with no Stripe history; false once they've had any Growth subscription.
-   * Drives CTA copy only — server-side checkout is the authoritative gate.
-   */
-  trialEligible: boolean;
   page: PricingPage;
 }
 
@@ -128,7 +122,6 @@ export function PricingCards({
   scheduledCancelAt,
   currentPeriodEnd,
   hasStripeCustomer,
-  trialEligible,
   page,
 }: PricingSectionProps) {
   const [interval, setInterval] = useState<Interval>("year");
@@ -392,7 +385,7 @@ export function PricingCards({
                   "Redirecting…"
                 ) : (
                   <>
-                    {trialEligible ? "Start 7-day free trial" : "Upgrade to Growth"}
+                    {connected ? "Upgrade to Growth" : "Get Started"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}

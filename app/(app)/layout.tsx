@@ -15,8 +15,8 @@ import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
 import { BrandLockup } from '@/components/brand-lockup';
 import { trackEvent } from '@/lib/analytics';
-import { getUsageSummaryAction } from '@/app/actions';
 import { BRAND_NAME } from '@/lib/brand';
+import { computePlanBadge } from '@/lib/plan-badge';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -124,10 +124,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [authLoaded, setAuthLoaded] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [plan, setPlan] = useState<string | null>(null);
-    const isFree = plan === 'free';
+    const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+    const [inTrial, setInTrial] = useState(false);
     const planLoaded = plan !== null;
-    const [usageExceeded, setUsageExceeded] = useState(false);
-    const [usageNearLimit, setUsageNearLimit] = useState(false);
+    const isFree = plan === 'free';
+    const badge = computePlanBadge({
+        plan,
+        inTrial,
+        trialEndsAt: trialEndsAt ? new Date(trialEndsAt) : null,
+    });
+    const trialDaysLeft = badge.kind === 'trial' ? badge.daysLeft : null;
+    const trialExpired = badge.kind === 'trial_expired';
+    const trialEndingSoon = badge.kind === 'trial' && badge.endingSoon;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const refreshThreads = useCallback(() => {
@@ -176,16 +184,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setIsDev(Boolean(connected && s?.isDev));
                 if (!connected) {
                     setPlan(null);
-                    setUsageExceeded(false);
-                    setUsageNearLimit(false);
+                    setTrialEndsAt(null);
+                    setInTrial(false);
                 }
             })
             .catch(() => {
                 setIsAuthenticated(false);
                 setIsDev(false);
                 setPlan(null);
-                setUsageExceeded(false);
-                setUsageNearLimit(false);
+                setTrialEndsAt(null);
+                setInTrial(false);
             })
             .finally(() => setAuthLoaded(true));
     }, []);
@@ -195,29 +203,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         fetch('/api/subscription', { credentials: 'include' })
             .then(r => (r.ok ? r.json() : null))
-            .then(sub => setPlan(sub?.plan ?? 'free'))
-            .catch(() => setPlan('free'));
-    }, [authLoaded, isAuthenticated]);
-
-    useEffect(() => {
-        if (!authLoaded || !isAuthenticated || plan !== 'free') return;
-
-        getUsageSummaryAction()
-            .then(info => {
-                const exceeded = !info.unlimited && info.remaining !== null && info.remaining <= 0;
-                const nearLimit =
-                    !exceeded &&
-                    !info.unlimited &&
-                    info.limit !== null &&
-                    info.used / info.limit > 2 / 3;
-                setUsageExceeded(exceeded);
-                setUsageNearLimit(nearLimit);
+            .then(sub => {
+                setPlan(sub?.plan ?? 'free');
+                setTrialEndsAt(sub?.trialEndsAt ?? null);
+                setInTrial(Boolean(sub?.inTrial));
             })
             .catch(() => {
-                setUsageExceeded(false);
-                setUsageNearLimit(false);
+                setPlan('free');
+                setTrialEndsAt(null);
+                setInTrial(false);
             });
-    }, [authLoaded, isAuthenticated, plan]);
+    }, [authLoaded, isAuthenticated]);
 
     function toggleCollapsed() {
         localStorage.setItem(COLLAPSED_KEY, String(!collapsed));
@@ -510,42 +506,56 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#3D3C36] bg-[#24231F] px-5">
                     <div className="flex items-center gap-2.5">
                         <AccountSwitcher collapsed={false} />
-                        {planLoaded && (
-                            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold tracking-wide ${
-                                isFree
-                                    ? 'bg-[#E8E4DD]/8 text-[#C4C0B6]'
-                                    : 'bg-[#4CAF6E]/15 text-[#4CAF6E]'
-                            }`}>
-                                {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                        {badge.kind === 'paid' && (
+                            <span className="inline-flex h-5 items-center rounded-full bg-[#4CAF6E]/15 px-2 text-[11px] font-semibold tracking-wide text-[#4CAF6E]">
+                                {badge.planName}
                             </span>
                         )}
-                        {planLoaded && isFree && usageExceeded && (
+                        {badge.kind === 'trial' && (
+                            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[11px] font-semibold tracking-wide ${
+                                badge.endingSoon
+                                    ? 'bg-[#D89344]/15 text-[#D89344]'
+                                    : 'bg-[#E8E4DD]/8 text-[#C4C0B6]'
+                            }`}>
+                                {badge.daysLeft === 0 ? 'Free trial ends today' : `Free trial · ${badge.daysLeft}d left`}
+                            </span>
+                        )}
+                        {badge.kind === 'trial_expired' && (
+                            <span className="inline-flex h-5 items-center rounded-full bg-[#C45D4A]/15 px-2 text-[11px] font-semibold tracking-wide text-[#C45D4A]">
+                                Trial ended
+                            </span>
+                        )}
+                        {planLoaded && trialExpired && (
                             <Link
                                 href="/upgrade"
                                 prefetch
-                                onClick={() => trackEvent('upgrade_clicked', { location: 'usage_exceeded_badge', page: pathname })}
+                                onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ended_badge', page: pathname })}
                                 className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#C45D4A] bg-[#C45D4A] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(196,93,74,0.18)] transition-all hover:bg-[#B54E3D] hover:shadow-[0_0_0_4px_rgba(196,93,74,0.28)]"
-                                aria-label="Monthly usage limit reached — upgrade to Growth for unlimited operations"
+                                aria-label="Free trial ended — upgrade to Growth to continue"
                             >
                                 <span className="relative flex h-2 w-2 shrink-0">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
                                 </span>
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                <span>Monthly usage limit reached — upgrade to get unlimited access</span>
+                                <span>Free trial ended — upgrade to keep using NotFair</span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                             </Link>
                         )}
-                        {planLoaded && isFree && usageNearLimit && (
+                        {planLoaded && trialEndingSoon && (
                             <Link
                                 href="/upgrade"
                                 prefetch
-                                onClick={() => trackEvent('upgrade_clicked', { location: 'usage_near_limit_badge', page: pathname })}
+                                onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ending_soon_badge', page: pathname })}
                                 className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#D89344] bg-[#D89344] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(216,147,68,0.18)] transition-all hover:bg-[#C0823A] hover:shadow-[0_0_0_4px_rgba(216,147,68,0.28)]"
-                                aria-label="Approaching monthly usage limit — upgrade to Growth for unlimited operations"
+                                aria-label="Free trial ending soon — upgrade to Growth"
                             >
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                <span>Approaching monthly limit — upgrade to get unlimited access</span>
+                                <span>
+                                    {trialDaysLeft === 0
+                                        ? 'Free trial ends today — upgrade to keep access'
+                                        : `Free trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} — upgrade to keep access`}
+                                </span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                             </Link>
                         )}
@@ -566,14 +576,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <UserMenu />
                     </div>
                 </div>
-                {/* Usage-exceeded banner — shown below the header on < lg screens where the inline pill is hidden */}
-                {planLoaded && isFree && usageExceeded && (
+                {/* Trial-ended banner — shown below the header on < lg screens where the inline pill is hidden */}
+                {planLoaded && trialExpired && (
                     <Link
                         href="/upgrade"
                         prefetch
-                        onClick={() => trackEvent('upgrade_clicked', { location: 'usage_exceeded_banner', page: pathname })}
+                        onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ended_banner', page: pathname })}
                         className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#C45D4A]/60 bg-[#C45D4A] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#B54E3D] lg:hidden"
-                        aria-label="Monthly usage limit reached — upgrade to Growth for unlimited operations"
+                        aria-label="Free trial ended — upgrade to Growth to continue"
                     >
                         <span className="relative flex h-2 w-2 shrink-0">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
@@ -581,25 +591,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </span>
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:inline">
-                            Monthly usage limit reached — upgrade to get unlimited access
+                            Free trial ended — upgrade to keep using NotFair
                         </span>
-                        <span className="sm:hidden">Monthly limit reached — upgrade</span>
+                        <span className="sm:hidden">Trial ended — upgrade</span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                     </Link>
                 )}
-                {planLoaded && isFree && usageNearLimit && (
+                {planLoaded && trialEndingSoon && (
                     <Link
                         href="/upgrade"
                         prefetch
-                        onClick={() => trackEvent('upgrade_clicked', { location: 'usage_near_limit_banner', page: pathname })}
+                        onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ending_soon_banner', page: pathname })}
                         className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#D89344]/60 bg-[#D89344] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#C0823A] lg:hidden"
-                        aria-label="Approaching monthly usage limit — upgrade to Growth for unlimited operations"
+                        aria-label="Free trial ending soon — upgrade to Growth"
                     >
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:inline">
-                            Approaching monthly limit — upgrade to get unlimited access
+                            {trialDaysLeft === 0
+                                ? 'Free trial ends today — upgrade to keep access'
+                                : `Free trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} — upgrade to keep access`}
                         </span>
-                        <span className="sm:hidden">Near monthly limit — upgrade</span>
+                        <span className="sm:hidden">
+                            {trialDaysLeft === 0
+                                ? 'Trial ends today — upgrade'
+                                : `${trialDaysLeft}d left — upgrade`}
+                        </span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                     </Link>
                 )}

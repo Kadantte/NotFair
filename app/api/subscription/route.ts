@@ -34,5 +34,7 @@ export async function GET() {
     status: sub.status,
     stripeCustomerId: sub.stripeCustomerId,
     scheduledCancelAt: sub.scheduledCancelAt?.toISOString() ?? null,
+    trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
+    inTrial: sub.inTrial,
   });
 }

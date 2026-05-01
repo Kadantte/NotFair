@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { stripe } from "@/lib/stripe/client";
 import { getGrowthMonthlyPriceId, getGrowthYearlyPriceId, stripeMode } from "@/lib/stripe/config";
-import { isGrowthTrialEligible, TRIAL_PERIOD_DAYS } from "@/lib/stripe/trial";
 import { getUserSubscription } from "@/lib/subscription";
+import { TRIAL_DURATION_MS } from "@/lib/trial-config";
 import { getAppOrigin } from "@/lib/app-url";
 import { db, schema } from "@/lib/db";
 
@@ -42,6 +42,9 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const env = stripeMode();
+    // First time we're seeing this user → start the 7-day trial clock.
+    // Existing rows keep their original trial_ends_at.
+    const trialEndsAt = new Date(now.getTime() + TRIAL_DURATION_MS);
     await db()
       .insert(schema.subscriptions)
       .values({
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
         email,
         stripeCustomerId: customerId,
         data: null,
+        trialEndsAt,
         createdAt: now,
         updatedAt: now,
       })
@@ -58,10 +62,6 @@ export async function POST(request: Request) {
         set: { email, stripeCustomerId: customerId, updatedAt: now },
       });
   }
-
-  // 7-day trial on Growth, gated to customers who have never had a Growth
-  // subscription. Stripe is the source of truth — see lib/stripe/trial.ts.
-  const trialEligible = await isGrowthTrialEligible(customerId);
 
   const checkout = await stripe().checkout.sessions.create({
     mode: "subscription",
@@ -74,7 +74,6 @@ export async function POST(request: Request) {
     metadata: { userId: session.userId },
     subscription_data: {
       metadata: { userId: session.userId },
-      ...(trialEligible ? { trial_period_days: TRIAL_PERIOD_DAYS } : {}),
     },
     allow_promotion_codes: true,
   }, {

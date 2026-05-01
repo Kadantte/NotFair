@@ -426,6 +426,8 @@ export const subscriptions = pgTable("subscriptions", {
   stripeCustomerId: text("stripe_customer_id"),
   /** Full Stripe Subscription object, or null if the customer has none. */
   data: jsonb("data"),
+  /** End of the per-user free trial. Set on row creation to created_at + 7d. */
+  trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

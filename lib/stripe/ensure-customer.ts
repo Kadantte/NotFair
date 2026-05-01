@@ -3,6 +3,7 @@ import "server-only";
 import { db, schema } from "@/lib/db";
 import { stripe } from "@/lib/stripe/client";
 import { stripeMode } from "@/lib/stripe/config";
+import { TRIAL_DURATION_MS } from "@/lib/trial-config";
 
 /**
  * Create a Stripe customer and persist it to `subscriptions`. Call sites must
@@ -17,6 +18,9 @@ export async function createStripeCustomerForUser(userId: string, email: string 
   );
 
   const now = new Date();
+  // First-time row: start the 7-day trial clock. On conflict (row already
+  // existed), leave trial_ends_at alone — we never reset an existing trial.
+  const trialEndsAt = new Date(now.getTime() + TRIAL_DURATION_MS);
   await db()
     .insert(schema.subscriptions)
     .values({
@@ -25,6 +29,7 @@ export async function createStripeCustomerForUser(userId: string, email: string 
       email,
       stripeCustomerId: customer.id,
       data: null,
+      trialEndsAt,
       createdAt: now,
       updatedAt: now,
     })

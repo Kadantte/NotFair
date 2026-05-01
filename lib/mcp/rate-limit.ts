@@ -1,29 +1,11 @@
 import { db, schema } from "@/lib/db";
 import { eq, gte, and, sql } from "drizzle-orm";
-import { getUserPlanLimits, PLANS } from "@/lib/subscription";
+import { checkAccess } from "@/lib/subscription";
 
 // ─── Config ────────────────────────────────────────────────────────
 
-/** Default cap for users on the Free plan (used only when subscription lookup fails). */
-const FREE_MONTHLY_OP_LIMIT = PLANS.free.limits.monthlyOpLimit ?? 300;
-
-/** Dev mode bypasses the monthly cap entirely so local development isn't gated. */
+/** Dev mode bypasses the trial gate entirely so local development isn't blocked. */
 const IS_DEV_BYPASS = process.env.NODE_ENV === "development";
-
-/**
- * Resolve a user's effective monthly op limit. `null` = unlimited.
- */
-async function resolveMonthlyLimit(userId: string): Promise<number | null> {
-  if (IS_DEV_BYPASS) return null;
-  // return 10
-  try {
-    const limits = await getUserPlanLimits(userId);
-    return limits.monthlyOpLimit;
-  } catch {
-    // If subscription lookup fails (e.g. table missing in tests), fall back to free.
-    return FREE_MONTHLY_OP_LIMIT;
-  }
-}
 
 // ─── In-memory cache to avoid DB hit on every tool call ────────────
 
@@ -107,46 +89,44 @@ function incrementCachedCount(userId: string) {
 
 // ─── Public API ────────────────────────────────────────────────────
 
-function formatResetHint(): string {
-  const ms = nextPeriodStart().getTime() - Date.now();
-  const days = Math.floor(ms / 86_400_000);
-  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
-  if (days > 0) return `${days}d ${hours}h`;
-  const minutes = Math.ceil((ms % 3_600_000) / 60_000);
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-}
-
+/**
+ * Thrown when a free user's 7-day trial has ended. Same Error name
+ * (`RateLimitError`) as before so existing catch-by-instanceof sites keep
+ * working — only the message and shape have changed.
+ */
 export class RateLimitError extends Error {
-  constructor(
-    public readonly used: number,
-    public readonly limit: number,
-  ) {
+  constructor(public readonly trialEndsAt: Date | null) {
     super(
-      `Monthly operation limit reached (${used}/${limit}). ` +
-      `Upgrade to Growth for unlimited operations: https://notfair.co/upgrade. ` +
-      `Otherwise your limit resets in ${formatResetHint()} (first of next month, UTC). ` +
-      `Check your usage at https://notfair.co/usage.`,
+      `Free trial ended. Upgrade to Growth to continue using NotFair: https://notfair.co/upgrade.`,
     );
     this.name = "RateLimitError";
   }
 }
 
 /**
- * Check if the user is within their monthly operation limit.
- * Throws RateLimitError if the limit is exceeded.
+ * Access gate. Paid users always pass; free users pass while in their 7-day
+ * trial. Throws RateLimitError once the trial has expired.
+ *
  * Call this BEFORE executing the operation.
  *
- * @param userId - The user's ID. If null/undefined (anonymous), rate limiting is skipped.
+ * @param userId - The user's ID. If null/undefined (anonymous), the gate is
+ *                 skipped — anonymous callers have other guards.
  */
 export async function enforceRateLimit(userId: string | null | undefined): Promise<void> {
-  if (!userId) return; // Anonymous users are not rate-limited (they have other guards)
+  if (!userId) return;
+  if (IS_DEV_BYPASS) return;
 
-  const limit = await resolveMonthlyLimit(userId);
-  if (limit === null) return; // Unlimited plan (Growth+)
+  let access;
+  try {
+    access = await checkAccess(userId);
+  } catch {
+    // If the subscription lookup fails (e.g. table missing in tests), let the
+    // call through rather than fail-closing — same posture as the old gate.
+    return;
+  }
 
-  const used = await getUsageCount(userId);
-  if (used >= limit) {
-    throw new RateLimitError(used, limit);
+  if (!access.ok) {
+    throw new RateLimitError(access.trialEndsAt);
   }
 }
 
@@ -160,7 +140,9 @@ export function recordOperation(userId: string | null | undefined): void {
 }
 
 /**
- * Get current usage info for a user (for display purposes).
+ * Get current usage info for a user (for display purposes on /usage).
+ * Now decoupled from billing — counts ops in the current calendar month
+ * regardless of plan, with `unlimited` always true (no monthly cap exists).
  */
 export async function getUsageInfo(userId: string | null | undefined) {
   const resetsAt = nextPeriodStart().toISOString();
@@ -169,18 +151,6 @@ export async function getUsageInfo(userId: string | null | undefined) {
   if (!userId) {
     return {
       used: 0,
-      limit: FREE_MONTHLY_OP_LIMIT,
-      remaining: FREE_MONTHLY_OP_LIMIT,
-      unlimited: false,
-      resetsAt,
-      periodStart,
-    };
-  }
-  const limit = await resolveMonthlyLimit(userId);
-  const used = await getUsageCount(userId);
-  if (limit === null) {
-    return {
-      used,
       limit: null,
       remaining: null,
       unlimited: true,
@@ -188,11 +158,12 @@ export async function getUsageInfo(userId: string | null | undefined) {
       periodStart,
     };
   }
+  const used = await getUsageCount(userId);
   return {
     used,
-    limit,
-    remaining: Math.max(0, limit - used),
-    unlimited: false,
+    limit: null,
+    remaining: null,
+    unlimited: true,
     resetsAt,
     periodStart,
   };
