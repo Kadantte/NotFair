@@ -41,8 +41,15 @@ vi.mock("@/lib/db", () => ({
       refreshToken: "refresh_token",
       customerId: "customer_id",
       customerIds: "customer_ids",
+      loginCustomerId: "login_customer_id",
       userId: "user_id",
       googleEmail: "google_email",
+    },
+    adPlatformConnections: {
+      accountIds: "account_ids",
+      activeAccountId: "active_account_id",
+      userId: "user_id",
+      platform: "platform",
     },
   },
 }));
@@ -109,6 +116,8 @@ describe("Session impersonation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCookies._clear();
+    // Default: Meta connection query returns no row (most tests don't set up Meta accounts)
+    mockSelectChain.mockReturnValue([]);
   });
 
   it("returns normal session when no impersonate cookie", async () => {

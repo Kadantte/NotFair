@@ -68,6 +68,7 @@ export function extractPolicyDetails(error: unknown): string | null {
   if (!Array.isArray(failures) || failures.length === 0) return null;
 
   const parts: string[] = [];
+  const seenPolicies = new Set<string>();
   for (const f of failures) {
     const code = f?.error_code ?? {};
     const isPolicy =
@@ -84,6 +85,7 @@ export function extractPolicyDetails(error: unknown): string | null {
     const description: string | undefined = pvd?.external_policy_description;
 
     const label = policyName ?? "POLICY";
+    if (policyName) seenPolicies.add(policyName.toUpperCase());
     if (violatingText) {
       parts.push(`${label} on text "${violatingText}"`);
     } else if (description) {
@@ -94,7 +96,14 @@ export function extractPolicyDetails(error: unknown): string | null {
   }
 
   if (parts.length === 0) return null;
-  return `Policy violation: ${parts.join("; ")}. Google Ads rejected this ad copy/keyword. Rewrite without the restricted phrase, or request a trademark/policy exception in the Google Ads UI.`;
+
+  const isHealthPolicy = seenPolicies.has("HEALTH_IN_PERSONALIZED_ADS");
+
+  const guidance = isHealthPolicy
+    ? "Health and medical content is blocked from personalized ads targeting. Do NOT retry this specific content — healthcare topics require an advertiser exemption before they can run. To apply: Google Ads → Tools → Policy Manager → Request Exemption. Rewording health/medical phrases will NOT bypass this policy; the exemption is required."
+    : "Google Ads rejected this content. Rewrite without the restricted phrase, or request a policy exception in the Google Ads UI (Tools → Policy Manager).";
+
+  return `Policy violation: ${parts.join("; ")}. ${guidance}`;
 }
 
 /**
