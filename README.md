@@ -2,13 +2,13 @@
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gVJCRczpps)
 
-**The official Google Ads + Meta Ads + SEO plugin from [NotFair](https://notfair.co). Data-driven decisions, not dashboards.**
+**The official Google & Meta Ads + SEO plugin from [NotFair](https://notfair.co). Data-driven decisions, not dashboards.**
 
 Toprank gives your AI agent direct access to Google Search Console, Google Ads, and Meta Ads (Facebook + Instagram). It analyzes your traffic, surfaces what's hurting your rankings, finds wasted ad spend, diagnoses creative fatigue and audience saturation, and tells you exactly what to fix. When you have access to the repo, it goes further: rewriting meta tags, fixing headings, adding structured data, and shipping the changes.
 
 ### Why NotFair?
 
-Toprank is the CLI side of NotFair — the skills that run inside Claude Code. [notfair.co](https://notfair.co) is the companion web app: sign in once, connect your Google Ads or Meta Ads accounts, and run audits through a browser UI. Both sides share the same engine, so an audit you run from the CLI uses the same tooling as the one on the web.
+Toprank is the CLI side of NotFair — the skills that run inside Claude Code. [notfair.co](https://notfair.co) is the companion web app: sign in once, connect your Google Ads and Meta Ads accounts, and run audits through a browser UI. Both sides share the same engine, so an audit you run from the CLI uses the same tooling as the one on the web.
 
 > *"Am I wasting money on ads right now?"*
 > *"Why did my traffic drop and how do I fix it?"*
@@ -153,16 +153,19 @@ Add the marketplace and enable the plugin in `~/.claude/settings.json`:
 
 ---
 
-## OpenClaw (alpha)
+## 🤖 The Fully-Automated SEO Agent (OpenClaw / Hermes)
 
-This repo now includes an **OpenClaw adaptive layer** under [`openclaw/`](openclaw/). It keeps the existing Toprank SEO skills intact, then adds:
+Instead of manually running single SEO skills, the future of Toprank is the **Fully-Automated SEO Agent**. 
 
-- multi-site portfolio state,
-- a per-site work folder for each website,
-- OpenClaw wrapper skills,
-- structured JSON artifacts for reviews, plans, and feedback.
+By leveraging the **OpenClaw adaptive layer** under [`openclaw/`](openclaw/), you can instruct OpenClaw or Hermes to automatically set up a persistent SEO agent for your project. This isn't just a set of tools—it's a background worker that configures cron jobs, continually monitors your site, runs SEO audits, and autonomously makes improvements over time.
 
-Start here:
+Features of the SEO Agent:
+- **Zero-Touch Setup:** Simply give the repo to OpenClaw or Hermes, and they will follow the instructions to spin up the agent for you.
+- **Always-On Automation:** Automatically schedules and runs SEO tasks via cron.
+- **Self-Improving:** Continuously monitors Search Console data, ships page optimizations, rewrites meta tags, and adds structured data without manual intervention.
+- **Multi-Site Portfolio:** Maintains portfolio state, a per-site work folder, OpenClaw wrapper skills, and structured JSON artifacts for reviews, plans, and feedback.
+
+Start building your agent here:
 
 - [`openclaw/README.md`](openclaw/README.md)
 - [`docs/openclaw-adaptive-layer.md`](docs/openclaw-adaptive-layer.md)
