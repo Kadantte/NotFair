@@ -20,14 +20,16 @@
 import type { AuthContext } from "@/lib/google-ads";
 import type { HostApi } from "@/lib/mcp/code-mode/sandbox";
 import { enforceRateLimit } from "@/lib/mcp/rate-limit";
+import { execMetaRead } from "@/lib/mcp/meta-tools/exec";
 import {
   metaGraph,
-  metaGraphParallel,
   metaGraphAllPages,
   metaInsights,
   metaBatch,
   withActPrefix,
   type GraphParallelInput,
+  type GraphParallelResult,
+  type GraphErrorPayload,
   type InsightsOptions,
   type BatchRequest,
 } from "@/lib/meta-ads/client";
@@ -55,11 +57,17 @@ export function buildMetaAdsHost(
     );
   }
 
+  // Every host-side Graph call goes through execMetaRead so it lands an
+  // `operations` row with `platform = 'meta_ads'` (telemetry parity with
+  // Google's `ads.gaql` / `ads.gaqlParallel`). Without these wraps, runScript
+  // calls were invisible on /dev/telemetry/meta-ads even when they hit Graph.
   async function graph(pathArg: unknown, paramsArg?: unknown, methodArg?: unknown) {
     const path = expectString(pathArg, "ads.graph: `path` must be a string (e.g. '/me/adaccounts')");
     const params = normalizeParams(paramsArg, "ads.graph");
     const method = normalizeMethod(methodArg);
-    return metaGraph(accessToken, { path: substituteAccountId(path, targetId), params, method });
+    return execMetaRead(auth, targetId, "run_script_graph", () =>
+      metaGraph(accessToken, { path: substituteAccountId(path, targetId), params, method }),
+    );
   }
 
   async function graphParallel(callsArg: unknown) {
@@ -109,7 +117,45 @@ export function buildMetaAdsHost(
     // Fail fast on rate limit before fanning out. Mirrors gaqlParallel.
     await enforceRateLimit(auth.userId);
 
-    return metaGraphParallel(accessToken, calls);
+    // Inlined Promise.allSettled fan-out so each task can be wrapped with
+    // execMetaRead individually. That gives us one operations row per Graph
+    // call (matching Google's gaqlParallel semantics) instead of zero.
+    const settled = await Promise.allSettled(
+      calls.map((call) =>
+        execMetaRead(auth, targetId, "run_script_graph_parallel", async () => {
+          if (call.paged) {
+            const rows = await metaGraphAllPages<unknown>(accessToken, call.request);
+            const trimmed = call.limit ? rows.slice(0, call.limit) : rows;
+            return { data: { data: trimmed }, rowCount: trimmed.length };
+          }
+          const body = await metaGraph<unknown>(accessToken, call.request);
+          const rowCount = Array.isArray((body as { data?: unknown[] })?.data)
+            ? (body as { data?: unknown[] }).data!.length
+            : undefined;
+          return { data: body, rowCount };
+        }),
+      ),
+    );
+
+    const out: Record<string, GraphParallelResult<unknown>> = {};
+    for (let i = 0; i < calls.length; i++) {
+      const call = calls[i];
+      const r = settled[i];
+      if (r.status === "fulfilled") {
+        out[call.name] = { ok: true, data: r.value.data, rowCount: r.value.rowCount };
+      } else {
+        const err = r.reason as Error & { graphError?: GraphErrorPayload };
+        out[call.name] = {
+          ok: false,
+          error: {
+            message: err?.message ?? "Unknown error",
+            code: err?.graphError?.code,
+            type: err?.graphError?.type,
+          },
+        };
+      }
+    }
+    return out;
   }
 
   async function insights(adAccountIdArg: unknown, optionsArg?: unknown) {
@@ -117,7 +163,9 @@ export function buildMetaAdsHost(
       ? targetId
       : expectString(adAccountIdArg, "ads.insights: `adAccountId` must be a string");
     const options = normalizeInsightsOptions(optionsArg);
-    return metaInsights(accessToken, provided, options);
+    return execMetaRead(auth, provided, "run_script_insights", () =>
+      metaInsights(accessToken, provided, options),
+    );
   }
 
   async function batch(requestsArg: unknown) {
@@ -140,7 +188,9 @@ export function buildMetaAdsHost(
         body,
       };
     });
-    return metaBatch(accessToken, requests);
+    return execMetaRead(auth, targetId, "run_script_batch", () =>
+      metaBatch(accessToken, requests),
+    );
   }
 
   // Quick helper for paged reads — common enough to deserve its own RPC so
@@ -149,10 +199,12 @@ export function buildMetaAdsHost(
     const path = expectString(pathArg, "ads.pagedAll: `path` must be a string");
     const params = normalizeParams(paramsArg, "ads.pagedAll");
     const maxPages = typeof maxPagesArg === "number" ? maxPagesArg : undefined;
-    return metaGraphAllPages(
-      accessToken,
-      { path: substituteAccountId(path, targetId), params },
-      maxPages !== undefined ? { maxPages } : {},
+    return execMetaRead(auth, targetId, "run_script_paged_all", () =>
+      metaGraphAllPages(
+        accessToken,
+        { path: substituteAccountId(path, targetId), params },
+        maxPages !== undefined ? { maxPages } : {},
+      ),
     );
   }
 

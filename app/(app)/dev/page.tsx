@@ -660,7 +660,7 @@ export default function DevPage() {
                                 </span>
                             </Button>
                         )}
-                        <Link href="/dev/telemetry" prefetch>
+                        <Link href="/dev/telemetry/google-ads" prefetch>
                             <Button
                                 variant="outline"
                                 size="sm"

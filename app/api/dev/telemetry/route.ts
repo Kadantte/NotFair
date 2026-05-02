@@ -1,5 +1,5 @@
 import { db, schema } from "@/lib/db";
-import { sql, desc, and, gte, lt, isNotNull } from "drizzle-orm";
+import { sql, desc, and, eq, gte, lt, isNotNull } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { excludeDevOpsFilter, devEmailSqlList } from "@/lib/dev-ops-filter";
 
@@ -10,6 +10,10 @@ import { excludeDevOpsFilter, devEmailSqlList } from "@/lib/dev-ops-filter";
  * buckets, a funnel of reads vs writes + errors by day, and the last 100 raw
  * calls with args and error messages. Full args and error messages are gated to
  * DEV_EMAILS so the payload never leaks outside the admin group.
+ *
+ * Scoped to a single ad platform via `?platform=google_ads|meta_ads` so the
+ * Google Ads and Meta Ads dashboards don't pollute each other's tool lists,
+ * arg shapes, and error breakdowns.
  */
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
@@ -22,10 +26,28 @@ export async function GET(request: Request) {
   const sinceIso = since.toISOString();
   const prevSince = new Date(Date.now() - 2 * days * 24 * 60 * 60 * 1000);
 
-  // Exclude ops attributed to dev users so internal testing doesn't skew telemetry.
-  const notDev = excludeDevOpsFilter();
-  const whereRecent = and(gte(schema.operations.createdAt, since), notDev);
-  const wherePrev = and(gte(schema.operations.createdAt, prevSince), lt(schema.operations.createdAt, since), notDev);
+  const platformParam = url.searchParams.get("platform") || "google_ads";
+  const platform = platformParam === "meta_ads" ? "meta_ads" : "google_ads";
+
+  // Admin escape hatch — `?includeDev=1` keeps DEV_EMAILS rows in the result so
+  // we can verify our own activity (e.g. live integration tests run by a dev
+  // user). Default behavior excludes them so the dashboard isn't dominated by
+  // internal testing.
+  const includeDev = url.searchParams.get("includeDev") === "1";
+
+  const platformFilter = eq(schema.operations.platform, platform);
+  const whereRecent = includeDev
+    ? and(gte(schema.operations.createdAt, since), platformFilter)
+    : and(gte(schema.operations.createdAt, since), excludeDevOpsFilter(), platformFilter);
+  const wherePrev = includeDev
+    ? and(gte(schema.operations.createdAt, prevSince), lt(schema.operations.createdAt, since), platformFilter)
+    : and(gte(schema.operations.createdAt, prevSince), lt(schema.operations.createdAt, since), excludeDevOpsFilter(), platformFilter);
+
+  // Inline raw-SQL fragment for the percentile and sample-args subqueries —
+  // when including dev, drop the NOT EXISTS clause; otherwise keep it.
+  const devExcludeSql = includeDev
+    ? sql``
+    : sql`AND NOT EXISTS (SELECT 1 FROM mcp_sessions s WHERE s.user_id = o2.user_id AND lower(s.google_email) IN (${devEmailSqlList()}))`;
 
   const [topTools, prevTopTools, topArgShapes, recentCalls, dailyCounts, errorBreakdown] = await Promise.all([
     // Bulk write tools (bulkPauseKeywords, bulkAddKeywords, moveKeywords, ...)
@@ -45,8 +67,9 @@ export async function GET(request: Request) {
             SELECT MAX(latency_ms) AS lat
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
+              AND o2.platform = ${platform}
               AND o2.created_at >= ${sinceIso}::timestamp
-              AND NOT EXISTS (SELECT 1 FROM mcp_sessions s WHERE s.user_id = o2.user_id AND lower(s.google_email) IN (${devEmailSqlList()}))
+              ${devExcludeSql}
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
@@ -56,8 +79,9 @@ export async function GET(request: Request) {
             SELECT MAX(latency_ms) AS lat
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
+              AND o2.platform = ${platform}
               AND o2.created_at >= ${sinceIso}::timestamp
-              AND NOT EXISTS (SELECT 1 FROM mcp_sessions s WHERE s.user_id = o2.user_id AND lower(s.google_email) IN (${devEmailSqlList()}))
+              ${devExcludeSql}
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
@@ -89,7 +113,9 @@ export async function GET(request: Request) {
     // order by ...)[1]` materializes the entire partition into memory, which
     // OOMs once popular arg shapes cross ~100K rows. The subquery with
     // LIMIT 1 lets Postgres use the ops_args_sha_idx to seek straight to the
-    // most recent row.
+    // most recent row. Sample args are scoped to the same platform so cross-
+    // platform sha collisions (rare, but possible) don't surface a
+    // mismatched payload.
     db()
       .select({
         toolName: schema.operations.toolName,
@@ -98,6 +124,7 @@ export async function GET(request: Request) {
         sampleArgs: sql<unknown>`(
           SELECT o2.args FROM operations o2
           WHERE o2.args_sha256 = ${schema.operations.argsSha256}
+            AND o2.platform = ${platform}
           ORDER BY o2.created_at DESC
           LIMIT 1
         )`,
@@ -156,6 +183,8 @@ export async function GET(request: Request) {
 
   return Response.json({
     days,
+    platform,
+    includeDev,
     topTools,
     prevTopTools,
     topArgShapes,
