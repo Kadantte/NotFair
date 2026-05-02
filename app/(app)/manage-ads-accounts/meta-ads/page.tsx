@@ -1,23 +1,22 @@
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { getAuthContext } from "@/lib/session";
+import { getSession } from "@/lib/session";
 import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
 
 /**
- * Page for adding/managing Meta ad accounts. Open to any signed-in user;
- * Meta App Review approval is what gates *successful* OAuth, not this route.
+ * Page for adding/managing Meta ad accounts. Open to any signed-in user —
+ * including pending-Google sessions (no Google Ads customer selected yet),
+ * since picking Meta is one of the valid platform paths from the
+ * /manage-ads-accounts hub. Meta App Review approval is what gates
+ * *successful* OAuth, not this route.
  */
 export default async function AddMetaAdsAccountPagePath() {
-  let userId: string | null = null;
-  try {
-    const ctx = await getAuthContext();
-    userId = ctx.session.userId;
-  } catch {
-    // Not authenticated — bounce through Google sign-in. The /connect page
-    // exists; layout handles the post-signin redirect.
-    redirect("/connect?next=%2Fmanage-ads-accounts%2Fmeta-ads");
+  const session = await getSession();
+  if (!session.connected) {
+    redirect("/login?next=%2Fmanage-ads-accounts%2Fmeta-ads");
   }
+  const userId = session.userId;
 
   type AccountEntry = {
     id: string;

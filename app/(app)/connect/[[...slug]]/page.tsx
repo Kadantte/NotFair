@@ -10,14 +10,12 @@ type Props = {
 export default async function AppConnectPage({ params, searchParams }: Props) {
     const sp = await searchParams;
 
-    // No-accounts states moved to the dedicated /welcome route. Forward stale
-    // URLs (bookmarks, email links from before the move) so users land on the
-    // right empty-state page instead of seeing nothing.
+    // No-accounts states route to /manage-ads-accounts (the platform picker).
     if (sp.reason === 'no_accounts' || sp.reason === 'no_client_accounts') {
-        redirect('/welcome');
+        redirect('/manage-ads-accounts');
     }
 
-    // Account-selection moved off /connect to /welcome/<platform>/select.
+    // Account-selection moved off /connect to /manage-ads-accounts/<platform>/select.
     // Forward any stale URLs that still carry the picker params there.
     if (sp.pending || sp.mode === 'update') {
         const params = new URLSearchParams();
@@ -26,22 +24,21 @@ export default async function AppConnectPage({ params, searchParams }: Props) {
         if (sp.accounts) params.set('accounts', sp.accounts);
         if (sp.selected) params.set('selected', sp.selected);
         if (sp.next) params.set('next', sp.next);
-        redirect(`/welcome/google-ads/select?${params.toString()}`);
+        redirect(`/manage-ads-accounts/google-ads/select?${params.toString()}`);
     }
 
     const session = await getSession();
     const { slug } = await params;
 
-    // Ads-less users hitting bare /connect belong on /welcome — that's the
-    // dedicated empty-state for "you're signed in but haven't picked a
-    // platform yet." Sub-paths like /connect/claude-connector remain open
-    // because the welcome page's CTAs may link to them.
+    // Ads-less users hitting bare /connect belong on /manage-ads-accounts —
+    // the platform picker. Sub-paths like /connect/claude-connector remain
+    // open because they don't depend on a connected platform.
     if (
         session.connected &&
         session.pendingSetup &&
         (!slug || slug.length === 0)
     ) {
-        redirect('/welcome');
+        redirect('/manage-ads-accounts');
     }
 
     return (

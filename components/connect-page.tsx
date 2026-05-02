@@ -45,8 +45,8 @@ export function ConnectPage({ initialSession = emptySession, slug }: ConnectPage
 }
 
 // Account selection (initial multi-pick + management) lives at the dedicated
-// /welcome/<platform>/select routes now. The connect page is for sign-in
-// (no session) and MCP/connector setup (post-auth).
+// /manage-ads-accounts/<platform>/select routes now. The connect page is for
+// sign-in (no session) and MCP/connector setup (post-auth).
 
 type ErrorReason = 'scope_denied' | 'scope_denied_retry' | 'load_accounts_failed' | 'session_error' | 'generic';
 

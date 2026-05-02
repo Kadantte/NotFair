@@ -40,8 +40,9 @@ export type AccountSelectorProps = {
 /**
  * Multi-account picker with a draft-then-save workflow: the user toggles
  * checkboxes to build their selection, then clicks Save to commit. Used by
- * the per-platform onboarding routes (/welcome/google-ads/select today,
- * /welcome/meta-ads/select later) and the in-app "manage accounts" surface.
+ * the per-platform onboarding routes (/manage-ads-accounts/google-ads/select
+ * today, /manage-ads-accounts/meta-ads/select later) and the in-app "manage
+ * accounts" surface.
  *
  * The component is platform-agnostic: it groups accounts by loginCustomerId
  * if any are set (Google Ads MCC behavior) and otherwise renders a flat

@@ -44,7 +44,7 @@ export type ImpactMonitorPageData = {
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/welcome");
+      redirect("/manage-ads-accounts");
     }
     throw err;
   });

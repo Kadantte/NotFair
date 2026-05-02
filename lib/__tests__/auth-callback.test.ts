@@ -265,7 +265,12 @@ describe("Auth callback route — GET", () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/welcome/google-ads/select?pending=");
+    // New users with multiple Google Ads accounts land on /manage-ads-accounts
+    // first so they can pick a platform; the pending token + candidate
+    // accounts are stored in the mcp_sessions row + cookie, and the page
+    // forwards to /manage-ads-accounts/google-ads/select when the user clicks the
+    // Google card.
+    expect(response.headers.get("location")).toContain("/manage-ads-accounts");
   });
 
   it("persists loginCustomerId on the session for a single manager-routed client", async () => {
@@ -311,7 +316,9 @@ describe("Auth callback route — GET", () => {
       makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
     );
 
-    expect(response.headers.get("location")).toContain("/welcome/google-ads/select?pending=");
+    // Multi-account users land on /manage-ads-accounts; the candidate
+    // accounts live on the pending mcp_sessions row, not the URL.
+    expect(response.headers.get("location")).toContain("/manage-ads-accounts");
     expect(mockInsertValues).toHaveBeenCalled();
     const insertedRow = mockInsertValues.mock.calls[0][0];
     expect(insertedRow.customerId).toBe("");
@@ -324,9 +331,6 @@ describe("Auth callback route — GET", () => {
       { id: "1111111111", name: "Direct Account", loginCustomerId: null },
       { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
     ]);
-
-    const decoded = decodeURIComponent(response.headers.get("location") ?? "");
-    expect(decoded).toContain('"loginCustomerName":"Acme MCC"');
   });
 
   it("returns NO_CLIENT_ACCOUNTS error when only managers exist with no clients", async () => {
@@ -342,9 +346,9 @@ describe("Auth callback route — GET", () => {
 
     expect(response.status).toBe(307);
     const location = new URL(response.headers.get("location") ?? "");
-    // No-accounts states route to the dedicated /welcome empty-state page,
+    // No-accounts states route to /manage-ads-accounts (the platform picker),
     // not back to /connect (which is reserved for connection-flow errors).
-    expect(location.pathname).toBe("/welcome");
+    expect(location.pathname).toBe("/manage-ads-accounts");
   });
 
   it("reuses an existing connected session for the same user", async () => {

@@ -1,8 +1,89 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { eq } from "drizzle-orm";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { db, schema } from "@/lib/db";
+import { getSession } from "@/lib/session";
 
-export default function ManageAdsAccountsPage() {
+type CandidateAccount = {
+  id: string;
+  name: string;
+  loginCustomerId?: string | null;
+  loginCustomerName?: string | null;
+};
+
+type Props = {
+  searchParams: Promise<{ next?: string }>;
+};
+
+/**
+ * Platform-picker hub. Two states:
+ *
+ *   1. **Pending Google session** — user just finished Google OAuth, has 2+
+ *      Ads accounts to choose from, but hasn't yet committed a selection.
+ *      The Google card forwards to /manage-ads-accounts/google-ads/select?pending=…
+ *      with the candidate accounts so the picker can render them. Auth
+ *      callback routes new users here instead of straight to the picker
+ *      so they can pick a platform first.
+ *
+ *   2. **Connected (or no pending data)** — Google card links to the
+ *      manage page; same for Meta. New users with neither connection see
+ *      the canonical connect entry points.
+ */
+export default async function ManageAdsAccountsPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const next = sp.next && sp.next.startsWith("/") ? sp.next : null;
+
+  const session = await getSession();
+
+  // Pull the candidate accounts list when this is a pending Google session.
+  // We can't read it from getSession() — it deliberately blanks out
+  // customerIds during pendingSetup so the navbar account switcher doesn't
+  // pre-show every connectable account as if the user had picked them all.
+  let pendingGoogleAccounts: CandidateAccount[] = [];
+  let pendingToken: string | null = null;
+  if (session.connected && session.pendingSetup) {
+    const [row] = await db()
+      .select({ customerIds: schema.mcpSessions.customerIds })
+      .from(schema.mcpSessions)
+      .where(eq(schema.mcpSessions.accessToken, session.token))
+      .limit(1);
+    if (row) {
+      try {
+        const parsed = JSON.parse(row.customerIds) as CandidateAccount[];
+        if (Array.isArray(parsed)) pendingGoogleAccounts = parsed;
+      } catch {
+        // Malformed candidate list — fall through to the empty-state link.
+      }
+      pendingToken = session.token;
+    }
+  }
+
+  // Ads-less Google session: signed in via Google but the identity has no
+  // Google Ads accounts to connect. Surface this inline on the hub instead
+  // of letting the user click into a dead-end manage page — show a warning
+  // under the Google entry and a "Switch Google account" CTA.
+  const isAdsLess = session.connected && session.pendingSetup && pendingGoogleAccounts.length === 0;
+
+  const googleHref = buildGoogleHref({
+    pendingToken,
+    pendingAccounts: pendingGoogleAccounts,
+    next,
+  });
+  const switchGoogleHref =
+    `/api/auth/signin?prompt=select_account+consent&next=${encodeURIComponent(next ?? "/manage-ads-accounts")}`;
+
+  const googleIcon = (
+    <Image
+      src="/google-ads-icon.svg"
+      alt=""
+      width={28}
+      height={28}
+      className="shrink-0"
+      aria-hidden="true"
+    />
+  );
+
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
@@ -15,21 +96,20 @@ export default function ManageAdsAccountsPage() {
           </header>
 
           <div className="space-y-3">
-            <PlatformCard
-              href="/manage-ads-accounts/google-ads"
-              title="Add Google Ads account"
-              description="Connect a Google Ads customer or MCC."
-              icon={
-                <Image
-                  src="/google-ads-icon.svg"
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="shrink-0"
-                  aria-hidden="true"
-                />
-              }
-            />
+            {isAdsLess ? (
+              <AdsLessGoogleEntry
+                icon={googleIcon}
+                switchHref={switchGoogleHref}
+                googleEmail={session.connected ? session.googleEmail : null}
+              />
+            ) : (
+              <PlatformCard
+                href={googleHref}
+                title="Add Google Ads account"
+                description="Connect a Google Ads customer or MCC."
+                icon={googleIcon}
+              />
+            )}
             <PlatformCard
               href="/manage-ads-accounts/meta-ads"
               title="Add Meta Ads account"
@@ -50,6 +130,65 @@ export default function ManageAdsAccountsPage() {
       </div>
     </section>
   );
+}
+
+function AdsLessGoogleEntry({
+  icon,
+  switchHref,
+  googleEmail,
+}: {
+  icon: React.ReactNode;
+  switchHref: string;
+  googleEmail: string | null;
+}) {
+  return (
+    <div className="rounded-xl border border-[#D4882A]/40 bg-[#D4882A]/[0.04] px-5 py-4">
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1A1917]">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-medium text-[#E8E4DD]">Add Google Ads account</p>
+          <p className="mt-1 inline-flex items-start gap-1.5 text-sm text-[#D4882A]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              No Google Ads account under{" "}
+              {googleEmail ? (
+                <span className="font-medium text-[#E8E4DD]">{googleEmail}</span>
+              ) : (
+                "this Google account"
+              )}
+              . Switch to a Google account that has Ads access.
+            </span>
+          </p>
+          <Link
+            href={switchHref}
+            className="mt-3 inline-flex h-9 items-center rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] hover:bg-[#3D9A5C]"
+          >
+            Switch Google account
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildGoogleHref(opts: {
+  pendingToken: string | null;
+  pendingAccounts: CandidateAccount[];
+  next: string | null;
+}): string {
+  // Pending with candidate Google accounts → forward straight to the picker
+  // so the user doesn't have to wait for an extra Google API roundtrip on
+  // /manage-ads-accounts/google-ads. Both ads-less pending users and
+  // already-connected users land on the manage page, which handles its own
+  // empty-state and re-OAuth UI.
+  if (opts.pendingToken && opts.pendingAccounts.length > 0) {
+    const accountsParam = encodeURIComponent(JSON.stringify(opts.pendingAccounts));
+    const nextParam = opts.next ? `&next=${encodeURIComponent(opts.next)}` : "";
+    return `/manage-ads-accounts/google-ads/select?pending=${opts.pendingToken}&accounts=${accountsParam}${nextParam}`;
+  }
+  return "/manage-ads-accounts/google-ads";
 }
 
 function PlatformCard({

@@ -132,9 +132,7 @@ function normalizeBiddingStrategy(strategy: string | number | null | undefined):
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     return fn().catch((err) => {
         if (err instanceof Error && err.message === "Not authenticated") {
-            // /welcome routes appropriately: not connected → /connect,
-            // ads-less → empty-state UI, fully connected → back to the app.
-            redirect("/welcome");
+            redirect("/manage-ads-accounts");
         }
         throw err;
     });

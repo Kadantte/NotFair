@@ -227,7 +227,7 @@ export async function getSession(): Promise<Session> {
 
 /**
  * Refresh token for the current session, regardless of pendingSetup state.
- * /welcome uses this to re-list connectable Google Ads accounts and decide
+ * /manage-ads-accounts uses this to re-list connectable Google Ads accounts and decide
  * whether to render the empty-state warning or send the user straight to
  * the picker. Returns null when there's no session at all.
  */

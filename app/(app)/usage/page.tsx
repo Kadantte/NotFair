@@ -5,13 +5,12 @@ import { UsagePage } from '@/components/usage-page';
 /**
  * Server-component wrapper that gates /usage on a real connected session.
  * Ads-less users (signed in via Google but no Google Ads customer yet)
- * belong on /welcome — they have nothing to look at on this page until
- * they pick a platform and start running operations.
+ * belong on /manage-ads-accounts so they can pick a platform.
  */
 export default async function UsageRoute() {
     const session = await getSession();
     if (session.connected && session.pendingSetup) {
-        redirect('/welcome');
+        redirect('/manage-ads-accounts');
     }
     return <UsagePage />;
 }

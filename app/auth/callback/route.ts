@@ -105,13 +105,13 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
  * shareable in support tickets, and refresh-safe. The optional `message`
  * is a backwards-compat fallback for old links and unmapped reasons.
  *
- * `no_accounts` and `no_client_accounts` are routed to the dedicated
- * /welcome empty-state page instead — that's where users with an ads-less
- * session pick how to proceed (different Google account / Meta / Claude only).
+ * `no_accounts` and `no_client_accounts` route to /manage-ads-accounts so
+ * the user can pick a platform (different Google identity, Meta, etc.)
+ * instead of being stuck on a Google-Ads-only empty state.
  */
 function redirectWithError(origin: string, reason: string, message?: string) {
   if (reason === "no_accounts" || reason === "no_client_accounts") {
-    return NextResponse.redirect(`${origin}/welcome`);
+    return NextResponse.redirect(`${origin}/manage-ads-accounts`);
   }
   const params = new URLSearchParams({ reason });
   if (message) params.set("error", message);
@@ -505,21 +505,16 @@ async function createOrRedirectGoogleAdsSession({
     return popupAccountSelectionResponse(usableAccounts, pendingToken, origin);
   }
 
-  // Send the full ConnectableAccount shape (including loginCustomerName for
-  // the manager group label) to the platform-specific picker page.
-  const accountsForUi = usableAccounts.map((a) => ({
-    id: a.id,
-    name: a.name,
-    ...(a.loginCustomerId ? { loginCustomerId: a.loginCustomerId, loginCustomerName: a.loginCustomerName } : {}),
-  }));
-  const accountsParam = encodeURIComponent(JSON.stringify(accountsForUi));
-  const nextParam = next !== "/connect" ? `&next=${encodeURIComponent(next)}` : "";
-  // FTUE picker lives at /welcome/<platform>/select — keeps onboarding off
-  // the /connect path (which is now strictly for MCP/connector setup) and
-  // gives Meta/TikTok a consistent shape (/welcome/meta-ads/select, etc.)
-  // when they ship.
+  // Land new users on /manage-ads-accounts so they can pick a platform
+  // (Google or Meta) before being routed to the Google picker. The pending
+  // mcp_sessions row + cookie carry the auth state; /manage-ads-accounts
+  // detects pending Google state and forwards to /manage-ads-accounts/google-ads/select
+  // with the candidate accounts when the user clicks the Google card.
+  // `next` is preserved as a query param so the eventual save lands the
+  // user where they originally intended.
+  const nextParam = next !== "/connect" ? `?next=${encodeURIComponent(next)}` : "";
   const pendingResponse = NextResponse.redirect(
-    `${origin}/welcome/google-ads/select?pending=${pendingToken}&accounts=${accountsParam}${nextParam}`,
+    `${origin}/manage-ads-accounts${nextParam}`,
   );
   // Surface the user's identity to the navbar while they're picking which
   // accounts to connect — without this they'd appear signed-out on the

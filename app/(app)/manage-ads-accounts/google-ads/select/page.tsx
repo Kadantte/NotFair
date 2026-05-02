@@ -22,7 +22,7 @@ type Props = {
  * /api/auth/select-account.
  *
  * Without a `pending` token there's nothing to show; users are bounced to
- * /welcome where they pick a platform.
+ * /manage-ads-accounts where they pick a platform.
  */
 export default async function GoogleAdsSelectRoute({ searchParams }: Props) {
     const sp = await searchParams;
@@ -32,15 +32,15 @@ export default async function GoogleAdsSelectRoute({ searchParams }: Props) {
 
     // Bare URL with nothing to pick from → go to the platform-picker hub.
     if (accounts.length === 0) {
-        redirect('/welcome');
+        redirect('/manage-ads-accounts');
     }
 
     // Confirm the user actually has a session backing the pending token.
     // If they don't, /api/auth/select-account would 404 anyway — bounce them
-    // to /welcome rather than presenting a doomed picker.
+    // to /login rather than presenting a doomed picker.
     const session = await getSession();
     if (!session.connected) {
-        redirect('/connect');
+        redirect('/login');
     }
 
     // In update mode, read the LIVE selection from the session (not the URL).

@@ -51,6 +51,24 @@ function subscribeHydration() {
     return noopUnsubscribe;
 }
 
+/**
+ * Routes that need at least one connected ad platform (Google or Meta) to
+ * render anything useful. Users with no connections get bounced to
+ * /manage-ads-accounts where they can pick a platform.
+ */
+const PROTECTED_FEATURE_PREFIXES = [
+    '/dashboard',
+    '/campaigns',
+    '/audit',
+    '/impact-monitor',
+    '/operations',
+    '/chat',
+] as const;
+
+function needsConnectedPlatform(pathname: string): boolean {
+    return PROTECTED_FEATURE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 function NavItem({
     href,
     icon: Icon,
@@ -235,6 +253,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setIsAuthenticated(connected);
                 setIsDev(Boolean(connected && s?.isDev));
                 setActivePlatform(s?.activePlatform === 'meta_ads' ? 'meta_ads' : 'google_ads');
+                if (connected) {
+                    // Guard: a signed-in user with neither a Google connection
+                    // (customerId === '') nor any Meta connection has nothing
+                    // to render on the data-driven feature tabs. Bounce them
+                    // to /manage-ads-accounts so they can pick a platform.
+                    const hasGoogle = typeof s?.customerId === 'string' && s.customerId.length > 0;
+                    const hasMeta = Array.isArray(s?.metaAccounts) && s.metaAccounts.length > 0;
+                    if (!hasGoogle && !hasMeta && needsConnectedPlatform(pathname)) {
+                        router.replace('/manage-ads-accounts');
+                    }
+                }
                 if (!connected) {
                     setPlan(null);
                     setTrialEndsAt(null);

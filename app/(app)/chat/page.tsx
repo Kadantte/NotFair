@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ChatRedirect() {
   // Ads-less users have no Google Ads context for the agent to work with,
-  // so route them to /welcome to pick a setup path before letting them chat.
+  // so route them to /manage-ads-accounts to pick a platform first.
   const session = await getSession();
   if (session.connected && session.pendingSetup) {
-    redirect("/welcome");
+    redirect("/manage-ads-accounts");
   }
 
   const auth = await getSessionAuth().catch(() => null);
