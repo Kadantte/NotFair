@@ -182,6 +182,27 @@ describe.skipIf(!BEARER)("Meta MCP live", () => {
     expect(parsed.rowCount).toBe(parsed.rows.length);
   });
 
+  // Regression test for the over-fetching bug — the read tool used to fetch
+  // up to 20 pages and slice client-side. With `limit: 1` and account-level
+  // insights, the result must contain at most 1 row.
+  it("limit param actually caps total rows (no over-fetch)", async () => {
+    const { isError, parsed } = await callTool("getInsights", {
+      level: "account",
+      date_preset: "last_30d",
+      limit: 1,
+    });
+    expect(isError).toBe(false);
+    expect(parsed.rows.length).toBeLessThanOrEqual(1);
+    expect(parsed.rowCount).toBe(parsed.rows.length);
+  });
+
+  it("listCampaigns honors small limit (no over-fetch)", async () => {
+    const { isError, parsed } = await callTool("listCampaigns", { limit: 2 });
+    expect(isError).toBe(false);
+    expect(parsed.campaigns.length).toBeLessThanOrEqual(2);
+    expect(parsed.rowCount).toBe(parsed.campaigns.length);
+  });
+
   it("runScript: ads.graph fetches /me Graph API user", async () => {
     const { isError, parsed } = await callTool("runScript", {
       code: `return await ads.graph("/me", { fields: "id,name" });`,

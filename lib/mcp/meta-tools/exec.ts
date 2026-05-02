@@ -1,4 +1,5 @@
 import { logChange, logRead, ERROR_CLASS, type CallTelemetry } from "@/lib/db/tracking";
+import type { ErrorClass } from "@/lib/db/tracking";
 import {
   enforceRateLimit,
   recordOperation,
@@ -68,6 +69,14 @@ function describeError(error: unknown): string {
  * Meta-side write envelope returned by the Meta tool handlers. Mirrors
  * `WriteResult` (Google) but with JSON-snapshot before/after instead of
  * pre-formatted strings.
+ *
+ * `accountId` is the requesting account context (the value passed to or
+ * resolved on the tool call), NOT a verified ownership claim about the
+ * entity. Meta's entity URLs (e.g. `/<campaignId>`) don't embed an account
+ * scope, so a caller passing `accountId: act_A` + `campaignId` from `act_B`
+ * will mutate the act_B entity while this field still says act_A. The
+ * agent should treat this as "which account I asked the tool to act under,"
+ * not "which account the entity lives in."
  */
 export type MetaWriteEnvelope = {
   success: boolean;
@@ -92,29 +101,32 @@ function snapshotToString(snap: Record<string, unknown> | null): string {
  * Run a Meta MCP write. Rate-limits, executes the Graph API mutation,
  * inserts an `operations` row with `platform = 'meta_ads'`, and bumps the
  * usage cache. The returned envelope is what the agent sees.
+ *
+ * Telemetry parity: rate-limit rejections and thrown writes both land as
+ * `op_type=write` rows so /dev/telemetry's write breakdown sees them. (The
+ * Google-side `execWrite` predates this and still logs thrown writes via
+ * logRead — see `lib/tools/execute.ts`. Fix that next time anyone touches it.)
  */
 export async function execMetaWrite(
   auth: ToolAuth,
   fn: () => Promise<MetaWriteEnvelope>,
 ): Promise<MetaWriteEnvelope> {
-  await enforceRateLimit(auth.userId ?? null);
   const ctx = getTelemetry();
+  try {
+    await enforceRateLimit(auth.userId ?? null);
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      logFailedWrite(auth, ctx, 0, ERROR_CLASS.RATE_LIMIT, error);
+    }
+    throw error;
+  }
   const t0 = performance.now();
   let result: MetaWriteEnvelope;
   try {
     result = await fn();
   } catch (error) {
     const latencyMs = Math.round(performance.now() - t0);
-    if (ctx?.toolName) {
-      void logRead({
-        accountId: "",
-        userId: auth.userId ?? null,
-        toolName: ctx.toolName,
-        clientSource: auth.clientName,
-        platform: "meta_ads",
-        telemetry: buildTelemetry(ctx, latencyMs, 0, ERROR_CLASS.THROWN, describeError(error)),
-      });
-    }
+    logFailedWrite(auth, ctx, latencyMs, ERROR_CLASS.THROWN, error);
     throw error;
   }
 
@@ -230,4 +242,38 @@ export async function execMetaRead<T>(
   });
   recordOperation(auth.userId ?? null);
   return result;
+}
+
+/**
+ * Insert a write-attribution row for a write that never reached
+ * `execMetaWrite`'s success path — rate-limit rejection or a thrown Graph API
+ * call. Without this, the dashboard would either miss the call entirely
+ * (rate-limit) or attribute it to the read funnel (thrown), neither of which
+ * matches the user's intent. The action name comes from the active telemetry
+ * context so per-tool buckets stay coherent; entityId/accountId are empty
+ * because we don't reach the resolved values until inside `fn()`.
+ */
+function logFailedWrite(
+  auth: ToolAuth,
+  ctx: ReturnType<typeof getTelemetry>,
+  latencyMs: number,
+  errorClass: ErrorClass,
+  error: unknown,
+): void {
+  const action = ctx?.toolName ?? "unknownWrite";
+  void logChange({
+    accountId: "",
+    userId: auth.userId ?? null,
+    campaignId: null,
+    platform: "meta_ads",
+    writeResult: {
+      success: false,
+      action,
+      entityId: "",
+      beforeValue: "",
+      afterValue: "",
+    },
+    clientSource: auth.clientName,
+    telemetry: buildTelemetry(ctx, latencyMs, 0, errorClass, describeError(error)),
+  });
 }

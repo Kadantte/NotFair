@@ -213,7 +213,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
     "pauseAd",
     {
       description:
-        "Pause a single ad (creative; status=PAUSED). Reversible via `enableAd`.",
+        "Pause a single ad (sets the ad's status=PAUSED — does not modify its creative). Reversible via `enableAd`.",
       inputSchema: {
         accountId: accountIdParam,
         adId: z.string(),

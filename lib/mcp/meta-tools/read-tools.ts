@@ -36,7 +36,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     "listAdAccounts",
     {
       description:
-        "List Meta ad accounts connected to this session. Returns the active account id plus every selected account (id, name, currency, timezone, business_id when routed through a Business Manager). Use the returned ids as `accountId` for other tools.",
+        "List Meta ad accounts connected to this session. Returns the active account id plus every selected account (id, name). Use the returned ids as `accountId` for other tools. For per-account currency, timezone, and Business Manager info, call `getAdAccount` with the id.",
       inputSchema: {},
       annotations: READ_ANNOTATIONS,
     },
@@ -104,7 +104,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
           .min(1)
           .max(500)
           .default(100)
-          .describe("Max rows per page; the tool follows paging up to ~20 pages."),
+          .describe("Max total rows returned. The tool stops paginating once it has this many."),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -152,7 +152,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
       inputSchema: {
         accountId: accountIdParam,
         statuses: StatusFilterSchema.describe(
-          "Filter by effective_status. Default: returns all (ACTIVE, PAUSED, ARCHIVED, DELETED).",
+          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only — pass `['ACTIVE','PAUSED','ARCHIVED','DELETED']` to include archived and deleted campaigns.",
         ),
         limit: z
           .number()
@@ -160,7 +160,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
           .min(1)
           .max(500)
           .default(100)
-          .describe("Max campaigns to return (after paging)."),
+          .describe("Max total campaigns returned. The tool stops paginating once it has this many."),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -177,11 +177,12 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
         const rows = await metaGraphAllPages<Record<string, unknown>>(
           targetAuth.refreshToken,
           { path: `/${withActPrefix(targetId)}/campaigns`, params },
+          { maxRows: limit },
         );
         return {
           accountId: targetId,
-          rowCount: Math.min(rows.length, limit),
-          campaigns: rows.slice(0, limit),
+          rowCount: rows.length,
+          campaigns: rows,
         };
       });
     }),
@@ -201,13 +202,16 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
           .describe(
             "Filter to ad sets under this campaign. Omit to list every ad set in the account.",
           ),
-        statuses: StatusFilterSchema,
+        statuses: StatusFilterSchema.describe(
+          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only.",
+        ),
         limit: z
           .number()
           .int()
           .min(1)
           .max(500)
-          .default(100),
+          .default(100)
+          .describe("Max total ad sets returned. The tool stops paginating once it has this many."),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -227,12 +231,13 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
         const rows = await metaGraphAllPages<Record<string, unknown>>(
           targetAuth.refreshToken,
           { path, params },
+          { maxRows: limit },
         );
         return {
           accountId: targetId,
           campaignId: campaignId ?? null,
-          rowCount: Math.min(rows.length, limit),
-          adSets: rows.slice(0, limit),
+          rowCount: rows.length,
+          adSets: rows,
         };
       });
     }),
@@ -250,13 +255,16 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
           .string()
           .optional()
           .describe("Filter to ads under this ad set. Omit to list across the whole account."),
-        statuses: StatusFilterSchema,
+        statuses: StatusFilterSchema.describe(
+          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only.",
+        ),
         limit: z
           .number()
           .int()
           .min(1)
           .max(500)
-          .default(100),
+          .default(100)
+          .describe("Max total ads returned. The tool stops paginating once it has this many."),
       },
       annotations: READ_ANNOTATIONS,
     },
@@ -276,12 +284,13 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
         const rows = await metaGraphAllPages<Record<string, unknown>>(
           targetAuth.refreshToken,
           { path, params },
+          { maxRows: limit },
         );
         return {
           accountId: targetId,
           adSetId: adSetId ?? null,
-          rowCount: Math.min(rows.length, limit),
-          ads: rows.slice(0, limit),
+          rowCount: rows.length,
+          ads: rows,
         };
       });
     }),

@@ -94,19 +94,24 @@ export async function metaGraph<T = unknown>(
     if (value === undefined || value === null) continue;
     params.set(key, String(value));
   }
-  // access_token always last so it's not surfaced in error messages first.
-  params.set("access_token", accessToken);
 
-  // Only POST puts params in the body — GET and DELETE keep them on the
-  // query string. Meta's API treats `?access_token=…` the same way for both.
+  // Token goes in Authorization header so it doesn't end up in URL access
+  // logs (GET/DELETE) or form-body traces (POST). Meta accepts Bearer tokens
+  // on every endpoint we touch.
   const url =
     method === "POST"
       ? `${GRAPH_BASE}/${apiVersion()}/${path}`
-      : `${GRAPH_BASE}/${apiVersion()}/${path}?${params.toString()}`;
+      : `${GRAPH_BASE}/${apiVersion()}/${path}${params.size ? `?${params.toString()}` : ""}`;
 
-  const init: RequestInit = { method };
+  const init: RequestInit = {
+    method,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  };
   if (method === "POST") {
-    init.headers = { "Content-Type": "application/x-www-form-urlencoded" };
+    init.headers = {
+      ...init.headers,
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
     init.body = params.toString();
   }
 
@@ -140,44 +145,86 @@ export async function metaGraph<T = unknown>(
 
 /**
  * Fetch every page of a paged Graph endpoint. Caps at `maxPages` (default 20)
- * so a misbehaving cursor can't loop forever. Each page follows the
- * `paging.next` URL Meta hands us — that URL embeds the cursor + access token,
- * so we just `fetch` it directly rather than reconstructing.
+ * so a misbehaving cursor can't loop forever. When `maxRows` is set, also
+ * stops once that many rows have been collected and slices the result to that
+ * exact size — callers that want a row cap should pass it instead of fetching
+ * 20 pages and slicing client-side.
+ *
+ * Each page after the first follows the `paging.next` URL Meta hands us. We
+ * strip the embedded `access_token` from that URL and re-attach via header so
+ * the token doesn't ride along in fetch traces / proxy logs.
  */
 export async function metaGraphAllPages<T = unknown>(
   accessToken: string,
   req: GraphRequest,
-  opts: { maxPages?: number } = {},
+  opts: { maxPages?: number; maxRows?: number } = {},
 ): Promise<T[]> {
   const maxPages = opts.maxPages ?? 20;
+  const maxRows = opts.maxRows;
   const out: T[] = [];
+
+  // First-page size: prefer the caller's explicit limit, then maxRows (so a
+  // small request fits in one page), else 100.
+  const firstPageLimit =
+    typeof req.params?.limit === "number"
+      ? req.params.limit
+      : (maxRows && maxRows < 100 ? maxRows : 100);
 
   // First page via metaGraph so we get unified error handling. Subsequent
   // pages follow paging.next, which is a pre-signed URL.
   const first = await metaGraph<GraphPage<T>>(accessToken, {
     ...req,
-    params: { ...(req.params ?? {}), limit: req.params?.limit ?? 100 },
+    params: { ...(req.params ?? {}), limit: firstPageLimit },
   });
   out.push(...(first.data ?? []));
+  if (maxRows != null && out.length >= maxRows) return out.slice(0, maxRows);
 
   let nextUrl = first.paging?.next;
   for (let i = 1; i < maxPages && nextUrl; i++) {
-    const res = await fetch(nextUrl);
+    // Strip access_token from Meta's paging URL — we'll send it via header.
+    const stripped = stripAccessToken(nextUrl);
+    const res = await fetch(stripped, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     let body: unknown = null;
     try { body = await res.json(); } catch { /* surface status below */ }
-    if (!res.ok) {
+
+    // Meta sometimes returns 200 + { error } envelopes — same drill as on
+    // page 1. Without this, a mid-pagination failure silently truncated
+    // results to whatever pages we'd already collected.
+    const errorEnvelope =
+      body && typeof body === "object" && "error" in body
+        ? ((body as { error?: GraphErrorPayload }).error ?? null)
+        : null;
+    if (!res.ok || errorEnvelope) {
       throw new MetaApiError({
         status: res.status,
         path: req.path,
-        graphError: null,
-        message: `Meta Graph paging fetch failed: HTTP ${res.status}`,
+        graphError: errorEnvelope,
+        message: errorEnvelope?.message
+          ? `Meta Graph paging ${req.path}: ${errorEnvelope.message}`
+            + (errorEnvelope.code ? ` (code ${errorEnvelope.code})` : "")
+          : `Meta Graph paging ${req.path}: HTTP ${res.status}`,
       });
     }
+
     const page = body as GraphPage<T>;
     out.push(...(page.data ?? []));
+    if (maxRows != null && out.length >= maxRows) return out.slice(0, maxRows);
     nextUrl = page.paging?.next;
   }
-  return out;
+  return maxRows != null ? out.slice(0, maxRows) : out;
+}
+
+function stripAccessToken(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    u.searchParams.delete("access_token");
+    return u.toString();
+  } catch {
+    // Malformed URL — return as-is and let fetch surface the error.
+    return rawUrl;
+  }
 }
 
 // ─── Parallel fan-out ──────────────────────────────────────────────────────
@@ -197,59 +244,10 @@ export type GraphParallelResult<T = unknown> =
   | { ok: true; data: T; rowCount?: number }
   | { ok: false; error: { message: string; code?: number; type?: string } };
 
-const PARALLEL_LIMIT = 20;
-
-/**
- * Fan out up to `PARALLEL_LIMIT` Graph calls concurrently. Mirrors
- * `ads.gaqlParallel` — caller passes named requests, gets back a name→result
- * map. Errors are surfaced per-call so a single 400 doesn't tank the batch.
- */
-export async function metaGraphParallel<T = unknown>(
-  accessToken: string,
-  calls: GraphParallelInput[],
-): Promise<Record<string, GraphParallelResult<T>>> {
-  if (calls.length === 0) return {};
-  if (calls.length > PARALLEL_LIMIT) {
-    throw new Error(
-      `metaGraphParallel: ${calls.length} calls exceeds the ${PARALLEL_LIMIT}-call cap. Split into smaller batches.`,
-    );
-  }
-
-  const settled = await Promise.allSettled(
-    calls.map(async (call) => {
-      if (call.paged) {
-        const rows = await metaGraphAllPages<unknown>(accessToken, call.request);
-        const trimmed = call.limit ? rows.slice(0, call.limit) : rows;
-        return { data: { data: trimmed } as unknown as T, rowCount: trimmed.length };
-      }
-      const body = await metaGraph<T>(accessToken, call.request);
-      const rowCount = Array.isArray((body as { data?: unknown[] })?.data)
-        ? (body as { data?: unknown[] }).data!.length
-        : undefined;
-      return { data: body, rowCount };
-    }),
-  );
-
-  const out: Record<string, GraphParallelResult<T>> = {};
-  for (let i = 0; i < calls.length; i++) {
-    const call = calls[i];
-    const r = settled[i];
-    if (r.status === "fulfilled") {
-      out[call.name] = { ok: true, data: r.value.data, rowCount: r.value.rowCount };
-    } else {
-      const err = r.reason as Error & { graphError?: GraphErrorPayload };
-      out[call.name] = {
-        ok: false,
-        error: {
-          message: err?.message ?? "Unknown error",
-          code: err?.graphError?.code,
-          type: err?.graphError?.type,
-        },
-      };
-    }
-  }
-  return out;
-}
+// metaGraphParallel was deleted in favor of an inlined fan-out in the
+// runScript host (lib/mcp/code-mode-meta/meta-host.ts) — that version wraps
+// each task with execMetaRead so each Graph call lands its own operations
+// row. The shared types above stay for the host to consume.
 
 // ─── Insights helper ───────────────────────────────────────────────────────
 
@@ -303,6 +301,10 @@ const DEFAULT_INSIGHT_FIELDS = [
  * Pull insights for an ad account at a chosen level. Wrapper over
  * `/{accountId}/insights` with sensible defaults so most callers don't
  * spelunk the Graph API docs to get a working query.
+ *
+ * `options.limit` is a TOTAL row cap (not a per-page hint) — pagination stops
+ * once that many rows have been collected, and the result is sliced to that
+ * exact size.
  */
 export async function metaInsights<T = Record<string, unknown>>(
   accessToken: string,
@@ -312,10 +314,13 @@ export async function metaInsights<T = Record<string, unknown>>(
   if (options.date_preset && options.time_range) {
     throw new Error("metaInsights: pass `date_preset` OR `time_range`, not both.");
   }
+  const totalCap = options.limit ?? 100;
   const params: Record<string, string | number> = {
     level: options.level ?? "campaign",
     fields: (options.fields ?? DEFAULT_INSIGHT_FIELDS).join(","),
-    limit: options.limit ?? 100,
+    // Per-page size: don't ask Meta for more rows than we'll return; cap at
+    // 100 (Meta's effective max for /insights default fields).
+    limit: Math.min(totalCap, 100),
   };
   if (options.date_preset) params.date_preset = options.date_preset;
   if (options.time_range) params.time_range = JSON.stringify(options.time_range);
@@ -323,10 +328,11 @@ export async function metaInsights<T = Record<string, unknown>>(
   if (options.breakdowns?.length) params.breakdowns = options.breakdowns.join(",");
   if (options.action_breakdowns?.length) params.action_breakdowns = options.action_breakdowns.join(",");
 
-  return metaGraphAllPages<T>(accessToken, {
-    path: `/${withActPrefix(adAccountId)}/insights`,
-    params,
-  });
+  return metaGraphAllPages<T>(
+    accessToken,
+    { path: `/${withActPrefix(adAccountId)}/insights`, params },
+    { maxRows: totalCap },
+  );
 }
 
 // ─── Batch endpoint ────────────────────────────────────────────────────────
@@ -348,8 +354,9 @@ export type BatchResponseEntry = {
  * Issue a Graph API batch request. Up to 50 sub-requests in one round-trip;
  * each sub-request returns its own status + body.
  *
- * Use this for unrelated operations the caller wants to bundle. For homogeneous
- * paged reads, prefer `metaGraphParallel` which gives nicer typed results.
+ * Use this for unrelated operations the caller wants to bundle. For
+ * homogeneous parallel reads, prefer the runScript host's `ads.graphParallel`
+ * (inlined in meta-host.ts) — it returns a typed name→result map.
  */
 export async function metaBatch(
   accessToken: string,
@@ -360,12 +367,14 @@ export async function metaBatch(
     throw new Error(`metaBatch: ${requests.length} requests exceeds Meta's 50-call cap.`);
   }
   const params = new URLSearchParams();
-  params.set("access_token", accessToken);
   params.set("batch", JSON.stringify(requests));
 
   const res = await fetch(`${GRAPH_BASE}/${apiVersion()}/`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: params.toString(),
   });
   let body: unknown = null;
