@@ -7,11 +7,23 @@ import { trackEvent } from "@/lib/analytics";
 const MARKETPLACE_CMD = "/plugin marketplace add nowork-studio/toprank";
 const INSTALL_CMD = "/plugin install toprank@nowork-studio";
 const RELOAD_CMD = "/reload-plugins";
-const ADS_CMD = "/google-ads";
+const DEFAULT_ADS_CMD = "/google-ads";
+const DEFAULT_AUDIT_PROMPT =
+  "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
 
 type Surface = "marketing" | "in_app";
 
-export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
+export function ClaudeCodePluginSteps({
+  surface,
+  slashCommand = DEFAULT_ADS_CMD,
+  platformLabel = "Google Ads",
+  examplePrompt = DEFAULT_AUDIT_PROMPT,
+}: {
+  surface: Surface;
+  slashCommand?: string;
+  platformLabel?: string;
+  examplePrompt?: string;
+}) {
   return (
     <div className="space-y-10">
       {/* Step 1 */}
@@ -59,7 +71,7 @@ export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
               toprank
             </a>{" "}
             marketplace, install the NotFair plugin, and reload plugins.
-            Toprank ships with pre-made Google Ads and SEO skills that
+            Toprank ships with pre-made paid-ads and SEO skills that
             teach Claude how to audit and optimize your campaigns.
           </p>
           <CommandBlock
@@ -84,20 +96,20 @@ export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
       <div id="step-3" className="space-y-3 scroll-mt-24">
         <div className="flex items-baseline gap-3">
           <StepNumber n={3} />
-          <h3 className="text-lg font-semibold text-[#E8E4DD]">Run /google-ads</h3>
+          <h3 className="text-lg font-semibold text-[#E8E4DD]">Run {slashCommand}</h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
             Run{" "}
             <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-sm text-[#4CAF6E]">
-              /google-ads
+              {slashCommand}
             </code>{" "}
             in Claude Code. It will open your browser to sign in and connect
             NotFair. If the command doesn&apos;t appear, restart Claude Code
             first.
           </p>
           <CommandBlock
-            command={ADS_CMD}
+            command={slashCommand}
             trackingStep="ads_command"
             surface={surface}
           />
@@ -107,7 +119,7 @@ export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
               with the{" "}
               <strong className="text-[#E8E4DD]">same Google account</strong>{" "}
               you use on NotFair. Otherwise Claude Code will connect to an
-              empty account and won&apos;t see your Google Ads data.
+              empty account and won&apos;t see your {platformLabel} data.
             </p>
           </div>
         </div>
@@ -125,8 +137,7 @@ export function ClaudeCodePluginSteps({ surface }: { surface: Surface }) {
           <p className="text-base leading-relaxed text-[#C4C0B6]">
             Try a prompt like{" "}
             <em className="text-[#E8E4DD]">
-              &ldquo;Audit my connected Google Ads account and tell me the 3
-              biggest optimization opportunities.&rdquo;
+              &ldquo;{examplePrompt}&rdquo;
             </em>{" "}
             Claude will call NotFair tools to read your account and respond
             with specific, data-backed insights.

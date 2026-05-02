@@ -1,0 +1,192 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
+import { fadeInUp } from "@/components/marketing/audit-cta";
+import { FaqSection } from "@/components/marketing/faq-section";
+import { LandingLinksSection } from "@/components/marketing/landing-links-section";
+import { ClaudeCodePluginSteps } from "@/components/claude-code-plugin-steps";
+import type { FaqItem } from "@/lib/seo";
+
+const FAQ_ITEMS: FaqItem[] = [
+  {
+    question: "What is the NotFair Claude Code plugin for Meta Ads?",
+    answer:
+      "It's the same toprank Claude Code plugin that gives Claude Code live access to your ad accounts — once installed, /ads connects Claude to your Meta (Facebook + Instagram) campaigns, ad sets, ads, insights, and creative. You diagnose issues, recommend fixes, and optimize through chat in your terminal.",
+  },
+  {
+    question: "How is this different from the Claude Connector?",
+    answer:
+      "The plugin is for Claude Code — Anthropic's terminal-based coding agent. The Claude Connector is for Claude.ai Web and Claude Cowork. Both use the same NotFair backend; the install flow is just different.",
+  },
+  {
+    question: "How long does setup take?",
+    answer:
+      "Under 2 minutes. Run three slash commands inside Claude Code to add the marketplace, install the plugin, and reload, then run /ads — Claude opens your browser to sign in via Meta's OAuth flow. No API key to copy.",
+  },
+  {
+    question: "Do I need to write any code?",
+    answer:
+      "No. Setup is entirely slash-command driven inside Claude Code. You'll paste a few commands — no JSON config edits, no environment variables, no scripts, no API keys.",
+  },
+  {
+    question: "Is the plugin free?",
+    answer:
+      "Yes. Installing the toprank plugin and using it for Meta Ads is free with no credit card. Paid plans unlock higher usage limits and team features.",
+  },
+  {
+    question: "Can Claude actually change my Meta ad accounts through the plugin?",
+    answer:
+      "Only with your explicit approval. Claude can propose pausing campaigns/ad sets/ads, adjusting budgets, or renaming entities — but every write action is shown to you first and requires confirmation. Read access is unrestricted; write access is gated.",
+  },
+  {
+    question: "Can I use the same plugin for both Google and Meta?",
+    answer:
+      "Yes. The toprank plugin ships skills for both platforms. Once installed, /ads can read whichever platforms you've linked. Switch between them via the navbar account dropdown in the NotFair web app.",
+  },
+];
+
+const RELATED_LINKS = [
+  {
+    href: "/meta-ads-claude-connector-setup-guide",
+    title: "Meta Ads Claude Connector",
+    description:
+      "If you use Claude.ai Web or Claude Cowork instead of Claude Code, install NotFair as a custom MCP connector in under 2 minutes.",
+  },
+  {
+    href: "/google-ads-claude-code-plugin-setup-guide",
+    title: "Google Ads Claude Code Plugin",
+    description:
+      "Same plugin, Google Ads side. Wire Claude Code to your Google Ads account through NotFair.",
+  },
+  {
+    href: "/google-ads-mcp-server",
+    title: "NotFair MCP Server",
+    description:
+      "Reference for the NotFair MCP servers and the read/write tools each platform exposes.",
+  },
+];
+
+export function MetaAdsClaudeCodePluginSetupPage() {
+  return (
+    <div className="bg-[#1A1917] text-[#E8E4DD]">
+      {/* ── Hero ── */}
+      <section className="px-4 pb-16 pt-16 md:pt-24">
+        <div className="mx-auto max-w-4xl text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          >
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              Setup guide · Claude Code plugin
+            </p>
+            <h1 className="font-display mx-auto mt-4 max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-[56px]">
+              Meta Ads Claude Code Plugin
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
+              Install the NotFair plugin in Claude Code in under 2 minutes.
+              Claude reads your Meta ad accounts — Facebook and Instagram
+              campaigns, ad sets, ads, and insights — in real time and helps
+              you diagnose, optimize, and manage them right from your terminal.
+            </p>
+            <p className="mt-6 text-sm text-[#C4C0B6]">
+              Free · No credit card · 2-minute setup
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── Setup Steps ── */}
+      <section className="border-t border-[#3D3C36] px-4 py-16">
+        <div className="mx-auto max-w-3xl">
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            className="mb-10 text-center"
+          >
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              How to install
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Add NotFair to Claude Code in 4 steps
+            </h2>
+            <p className="mt-3 text-sm text-[#C4C0B6]">
+              Free · No credit card · No API key to copy
+            </p>
+          </motion.div>
+
+          <ClaudeCodePluginSteps
+            surface="marketing"
+            slashCommand="/meta-ads"
+            platformLabel="Meta Ads"
+            examplePrompt="Audit my connected Meta ad account (Facebook + Instagram) and tell me the 3 biggest optimization opportunities."
+          />
+        </div>
+      </section>
+
+      {/* ── CTA Band ── */}
+      <section className="border-t border-[#3D3C36] px-4 py-16">
+        <div className="mx-auto max-w-4xl">
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-8 text-center"
+          >
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
+              Ready to install the plugin?
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#C4C0B6]">
+              Run three slash commands in Claude Code, then{" "}
+              <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-sm text-[#4CAF6E]">/ads</code>{" "}
+              to sign in and link Meta. Setup takes under 2 minutes — no API key.
+            </p>
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <Link
+                href="/connect/meta-ads/claude-code"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#4CAF6E] px-6 py-3 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+                onClick={() =>
+                  trackEvent("cta_clicked", {
+                    page: "meta-ads-claude-code-plugin-setup-guide",
+                    cta: "open_in_app_setup",
+                    destination: "/connect/meta-ads/claude-code",
+                  })
+                }
+              >
+                Open in-app setup
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/meta-ads-claude-connector-setup-guide"
+                className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
+              >
+                Or use the Claude Web / Cowork connector
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <FaqSection
+        title="FAQ — NotFair for Claude Code (Meta Ads)"
+        intro="Everything you need to know about installing and using the NotFair plugin inside Claude Code for Meta Ads."
+        items={FAQ_ITEMS}
+      />
+
+      {/* ── Related Pages ── */}
+      <LandingLinksSection
+        title="Related guides"
+        intro="Explore the rest of the NotFair + Claude workflow."
+        links={RELATED_LINKS}
+      />
+    </div>
+  );
+}

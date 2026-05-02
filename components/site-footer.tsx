@@ -20,6 +20,22 @@ const setupGuideLinks = [
         href: "/google-ads-mcp",
         label: "Google Ads MCP Server (any client)",
     },
+    {
+        href: "/meta-ads-claude-connector-setup-guide",
+        label: "Meta Ads Claude Connector Setup Guide",
+    },
+    {
+        href: "/meta-ads-claude-code-plugin-setup-guide",
+        label: "Meta Ads Claude Code Plugin Setup Guide",
+    },
+    {
+        href: "/meta-ads-codex-mcp-setup-guide",
+        label: "Meta Ads Codex MCP Setup Guide",
+    },
+    {
+        href: "/meta-ads-mcp",
+        label: "Meta Ads MCP Server (any client)",
+    },
 ];
 
 export function SiteFooter() {

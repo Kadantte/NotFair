@@ -11,14 +11,21 @@ type Surface = "marketing" | "in_app";
 const TOPRANK_REPO = "https://github.com/nowork-studio/toprank";
 const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/settings/connectors?modal=add-custom-connector";
 
+const DEFAULT_AUDIT_PROMPT =
+  "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
+
 export function ConnectorSetupSteps({
   surface,
   serverUrl = MCP_SERVER_URL,
   connectorName = MCP_CONNECTOR_NAME,
+  platformLabel = "Google Ads",
+  examplePrompt = DEFAULT_AUDIT_PROMPT,
 }: {
   surface: Surface;
   serverUrl?: string;
   connectorName?: string;
+  platformLabel?: string;
+  examplePrompt?: string;
 }) {
   return (
     <div className="space-y-10">
@@ -122,7 +129,7 @@ export function ConnectorSetupSteps({
             repo URL into the{" "}
             <strong className="text-[#E8E4DD]">Add marketplace</strong> dialog
             and click <strong className="text-[#E8E4DD]">Sync</strong>. Toprank
-            ships with pre-made Google Ads and SEO skills that teach Claude how
+            ships with pre-made paid-ads and SEO skills that teach Claude how
             to diagnose, optimize, and manage your campaigns alongside the NotFair
             connector.
           </p>
@@ -180,15 +187,14 @@ export function ConnectorSetupSteps({
           <p className="text-base leading-relaxed text-[#C4C0B6]">
             Try a prompt like{" "}
             <em className="text-[#E8E4DD]">
-              &ldquo;Audit my connected Google Ads account and tell me the 3
-              biggest optimization opportunities.&rdquo;
+              &ldquo;{examplePrompt}&rdquo;
             </em>{" "}
             Claude will call NotFair tools to read your account and respond
             with specific, data-backed insights.
           </p>
           <SetupScreenshot
             src="/connector-setup/05-use-in-chat.png"
-            alt="Claude using the NotFair connector to audit a Google Ads account in a chat"
+            alt={`Claude using the NotFair connector to audit a ${platformLabel} account in a chat`}
             surface={surface}
           />
         </div>

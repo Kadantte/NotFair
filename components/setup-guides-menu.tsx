@@ -1,11 +1,38 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { SVGProps } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
+
+function GoogleAdsIcon({ className }: { className?: string }) {
+    return (
+        <Image
+            src="/google-ads-icon.svg"
+            alt=""
+            width={14}
+            height={14}
+            aria-hidden="true"
+            className={className}
+        />
+    );
+}
+
+function MetaAdsIcon({ className }: { className?: string }) {
+    return (
+        <Image
+            src="/meta-icon.svg"
+            alt=""
+            width={14}
+            height={14}
+            aria-hidden="true"
+            className={className}
+        />
+    );
+}
 
 function ClaudeIcon(props: SVGProps<SVGSVGElement>) {
     return (
@@ -63,37 +90,84 @@ type Guide = {
     iconColor: string;
 };
 
+type GuideSection = {
+    /** Platform label rendered as the section header. */
+    label: string;
+    icon: IconComponent;
+    guides: Guide[];
+};
+
 // Official brand colors:
 //   Claude / Anthropic — coral orange #D97757
 //   OpenAI — black on light, white on dark surfaces
-const GUIDES: Guide[] = [
+const SECTIONS: GuideSection[] = [
     {
-        href: "/google-ads-claude-connector-setup-guide",
-        title: "Claude Cowork, Desktop, Web",
-        description: "Install NotFair as a custom MCP connector inside Claude.ai.",
-        icon: ClaudeIcon,
-        iconColor: "text-[#D97757]",
+        label: "Google Ads",
+        icon: GoogleAdsIcon,
+        guides: [
+            {
+                href: "/google-ads-claude-connector-setup-guide",
+                title: "Claude Cowork, Desktop, Web",
+                description: "Install NotFair as a custom MCP connector inside Claude.ai.",
+                icon: ClaudeIcon,
+                iconColor: "text-[#D97757]",
+            },
+            {
+                href: "/google-ads-claude-code-plugin-setup-guide",
+                title: "Claude Code",
+                description: "Install via Claude plugin.",
+                icon: ClaudeIcon,
+                iconColor: "text-[#D97757]",
+            },
+            {
+                href: "/google-ads-codex-mcp-setup-guide",
+                title: "Codex",
+                description: "Add the NotFair MCP to OpenAI's Codex CLI with one command.",
+                icon: OpenAIIcon,
+                iconColor: "text-white",
+            },
+            {
+                href: "/google-ads-mcp",
+                title: "Any other client via MCP",
+                description: "Generic MCP config — works with Cursor, Cline, or any MCP-compatible client.",
+                icon: McpIcon,
+                iconColor: "text-[#E8E4DD]",
+            },
+        ],
     },
     {
-        href: "/google-ads-claude-code-plugin-setup-guide",
-        title: "Claude Code",
-        description: "Install via Claude plugin.",
-        icon: ClaudeIcon,
-        iconColor: "text-[#D97757]",
-    },
-    {
-        href: "/google-ads-codex-mcp-setup-guide",
-        title: "Codex",
-        description: "Add the NotFair MCP to OpenAI's Codex CLI with one command.",
-        icon: OpenAIIcon,
-        iconColor: "text-white",
-    },
-    {
-        href: "/google-ads-mcp",
-        title: "Any other client via MCP",
-        description: "Generic MCP config — works with Cursor, Cline, or any MCP-compatible client.",
-        icon: McpIcon,
-        iconColor: "text-[#E8E4DD]",
+        label: "Meta Ads",
+        icon: MetaAdsIcon,
+        guides: [
+            {
+                href: "/meta-ads-claude-connector-setup-guide",
+                title: "Claude Cowork, Desktop, Web",
+                description: "Install the NotFair Meta connector inside Claude.ai for Facebook + Instagram ads.",
+                icon: ClaudeIcon,
+                iconColor: "text-[#D97757]",
+            },
+            {
+                href: "/meta-ads-claude-code-plugin-setup-guide",
+                title: "Claude Code",
+                description: "Install via Claude plugin for Meta (Facebook + Instagram).",
+                icon: ClaudeIcon,
+                iconColor: "text-[#D97757]",
+            },
+            {
+                href: "/meta-ads-codex-mcp-setup-guide",
+                title: "Codex",
+                description: "Add the NotFair Meta MCP to OpenAI's Codex CLI with one command.",
+                icon: OpenAIIcon,
+                iconColor: "text-white",
+            },
+            {
+                href: "/meta-ads-mcp",
+                title: "Any other client via MCP",
+                description: "Generic MCP config for Meta — works with Cursor, Cline, or any MCP-compatible client.",
+                icon: McpIcon,
+                iconColor: "text-[#E8E4DD]",
+            },
+        ],
     },
 ];
 
@@ -156,7 +230,7 @@ export function SetupGuidesMenu({ className = "" }: { className?: string }) {
             <div
                 role="menu"
                 aria-hidden={!open}
-                className={`absolute right-0 top-full z-50 mt-2 w-[420px] origin-top-right transition-all duration-150 ease-out ${
+                className={`absolute right-0 top-full z-50 mt-2 w-[760px] origin-top-right transition-all duration-150 ease-out ${
                     open
                         ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
                         : "pointer-events-none -translate-y-1 scale-[0.98] opacity-0"
@@ -168,37 +242,52 @@ export function SetupGuidesMenu({ className = "" }: { className?: string }) {
                             More NotFair Setup Guides
                         </p>
                         <p className="mt-1 text-xs text-[#C4C0B6]">
-                            Access Google Ads in all AI platforms via NotFair MCP.
+                            Access Google Ads and Meta Ads from any AI client via NotFair MCP.
                         </p>
                     </div>
-                    <ul className="p-1.5">
-                        {GUIDES.map(guide => {
-                            const Icon = guide.icon;
+                    <div className="grid grid-cols-2 divide-x divide-[#3D3C36]">
+                        {SECTIONS.map(section => {
+                            const PlatformIcon = section.icon;
                             return (
-                                <li key={guide.href}>
-                                    <Link
-                                        href={guide.href}
-                                        prefetch
-                                        role="menuitem"
-                                        onClick={() => setOpen(false)}
-                                        className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[#2E2D28]"
-                                    >
-                                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#3D3C36] bg-[#1A1917] transition-colors group-hover:border-[#4D4C46] group-hover:bg-[#2E2D28]">
-                                            <Icon className={`h-4 w-4 ${guide.iconColor}`} />
-                                        </span>
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block text-sm font-medium text-[#E8E4DD]">
-                                                {guide.title}
-                                            </span>
-                                            <span className="mt-0.5 block text-xs leading-snug text-[#C4C0B6]">
-                                                {guide.description}
-                                            </span>
-                                        </span>
-                                    </Link>
-                                </li>
+                                <div key={section.label}>
+                                    <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
+                                        <PlatformIcon className="h-3.5 w-3.5 shrink-0" />
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#C4C0B6]/80">
+                                            {section.label}
+                                        </p>
+                                    </div>
+                                    <ul className="px-1.5 pb-1.5">
+                                        {section.guides.map(guide => {
+                                            const Icon = guide.icon;
+                                            return (
+                                                <li key={guide.href}>
+                                                    <Link
+                                                        href={guide.href}
+                                                        prefetch
+                                                        role="menuitem"
+                                                        onClick={() => setOpen(false)}
+                                                        className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[#2E2D28]"
+                                                    >
+                                                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#3D3C36] bg-[#1A1917] transition-colors group-hover:border-[#4D4C46] group-hover:bg-[#2E2D28]">
+                                                            <Icon className={`h-4 w-4 ${guide.iconColor}`} />
+                                                        </span>
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="block text-sm font-medium text-[#E8E4DD]">
+                                                                {guide.title}
+                                                            </span>
+                                                            <span className="mt-0.5 block text-xs leading-snug text-[#C4C0B6]">
+                                                                {guide.description}
+                                                            </span>
+                                                        </span>
+                                                    </Link>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
                             );
                         })}
-                    </ul>
+                    </div>
                 </div>
             </div>
         </div>

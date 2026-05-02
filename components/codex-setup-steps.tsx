@@ -7,17 +7,19 @@ import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
-const AUDIT_PROMPT =
+const DEFAULT_AUDIT_PROMPT =
   "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
 
 export function CodexSetupSteps({
   surface,
   serverUrl = MCP_SERVER_URL,
   connectorName = MCP_CONNECTOR_NAME,
+  examplePrompt = DEFAULT_AUDIT_PROMPT,
 }: {
   surface: Surface;
   serverUrl?: string;
   connectorName?: string;
+  examplePrompt?: string;
 }) {
   const oneLiner = `codex mcp add ${connectorName} --url ${serverUrl}`;
   return (
@@ -82,7 +84,7 @@ export function CodexSetupSteps({
           </p>
           <div className="rounded-lg border border-[#3D3C36] bg-[#1A1917] px-4 py-3">
             <p className="text-sm italic leading-relaxed text-[#E8E4DD]">
-              &ldquo;{AUDIT_PROMPT}&rdquo;
+              &ldquo;{examplePrompt}&rdquo;
             </p>
           </div>
           <p className="text-base leading-relaxed text-[#C4C0B6]">

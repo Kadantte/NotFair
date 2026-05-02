@@ -12,6 +12,10 @@ const publicMarketingRoutes = [
   "/google-ads-claude-code-plugin-setup-guide",
   "/google-ads-codex-mcp-setup-guide",
   "/google-ads-mcp-server",
+  "/meta-ads-claude-connector-setup-guide",
+  "/meta-ads-claude-code-plugin-setup-guide",
+  "/meta-ads-codex-mcp-setup-guide",
+  "/meta-ads-mcp",
   "/impact",
   "/privacy",
   "/terms",
@@ -19,10 +23,22 @@ const publicMarketingRoutes = [
   ...allLandingPages.map((page) => `/${page.slug}`),
 ];
 
-const highPriorityRoutes = new Set(["/", "/google-ads-audit", "/google-ads-claude", "/google-ads-claude-connector-setup-guide", "/google-ads-claude-code-plugin-setup-guide", "/google-ads-codex-mcp-setup-guide", "/google-ads-mcp-server"]);
+const highPriorityRoutes = new Set([
+  "/",
+  "/google-ads-audit",
+  "/google-ads-claude",
+  "/google-ads-claude-connector-setup-guide",
+  "/google-ads-claude-code-plugin-setup-guide",
+  "/google-ads-codex-mcp-setup-guide",
+  "/google-ads-mcp-server",
+  "/meta-ads-claude-connector-setup-guide",
+  "/meta-ads-claude-code-plugin-setup-guide",
+  "/meta-ads-codex-mcp-setup-guide",
+]);
 const seoLandingRoutes = new Set([
   "/ai-google-ads-agent",
   "/google-ads-mcp",
+  "/meta-ads-mcp",
   "/connect-google-ads-to-claude",
   "/connect-google-ads-to-chatgpt",
   "/ai-google-ads-optimization",
