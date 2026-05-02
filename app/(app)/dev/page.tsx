@@ -228,6 +228,8 @@ export default function DevPage() {
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
     const [growthOverride, setGrowthOverride] = useState<'on' | 'off' | null>(null);
     const [togglingGrowthOverride, setTogglingGrowthOverride] = useState(false);
+    const [metaWaitlistWall, setMetaWaitlistWall] = useState<'on' | 'off' | null>(null);
+    const [togglingMetaWaitlistWall, setTogglingMetaWaitlistWall] = useState(false);
     const [resetPreview, setResetPreview] = useState<ResetPreview | null>(null);
     const [loadingResetPreview, setLoadingResetPreview] = useState(false);
     const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -241,6 +243,13 @@ export default function DevPage() {
             .then((data) => {
                 if (cancelled || !data) return;
                 setGrowthOverride(data.state === 'off' ? 'off' : 'on');
+            })
+            .catch(() => { /* dev-only endpoint, fine if it 403s */ });
+        fetch('/api/dev/meta-waitlist-override', { credentials: 'include' })
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+                if (cancelled || !data) return;
+                setMetaWaitlistWall(data.state === 'off' ? 'off' : 'on');
             })
             .catch(() => { /* dev-only endpoint, fine if it 403s */ });
         return () => { cancelled = true; };
@@ -309,6 +318,30 @@ export default function DevPage() {
             setError('Failed to toggle growth override');
         } finally {
             setTogglingGrowthOverride(false);
+        }
+    }
+
+    async function toggleMetaWaitlistWall() {
+        if (metaWaitlistWall === null) return;
+        const next = metaWaitlistWall === 'on' ? 'off' : 'on';
+        setTogglingMetaWaitlistWall(true);
+        try {
+            const res = await fetch('/api/dev/meta-waitlist-override', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ enabled: next === 'on' }),
+            });
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            setMetaWaitlistWall(data.state === 'off' ? 'off' : 'on');
+            // The wall is server-rendered on /manage-ads-accounts, so refresh
+            // route caches so the toggle is visible without a hard reload.
+            router.refresh();
+        } catch {
+            setError('Failed to toggle Meta waitlist wall');
+        } finally {
+            setTogglingMetaWaitlistWall(false);
         }
     }
 
@@ -1273,8 +1306,44 @@ export default function DevPage() {
 
                 {/* ── Developer Options Tab ── */}
                 {activeTab === 'developer' && (
-                    <div>
+                    <div className="space-y-4">
                         <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">Developer Options</h2>
+
+                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F] p-4 sm:p-5">
+                            <div className="flex items-start gap-3">
+                                <div className="shrink-0 rounded-md bg-[#1877F2]/15 p-2">
+                                    <Eye className="w-4 h-4 text-[#1877F2]" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-sm font-semibold text-[#E8E4DD]">Meta waitlist wall</h3>
+                                    <p className="mt-1 text-xs text-[#C4C0B6] leading-relaxed">
+                                        Meta App Review is pending — non-developer customers always see a
+                                        &ldquo;Coming soon, join waitlist&rdquo; wall on{' '}
+                                        <code className="font-mono text-[#E8E4DD]">/manage-ads-accounts</code>{' '}
+                                        and{' '}
+                                        <code className="font-mono text-[#E8E4DD]">/manage-ads-accounts/meta-ads</code>.
+                                        Toggle off to preview the underlying connect/manage UX as a developer.
+                                    </p>
+                                    <div className="mt-3">
+                                        <Button
+                                            onClick={toggleMetaWaitlistWall}
+                                            disabled={metaWaitlistWall === null || togglingMetaWaitlistWall}
+                                            variant="outline"
+                                            size="sm"
+                                            className={`gap-1.5 ${metaWaitlistWall === 'on'
+                                                ? 'border-[#D4882A]/40 bg-[#D4882A]/[0.08] text-[#D4882A] hover:bg-[#D4882A]/[0.14]'
+                                                : 'border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] text-[#4CAF6E] hover:bg-[#4CAF6E]/[0.14]'
+                                            }`}
+                                        >
+                                            {togglingMetaWaitlistWall
+                                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                : <Eye className="w-3.5 h-3.5" />}
+                                            Wall: {metaWaitlistWall === 'on' ? 'ON (customer view)' : metaWaitlistWall === 'off' ? 'OFF (preview underlying UX)' : '…'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="border border-[#C45D4A]/30 rounded-xl bg-[#C45D4A]/[0.04] p-4 sm:p-5">
                             <div className="flex items-start gap-3">

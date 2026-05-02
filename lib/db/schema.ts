@@ -619,3 +619,26 @@ export const chatMessages = pgTable("chat_messages", {
 }, (table) => [
   index("chat_messages_thread_idx").on(table.threadId, table.createdAt),
 ]);
+
+// ─── Waitlist Signups (generic) ─────────────────────────────────────
+//
+// One table per all waitlists. `key` namespaces the waitlist so adding a
+// new platform / feature waitlist is a no-migration change: pick a new key
+// (e.g. "meta_ads", "tiktok_ads", "agent_v2_beta") and insert. The partial
+// unique index on (key, user_id) deduplicates signed-in users. Anonymous
+// (user_id IS NULL) signups are unconstrained and pile up — fine for
+// pre-auth landing-page captures we may add later.
+
+export const waitlistSignups = pgTable("waitlist_signups", {
+  id: serial("id").primaryKey(),
+  /** Waitlist namespace, e.g. "meta_ads". */
+  key: text("key").notNull(),
+  /** NotFair user id (matches mcp_sessions.user_id). Null for anonymous. */
+  userId: text("user_id"),
+  /** Email at signup time — captured even when userId is set so support
+   * doesn't have to join across tables. */
+  email: text("email"),
+  /** Free-form context: source page, plan tier, referral, etc. */
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

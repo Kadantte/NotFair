@@ -4,8 +4,11 @@ import { eq } from "drizzle-orm";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { isMetaWaitlistWallEnabled } from "@/lib/meta-waitlist";
+import { hasJoinedWaitlist } from "@/lib/waitlist";
 import { BrandLockup } from "@/components/brand-lockup";
 import { OnboardingSignOut } from "@/components/onboarding-sign-out";
+import { MetaWaitlistCard } from "@/components/meta-waitlist";
 
 type CandidateAccount = {
   id: string;
@@ -84,13 +87,19 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
       iconSrc="/google-ads-icon.svg"
     />
   );
-  // Skip the connect-Meta interstitial when the user has no Meta connection
-  // — kick off OAuth straight from the hub. Already-connected users land on
-  // the manage page so they can curate which accounts NotFair touches.
+  // Meta App Review is still pending — gate the entry behind a join-waitlist
+  // card for everyone except devs who've toggled the wall off in /dev. The
+  // gate also fires if the user has already joined, so the card shows
+  // "You're on the list" instead of the CTA.
+  const metaWallEnabled = await isMetaWaitlistWallEnabled();
+  const metaWaitlistJoined = metaWallEnabled ? await hasJoinedWaitlist("meta_ads") : false;
+
   const metaHref = hasMeta
     ? "/manage-ads-accounts/meta-ads"
     : `/api/oauth/meta/start?next=${encodeURIComponent(next ?? "/manage-ads-accounts/meta-ads")}`;
-  const metaCard = (
+  const metaCard = metaWallEnabled ? (
+    <MetaWaitlistCard initialJoined={metaWaitlistJoined} source="hub" />
+  ) : (
     <PlatformCard
       href={metaHref}
       title={hasMeta ? "Manage Meta Ads accounts" : "Add Meta Ads account"}

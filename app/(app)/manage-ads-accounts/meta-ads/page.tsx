@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { isMetaWaitlistWallEnabled } from "@/lib/meta-waitlist";
+import { hasJoinedWaitlist } from "@/lib/waitlist";
 import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
+import { MetaWaitlistWall } from "@/components/meta-waitlist";
 
 /**
  * Page for adding/managing Meta ad accounts. Open to any signed-in user —
@@ -16,6 +19,15 @@ export default async function AddMetaAdsAccountPagePath() {
   if (!session.connected) {
     redirect("/login?next=%2Fmanage-ads-accounts%2Fmeta-ads");
   }
+
+  // Meta App Review is pending — block the connect/manage UX behind a
+  // join-waitlist wall for everyone except devs who've toggled the wall
+  // off in /dev (Developer Options → "Meta waitlist wall").
+  if (await isMetaWaitlistWallEnabled()) {
+    const joined = await hasJoinedWaitlist("meta_ads");
+    return <MetaWaitlistWall initialJoined={joined} source="meta_ads_page" />;
+  }
+
   const userId = session.userId;
 
   type AccountEntry = {
