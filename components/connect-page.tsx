@@ -11,6 +11,7 @@ import { BOOK_DEMO_URL } from '@/lib/links';
 import { notifyHelpClicked } from '@/app/actions';
 import { McpSetupTabs, parseSetupSlug } from '@/components/mcp-setup-tabs';
 import { GoHighLevelConnectSurface } from '@/components/gohighlevel-connect-surface';
+import { GoogleConnectedToast } from '@/components/google-connected-toast';
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from '@/lib/brand';
 
 const emptySession: Session = { connected: false };
@@ -184,6 +185,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
     return (
         <section className="flex h-full min-h-0 flex-col overflow-hidden">
+            <GoogleConnectedToast />
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
                 <div className="mx-auto max-w-4xl">
                     {(error || isKnownReason(errorReason)) && (() => {
@@ -264,7 +266,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                 setSession(next);
                                 router.refresh();
                             }}
-                            basePath="/connect"
+                            basePath="/connect/google-ads"
                             serverUrl={MCP_SERVER_URL}
                             connectorName={MCP_CONNECTOR_NAME}
                         />

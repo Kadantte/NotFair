@@ -4,12 +4,13 @@ import { useEffect, useRef } from "react";
 import { appToastSuccess } from "@/lib/app-toast";
 
 /**
- * Fires a success toast after a Meta OAuth round-trip — the callback
- * redirects to /connect/meta-ads?connected=1 and this client island reads
- * the flag from window.location, then dispatches an `app-toast` event. The
+ * Fires a success toast after a Google Ads account-pick save — the
+ * /api/auth/select-account flow lands the user on
+ * /connect/google-ads?connected=1 and this client island reads the flag
+ * from window.location and dispatches an `app-toast` event. The
  * <AppToaster /> in the root layout listens and renders the toast.
  */
-export function MetaConnectedToast() {
+export function GoogleConnectedToast() {
   const fired = useRef(false);
 
   useEffect(() => {
@@ -18,8 +19,8 @@ export function MetaConnectedToast() {
     if (params.get("connected") !== "1") return;
     fired.current = true;
     appToastSuccess(
-      "Meta ads accounts connected.",
-      "Let's set up the Meta Ads MCP so Claude, Codex, and other clients can use it.",
+      "Google Ads accounts connected.",
+      "Set up the Google Ads MCP so Claude, Codex, and other clients can use it.",
     );
   }, []);
 

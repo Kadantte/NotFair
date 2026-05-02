@@ -11,11 +11,10 @@ const ITEMS: Array<{
   icon: "google" | "meta";
 }> = [
   {
-    href: "/connect",
+    href: "/connect/google-ads",
     label: "Google Ads MCP",
     icon: "google",
-    // Default base for /connect plus any tab slug, but NOT /connect/meta-ads/*
-    match: (p) => p === "/connect" || (p.startsWith("/connect/") && !p.startsWith("/connect/meta-ads")),
+    match: (p) => p === "/connect" || p.startsWith("/connect/google-ads"),
   },
   {
     href: "/connect/meta-ads",

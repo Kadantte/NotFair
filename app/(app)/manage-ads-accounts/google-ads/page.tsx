@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import { getCurrentRefreshToken, getSession } from "@/lib/session";
 import { listConnectableAccounts } from "@/lib/google-ads";
 import { AccountSelector, type SelectableAccount } from "@/components/account-selector";
@@ -86,17 +87,42 @@ export default async function AddGoogleAdsAccountPagePath() {
     );
   }
 
+  // The "Connect to MCP" CTA is only useful once the user has at least one
+  // Google account selected — before that, the MCP would have nothing to
+  // bind to. Show it when the user is past pendingSetup.
+  const showMcpCta = !session.pendingSetup;
+
   return (
     <ManageAdsAccountsShell error={enumerationError}>
       <AccountSelector
         accounts={availableAccounts}
         mode={session.pendingSetup ? "create" : "update"}
         preselectedIds={preselectedIds}
-        next="/connect"
+        next="/connect/google-ads?connected=1"
         submitEndpoint="/api/auth/select-account"
         headline={session.pendingSetup ? "Select your Google Ads accounts" : "Manage Google Ads accounts"}
         body="Which Google Ads accounts do you want to manage?"
       />
+      {showMcpCta && (
+        <div className="mt-6 rounded-2xl border border-[#3D3C36] bg-[#24231F] p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#E8E4DD]">Connect to Google Ads MCP</p>
+              <p className="mt-1 text-sm text-[#C4C0B6]">
+                Wire Claude, Codex, or any MCP client to your Google Ads accounts.
+              </p>
+            </div>
+            <Link
+              href="/connect/google-ads"
+              prefetch
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+            >
+              Connect MCP
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      )}
     </ManageAdsAccountsShell>
   );
 }

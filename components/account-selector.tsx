@@ -153,10 +153,11 @@ export function AccountSelector({
                 setSubmitting(false);
                 return;
             }
-            // Save succeeded → land the user on /connect for MCP setup. The
+            // Save succeeded → land the user on the Google MCP setup page
+            // for MCP setup (with the success toast firing on arrival). The
             // server may also have included a redirectUrl (post-signup); use
-            // that when present, otherwise fall back to /connect.
-            window.location.assign(data.redirectUrl ?? '/connect');
+            // that when present, otherwise fall back to /connect/google-ads.
+            window.location.assign(data.redirectUrl ?? '/connect/google-ads?connected=1');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to save selection.');
             setSubmitting(false);

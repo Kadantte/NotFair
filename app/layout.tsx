@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { AppToaster } from "@/components/app-toaster";
+import "./sonner.css";
 import "./globals.css";
 
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
@@ -141,6 +143,7 @@ export default async function RootLayout({
         <PostHogProvider bootstrapUser={bootstrapUser}>
           <GadsConversionTracker />
           {children}
+          <AppToaster />
         </PostHogProvider>
       </body>
     </html>

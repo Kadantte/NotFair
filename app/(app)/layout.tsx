@@ -579,21 +579,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             {(isCollapsed || !isOnChat || sidebarThreads.length === 0) && <div className="flex-1" />}
 
-            {/* Footer */}
+            {/* Link platforms — sits in its own section above the footer. */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem
-                    href="/upgrade"
-                    icon={Rocket}
-                    label={isFree ? 'Upgrade' : 'Pricing'}
-                    active={pathname === '/upgrade'}
-                    collapsed={isCollapsed}
-                    onClick={() => {
-                        if (isMobile) setMobileMenuOpen(false);
-                        trackEvent('upgrade_clicked', { location: 'sidebar', page: pathname });
-                    }}
-                />
-                {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
                 <NavItem
                     href="/manage-ads-accounts/google-ads"
                     icon={GoogleAdsNavIcon}
@@ -610,6 +597,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                 />
+            </div>
+
+            {/* Footer */}
+            <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
+                <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem
+                    href="/upgrade"
+                    icon={Rocket}
+                    label={isFree ? 'Upgrade' : 'Pricing'}
+                    active={pathname === '/upgrade'}
+                    collapsed={isCollapsed}
+                    onClick={() => {
+                        if (isMobile) setMobileMenuOpen(false);
+                        trackEvent('upgrade_clicked', { location: 'sidebar', page: pathname });
+                    }}
+                />
+                {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
                 <DiscordLink
                     location="sidebar"
                     className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}

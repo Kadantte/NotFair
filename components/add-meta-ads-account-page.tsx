@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
 
@@ -56,14 +57,34 @@ export function AddMetaAdsAccountPage({
       {!connection ? (
         <NotConnected onConnect={handleConnect} />
       ) : (
-        <Connected
-          connection={connection}
-          updating={updating}
-          setUpdating={setUpdating}
-          setError={setError}
-          onConnectionChange={setConnection}
-          onReauthorize={handleConnect}
-        />
+        <>
+          <Connected
+            connection={connection}
+            updating={updating}
+            setUpdating={setUpdating}
+            setError={setError}
+            onConnectionChange={setConnection}
+            onReauthorize={handleConnect}
+          />
+          <div className="mt-6 rounded-2xl border border-[#3D3C36] bg-[#24231F] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#E8E4DD]">Connect to Meta Ads MCP</p>
+                <p className="mt-1 text-sm text-[#C4C0B6]">
+                  Wire Claude, Codex, or any MCP client to your Meta ad accounts.
+                </p>
+              </div>
+              <Link
+                href="/connect/meta-ads"
+                prefetch
+                className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
+              >
+                Connect MCP
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </>
       )}
     </ManageAdsAccountsShell>
   );

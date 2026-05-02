@@ -55,10 +55,10 @@ export default async function GoogleAdsSelectRoute({ searchParams }: Props) {
             ? session.customerIds.map((a) => a.id)
             : parseSelected(sp.selected);
 
-    // Default post-save destination is /connect (the MCP setup hub). The
-    // AccountSelector falls back to this when the API doesn't return a
-    // redirectUrl (i.e. update mode and post-promotion saves).
-    const next = sp.next && sp.next.startsWith('/') ? sp.next : '/connect';
+    // Default post-save destination is the Google Ads MCP setup page,
+    // with `?connected=1` so the toast fires. The AccountSelector falls
+    // back to this when the API doesn't return a redirectUrl.
+    const next = sp.next && sp.next.startsWith('/') ? sp.next : '/connect/google-ads?connected=1';
 
     return (
         <section className="flex h-full min-h-0 flex-col overflow-hidden">

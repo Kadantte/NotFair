@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   const { pendingToken, accounts, next: rawNext } = body;
-  const next = typeof rawNext === 'string' && rawNext.startsWith('/') ? rawNext : '/connect';
+  const next = typeof rawNext === 'string' && rawNext.startsWith('/') ? rawNext : '/connect/google-ads?connected=1';
 
   if (!Array.isArray(accounts) || accounts.length === 0) {
     return NextResponse.json(
@@ -235,8 +235,11 @@ export async function POST(request: Request) {
     }
   }
 
+  // After save we always land on the Google MCP setup page. New-signup
+  // flows can override via `next` (e.g. /audit) — they don't get the toast
+  // since they're not on /connect/google-ads.
   const response = NextResponse.json({
-    redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect'}`,
+    redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect/google-ads?connected=1'}`,
   });
   setSessionCookies(response, session.accessToken, accountNames);
   if (isNewSignup) {
@@ -254,7 +257,7 @@ export async function POST(request: Request) {
     JSON.stringify({
       count: validAccounts.length,
       first: !!isNewSignup,
-      destination: isNewSignup ? next : "/connect",
+      destination: isNewSignup ? next : "/connect/google-ads",
     }),
     { path: "/", maxAge: 120 },
   );
