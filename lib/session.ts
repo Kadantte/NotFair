@@ -6,6 +6,7 @@ import { eq, gte, and } from "drizzle-orm";
 import { COOKIE_NAMES, type ActivePlatform } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 import { DEV_EMAILS } from "@/lib/dev-access";
+import { resolveActivePlatform } from "@/lib/active-platform";
 
 export type Session = {
   connected: true;
@@ -197,14 +198,19 @@ export async function getSession(): Promise<Session> {
     }
   }
 
-  // Read the active platform cookie. Default to google_ads (preserves old
-  // behavior for pre-feature sessions). If the cookie says meta_ads but the
-  // user has no Meta connection, fall back to google_ads so the sidebar
-  // doesn't render in a half-broken state.
+  // Resolve which platform's UI the navbar + sidebar should render. The
+  // `connections` array order is the priority used when no cookie pick
+  // exists — first connected platform wins. To add a new platform later,
+  // extend ActivePlatform and append a {platform, connected} entry here.
   const cookieStore = await cookies();
   const rawActivePlatform = cookieStore.get(COOKIE_NAMES.activePlatform)?.value;
-  const activePlatform: ActivePlatform =
-    rawActivePlatform === "meta_ads" && metaAccounts.length > 0 ? "meta_ads" : "google_ads";
+  const activePlatform: ActivePlatform = resolveActivePlatform({
+    cookie: rawActivePlatform,
+    connections: [
+      { platform: "google_ads", connected: !pendingSetup && !!result.row.customerId },
+      { platform: "meta_ads", connected: metaAccounts.length > 0 },
+    ],
+  });
 
   return {
     connected: true,
