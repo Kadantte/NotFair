@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { McpSetupTabs, parseSetupSlug } from "@/components/mcp-setup-tabs";
 import { MetaConnectedToast } from "@/components/meta-connected-toast";
+import { MissingPlatformWarning } from "@/components/missing-platform-warning";
 import { META_MCP_CONNECTOR_NAME, META_MCP_SERVER_URL } from "@/lib/brand";
 
 /**
@@ -19,9 +20,11 @@ import { META_MCP_CONNECTOR_NAME, META_MCP_SERVER_URL } from "@/lib/brand";
 export function ConnectMetaAdsMcpPage({
   slug,
   apiKey,
+  hasMeta,
 }: {
   slug?: string[];
   apiKey: string | null;
+  hasMeta: boolean;
 }) {
   const router = useRouter();
   const { activeTab } = parseSetupSlug(slug);
@@ -31,6 +34,7 @@ export function ConnectMetaAdsMcpPage({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
         <div className="mx-auto max-w-4xl space-y-8">
           <MetaConnectedToast />
+          {!hasMeta && <MissingPlatformWarning platform="meta_ads" />}
           <header className="space-y-2">
             <h1 className="text-3xl font-bold text-[#E8E4DD]">
               Connect Meta Ads MCP

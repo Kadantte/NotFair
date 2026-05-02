@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { ConnectPage } from '@/components/connect-page';
 import { getSession } from '@/lib/session';
-import { unsupportedFeatureRedirect } from '@/lib/onboarding-redirect';
 
 type Props = {
     params: Promise<{ slug?: string[] }>;
@@ -31,14 +30,17 @@ export default async function AppConnectPage({ params, searchParams }: Props) {
     const session = await getSession();
     const { slug } = await params;
 
-    // Bare /connect on a Google-Ads-less session: route to the platform-
-    // appropriate home. 0 platforms → onboarding, Meta-only → Meta MCP page.
-    // Sub-paths like /connect/claude-connector remain open because they
-    // don't depend on a connected platform.
+    // 0-platform users belong on onboarding (the platform picker). Users
+    // with at least one platform connected — even if it's only Meta — can
+    // browse the Google MCP setup instructions; ConnectPage shows a
+    // "no Google Ads linked" warning banner so they know connecting MCP
+    // alone isn't enough.
     if (!slug || slug.length === 0) {
-        const unsupported = unsupportedFeatureRedirect(session);
-        if (unsupported) {
-            redirect(unsupported);
+        if (!session.connected) redirect('/login?next=%2Fconnect%2Fgoogle-ads');
+        const hasGoogle = !session.pendingSetup && !!session.customerId;
+        const hasMeta = session.metaAccounts.length > 0;
+        if (!hasGoogle && !hasMeta) {
+            redirect('/manage-ads-accounts');
         }
     }
 

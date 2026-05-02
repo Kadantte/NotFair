@@ -12,6 +12,7 @@ import { notifyHelpClicked } from '@/app/actions';
 import { McpSetupTabs, parseSetupSlug } from '@/components/mcp-setup-tabs';
 import { GoHighLevelConnectSurface } from '@/components/gohighlevel-connect-surface';
 import { GoogleConnectedToast } from '@/components/google-connected-toast';
+import { MissingPlatformWarning } from '@/components/missing-platform-warning';
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from '@/lib/brand';
 
 const emptySession: Session = { connected: false };
@@ -183,11 +184,14 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     }
 
 
+    const hasGoogleCustomer = session.connected && !session.pendingSetup && !!session.customerId;
+
     return (
         <section className="flex h-full min-h-0 flex-col overflow-hidden">
             <GoogleConnectedToast />
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
                 <div className="mx-auto max-w-4xl">
+                    {!hasGoogleCustomer && session.connected && <MissingPlatformWarning platform="google_ads" />}
                     {(error || isKnownReason(errorReason)) && (() => {
                         const reason: ErrorReason = isKnownReason(errorReason) ? errorReason : 'generic';
                         const copy = getErrorCopy(reason, { fallbackMessage: error });
