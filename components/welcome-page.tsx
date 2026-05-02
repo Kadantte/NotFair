@@ -63,7 +63,7 @@ export function WelcomePage({ googleEmail }: WelcomePageProps) {
             label: 'Connect Meta Ads',
             description: 'Manage Facebook and Instagram campaigns from NotFair.',
             onConnect: () => {
-                window.location.href = '/api/oauth/meta/start?next=%2Fadd-meta-ads-account';
+                window.location.href = '/api/oauth/meta/start?next=%2Fmanage-ads-accounts%2Fmeta-ads';
             },
             ctaLabel: (isPending) => (isPending ? 'Redirecting…' : 'Connect Meta'),
             accent: '#1877F2',

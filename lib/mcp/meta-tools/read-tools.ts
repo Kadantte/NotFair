@@ -13,7 +13,7 @@ import {
   type ToolRegistrar,
 } from "@/lib/mcp/types";
 import { resolveToolAuth } from "@/lib/mcp/helpers";
-import { enforceRateLimit } from "@/lib/mcp/rate-limit";
+import { execMetaRead } from "@/lib/mcp/meta-tools/exec";
 import {
   metaGraph,
   metaGraphAllPages,
@@ -42,15 +42,17 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     safeTypedHandler(async () => {
       const auth = currentAuth();
-      const accounts = (auth.customerIds ?? []).map((a) => ({
-        id: a.id,
-        name: a.name || "Unknown Account",
-      }));
-      return {
-        accounts,
-        activeAccountId: auth.customerId,
-        totalAccounts: accounts.length,
-      };
+      return execMetaRead(auth, auth.customerId, "listAdAccounts", async () => {
+        const accounts = (auth.customerIds ?? []).map((a) => ({
+          id: a.id,
+          name: a.name || "Unknown Account",
+        }));
+        return {
+          accounts,
+          activeAccountId: auth.customerId,
+          totalAccounts: accounts.length,
+        };
+      });
     }),
   );
 
@@ -119,23 +121,24 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
         limit,
       }) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-        await enforceRateLimit(targetAuth.userId);
-        const rows = await metaInsights(targetAuth.refreshToken, targetId, {
-          level: level as InsightsLevel,
-          date_preset,
-          time_range,
-          time_increment,
-          fields,
-          breakdowns,
-          action_breakdowns,
-          limit,
+        return execMetaRead(targetAuth, targetId, "getInsights", async () => {
+          const rows = await metaInsights(targetAuth.refreshToken, targetId, {
+            level: level as InsightsLevel,
+            date_preset,
+            time_range,
+            time_increment,
+            fields,
+            breakdowns,
+            action_breakdowns,
+            limit,
+          });
+          return {
+            accountId: targetId,
+            level,
+            rowCount: rows.length,
+            rows,
+          };
         });
-        return {
-          accountId: targetId,
-          level,
-          rowCount: rows.length,
-          rows,
-        };
       },
     ),
   );
@@ -163,23 +166,24 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     safeTypedHandler(async ({ accountId, statuses, limit }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const params: Record<string, string | number> = {
-        fields:
-          "id,name,status,effective_status,objective,daily_budget,lifetime_budget,bid_strategy,start_time,stop_time,buying_type,special_ad_categories,created_time,updated_time",
-      };
-      if (statuses && statuses.length > 0) {
-        params.effective_status = JSON.stringify(statuses);
-      }
-      const rows = await metaGraphAllPages<Record<string, unknown>>(
-        targetAuth.refreshToken,
-        { path: `/${withActPrefix(targetId)}/campaigns`, params },
-      );
-      return {
-        accountId: targetId,
-        rowCount: Math.min(rows.length, limit),
-        campaigns: rows.slice(0, limit),
-      };
+      return execMetaRead(targetAuth, targetId, "listCampaigns", async () => {
+        const params: Record<string, string | number> = {
+          fields:
+            "id,name,status,effective_status,objective,daily_budget,lifetime_budget,bid_strategy,start_time,stop_time,buying_type,special_ad_categories,created_time,updated_time",
+        };
+        if (statuses && statuses.length > 0) {
+          params.effective_status = JSON.stringify(statuses);
+        }
+        const rows = await metaGraphAllPages<Record<string, unknown>>(
+          targetAuth.refreshToken,
+          { path: `/${withActPrefix(targetId)}/campaigns`, params },
+        );
+        return {
+          accountId: targetId,
+          rowCount: Math.min(rows.length, limit),
+          campaigns: rows.slice(0, limit),
+        };
+      });
     }),
   );
 
@@ -209,27 +213,28 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     safeTypedHandler(async ({ accountId, campaignId, statuses, limit }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const path = campaignId
-        ? `/${campaignId}/adsets`
-        : `/${withActPrefix(targetId)}/adsets`;
-      const params: Record<string, string | number> = {
-        fields:
-          "id,name,status,effective_status,campaign_id,optimization_goal,billing_event,bid_amount,bid_strategy,daily_budget,lifetime_budget,start_time,end_time,targeting,promoted_object,created_time,updated_time",
-      };
-      if (statuses && statuses.length > 0) {
-        params.effective_status = JSON.stringify(statuses);
-      }
-      const rows = await metaGraphAllPages<Record<string, unknown>>(
-        targetAuth.refreshToken,
-        { path, params },
-      );
-      return {
-        accountId: targetId,
-        campaignId: campaignId ?? null,
-        rowCount: Math.min(rows.length, limit),
-        adSets: rows.slice(0, limit),
-      };
+      return execMetaRead(targetAuth, targetId, "listAdSets", async () => {
+        const path = campaignId
+          ? `/${campaignId}/adsets`
+          : `/${withActPrefix(targetId)}/adsets`;
+        const params: Record<string, string | number> = {
+          fields:
+            "id,name,status,effective_status,campaign_id,optimization_goal,billing_event,bid_amount,bid_strategy,daily_budget,lifetime_budget,start_time,end_time,targeting,promoted_object,created_time,updated_time",
+        };
+        if (statuses && statuses.length > 0) {
+          params.effective_status = JSON.stringify(statuses);
+        }
+        const rows = await metaGraphAllPages<Record<string, unknown>>(
+          targetAuth.refreshToken,
+          { path, params },
+        );
+        return {
+          accountId: targetId,
+          campaignId: campaignId ?? null,
+          rowCount: Math.min(rows.length, limit),
+          adSets: rows.slice(0, limit),
+        };
+      });
     }),
   );
 
@@ -257,27 +262,28 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     safeTypedHandler(async ({ accountId, adSetId, statuses, limit }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const path = adSetId
-        ? `/${adSetId}/ads`
-        : `/${withActPrefix(targetId)}/ads`;
-      const params: Record<string, string | number> = {
-        fields:
-          "id,name,status,effective_status,adset_id,campaign_id,creative,configured_status,created_time,updated_time",
-      };
-      if (statuses && statuses.length > 0) {
-        params.effective_status = JSON.stringify(statuses);
-      }
-      const rows = await metaGraphAllPages<Record<string, unknown>>(
-        targetAuth.refreshToken,
-        { path, params },
-      );
-      return {
-        accountId: targetId,
-        adSetId: adSetId ?? null,
-        rowCount: Math.min(rows.length, limit),
-        ads: rows.slice(0, limit),
-      };
+      return execMetaRead(targetAuth, targetId, "listAds", async () => {
+        const path = adSetId
+          ? `/${adSetId}/ads`
+          : `/${withActPrefix(targetId)}/ads`;
+        const params: Record<string, string | number> = {
+          fields:
+            "id,name,status,effective_status,adset_id,campaign_id,creative,configured_status,created_time,updated_time",
+        };
+        if (statuses && statuses.length > 0) {
+          params.effective_status = JSON.stringify(statuses);
+        }
+        const rows = await metaGraphAllPages<Record<string, unknown>>(
+          targetAuth.refreshToken,
+          { path, params },
+        );
+        return {
+          accountId: targetId,
+          adSetId: adSetId ?? null,
+          rowCount: Math.min(rows.length, limit),
+          ads: rows.slice(0, limit),
+        };
+      });
     }),
   );
 
@@ -294,18 +300,19 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     },
     safeTypedHandler(async ({ accountId }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const data = await metaGraph<Record<string, unknown>>(
-        targetAuth.refreshToken,
-        {
-          path: `/${withActPrefix(targetId)}`,
-          params: {
-            fields:
-              "id,account_id,name,currency,timezone_name,account_status,balance,amount_spent,spend_cap,disable_reason,business",
+      return execMetaRead(targetAuth, targetId, "getAdAccount", async () => {
+        const data = await metaGraph<Record<string, unknown>>(
+          targetAuth.refreshToken,
+          {
+            path: `/${withActPrefix(targetId)}`,
+            params: {
+              fields:
+                "id,account_id,name,currency,timezone_name,account_status,balance,amount_spent,spend_cap,disable_reason,business",
+            },
           },
-        },
-      );
-      return data;
+        );
+        return data;
+      });
     }),
   );
 };

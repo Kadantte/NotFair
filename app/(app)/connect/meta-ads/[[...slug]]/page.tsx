@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { DEV_EMAILS } from "@/lib/dev-emails";
 import { ConnectMetaAdsMcpPage } from "@/components/connect-meta-ads-mcp-page";
 
 type Props = {
@@ -8,22 +7,15 @@ type Props = {
 };
 
 /**
- * Dev-gated mirror of /connect that surfaces the Meta Ads MCP URL
- * (`/api/mcp/meta_ads`) instead of the Google one. Same tabs, same step
- * components — only the URL and connector name differ.
- *
- * Behind a DEV_EMAILS gate while Meta Ads tooling is still skeleton-only.
+ * Meta Ads MCP setup page. Mirror of /connect for the Meta resource —
+ * same setup tabs, different server URL and connector name.
  */
 export default async function ConnectMetaAdsMcpPagePath({ params }: Props) {
   const session = await getSession();
   const { slug } = await params;
 
   if (!session.connected) {
-    redirect("/connect?next=%2Fconnect-meta-ads-mcp");
-  }
-
-  if (!session.googleEmail || !DEV_EMAILS.includes(session.googleEmail)) {
-    redirect("/connect");
+    redirect("/connect?next=%2Fconnect%2Fmeta-ads");
   }
 
   return (

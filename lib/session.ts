@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
 import { eq, gte, and } from "drizzle-orm";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
+import { COOKIE_NAMES, type ActivePlatform } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 import { DEV_EMAILS } from "@/lib/dev-access";
 
@@ -25,6 +25,12 @@ export type Session = {
   customerId: string;
   customerName: string;
   customerIds: { id: string; name: string }[];
+  /** Linked Meta ad accounts (curated subset). Empty if user has no Meta connection. */
+  metaAccounts: { id: string; name: string }[];
+  /** Active Meta account id from `ad_platform_connections.active_account_id`. */
+  activeMetaAccountId: string | null;
+  /** Which platform's UI the user picked in the navbar dropdown. Drives sidebar gating. */
+  activePlatform: ActivePlatform;
   googleEmail: string | null;
   /** Display name from Supabase user_metadata.full_name (Google OAuth provides this) */
   displayName: string | null;
@@ -163,6 +169,43 @@ export async function getSession(): Promise<Session> {
   // them at this stage.
   const pendingSetup = !result.row.customerId;
 
+  // Pull Meta connection (if any) so the navbar dropdown can offer Meta
+  // accounts alongside Google. One extra DB hit per session render —
+  // tolerable; the row is keyed by (userId, platform) and uniquely indexed.
+  let metaAccounts: { id: string; name: string }[] = [];
+  let activeMetaAccountId: string | null = null;
+  if (result.row.userId) {
+    const [metaRow] = await db()
+      .select({
+        accountIds: schema.adPlatformConnections.accountIds,
+        activeAccountId: schema.adPlatformConnections.activeAccountId,
+      })
+      .from(schema.adPlatformConnections)
+      .where(
+        and(
+          eq(schema.adPlatformConnections.userId, result.row.userId),
+          eq(schema.adPlatformConnections.platform, "meta_ads"),
+        ),
+      )
+      .limit(1);
+    if (metaRow) {
+      metaAccounts = (metaRow.accountIds ?? []).map((a) => ({
+        id: a.id,
+        name: a.name || `Ad Account ${a.id}`,
+      }));
+      activeMetaAccountId = metaRow.activeAccountId ?? null;
+    }
+  }
+
+  // Read the active platform cookie. Default to google_ads (preserves old
+  // behavior for pre-feature sessions). If the cookie says meta_ads but the
+  // user has no Meta connection, fall back to google_ads so the sidebar
+  // doesn't render in a half-broken state.
+  const cookieStore = await cookies();
+  const rawActivePlatform = cookieStore.get(COOKIE_NAMES.activePlatform)?.value;
+  const activePlatform: ActivePlatform =
+    rawActivePlatform === "meta_ads" && metaAccounts.length > 0 ? "meta_ads" : "google_ads";
+
   return {
     connected: true,
     pendingSetup,
@@ -171,6 +214,9 @@ export async function getSession(): Promise<Session> {
     customerId: result.row.customerId,
     customerName: pendingSetup ? "" : deriveCustomerName(result.row.customerIds),
     customerIds: pendingSetup ? [] : parseCustomerIds(result.row.customerIds),
+    metaAccounts,
+    activeMetaAccountId,
+    activePlatform,
     googleEmail: result.row.googleEmail,
     displayName: profile.displayName,
     picture: profile.picture,

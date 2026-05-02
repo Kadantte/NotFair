@@ -2,41 +2,22 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getAuthContext } from "@/lib/session";
-import { DEV_EMAILS } from "@/lib/dev-emails";
 import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
 
 /**
- * Dev-gated page for adding/managing Meta ad accounts.
- *
- * Two layers of protection:
- *   1. Sidebar link only renders when `isDev` is true (client-side filter).
- *   2. This server component re-checks `DEV_EMAILS` membership on every
- *      request — sidebar visibility is convenience; this is the actual gate.
- *
- * Available to anyone in `lib/dev-emails.ts` while Meta App Review is
- * pending. Once App Review approves advanced access on `ads_management`,
- * this page becomes generally available and the gate is removed.
+ * Page for adding/managing Meta ad accounts. Open to any signed-in user;
+ * Meta App Review approval is what gates *successful* OAuth, not this route.
  */
 export default async function AddMetaAdsAccountPagePath() {
-  let realEmail: string | null = null;
+  let userId: string | null = null;
   try {
     const ctx = await getAuthContext();
-    realEmail = ctx.auth.realGoogleEmail ?? ctx.session.googleEmail;
+    userId = ctx.session.userId;
   } catch {
     // Not authenticated — bounce through Google sign-in. The /connect page
     // exists; layout handles the post-signin redirect.
-    redirect("/connect?next=%2Fadd-meta-ads-account");
+    redirect("/connect?next=%2Fmanage-ads-accounts%2Fmeta-ads");
   }
-
-  if (!realEmail || !DEV_EMAILS.includes(realEmail)) {
-    // Logged in but not a dev — same shape as /dev access denial.
-    redirect("/connect");
-  }
-
-  // Pull the user's existing Meta connection (if any) so the page can render
-  // either the "Connect Meta" CTA or the connected-state UI on first paint.
-  const ctx = await getAuthContext();
-  const userId = ctx.session.userId;
 
   type AccountEntry = {
     id: string;
@@ -97,5 +78,5 @@ export default async function AddMetaAdsAccountPagePath() {
     }
   }
 
-  return <AddMetaAdsAccountPage initialConnection={connection} userEmail={realEmail} />;
+  return <AddMetaAdsAccountPage initialConnection={connection} />;
 }

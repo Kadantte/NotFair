@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getAuthContext } from "@/lib/session";
+import { setActivePlatformCookie } from "@/lib/auth-cookies";
 
 export async function POST(request: Request) {
   let userId: string | null = null;
@@ -80,5 +81,7 @@ export async function POST(request: Request) {
     })
     .where(eq(schema.adPlatformConnections.id, conn.id));
 
-  return NextResponse.json({ ok: true, activeAccountId: accountId });
+  const response = NextResponse.json({ ok: true, activeAccountId: accountId });
+  setActivePlatformCookie(response, "meta_ads");
+  return response;
 }

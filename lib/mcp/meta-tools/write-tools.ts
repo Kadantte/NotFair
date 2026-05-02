@@ -22,7 +22,7 @@ import {
   type ToolRegistrar,
 } from "@/lib/mcp/types";
 import { resolveToolAuth } from "@/lib/mcp/helpers";
-import { enforceRateLimit, recordOperation } from "@/lib/mcp/rate-limit";
+import { execMetaWrite } from "@/lib/mcp/meta-tools/exec";
 import { metaGraph, withActPrefix } from "@/lib/meta-ads/client";
 
 type StatusValue = "ACTIVE" | "PAUSED";
@@ -91,28 +91,20 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       WriteEnvelope
     >(async ({ accountId, campaignId }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const before = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      await setStatus(targetAuth.refreshToken, campaignId, "PAUSED");
-      const after = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      recordOperation(targetAuth.userId);
-      return {
-        success: true,
-        action: "pauseCampaign",
-        entityType: "campaign",
-        entityId: campaignId,
-        accountId: targetId,
-        before,
-        after,
-      };
+      return execMetaWrite(targetAuth, async () => {
+        const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        await setStatus(targetAuth.refreshToken, campaignId, "PAUSED");
+        const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        return {
+          success: true,
+          action: "pauseCampaign",
+          entityType: "campaign",
+          entityId: campaignId,
+          accountId: targetId,
+          before,
+          after,
+        };
+      });
     }),
   );
 
@@ -133,28 +125,20 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       WriteEnvelope
     >(async ({ accountId, campaignId }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const before = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      await setStatus(targetAuth.refreshToken, campaignId, "ACTIVE");
-      const after = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      recordOperation(targetAuth.userId);
-      return {
-        success: true,
-        action: "enableCampaign",
-        entityType: "campaign",
-        entityId: campaignId,
-        accountId: targetId,
-        before,
-        after,
-      };
+      return execMetaWrite(targetAuth, async () => {
+        const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        await setStatus(targetAuth.refreshToken, campaignId, "ACTIVE");
+        const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        return {
+          success: true,
+          action: "enableCampaign",
+          entityType: "campaign",
+          entityId: campaignId,
+          accountId: targetId,
+          before,
+          after,
+        };
+      });
     }),
   );
 
@@ -173,28 +157,20 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
     safeTypedHandler<{ accountId?: string; adSetId: string }, WriteEnvelope>(
       async ({ accountId, adSetId }) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-        await enforceRateLimit(targetAuth.userId);
-        const before = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adSetId,
-          ADSET_FIELDS,
-        );
-        await setStatus(targetAuth.refreshToken, adSetId, "PAUSED");
-        const after = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adSetId,
-          ADSET_FIELDS,
-        );
-        recordOperation(targetAuth.userId);
-        return {
-          success: true,
-          action: "pauseAdSet",
-          entityType: "adset",
-          entityId: adSetId,
-          accountId: targetId,
-          before,
-          after,
-        };
+        return execMetaWrite(targetAuth, async () => {
+          const before = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
+          await setStatus(targetAuth.refreshToken, adSetId, "PAUSED");
+          const after = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
+          return {
+            success: true,
+            action: "pauseAdSet",
+            entityType: "adset",
+            entityId: adSetId,
+            accountId: targetId,
+            before,
+            after,
+          };
+        });
       },
     ),
   );
@@ -214,28 +190,20 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
     safeTypedHandler<{ accountId?: string; adSetId: string }, WriteEnvelope>(
       async ({ accountId, adSetId }) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-        await enforceRateLimit(targetAuth.userId);
-        const before = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adSetId,
-          ADSET_FIELDS,
-        );
-        await setStatus(targetAuth.refreshToken, adSetId, "ACTIVE");
-        const after = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adSetId,
-          ADSET_FIELDS,
-        );
-        recordOperation(targetAuth.userId);
-        return {
-          success: true,
-          action: "enableAdSet",
-          entityType: "adset",
-          entityId: adSetId,
-          accountId: targetId,
-          before,
-          after,
-        };
+        return execMetaWrite(targetAuth, async () => {
+          const before = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
+          await setStatus(targetAuth.refreshToken, adSetId, "ACTIVE");
+          const after = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
+          return {
+            success: true,
+            action: "enableAdSet",
+            entityType: "adset",
+            entityId: adSetId,
+            accountId: targetId,
+            before,
+            after,
+          };
+        });
       },
     ),
   );
@@ -255,28 +223,20 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
     safeTypedHandler<{ accountId?: string; adId: string }, WriteEnvelope>(
       async ({ accountId, adId }) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-        await enforceRateLimit(targetAuth.userId);
-        const before = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adId,
-          AD_FIELDS,
-        );
-        await setStatus(targetAuth.refreshToken, adId, "PAUSED");
-        const after = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adId,
-          AD_FIELDS,
-        );
-        recordOperation(targetAuth.userId);
-        return {
-          success: true,
-          action: "pauseAd",
-          entityType: "ad",
-          entityId: adId,
-          accountId: targetId,
-          before,
-          after,
-        };
+        return execMetaWrite(targetAuth, async () => {
+          const before = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
+          await setStatus(targetAuth.refreshToken, adId, "PAUSED");
+          const after = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
+          return {
+            success: true,
+            action: "pauseAd",
+            entityType: "ad",
+            entityId: adId,
+            accountId: targetId,
+            before,
+            after,
+          };
+        });
       },
     ),
   );
@@ -296,28 +256,20 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
     safeTypedHandler<{ accountId?: string; adId: string }, WriteEnvelope>(
       async ({ accountId, adId }) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-        await enforceRateLimit(targetAuth.userId);
-        const before = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adId,
-          AD_FIELDS,
-        );
-        await setStatus(targetAuth.refreshToken, adId, "ACTIVE");
-        const after = await fetchEntitySnapshot(
-          targetAuth.refreshToken,
-          adId,
-          AD_FIELDS,
-        );
-        recordOperation(targetAuth.userId);
-        return {
-          success: true,
-          action: "enableAd",
-          entityType: "ad",
-          entityId: adId,
-          accountId: targetId,
-          before,
-          after,
-        };
+        return execMetaWrite(targetAuth, async () => {
+          const before = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
+          await setStatus(targetAuth.refreshToken, adId, "ACTIVE");
+          const after = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
+          return {
+            success: true,
+            action: "enableAd",
+            entityType: "ad",
+            entityId: adId,
+            accountId: targetId,
+            before,
+            after,
+          };
+        });
       },
     ),
   );
@@ -360,7 +312,6 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       WriteEnvelope
     >(async ({ accountId, campaignId, dailyBudget, lifetimeBudget }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
       if (
         (dailyBudget && lifetimeBudget) ||
         (!dailyBudget && !lifetimeBudget)
@@ -369,34 +320,27 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
           "updateCampaignBudget: pass exactly one of `dailyBudget` or `lifetimeBudget`.",
         );
       }
-      const before = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      const params: Record<string, string | number> = {};
-      if (dailyBudget) params.daily_budget = dailyBudget;
-      if (lifetimeBudget) params.lifetime_budget = lifetimeBudget;
-      await metaGraph(targetAuth.refreshToken, {
-        path: `/${campaignId}`,
-        method: "POST",
-        params,
+      return execMetaWrite(targetAuth, async () => {
+        const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        const params: Record<string, string | number> = {};
+        if (dailyBudget) params.daily_budget = dailyBudget;
+        if (lifetimeBudget) params.lifetime_budget = lifetimeBudget;
+        await metaGraph(targetAuth.refreshToken, {
+          path: `/${campaignId}`,
+          method: "POST",
+          params,
+        });
+        const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        return {
+          success: true,
+          action: "updateCampaignBudget",
+          entityType: "campaign",
+          entityId: campaignId,
+          accountId: targetId,
+          before,
+          after,
+        };
       });
-      const after = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      recordOperation(targetAuth.userId);
-      return {
-        success: true,
-        action: "updateCampaignBudget",
-        entityType: "campaign",
-        entityId: campaignId,
-        accountId: targetId,
-        before,
-        after,
-      };
     }),
   );
 
@@ -424,7 +368,6 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       WriteEnvelope
     >(async ({ accountId, adSetId, dailyBudget, lifetimeBudget }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
       if (
         (dailyBudget && lifetimeBudget) ||
         (!dailyBudget && !lifetimeBudget)
@@ -433,34 +376,27 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
           "updateAdSetBudget: pass exactly one of `dailyBudget` or `lifetimeBudget`.",
         );
       }
-      const before = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        adSetId,
-        ADSET_FIELDS,
-      );
-      const params: Record<string, string | number> = {};
-      if (dailyBudget) params.daily_budget = dailyBudget;
-      if (lifetimeBudget) params.lifetime_budget = lifetimeBudget;
-      await metaGraph(targetAuth.refreshToken, {
-        path: `/${adSetId}`,
-        method: "POST",
-        params,
+      return execMetaWrite(targetAuth, async () => {
+        const before = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
+        const params: Record<string, string | number> = {};
+        if (dailyBudget) params.daily_budget = dailyBudget;
+        if (lifetimeBudget) params.lifetime_budget = lifetimeBudget;
+        await metaGraph(targetAuth.refreshToken, {
+          path: `/${adSetId}`,
+          method: "POST",
+          params,
+        });
+        const after = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
+        return {
+          success: true,
+          action: "updateAdSetBudget",
+          entityType: "adset",
+          entityId: adSetId,
+          accountId: targetId,
+          before,
+          after,
+        };
       });
-      const after = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        adSetId,
-        ADSET_FIELDS,
-      );
-      recordOperation(targetAuth.userId);
-      return {
-        success: true,
-        action: "updateAdSetBudget",
-        entityType: "adset",
-        entityId: adSetId,
-        accountId: targetId,
-        before,
-        after,
-      };
     }),
   );
 
@@ -481,32 +417,24 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       WriteEnvelope
     >(async ({ accountId, campaignId, name }) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
-      await enforceRateLimit(targetAuth.userId);
-      const before = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      await metaGraph(targetAuth.refreshToken, {
-        path: `/${campaignId}`,
-        method: "POST",
-        params: { name },
+      return execMetaWrite(targetAuth, async () => {
+        const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        await metaGraph(targetAuth.refreshToken, {
+          path: `/${campaignId}`,
+          method: "POST",
+          params: { name },
+        });
+        const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
+        return {
+          success: true,
+          action: "renameCampaign",
+          entityType: "campaign",
+          entityId: campaignId,
+          accountId: targetId,
+          before,
+          after,
+        };
       });
-      const after = await fetchEntitySnapshot(
-        targetAuth.refreshToken,
-        campaignId,
-        CAMPAIGN_FIELDS,
-      );
-      recordOperation(targetAuth.userId);
-      return {
-        success: true,
-        action: "renameCampaign",
-        entityType: "campaign",
-        entityId: campaignId,
-        accountId: targetId,
-        before,
-        after,
-      };
     }),
   );
 };

@@ -44,6 +44,12 @@ export const operations = pgTable("operations", {
   accountId: text("account_id").notNull(),
   userId: text("user_id"),
   campaignId: text("campaign_id"),
+  /**
+   * Which ad platform this operation hit. Defaults to "google_ads" so all
+   * pre-Meta-tracking rows back-fill correctly. Drives /usage breakdowns and
+   * platform-aware filtering in /operations.
+   */
+  platform: text("platform").notNull().default("google_ads"),
   /** 0=read, 1=write — see OP_TYPE in tracking.ts */
   opType: smallint("op_type").notNull(),
   /** Compact tool code — see TOOL_CODE in tracking.ts. Nullable for tools

@@ -13,7 +13,7 @@ export type McpSetupTabsProps = {
   apiKey: string | null;
   onSignIn: () => void;
   onTokenRotated: () => Promise<void>;
-  /** Base path for tab hrefs (e.g. "/connect" or "/connect-meta-ads-mcp"). */
+  /** Base path for tab hrefs (e.g. "/connect" or "/connect/meta-ads"). */
   basePath: string;
   /** Server URL to surface in copy-paste fields and snippets. */
   serverUrl: string;

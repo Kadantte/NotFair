@@ -313,7 +313,7 @@ function popupAccountSelectionResponse(
  * account, or because their only path was a manager (MCC) with no clients.
  *
  * The row carries the user's refresh token, so when they later create an
- * Ads account on this same Google identity, /add-google-ads-account can
+ * Ads account on this same Google identity, /manage-ads-accounts/google-ads can
  * reuse the credentials without forcing another OAuth round-trip.
  *
  * The session is loadable by getSession() (with `pendingSetup: true`) but

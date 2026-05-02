@@ -27,7 +27,20 @@ export const COOKIE_NAMES = {
    * authority — purely for display.
    */
   lastAttemptEmail: "adsagent_last_attempt_email",
+  /**
+   * Which ad platform is currently "active" in the navbar account switcher.
+   * Drives sidebar gating (Campaigns/Audit/Impact Monitor/Operations are
+   * Google-only for now). Values: "google_ads" | "meta_ads". Missing cookie
+   * defaults to "google_ads".
+   */
+  activePlatform: "adsagent_active_platform",
 } as const;
+
+export type ActivePlatform = "google_ads" | "meta_ads";
+
+export function setActivePlatformCookie(response: NextResponse, platform: ActivePlatform) {
+  response.cookies.set(COOKIE_NAMES.activePlatform, platform, COOKIE_OPTIONS);
+}
 
 const LAST_ATTEMPT_EMAIL_OPTIONS = {
   httpOnly: true, // Read server-side in /connect's server component, passed as prop
@@ -91,4 +104,5 @@ export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(COOKIE_NAMES.customer);
   response.cookies.delete(COOKIE_NAMES.impersonate);
   response.cookies.delete(COOKIE_NAMES.profile);
+  response.cookies.delete(COOKIE_NAMES.activePlatform);
 }

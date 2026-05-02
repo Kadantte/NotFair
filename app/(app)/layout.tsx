@@ -18,6 +18,7 @@ import { trackEvent } from '@/lib/analytics';
 import { getUsageSummaryAction } from '@/app/actions';
 import { BRAND_NAME } from '@/lib/brand';
 import { computePlanBadge } from '@/lib/plan-badge';
+import { MetaUnsupportedModal } from '@/components/meta-unsupported-modal';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -57,6 +58,8 @@ function NavItem({
     active,
     collapsed,
     onClick,
+    disabled = false,
+    onDisabledClick,
 }: {
     href: string;
     icon: React.ElementType;
@@ -64,28 +67,71 @@ function NavItem({
     active: boolean;
     collapsed: boolean;
     onClick?: () => void;
+    disabled?: boolean;
+    onDisabledClick?: () => void;
 }) {
-    return (
-        <Link href={href} prefetch onClick={onClick}>
+    const buttonClass = `h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
+        active
+            ? 'bg-[#4CAF6E]/12 text-[#4CAF6E] hover:bg-[#4CAF6E]/16 hover:text-[#4CAF6E]'
+            : 'text-[#C4C0B6]'
+    } ${disabled ? 'opacity-50' : ''} ${collapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`;
+    const buttonInner = (
+        <>
+            <Icon className="h-[18px] w-[18px] shrink-0" />
+            <span
+                className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
+                    collapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
+                }`}
+            >
+                {label}
+            </span>
+        </>
+    );
+    if (disabled) {
+        return (
             <Button
                 type="button"
                 variant="ghost"
-                className={`h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
-                    active
-                        ? 'bg-[#4CAF6E]/12 text-[#4CAF6E] hover:bg-[#4CAF6E]/16 hover:text-[#4CAF6E]'
-                        : 'text-[#C4C0B6]'
-                } ${collapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
+                onClick={onDisabledClick}
+                className={buttonClass}
+                title="Not available for the active platform"
             >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                <span
-                    className={`overflow-hidden whitespace-nowrap text-[14px] font-medium transition-all duration-200 ease-out ${
-                        collapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
-                    }`}
-                >
-                    {label}
-                </span>
+                {buttonInner}
+            </Button>
+        );
+    }
+    return (
+        <Link href={href} prefetch onClick={onClick}>
+            <Button type="button" variant="ghost" className={buttonClass}>
+                {buttonInner}
             </Button>
         </Link>
+    );
+}
+
+function GoogleAdsNavIcon({ className }: { className?: string }) {
+    return (
+        <Image
+            src="/google-ads-icon.svg"
+            alt=""
+            width={18}
+            height={18}
+            className={className}
+            aria-hidden="true"
+        />
+    );
+}
+
+function MetaNavIcon({ className }: { className?: string }) {
+    return (
+        <Image
+            src="/meta-icon.svg"
+            alt=""
+            width={18}
+            height={18}
+            className={className}
+            aria-hidden="true"
+        />
     );
 }
 
@@ -139,6 +185,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const trialDaysLeft = badge.kind === 'trial' ? badge.daysLeft : null;
     const trialEndingSoon = badge.kind === 'trial' && badge.endingSoon;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [activePlatform, setActivePlatform] = useState<'google_ads' | 'meta_ads'>('google_ads');
+    const [metaModalFeature, setMetaModalFeature] = useState<string | null>(null);
+    const isMetaActive = activePlatform === 'meta_ads';
+    const showMetaModal = (feature: string) => setMetaModalFeature(feature);
 
     const refreshThreads = useCallback(() => {
         fetch('/api/chat/threads', { credentials: 'include' })
@@ -184,6 +234,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 const connected = Boolean(s?.connected);
                 setIsAuthenticated(connected);
                 setIsDev(Boolean(connected && s?.isDev));
+                setActivePlatform(s?.activePlatform === 'meta_ads' ? 'meta_ads' : 'google_ads');
                 if (!connected) {
                     setPlan(null);
                     setTrialEndsAt(null);
@@ -335,7 +386,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 isCollapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
                             }`}
                         >
-                            Connect Claude
+                            Connect MCP
                         </span>
                     </Button>
                 </Link>
@@ -343,11 +394,56 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Nav items */}
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
-                <NavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem href="/impact-monitor" icon={Gauge} label="Impact Monitor" active={pathname.startsWith('/impact-monitor')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem href="/operations" icon={Activity} label="Operations" active={pathname === '/operations'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem
+                    href="/campaigns"
+                    icon={LayoutDashboard}
+                    label="Campaigns"
+                    active={pathname.startsWith('/campaigns')}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                    disabled={isMetaActive}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Campaigns'); }}
+                />
+                <NavItem
+                    href="/audit"
+                    icon={ClipboardCheck}
+                    label="Audit"
+                    active={pathname === '/audit'}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                    disabled={isMetaActive}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Audit'); }}
+                />
+                <NavItem
+                    href="/impact-monitor"
+                    icon={Gauge}
+                    label="Impact Monitor"
+                    active={pathname.startsWith('/impact-monitor')}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                    disabled={isMetaActive}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Impact Monitor'); }}
+                />
+                <NavItem
+                    href="/operations"
+                    icon={Activity}
+                    label="Operations"
+                    active={pathname === '/operations'}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                    disabled={isMetaActive}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Operations'); }}
+                />
+                <NavItem
+                    href="/chat"
+                    icon={MessageSquare}
+                    label="Chat"
+                    active={pathname.startsWith('/chat')}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                    disabled={isMetaActive}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Chat'); }}
+                />
             </nav>
 
             {isOnChat && (
@@ -469,9 +565,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     }}
                 />
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
-                {isDev && <NavItem href="/add-google-ads-account" icon={PlugZap} label="Add Google Ads Account" active={pathname.startsWith('/add-google-ads-account')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
-                {isDev && <NavItem href="/add-meta-ads-account" icon={PlugZap} label="Add Meta Ads Account" active={pathname.startsWith('/add-meta-ads-account')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
-                {isDev && <NavItem href="/connect-meta-ads-mcp" icon={PlugZap} label="Meta Ads MCP" active={pathname.startsWith('/connect-meta-ads-mcp')} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
+                <NavItem
+                    href="/manage-ads-accounts/google-ads"
+                    icon={GoogleAdsNavIcon}
+                    label="Link Google Ads"
+                    active={pathname.startsWith('/manage-ads-accounts/google-ads')}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                />
+                <NavItem
+                    href="/manage-ads-accounts/meta-ads"
+                    icon={MetaNavIcon}
+                    label="Link Meta Ads"
+                    active={pathname.startsWith('/manage-ads-accounts/meta-ads')}
+                    collapsed={isCollapsed}
+                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
+                />
                 <DiscordLink
                     location="sidebar"
                     className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
@@ -713,6 +822,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <MobileNavItem href="/impact-monitor" icon={Gauge} label="Impact" active={pathname.startsWith('/impact-monitor')} />
                 <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} />
             </nav>
+
+            <MetaUnsupportedModal
+                open={metaModalFeature !== null}
+                feature={metaModalFeature ?? ''}
+                onClose={() => setMetaModalFeature(null)}
+            />
         </div>
     );
 }

@@ -93,7 +93,7 @@ Handling write rejections:
 - A 400 with \`(#100) Invalid parameter\` typically means the entity id doesn't
   exist or doesn't belong to this account — re-list before retrying.
 - \`(#200) The user hasn't granted ads_management permission\` means the
-  connection needs to be re-OAuthed at /add-meta-ads-account with the
+  connection needs to be re-OAuthed at /manage-ads-accounts/meta-ads with the
   ads_management scope checked.
 - Budget-update rejections under a CBO campaign require updating the
   campaign-level budget instead, not the ad set's.

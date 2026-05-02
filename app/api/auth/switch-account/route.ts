@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
-import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
+import { COOKIE_NAMES, setActivePlatformCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds } from "@/lib/google-ads";
 
 export async function POST(request: Request) {
@@ -57,5 +57,6 @@ export async function POST(request: Request) {
   const accountNames = deriveCustomerName(session.customerIds);
   const response = NextResponse.json({ ok: true });
   setSessionCookies(response, session.accessToken, accountNames);
+  setActivePlatformCookie(response, "google_ads");
   return response;
 }

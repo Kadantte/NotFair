@@ -46,12 +46,12 @@ export function buildMetaAdsHost(
   const accessToken = auth.refreshToken;
   if (!accessToken) {
     throw new Error(
-      "Meta runScript: no access token on connection. Reconnect Meta at /add-meta-ads-account.",
+      "Meta runScript: no access token on connection. Reconnect Meta at /manage-ads-accounts/meta-ads.",
     );
   }
   if (!targetId) {
     throw new Error(
-      "Meta runScript: no active ad account selected. Pick one at /add-meta-ads-account.",
+      "Meta runScript: no active ad account selected. Pick one at /manage-ads-accounts/meta-ads.",
     );
   }
 

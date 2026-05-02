@@ -231,10 +231,12 @@ export type LogChangeOpts = {
   reasoning?: string;
   clientSource?: string | null;
   telemetry?: CallTelemetry;
+  /** Defaults to "google_ads" for back-compat with existing call sites. */
+  platform?: "google_ads" | "meta_ads";
 };
 
 export async function logChange(opts: LogChangeOpts) {
-  const { accountId, userId, campaignId, writeResult, reasoning, clientSource, telemetry } = opts;
+  const { accountId, userId, campaignId, writeResult, reasoning, clientSource, telemetry, platform } = opts;
   try {
     const code = toolNameToCode(writeResult.action) ?? null;
     if (code === null) {
@@ -259,6 +261,7 @@ export async function logChange(opts: LogChangeOpts) {
         accountId,
         userId: userId ?? null,
         campaignId,
+        platform: platform ?? "google_ads",
         opType: OP_TYPE.WRITE,
         toolCode: code,
         entityCode: getEntityCode(writeResult.action),
@@ -299,10 +302,12 @@ export type LogReadOpts = {
   campaignId?: string | null;
   clientSource?: string | null;
   telemetry?: CallTelemetry;
+  /** Defaults to "google_ads" for back-compat with existing call sites. */
+  platform?: "google_ads" | "meta_ads";
 };
 
 export async function logRead(opts: LogReadOpts) {
-  const { accountId, userId, toolName, campaignId, clientSource, telemetry } = opts;
+  const { accountId, userId, toolName, campaignId, clientSource, telemetry, platform } = opts;
   try {
     const code = toolNameToCode(toolName) ?? null;
 
@@ -321,6 +326,7 @@ export async function logRead(opts: LogReadOpts) {
         accountId,
         userId: userId ?? null,
         campaignId: campaignId ?? null,
+        platform: platform ?? "google_ads",
         opType: OP_TYPE.READ,
         toolCode: code,
         clientSource: clientSource ?? null,
