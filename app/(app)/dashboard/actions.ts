@@ -13,7 +13,8 @@ import {
   updateCampaignBudget,
   toMicros,
 } from "@/lib/google-ads";
-import { getAuthContext } from "@/lib/session";
+import { getAuthContext, getSession } from "@/lib/session";
+import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { getChanges, getImpact, logChange } from "@/lib/db/tracking";
@@ -24,13 +25,16 @@ import { detectOpportunities, type ImpressionShareData, type RecommendationData 
 import { isDemoCustomerId } from "@/lib/demo/constants";
 import { demoSparklineData, demoWoWPerformance } from "@/lib/demo/reads";
 
-function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
-  return fn().catch((err) => {
+async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/manage-ads-accounts");
+      const session = await getSession();
+      redirect(unsupportedFeatureRedirect(session) ?? "/manage-ads-accounts");
     }
     throw err;
-  });
+  }
 }
 
 // ─── Dashboard Data Fetcher (two-phase for perceived performance) ───

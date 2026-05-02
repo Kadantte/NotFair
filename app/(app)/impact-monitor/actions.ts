@@ -5,7 +5,8 @@ import {
   evaluateChangeIntervention,
   listChangeInterventions,
 } from "@/lib/db/interventions";
-import { getSessionAuth } from "@/lib/session";
+import { getSession, getSessionAuth } from "@/lib/session";
+import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 
 type RawListItem = Awaited<ReturnType<typeof listChangeInterventions>>["items"][number];
 
@@ -41,13 +42,16 @@ export type ImpactMonitorPageData = {
   sections: Record<ImpactMonitorSectionKey, ImpactMonitorListItem[]>;
 };
 
-function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
-  return fn().catch((err) => {
+async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/manage-ads-accounts");
+      const session = await getSession();
+      redirect(unsupportedFeatureRedirect(session) ?? "/manage-ads-accounts");
     }
     throw err;
-  });
+  }
 }
 
 function toIso(value: Date | string | null | undefined) {

@@ -19,6 +19,7 @@ import { eq, and } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
+import { setActivePlatformCookie } from "@/lib/auth-cookies";
 import {
   exchangeCodeForShortLivedToken,
   exchangeForLongLivedToken,
@@ -57,6 +58,16 @@ function redirectToConnect(opts: {
   reason?: string;
   next?: string;
 }): NextResponse {
+  // Successful Meta connects always land on /connect/meta-ads so the user
+  // sees the MCP setup flow next — the in-page toast (read from
+  // ?connected=1) confirms the connection. The `next` param is honored
+  // only for error redirects so error UIs can re-render in their original
+  // context.
+  if (opts.status === "connected") {
+    const url = new URL("/connect/meta-ads", getAppOrigin());
+    url.searchParams.set("connected", "1");
+    return NextResponse.redirect(url.toString());
+  }
   const url = new URL(opts.next ?? "/connect", getAppOrigin());
   // Always set platform=meta_ads so the /connect UI knows which tile to focus.
   url.searchParams.set("platform", "meta_ads");
@@ -210,5 +221,13 @@ export async function GET(request: Request) {
       },
     });
 
-  return redirectToConnect({ status: "connected", next });
+  const response = redirectToConnect({ status: "connected", next });
+  // Promote Meta to the active platform once a connection lands with at
+  // least one usable account — without this, the navbar dropdown would
+  // still highlight Google (or the empty default) and the sidebar gate
+  // for Google-only features wouldn't kick in for Meta-first users.
+  if (activeAccountId) {
+    setActivePlatformCookie(response, "meta_ads");
+  }
+  return response;
 }

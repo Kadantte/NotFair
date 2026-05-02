@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { BrandLockup } from "@/components/brand-lockup";
+import { OnboardingSignOut } from "@/components/onboarding-sign-out";
 
 type CandidateAccount = {
   id: string;
@@ -17,18 +19,20 @@ type Props = {
 };
 
 /**
- * Platform-picker hub. Two states:
+ * Platform-picker hub. Three states:
  *
- *   1. **Pending Google session** — user just finished Google OAuth, has 2+
- *      Ads accounts to choose from, but hasn't yet committed a selection.
- *      The Google card forwards to /manage-ads-accounts/google-ads/select?pending=…
- *      with the candidate accounts so the picker can render them. Auth
- *      callback routes new users here instead of straight to the picker
- *      so they can pick a platform first.
+ *   1. **First-time** — signed in but neither a Google customer nor a Meta
+ *      ad account is connected yet. Render a focused full-screen onboarding
+ *      that covers the app chrome: brand, title, two platform cards, and an
+ *      "Exit and sign out" escape hatch. The user MUST connect a platform
+ *      to proceed into the app.
  *
- *   2. **Connected (or no pending data)** — Google card links to the
- *      manage page; same for Meta. New users with neither connection see
- *      the canonical connect entry points.
+ *   2. **Pending Google with candidate accounts** — Google card forwards
+ *      straight to the picker so the user can commit a selection.
+ *
+ *   3. **Already-connected** (Google, Meta, or both) — the regular embedded
+ *      hub UI inside the app layout. Cards link to the platform manage
+ *      pages.
  */
 export default async function ManageAdsAccountsPage({ searchParams }: Props) {
   const sp = await searchParams;
@@ -37,9 +41,6 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
   const session = await getSession();
 
   // Pull the candidate accounts list when this is a pending Google session.
-  // We can't read it from getSession() — it deliberately blanks out
-  // customerIds during pendingSetup so the navbar account switcher doesn't
-  // pre-show every connectable account as if the user had picked them all.
   let pendingGoogleAccounts: CandidateAccount[] = [];
   let pendingToken: string | null = null;
   if (session.connected && session.pendingSetup) {
@@ -59,10 +60,10 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
     }
   }
 
-  // Ads-less Google session: signed in via Google but the identity has no
-  // Google Ads accounts to connect. Surface this inline on the hub instead
-  // of letting the user click into a dead-end manage page — show a warning
-  // under the Google entry and a "Switch Google account" CTA.
+  const googleEmail = session.connected ? session.googleEmail : null;
+  const hasGoogle = session.connected && !session.pendingSetup;
+  const hasMeta = session.connected && session.metaAccounts.length > 0;
+  const isFirstTime = session.connected && !hasGoogle && !hasMeta;
   const isAdsLess = session.connected && session.pendingSetup && pendingGoogleAccounts.length === 0;
 
   const googleHref = buildGoogleHref({
@@ -73,16 +74,61 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
   const switchGoogleHref =
     `/api/auth/signin?prompt=select_account+consent&next=${encodeURIComponent(next ?? "/manage-ads-accounts")}`;
 
-  const googleIcon = (
-    <Image
-      src="/google-ads-icon.svg"
-      alt=""
-      width={28}
-      height={28}
-      className="shrink-0"
-      aria-hidden="true"
+  const googleCard = isAdsLess ? (
+    <AdsLessGoogleEntry switchHref={switchGoogleHref} googleEmail={googleEmail} />
+  ) : (
+    <PlatformCard
+      href={googleHref}
+      title="Add Google Ads account"
+      description="Connect a Google Ads customer or MCC."
+      iconSrc="/google-ads-icon.svg"
     />
   );
+  // Skip the connect-Meta interstitial when the user has no Meta connection
+  // — kick off OAuth straight from the hub. Already-connected users land on
+  // the manage page so they can curate which accounts NotFair touches.
+  const metaHref = hasMeta
+    ? "/manage-ads-accounts/meta-ads"
+    : `/api/oauth/meta/start?next=${encodeURIComponent(next ?? "/manage-ads-accounts/meta-ads")}`;
+  const metaCard = (
+    <PlatformCard
+      href={metaHref}
+      title={hasMeta ? "Manage Meta Ads accounts" : "Add Meta Ads account"}
+      description="Connect a Facebook + Instagram ad account."
+      iconSrc="/meta-icon.svg"
+    />
+  );
+
+  if (isFirstTime) {
+    return (
+      <div className="fixed inset-0 z-[60] flex flex-col bg-[#1A1917]">
+        <header className="flex shrink-0 items-center justify-between px-6 py-5">
+          <BrandLockup size="md" />
+          <OnboardingSignOut />
+        </header>
+        <div className="flex flex-1 items-center justify-center overflow-y-auto px-6 pb-12">
+          <div className="w-full max-w-xl">
+            <div className="mb-8 text-center">
+              <h1 className="text-3xl font-bold text-[#E8E4DD]">
+                Connect your first ad account
+              </h1>
+              <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
+                NotFair needs at least one ad account to get to work.
+                Pick a platform below to continue.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {googleCard}
+              {metaCard}
+            </div>
+            <p className="mt-6 text-center text-xs text-[#C4C0B6]/70">
+              You can add more platforms later from the navbar account menu.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -94,37 +140,9 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
               Pick the platform you want to connect to NotFair.
             </p>
           </header>
-
           <div className="space-y-3">
-            {isAdsLess ? (
-              <AdsLessGoogleEntry
-                icon={googleIcon}
-                switchHref={switchGoogleHref}
-                googleEmail={session.connected ? session.googleEmail : null}
-              />
-            ) : (
-              <PlatformCard
-                href={googleHref}
-                title="Add Google Ads account"
-                description="Connect a Google Ads customer or MCC."
-                icon={googleIcon}
-              />
-            )}
-            <PlatformCard
-              href="/manage-ads-accounts/meta-ads"
-              title="Add Meta Ads account"
-              description="Connect a Facebook + Instagram ad account."
-              icon={
-                <Image
-                  src="/meta-icon.svg"
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="shrink-0"
-                  aria-hidden="true"
-                />
-              }
-            />
+            {googleCard}
+            {metaCard}
           </div>
         </div>
       </div>
@@ -133,11 +151,9 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
 }
 
 function AdsLessGoogleEntry({
-  icon,
   switchHref,
   googleEmail,
 }: {
-  icon: React.ReactNode;
   switchHref: string;
   googleEmail: string | null;
 }) {
@@ -145,7 +161,14 @@ function AdsLessGoogleEntry({
     <div className="rounded-xl border border-[#D4882A]/40 bg-[#D4882A]/[0.04] px-5 py-4">
       <div className="flex items-start gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1A1917]">
-          {icon}
+          <Image
+            src="/google-ads-icon.svg"
+            alt=""
+            width={28}
+            height={28}
+            className="shrink-0"
+            aria-hidden="true"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-base font-medium text-[#E8E4DD]">Add Google Ads account</p>
@@ -178,11 +201,6 @@ function buildGoogleHref(opts: {
   pendingAccounts: CandidateAccount[];
   next: string | null;
 }): string {
-  // Pending with candidate Google accounts → forward straight to the picker
-  // so the user doesn't have to wait for an extra Google API roundtrip on
-  // /manage-ads-accounts/google-ads. Both ads-less pending users and
-  // already-connected users land on the manage page, which handles its own
-  // empty-state and re-OAuth UI.
   if (opts.pendingToken && opts.pendingAccounts.length > 0) {
     const accountsParam = encodeURIComponent(JSON.stringify(opts.pendingAccounts));
     const nextParam = opts.next ? `&next=${encodeURIComponent(opts.next)}` : "";
@@ -195,12 +213,12 @@ function PlatformCard({
   href,
   title,
   description,
-  icon,
+  iconSrc,
 }: {
   href: string;
   title: string;
   description: string;
-  icon: React.ReactNode;
+  iconSrc: string;
 }) {
   return (
     <Link
@@ -209,7 +227,7 @@ function PlatformCard({
       className="group flex items-center gap-4 rounded-xl border border-[#3D3C36] bg-[#24231F] px-5 py-4 transition hover:border-[#C4C0B6]/40 hover:bg-[#2E2D28]"
     >
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#1A1917]">
-        {icon}
+        <Image src={iconSrc} alt="" width={28} height={28} className="shrink-0" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-base font-medium text-[#E8E4DD]">{title}</p>

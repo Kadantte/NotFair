@@ -5,6 +5,7 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getCustomer, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
 import { getSession, getSessionAuth, getAuthContext } from "@/lib/session";
+import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 import type { AuthContext } from "@/lib/google-ads";
 import { getAccountBudgetSummary } from "@/lib/google-ads/reads";
 import { getCurrencyInfo, getUsdRates, toUsd } from "@/lib/currency";
@@ -129,13 +130,19 @@ function normalizeBiddingStrategy(strategy: string | number | null | undefined):
     }
 }
 
-function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
-    return fn().catch((err) => {
+async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+        return await fn();
+    } catch (err) {
         if (err instanceof Error && err.message === "Not authenticated") {
-            redirect("/manage-ads-accounts");
+            // Multi-platform aware: send users without a Google customer
+            // somewhere they can actually use the app. 0 platforms → the
+            // onboarding hub, Meta-only users → the Meta MCP home.
+            const session = await getSession();
+            redirect(unsupportedFeatureRedirect(session) ?? "/manage-ads-accounts");
         }
         throw err;
-    });
+    }
 }
 
 /**

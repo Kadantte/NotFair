@@ -28,7 +28,8 @@
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { getAuthContext } from "@/lib/session";
+import { getSession } from "@/lib/session";
+import { setActivePlatformCookie } from "@/lib/auth-cookies";
 
 type AccountEntry = {
   id: string;
@@ -39,16 +40,15 @@ type AccountEntry = {
 };
 
 export async function POST(request: Request) {
-  let userId: string | null = null;
-  try {
-    const ctx = await getAuthContext();
-    userId = ctx.session.userId;
-  } catch {
+  // Use getSession() not getAuthContext() — pending-Google users (signed in
+  // but with no Google Ads customer selected yet, including ads-less Google
+  // identities) are a supported entry point for Meta connection. The
+  // Google-strict gate would 403 them otherwise.
+  const session = await getSession();
+  if (!session.connected || !session.userId) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 403 });
   }
-  if (!userId) {
-    return NextResponse.json({ error: "no_user_id" }, { status: 403 });
-  }
+  const userId = session.userId;
 
   let body: { selectedIds?: unknown };
   try {
@@ -136,9 +136,18 @@ export async function POST(request: Request) {
     })
     .where(eq(schema.adPlatformConnections.id, conn.id));
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ok: true,
     selectedCount: newAccountIds.length,
     activeAccountId: newActiveId,
   });
+  // Promote Meta to the active platform when the user has at least one
+  // selected account. This is the signal that the user wants to operate
+  // in a Meta-first context — drives the navbar dropdown and the sidebar
+  // gate. If they've cleared all selections, leave the existing cookie
+  // alone (they can switch back via the dropdown).
+  if (newActiveId) {
+    setActivePlatformCookie(response, "meta_ads");
+  }
+  return response;
 }

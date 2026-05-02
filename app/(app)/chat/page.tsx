@@ -1,15 +1,18 @@
 import { redirect } from "next/navigation";
 import { getSession, getSessionAuth } from "@/lib/session";
 import { loadThreadsForUser } from "@/lib/db/chat";
+import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChatRedirect() {
-  // Ads-less users have no Google Ads context for the agent to work with,
-  // so route them to /manage-ads-accounts to pick a platform first.
+  // Chat is currently a Google-Ads-only surface. Route users without a
+  // Google customer somewhere they can actually do work: brand-new users
+  // get the onboarding hub, Meta-only users get sent to the Meta MCP page.
   const session = await getSession();
-  if (session.connected && session.pendingSetup) {
-    redirect("/manage-ads-accounts");
+  const unsupported = unsupportedFeatureRedirect(session);
+  if (unsupported) {
+    redirect(unsupported);
   }
 
   const auth = await getSessionAuth().catch(() => null);

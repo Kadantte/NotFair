@@ -3,7 +3,8 @@
 import { db, schema } from "@/lib/db";
 import { eq, and, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getAuthContext } from "@/lib/session";
+import { getAuthContext, getSession } from "@/lib/session";
+import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 import type { SharedAuditPayload } from "@/lib/audit/anonymize";
 
 export type AuditHistoryRow = {
@@ -21,13 +22,16 @@ export type AuditHistoryDetail = {
   payload: SharedAuditPayload;
 };
 
-function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
-  return fn().catch((err) => {
+async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/manage-ads-accounts");
+      const session = await getSession();
+      redirect(unsupportedFeatureRedirect(session) ?? "/manage-ads-accounts");
     }
     throw err;
-  });
+  }
 }
 
 /**

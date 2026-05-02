@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { McpSetupTabs, parseSetupSlug } from "@/components/mcp-setup-tabs";
+import { MetaConnectedToast } from "@/components/meta-connected-toast";
 import { META_MCP_CONNECTOR_NAME, META_MCP_SERVER_URL } from "@/lib/brand";
 
 /**
@@ -29,6 +30,7 @@ export function ConnectMetaAdsMcpPage({
     <section className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
         <div className="mx-auto max-w-4xl space-y-8">
+          <MetaConnectedToast />
           <header className="space-y-2">
             <h1 className="text-3xl font-bold text-[#E8E4DD]">
               Connect Meta Ads MCP

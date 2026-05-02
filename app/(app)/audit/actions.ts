@@ -17,19 +17,23 @@ import {
   pauseKeyword,
   invalidateCache,
 } from "@/lib/google-ads";
-import { getAuthContext } from "@/lib/session";
+import { getAuthContext, getSession } from "@/lib/session";
+import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 import { computeAuditScore, type AuditInput, type AuditResult } from "@/lib/audit/scoring";
 import { analyzeAdLandingPages } from "@/lib/audit/landing-page";
 import { saveAuditSnapshot } from "@/lib/audit/persist";
 import { saveAuditToHistory } from "@/lib/audit/shared-persist";
 
-function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
-  return fn().catch((err) => {
+async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/manage-ads-accounts");
+      const session = await getSession();
+      redirect(unsupportedFeatureRedirect(session) ?? "/manage-ads-accounts");
     }
     throw err;
-  });
+  }
 }
 
 // ─── Types ───────────────────────────────────────────────────────────

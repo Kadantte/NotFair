@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { ConnectPage } from '@/components/connect-page';
 import { getSession } from '@/lib/session';
+import { unsupportedFeatureRedirect } from '@/lib/onboarding-redirect';
 
 type Props = {
     params: Promise<{ slug?: string[] }>;
@@ -30,15 +31,15 @@ export default async function AppConnectPage({ params, searchParams }: Props) {
     const session = await getSession();
     const { slug } = await params;
 
-    // Ads-less users hitting bare /connect belong on /manage-ads-accounts —
-    // the platform picker. Sub-paths like /connect/claude-connector remain
-    // open because they don't depend on a connected platform.
-    if (
-        session.connected &&
-        session.pendingSetup &&
-        (!slug || slug.length === 0)
-    ) {
-        redirect('/manage-ads-accounts');
+    // Bare /connect on a Google-Ads-less session: route to the platform-
+    // appropriate home. 0 platforms → onboarding, Meta-only → Meta MCP page.
+    // Sub-paths like /connect/claude-connector remain open because they
+    // don't depend on a connected platform.
+    if (!slug || slug.length === 0) {
+        const unsupported = unsupportedFeatureRedirect(session);
+        if (unsupported) {
+            redirect(unsupported);
+        }
     }
 
     return (

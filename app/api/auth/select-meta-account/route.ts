@@ -14,20 +14,18 @@
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { getAuthContext } from "@/lib/session";
+import { getSession } from "@/lib/session";
 import { setActivePlatformCookie } from "@/lib/auth-cookies";
 
 export async function POST(request: Request) {
-  let userId: string | null = null;
-  try {
-    const ctx = await getAuthContext();
-    userId = ctx.session.userId;
-  } catch {
+  // Use getSession() not getAuthContext() — the navbar account switcher must
+  // work for users who have a Meta connection but no Google customer (ads-less
+  // Google sessions). Google-strict gates would 403 them otherwise.
+  const session = await getSession();
+  if (!session.connected || !session.userId) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 403 });
   }
-  if (!userId) {
-    return NextResponse.json({ error: "no_user_id" }, { status: 403 });
-  }
+  const userId = session.userId;
 
   let body: { accountId?: unknown };
   try {

@@ -1,16 +1,18 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import { unsupportedFeatureRedirect } from '@/lib/onboarding-redirect';
 import { UsagePage } from '@/components/usage-page';
 
 /**
  * Server-component wrapper that gates /usage on a real connected session.
- * Ads-less users (signed in via Google but no Google Ads customer yet)
- * belong on /manage-ads-accounts so they can pick a platform.
+ * Multi-platform aware: 0 platforms → onboarding, Meta-only → Meta home,
+ * otherwise render the page (the Google customer is assumed downstream).
  */
 export default async function UsageRoute() {
     const session = await getSession();
-    if (session.connected && session.pendingSetup) {
-        redirect('/manage-ads-accounts');
+    const unsupported = unsupportedFeatureRedirect(session);
+    if (unsupported) {
+        redirect(unsupported);
     }
     return <UsagePage />;
 }

@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { getAuthContext } from "@/lib/session";
+import { getSession } from "@/lib/session";
 import { getEnv } from "@/lib/env";
 
 async function revokeUpstream(accessToken: string): Promise<void> {
@@ -33,16 +33,14 @@ async function revokeUpstream(accessToken: string): Promise<void> {
 }
 
 export async function DELETE() {
-  let userId: string | null = null;
-  try {
-    const ctx = await getAuthContext();
-    userId = ctx.session.userId;
-  } catch {
+  // Use getSession() not getAuthContext() — disconnecting Meta must work for
+  // users who have a Meta connection but no Google customer (ads-less Google
+  // sessions). Google-strict gates would 403 them otherwise.
+  const session = await getSession();
+  if (!session.connected || !session.userId) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 403 });
   }
-  if (!userId) {
-    return NextResponse.json({ error: "no_user_id" }, { status: 403 });
-  }
+  const userId = session.userId;
 
   const [conn] = await db()
     .select({

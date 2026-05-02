@@ -34,7 +34,7 @@ export function BrandLockup({
                 style={{ height: s.mark }}
             />
             <span aria-hidden="true" className={`w-px ${s.divider} ${dividerClassName}`} />
-            <span className={`${s.text} font-black tracking-tighter ${textClassName} ${s.stroke}`}>
+            <span className={`${s.text} font-sans font-black tracking-tighter ${textClassName} ${s.stroke}`}>
                 Not Fair
             </span>
         </span>
