@@ -17,7 +17,7 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
@@ -48,6 +48,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(signinUrl.toString());
   }
 
+  // Don't filter on `customerId <> ''` here: ads-less sessions (user signed
+  // in via Google but has no Google Ads account yet) need to be able to
+  // start Meta OAuth — connecting Meta is one of the explicit "set up
+  // later" paths offered to those users.
   const [session] = await db()
     .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
     .from(schema.mcpSessions)
@@ -55,7 +59,6 @@ export async function GET(request: Request) {
       and(
         eq(schema.mcpSessions.accessToken, sessionToken),
         gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        sql`${schema.mcpSessions.customerId} <> ''`,
       ),
     )
     .limit(1);

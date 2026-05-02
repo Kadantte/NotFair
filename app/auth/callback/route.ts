@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
-import { clearSessionCookies, setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
+import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
@@ -104,8 +104,15 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
  * by reason — keep English out of the URL so it's stable across i18n,
  * shareable in support tickets, and refresh-safe. The optional `message`
  * is a backwards-compat fallback for old links and unmapped reasons.
+ *
+ * `no_accounts` and `no_client_accounts` are routed to the dedicated
+ * /welcome empty-state page instead — that's where users with an ads-less
+ * session pick how to proceed (different Google account / Meta / Claude only).
  */
 function redirectWithError(origin: string, reason: string, message?: string) {
+  if (reason === "no_accounts" || reason === "no_client_accounts") {
+    return NextResponse.redirect(`${origin}/welcome`);
+  }
   const params = new URLSearchParams({ reason });
   if (message) params.set("error", message);
   return NextResponse.redirect(`${origin}/connect?${params.toString()}`);
@@ -299,6 +306,49 @@ function popupAccountSelectionResponse(
   );
 }
 
+/**
+ * Mint an "ads-less" mcp_sessions row + cookie for a user who completed
+ * Google OAuth (with the adwords scope) but has no Google Ads customer to
+ * connect — either because the Google identity isn't linked to any Ads
+ * account, or because their only path was a manager (MCC) with no clients.
+ *
+ * The row carries the user's refresh token, so when they later create an
+ * Ads account on this same Google identity, /add-google-ads-account can
+ * reuse the credentials without forcing another OAuth round-trip.
+ *
+ * The session is loadable by getSession() (with `pendingSetup: true`) but
+ * getSessionAuth() and getAuthContext() still throw — Google-Ads-dependent
+ * routes bounce back to /connect, which is the right behavior for a user
+ * who hasn't picked an Ads customer yet.
+ */
+async function mintAdsLessSession({
+  response,
+  refreshToken,
+  userId,
+  googleEmail,
+}: {
+  response: NextResponse;
+  refreshToken: string;
+  userId: string | null;
+  googleEmail: string | null;
+}) {
+  const accessToken = randomBytes(32).toString("hex");
+  const expiresAt = new Date();
+  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+  await db().insert(schema.mcpSessions).values({
+    accessToken,
+    refreshToken,
+    customerId: "",
+    customerIds: "[]",
+    userId,
+    googleEmail,
+    expiresAt: expiresAt.toISOString(),
+  });
+
+  setSessionCookies(response, accessToken, "");
+}
+
 async function createOrRedirectGoogleAdsSession({
   origin,
   userId,
@@ -332,6 +382,11 @@ async function createOrRedirectGoogleAdsSession({
     const response = redirectWithError(origin, reason);
     if (reason === "no_accounts") {
       setLastAttemptEmailCookie(response, googleEmail);
+      // Mint an ads-less session so the user can choose to continue into the
+      // app (set up Claude/MCP, connect Meta later, or come back when they
+      // have a Google Ads account on this identity). Without this, they'd
+      // hit /connect with no session and have nothing to do but retry OAuth.
+      await mintAdsLessSession({ response, refreshToken, userId, googleEmail });
     }
     return response;
   }
@@ -347,7 +402,9 @@ async function createOrRedirectGoogleAdsSession({
     if (popup) return popupErrorResponse(origin, msg);
     const response = redirectWithError(origin, reason);
     setLastAttemptEmailCookie(response, googleEmail);
-    clearSessionCookies(response);
+    // Same rationale as the catch branch above — mint an ads-less session
+    // so the user can keep using NotFair while they sort out Ads access.
+    await mintAdsLessSession({ response, refreshToken, userId, googleEmail });
     return response;
   }
 
@@ -449,7 +506,7 @@ async function createOrRedirectGoogleAdsSession({
   }
 
   // Send the full ConnectableAccount shape (including loginCustomerName for
-  // the manager group label) to the connect page UI.
+  // the manager group label) to the platform-specific picker page.
   const accountsForUi = usableAccounts.map((a) => ({
     id: a.id,
     name: a.name,
@@ -457,9 +514,20 @@ async function createOrRedirectGoogleAdsSession({
   }));
   const accountsParam = encodeURIComponent(JSON.stringify(accountsForUi));
   const nextParam = next !== "/connect" ? `&next=${encodeURIComponent(next)}` : "";
-  return NextResponse.redirect(
-    `${origin}/connect?pending=${pendingToken}&accounts=${accountsParam}${nextParam}`,
+  // FTUE picker lives at /welcome/<platform>/select — keeps onboarding off
+  // the /connect path (which is now strictly for MCP/connector setup) and
+  // gives Meta/TikTok a consistent shape (/welcome/meta-ads/select, etc.)
+  // when they ship.
+  const pendingResponse = NextResponse.redirect(
+    `${origin}/welcome/google-ads/select?pending=${pendingToken}&accounts=${accountsParam}${nextParam}`,
   );
+  // Surface the user's identity to the navbar while they're picking which
+  // accounts to connect — without this they'd appear signed-out on the
+  // selection screen because loadSessionRow is keyed on adsagent_token.
+  // /api/auth/select-account replaces this row's customerId on submission;
+  // setSessionCookies just renames customerName once accounts are picked.
+  setSessionCookies(pendingResponse, pendingToken, "");
+  return pendingResponse;
 }
 
 async function reuseExistingSession({

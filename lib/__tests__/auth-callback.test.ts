@@ -265,7 +265,7 @@ describe("Auth callback route — GET", () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/connect?pending=");
+    expect(response.headers.get("location")).toContain("/welcome/google-ads/select?pending=");
   });
 
   it("persists loginCustomerId on the session for a single manager-routed client", async () => {
@@ -311,7 +311,7 @@ describe("Auth callback route — GET", () => {
       makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
     );
 
-    expect(response.headers.get("location")).toContain("/connect?pending=");
+    expect(response.headers.get("location")).toContain("/welcome/google-ads/select?pending=");
     expect(mockInsertValues).toHaveBeenCalled();
     const insertedRow = mockInsertValues.mock.calls[0][0];
     expect(insertedRow.customerId).toBe("");
@@ -342,8 +342,9 @@ describe("Auth callback route — GET", () => {
 
     expect(response.status).toBe(307);
     const location = new URL(response.headers.get("location") ?? "");
-    expect(location.pathname).toBe("/connect");
-    expect(location.searchParams.get("reason")).toBe("no_client_accounts");
+    // No-accounts states route to the dedicated /welcome empty-state page,
+    // not back to /connect (which is reserved for connection-flow errors).
+    expect(location.pathname).toBe("/welcome");
   });
 
   it("reuses an existing connected session for the same user", async () => {

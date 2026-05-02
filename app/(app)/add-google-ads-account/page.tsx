@@ -2,18 +2,15 @@ import { redirect } from "next/navigation";
 import { getAuthContext } from "@/lib/session";
 import { DEV_EMAILS } from "@/lib/dev-emails";
 import { listConnectableAccounts, parseCustomerIds } from "@/lib/google-ads";
-import { AddGoogleAdsAccountPage } from "@/components/add-google-ads-account-page";
+import { AccountSelector, type SelectableAccount } from "@/components/account-selector";
 
 /**
- * Dev-gated page for adding/managing the user's Google ad-account selection.
+ * Dev-gated page for managing the user's Google ad-account selection.
  *
  * Mirrors the Meta page (/add-meta-ads-account) — both let a signed-in user
  * curate which ad accounts NotFair is allowed to touch on each platform.
- *
- *   Google: `mcp_sessions.customerIds` (selected) + `mcp_sessions.customerId`
- *           (active default, switched via navbar AccountSwitcher).
- *   Meta:   `ad_platform_connections.account_ids` (selected) +
- *           `ad_platform_connections.active_account_id` (active default).
+ * Shares the AccountSelector UI with /welcome/google-ads/select?mode=update
+ * so the management surface is identical no matter how the user arrives.
  *
  * The full universe of available Google accounts is computed at request
  * time via `listConnectableAccounts(refreshToken)` — there's no persisted
@@ -24,17 +21,13 @@ import { AddGoogleAdsAccountPage } from "@/components/add-google-ads-account-pag
 export default async function AddGoogleAdsAccountPagePath() {
   let realEmail: string | null = null;
   let refreshToken: string | null = null;
-  let userId: string | null = null;
   let customerIds: string | null = null;
-  let activeCustomerId: string | null = null;
 
   try {
     const ctx = await getAuthContext();
     realEmail = ctx.auth.realGoogleEmail ?? ctx.session.googleEmail;
     refreshToken = ctx.session.refreshToken;
-    userId = ctx.session.userId;
     customerIds = ctx.session.customerIds ?? null;
-    activeCustomerId = ctx.session.customerId;
   } catch {
     redirect("/connect?next=%2Fadd-google-ads-account");
   }
@@ -43,15 +36,10 @@ export default async function AddGoogleAdsAccountPagePath() {
     redirect("/connect");
   }
 
-  // Compute the full universe of accounts the user can target. Failures are
-  // surfaced to the UI as an empty available list — the user can hit
-  // "Re-authorize Google" to retry.
-  let availableAccounts: Array<{
-    id: string;
-    name: string;
-    loginCustomerId?: string;
-    loginCustomerName?: string;
-  }> = [];
+  // Compute the full universe of accounts the user can target. Failures
+  // surface as an empty list — the user can re-trigger Google OAuth from
+  // /welcome to refresh.
+  let availableAccounts: SelectableAccount[] = [];
   let enumerationError: string | null = null;
   if (refreshToken) {
     try {
@@ -67,20 +55,28 @@ export default async function AddGoogleAdsAccountPagePath() {
     }
   }
 
-  const selectedAccounts = parseCustomerIds(customerIds ?? "[]").map((a) => ({
-    id: a.id,
-    name: a.name || `Customer ${a.id}`,
-    ...(a.loginCustomerId ? { loginCustomerId: a.loginCustomerId } : {}),
-  }));
+  const preselectedIds = parseCustomerIds(customerIds ?? "[]").map((a) => a.id);
 
   return (
-    <AddGoogleAdsAccountPage
-      userEmail={realEmail}
-      userId={userId}
-      availableAccounts={availableAccounts}
-      selectedAccounts={selectedAccounts}
-      activeCustomerId={activeCustomerId}
-      enumerationError={enumerationError}
-    />
+    <section className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+        <div className="mx-auto max-w-4xl">
+          {enumerationError && (
+            <div className="mb-6 rounded-lg border border-[#D4882A]/40 bg-[#D4882A]/10 px-4 py-3 text-sm text-[#D4882A]">
+              {enumerationError}
+            </div>
+          )}
+          <AccountSelector
+            accounts={availableAccounts}
+            mode="update"
+            preselectedIds={preselectedIds}
+            next="/connect"
+            submitEndpoint="/api/auth/select-account"
+            headline="Manage Google Ads accounts"
+            body="Which Google Ads accounts do you want to manage?"
+          />
+        </div>
+      </div>
+    </section>
   );
 }

@@ -24,7 +24,7 @@ export type AuditHistoryDetail = {
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/connect");
+      redirect("/welcome");
     }
     throw err;
   });

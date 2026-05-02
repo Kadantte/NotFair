@@ -27,7 +27,9 @@ import { demoSparklineData, demoWoWPerformance } from "@/lib/demo/reads";
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((err) => {
     if (err instanceof Error && err.message === "Not authenticated") {
-      redirect("/connect");
+      // /welcome handles routing: not connected → /connect, ads-less →
+      // empty-state UI, fully connected → back to the app.
+      redirect("/welcome");
     }
     throw err;
   });

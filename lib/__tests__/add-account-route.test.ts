@@ -73,7 +73,7 @@ describe("Add account route — GET", () => {
     expect(response.status).toBe(307);
 
     const location = response.headers.get("location") ?? "";
-    expect(location).toContain("/connect?mode=update");
+    expect(location).toContain("/welcome/google-ads/select?mode=update");
     expect(location).toContain("accounts=");
     expect(location).toContain("selected=");
     expect(decodeURIComponent(location)).toContain('"1234567890"');
@@ -102,7 +102,9 @@ describe("Add account route — GET", () => {
     expect(decoded).toContain('"loginCustomerName":"Acme MCC"');
   });
 
-  it("returns NO_CLIENT_ACCOUNTS error when only managers exist with no clients", async () => {
+  // No-accounts states route to the dedicated /welcome empty-state page,
+  // not back to /connect (which is reserved for connection-flow errors).
+  it("redirects to /welcome when only managers exist with no clients", async () => {
     mockListConnectableAccounts.mockResolvedValue({
       accounts: [],
       managers: [{ id: "9999999999", name: "Empty MCC" }],
@@ -111,11 +113,10 @@ describe("Add account route — GET", () => {
     const response = await GET();
     expect(response.status).toBe(307);
     const location = new URL(response.headers.get("location") ?? "");
-    expect(location.pathname).toBe("/connect");
-    expect(location.searchParams.get("reason")).toBe("no_client_accounts");
+    expect(location.pathname).toBe("/welcome");
   });
 
-  it("returns NO_ACCOUNTS error when no accounts at all", async () => {
+  it("redirects to /welcome when no accounts at all", async () => {
     mockListConnectableAccounts.mockResolvedValue({
       accounts: [],
       managers: [],
@@ -124,8 +125,7 @@ describe("Add account route — GET", () => {
     const response = await GET();
     expect(response.status).toBe(307);
     const location = new URL(response.headers.get("location") ?? "");
-    expect(location.pathname).toBe("/connect");
-    expect(location.searchParams.get("reason")).toBe("no_accounts");
+    expect(location.pathname).toBe("/welcome");
   });
 
   it("redirects back to connect with an error when session auth is unavailable", async () => {

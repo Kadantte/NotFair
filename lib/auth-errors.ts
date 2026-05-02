@@ -46,12 +46,17 @@ export const AUTH_ERROR_MESSAGES = {
 // that mean "this Google identity has no Ads customer" rather than a
 // scope/transient issue. Kept as a plain list so new surface wordings
 // can be appended without restructuring.
+//
+// "not associated with any ads accounts" is the literal phrase Google returns
+// in errors[0].message for a brand-new Google identity that has never created
+// or been added to a Google Ads account — caught in production 2026-05-01.
 const NO_ADS_ACCOUNT_SIGNALS = [
   "not_ads_user",
   "user_permission_denied",
   "the caller does not have permission",
   "customer not found",
   "no customers accessible",
+  "not associated with any ads accounts",
 ];
 
 export function isNoAdsAccountError(raw: string): boolean {

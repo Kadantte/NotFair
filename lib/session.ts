@@ -9,6 +9,17 @@ import { DEV_EMAILS } from "@/lib/dev-access";
 
 export type Session = {
   connected: true;
+  /**
+   * True when the user finished Google OAuth but has no Google Ads account
+   * to connect (e.g. brand-new Google identity that's never used Google Ads).
+   * The session row exists with `customerId === ""`, so the user can browse
+   * the app while we wait for them to either create a Google Ads account on
+   * the same identity or connect a different platform (Meta, etc.).
+   *
+   * Server actions that touch the Google Ads API still get "Not authenticated"
+   * from getSessionAuth/getAuthContext — those gates intentionally stay strict.
+   */
+  pendingSetup: boolean;
   token: string;
   userId: string | null;
   customerId: string;
@@ -64,7 +75,11 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
     )
     .limit(1);
 
-  if (!realRow || !realRow.customerId) return null;
+  // Empty customerId is a valid "ads-less" session — user signed in via Google
+  // but has no Google Ads account to connect yet. Pending account-selection
+  // tokens also have customerId="", but those are passed via URL (?pending=…),
+  // never set as the cookie, so they don't leak through this lookup.
+  if (!realRow) return null;
 
   const row: SessionRow = { ...realRow, userId: realRow.userId ?? null, loginCustomerId: realRow.loginCustomerId ?? null };
 
@@ -92,7 +107,10 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
       )
       .limit(1);
 
-    if (!targetRow || !targetRow.customerId) return null; // target expired/missing → hard-fail to prevent accidental writes to real account
+    // Impersonation requires a real, connected target session — never let a
+    // dev "impersonate" an ads-less placeholder, since the whole point of dev
+    // impersonation is to read another user's actual Google Ads data.
+    if (!targetRow || !targetRow.customerId) return null;
 
     return {
       token,
@@ -137,13 +155,22 @@ export async function getSession(): Promise<Session> {
     ? { displayName: null, picture: null }
     : await readProfileCookie();
 
+  // For pending account-selection rows, customerIds stores the candidate set
+  // the user can pick from — NOT accounts they've actually selected. Surfacing
+  // it would have the navbar's AccountSwitcher pre-show every account they
+  // could connect, which looks like they're already managing all of them.
+  // The /connect picker reads candidates from the URL; nothing else needs
+  // them at this stage.
+  const pendingSetup = !result.row.customerId;
+
   return {
     connected: true,
+    pendingSetup,
     token: result.token,
     userId: result.row.userId,
     customerId: result.row.customerId,
-    customerName: deriveCustomerName(result.row.customerIds),
-    customerIds: parseCustomerIds(result.row.customerIds),
+    customerName: pendingSetup ? "" : deriveCustomerName(result.row.customerIds),
+    customerIds: pendingSetup ? [] : parseCustomerIds(result.row.customerIds),
     googleEmail: result.row.googleEmail,
     displayName: profile.displayName,
     picture: profile.picture,
@@ -152,15 +179,30 @@ export async function getSession(): Promise<Session> {
   };
 }
 
+/**
+ * Refresh token for the current session, regardless of pendingSetup state.
+ * /welcome uses this to re-list connectable Google Ads accounts and decide
+ * whether to render the empty-state warning or send the user straight to
+ * the picker. Returns null when there's no session at all.
+ */
+export async function getCurrentRefreshToken(): Promise<string | null> {
+  const result = await loadSessionRow();
+  return result?.row.refreshToken ?? null;
+}
+
 export async function getSessionAuth(): Promise<SessionRow> {
   const result = await loadSessionRow();
-  if (!result) throw new Error("Not authenticated");
+  // Reject ads-less sessions: callers of getSessionAuth do Google Ads work
+  // that requires a real customerId. The user-facing route handlers catch
+  // this and bounce the user back to /connect, which is the right behavior
+  // for "you signed in but haven't connected an Ads account yet."
+  if (!result || !result.row.customerId) throw new Error("Not authenticated");
   return result.row;
 }
 
 export async function getAuthContext(): Promise<{ auth: AuthContext; session: SessionRow }> {
   const result = await loadSessionRow();
-  if (!result) throw new Error("Not authenticated");
+  if (!result || !result.row.customerId) throw new Error("Not authenticated");
   return {
     auth: {
       refreshToken: result.row.refreshToken,

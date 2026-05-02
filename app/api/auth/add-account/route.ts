@@ -4,6 +4,11 @@ import { listConnectableAccounts, parseCustomerIds } from "@/lib/google-ads";
 import { getSessionAuth } from "@/lib/session";
 
 function redirectWithError(reason: string, message?: string) {
+  // Send no-accounts cases to the dedicated /welcome empty-state route.
+  // /connect remains for genuinely connection-flow errors.
+  if (reason === "no_accounts" || reason === "no_client_accounts") {
+    return NextResponse.redirect(`${getAppOrigin()}/welcome`);
+  }
   const params = new URLSearchParams({ reason });
   if (message) params.set("error", message);
   return NextResponse.redirect(`${getAppOrigin()}/connect?${params.toString()}`);
@@ -40,7 +45,7 @@ export async function GET() {
     );
 
     return NextResponse.redirect(
-      `${getAppOrigin()}/connect?mode=update&accounts=${accountsParam}&selected=${selectedParam}`,
+      `${getAppOrigin()}/welcome/google-ads/select?mode=update&accounts=${accountsParam}&selected=${selectedParam}`,
     );
   } catch (error) {
     return redirectWithError(

@@ -15,7 +15,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
@@ -100,16 +100,13 @@ export async function GET(request: Request) {
   }
 
   // Verify the user_id from state still matches an active session — defends
-  // against stale state from a logged-out tab.
+  // against stale state from a logged-out tab. We don't require customerId
+  // here because ads-less sessions (user has no Google Ads account yet) are
+  // a supported entry point for Meta connection.
   const [session] = await db()
     .select({ userId: schema.mcpSessions.userId })
     .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.userId, state.userId),
-        sql`${schema.mcpSessions.customerId} <> ''`,
-      ),
-    )
+    .where(eq(schema.mcpSessions.userId, state.userId))
     .limit(1);
 
   if (!session) {

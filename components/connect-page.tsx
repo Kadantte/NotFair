@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Check, ExternalLink, AlertCircle, CheckCircle2, Loader2, Calendar } from 'lucide-react';
+import { ExternalLink, AlertCircle, Loader2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
@@ -28,16 +28,9 @@ async function readServerSession(): Promise<Session> {
 type ConnectPageProps = {
     initialSession?: Session;
     slug?: string[];
-    /**
-     * Email of the Google identity that just failed an OAuth attempt (no Ads
-     * accounts, no client accounts, etc.). Read server-side from the
-     * `adsagent_last_attempt_email` cookie. Used in the no-account error
-     * banners so users immediately see "I signed in with the wrong account."
-     */
-    lastAttemptEmail?: string | null;
 };
 
-export function ConnectPage({ initialSession = emptySession, slug, lastAttemptEmail = null }: ConnectPageProps) {
+export function ConnectPage({ initialSession = emptySession, slug }: ConnectPageProps) {
     return (
         <Suspense
             fallback={
@@ -46,14 +39,16 @@ export function ConnectPage({ initialSession = emptySession, slug, lastAttemptEm
                 </div>
             }
         >
-            <ConnectContent initialSession={initialSession} slug={slug} lastAttemptEmail={lastAttemptEmail} />
+            <ConnectContent initialSession={initialSession} slug={slug} />
         </Suspense>
     );
 }
 
-const GOOGLE_ADS_HOME_URL = 'https://ads.google.com/';
+// Account selection (initial multi-pick + management) lives at the dedicated
+// /welcome/<platform>/select routes now. The connect page is for sign-in
+// (no session) and MCP/connector setup (post-auth).
 
-type ErrorReason = 'scope_denied' | 'scope_denied_retry' | 'no_accounts' | 'no_client_accounts' | 'load_accounts_failed' | 'session_error' | 'generic';
+type ErrorReason = 'scope_denied' | 'scope_denied_retry' | 'load_accounts_failed' | 'session_error' | 'generic';
 
 type ErrorCopy = {
     headline: string;
@@ -65,12 +60,9 @@ type ErrorCopy = {
         /** Pass to startGoogleConnect — switches Google's `prompt` param. */
         prompt?: 'consent' | 'select_account' | 'select_account consent';
     };
-    /** Optional secondary CTA. External link opens in a new tab. */
-    secondaryCta?: { label: string; href: string };
 };
 
-function getErrorCopy(reason: ErrorReason, opts: { fallbackMessage?: string | null; attemptedEmail?: string | null }): ErrorCopy {
-    const email = opts.attemptedEmail?.trim() || null;
+function getErrorCopy(reason: ErrorReason, opts: { fallbackMessage?: string | null }): ErrorCopy {
     switch (reason) {
         case 'scope_denied':
         case 'scope_denied_retry':
@@ -79,24 +71,6 @@ function getErrorCopy(reason: ErrorReason, opts: { fallbackMessage?: string | nu
                 body: "NotFair can't read your campaigns or make changes without the Google Ads permission. When you continue, please keep that permission checked on Google's consent screen.",
                 helper: "Look for the checkbox labelled \"See, edit, create, and delete your Google Ads accounts and data.\" If you uncheck it, NotFair has no way to see your campaigns.",
                 primaryCta: { label: 'Continue and allow Google Ads access', prompt: 'consent' },
-            };
-        case 'no_accounts':
-            return {
-                headline: email ? `No Google Ads accounts found for ${email}` : 'No Google Ads accounts found',
-                body: email
-                    ? `${email} isn't connected to any Google Ads customer. The most common cause is signing in with the wrong Google account — try the one your team uses for Google Ads.`
-                    : "This Google account isn't connected to any Google Ads customer. The most common cause is signing in with the wrong Google account.",
-                primaryCta: { label: 'Use a different Google account', prompt: 'select_account consent' },
-                secondaryCta: { label: 'Create a Google Ads account', href: GOOGLE_ADS_HOME_URL },
-            };
-        case 'no_client_accounts':
-            return {
-                headline: 'No client accounts under this manager',
-                body: email
-                    ? `We found a manager (MCC) account for ${email}, but it doesn't have any client accounts linked yet. Either switch to a Google account that has direct access, or link a client to your manager in Google Ads.`
-                    : "We found a manager (MCC) account, but it doesn't have any client accounts linked yet. Either switch to a Google account that has direct access, or link a client to your manager in Google Ads.",
-                primaryCta: { label: 'Use a different Google account', prompt: 'select_account consent' },
-                secondaryCta: { label: 'Open Google Ads to link a client', href: GOOGLE_ADS_HOME_URL },
             };
         case 'load_accounts_failed':
         case 'session_error':
@@ -111,10 +85,8 @@ function getErrorCopy(reason: ErrorReason, opts: { fallbackMessage?: string | nu
 }
 
 function isKnownReason(value: string | null | undefined): value is ErrorReason {
-    return value === 'scope_denied' || value === 'scope_denied_retry' || value === 'no_accounts' || value === 'no_client_accounts' || value === 'load_accounts_failed' || value === 'session_error';
+    return value === 'scope_denied' || value === 'scope_denied_retry' || value === 'load_accounts_failed' || value === 'session_error';
 }
-
-
 
 
 type SetupTab = 'claude-code' | 'connector' | 'codex' | 'any-mcp' | 'gohighlevel';
@@ -137,8 +109,7 @@ function connectPathForTab(tab: SetupTab): string {
 }
 
 
-
-function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSession: Session; slug?: string[]; lastAttemptEmail: string | null }) {
+function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
     const isGhl = slug?.[0] === 'gohighlevel' || slug?.[0] === 'go-high-level' || slug?.[0] === 'ghl';
     const { activeTab: baseTab } = isGhl ? { activeTab: 'connector' as const } : parseSetupSlug(slug);
     const activeTab: SetupTab = isGhl ? 'gohighlevel' : baseTab;
@@ -147,78 +118,13 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
     const urlToken = searchParams.get('token');
     const urlError = searchParams.get('error');
     const urlErrorReason = searchParams.get('reason');
-    const pendingToken = searchParams.get('pending');
-    const selectionMode = searchParams.get('mode');
-    const accountsParam = searchParams.get('accounts');
-    const selectedParam = searchParams.get('selected');
     const currentConnectPath = connectPathForTab(activeTab);
-    const nextAfterConnect = searchParams.get('next') ?? currentConnectPath;
 
     const [session, setSession] = useState<Session>(initialSession);
     const [error, setError] = useState<string | null>(urlError);
     const [errorReason, setErrorReason] = useState<string | null>(urlErrorReason);
-    const [selecting, setSelecting] = useState(false);
-    const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
     const token = urlToken || (session.connected ? session.token : null);
-    type SelectableAccount = {
-        id: string;
-        name: string;
-        loginCustomerId?: string;
-        loginCustomerName?: string;
-    };
-
-    const accounts = useMemo<SelectableAccount[]>(() => {
-        if (!accountsParam) return [];
-        try {
-            const parsed = JSON.parse(accountsParam);
-            if (!Array.isArray(parsed)) return [];
-            return parsed.filter(
-                (account: unknown): account is SelectableAccount =>
-                    typeof account === 'object' &&
-                    account !== null &&
-                    'id' in account &&
-                    typeof (account as { id: unknown }).id === 'string' &&
-                    'name' in account &&
-                    typeof (account as { name: unknown }).name === 'string',
-            );
-        } catch {
-            return [];
-        }
-    }, [accountsParam]);
-
-    // Group accounts: direct first, then by manager. Used to render section
-    // headers ("Via manager: Acme MCC") so users see the manager grouping.
-    const accountGroups = useMemo(() => {
-        const groups = new Map<string, { key: string; label: string; isManager: boolean; accounts: SelectableAccount[] }>();
-        for (const a of accounts) {
-            const key = a.loginCustomerId ?? '__direct__';
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    key,
-                    label: a.loginCustomerId
-                        ? a.loginCustomerName || `Manager ${a.loginCustomerId}`
-                        : 'Direct access',
-                    isManager: !!a.loginCustomerId,
-                    accounts: [],
-                });
-            }
-            groups.get(key)!.accounts.push(a);
-        }
-        return Array.from(groups.values());
-    }, [accounts]);
-
-
-    const preselectedAccountIds = useMemo(() => {
-        if (!selectedParam) return [] as string[];
-        try {
-            const parsed = JSON.parse(selectedParam);
-            if (!Array.isArray(parsed)) return [] as string[];
-            return parsed.filter((value): value is string => typeof value === 'string');
-        } catch {
-            return [] as string[];
-        }
-    }, [selectedParam]);
 
     useEffect(() => {
         if (urlToken) {
@@ -239,18 +145,6 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
             cancelled = true;
         };
     }, [currentConnectPath, urlToken]);
-
-    useEffect(() => {
-        if ((!pendingToken && selectionMode !== 'update') || accounts.length === 0) {
-            setSelectedAccounts([]);
-            return;
-        }
-
-        const accessiblePreselected = preselectedAccountIds.filter(id =>
-            accounts.some(account => account.id === id),
-        );
-        setSelectedAccounts(accessiblePreselected);
-    }, [pendingToken, selectionMode, accounts, preselectedAccountIds]);
 
     async function beginGoogleSignIn(prompt?: 'consent' | 'select_account' | 'select_account consent') {
         setError(null);
@@ -287,38 +181,6 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
         }
     }
 
-    function toggleAccount(accountId: string) {
-        setSelectedAccounts(prev =>
-            prev.includes(accountId) ? prev.filter(id => id !== accountId) : [...prev, accountId],
-        );
-    }
-
-    async function submitSelectedAccounts() {
-        setSelecting(true);
-        const selected = accounts.filter(account => selectedAccounts.includes(account.id));
-        try {
-            const res = await fetch('/api/auth/select-account', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pendingToken,
-                    accounts: selected,
-                    next: nextAfterConnect,
-                }),
-            });
-            const data = await res.json();
-            if (data.redirectUrl) {
-                // account_connected is now fired centrally from PostHogProvider
-                // via the gads_connect_event cookie set by select-account route.
-                window.location.assign(data.redirectUrl);
-            } else if (data.error) {
-                router.push(`/connect?error=${encodeURIComponent(data.error)}`);
-            }
-        } finally {
-            setSelecting(false);
-        }
-    }
-
 
     return (
         <section className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -326,7 +188,7 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
                 <div className="mx-auto max-w-4xl">
                     {(error || isKnownReason(errorReason)) && (() => {
                         const reason: ErrorReason = isKnownReason(errorReason) ? errorReason : 'generic';
-                        const copy = getErrorCopy(reason, { fallbackMessage: error, attemptedEmail: lastAttemptEmail });
+                        const copy = getErrorCopy(reason, { fallbackMessage: error });
                         return (
                             <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-5">
                                 <div className="flex items-start gap-3">
@@ -347,16 +209,6 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
                                     >
                                         {copy.primaryCta.label}
                                     </Button>
-                                    {copy.secondaryCta && (
-                                        <a
-                                            href={copy.secondaryCta.href}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm font-medium text-[#C45D4A] underline-offset-4 hover:underline"
-                                        >
-                                            {copy.secondaryCta.label}
-                                        </a>
-                                    )}
                                 </div>
                             </div>
                         );
@@ -364,73 +216,6 @@ function ConnectContent({ initialSession, slug, lastAttemptEmail }: { initialSes
 
                     {activeTab === 'gohighlevel' ? (
                         <GoHighLevelConnectSurface session={session} />
-                    ) : (pendingToken || selectionMode === 'update') && accounts.length > 0 ? (
-                        <div className="flex flex-col items-center space-y-6 text-center">
-                            <div className="flex items-center gap-2 text-[#4CAF6E]">
-                                <CheckCircle2 className="h-5 w-5" />
-                                <span className="text-sm font-medium">Google connected</span>
-                            </div>
-                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Select accounts</h2>
-                            <p className="max-w-md text-lg text-[#C4C0B6]">
-                                Which Google Ads accounts do you want to manage?
-                            </p>
-                            <div className="w-full max-w-md space-y-5">
-                                {accountGroups.map(group => (
-                                    <div key={group.key} className="space-y-2">
-                                        <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#C4C0B6]/80">
-                                            {group.isManager ? (
-                                                <>
-                                                    <span>Via manager</span>
-                                                    <span className="rounded-md border border-[#3D3C36] bg-[#1A1917] px-2 py-0.5 text-[11px] font-medium normal-case tracking-normal text-[#E8E4DD]">
-                                                        {group.label}
-                                                    </span>
-                                                </>
-                                            ) : (
-                                                <span>Direct access</span>
-                                            )}
-                                        </div>
-                                        <div className="space-y-3">
-                                            {group.accounts.map(account => {
-                                                const isSelected = selectedAccounts.includes(account.id);
-                                                return (
-                                                    <button
-                                                        key={account.id}
-                                                        onClick={() => toggleAccount(account.id)}
-                                                        disabled={selecting}
-                                                        className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all disabled:opacity-50 ${isSelected
-                                                                ? 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10'
-                                                                : 'border-[#3D3C36] bg-[#24231F] hover:border-[#C4C0B6]/40 hover:bg-[#2E2D28]'
-                                                            }`}
-                                                    >
-                                                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSelected ? 'border-[#4CAF6E] bg-[#4CAF6E]' : 'border-[#C4C0B6]/40'
-                                                            }`}>
-                                                            {isSelected && <Check className="h-3 w-3 text-[#1A1917]" />}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-[#E8E4DD]">{account.name}</p>
-                                                            <p className="mt-0.5 text-sm text-[#C4C0B6]">{account.id}</p>
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            {selectedAccounts.length > 0 && (
-                                <p className="text-sm text-[#C4C0B6]">
-                                    {selectedAccounts.length} of {accounts.length} account{accounts.length > 1 ? 's' : ''} selected.
-                                </p>
-                            )}
-                            <Button
-                                size="lg"
-                                onClick={submitSelectedAccounts}
-                                disabled={selectedAccounts.length === 0 || selecting}
-                                className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C] disabled:opacity-50 disabled:hover:scale-100"
-                            >
-                                {selecting ? 'Connecting...' : `Connect ${selectedAccounts.length || ''} account${selectedAccounts.length !== 1 ? 's' : ''}`}
-                            </Button>
-                        </div>
                     ) : !token ? (
                         <div className="flex flex-col items-center space-y-6 pt-12 text-center">
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect Google Ads</h2>

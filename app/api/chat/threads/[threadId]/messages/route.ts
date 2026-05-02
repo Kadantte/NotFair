@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionAuth } from "@/lib/session";
+import { getSession } from "@/lib/session";
 import { loadMessages } from "@/lib/db/chat";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
@@ -8,8 +8,12 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ threadId: string }> },
 ) {
-  const session = await getSessionAuth().catch(() => null);
-  if (!session?.userId) {
+  // Use getSession (not getSessionAuth) so ads-less users can read their
+  // chat history. Auth here is by userId — there's no Google Ads call in
+  // this handler, so a missing customerId shouldn't block it.
+  const session = await getSession();
+  const userId = session.connected ? session.userId : null;
+  if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -22,7 +26,7 @@ export async function GET(
     .where(
       and(
         eq(schema.chatThreads.id, threadId),
-        eq(schema.chatThreads.userId, session.userId),
+        eq(schema.chatThreads.userId, userId),
       ),
     )
     .limit(1);

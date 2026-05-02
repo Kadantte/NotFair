@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getCustomer, pauseCampaign, enableCampaign, removeCampaign, listCampaigns, listAds, getConversionActions, getSmartCampaignKeywordThemes, getSmartCampaignSetting, getSmartCampaignAds, getSmartCampaignSearchTerms, getImpressionShare, getSearchTermReport, micros } from "@/lib/google-ads";
-import { getSessionAuth, getAuthContext } from "@/lib/session";
+import { getSession, getSessionAuth, getAuthContext } from "@/lib/session";
 import type { AuthContext } from "@/lib/google-ads";
 import { getAccountBudgetSummary } from "@/lib/google-ads/reads";
 import { getCurrencyInfo, getUsdRates, toUsd } from "@/lib/currency";
@@ -132,7 +132,9 @@ function normalizeBiddingStrategy(strategy: string | number | null | undefined):
 function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     return fn().catch((err) => {
         if (err instanceof Error && err.message === "Not authenticated") {
-            redirect("/connect");
+            // /welcome routes appropriately: not connected → /connect,
+            // ads-less → empty-state UI, fully connected → back to the app.
+            redirect("/welcome");
         }
         throw err;
     });
@@ -640,18 +642,24 @@ export async function getSmartCampaignSettingAction(campaignId: string) {
 // ─── Usage / Rate Limit ─────────────────────────────────────────────
 
 export async function getUsageAction() {
-    const auth = await getSessionAuth();
+    // Use getSession (not getSessionAuth) so ads-less users — who have a real
+    // userId from Supabase but no Google Ads customer yet — still get a usage
+    // readout. getUsageInfo/getDailyUsage are userId-keyed and don't touch
+    // Google Ads at all, so customerId isn't required here.
+    const session = await getSession();
+    const userId = session.connected ? session.userId : null;
     const [info, daily] = await Promise.all([
-        getUsageInfo(auth.userId),
-        getDailyUsage(auth.userId),
+        getUsageInfo(userId),
+        getDailyUsage(userId),
     ]);
     return { ...info, daily };
 }
 
 /** Lightweight summary used by the app header to flag exceeded quota. Skips the daily bucket aggregation. */
 export async function getUsageSummaryAction() {
-    const auth = await getSessionAuth();
-    return await getUsageInfo(auth.userId);
+    const session = await getSession();
+    const userId = session.connected ? session.userId : null;
+    return await getUsageInfo(userId);
 }
 
 // Best-effort: any failure yields an empty array so the support ping still fires.
