@@ -19,6 +19,12 @@ export type McpSetupTabsProps = {
   serverUrl: string;
   /** Connector name to surface in copy-paste fields and snippets. */
   connectorName: string;
+  /** Platform label used in step copy (default "Google Ads"). */
+  platformLabel?: string;
+  /** Example prompt shown in the final "ask Claude/Codex" step. */
+  examplePrompt?: string;
+  /** Claude Code slash command (default "/google-ads"). */
+  slashCommand?: string;
 };
 
 export function tabSlugFromActive(tab: SetupTab): string {
@@ -52,6 +58,9 @@ export function McpSetupTabs({
   basePath,
   serverUrl,
   connectorName,
+  platformLabel,
+  examplePrompt,
+  slashCommand,
 }: McpSetupTabsProps) {
   const tabs: Array<{
     id: SetupTab;
@@ -153,7 +162,12 @@ export function McpSetupTabs({
 
       {activeTab === "claude-code" ? (
         <div className="w-full max-w-4xl text-left">
-          <ClaudeCodePluginSteps surface="in_app" />
+          <ClaudeCodePluginSteps
+            surface="in_app"
+            slashCommand={slashCommand}
+            platformLabel={platformLabel}
+            examplePrompt={examplePrompt}
+          />
         </div>
       ) : activeTab === "connector" ? (
         <div className="w-full max-w-4xl text-left">
@@ -161,6 +175,8 @@ export function McpSetupTabs({
             surface="in_app"
             serverUrl={serverUrl}
             connectorName={connectorName}
+            platformLabel={platformLabel}
+            examplePrompt={examplePrompt}
           />
         </div>
       ) : activeTab === "codex" ? (
@@ -169,6 +185,7 @@ export function McpSetupTabs({
             surface="in_app"
             serverUrl={serverUrl}
             connectorName={connectorName}
+            examplePrompt={examplePrompt}
           />
         </div>
       ) : (

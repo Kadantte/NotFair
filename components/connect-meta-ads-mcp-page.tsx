@@ -62,6 +62,9 @@ export function ConnectMetaAdsMcpPage({
             basePath="/connect/meta-ads"
             serverUrl={META_MCP_SERVER_URL}
             connectorName={META_MCP_CONNECTOR_NAME}
+            platformLabel="Meta Ads"
+            slashCommand="/meta-ads"
+            examplePrompt="Audit my connected Meta ad account (Facebook + Instagram) and tell me the 3 biggest optimization opportunities."
           />
         </div>
       </div>
