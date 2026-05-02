@@ -5,6 +5,7 @@ import {
   RateLimitError,
 } from "@/lib/mcp/rate-limit";
 import { getTelemetry } from "@/lib/mcp/telemetry";
+import { trackServerEvent } from "@/lib/analytics-server";
 import type { AuthContext } from "@/lib/google-ads";
 
 /**
@@ -141,6 +142,21 @@ export async function execMetaWrite(
     telemetry,
   });
   recordOperation(auth.userId ?? null);
+  trackServerEvent(auth.userId ?? null, result.success ? "ai_change_executed" : "ai_change_failed", {
+    platform: "meta_ads",
+    tool_name: result.action,
+    entity_type: result.entityType,
+    account_id: result.accountId,
+    campaign_id: null,
+    before_value: snapshotToString(result.before) || null,
+    after_value: snapshotToString(result.after) || null,
+    error: result.success ? null : null,
+    client_name: auth.clientName ?? null,
+    client_version: auth.clientVersion ?? null,
+    auth_method: auth.authMethod ?? null,
+    user_agent: auth.userAgent ?? null,
+    latency_ms: latencyMs,
+  });
   return result;
 }
 
@@ -198,6 +214,18 @@ export async function execMetaRead<T>(
       clientSource: auth.clientName,
       platform: "meta_ads",
       telemetry: buildTelemetry(ctx, latencyMs, bytesOut, null),
+    });
+    trackServerEvent(auth.userId ?? null, "ai_read_executed", {
+      platform: "meta_ads",
+      tool_name: toolName,
+      account_id: accountId,
+      campaign_id: null,
+      client_name: auth.clientName ?? null,
+      client_version: auth.clientVersion ?? null,
+      auth_method: auth.authMethod ?? null,
+      user_agent: auth.userAgent ?? null,
+      latency_ms: latencyMs,
+      bytes_out: bytesOut,
     });
   });
   recordOperation(auth.userId ?? null);

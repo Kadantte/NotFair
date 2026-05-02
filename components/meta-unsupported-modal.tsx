@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 
 /**
  * Shown when a user with Meta selected as their active platform tries to
@@ -22,6 +23,7 @@ export function MetaUnsupportedModal({
 }) {
   useEffect(() => {
     if (!open) return;
+    trackEvent("meta_unsupported_modal_shown", { feature });
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -31,7 +33,7 @@ export function MetaUnsupportedModal({
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open, feature, onClose]);
 
   if (!open) return null;
 
@@ -71,7 +73,10 @@ export function MetaUnsupportedModal({
           <Link
             href="/connect/meta-ads"
             prefetch
-            onClick={onClose}
+            onClick={() => {
+              trackEvent("meta_mcp_setup_cta_clicked", { feature, location: "meta_unsupported_modal" });
+              onClose();
+            }}
             className="inline-flex h-9 items-center rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] hover:bg-[#3D9A5C]"
           >
             Set up Meta Ads MCP

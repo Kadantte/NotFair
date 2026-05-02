@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-04-28.
+> Source of truth for all analytics events. Last updated: 2026-05-01.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -37,14 +37,15 @@
 **Phase:** 1
 **Category:** value_exchange (NSM event)
 **Platform:** PostHog (server)
-**Trigger:** Fires when an AI write operation completes successfully via MCP or the in-app chat agent. Both surfaces flow through the same `execWrite` path in `lib/tools/execute.ts`, so this event covers all agentic write traffic.
-**Hypothesis:** We believe tracking this tells us core value delivery frequency, which drives all product decisions as the NSM event. The client properties (`client_name`, `client_version`, `auth_method`) let us slice usage by which surface (Claude Code plugin, Claude.ai Web connector, Claude Cowork, in-app chat, etc.) is producing real changes — useful for prioritizing surface-specific UX work.
+**Trigger:** Fires when an AI write operation completes successfully via MCP or the in-app chat agent. Google writes flow through `execWrite` in `lib/tools/execute.ts`; Meta MCP writes flow through `execMetaWrite` in `lib/mcp/meta-tools/exec.ts`. Both wrappers emit this event with the right `platform`.
+**Hypothesis:** We believe tracking this tells us core value delivery frequency, which drives all product decisions as the NSM event. The `platform` property splits Google vs Meta NSM contribution; client properties (`client_name`, `client_version`, `auth_method`) slice by surface (Claude Code plugin, Claude.ai Web connector, Claude Cowork, in-app chat, etc.) for prioritizing surface-specific UX work.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
+| `platform` | string | `"google_ads"` | Which ad platform the write hit. Enum: `google_ads`, `meta_ads`. |
 | `tool_name` | string | `"pause_keyword"` | Which write tool was executed |
-| `entity_type` | string | `"keyword"` | Entity type affected (keyword or campaign) |
-| `account_id` | string | `"1301265570"` | Google Ads account ID |
+| `entity_type` | string | `"keyword"` | Entity type affected. Google: `keyword`/`campaign`. Meta: `campaign`/`adset`/`ad`/`account`. |
+| `account_id` | string | `"1301265570"` | Ad account ID. Google: customer ID. Meta: act_ ID without prefix. |
 | `campaign_id` | string \| null | `"20345678"` | Campaign affected (null if not campaign-scoped) |
 | `before_value` | string \| null | `"ENABLED"` | State before the change |
 | `after_value` | string \| null | `"PAUSED"` | State after the change |
@@ -54,10 +55,10 @@
 | `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the inbound HTTP request. Often `mcp-remote/...` rather than the end client's UA, so prefer `client_name` / `auth_method` for client attribution. Null for in-app chat. |
 
 ```json
-{ "event": "ai_change_executed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "PAUSED", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
+{ "event": "ai_change_executed", "properties": { "platform": "google_ads", "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "PAUSED", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
 ```
 
-**Files:** `lib/tools/execute.ts`
+**Files:** `lib/tools/execute.ts` (Google), `lib/mcp/meta-tools/exec.ts` (Meta)
 
 ---
 
@@ -66,14 +67,15 @@
 **Phase:** 1
 **Category:** quality_signal
 **Platform:** PostHog (server)
-**Trigger:** Fires whenever a write operation returns `success: false` through the `execWrite` chokepoint in `lib/tools/execute.ts`. Covers single-op and bulk tools, whether the failure came from our pre-validation (guardrail violation, malformed input) or from Google's API (partial_failure, rejected mutate). Thrown errors (network outages, auth crashes) do NOT fire this event — they propagate unlogged so outages don't burn user quota.
-**Hypothesis:** We believe tracking this tells us the real per-tool failure rate and lets us distinguish "our guardrails blocked a bad agent request" from "Google rejected a valid-looking mutate." Pairs with `ai_change_executed` to compute per-tool success rates and with `error` string patterns to classify failure mode.
+**Trigger:** Fires whenever a write operation returns `success: false` through the `execWrite` chokepoint (`lib/tools/execute.ts`) or `execMetaWrite` (`lib/mcp/meta-tools/exec.ts`). Covers single-op and bulk Google tools, plus every Meta write. Thrown errors (network outages, auth crashes) do NOT fire this event — they propagate unlogged so outages don't burn user quota.
+**Hypothesis:** We believe tracking this tells us the real per-tool failure rate and lets us distinguish "our guardrails blocked a bad agent request" from "platform rejected a valid-looking mutate." Pairs with `ai_change_executed` for per-tool, per-platform success rates.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
+| `platform` | string | `"google_ads"` | Which ad platform rejected the write. Enum: `google_ads`, `meta_ads`. |
 | `tool_name` | string | `"pause_keyword"` | Which write tool was attempted |
-| `entity_type` | string | `"keyword"` | Entity type attempted (keyword or campaign) |
-| `account_id` | string | `"1301265570"` | Google Ads account ID |
+| `entity_type` | string | `"keyword"` | Entity type attempted. Google: `keyword`/`campaign`. Meta: `campaign`/`adset`/`ad`/`account`. |
+| `account_id` | string | `"1301265570"` | Ad account ID |
 | `campaign_id` | string \| null | `"20345678"` | Campaign scope (null if not campaign-scoped) |
 | `before_value` | string \| null | `"ENABLED"` | State before the attempt (unchanged by the failure) |
 | `after_value` | string \| null | `"ENABLED"` | Same as `before_value` for failures — no state change occurred |
@@ -84,10 +86,10 @@
 | `user_agent` | string \| null | `"claude-code/1.2.3"` | See `ai_change_executed` |
 
 ```json
-{ "event": "ai_change_failed", "properties": { "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "ENABLED", "error": "INVALID_ARGUMENT: criterion not found", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
+{ "event": "ai_change_failed", "properties": { "platform": "google_ads", "tool_name": "pause_keyword", "entity_type": "keyword", "account_id": "1301265570", "campaign_id": "20345678", "before_value": "ENABLED", "after_value": "ENABLED", "error": "INVALID_ARGUMENT: criterion not found", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
 ```
 
-**Files:** `lib/tools/execute.ts`, `lib/google-ads/bulk.ts`
+**Files:** `lib/tools/execute.ts`, `lib/google-ads/bulk.ts` (Google), `lib/mcp/meta-tools/exec.ts` (Meta)
 
 ---
 
@@ -117,13 +119,14 @@
 **Phase:** 1
 **Category:** ambient
 **Platform:** PostHog (server)
-**Trigger:** Fires when an AI read operation completes via MCP or the in-app chat agent. Both surfaces flow through the same `execRead` path in `lib/tools/execute.ts`, so this event covers all agentic read traffic.
-**Hypothesis:** We believe tracking this tells us which read tools are most used and which surfaces are producing the read traffic, which lets us prioritize tool development and understand user intent patterns per surface.
+**Trigger:** Fires when an AI read operation completes. Google reads flow through `execRead` in `lib/tools/execute.ts`; Meta reads flow through `execMetaRead` in `lib/mcp/meta-tools/exec.ts`. Both wrappers emit this event with the right `platform`.
+**Hypothesis:** We believe tracking this tells us which read tools are most used per platform and which surfaces are producing the read traffic, which lets us prioritize tool development and understand user intent patterns per surface.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
+| `platform` | string | `"google_ads"` | Which ad platform served the read. Enum: `google_ads`, `meta_ads`. |
 | `tool_name` | string | `"getCampaignPerformance"` | Which read tool was executed |
-| `account_id` | string | `"1301265570"` | Google Ads account ID |
+| `account_id` | string | `"1301265570"` | Ad account ID |
 | `campaign_id` | string \| null | `"20345678"` | Campaign queried (null if account-level) |
 | `client_name` | string \| null | `"adsagent-chat"` | Identifies the calling surface. For MCP this is the client's `clientInfo.name` from the MCP `initialize` handshake (e.g. `claude-code`, `claude-ai`, `mcp-remote`). For in-app chat this is the constant `adsagent-chat`. Null only for legacy MCP sessions whose handshake did not report a name. |
 | `client_version` | string \| null | `"1.2.3"` | MCP client version from the handshake. Null for in-app chat (no version concept) and legacy MCP sessions. |
@@ -131,10 +134,10 @@
 | `user_agent` | string \| null | `"node-fetch/1.0"` | Raw `User-Agent` of the inbound HTTP request. Often `mcp-remote/...` rather than the end client's UA, so prefer `client_name` / `auth_method` for client attribution. Null for in-app chat. |
 
 ```json
-{ "event": "ai_read_executed", "properties": { "tool_name": "getCampaignPerformance", "account_id": "1301265570", "campaign_id": "20345678", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
+{ "event": "ai_read_executed", "properties": { "platform": "google_ads", "tool_name": "getCampaignPerformance", "account_id": "1301265570", "campaign_id": "20345678", "client_name": "claude-code", "client_version": "1.2.3", "auth_method": "oauth", "user_agent": "claude-code/1.2.3" } }
 ```
 
-**Files:** `lib/tools/execute.ts`
+**Files:** `lib/tools/execute.ts` (Google), `lib/mcp/meta-tools/exec.ts` (Meta)
 
 ---
 
@@ -483,24 +486,6 @@ No properties.
 
 ---
 
-## oauth_credentials_generated
-
-**Phase:** 1
-**Category:** activation
-**Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks "Generate Credentials" inside the in-app Claude Connector tab and the request to create an OAuth client succeeds.
-**Hypothesis:** We believe tracking this tells us how many users complete the credential-generation step of the Claude.ai Web/Cowork connector setup. Combined with `account_connected`, it tells us where the connector funnel drops off — pre-credentials (auth issue) vs post-credentials (Claude UI friction).
-
-No properties.
-
-```json
-{ "event": "oauth_credentials_generated" }
-```
-
-**Files:** `components/connect-page.tsx`
-
----
-
 ## user_signed_up
 
 **Phase:** 1
@@ -689,6 +674,232 @@ No properties.
 ```
 
 **Files:** `lib/mcp/agent-feedback.ts`
+
+---
+
+## demo_connect_cta_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user in demo mode clicks the "Connect your account" CTA in the demo banner.
+**Hypothesis:** Tells us demo→signup conversion intent — pairs with `user_signed_up` to compute the demo conversion rate.
+
+No properties.
+
+```json
+{ "event": "demo_connect_cta_clicked" }
+```
+
+**Files:** `components/demo-banner.tsx`
+
+---
+
+## demo_mode_exited
+
+**Phase:** 1
+**Category:** activation
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user explicitly exits demo mode (e.g. dismissing the demo banner).
+**Hypothesis:** Tells us how many demo users abandon vs convert. Pairs with `demo_mode_started` and `demo_connect_cta_clicked` for funnel attribution.
+
+No properties.
+
+```json
+{ "event": "demo_mode_exited" }
+```
+
+**Files:** `components/demo-banner.tsx`
+
+---
+
+## demo_mode_started
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a visitor enters demo mode from `/connect`.
+**Hypothesis:** Tells us how many top-of-funnel visitors take the "try without committing" path. Top-of-funnel signal for the demo experience.
+
+No properties.
+
+```json
+{ "event": "demo_mode_started" }
+```
+
+**Files:** `components/connect-page.tsx`
+
+---
+
+## discord_link_clicked
+
+**Phase:** 1
+**Category:** ambient
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the "Join Discord" link from any surface.
+**Hypothesis:** Tells us which surfaces drive community engagement. Use to prioritize Discord placement (sidebar vs marketing pages).
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `location` | string | `"sidebar"` | Where the click happened. Free-form caller-supplied string (`sidebar`, `marketing_footer`, etc.). |
+
+```json
+{ "event": "discord_link_clicked", "properties": { "location": "sidebar" } }
+```
+
+**Files:** `components/discord-link.tsx`
+
+---
+
+## first_tool_call_attempted
+
+**Phase:** 1
+**Category:** activation (aha-moment input)
+**Platform:** PostHog (server)
+**Trigger:** Fires from `logChange` / `logRead` (`lib/db/tracking.ts`) on a user's very first row in the `operations` table. Detected via a `count(*) = 0` precheck before insert. Both Google and Meta paths trigger it.
+**Hypothesis:** First tool call is the activation event for our MCP product — predicts long-term retention. Tracking attempt (vs successful completion) lets us isolate "tried but errored" users for outreach.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `tool_name` | string | `"listCampaigns"` | Raw camelCase tool name from the call |
+| `client_source` | string \| null | `"claude-code"` | MCP client name from `clientInfo.name`, or null for chat / legacy sessions |
+| `success` | number | `1` | 1 if the call succeeded, 0 if it threw or was rejected |
+| `error_class` | string \| null | `"WRITE_REJECTED"` | Coarse failure bucket. Null on success. Enum: `THROWN`, `RATE_LIMIT`, `WRITE_REJECTED`, `LOGGING`. |
+
+```json
+{ "event": "first_tool_call_attempted", "properties": { "tool_name": "listCampaigns", "client_source": "claude-code", "success": 1, "error_class": null } }
+```
+
+**Files:** `lib/db/tracking.ts`
+
+---
+
+## first_tool_call_error
+
+**Phase:** 1
+**Category:** errors
+**Platform:** PostHog (server)
+**Trigger:** Fires alongside `first_tool_call_attempted` *only* when that first call failed (`success: 0`). Lets us alert/triage on first-call regressions specifically.
+**Hypothesis:** A user whose very first MCP call errors is highly at risk of dropping off — surfacing this as a separate event makes it filterable and alertable.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `tool_name` | string | `"listCampaigns"` | Tool that errored |
+| `client_source` | string \| null | `"claude-code"` | MCP client name (or null) |
+| `error_class` | string \| null | `"THROWN"` | Coarse failure bucket; same enum as `first_tool_call_attempted.error_class` |
+
+```json
+{ "event": "first_tool_call_error", "properties": { "tool_name": "listCampaigns", "client_source": "claude-code", "error_class": "THROWN" } }
+```
+
+**Files:** `lib/db/tracking.ts`
+
+---
+
+## meta_mcp_setup_cta_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the "Set up Meta Ads MCP" CTA inside the Meta-unsupported modal (sidebar gate for Campaigns/Audit/Impact Monitor/Operations/Chat when Meta is the active platform).
+**Hypothesis:** Pairs with `meta_unsupported_modal_shown` to compute "shown→clicked" conversion. A high rate validates that users blocked from in-app surfaces willingly route to MCP setup; a low rate signals the in-app feature gap is more painful than the MCP path is appealing.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `feature` | string | `"Campaigns"` | Which gated feature triggered the modal. Enum: `Campaigns`, `Audit`, `Impact Monitor`, `Operations`, `Chat`. |
+| `location` | string | `"meta_unsupported_modal"` | Constant — distinguishes from any future MCP CTAs. |
+
+```json
+{ "event": "meta_mcp_setup_cta_clicked", "properties": { "feature": "Campaigns", "location": "meta_unsupported_modal" } }
+```
+
+**Files:** `components/meta-unsupported-modal.tsx`
+
+---
+
+## meta_unsupported_modal_shown
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when the Meta-unsupported modal opens — i.e. a user with Meta as the active platform clicks one of the disabled sidebar items (Campaigns, Audit, Impact Monitor, Operations, Chat).
+**Hypothesis:** Concrete demand signal for which Google in-app surface to port to Meta first. The `feature` property ranks user intent (e.g. if Audit is shown 3× as often as Operations, prioritize Meta Audit).
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `feature` | string | `"Campaigns"` | Which gated feature the user tried to open. Enum: `Campaigns`, `Audit`, `Impact Monitor`, `Operations`, `Chat`. |
+
+```json
+{ "event": "meta_unsupported_modal_shown", "properties": { "feature": "Campaigns" } }
+```
+
+**Files:** `components/meta-unsupported-modal.tsx`
+
+---
+
+## platform_switched
+
+**Phase:** 1
+**Category:** value_exchange
+**Platform:** PostHog (client)
+**Trigger:** Fires when the user picks an account in the navbar account switcher. Captures both within-platform account changes and cross-platform switches (Google ↔ Meta). Fires only on a real change — no event if the chosen account already matches the active one.
+**Hypothesis:** Tells us which platform users actually engage with after connecting. Cross-platform switches (`cross_platform: true`) are a strong signal that a user is actively running both — guides whether to keep investing in Meta in-app surfaces vs MCP-only.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `to_platform` | string | `"meta_ads"` | Platform of the newly selected account. Enum: `google_ads`, `meta_ads`. |
+| `from_platform` | string | `"google_ads"` | Platform that was active before the switch. Same enum. |
+| `cross_platform` | boolean | `true` | True iff `to_platform !== from_platform`. |
+| `google_accounts_count` | number | `5` | How many Google Ads accounts the user has linked. |
+| `meta_accounts_count` | number | `2` | How many Meta Ads accounts the user has linked. |
+
+```json
+{ "event": "platform_switched", "properties": { "to_platform": "meta_ads", "from_platform": "google_ads", "cross_platform": true, "google_accounts_count": 5, "meta_accounts_count": 2 } }
+```
+
+**Files:** `components/account-switcher.tsx`
+
+---
+
+## post_audit_claude_cta_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user finishes an audit and clicks the "Continue in Claude" CTA on the audit results page.
+**Hypothesis:** Audit→connect conversion intent. Properties carry audit severity so we can correlate "bad audit results → high CTA click rate" (which would validate the audit-as-acquisition-funnel hypothesis).
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `destination` | string | `"/connect"` | Where the link points (constant for now). |
+| `overall_score` | number | `62` | Audit overall score (0–100). |
+| `wasted_spend_monthly` | number \| null | `1240.5` | Monthly wasted spend total in account currency, if computed. |
+
+```json
+{ "event": "post_audit_claude_cta_clicked", "properties": { "destination": "/connect", "overall_score": 62, "wasted_spend_monthly": 1240.5 } }
+```
+
+**Files:** `app/(app)/audit/audit-content.tsx`
+
+---
+
+## welcome_connect_clicked
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when an ads-less user on `/welcome` clicks the "Connect Google Ads" platform card to start OAuth.
+**Hypothesis:** Tells us how many ads-less Google sessions actually attempt to connect a real Ads account vs sitting idle. Pairs with `account_connected` to compute connect-attempt → connect-success rate per platform.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `platform` | string | `"google-ads"` | Which platform card was clicked. |
+
+```json
+{ "event": "welcome_connect_clicked", "properties": { "platform": "google-ads" } }
+```
+
+**Files:** `components/welcome-page.tsx`
 
 ---
 

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Plus } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 
 type Platform = 'google_ads' | 'meta_ads';
 
@@ -103,6 +104,13 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 body: JSON.stringify(body),
             });
             if (res.ok) {
+                trackEvent('platform_switched', {
+                    to_platform: platform,
+                    from_platform: data.activePlatform,
+                    cross_platform: !isSamePlatform,
+                    google_accounts_count: data.googleAccounts.length,
+                    meta_accounts_count: data.metaAccounts.length,
+                });
                 cachedAccountData = null;
                 if (window.location.pathname.startsWith('/chat/')) {
                     window.location.assign('/chat');

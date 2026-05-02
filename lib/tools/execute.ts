@@ -154,6 +154,7 @@ export async function execWrite<R extends WriteResult = WriteResult>(
   });
   recordOperation(auth.userId);
   trackServerEvent(auth.userId, result.success ? "ai_change_executed" : "ai_change_failed", {
+    platform: "google_ads",
     tool_name: result.action,
     entity_type: result.action.includes("keyword") || result.action.includes("bid") ? "keyword" : "campaign",
     account_id: accountId,
@@ -247,6 +248,7 @@ export async function execRead<T>(
       telemetry,
     });
     trackServerEvent(auth.userId, "ai_read_executed", {
+      platform: "google_ads",
       tool_name: toolName,
       account_id: accountId,
       campaign_id: campaignId ?? null,
