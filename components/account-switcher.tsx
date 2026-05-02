@@ -1,7 +1,21 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Plus } from 'lucide-react';
+
+function GoogleAdsIcon({ size }: { size: number }) {
+    return (
+        <Image
+            src="/google-ads-icon.svg"
+            alt=""
+            width={size}
+            height={size}
+            className="shrink-0"
+            aria-hidden="true"
+        />
+    );
+}
 
 type Account = { id: string; name: string };
 
@@ -85,9 +99,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                     className={`flex h-10 w-10 items-center justify-center rounded-lg text-[#C4C0B6] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
                     title={data.impersonating ? `Viewing as ${displayName}` : displayName}
                 >
-                    <div className="flex h-6 w-6 items-center justify-center rounded bg-[#4CAF6E]/15 text-[11px] font-semibold text-[#4CAF6E]">
-                        {(active?.name || 'A')[0].toUpperCase()}
-                    </div>
+                    <GoogleAdsIcon size={20} />
                 </button>
                 {open && (
                     <div className="absolute left-[60px] top-0 z-50 min-w-[220px] rounded-lg border border-[#3D3C36] bg-[#24231F] py-1 shadow-xl">
@@ -102,9 +114,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                                 disabled={switching}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-[#E8E4DD]/6 disabled:opacity-50"
                             >
-                                <div className="flex h-5 w-5 items-center justify-center rounded bg-[#4CAF6E]/15 text-[10px] font-semibold text-[#4CAF6E]">
-                                    {(account.name || 'A')[0].toUpperCase()}
-                                </div>
+                                <GoogleAdsIcon size={16} />
                                 <span className={`flex-1 truncate ${account.id === data.customerId ? 'text-[#E8E4DD]' : 'text-[#C4C0B6]'}`}>
                                     {account.name || account.id}
                                 </span>
@@ -135,9 +145,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 onClick={() => canSwitch && setOpen(!open)}
                 className={`flex h-9 items-center gap-2.5 rounded-md text-left transition hover:bg-[#E8E4DD]/6 ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
             >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#4CAF6E]/15 text-[12px] font-semibold text-[#4CAF6E]">
-                    {(active?.name || 'A')[0].toUpperCase()}
-                </div>
+                <GoogleAdsIcon size={20} />
                 <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#E8E4DD]">
                     {displayName}
                 </span>
@@ -153,9 +161,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                             disabled={switching}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-[#E8E4DD]/6 disabled:opacity-50"
                         >
-                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#4CAF6E]/15 text-[10px] font-semibold text-[#4CAF6E]">
-                                {(account.name || 'A')[0].toUpperCase()}
-                            </div>
+                            <GoogleAdsIcon size={16} />
                             <span className={`min-w-0 flex-1 truncate ${account.id === data.customerId ? 'text-[#E8E4DD]' : 'text-[#C4C0B6]'}`}>
                                 {account.name || account.id}
                             </span>
