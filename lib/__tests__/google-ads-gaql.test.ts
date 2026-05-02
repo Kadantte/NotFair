@@ -608,6 +608,40 @@ describe("enrichGaqlError", () => {
     expect(out).toContain("getResourceMetadata");
   });
 
+  it("does NOT classify metrics.conversion_value as virtual (real Google Ads field)", () => {
+    const out = enrichGaqlError(
+      "Unrecognized field in the query: 'metrics.conversion_value'. (query_error=32)",
+    );
+    expect(out).not.toContain("virtual field");
+    expect(out).toContain("getResourceMetadata");
+  });
+
+  it("does NOT classify customer.descriptive_name as virtual (real Google Ads field)", () => {
+    const out = enrichGaqlError(
+      "Unrecognized field in the query: 'customer.descriptive_name'. (query_error=32)",
+    );
+    expect(out).not.toContain("virtual field");
+    expect(out).toContain("getResourceMetadata");
+  });
+
+  it("identifies _value field as a virtual micros-to-currency sibling and names the raw field", () => {
+    const out = enrichGaqlError(
+      "Unrecognized field in the query: 'metrics.cost_value'. (query_error=32)",
+    );
+    expect(out).toContain("virtual field");
+    expect(out).toContain("cost_micros");
+    expect(out).not.toContain("getResourceMetadata");
+  });
+
+  it("identifies _name field as a virtual enum-to-string sibling and names the raw field", () => {
+    const out = enrichGaqlError(
+      "Unrecognized field in the query: 'campaign.bidding_strategy_type_name'. (query_error=32)",
+    );
+    expect(out).toContain("virtual field");
+    expect(out).toContain("campaign.bidding_strategy_type");
+    expect(out).not.toContain("getResourceMetadata");
+  });
+
   it("hints to switch FROM resource on metric/resource incompatibility", () => {
     const msg = "Cannot select or filter on the following metrics: 'conversions'(could not support requested resources: 'CONVERSION_ACTION'), since metric is incompatible with the resource in the FROM clause or other selected segmenting resources. (query_error=49)";
     const out = enrichGaqlError(msg);

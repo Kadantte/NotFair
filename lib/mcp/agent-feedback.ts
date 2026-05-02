@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { after } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { postToSlack } from "@/lib/slack";
 import { typedResult } from "./types";
@@ -83,6 +85,7 @@ function recordCall(
   const now = Date.now();
   const entry = sessionCounts.get(key);
   if (!entry || now - entry.windowStart > PER_SESSION_WINDOW_MS) {
+    sessionCounts.delete(key);
     sessionCounts.set(key, { count: 1, windowStart: now });
     return { allowed: true, remaining: PER_SESSION_LIMIT - 1 };
   }
@@ -109,6 +112,45 @@ function truncate(s: string | undefined | null, max: number): string | null {
  */
 function escapeSlack(s: string): string {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+/**
+ * Resolve the user's email so triage can reach the affected user. Tries
+ * sources in order of reliability:
+ *   1. `mcp_sessions.google_email` — the Google account the agent is acting
+ *      on behalf of. Authoritative for OAuth/MCP paths and the dev bypass.
+ *   2. `subscriptions.email` — Stripe billing email. Covers chat-only paths
+ *      where the user has no MCP session yet but did pay.
+ *
+ * Returns null when neither lookup matches (anon/seed/test flows). Failures
+ * are swallowed — Slack/PostHog enrichment is never load-bearing on the
+ * tool's primary success.
+ */
+async function resolveUserEmail(
+  sessionId: number | null | undefined,
+  userId: string | null | undefined,
+): Promise<string | null> {
+  try {
+    if (sessionId != null) {
+      const [row] = await db()
+        .select({ email: schema.mcpSessions.googleEmail })
+        .from(schema.mcpSessions)
+        .where(eq(schema.mcpSessions.id, sessionId))
+        .limit(1);
+      if (row?.email) return row.email;
+    }
+    if (userId) {
+      const [row] = await db()
+        .select({ email: schema.subscriptions.email })
+        .from(schema.subscriptions)
+        .where(and(eq(schema.subscriptions.userId, userId), eq(schema.subscriptions.env, "live")))
+        .limit(1);
+      if (row?.email) return row.email;
+    }
+  } catch (err) {
+    console.error("[suggestImprovement] email lookup failed:", err);
+  }
+  return null;
 }
 
 function quoteBlock(text: string, maxLen = 600): string {
@@ -176,12 +218,15 @@ export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) =
       const truncatedSuggestion = truncate(suggestion, 1000) ?? "";
       const truncatedGoal = truncate(user_goal, 500);
 
+      const userEmail = await resolveUserEmail(auth.sessionId, auth.userId);
+
       trackServerEvent(auth.userId, "mcp_improvement_suggested", {
         category,
         affected_tool,
         observation: truncatedObservation,
         suggestion: truncatedSuggestion,
         user_goal: truncatedGoal,
+        user_email: userEmail,
         client_name: auth.clientName ?? null,
         client_version: auth.clientVersion ?? null,
         auth_method: auth.authMethod ?? null,
@@ -202,6 +247,7 @@ export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) =
       const slackText = [
         `:robot_face: *Agent feedback — \`${category}\`*`,
         `*Tool:* \`${escapeSlack(affected_tool)}\`  ·  *Client:* ${escapeSlack(clientLabel)}  ·  *Session:* ${auth.sessionId ?? "n/a"}`,
+        userEmail ? `*User:* ${escapeSlack(userEmail)}` : null,
         ``,
         `*Observation:*`,
         quoteBlock(truncatedObservation),

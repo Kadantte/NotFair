@@ -1809,6 +1809,24 @@ export function rewriteInvalidDateLiterals(query: string, today: Date = new Date
  */
 export function enrichGaqlError(message: string): string {
   if (/Unrecognized fields? in the query/i.test(message)) {
+    // Check whether the unrecognized field is a MCP virtual field (_value /
+    // _name siblings added after the query runs). They look like GAQL fields
+    // but don't exist in the schema — a targeted hint beats the generic one.
+    const virtualMatch = message.match(/\b([\w.]+_(?:value|name))\b/);
+    if (virtualMatch) {
+      const field = virtualMatch[1];
+      // Exclude real Google Ads fields that end in _value (e.g. metrics.conversion_value,
+      // metrics.all_conversions_value) — those are genuine GAQL fields, not virtual siblings.
+      // Real _name fields like customer.descriptive_name are similarly excluded.
+      const isVirtualValue = field.endsWith("_value") && !/conversions?_value$/.test(field);
+      const isVirtualName = field.endsWith("_name") && !/(descriptive|resource|conversion_action)_name$/.test(field);
+      if (isVirtualValue || isVirtualName) {
+        const rawField = field.endsWith("_value")
+          ? field.replace(/_value$/, "_micros")
+          : field.replace(/_name$/, "");
+        return `${message} Tip: \`${field}\` is a virtual field added by the MCP after the query runs — it does not exist in the GAQL schema and cannot be used in SELECT or WHERE. Instead, select the raw field (\`${rawField}\`) and the MCP will automatically attach \`${field}\` to every result row.`;
+      }
+    }
     return `${message} Tip: call getResourceMetadata('<resource>') to discover valid fields before retrying.`;
   }
   if (/incompatible with the resource in the FROM clause/i.test(message)) {

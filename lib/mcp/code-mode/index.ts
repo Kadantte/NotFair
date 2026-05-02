@@ -49,6 +49,7 @@ Constants: ads.constants.RESOURCE_CHANGE_OP, CHANGE_RESOURCE_TYPE, CHANGE_CLIENT
 Rows are augmented post-fetch so you can read the LLM-friendly form directly:
 - Enum integer fields get a sibling \`<field>_name\` (canonical Google Ads enum name). Read \`bidding_strategy_type_name === "MAXIMIZE_CONVERSIONS"\`, not the integer 10. Avoids the BiddingStrategyType landmines (10=MAX_CONVERSIONS, 11=MAX_CONVERSION_VALUE, 9=TARGET_SPEND/MaxClicks, 15=TARGET_IMPRESSION_SHARE).
 - Money fields ending \`_micros\` get a sibling \`<base>_value\` in major units (\`cost_micros: 11_000_000\` ⇒ \`cost_value: 11\`). Currency-agnostic — works for USD/EUR/JPY. Raw \`_micros\` is preserved.
+⚠ IMPORTANT: \`_name\` / \`_value\` siblings are NOT GAQL fields — do NOT put them in SELECT or WHERE. They appear automatically in result rows when the corresponding raw field is selected (\`_name\` → base enum field; \`_value\` → the \`_micros\` field).
 
 ── DATE LITERALS (GAQL only supports a fixed set) ──
 

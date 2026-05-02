@@ -11,12 +11,41 @@ import { z } from "zod";
 const trackServerEvent = vi.fn();
 const postToSlack = vi.fn().mockResolvedValue(undefined);
 
+// Stubbable DB query result. Tests can swap this to control what
+// `resolveUserEmail` sees without touching a real database.
+let dbEmailResult: { email: string | null }[] = [{ email: "user@example.com" }];
+
 vi.mock("@/lib/analytics-server", () => ({
   trackServerEvent: (...args: unknown[]) => trackServerEvent(...args),
 }));
 
 vi.mock("@/lib/slack", () => ({
   postToSlack: (...args: unknown[]) => postToSlack(...args),
+}));
+
+// `resolveUserEmail` issues a `db().select().from().where().limit()` chain.
+// We don't need to differentiate `mcpSessions` vs `subscriptions` here — the
+// resolver short-circuits as soon as the first non-null email arrives, so a
+// single chainable stub returning `dbEmailResult` is enough.
+vi.mock("@/lib/db", () => {
+  const chainable = {
+    select: () => chainable,
+    from: () => chainable,
+    where: () => chainable,
+    limit: () => Promise.resolve(dbEmailResult),
+  };
+  return {
+    db: () => chainable,
+    schema: {
+      mcpSessions: { id: "id", googleEmail: "googleEmail" },
+      subscriptions: { userId: "userId", email: "email" },
+    },
+  };
+});
+
+vi.mock("drizzle-orm", () => ({
+  eq: () => ({ __eq: true }),
+  and: () => ({ __and: true }),
 }));
 
 // `next/server`'s `after()` requires an active request context, which vitest
@@ -77,6 +106,7 @@ const VALID_INPUT = {
 beforeEach(() => {
   trackServerEvent.mockClear();
   postToSlack.mockClear();
+  dbEmailResult = [{ email: "user@example.com" }];
   _resetSessionCountsForTest();
 });
 
@@ -108,6 +138,7 @@ describe("suggestImprovement tool", () => {
       auth_method: "oauth",
       session_id: 42,
       remaining_calls: 4,
+      user_email: "user@example.com",
     });
   });
 
@@ -185,6 +216,46 @@ describe("suggestImprovement tool", () => {
     await expect(
       server.call("suggestImprovement", { ...VALID_INPUT, category: "vibes" }),
     ).rejects.toThrow();
+  });
+
+  it("includes user_email in the PostHog event and the Slack message", async () => {
+    dbEmailResult = [{ email: "alice@notfair.co" }];
+    const server = makeServer();
+    registerAgentFeedbackTools(server as never, () => VALID_AUTH);
+    await server.call("suggestImprovement", VALID_INPUT);
+    await Promise.resolve();
+
+    const [, , props] = trackServerEvent.mock.calls[0];
+    expect((props as { user_email: string }).user_email).toBe("alice@notfair.co");
+
+    const [slackText] = postToSlack.mock.calls[0];
+    expect(slackText).toContain("alice@notfair.co");
+    expect(slackText).toContain("*User:*");
+  });
+
+  it("omits the User line from Slack when no email can be resolved", async () => {
+    dbEmailResult = [];
+    const server = makeServer();
+    registerAgentFeedbackTools(server as never, () => VALID_AUTH);
+    await server.call("suggestImprovement", VALID_INPUT);
+    await Promise.resolve();
+
+    const [, , props] = trackServerEvent.mock.calls[0];
+    expect((props as { user_email: string | null }).user_email).toBeNull();
+    const [slackText] = postToSlack.mock.calls[0];
+    expect(slackText).not.toContain("*User:*");
+  });
+
+  it("resolves user_email via subscriptions when sessionId is absent", async () => {
+    dbEmailResult = [{ email: "sub@example.com" }];
+    const authWithoutSession: AuthContext = { ...VALID_AUTH, sessionId: undefined as never };
+    const server = makeServer();
+    registerAgentFeedbackTools(server as never, () => authWithoutSession);
+    await server.call("suggestImprovement", VALID_INPUT);
+    await Promise.resolve();
+
+    const [, , props] = trackServerEvent.mock.calls[0];
+    expect((props as { user_email: string }).user_email).toBe("sub@example.com");
   });
 
   it("truncates oversized observation/suggestion in the event payload", async () => {

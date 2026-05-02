@@ -3,6 +3,20 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+
+## [0.3.3.3] - 2026-05-02
+
+### Added
+- **`suggestImprovement` events now include user email context.** Feedback events and Slack notifications resolve the authenticated user's Google email from the MCP session, with a live-subscription fallback when session email is unavailable.
+- **GAQL virtual-field error hints.** When agents accidentally SELECT or WHERE on MCP-only `_value` / `_name` result siblings, the GAQL error now explains that those fields are post-fetch virtual fields and points to the raw Google Ads field to query instead.
+
+### Changed
+- **`runScript` description now warns about virtual humanized fields.** Tool instructions explicitly say `_name` and `_value` siblings are added to result rows only and cannot be used in GAQL.
+
+### Fixed
+- **Avoid false positive virtual-field hints for real Google Ads fields.** Fields like `metrics.conversion_value`, `metrics.all_conversions_value`, `*.descriptive_name`, and `*.resource_name` are treated as legitimate GAQL fields.
+- **Bound `suggestImprovement` session rate-limit memory.** Expired per-session counters are deleted before re-creation to avoid unbounded growth in long-lived server processes.
+
 ## [0.3.3.2] - 2026-05-01
 
 ### Fixed
