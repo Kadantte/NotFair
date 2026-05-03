@@ -53,7 +53,6 @@ export const GROWTH_FEATURES = [
   "Everything in Free",
   "Approval-gated writes for campaign changes",
   "Bulk Google Ads workflows — keywords, ads, budgets, scripts",
-  "Latest OpenAI and Anthropic model support in chat (GPT-5.4, Claude Opus 4.7)",
   "Cancel any time — no contracts",
 ];
 

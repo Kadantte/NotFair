@@ -10,7 +10,7 @@ import type { GoogleAdsAgentUIMessage } from "@/lib/agents/google-ads-agent";
 import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 import { McpToolsSheet } from "@/components/chat/mcp-tools-sheet";
 import { useMcpTools } from "@/components/chat/use-mcp-tools";
-import { ModelSelector, type ModelId } from "@/components/chat/model-selector";
+import { UseInYourClaudePill } from "@/components/chat/model-selector";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -39,11 +39,6 @@ export function AuditChatDrawer({
   context: AuditChatContext | null;
 }) {
   const [input, setInput] = useState("");
-  const [modelId, setModelId] = useState<ModelId>("gpt-5-mini");
-  const modelIdRef = useRef<ModelId>("gpt-5-mini");
-  useEffect(() => {
-    modelIdRef.current = modelId;
-  }, [modelId]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const threadId = useRef(crypto.randomUUID());
 
@@ -52,7 +47,7 @@ export function AuditChatDrawer({
       new DefaultChatTransport({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
-          body: { id, messageId, trigger, messages, modelId: modelIdRef.current },
+          body: { id, messageId, trigger, messages },
         }),
       }),
     [],
@@ -247,7 +242,7 @@ export function AuditChatDrawer({
                 Google Ads MCP tools
               </button>
               <div className="flex items-center gap-1">
-                <ModelSelector value={modelId} onChange={setModelId} surface="audit_drawer" />
+                <UseInYourClaudePill platform="google_ads" surface="audit_drawer" />
               {isSending ? (
                 <Button
                   type="button"

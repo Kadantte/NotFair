@@ -13,7 +13,7 @@ import type { Session } from "@/lib/session";
 import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 import { McpToolsSheet } from "@/components/chat/mcp-tools-sheet";
 import { useMcpTools } from "@/components/chat/use-mcp-tools";
-import { ModelSelector, type ModelId } from "@/components/chat/model-selector";
+import { UseInYourClaudePill } from "@/components/chat/model-selector";
 
 type StoredAccount = {
   connected: boolean;
@@ -65,7 +65,6 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [account, setAccount] = useState<StoredAccount>(emptyAccount);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [modelId, setModelId] = useState<ModelId>("gpt-5-mini");
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -76,11 +75,10 @@ export default function ChatPage() {
             messageId,
             trigger,
             messages,
-            modelId,
           },
         }),
       }),
-    [modelId],
+    [],
   );
 
   const { messages, sendMessage, setMessages, status, error, stop, addToolApprovalResponse } =
@@ -349,7 +347,7 @@ export default function ChatPage() {
                 {account.platform === "meta_ads" ? "Meta Ads MCP tools" : "Google Ads MCP tools"}
               </button>
               <div className="flex items-center gap-2">
-                <ModelSelector value={modelId} onChange={setModelId} surface="chat_page" />
+                <UseInYourClaudePill platform={account.platform} surface="chat_page" />
               {isSending ? (
                 <Button
                   type="button"

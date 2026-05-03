@@ -1,15 +1,11 @@
 import { createAgentUIStream, createUIMessageStreamResponse } from "ai";
 import { and, eq } from "drizzle-orm";
-import { createGoogleAdsAgent, type ChatModelId } from "@/lib/agents/google-ads-agent";
+import { createGoogleAdsAgent } from "@/lib/agents/google-ads-agent";
 import { createMetaAdsAgent } from "@/lib/agents/meta-ads-agent";
 import { getSession, getSessionAuth } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
-import { getUserSubscription, isPlanEntitled } from "@/lib/subscription";
-
-const PAID_MODELS = new Set<ChatModelId>(["gpt-5.4", "claude-opus-4.7"]);
-const ALL_MODELS = new Set<ChatModelId>(["gpt-5-mini", "gpt-5.4", "claude-opus-4.7"]);
 
 export async function POST(request: Request) {
   const payload = await request.json();
@@ -25,21 +21,7 @@ export async function POST(request: Request) {
   const userId = session.userId;
   const platform = session.activePlatform;
 
-  // Resolve model + tool permissions BEFORE branching on platform — both
-  // branches share these.
   const toolPermissions = await getToolPermissions(userId).catch(() => ({}));
-  const requestedModel = payload.modelId as ChatModelId | undefined;
-  let modelId: ChatModelId = "gpt-5-mini";
-  if (requestedModel && ALL_MODELS.has(requestedModel)) {
-    if (PAID_MODELS.has(requestedModel)) {
-      const sub = await getUserSubscription(userId).catch(() => null);
-      if (sub && sub.plan !== "free" && isPlanEntitled(sub.status)) {
-        modelId = requestedModel;
-      }
-    } else {
-      modelId = requestedModel;
-    }
-  }
 
   // ── Build the platform-specific agent ────────────────────────────────────
   // Google Ads uses the user's refresh_token from `mcp_sessions`; Meta Ads
@@ -79,7 +61,6 @@ export async function POST(request: Request) {
       userId,
       authMethod: "chat",
       toolPermissions,
-      modelId,
     });
   } else {
     // Google Ads default. getSessionAuth still requires a customerId, so
@@ -95,7 +76,6 @@ export async function POST(request: Request) {
       userId,
       authMethod: "chat",
       toolPermissions,
-      modelId,
     });
   }
 

@@ -1,15 +1,12 @@
 import { InferAgentUIMessage, stepCountIs, ToolLoopAgent, tool, type Tool } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
 import { z, type ZodTypeAny } from "zod";
 import type { AuthContext } from "@/lib/google-ads";
 import { collectAdsTools, type CollectedTool } from "@/lib/mcp/collect";
+import { chatModel } from "@/lib/agents/model";
 import {
   defaultModeFor,
   type ToolPermissionMode,
 } from "@/lib/tool-permissions";
-
-export type ChatModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.7";
 
 type AgentAuth = {
   refreshToken: string;
@@ -18,20 +15,7 @@ type AgentAuth = {
   authMethod?: string | null;
   /** Map of toolName -> mode overrides. Unset tools fall back to defaultModeFor(readOnly). */
   toolPermissions?: Record<string, ToolPermissionMode>;
-  modelId?: ChatModelId;
 };
-
-function resolveModel(modelId: ChatModelId | undefined) {
-  switch (modelId) {
-    case "gpt-5.4":
-      return openai("gpt-5");
-    case "claude-opus-4.7":
-      return anthropic("claude-opus-4-7");
-    case "gpt-5-mini":
-    default:
-      return openai("gpt-5-mini");
-  }
-}
 
 const MAX_STEPS = 8;
 
@@ -95,7 +79,7 @@ export function createGoogleAdsAgent(agentAuth: AgentAuth) {
   }
 
   return new ToolLoopAgent({
-    model: resolveModel(agentAuth.modelId),
+    model: chatModel,
     stopWhen: stepCountIs(MAX_STEPS),
     prepareStep: ({ stepNumber }) => {
       // On the last step, force text-only response by disabling tool calls

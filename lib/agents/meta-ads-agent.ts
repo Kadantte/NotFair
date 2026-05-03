@@ -1,16 +1,13 @@
 import { InferAgentUIMessage, stepCountIs, ToolLoopAgent, tool, type Tool } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
 import { z, type ZodTypeAny } from "zod";
 import type { AuthContext } from "@/lib/google-ads";
 import { collectMetaAdsTools } from "@/lib/mcp/collect-meta";
 import type { CollectedTool } from "@/lib/mcp/collect";
+import { chatModel } from "@/lib/agents/model";
 import {
   defaultModeFor,
   type ToolPermissionMode,
 } from "@/lib/tool-permissions";
-
-export type ChatModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.7";
 
 type AgentAuth = {
   /** Long-lived Meta access token from `ad_platform_connections.refresh_token`. */
@@ -22,20 +19,7 @@ type AgentAuth = {
   userId?: string | null;
   authMethod?: string | null;
   toolPermissions?: Record<string, ToolPermissionMode>;
-  modelId?: ChatModelId;
 };
-
-function resolveModel(modelId: ChatModelId | undefined) {
-  switch (modelId) {
-    case "gpt-5.4":
-      return openai("gpt-5");
-    case "claude-opus-4.7":
-      return anthropic("claude-opus-4-7");
-    case "gpt-5-mini":
-    default:
-      return openai("gpt-5-mini");
-  }
-}
 
 const MAX_STEPS = 8;
 
@@ -101,7 +85,7 @@ export function createMetaAdsAgent(agentAuth: AgentAuth) {
   }
 
   return new ToolLoopAgent({
-    model: resolveModel(agentAuth.modelId),
+    model: chatModel,
     stopWhen: stepCountIs(MAX_STEPS),
     prepareStep: ({ stepNumber }) => {
       if (stepNumber >= MAX_STEPS - 1) {
