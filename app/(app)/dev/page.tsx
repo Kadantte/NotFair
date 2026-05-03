@@ -145,8 +145,14 @@ function readStoredTab(): Tab {
     return raw && VALID_TABS.has(raw as Tab) ? (raw as Tab) : 'customers';
 }
 
-// Module-level cache keyed by "days|source" per CLAUDE.md stale-while-revalidate pattern.
+// Module-level cache keyed by "days|source|platform" per CLAUDE.md stale-while-revalidate pattern.
 const usageStatsCache = new Map<string, UsageStats>();
+type UsagePlatform = 'all' | 'google_ads' | 'meta_ads';
+const USAGE_PLATFORM_LABELS: Record<UsagePlatform, string> = {
+    all: 'All platforms',
+    google_ads: 'Google Ads',
+    meta_ads: 'Meta Ads',
+};
 let cachedContacts: Contact[] | null = null;
 let cachedCustomers: Customer[] | null = null;
 let cachedDraftEmails: Set<string> | null = null;
@@ -155,8 +161,8 @@ export default function DevPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<Tab>('customers');
     const [usageDays, setUsageDays] = useState(30);
-    const [stats, setStats] = useState<UsageStats | null>(usageStatsCache.get('30|all') ?? null);
-    const [loading, setLoading] = useState(!usageStatsCache.has('30|all'));
+    const [stats, setStats] = useState<UsageStats | null>(usageStatsCache.get('30|all|all') ?? null);
+    const [loading, setLoading] = useState(!usageStatsCache.has('30|all|all'));
     const [error, setError] = useState<string | null>(null);
     const [contacts, setContacts] = useState<Contact[]>(cachedContacts ?? []);
     const [loadingContacts, setLoadingContacts] = useState(!cachedContacts);
@@ -172,6 +178,7 @@ export default function DevPage() {
     const [impersonatingAccountId, setImpersonatingAccountId] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [usageSource, setUsageSource] = useState<string>('all');
+    const [usagePlatform, setUsagePlatform] = useState<UsagePlatform>('all');
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
     const [growthOverride, setGrowthOverride] = useState<'on' | 'off' | null>(null);
     const [togglingGrowthOverride, setTogglingGrowthOverride] = useState(false);
@@ -383,8 +390,8 @@ export default function DevPage() {
         }
     }, []);
 
-    const fetchStats = useCallback(async ({ days, source = 'all', background = false, fresh = false }: { days: number; source?: string; background?: boolean; fresh?: boolean }) => {
-        const cacheKey = `${days}|${source}`;
+    const fetchStats = useCallback(async ({ days, source = 'all', platform = 'all', background = false, fresh = false }: { days: number; source?: string; platform?: UsagePlatform; background?: boolean; fresh?: boolean }) => {
+        const cacheKey = `${days}|${source}|${platform}`;
         const cached = usageStatsCache.get(cacheKey);
         if (cached && !fresh) {
             setStats(cached);
@@ -396,6 +403,7 @@ export default function DevPage() {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const params = new URLSearchParams({ tz, days: String(days) });
             if (source !== 'all') params.set('source', source);
+            if (platform !== 'all') params.set('platform', platform);
             if (fresh) params.set('fresh', '1');
             const res = await fetch(`/api/dev/usage?${params}`, { credentials: 'include' });
             if (res.status === 403) {
@@ -488,12 +496,12 @@ export default function DevPage() {
             // Out-of-band Gmail drafts — non-blocking.
             if (!cachedDraftEmails) fetchDraftEmails();
         } else if (activeTab === 'usage') {
-            const cacheKey = `${usageDays}|${usageSource}`;
-            fetchStats({ days: usageDays, source: usageSource, background: !!usageStatsCache.get(cacheKey) });
+            const cacheKey = `${usageDays}|${usageSource}|${usagePlatform}`;
+            fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, background: !!usageStatsCache.get(cacheKey) });
         } else if (activeTab === 'outreach') {
             fetchContacts(!!cachedContacts);
         }
-    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource, usageDays]);
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource, usageDays, usagePlatform]);
 
     // Idle prefetch of the other heavy tab so the first switch is instant.
     useEffect(() => {
@@ -501,7 +509,7 @@ export default function DevPage() {
         const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
             ?? ((cb: () => void) => window.setTimeout(cb, 800));
         const handle = idle(() => {
-            if (activeTab === 'customers' && !usageStatsCache.has(`${usageDays}|${usageSource}`)) fetchStats({ days: usageDays, source: usageSource, background: true });
+            if (activeTab === 'customers' && !usageStatsCache.has(`${usageDays}|${usageSource}|${usagePlatform}`)) fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, background: true });
             else if (activeTab === 'usage' && !cachedCustomers) {
                 fetchCustomers(true);
                 if (!cachedDraftEmails) fetchDraftEmails();
@@ -511,7 +519,7 @@ export default function DevPage() {
             const cancel = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
             if (cancel && typeof handle === 'number') cancel(handle);
         };
-    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource, usageDays]);
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource, usageDays, usagePlatform]);
 
     async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -593,28 +601,6 @@ export default function DevPage() {
                         <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        {growthOverride !== null && (
-                            <Button
-                                onClick={toggleGrowthOverride}
-                                disabled={togglingGrowthOverride}
-                                variant="outline"
-                                size="sm"
-                                title={growthOverride === 'on'
-                                    ? 'Growth override is ON — synthetic Growth plan granted. Click to turn off and use your real subscription state from the DB.'
-                                    : 'Growth override is OFF — your real subscription state from the DB applies. Click to re-enable the override.'}
-                                className={`gap-1.5 ${growthOverride === 'on'
-                                    ? 'border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] text-[#4CAF6E] hover:bg-[#4CAF6E]/[0.14]'
-                                    : 'border-[#D4882A]/40 bg-[#D4882A]/[0.08] text-[#D4882A] hover:bg-[#D4882A]/[0.14]'
-                                }`}
-                            >
-                                {togglingGrowthOverride
-                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    : <Sparkles className="w-3.5 h-3.5" />}
-                                <span className="hidden sm:inline">
-                                    Growth override: {growthOverride === 'on' ? 'ON' : 'OFF'}
-                                </span>
-                            </Button>
-                        )}
                         <Button
                             onClick={() => {
                                 usageStatsCache.clear();
@@ -625,7 +611,7 @@ export default function DevPage() {
                                     fetchCustomers(false, true);
                                     fetchDraftEmails();
                                 } else if (activeTab === 'usage') {
-                                    fetchStats({ days: usageDays, source: usageSource, fresh: true });
+                                    fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, fresh: true });
                                 } else {
                                     fetchContacts(false);
                                 }
@@ -672,6 +658,30 @@ export default function DevPage() {
                     </div>
                 ) : stats ? (
                     <>
+                        {/* ── Platform filter (applies to whole tab) ── */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {(['all', 'google_ads', 'meta_ads'] as const).map((p) => {
+                                const active = usagePlatform === p;
+                                return (
+                                    <button
+                                        key={p}
+                                        onClick={() => {
+                                            if (active) return;
+                                            setUsagePlatform(p);
+                                            fetchStats({ days: usageDays, source: usageSource, platform: p, background: !!usageStatsCache.get(`${usageDays}|${usageSource}|${p}`) });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                            active
+                                                ? 'border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.12] text-[#4CAF6E]'
+                                                : 'border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD] hover:border-[#4D4C46]'
+                                        }`}
+                                    >
+                                        {USAGE_PLATFORM_LABELS[p]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
                         {/* ── Stat tiles ── */}
                         {(() => {
                             const currCallsRate = stats.totals.calls > 0
@@ -778,7 +788,7 @@ export default function DevPage() {
                                             onChange={(e) => {
                                                 setUsageSource(e.target.value);
                                                 usageStatsCache.clear();
-                                                fetchStats({ days: usageDays, source: e.target.value });
+                                                fetchStats({ days: usageDays, source: e.target.value, platform: usagePlatform });
                                             }}
                                             className="text-xs bg-[#24231F] border border-[#3D3C36] rounded px-2 py-1 text-[#E8E4DD] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]"
                                         >
@@ -793,8 +803,8 @@ export default function DevPage() {
                                         value={usageDays}
                                         onChange={(v) => {
                                             setUsageDays(v);
-                                            const key = `${v}|${usageSource}`;
-                                            fetchStats({ days: v, source: usageSource, background: !!usageStatsCache.get(key) });
+                                            const key = `${v}|${usageSource}|${usagePlatform}`;
+                                            fetchStats({ days: v, source: usageSource, platform: usagePlatform, background: !!usageStatsCache.get(key) });
                                         }}
                                     />
                                 </div>
@@ -1576,6 +1586,39 @@ export default function DevPage() {
                 {activeTab === 'developer' && (
                     <div className="space-y-4">
                         <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">Developer Options</h2>
+
+                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F] p-4 sm:p-5">
+                            <div className="flex items-start gap-3">
+                                <div className="shrink-0 rounded-md bg-[#4CAF6E]/15 p-2">
+                                    <Sparkles className="w-4 h-4 text-[#4CAF6E]" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-sm font-semibold text-[#E8E4DD]">Growth override</h3>
+                                    <p className="mt-1 text-xs text-[#C4C0B6] leading-relaxed">
+                                        When ON, your session is granted a synthetic Growth plan regardless of
+                                        the real subscription state in the DB. Toggle OFF to test the app as
+                                        the underlying subscription tier (Free, paywalls, etc.).
+                                    </p>
+                                    <div className="mt-3">
+                                        <Button
+                                            onClick={toggleGrowthOverride}
+                                            disabled={growthOverride === null || togglingGrowthOverride}
+                                            variant="outline"
+                                            size="sm"
+                                            className={`gap-1.5 ${growthOverride === 'on'
+                                                ? 'border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] text-[#4CAF6E] hover:bg-[#4CAF6E]/[0.14]'
+                                                : 'border-[#D4882A]/40 bg-[#D4882A]/[0.08] text-[#D4882A] hover:bg-[#D4882A]/[0.14]'
+                                            }`}
+                                        >
+                                            {togglingGrowthOverride
+                                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                : <Sparkles className="w-3.5 h-3.5" />}
+                                            Growth override: {growthOverride === 'on' ? 'ON' : growthOverride === 'off' ? 'OFF (real subscription)' : '…'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="border border-[#3D3C36] rounded-xl bg-[#24231F] p-4 sm:p-5">
                             <div className="flex items-start gap-3">
