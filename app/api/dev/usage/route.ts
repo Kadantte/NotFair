@@ -1,5 +1,5 @@
 import { db, schema } from "@/lib/db";
-import { sql, desc, and, gte, lt, isNotNull, inArray } from "drizzle-orm";
+import { sql, desc, and, eq, gte, lt, isNotNull, inArray } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, dedupeCount, dedupeErrorCount } from "@/lib/dev-ops-filter";
 
@@ -11,9 +11,11 @@ import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, dedupeCount, dedupeEr
  * All counts dedupe by coalesce(request_id, id::text) so bulk fan-out tools
  * (bulkAddKeywords, moveKeywords, etc.) don't inflate call totals.
  *
- * ?days=30  — window size, 1–90 (default 30)
- * ?tz=...   — IANA timezone name for the day boundaries in `daily`
- * ?source=  — optional client_source filter, applied ONLY to `daily`
+ * ?days=30   — window size, 1–90 (default 30)
+ * ?tz=...    — IANA timezone name for the day boundaries in `daily`
+ * ?source=   — optional client_source filter, applied ONLY to `daily`
+ * ?platform= — optional ad-platform filter (`google_ads` | `meta_ads`),
+ *              applied to ALL queries so the whole tab reflects one platform
  */
 
 const PLATFORM_START = new Date("2026-03-25T00:00:00Z");
@@ -35,9 +37,14 @@ export async function GET(request: Request) {
   }
 
   const source = url.searchParams.get("source") || null;
+  const rawPlatform = url.searchParams.get("platform");
+  const platform =
+    rawPlatform === "google_ads" || rawPlatform === "meta_ads"
+      ? rawPlatform
+      : null;
   const fresh = url.searchParams.get("fresh") === "1";
 
-  const cacheKey = `${tz}|${days}`;
+  const cacheKey = `${tz}|${days}|${platform ?? "all"}`;
   if (!fresh) {
     const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
@@ -57,14 +64,18 @@ export async function GET(request: Request) {
   // Build WHERE clauses for current and previous windows.
   // excludeDevOpsFilter() uses an EXISTS subquery on mcp_sessions, which is
   // stable across both windows — so dev users are excluded from both halves.
+  const platformFilter = platform ? eq(schema.operations.platform, platform) : null;
+
   const whereRecent = and(
     gte(schema.operations.createdAt, since),
     excludeDevOpsFilter(),
+    ...(platformFilter ? [platformFilter] : []),
   );
   const wherePrev = and(
     gte(schema.operations.createdAt, prevSince),
     lt(schema.operations.createdAt, since),
     excludeDevOpsFilter(),
+    ...(platformFilter ? [platformFilter] : []),
   );
 
   const tzLiteral = sql.raw(`'${tz}'`);
@@ -119,6 +130,7 @@ export async function GET(request: Request) {
             where older.user_id = ${schema.operations.userId}
               and older.created_at < ${sinceIso}::timestamp
               AND ${excludeDevOpsFilterForAlias(sql`older.user_id`)}
+              ${platform ? sql`and older.platform = ${platform}` : sql``}
           )`,
         ),
       ),
@@ -173,6 +185,7 @@ export async function GET(request: Request) {
             WHERE o2.tool_name = ${schema.operations.toolName}
               AND o2.created_at >= ${sinceIso}::timestamp
               AND ${excludeDevOpsFilterForAlias(sql`o2.user_id`)}
+              ${platform ? sql`AND o2.platform = ${platform}` : sql``}
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
@@ -184,6 +197,7 @@ export async function GET(request: Request) {
             WHERE o2.tool_name = ${schema.operations.toolName}
               AND o2.created_at >= ${sinceIso}::timestamp
               AND ${excludeDevOpsFilterForAlias(sql`o2.user_id`)}
+              ${platform ? sql`AND o2.platform = ${platform}` : sql``}
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
         ), 0)::int`,
