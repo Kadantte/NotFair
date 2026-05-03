@@ -100,7 +100,7 @@ export async function execWrite<R extends WriteResult = WriteResult>(
   // Bulk fan-out handlers call the real Google API once upstream, then invoke
   // execWrite N times with `fn = async () => result` to log per-item rows for
   // undo/impact history. Timing the stub reads 0ms, which collapses the
-  // /dev/telemetry p50/p95 for every bulk write. The caller measures the real
+  // /dev usage tab p50/p95 for every bulk write. The caller measures the real
   // API latency and threads it in here so every fan-out row carries the same
   // honest invocation latency.
   options?: { overrideLatencyMs?: number },

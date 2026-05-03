@@ -60,7 +60,7 @@ export function buildMetaAdsHost(
   // Every host-side Graph call goes through execMetaRead so it lands an
   // `operations` row with `platform = 'meta_ads'` (telemetry parity with
   // Google's `ads.gaql` / `ads.gaqlParallel`). Without these wraps, runScript
-  // calls were invisible on /dev/telemetry/meta-ads even when they hit Graph.
+  // calls were invisible on the /dev usage tab even when they hit Graph.
   async function graph(pathArg: unknown, paramsArg?: unknown, methodArg?: unknown) {
     const path = expectString(pathArg, "ads.graph: `path` must be a string (e.g. '/me/adaccounts')");
     const params = normalizeParams(paramsArg, "ads.graph");
