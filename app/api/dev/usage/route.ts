@@ -1,5 +1,5 @@
 import { db, schema } from "@/lib/db";
-import { sql, desc, and, eq, gte, lt, isNotNull, inArray } from "drizzle-orm";
+import { sql, desc, and, eq, gte, lt, isNotNull, inArray, type SQL } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, dedupeCount, dedupeErrorCount } from "@/lib/dev-ops-filter";
 
@@ -44,7 +44,13 @@ export async function GET(request: Request) {
       : null;
   const fresh = url.searchParams.get("fresh") === "1";
 
-  const cacheKey = `${tz}|${days}|${platform ?? "all"}`;
+  // Admin escape hatch — `?includeDev=1` keeps DEV_EMAILS rows in the result
+  // so devs can verify their own activity (e.g. integration tests). Default
+  // behavior excludes them so the dashboard isn't dominated by internal
+  // testing.
+  const includeDev = url.searchParams.get("includeDev") === "1";
+
+  const cacheKey = `${tz}|${days}|${platform ?? "all"}|${includeDev ? "dev" : "prod"}`;
   if (!fresh) {
     const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
@@ -64,17 +70,21 @@ export async function GET(request: Request) {
   // Build WHERE clauses for current and previous windows.
   // excludeDevOpsFilter() uses an EXISTS subquery on mcp_sessions, which is
   // stable across both windows — so dev users are excluded from both halves.
+  // When `includeDev` is true, skip the dev exclusion so the dashboard shows
+  // activity from DEV_EMAILS (used to verify integration-test traffic).
   const platformFilter = platform ? eq(schema.operations.platform, platform) : null;
+  const devExcludeForAlias = (alias: SQL) =>
+    includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(alias)}`;
 
   const whereRecent = and(
     gte(schema.operations.createdAt, since),
-    excludeDevOpsFilter(),
+    ...(includeDev ? [] : [excludeDevOpsFilter()]),
     ...(platformFilter ? [platformFilter] : []),
   );
   const wherePrev = and(
     gte(schema.operations.createdAt, prevSince),
     lt(schema.operations.createdAt, since),
-    excludeDevOpsFilter(),
+    ...(includeDev ? [] : [excludeDevOpsFilter()]),
     ...(platformFilter ? [platformFilter] : []),
   );
 
@@ -129,7 +139,7 @@ export async function GET(request: Request) {
             select 1 from operations older
             where older.user_id = ${schema.operations.userId}
               and older.created_at < ${sinceIso}::timestamp
-              AND ${excludeDevOpsFilterForAlias(sql`older.user_id`)}
+              ${devExcludeForAlias(sql`older.user_id`)}
               ${platform ? sql`and older.platform = ${platform}` : sql``}
           )`,
         ),
@@ -184,7 +194,7 @@ export async function GET(request: Request) {
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
               AND o2.created_at >= ${sinceIso}::timestamp
-              AND ${excludeDevOpsFilterForAlias(sql`o2.user_id`)}
+              ${devExcludeForAlias(sql`o2.user_id`)}
               ${platform ? sql`AND o2.platform = ${platform}` : sql``}
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t
@@ -196,7 +206,7 @@ export async function GET(request: Request) {
             FROM operations o2
             WHERE o2.tool_name = ${schema.operations.toolName}
               AND o2.created_at >= ${sinceIso}::timestamp
-              AND ${excludeDevOpsFilterForAlias(sql`o2.user_id`)}
+              ${devExcludeForAlias(sql`o2.user_id`)}
               ${platform ? sql`AND o2.platform = ${platform}` : sql``}
             GROUP BY COALESCE(o2.request_id, o2.id::text)
           ) t

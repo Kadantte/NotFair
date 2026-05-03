@@ -161,8 +161,9 @@ export default function DevPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<Tab>('customers');
     const [usageDays, setUsageDays] = useState(30);
-    const [stats, setStats] = useState<UsageStats | null>(usageStatsCache.get('30|all|all') ?? null);
-    const [loading, setLoading] = useState(!usageStatsCache.has('30|all|all'));
+    const [includeDev, setIncludeDev] = useState(false);
+    const [stats, setStats] = useState<UsageStats | null>(usageStatsCache.get('30|all|all|prod') ?? null);
+    const [loading, setLoading] = useState(!usageStatsCache.has('30|all|all|prod'));
     const [error, setError] = useState<string | null>(null);
     const [contacts, setContacts] = useState<Contact[]>(cachedContacts ?? []);
     const [loadingContacts, setLoadingContacts] = useState(!cachedContacts);
@@ -390,8 +391,8 @@ export default function DevPage() {
         }
     }, []);
 
-    const fetchStats = useCallback(async ({ days, source = 'all', platform = 'all', background = false, fresh = false }: { days: number; source?: string; platform?: UsagePlatform; background?: boolean; fresh?: boolean }) => {
-        const cacheKey = `${days}|${source}|${platform}`;
+    const fetchStats = useCallback(async ({ days, source = 'all', platform = 'all', dev = false, background = false, fresh = false }: { days: number; source?: string; platform?: UsagePlatform; dev?: boolean; background?: boolean; fresh?: boolean }) => {
+        const cacheKey = `${days}|${source}|${platform}|${dev ? 'dev' : 'prod'}`;
         const cached = usageStatsCache.get(cacheKey);
         if (cached && !fresh) {
             setStats(cached);
@@ -404,6 +405,7 @@ export default function DevPage() {
             const params = new URLSearchParams({ tz, days: String(days) });
             if (source !== 'all') params.set('source', source);
             if (platform !== 'all') params.set('platform', platform);
+            if (dev) params.set('includeDev', '1');
             if (fresh) params.set('fresh', '1');
             const res = await fetch(`/api/dev/usage?${params}`, { credentials: 'include' });
             if (res.status === 403) {
@@ -496,12 +498,12 @@ export default function DevPage() {
             // Out-of-band Gmail drafts — non-blocking.
             if (!cachedDraftEmails) fetchDraftEmails();
         } else if (activeTab === 'usage') {
-            const cacheKey = `${usageDays}|${usageSource}|${usagePlatform}`;
-            fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, background: !!usageStatsCache.get(cacheKey) });
+            const cacheKey = `${usageDays}|${usageSource}|${usagePlatform}|${includeDev ? 'dev' : 'prod'}`;
+            fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, dev: includeDev, background: !!usageStatsCache.get(cacheKey) });
         } else if (activeTab === 'outreach') {
             fetchContacts(!!cachedContacts);
         }
-    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource, usageDays, usagePlatform]);
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource, usageDays, usagePlatform, includeDev]);
 
     // Idle prefetch of the other heavy tab so the first switch is instant.
     useEffect(() => {
@@ -509,7 +511,8 @@ export default function DevPage() {
         const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
             ?? ((cb: () => void) => window.setTimeout(cb, 800));
         const handle = idle(() => {
-            if (activeTab === 'customers' && !usageStatsCache.has(`${usageDays}|${usageSource}|${usagePlatform}`)) fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, background: true });
+            const cacheKey = `${usageDays}|${usageSource}|${usagePlatform}|${includeDev ? 'dev' : 'prod'}`;
+            if (activeTab === 'customers' && !usageStatsCache.has(cacheKey)) fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, dev: includeDev, background: true });
             else if (activeTab === 'usage' && !cachedCustomers) {
                 fetchCustomers(true);
                 if (!cachedDraftEmails) fetchDraftEmails();
@@ -519,7 +522,7 @@ export default function DevPage() {
             const cancel = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
             if (cancel && typeof handle === 'number') cancel(handle);
         };
-    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource, usageDays, usagePlatform]);
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource, usageDays, usagePlatform, includeDev]);
 
     async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -611,7 +614,7 @@ export default function DevPage() {
                                     fetchCustomers(false, true);
                                     fetchDraftEmails();
                                 } else if (activeTab === 'usage') {
-                                    fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, fresh: true });
+                                    fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, dev: includeDev, fresh: true });
                                 } else {
                                     fetchContacts(false);
                                 }
@@ -658,7 +661,7 @@ export default function DevPage() {
                     </div>
                 ) : stats ? (
                     <>
-                        {/* ── Platform filter (applies to whole tab) ── */}
+                        {/* ── Platform filter + dev toggle (apply to whole tab) ── */}
                         <div className="flex flex-wrap items-center gap-1.5">
                             {(['all', 'google_ads', 'meta_ads'] as const).map((p) => {
                                 const active = usagePlatform === p;
@@ -668,7 +671,7 @@ export default function DevPage() {
                                         onClick={() => {
                                             if (active) return;
                                             setUsagePlatform(p);
-                                            fetchStats({ days: usageDays, source: usageSource, platform: p, background: !!usageStatsCache.get(`${usageDays}|${usageSource}|${p}`) });
+                                            fetchStats({ days: usageDays, source: usageSource, platform: p, dev: includeDev, background: !!usageStatsCache.get(`${usageDays}|${usageSource}|${p}|${includeDev ? 'dev' : 'prod'}`) });
                                         }}
                                         className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                                             active
@@ -680,6 +683,36 @@ export default function DevPage() {
                                     </button>
                                 );
                             })}
+
+                            {/* Dev-traffic toggle. Default excludes DEV_EMAILS so internal
+                                test traffic doesn't dominate the charts; flip on to verify
+                                your own activity (e.g. integration tests). */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const next = !includeDev;
+                                    setIncludeDev(next);
+                                    fetchStats({
+                                        days: usageDays,
+                                        source: usageSource,
+                                        platform: usagePlatform,
+                                        dev: next,
+                                        background: !!usageStatsCache.get(`${usageDays}|${usageSource}|${usagePlatform}|${next ? 'dev' : 'prod'}`),
+                                    });
+                                }}
+                                title={
+                                    includeDev
+                                        ? 'Including DEV_EMAILS rows (your own traffic). Click to exclude.'
+                                        : 'Excluding DEV_EMAILS rows (default). Click to include your own traffic.'
+                                }
+                                className={`ml-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                    includeDev
+                                        ? 'border-[#D4882A]/40 bg-[#D4882A]/[0.12] text-[#D4882A]'
+                                        : 'border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD] hover:border-[#4D4C46]'
+                                }`}
+                            >
+                                {includeDev ? 'Including test users' : 'Excluding test users'}
+                            </button>
                         </div>
 
                         {/* ── Stat tiles ── */}
@@ -788,7 +821,7 @@ export default function DevPage() {
                                             onChange={(e) => {
                                                 setUsageSource(e.target.value);
                                                 usageStatsCache.clear();
-                                                fetchStats({ days: usageDays, source: e.target.value, platform: usagePlatform });
+                                                fetchStats({ days: usageDays, source: e.target.value, platform: usagePlatform, dev: includeDev });
                                             }}
                                             className="text-xs bg-[#24231F] border border-[#3D3C36] rounded px-2 py-1 text-[#E8E4DD] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]"
                                         >
@@ -803,8 +836,8 @@ export default function DevPage() {
                                         value={usageDays}
                                         onChange={(v) => {
                                             setUsageDays(v);
-                                            const key = `${v}|${usageSource}|${usagePlatform}`;
-                                            fetchStats({ days: v, source: usageSource, platform: usagePlatform, background: !!usageStatsCache.get(key) });
+                                            const key = `${v}|${usageSource}|${usagePlatform}|${includeDev ? 'dev' : 'prod'}`;
+                                            fetchStats({ days: v, source: usageSource, platform: usagePlatform, dev: includeDev, background: !!usageStatsCache.get(key) });
                                         }}
                                     />
                                 </div>

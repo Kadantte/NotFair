@@ -391,11 +391,137 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     }),
   );
 
+  // ─── listPageAds ────────────────────────────────────────────────────────
+  // The canonical endpoint that exercises `pages_manage_ads` — Meta docs
+  // describe this scope as "manage ads for your Page," and `/{pageId}/ads_posts`
+  // is literally the list of ad-promoting posts on a Page. Using this as the
+  // pages_manage_ads test call is more reliable than `leadgen_forms`, which
+  // Meta's tracker may classify under `leads_retrieval` instead.
+  server.registerTool(
+    "listPageAds",
+    {
+      description:
+        "List ad-promoting posts on a Page (the posts that have been or are being run as paid ads). Includes id, message, created_time, and any boost/promotion metadata Meta surfaces. Requires `pages_manage_ads` and a Page Access Token (resolved from `/me/accounts`).",
+      inputSchema: {
+        pageId: z
+          .string()
+          .describe("Page id (numeric). Must be a Page the connected user manages."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(25)
+          .describe("Max ad-posts to return."),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    safeTypedHandler(async ({ pageId, limit }) => {
+      const auth = currentAuth();
+      return execMetaRead(auth, auth.customerId, "listPageAds", async () => {
+        const accountsRes = await metaGraph<{
+          data: Array<{ id: string; access_token?: string; name?: string }>;
+        }>(auth.refreshToken, {
+          path: "/me/accounts",
+          params: { fields: "id,access_token,name" },
+        });
+        const page = (accountsRes?.data ?? []).find((p) => p.id === pageId);
+        const pageToken = page?.access_token;
+        if (!pageToken) {
+          throw new Error(
+            `listPageAds: no Page Access Token for page ${pageId} — the connected user must manage that Page.`,
+          );
+        }
+        const adsRes = await metaGraph<{ data: Array<Record<string, unknown>> }>(
+          pageToken,
+          {
+            path: `/${pageId}/ads_posts`,
+            params: { fields: "id,message,created_time,permalink_url", limit },
+          },
+        );
+        return {
+          pageId,
+          pageName: page?.name ?? null,
+          rowCount: (adsRes?.data ?? []).length,
+          ads: adsRes?.data ?? [],
+        };
+      });
+    }),
+  );
+
+  // ─── listLeadGenForms ───────────────────────────────────────────────────
+  // Lead-Gen Forms are part of Page Ads management — they're the lead-capture
+  // forms attached to Lead Ads. Reading them through `/{pageId}/leadgen_forms`
+  // is gated on `pages_manage_ads`, which makes this the cleanest tool to
+  // (a) demonstrate the scope to Meta App Review with a successful API call
+  // and (b) actually surface useful data for advertisers ("which lead forms
+  // do I have on each Page?"). Requires a Page Access Token, fetched via
+  // `/me/accounts` like getPagePostInsights does.
+  server.registerTool(
+    "listLeadGenForms",
+    {
+      description:
+        "List Lead-Gen Forms attached to a Page (used by Lead Ads to capture sign-ups, demo requests, etc.). Returns id + name per form. Requires `pages_manage_ads` because lead forms are part of Page-level ad management.",
+      inputSchema: {
+        pageId: z
+          .string()
+          .describe(
+            "Page id (numeric). Must be a Page the connected user manages.",
+          ),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(25)
+          .describe("Max forms to return."),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    safeTypedHandler(async ({ pageId, limit }) => {
+      const auth = currentAuth();
+      return execMetaRead(auth, auth.customerId, "listLeadGenForms", async () => {
+        const accountsRes = await metaGraph<{
+          data: Array<{ id: string; access_token?: string; name?: string }>;
+        }>(auth.refreshToken, {
+          path: "/me/accounts",
+          params: { fields: "id,access_token,name" },
+        });
+        const page = (accountsRes?.data ?? []).find((p) => p.id === pageId);
+        const pageToken = page?.access_token;
+        if (!pageToken) {
+          throw new Error(
+            `listLeadGenForms: no Page Access Token for page ${pageId} — the connected user must manage that Page.`,
+          );
+        }
+        const formsRes = await metaGraph<{ data: Array<Record<string, unknown>> }>(
+          pageToken,
+          {
+            path: `/${pageId}/leadgen_forms`,
+            params: { fields: "id,name,status,created_time,leads_count", limit },
+          },
+        );
+        return {
+          pageId,
+          pageName: page?.name ?? null,
+          rowCount: (formsRes?.data ?? []).length,
+          forms: formsRes?.data ?? [],
+        };
+      });
+    }),
+  );
+
   // ─── getPagePostInsights ────────────────────────────────────────────────
   // Aggregate engagement on a Page post backing a boosted-post ad — needed
   // when the user asks "how is my boosted post performing organically?" The
   // standard Ads Insights API only returns ad-level metrics; the underlying
   // post's organic engagement requires `pages_read_engagement`.
+  //
+  // Implementation note: Meta requires a Page Access Token (not the User
+  // token) for `/{post_id}/insights`, even when the user has
+  // `pages_read_engagement` granted. We fetch the Page token via
+  // `/me/accounts` (filtered to the post's owning page_id) and use it for
+  // both the /insights call and the summary fetch.
   server.registerTool(
     "getPagePostInsights",
     {
@@ -419,22 +545,59 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
     safeTypedHandler(async ({ postId, metrics }) => {
       const auth = currentAuth();
       return execMetaRead(auth, auth.customerId, "getPagePostInsights", async () => {
+        // Extract page_id from the post id (format: <page_id>_<post_id>) and
+        // resolve a Page Access Token. /insights rejects User tokens with
+        // code 190 even when pages_read_engagement is granted.
+        const pageId = postId.split("_")[0];
+        if (!pageId) {
+          throw new Error(
+            `getPagePostInsights: invalid postId "${postId}" — expected <page_id>_<post_id> format.`,
+          );
+        }
+        const accountsRes = await metaGraph<{
+          data: Array<{ id: string; access_token?: string; name?: string }>;
+        }>(auth.refreshToken, {
+          path: "/me/accounts",
+          params: { fields: "id,access_token,name" },
+        });
+        const page = (accountsRes?.data ?? []).find((p) => p.id === pageId);
+        const pageToken = page?.access_token;
+        if (!pageToken) {
+          throw new Error(
+            `getPagePostInsights: no Page Access Token for page ${pageId} — the connected user must manage that Page.`,
+          );
+        }
+
+        // Default metric set verified against Graph API v21.0. Meta pruned
+        // many post-insight metrics in 2024 — the non-`_unique` impression
+        // variants (post_impressions, post_impressions_paid, etc.),
+        // post_engaged_users, post_clicks_unique, post_negative_feedback,
+        // and post_activity are all "Invalid metric." The set below all
+        // resolved against a real Page post on v21.0.
         const metricList = (metrics && metrics.length > 0
           ? metrics
           : [
-              "post_impressions",
               "post_impressions_unique",
-              "post_engaged_users",
-              "post_reactions_by_type_total",
+              "post_impressions_paid_unique",
+              "post_impressions_organic_unique",
               "post_clicks",
+              "post_reactions_by_type_total",
             ]
         ).join(",");
-        const [insightsRes, summaryRes] = await Promise.all([
-          metaGraph<{ data: unknown[] }>(auth.refreshToken, {
+        // Two parallel calls. The summary call (likes/comments/shares) goes
+        // through the `Page Public Content Access` feature gate; until that
+        // feature clears App Review the call fails with code 10 even on a
+        // Page Access Token. Catch its failure separately so the user still
+        // gets the insights row even when the summary is blocked.
+        const [insightsRes, summaryRes] = await Promise.allSettled([
+          metaGraph<{ data: unknown[] }>(pageToken, {
             path: `/${postId}/insights`,
-            params: { metric: metricList },
+            // `period=lifetime` is required for these metrics (Meta rejects
+            // them as "invalid" without a period set, even though some docs
+            // imply the default is lifetime).
+            params: { metric: metricList, period: "lifetime" },
           }),
-          metaGraph<Record<string, unknown>>(auth.refreshToken, {
+          metaGraph<Record<string, unknown>>(pageToken, {
             path: `/${postId}`,
             params: {
               fields:
@@ -442,22 +605,38 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
             },
           }),
         ]);
-        const summary = summaryRes as {
-          id?: string;
-          created_time?: string;
-          permalink_url?: string;
-          likes?: { summary?: { total_count?: number } };
-          comments?: { summary?: { total_count?: number } };
-          shares?: { count?: number };
-        };
+
+        // Insights is the primary signal — if it failed, surface the error
+        // to the agent rather than returning a misleading empty envelope.
+        if (insightsRes.status === "rejected") throw insightsRes.reason;
+        const insightsData = insightsRes.value?.data ?? [];
+
+        // Summary is best-effort. When blocked, return nulls so the tool
+        // still resolves with the insights data the user actually got.
+        const summary = summaryRes.status === "fulfilled"
+          ? (summaryRes.value as {
+              id?: string;
+              created_time?: string;
+              permalink_url?: string;
+              likes?: { summary?: { total_count?: number } };
+              comments?: { summary?: { total_count?: number } };
+              shares?: { count?: number };
+            })
+          : null;
+
         return {
-          postId: summary.id ?? postId,
-          createdTime: summary.created_time ?? null,
-          permalinkUrl: summary.permalink_url ?? null,
-          likeCount: summary.likes?.summary?.total_count ?? null,
-          commentCount: summary.comments?.summary?.total_count ?? null,
-          shareCount: summary.shares?.count ?? null,
-          insights: insightsRes?.data ?? [],
+          postId: summary?.id ?? postId,
+          pageId,
+          pageName: page?.name ?? null,
+          createdTime: summary?.created_time ?? null,
+          permalinkUrl: summary?.permalink_url ?? null,
+          likeCount: summary?.likes?.summary?.total_count ?? null,
+          commentCount: summary?.comments?.summary?.total_count ?? null,
+          shareCount: summary?.shares?.count ?? null,
+          summaryError: summaryRes.status === "rejected"
+            ? (summaryRes.reason as Error)?.message ?? "summary fetch failed"
+            : null,
+          insights: insightsData,
         };
       });
     }),

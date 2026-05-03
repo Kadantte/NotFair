@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
 
@@ -231,13 +231,27 @@ function Connected({
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[#3D3C36] bg-[#24231F] p-6">
-        <h3 className="text-base font-semibold text-[#E8E4DD]">
-          Choose which ad accounts NotFair can access
-        </h3>
-        <p className="mt-1 text-sm text-[#C4C0B6]">
-          Check the accounts you want NotFair to manage. Re-authorize Meta if your account list
-          has changed.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-[#E8E4DD]">
+              Choose which ad accounts NotFair can access
+            </h3>
+            <p className="mt-1 text-sm text-[#C4C0B6]">
+              Check the accounts you want NotFair to manage. Re-authorize Meta if your account
+              list has changed or if you&apos;ve added new permissions to the app.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onReauthorize}
+            disabled={updating}
+            title="Run the Meta OAuth flow again to pick up new scopes (e.g. after Login Configuration changes) or refresh the account list."
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 text-sm font-medium text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Re-authorize
+          </button>
+        </div>
 
         {accounts.length === 0 ? (
           <div className="mt-4 rounded-lg border border-[#D89344]/40 bg-[#D89344]/10 px-4 py-3 text-sm text-[#D89344]">

@@ -441,6 +441,48 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
     }),
   );
 
+  // ─── renameAd ──────────────────────────────────────────────────────────
+  // POST `/{ad_id}` with a `name` update is the canonical `pages_manage_ads`
+  // write Meta accepts pre-review for app developers on their own Page-managed
+  // ads. Verified empirically: the `status` field is blocked (code 100), but
+  // `name` succeeds — Meta gates lifecycle mutations on boosted-post ads more
+  // strictly than metadata edits. Per Meta's permission docs, "manage ads
+  // for the Page" maps directly to this endpoint, so this is what their App
+  // Review test-call tracker should count toward pages_manage_ads.
+  server.registerTool(
+    "renameAd",
+    {
+      description:
+        "Rename an ad (set its `name` field). Works on every ad type the user has rights to, including boosted-Page-post ads where status writes are blocked. This is the canonical `pages_manage_ads` write — Meta's permission description maps directly to renaming/managing ads attached to a Page.",
+      inputSchema: {
+        accountId: accountIdParam,
+        adId: z.string().describe("Numeric ad id."),
+        name: z.string().min(1).max(400),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    safeTypedHandler<
+      { accountId?: string; adId: string; name: string },
+      WriteEnvelope
+    >(async ({ accountId, adId, name }) => {
+      const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
+      return execMetaWrite(targetAuth, async () => {
+        const before = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
+        await metaWritePost(targetAuth, `/${adId}`, { name });
+        const after = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
+        return {
+          success: true,
+          action: "renameAd",
+          entityType: "ad",
+          entityId: adId,
+          accountId: targetId,
+          before,
+          after,
+        };
+      });
+    }),
+  );
+
   // ─── pausePromotedPost ──────────────────────────────────────────────────
   // Boosted page-post ads cannot have their status mutated via the standard
   // `/{ad_id}` POST status=PAUSED route — Meta's Ads API rejects with code
