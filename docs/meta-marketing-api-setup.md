@@ -74,12 +74,15 @@ Sidebar: **Facebook Login for Business → Configurations → Create configurati
   - `ads_management`
   - `ads_read`
   - `business_management`
-  - `pages_show_list` (only to surface the user's Page list when a new
-    ad creative needs `object_story_spec.page_id` — *not* Page management)
+  - `pages_show_list` (surface the user's Page list when a new ad
+    creative needs `object_story_spec.page_id` — *not* Page management)
+  - `pages_read_engagement` (Meta-required sibling of `ads_management`;
+    used by `getPagePostInsights` for paid-vs-organic comparison on
+    boosted-post ads)
   - `instagram_basic`
 - Assets to request:
   - Ad accounts (read + manage)
-  - Pages (read — identity only, no engagement / management)
+  - Pages (read — identity + aggregate post engagement; no management)
   - Instagram accounts (read)
 
 Save. Note the **Configuration ID** — required in the OAuth URL.
@@ -208,12 +211,15 @@ Request **advanced access** for each:
 - `ads_read`
 - `business_management`
 - `pages_show_list`
+- `pages_read_engagement` (Meta-required sibling of `ads_management`)
 - `instagram_basic`
 
-> Page-level management permissions (`pages_manage_ads`,
-> `pages_read_engagement`, `pages_manage_posts`) are intentionally
-> **not** requested — Page-level read/write is out of scope for the
-> NotFair MCP. See `docs/meta-app-review.md` for the scope decision.
+> Page-level *management* permissions (`pages_manage_ads`,
+> `pages_manage_posts`) are intentionally **not** requested — Page-level
+> writes are out of scope for the NotFair MCP. `pages_read_engagement`
+> is the lone Page-side scope kept because Meta enforces it as a sibling
+> of `ads_management`. See `docs/meta-app-review.md` for the scope
+> decision.
 
 ### 7.1 Use case writeup (per permission)
 

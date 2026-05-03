@@ -126,6 +126,7 @@ Rules:
   • Create: createCampaign, createAdSet, createAdCreative, createAd (creation order: campaign → ad set → creative → ad). Use \`listPages\` to surface the user's Page id for object_story_spec.page_id when minting a creative. Default new entities to status=PAUSED so the user can review before launching.
   • Comprehensive updates: updateCampaign (bid strategy, schedule, special_ad_categories, …), updateAdSet (targeting, optimization_goal, billing_event, bid, schedule, …), updateAdCreative (swap creative on existing ad).
 - Boosted page-post ads cannot have their status mutated through pauseAd (Meta returns code 100). For those, use \`pauseAdSet\` on the parent ad set; pausing the underlying Page post is out of scope for this MCP and the user must use Ads Manager.
+- For boosted Page posts, the user may want to compare paid vs organic. Use \`getPagePostInsights(postId)\` with the post id from \`creative.effective_object_story_id\` (format: <page_id>_<post_id>). Returns aggregate impressions, reach, reactions, like / comment / share counts only — never individual user data.
 - Ad-set-level budget updates fail under Campaign Budget Optimization (CBO) — if updateAdSetBudget returns a CBO rejection, fall back to updateCampaignBudget on the parent.
 - IMPORTANT: Always end your response with a text summary. Never stop after tool calls without explaining the results to the user.`,
     tools,

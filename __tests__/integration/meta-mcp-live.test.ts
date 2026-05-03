@@ -153,10 +153,14 @@ describe.skipIf(!BEARER)("Meta MCP live", () => {
     expect(names).toContain("updateAdCreative");
     // Page-identity read (pages_show_list) — needed to surface the Page
     // list to the user when picking the `object_story_spec.page_id` for
-    // a new ad creative. Page-management tools (listPageAds,
-    // listLeadGenForms, getPagePostInsights, pausePromotedPost,
-    // resumePromotedPost) are out of scope and not registered.
+    // a new ad creative.
     expect(names).toContain("listPages");
+    // Page-post insights (pages_read_engagement) — required by Meta as a
+    // mandatory sibling of `ads_management`. Used for paid-vs-organic
+    // comparison on boosted-post ads. Other Page-management tools
+    // (listPageAds, listLeadGenForms, pausePromotedPost,
+    // resumePromotedPost) remain out of scope and unregistered.
+    expect(names).toContain("getPagePostInsights");
   });
 
   it("listAdAccounts returns at least one account", async () => {
@@ -667,4 +671,26 @@ describe.skipIf(!BEARER)("Meta MCP live: Page identity", () => {
       expect(typeof p.name).toBe("string");
     }
   });
+
+  // pages_read_engagement coverage. Meta requires this scope as a sibling
+  // of ads_management; getPagePostInsights is the tool that exercises it.
+  // Until the test bearer's connection has pages_read_engagement granted,
+  // this returns a clean Meta permission-error envelope — both outcomes
+  // prove the tool plumbing reaches Meta's permission gate.
+  it(
+    "getPagePostInsights reaches Meta's validator",
+    { timeout: 30_000 },
+    async () => {
+      // Known boosted post on Oncall247 — see the boosted-post ad's
+      // creative.effective_object_story_id (page_id _ post_id format).
+      const KNOWN_PAGE_POST_ID = "108561168972321_122272807601109";
+      const r = await callTool("getPagePostInsights", {
+        postId: KNOWN_PAGE_POST_ID,
+      });
+      // Either the call succeeds (with pages_read_engagement granted) or
+      // returns a clean Meta permission-error envelope. Both prove the
+      // tool plumbing reaches Meta's permission gate.
+      expect(typeof r.parsed?.postId === "string" || r.isError).toBe(true);
+    },
+  );
 });

@@ -390,4 +390,123 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
       });
     }),
   );
+
+  // ─── getPagePostInsights ────────────────────────────────────────────────
+  // Required because Meta's App Review treats `pages_read_engagement` as a
+  // mandatory sibling of `ads_management` ("Your submission must include
+  // pages_read_engagement to use ads_management"). This tool gives the
+  // permission a real, narrow use case: when a user runs ads tied to a
+  // boosted Page post, they often want to compare the ad's paid metrics
+  // (Ads Insights) against the underlying post's organic reach. The
+  // standard Ads Insights API only returns ad-level metrics; the
+  // underlying post's organic engagement requires `pages_read_engagement`.
+  //
+  // Implementation note: Meta requires a Page Access Token (not the User
+  // token) for `/{post_id}/insights`, even when the user has
+  // `pages_read_engagement` granted. We fetch the Page token via
+  // `/me/accounts` and use it for both the /insights call and the summary
+  // fetch. We do NOT mutate Page state — read-only.
+  server.registerTool(
+    "getPagePostInsights",
+    {
+      description:
+        "Aggregate engagement metrics for a Page post (typically the post backing a boosted-post ad). Returns impressions, reach, reactions, and aggregate like / comment / share counts — never individual user data. Pair with `getInsights` to compare paid + organic performance on a boosted post.",
+      inputSchema: {
+        postId: z
+          .string()
+          .describe(
+            "Page post id in `<page_id>_<post_id>` form (matches `effective_object_story_id` on a boosted-post ad's creative).",
+          ),
+        metrics: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Insight metric names. Defaults to: post_impressions_unique, post_impressions_paid_unique, post_impressions_organic_unique, post_clicks, post_reactions_by_type_total.",
+          ),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    safeTypedHandler(async ({ postId, metrics }) => {
+      const auth = currentAuth();
+      return execMetaRead(auth, auth.customerId, "getPagePostInsights", async () => {
+        const pageId = postId.split("_")[0];
+        if (!pageId) {
+          throw new Error(
+            `getPagePostInsights: invalid postId "${postId}" — expected <page_id>_<post_id> format.`,
+          );
+        }
+        const accountsRes = await metaGraph<{
+          data: Array<{ id: string; access_token?: string; name?: string }>;
+        }>(auth.refreshToken, {
+          path: "/me/accounts",
+          params: { fields: "id,access_token,name" },
+        });
+        const page = (accountsRes?.data ?? []).find((p) => p.id === pageId);
+        const pageToken = page?.access_token;
+        if (!pageToken) {
+          throw new Error(
+            `getPagePostInsights: no Page Access Token for page ${pageId} — the connected user must manage that Page.`,
+          );
+        }
+
+        const metricList = (metrics && metrics.length > 0
+          ? metrics
+          : [
+              "post_impressions_unique",
+              "post_impressions_paid_unique",
+              "post_impressions_organic_unique",
+              "post_clicks",
+              "post_reactions_by_type_total",
+            ]
+        ).join(",");
+        // Two parallel calls. The summary call (likes/comments/shares) goes
+        // through the `Page Public Content Access` feature gate; until that
+        // feature clears App Review the call fails with code 10 even on a
+        // Page Access Token. Catch its failure separately so the user still
+        // gets the insights row even when the summary is blocked.
+        const [insightsRes, summaryRes] = await Promise.allSettled([
+          metaGraph<{ data: unknown[] }>(pageToken, {
+            path: `/${postId}/insights`,
+            params: { metric: metricList, period: "lifetime" },
+          }),
+          metaGraph<Record<string, unknown>>(pageToken, {
+            path: `/${postId}`,
+            params: {
+              fields:
+                "id,created_time,permalink_url,likes.summary(true).limit(0),comments.summary(true).limit(0),shares",
+            },
+          }),
+        ]);
+
+        if (insightsRes.status === "rejected") throw insightsRes.reason;
+        const insightsData = insightsRes.value?.data ?? [];
+
+        const summary = summaryRes.status === "fulfilled"
+          ? (summaryRes.value as {
+              id?: string;
+              created_time?: string;
+              permalink_url?: string;
+              likes?: { summary?: { total_count?: number } };
+              comments?: { summary?: { total_count?: number } };
+              shares?: { count?: number };
+            })
+          : null;
+
+        return {
+          postId: summary?.id ?? postId,
+          pageId,
+          pageName: page?.name ?? null,
+          createdTime: summary?.created_time ?? null,
+          permalinkUrl: summary?.permalink_url ?? null,
+          likeCount: summary?.likes?.summary?.total_count ?? null,
+          commentCount: summary?.comments?.summary?.total_count ?? null,
+          shareCount: summary?.shares?.count ?? null,
+          summaryError: summaryRes.status === "rejected"
+            ? (summaryRes.reason as Error)?.message ?? "summary fetch failed"
+            : null,
+          insights: insightsData,
+        };
+      });
+    }),
+  );
 };

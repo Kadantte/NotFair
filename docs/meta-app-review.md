@@ -36,9 +36,9 @@ section's checkbox is ticked and screencast is uploaded.
 ## Scope decision (2026-05-03)
 
 **Scope: campaign-level full life cycle management on the ad account.**
-Page-level reads and writes (listPageAds, listLeadGenForms,
-getPagePostInsights, pausePromotedPost, resumePromotedPost) were cut to
-shrink the review surface. The five tools were deleted from
+Most Page-level reads and writes (listPageAds, listLeadGenForms,
+pausePromotedPost, resumePromotedPost) were cut to shrink the review
+surface. Those four tools were deleted from
 `lib/mcp/meta-tools/{read,write}-tools.ts` and from the agent prompt.
 
 `pages_show_list` stays in scope: every Meta ad creative requires
@@ -46,18 +46,29 @@ shrink the review surface. The five tools were deleted from
 via `listPages` when creating ads. That's a Page *identity* read, not
 Page management.
 
+`pages_read_engagement` is **kept** because Meta App Review enforces it
+as a mandatory sibling of `ads_management` ("Your submission must
+include pages_read_engagement to use ads_management"). The single tool
+that exercises it — `getPagePostInsights` — was restored in the second
+revision so the permission has a real, narrow use case (paid-vs-organic
+comparison on boosted-post ads). It is read-only and returns aggregate
+metrics only, never individual user data.
+
 ## Current MCP tool surface
 
-After the 2026-05-03 scope cut + the life cycle expansion, the Meta Ads
-MCP exposes 25 tools:
+After the 2026-05-03 scope cut + the life cycle expansion + the
+pages_read_engagement re-add, the Meta Ads MCP exposes 26 tools:
 
-**Read (8) — `ads_read` + `business_management` + `pages_show_list`:**
+**Read (9) — `ads_read` + `business_management` + `pages_show_list` +
+`pages_read_engagement`:**
 - `listAdAccounts`, `getAdAccount`
 - `listCampaigns`, `listAdSets`, `listAds`
 - `getInsights` (performance metrics at any level)
 - `runScript` (sandboxed JS with `ads.graph` / `ads.graphParallel` for
   ad-hoc joins and audits)
 - `listPages` (Page identity for ad creatives — `pages_show_list`)
+- `getPagePostInsights` (aggregate post engagement for boosted-post ads
+  — `pages_read_engagement`)
 
 **Write — status (6) — `ads_management`:**
 - `pauseCampaign` / `enableCampaign`
@@ -88,7 +99,7 @@ change before exiting the turn.
 
 ## Permissions to keep / drop
 
-**Keep (7 items):**
+**Keep (8 items):**
 - ads_management
 - Ads Management Standard Access (paired with ads_management)
 - ads_read
@@ -96,14 +107,16 @@ change before exiting the turn.
 - Business Asset User Profile Access (paired with business_management)
 - pages_show_list (Page identity for `object_story_spec.page_id` on new
   ad creatives — *not* Page management)
+- pages_read_engagement (**Meta-required** sibling of `ads_management`;
+  used by `getPagePostInsights` for paid-vs-organic comparison on
+  boosted-post ads)
 - public_profile + email (auto-granted, no description needed)
 
 **Drop:**
 - catalog_management — only needed for Commerce / Dynamic Product Ads
-- pages_manage_ads — Page-level management is now out of scope; the
-  tools that justified it (`listPageAds`, `listLeadGenForms`) have been
-  removed
-- pages_read_engagement — same reason; `getPagePostInsights` removed
+- pages_manage_ads — Page-level ad-asset management is out of scope;
+  the tools that justified it (`listPageAds`, `listLeadGenForms`) have
+  been removed
 
 ---
 
@@ -113,7 +126,7 @@ When configuring Login for Business (or building any standalone OAuth
 URL), request these and only these:
 
 ```
-ads_management,ads_read,business_management,pages_show_list,public_profile,email
+ads_management,ads_read,business_management,pages_show_list,pages_read_engagement,public_profile,email
 ```
 
 Standard Access and Business Asset User Profile Access are *features*
@@ -130,15 +143,14 @@ At <https://developers.facebook.com/apps/2032476734312233/create-login-configura
 ✅ ads_read
 ✅ business_management
 ✅ pages_show_list
-✅ public_profile     (auto)
+✅ pages_read_engagement   (Meta-required sibling of ads_management)
+✅ public_profile          (auto)
 ✅ email
-☐ pages_manage_ads        (drop)
-☐ pages_read_engagement   (drop)
+☐ pages_manage_ads         (drop)
 ```
 
-If pages_manage_ads or pages_read_engagement are currently ticked,
-untick them before submitting. Meta may auto-tick dependencies — let
-it for the *kept* permissions only.
+If pages_manage_ads is currently ticked, untick it before submitting.
+Meta may auto-tick dependencies — let it for the *kept* permissions only.
 
 ---
 
@@ -413,20 +425,81 @@ management.
 
 ## pages_manage_ads — DROPPED (out of scope)
 
-Page-level management is out of scope for this submission. The tools that
-would have justified this scope (`listPageAds` via `/{pageId}/ads_posts`,
-`listLeadGenForms` via `/{pageId}/leadgen_forms`) have been removed from
-`lib/mcp/meta-tools/read-tools.ts`. Do not request `pages_manage_ads` in
-the App Review form or the Login Configuration.
+Page-level ad-asset management is out of scope for this submission. The
+tools that would have justified this scope (`listPageAds` via
+`/{pageId}/ads_posts`, `listLeadGenForms` via `/{pageId}/leadgen_forms`)
+have been removed from `lib/mcp/meta-tools/read-tools.ts`. Do not
+request `pages_manage_ads` in the App Review form or the Login
+Configuration.
 
 ---
 
-## pages_read_engagement — DROPPED (out of scope)
+## pages_read_engagement
 
-Page-level engagement reads are out of scope. `getPagePostInsights` has
-been removed from `lib/mcp/meta-tools/read-tools.ts`. Do not request
-`pages_read_engagement` in the App Review form or the Login
-Configuration.
+> **Why this scope is in scope despite the Page-management cut:** Meta
+> App Review enforces `pages_read_engagement` as a mandatory sibling of
+> `ads_management` ("Your submission must include pages_read_engagement
+> to use ads_management"). The dependency is hardcoded on Meta's side —
+> there is no path to ship `ads_management` without it. To satisfy both
+> Meta's static dependency check and the App Review usage requirement,
+> we re-added a single read-only tool (`getPagePostInsights`) that
+> exercises this scope for a narrow, ads-adjacent purpose: comparing a
+> boosted post's paid metrics (Ads Insights) against the underlying Page
+> post's organic engagement.
+
+**Description:**
+
+```
+NotFair is an AI-agent platform (MCP server) that lets advertisers
+manage their Meta advertising conversationally through Claude, Cursor,
+and other AI assistants. When a user is reviewing a boosted Page post
+ad and asks the agent "is this boost amplifying real interest, or am I
+just buying impressions on a flat post?", the agent needs to read the
+underlying Page post's organic engagement metrics. The standard Ads
+Insights API only returns ad-level performance (CPM, CPC, ROAS); the
+Page post's organic reach, impressions, and aggregate reaction / like /
+comment / share counts require pages_read_engagement.
+
+How we use it. One tool, getPagePostInsights(postId):
+
+  1. Calls /{post_id}/insights for aggregate post_impressions_unique,
+     post_impressions_paid_unique, post_impressions_organic_unique,
+     post_clicks, and post_reactions_by_type_total.
+  2. Calls /{post_id}?fields=likes.summary,comments.summary,shares for
+     aggregate like / comment / share counts (never the underlying
+     records).
+  3. Surfaces those numbers back to the user via the AI agent so they
+     can decide whether to keep, pause, or refresh the boost.
+
+What we do NOT read. Individual comment text, individual reactor
+identities (PSIDs, names, profile pictures), follower lists, message
+threads, or any other per-user data. The tool returns aggregate counts
+and Meta's standard insight metrics — exactly the "aggregated and
+de-identified or anonymized information" allowed under Meta's stated
+policy. We do not write to Page posts; this is read-only.
+
+Why it's necessary. Two reasons:
+  1. Meta's review system enforces pages_read_engagement as a
+     mandatory sibling of ads_management. Without it, our submission
+     cannot be accepted.
+  2. The standard Ads Insights API does not expose Page-side organic
+     metrics. Without pages_read_engagement, the agent cannot answer
+     the most common follow-up question after viewing a boosted post's
+     ad performance — "what did the underlying post actually do
+     organically?" — and the user has to leave the chat to find that
+     data manually.
+```
+
+**Screencast (~30s):**
+
+1. (5s) Open Claude with the NotFair MCP server connected
+2. (10s) Type: *"How is my boosted post about [topic] performing
+   organically vs paid?"*
+3. (15s) Show the agent calling `getPagePostInsights` with the
+   `<page_id>_<post_id>` id (resolved from the boosted-post ad's
+   `creative.effective_object_story_id`), then surfacing aggregate
+   impressions / reach / likes / comments / shares alongside the paid
+   metrics from `getInsights`.
 
 ---
 
@@ -546,6 +619,9 @@ To test the Meta integration:
      verify the ad appears in Ads Manager paused (ads_management)
  14. Ask: "change the ad set's optimization goal to LANDING_PAGE_VIEWS"
      — verify the change in Ads Manager (ads_management)
+ 15. Ask: "how is my boosted post about [topic] performing organically?"
+     — verify aggregate impressions / reach / reactions / like-comment-
+     share counts return (pages_read_engagement)
 
 Test user credentials:
   Email: <CREATE A META TEST USER VIA APP DASHBOARD → ROLES → TEST USERS>
@@ -570,15 +646,18 @@ test Ad account they can manage.
 ## Order of operations
 
 1. **Update Login configuration** at `/create-login-configuration/...` —
-   tick the six in-scope permissions (`ads_management`, `ads_read`,
-   `business_management`, `pages_show_list`, `public_profile`, `email`).
-   Untick `pages_manage_ads` and `pages_read_engagement` if currently
+   tick the seven in-scope permissions (`ads_management`, `ads_read`,
+   `business_management`, `pages_show_list`, `pages_read_engagement`,
+   `public_profile`, `email`). Untick `pages_manage_ads` if currently
    ticked.
-2. **Edit submission** to drop `catalog_management`, `pages_manage_ads`,
-   and `pages_read_engagement` from the requested permissions list.
-3. **Record one master screencast** (~2.5 min) covering: connect Meta →
+2. **Edit submission** to drop `catalog_management` and
+   `pages_manage_ads` from the requested permissions list. Keep
+   `pages_read_engagement` — Meta forces it as a sibling of
+   `ads_management`.
+3. **Record one master screencast** (~3 min) covering: connect Meta →
    list accounts → list campaigns → pause/enable → budget update →
-   list Pages → create new paused campaign. Re-upload across permissions
+   list Pages → create new paused campaign → boosted-post organic
+   insights via `getPagePostInsights`. Re-upload across permissions
    where possible.
 4. For each in-scope permission, click **Get started**, paste the
    description from this doc, upload the screencast, tick the agreement
@@ -589,6 +668,7 @@ test Ad account they can manage.
    - business_management
    - Business Asset User Profile Access
    - pages_show_list
+   - pages_read_engagement
    - (`public_profile` and `email` are auto-granted; just tick the
      compliance checkbox)
 5. Complete the **Data handling** and **Reviewer instructions** sections.
