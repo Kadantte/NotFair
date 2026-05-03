@@ -4,6 +4,24 @@ All notable changes to AdsAgent will be documented in this file.
 
 
 
+## [0.3.3.5] - 2026-05-02
+
+### Added
+- **Unified `/dev` Usage tab.** One surface answers volume, error rate, and which users are running into errors — total calls, error rate, active users, and new users at the top, with trend deltas vs the prior window. Volume chart stacks reads/writes and overlays an error-rate line. New "Top Users by Errors" table is clickable through to each user's account view.
+- **Daily Active Users chart on `/dev` Usage tab.** Area chart with today / avg / peak callouts so growth is visible at a glance.
+- **Per-account Activity section on `/dev/[accountId]`.** Shows that customer's calls, errors, error rate, p50 latency, and recent errors with expandable args, scoped by the same 24h/7d/30d/90d range.
+- **Errors (30d) column on the Customers tab.** Shows error count and rate per customer, color-coded by severity, sortable by rate so the loudest broken users surface first.
+
+### Changed
+- **All `/dev` aggregates dedupe by `request_id`.** Bulk fan-out tools (`bulkAddKeywords`, `moveKeywords`, `bulkUpdateBids`) used to inflate write counts 5-7× because every fan-out row was counted separately. Counts now reflect logical invocations, matching what the old telemetry page already showed. Read counts unchanged.
+- **Default time range is 30d.** Range options are 24h / 7d / 30d / 90d; selection persists on the client.
+
+### Removed
+- **`/dev/telemetry` route deleted.** The unified Usage tab absorbs the overview, by-tool, and recent-call surfaces; per-platform telemetry subpages are gone. Per-user "recent errors" lives on `/dev/[accountId]`.
+
+### Fixed
+- **`= ANY(jsArray)` Postgres errors on dev endpoints.** Drizzle was splatting JS arrays into `(p1,p2,p3)` records, which Postgres rejected with `cannot cast type record to text[]`. Switched to `inArray()` operator.
+
 ## [0.3.3.3] - 2026-05-02
 
 ### Added
