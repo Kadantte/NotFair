@@ -1,0 +1,133 @@
+import { InferAgentUIMessage, stepCountIs, ToolLoopAgent, tool, type Tool } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { z, type ZodTypeAny } from "zod";
+import type { AuthContext } from "@/lib/google-ads";
+import { collectMetaAdsTools } from "@/lib/mcp/collect-meta";
+import type { CollectedTool } from "@/lib/mcp/collect";
+import {
+  defaultModeFor,
+  type ToolPermissionMode,
+} from "@/lib/tool-permissions";
+
+export type ChatModelId = "gpt-5-mini" | "gpt-5.4" | "claude-opus-4.7";
+
+type AgentAuth = {
+  /** Long-lived Meta access token from `ad_platform_connections.refresh_token`. */
+  refreshToken: string;
+  /** Active Meta ad account id (numeric, no `act_` prefix). */
+  customerId: string;
+  /** Every account the connection has rights to — drives the resolveAccountId allow-list. */
+  customerIds?: { id: string; name: string }[];
+  userId?: string | null;
+  authMethod?: string | null;
+  toolPermissions?: Record<string, ToolPermissionMode>;
+  modelId?: ChatModelId;
+};
+
+function resolveModel(modelId: ChatModelId | undefined) {
+  switch (modelId) {
+    case "gpt-5.4":
+      return openai("gpt-5");
+    case "claude-opus-4.7":
+      return anthropic("claude-opus-4-7");
+    case "gpt-5-mini":
+    default:
+      return openai("gpt-5-mini");
+  }
+}
+
+const MAX_STEPS = 8;
+
+type McpToolResult = {
+  content?: Array<{ type: string; text?: string }>;
+  isError?: boolean;
+};
+
+function unwrapMcpResult(result: McpToolResult): unknown {
+  const text = result.content?.find((c) => c.type === "text")?.text;
+  if (text === undefined) return null;
+  if (result.isError) return { error: text };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function adaptCollectedTool(collected: CollectedTool, mode: ToolPermissionMode): Tool {
+  // Strip `accountId` — chat is single-account, the MCP handler resolves to
+  // the session's active Meta ad account when accountId is undefined.
+  const { accountId: _accountId, ...inputShape } = collected.inputShape as Record<
+    string,
+    ZodTypeAny
+  >;
+
+  return tool({
+    description: collected.description,
+    inputSchema: z.object(inputShape),
+    needsApproval: mode === "needs_approval",
+    execute: async (args) => {
+      const result = await collected.handler({
+        ...(args as Record<string, unknown>),
+        accountId: undefined,
+      });
+      return unwrapMcpResult(result);
+    },
+  });
+}
+
+export function createMetaAdsAgent(agentAuth: AgentAuth) {
+  const authContext: AuthContext = {
+    refreshToken: agentAuth.refreshToken,
+    customerId: agentAuth.customerId,
+    customerIds:
+      agentAuth.customerIds && agentAuth.customerIds.length > 0
+        ? agentAuth.customerIds
+        : [{ id: agentAuth.customerId, name: "" }],
+    userId: agentAuth.userId ?? null,
+    authMethod: agentAuth.authMethod ?? "chat",
+    clientName: "adsagent-chat",
+  };
+
+  const collected = collectMetaAdsTools(() => authContext);
+  const overrides = agentAuth.toolPermissions ?? {};
+  const tools: Record<string, Tool> = {};
+  for (const t of collected) {
+    const readOnly = Boolean((t.annotations as { readOnlyHint?: boolean } | undefined)?.readOnlyHint);
+    const mode = overrides[t.name] ?? defaultModeFor(readOnly);
+    if (mode === "blocked") continue;
+    tools[t.name] = adaptCollectedTool(t, mode);
+  }
+
+  return new ToolLoopAgent({
+    model: resolveModel(agentAuth.modelId),
+    stopWhen: stepCountIs(MAX_STEPS),
+    prepareStep: ({ stepNumber }) => {
+      if (stepNumber >= MAX_STEPS - 1) {
+        return { toolChoice: "none" as const };
+      }
+      return {};
+    },
+    instructions: `You are NotFair, a Meta Ads (Facebook + Instagram) copilot in a chat interface.
+
+You are currently operating on one connected Meta ad account chosen by the user.
+Be precise, commercial, and action-oriented.
+
+Rules:
+- Use tools whenever the user asks about account data, campaigns, ad sets, ads, creatives, or performance.
+- For analytical questions ("how is X performing", "audit my account", "find waste") prefer ONE \`runScript\` call that fans out via \`ads.graphParallel\` (up to 20 Graph API calls in parallel). Reads are runScript-first; the per-surface read tools (listCampaigns, listAdSets, listAds, getInsights, getAdAccount) are for narrow point queries when correlation isn't needed.
+- Explain metrics in plain English and include exact numbers from tool results. Spend / budget values come from Meta in the account's MINOR currency units (cents for USD); convert before showing the user.
+- Never invent campaign performance. If data is missing, say so.
+- Never make write changes without explicit user confirmation. Always show what you plan to change, the current value, and the new value before executing.
+- Writes available: pauseCampaign / enableCampaign, pauseAdSet / enableAdSet, pauseAd / enableAd, updateCampaignBudget, updateAdSetBudget, renameCampaign, renameAd, pausePromotedPost / resumePromotedPost. There is no createCampaign/createAd in chat yet — direct the user to Ads Manager for new ad creation.
+- Boosted page-post ads cannot have their status mutated through pauseAd (Meta returns code 100). For those, use \`pauseAdSet\` on the parent ad set, or \`pausePromotedPost\` on the underlying post id.
+- Ad-set-level budget updates fail under Campaign Budget Optimization (CBO) — if updateAdSetBudget returns a CBO rejection, fall back to updateCampaignBudget on the parent.
+- IMPORTANT: Always end your response with a text summary. Never stop after tool calls without explaining the results to the user.`,
+    tools,
+  });
+}
+
+export type MetaAdsAgentUIMessage = InferAgentUIMessage<
+  ReturnType<typeof createMetaAdsAgent>
+>;

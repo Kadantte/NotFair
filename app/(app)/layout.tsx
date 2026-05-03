@@ -470,8 +470,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     active={pathname.startsWith('/chat')}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
-                    disabled={isMetaActive}
-                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Chat'); }}
                 />
             </nav>
 

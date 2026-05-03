@@ -1,6 +1,9 @@
 import { createAgentUIStream, createUIMessageStreamResponse } from "ai";
+import { and, eq } from "drizzle-orm";
 import { createGoogleAdsAgent, type ChatModelId } from "@/lib/agents/google-ads-agent";
-import { getSessionAuth } from "@/lib/session";
+import { createMetaAdsAgent } from "@/lib/agents/meta-ads-agent";
+import { getSession, getSessionAuth } from "@/lib/session";
+import { db, schema } from "@/lib/db";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
 import { getUserSubscription, isPlanEntitled } from "@/lib/subscription";
@@ -11,29 +14,25 @@ const ALL_MODELS = new Set<ChatModelId>(["gpt-5-mini", "gpt-5.4", "claude-opus-4
 export async function POST(request: Request) {
   const payload = await request.json();
   const messages = payload.messages;
-  const session = await getSessionAuth().catch(() => null);
-  const refreshToken = session?.refreshToken ?? "";
-  const customerId = session?.customerId ?? "";
 
-  if (!refreshToken || !customerId) {
-    return new Response("Missing Google Ads auth context.", { status: 400 });
+  // Use the non-strict getSession so Meta-only users (no Google customerId)
+  // can still chat. The route then dispatches on session.activePlatform.
+  const session = await getSession();
+  if (!session.connected || !session.userId) {
+    return new Response("Not authenticated.", { status: 401 });
   }
 
-  // No route-level gate. Tool calls inside the chat go through
-  // enforceRateLimit, which throws RateLimitError once a post-trial free
-  // user hits 300 ops in their current 30-day period. Paid + in-trial
-  // users bypass that check entirely. Letting chat load (instead of 402)
-  // means a capped user can still read prior threads and read-only chat.
+  const userId = session.userId;
+  const platform = session.activePlatform;
 
-  const toolPermissions = session?.userId
-    ? await getToolPermissions(session.userId).catch(() => ({}))
-    : {};
-
+  // Resolve model + tool permissions BEFORE branching on platform — both
+  // branches share these.
+  const toolPermissions = await getToolPermissions(userId).catch(() => ({}));
   const requestedModel = payload.modelId as ChatModelId | undefined;
   let modelId: ChatModelId = "gpt-5-mini";
   if (requestedModel && ALL_MODELS.has(requestedModel)) {
     if (PAID_MODELS.has(requestedModel)) {
-      const sub = session?.userId ? await getUserSubscription(session.userId).catch(() => null) : null;
+      const sub = await getUserSubscription(userId).catch(() => null);
       if (sub && sub.plan !== "free" && isPlanEntitled(sub.status)) {
         modelId = requestedModel;
       }
@@ -42,19 +41,69 @@ export async function POST(request: Request) {
     }
   }
 
-  const agent = createGoogleAdsAgent({
-    refreshToken,
-    customerId,
-    userId: session?.userId ?? null,
-    authMethod: "chat",
-    toolPermissions,
-    modelId,
-  });
+  // ── Build the platform-specific agent ────────────────────────────────────
+  // Google Ads uses the user's refresh_token from `mcp_sessions`; Meta Ads
+  // uses the long-lived access token stored on `ad_platform_connections`.
+  let agent: ReturnType<typeof createGoogleAdsAgent> | ReturnType<typeof createMetaAdsAgent>;
+  let threadAccountId: string;
 
-  // Persist thread metadata (fire-and-forget, don't block streaming)
-  const userId = session?.userId;
+  if (platform === "meta_ads") {
+    const [conn] = await db()
+      .select({
+        refreshToken: schema.adPlatformConnections.refreshToken,
+        activeAccountId: schema.adPlatformConnections.activeAccountId,
+        accountIds: schema.adPlatformConnections.accountIds,
+      })
+      .from(schema.adPlatformConnections)
+      .where(
+        and(
+          eq(schema.adPlatformConnections.userId, userId),
+          eq(schema.adPlatformConnections.platform, "meta_ads"),
+        ),
+      )
+      .limit(1);
+    if (!conn || !conn.refreshToken || !conn.activeAccountId) {
+      return new Response(
+        "No Meta Ads connection. Connect Meta at /manage-ads-accounts/meta-ads.",
+        { status: 400 },
+      );
+    }
+    threadAccountId = conn.activeAccountId;
+    agent = createMetaAdsAgent({
+      refreshToken: conn.refreshToken,
+      customerId: conn.activeAccountId,
+      customerIds: (conn.accountIds ?? []).map((a) => ({
+        id: a.id,
+        name: a.name ?? "",
+      })),
+      userId,
+      authMethod: "chat",
+      toolPermissions,
+      modelId,
+    });
+  } else {
+    // Google Ads default. getSessionAuth still requires a customerId, so
+    // ads-less users won't reach here.
+    const sessionAuth = await getSessionAuth().catch(() => null);
+    if (!sessionAuth?.refreshToken || !sessionAuth?.customerId) {
+      return new Response("Missing Google Ads auth context.", { status: 400 });
+    }
+    threadAccountId = sessionAuth.customerId;
+    agent = createGoogleAdsAgent({
+      refreshToken: sessionAuth.refreshToken,
+      customerId: sessionAuth.customerId,
+      userId,
+      authMethod: "chat",
+      toolPermissions,
+      modelId,
+    });
+  }
+
+  // Persist thread metadata (fire-and-forget, don't block streaming).
+  // accountId stores the platform-specific id: Google customer id for
+  // Google chats, Meta numeric ad-account id for Meta chats.
   const threadId = payload.id;
-  if (userId && threadId) {
+  if (threadId) {
     const firstUserMsg = messages.find((m: { role: string }) => m.role === "user");
     const title = firstUserMsg?.parts
       ?.filter((p: { type: string }) => p.type === "text")
@@ -62,7 +111,7 @@ export async function POST(request: Request) {
       ?.join(" ")
       ?.slice(0, 48) || "New chat";
 
-    upsertThread({ id: threadId, userId, accountId: customerId, title }).catch(() => {});
+    upsertThread({ id: threadId, userId, accountId: threadAccountId, title }).catch(() => {});
   }
 
   const stream = await createAgentUIStream({
@@ -71,8 +120,7 @@ export async function POST(request: Request) {
     originalMessages: messages,
     abortSignal: request.signal,
     onFinish: async ({ messages: finalMessages }) => {
-      // Save complete conversation snapshot (all messages including tool calls)
-      if (!userId || !threadId) return;
+      if (!threadId) return;
       try {
         await saveAllMessages(
           threadId,
@@ -87,7 +135,7 @@ export async function POST(request: Request) {
         await upsertThread({
           id: threadId,
           userId,
-          accountId: customerId,
+          accountId: threadAccountId,
           title: null,
         });
       } catch (err) {

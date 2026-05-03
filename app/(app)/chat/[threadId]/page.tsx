@@ -19,12 +19,15 @@ type StoredAccount = {
   connected: boolean;
   customerId: string | null;
   customerName: string | null;
+  /** "google_ads" | "meta_ads" — drives placeholders, MCP-tools sheet scope. */
+  platform: "google_ads" | "meta_ads";
 };
 
 const emptyAccount: StoredAccount = {
   connected: false,
   customerId: null,
   customerName: null,
+  platform: "google_ads",
 };
 
 const primaryPrompt = "Run an audit on my account and suggest the 3 biggest fixes with dollar impact.";
@@ -94,10 +97,20 @@ export default function ChatPage() {
       .then(async session => {
         if (cancelled) return;
         if (session.connected) {
+          const platform = session.activePlatform === "meta_ads" ? "meta_ads" : "google_ads";
+          const fallbackName = platform === "meta_ads" ? "Meta Ads Account" : "Google Ads Account";
+          // For Meta-active sessions, the Google customerId may be empty;
+          // surface the active Meta account id so the chat header still
+          // reflects which account the agent is operating on.
+          const id =
+            platform === "meta_ads"
+              ? session.activeMetaAccountId ?? null
+              : session.customerId ?? null;
           setAccount({
             connected: true,
-            customerId: session.customerId,
-            customerName: session.customerName ?? "Google Ads Account",
+            customerId: id,
+            customerName: session.customerName ?? fallbackName,
+            platform,
           });
           // Load messages for this thread
           const dbMessages = await fetchMessages(threadId).catch(() => []);
@@ -173,6 +186,7 @@ export default function ChatPage() {
   const [copied, setCopied] = useState(false);
 
   const {
+    // Re-collect tools when the user switches the active platform mid-thread.
     toolsOpen,
     setToolsOpen,
     tools,
@@ -181,7 +195,7 @@ export default function ChatPage() {
     toolsError,
     openTools,
     updatePermissions,
-  } = useMcpTools();
+  } = useMcpTools(account.platform);
 
   const isReady = isHydrated && account.connected;
   const isSending = status === "submitted" || status === "streaming";
@@ -236,7 +250,9 @@ export default function ChatPage() {
         {messages.length === 0 ? (
           <div className="flex min-h-full w-full flex-col items-center justify-center px-4 md:px-6">
             <h1 className="text-2xl font-medium text-white md:text-3xl">
-              What can I help with your Google Ads account today?
+              {account.platform === "meta_ads"
+                ? "What can I help with your Meta Ads account today?"
+                : "What can I help with your Google Ads account today?"}
             </h1>
             <div className="mx-auto mt-8 w-full max-w-3xl">
               <button
@@ -313,7 +329,13 @@ export default function ChatPage() {
             <Input
               value={input}
               onChange={event => setInput(event.currentTarget.value)}
-              placeholder={isReady ? "Reply..." : "Connect Google Ads first..."}
+              placeholder={
+                isReady
+                  ? "Reply..."
+                  : account.platform === "meta_ads"
+                    ? "Connect Meta Ads first..."
+                    : "Connect Google Ads first..."
+              }
               disabled={!isReady || isSending}
               className="h-11 border-0 bg-transparent px-2 text-base text-white shadow-none placeholder:text-[#8b8b89] focus-visible:ring-0"
             />
@@ -324,7 +346,7 @@ export default function ChatPage() {
                 className="inline-flex items-center gap-1.5 rounded-full border border-[#4a4a48] bg-[#222221] px-3 py-1.5 text-xs text-[#b0b0ae] transition-colors hover:border-[#6a6a68] hover:bg-[#3a3a39] hover:text-white"
               >
                 <Wrench className="h-3.5 w-3.5" />
-                Google Ads MCP tools
+                {account.platform === "meta_ads" ? "Meta Ads MCP tools" : "Google Ads MCP tools"}
               </button>
               <div className="flex items-center gap-2">
                 <ModelSelector value={modelId} onChange={setModelId} surface="chat_page" />

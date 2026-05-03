@@ -4,60 +4,63 @@ import { useCallback, useEffect, useState } from "react";
 import type { McpToolSummary } from "@/components/chat/mcp-tools-sheet";
 import type { ToolPermissionMode } from "@/lib/tool-permissions";
 
-let cachedMcpTools: McpToolSummary[] | null = null;
+// Per-platform tool cache so switching the active platform mid-session
+// doesn't show the wrong list while the network call is in flight.
+const cachedMcpToolsByPlatform = new Map<string, McpToolSummary[]>();
 let cachedPermissions: Record<string, ToolPermissionMode> | null = null;
 
-async function fetchMcpTools(): Promise<McpToolSummary[]> {
-  if (cachedMcpTools) return cachedMcpTools;
-  const res = await fetch("/api/mcp", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/list",
-      params: {},
-    }),
-  });
+async function fetchMcpTools(platform: string | undefined): Promise<McpToolSummary[]> {
+  const key = platform ?? "default";
+  const hit = cachedMcpToolsByPlatform.get(key);
+  if (hit) return hit;
+  const url = platform
+    ? `/api/chat/tools?platform=${encodeURIComponent(platform)}`
+    : "/api/chat/tools";
+  const res = await fetch(url, { credentials: "include" });
   if (!res.ok) throw new Error(`tools/list failed (${res.status})`);
-  const raw = await res.text();
-  const dataLine = raw
-    .split("\n")
-    .map(l => l.trim())
-    .find(l => l.startsWith("data: "));
-  if (!dataLine) throw new Error("Empty MCP response");
-  const payload = JSON.parse(dataLine.slice(6));
-  const tools = payload?.result?.tools;
-  if (!Array.isArray(tools)) throw new Error("Malformed MCP response");
-  cachedMcpTools = tools.map((t: { name: string; description?: string; annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean } }) => ({
-    name: t.name,
-    description: t.description ?? "",
-    readOnly: Boolean(t.annotations?.readOnlyHint),
-    destructive: Boolean(t.annotations?.destructiveHint),
-  }));
-  return cachedMcpTools;
+  const payload = await res.json();
+  const tools = payload?.tools;
+  if (!Array.isArray(tools)) throw new Error("Malformed tools response");
+  const summaries: McpToolSummary[] = tools.map(
+    (t: { name: string; description?: string; readOnly?: boolean; destructive?: boolean }) => ({
+      name: t.name,
+      description: t.description ?? "",
+      readOnly: Boolean(t.readOnly),
+      destructive: Boolean(t.destructive),
+    }),
+  );
+  cachedMcpToolsByPlatform.set(key, summaries);
+  return summaries;
 }
 
-export function useMcpTools() {
+export function useMcpTools(platform?: string) {
+  const platformKey = platform ?? "default";
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [tools, setTools] = useState<McpToolSummary[] | null>(cachedMcpTools);
+  const [tools, setTools] = useState<McpToolSummary[] | null>(
+    cachedMcpToolsByPlatform.get(platformKey) ?? null,
+  );
   const [permissions, setPermissions] = useState<Record<string, ToolPermissionMode>>(
     cachedPermissions ?? {},
   );
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState<string | null>(null);
 
+  // When the platform prop changes (user toggled the navbar account
+  // switcher), swap to the cached list for that platform and clear the
+  // current one so the sheet doesn't flash the wrong tool set.
+  useEffect(() => {
+    const cached = cachedMcpToolsByPlatform.get(platformKey) ?? null;
+    setTools(cached);
+  }, [platformKey]);
+
   const openTools = useCallback(async () => {
     setToolsOpen(true);
-    if ((tools && cachedPermissions) || toolsLoading) return;
+    if ((cachedMcpToolsByPlatform.get(platformKey) && cachedPermissions) || toolsLoading) return;
     setToolsLoading(true);
     setToolsError(null);
     try {
       const [fetched, permsRes] = await Promise.all([
-        fetchMcpTools(),
+        fetchMcpTools(platform),
         fetch("/api/chat/tool-permissions", { credentials: "include" }).then(r => r.json()),
       ]);
       setTools(fetched);
@@ -69,7 +72,7 @@ export function useMcpTools() {
     } finally {
       setToolsLoading(false);
     }
-  }, [tools, toolsLoading]);
+  }, [platform, platformKey, toolsLoading]);
 
   useEffect(() => {
     const onChanged = (e: Event) => {
