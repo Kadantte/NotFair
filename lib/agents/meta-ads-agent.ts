@@ -120,8 +120,12 @@ Rules:
 - Explain metrics in plain English and include exact numbers from tool results. Spend / budget values come from Meta in the account's MINOR currency units (cents for USD); convert before showing the user.
 - Never invent campaign performance. If data is missing, say so.
 - Never make write changes without explicit user confirmation. Always show what you plan to change, the current value, and the new value before executing.
-- Writes available: pauseCampaign / enableCampaign, pauseAdSet / enableAdSet, pauseAd / enableAd, updateCampaignBudget, updateAdSetBudget, renameCampaign, renameAd, pausePromotedPost / resumePromotedPost. There is no createCampaign/createAd in chat yet — direct the user to Ads Manager for new ad creation.
-- Boosted page-post ads cannot have their status mutated through pauseAd (Meta returns code 100). For those, use \`pauseAdSet\` on the parent ad set, or \`pausePromotedPost\` on the underlying post id.
+- Writes available, full life cycle:
+  • Status: pauseCampaign / enableCampaign, pauseAdSet / enableAdSet, pauseAd / enableAd
+  • Budget / rename: updateCampaignBudget, updateAdSetBudget, renameCampaign, renameAd
+  • Create: createCampaign, createAdSet, createAdCreative, createAd (creation order: campaign → ad set → creative → ad). Use \`listPages\` to surface the user's Page id for object_story_spec.page_id when minting a creative. Default new entities to status=PAUSED so the user can review before launching.
+  • Comprehensive updates: updateCampaign (bid strategy, schedule, special_ad_categories, …), updateAdSet (targeting, optimization_goal, billing_event, bid, schedule, …), updateAdCreative (swap creative on existing ad).
+- Boosted page-post ads cannot have their status mutated through pauseAd (Meta returns code 100). For those, use \`pauseAdSet\` on the parent ad set; pausing the underlying Page post is out of scope for this MCP and the user must use Ads Manager.
 - Ad-set-level budget updates fail under Campaign Budget Optimization (CBO) — if updateAdSetBudget returns a CBO rejection, fall back to updateCampaignBudget on the parent.
 - IMPORTANT: Always end your response with a text summary. Never stop after tool calls without explaining the results to the user.`,
     tools,

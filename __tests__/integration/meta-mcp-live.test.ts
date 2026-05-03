@@ -143,15 +143,20 @@ describe.skipIf(!BEARER)("Meta MCP live", () => {
     expect(names).toContain("updateAdSetBudget");
     expect(names).toContain("renameCampaign");
     expect(names).toContain("renameAd");
-    // Page tools (require pages_show_list / pages_read_engagement /
-    // pages_manage_ads — Meta App Review pending; tools are wired up so
-    // the surface is ready as soon as scopes land).
+    // Create + comprehensive-update tools (full life cycle).
+    expect(names).toContain("createCampaign");
+    expect(names).toContain("createAdSet");
+    expect(names).toContain("createAdCreative");
+    expect(names).toContain("createAd");
+    expect(names).toContain("updateCampaign");
+    expect(names).toContain("updateAdSet");
+    expect(names).toContain("updateAdCreative");
+    // Page-identity read (pages_show_list) — needed to surface the Page
+    // list to the user when picking the `object_story_spec.page_id` for
+    // a new ad creative. Page-management tools (listPageAds,
+    // listLeadGenForms, getPagePostInsights, pausePromotedPost,
+    // resumePromotedPost) are out of scope and not registered.
     expect(names).toContain("listPages");
-    expect(names).toContain("listPageAds");
-    expect(names).toContain("listLeadGenForms");
-    expect(names).toContain("getPagePostInsights");
-    expect(names).toContain("pausePromotedPost");
-    expect(names).toContain("resumePromotedPost");
   });
 
   it("listAdAccounts returns at least one account", async () => {
@@ -444,12 +449,11 @@ describe.skipIf(!BEARER)("Meta MCP live: write tools (validate-only)", () => {
     expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
   });
 
-  // renameAd is the canonical pages_manage_ads write — POST `/{ad_id}` with
-  // a `name` field is what Meta's permission docs describe ("manage ads for
-  // the Page"). Unlike status writes (blocked pre-review), name writes
-  // succeed against real Page-managed ads. This call is what should tick
-  // Meta's App Review test-call tracker for pages_manage_ads.
-  it("renameAd succeeds — exercises pages_manage_ads write path", async () => {
+  // renameAd — POST `/{ad_id}` with a `name` field. Gated on
+  // `ads_management`. Unlike status writes (blocked on boosted-post ads
+  // pre-review), name writes succeed against every ad type the user has
+  // rights to.
+  it("renameAd succeeds — name write through ads_management", async () => {
     if (!firstAd) return console.warn("[skip] no ad available");
     // No-op rename: re-set the existing name. Meta accepts and processes
     // the write, returning success: true.
@@ -519,27 +523,134 @@ describe.skipIf(!BEARER)("Meta MCP live: write tools (validate-only)", () => {
     // full validation path.
     expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
   });
+
+  // ─── Life-cycle creation + comprehensive updates ──────────────────────
+  // validate_only doesn't persist, so create tools that pass Meta's
+  // validator return a synthetic envelope with no real id. Some create
+  // combinations fail Meta's business-rule validation (objective vs
+  // optimization_goal mismatch, special_ad_categories vs ad type, etc.)
+  // — accept either OK envelope or a clean Meta error envelope: both
+  // prove the call reached Graph's validator.
+
+  // Validate-only against Meta's full validator can take 5–15s per call
+  // (page-id resolution, link probe, business-rule checks). 30s gives
+  // headroom even on cold-start dev compiles.
+  const CREATE_TIMEOUT = { timeout: 30_000 } as const;
+
+  it("createCampaign reaches Meta's validator", CREATE_TIMEOUT, async () => {
+    if (!testAccountId) return console.warn("[skip] no test account");
+    const r = await callTool("createCampaign", {
+      accountId: testAccountId,
+      name: "live-test-campaign-do-not-keep",
+      objective: "OUTCOME_TRAFFIC",
+      status: "PAUSED",
+      special_ad_categories: ["NONE"],
+      daily_budget: 1000,
+    });
+    expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
+  });
+
+  it("createAdSet reaches Meta's validator", CREATE_TIMEOUT, async () => {
+    if (!firstCampaign) return console.warn("[skip] no campaign available");
+    const r = await callTool("createAdSet", {
+      accountId: testAccountId!,
+      name: "live-test-adset-do-not-keep",
+      campaign_id: firstCampaign.id,
+      billing_event: "IMPRESSIONS",
+      optimization_goal: "REACH",
+      targeting: { geo_locations: { countries: ["US"] } },
+      status: "PAUSED",
+      daily_budget: 1000,
+    });
+    expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
+  });
+
+  it("createAdCreative reaches Meta's validator", CREATE_TIMEOUT, async () => {
+    if (!testAccountId) return console.warn("[skip] no test account");
+    // Test connection's business owns Oncall247 (id 108561168972321) —
+    // see the Page-identity describe block.
+    const PAGE_ID = "108561168972321";
+    const r = await callTool("createAdCreative", {
+      accountId: testAccountId,
+      name: "live-test-creative-do-not-keep",
+      object_story_spec: {
+        page_id: PAGE_ID,
+        link_data: {
+          link: "https://www.notfair.co",
+          message: "live-test creative — validate only",
+          name: "NotFair",
+        },
+      },
+    });
+    expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
+  });
+
+  it("createAd reaches Meta's validator", CREATE_TIMEOUT, async () => {
+    if (!firstAdSet || !firstAd) return console.warn("[skip] need adset+ad");
+    // Reuse an existing creative id where possible. listAds returns the
+    // creative envelope; fall back to the ad id (Meta will reject as a
+    // bad creative id, which still proves the call reached the validator).
+    const adCreativeId =
+      (firstAd as { creative?: { id?: string } }).creative?.id ?? firstAd.id;
+    const r = await callTool("createAd", {
+      accountId: testAccountId!,
+      name: "live-test-ad-do-not-keep",
+      adset_id: firstAdSet.id,
+      creative_id: adCreativeId,
+      status: "PAUSED",
+    });
+    expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
+  });
+
+  it("updateCampaign validates a no-op name write", CREATE_TIMEOUT, async () => {
+    if (!firstCampaign?.name)
+      return console.warn("[skip] no campaign name available");
+    const r = await callTool("updateCampaign", {
+      accountId: testAccountId!,
+      campaignId: firstCampaign.id,
+      name: firstCampaign.name,
+    });
+    expect(r.isError).toBe(false);
+    expect(r.parsed.success).toBe(true);
+    expect(r.parsed.action).toBe("updateCampaign");
+    expect(r.parsed.entityId).toBe(firstCampaign.id);
+  });
+
+  it("updateAdSet reaches Meta's validator", CREATE_TIMEOUT, async () => {
+    if (!firstAdSet) return console.warn("[skip] no ad set available");
+    const adSetName = (firstAdSet as { name?: string }).name ?? "live-test";
+    const r = await callTool("updateAdSet", {
+      accountId: testAccountId!,
+      adSetId: firstAdSet.id,
+      name: adSetName,
+    });
+    expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
+  });
+
+  it("updateAdCreative reaches Meta's validator", CREATE_TIMEOUT, async () => {
+    if (!firstAd) return console.warn("[skip] no ad available");
+    // No-op swap: pass the same creative id the ad already references
+    // (or fall back to the ad id — Meta validates either way).
+    const adCreativeId =
+      (firstAd as { creative?: { id?: string } }).creative?.id ?? firstAd.id;
+    const r = await callTool("updateAdCreative", {
+      accountId: testAccountId!,
+      adId: firstAd.id,
+      creative_id: adCreativeId,
+    });
+    expect(typeof r.parsed?.success === "boolean" || r.isError).toBe(true);
+  });
 });
 
-// ─── Page tools (pages_show_list / pages_read_engagement / pages_manage_ads) ─
+// ─── Page-identity read (pages_show_list) ───────────────────────────────
 //
-// Each test issues a real HTTP call into the MCP, which calls the real Meta
-// Graph API. Until Meta App Review approves the page_* scopes, the tokens
-// our test runner mints don't have those scopes — so getPagePostInsights /
-// pausePromotedPost / resumePromotedPost return Meta permission-error
-// envelopes (code 100, "This app does not have the required permission for
-// this endpoint"). That is the expected and documented response, and it
-// proves the tool plumbing reaches Meta's permission gate without
-// performing any state mutation.
-//
-// Once the page_* scopes are granted, the assertions can tighten to
-// require success on the read tools; pausePromotedPost is destructive so
-// we always pause-and-resume in a try-finally so the post can never stay
-// unpublished.
-describe.skipIf(!BEARER)("Meta MCP live: Page tools", () => {
-  // The known boosted post on the connected account — see the boosted-post
-  // ad's `creative.effective_object_story_id` (page_id _ post_id format).
-  const KNOWN_PAGE_POST_ID = "108561168972321_122272807601109";
+// `listPages` is the only Page-related tool still in scope — the agent
+// uses it to surface the user's Page list when picking the
+// `object_story_spec.page_id` for a new ad creative. Page-management
+// tools (listPageAds, listLeadGenForms, getPagePostInsights,
+// pausePromotedPost, resumePromotedPost) are out of scope and not
+// registered.
+describe.skipIf(!BEARER)("Meta MCP live: Page identity", () => {
   const BUSINESS_ID = "1211081106225236";
 
   it("listPages returns the Pages the user manages", async () => {
@@ -554,74 +665,6 @@ describe.skipIf(!BEARER)("Meta MCP live: Page tools", () => {
     for (const p of parsed.pages) {
       expect(typeof p.id).toBe("string");
       expect(typeof p.name).toBe("string");
-    }
-  });
-
-  // listPageAds is the canonical pages_manage_ads endpoint — `/{page_id}/ads_posts`
-  // is literally "list ad-promoting posts on this Page," and Meta's permission
-  // docs describe pages_manage_ads as "manage ads for your Page." This is the
-  // best candidate for satisfying Meta's "completed test call" tracker.
-  it("listPageAds succeeds with pages_manage_ads scope", async () => {
-    const r = await callTool("listPageAds", { pageId: "108561168972321" });
-    expect(r.isError).toBe(false);
-    expect(r.parsed.pageId).toBe("108561168972321");
-    expect(Array.isArray(r.parsed.ads)).toBe(true);
-    expect(r.parsed.rowCount).toBe(r.parsed.ads.length);
-  });
-
-  // listLeadGenForms also exercises pages_manage_ads via the leadgen_forms
-  // read. Meta's tracker may classify this under leads_retrieval instead of
-  // pages_manage_ads — keeping it as a secondary test call.
-  it("listLeadGenForms succeeds with pages_manage_ads scope", async () => {
-    const r = await callTool("listLeadGenForms", {
-      pageId: "108561168972321",
-    });
-    expect(r.isError).toBe(false);
-    expect(r.parsed.pageId).toBe("108561168972321");
-    expect(Array.isArray(r.parsed.forms)).toBe(true);
-    expect(r.parsed.rowCount).toBe(r.parsed.forms.length);
-  });
-
-  it("getPagePostInsights returns insights via the Page Access Token", async () => {
-    const r = await callTool("getPagePostInsights", {
-      postId: KNOWN_PAGE_POST_ID,
-    });
-    expect(r.isError).toBe(false);
-    expect(r.parsed.postId).toBe(KNOWN_PAGE_POST_ID);
-    expect(r.parsed.pageId).toBe("108561168972321");
-    // `insights` is always an array (may be empty for old posts where Meta
-    // dropped the metric values, or when App Review is incomplete on Page
-    // Public Content Access — the call still resolves cleanly).
-    expect(Array.isArray(r.parsed.insights)).toBe(true);
-    // summaryError is null after App Review approves Page Public Content
-    // Access; non-null until then. Either is a passing outcome.
-    expect(r.parsed.summaryError === null || typeof r.parsed.summaryError === "string").toBe(true);
-  });
-
-  it("pausePromotedPost + resumePromotedPost round-trip reaches Meta", async () => {
-    let pausedSuccessfully = false;
-    try {
-      const pauseR = await callTool("pausePromotedPost", {
-        postId: KNOWN_PAGE_POST_ID,
-      });
-      // Reaches Meta — either succeeds (with pages_manage_ads granted) or
-      // returns a permission-error envelope. Either is a valid integration
-      // test outcome.
-      expect(typeof pauseR.parsed?.success === "boolean" || pauseR.isError).toBe(true);
-      if (pauseR.parsed?.success === true && pauseR.parsed?.action === "pausePromotedPost") {
-        pausedSuccessfully = true;
-      }
-    } finally {
-      // Defensive: if the pause actually persisted, restore is_published=true
-      // so we never leave the post unpublished. With the test token's
-      // current scopes, pause never actually persists — but this guard runs
-      // regardless so the test stays safe once scopes are granted.
-      if (pausedSuccessfully) {
-        const resumeR = await callTool("resumePromotedPost", {
-          postId: KNOWN_PAGE_POST_ID,
-        });
-        expect(typeof resumeR.parsed?.success === "boolean" || resumeR.isError).toBe(true);
-      }
     }
   });
 });

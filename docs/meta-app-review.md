@@ -33,42 +33,112 @@ section's checkbox is ticked and screencast is uploaded.
 
 ---
 
+## Scope decision (2026-05-03)
+
+**Scope: campaign-level full life cycle management on the ad account.**
+Page-level reads and writes (listPageAds, listLeadGenForms,
+getPagePostInsights, pausePromotedPost, resumePromotedPost) were cut to
+shrink the review surface. The five tools were deleted from
+`lib/mcp/meta-tools/{read,write}-tools.ts` and from the agent prompt.
+
+`pages_show_list` stays in scope: every Meta ad creative requires
+`object_story_spec.page_id`, so the agent surfaces the user's Page list
+via `listPages` when creating ads. That's a Page *identity* read, not
+Page management.
+
+## Current MCP tool surface
+
+After the 2026-05-03 scope cut + the life cycle expansion, the Meta Ads
+MCP exposes 25 tools:
+
+**Read (8) — `ads_read` + `business_management` + `pages_show_list`:**
+- `listAdAccounts`, `getAdAccount`
+- `listCampaigns`, `listAdSets`, `listAds`
+- `getInsights` (performance metrics at any level)
+- `runScript` (sandboxed JS with `ads.graph` / `ads.graphParallel` for
+  ad-hoc joins and audits)
+- `listPages` (Page identity for ad creatives — `pages_show_list`)
+
+**Write — status (6) — `ads_management`:**
+- `pauseCampaign` / `enableCampaign`
+- `pauseAdSet` / `enableAdSet`
+- `pauseAd` / `enableAd`
+
+**Write — focused edits (4) — `ads_management`:**
+- `updateCampaignBudget`, `updateAdSetBudget`
+- `renameCampaign`, `renameAd`
+
+**Write — creation (4) — `ads_management`:**
+- `createCampaign` (POST /act_{id}/campaigns)
+- `createAdSet` (POST /act_{id}/adsets, with full targeting spec)
+- `createAdCreative` (POST /act_{id}/adcreatives, requires `page_id`
+  surfaced from `listPages`)
+- `createAd` (POST /act_{id}/ads, links existing ad set + creative)
+
+**Write — comprehensive updates (3) — `ads_management`:**
+- `updateCampaign` (bid_strategy, schedule, special_ad_categories,
+  budget, name, status — anything not on the focused tools)
+- `updateAdSet` (targeting, optimization_goal, billing_event, bid,
+  schedule, budget, promoted_object — anything not on the focused tools)
+- `updateAdCreative` (swap creative on an existing ad)
+
+All writes default new entities to `status=PAUSED` and return a
+`{ before, after }` snapshot envelope so the agent can confirm the
+change before exiting the turn.
+
 ## Permissions to keep / drop
 
-**Keep (9 items):**
+**Keep (7 items):**
 - ads_management
 - Ads Management Standard Access (paired with ads_management)
 - ads_read
 - business_management
 - Business Asset User Profile Access (paired with business_management)
-- pages_show_list
-- pages_manage_ads
-- pages_read_engagement (Meta requires it as sibling to ads_management)
+- pages_show_list (Page identity for `object_story_spec.page_id` on new
+  ad creatives — *not* Page management)
 - public_profile + email (auto-granted, no description needed)
 
 **Drop:**
 - catalog_management — only needed for Commerce / Dynamic Product Ads
-- (originally pages_read_engagement was on the drop list — keep it, it's
-  required by ads_management)
+- pages_manage_ads — Page-level management is now out of scope; the
+  tools that justified it (`listPageAds`, `listLeadGenForms`) have been
+  removed
+- pages_read_engagement — same reason; `getPagePostInsights` removed
+
+---
+
+## OAuth scope string
+
+When configuring Login for Business (or building any standalone OAuth
+URL), request these and only these:
+
+```
+ads_management,ads_read,business_management,pages_show_list,public_profile,email
+```
+
+Standard Access and Business Asset User Profile Access are *features*
+attached to permissions in the App Review UI, not separate OAuth scopes.
 
 ---
 
 ## Login Configuration
 
-Tick the same five at <https://developers.facebook.com/apps/2032476734312233/create-login-configuration/>:
+At <https://developers.facebook.com/apps/2032476734312233/create-login-configuration/>:
 
 ```
 ✅ ads_management
 ✅ ads_read
 ✅ business_management
+✅ pages_show_list
 ✅ public_profile     (auto)
 ✅ email
-✅ pages_show_list
-✅ pages_manage_ads
-✅ pages_read_engagement
+☐ pages_manage_ads        (drop)
+☐ pages_read_engagement   (drop)
 ```
 
-Meta may auto-tick dependencies — let it.
+If pages_manage_ads or pages_read_engagement are currently ticked,
+untick them before submitting. Meta may auto-tick dependencies — let
+it for the *kept* permissions only.
 
 ---
 
@@ -80,43 +150,62 @@ Meta may auto-tick dependencies — let it.
 NotFair is a Model Context Protocol (MCP) server that lets users manage their
 Meta Ads accounts conversationally through AI agents like Claude and Cursor.
 After the user OAuths into their Meta account, they ask the agent natural-
-language questions like "pause my underperforming campaigns" or "increase
-my CPC ad set's daily budget by 20%." The agent calls our MCP tools
-(pauseCampaign, enableCampaign, pauseAdSet, enableAdSet, pauseAd, enableAd,
-updateCampaignBudget, updateAdSetBudget, renameCampaign) which then call
-the Meta Marketing API on the user's behalf.
+language questions like "pause my underperforming campaigns," "increase my
+CPC ad set's daily budget by 20%," or "create a new traffic campaign with a
+$10/day budget targeting US 25–45." The agent calls our MCP tools, which
+then call the Meta Marketing API on the user's behalf.
 
-We use ads_management to:
-  1. Pause / re-enable campaigns, ad sets, and individual ads on the user's
-     account when they ask the agent to do so.
-  2. Update daily / lifetime budgets on campaigns and ad sets.
-  3. Rename campaigns.
-  4. (Future) Create new campaigns, ad sets, and ads end-to-end via natural
-     language.
+We use ads_management for the full campaign / ad set / ad life cycle:
+
+  1. Status changes — pauseCampaign, enableCampaign, pauseAdSet, enableAdSet,
+     pauseAd, enableAd. POST /{id} with status=PAUSED|ACTIVE.
+
+  2. Budget edits — updateCampaignBudget, updateAdSetBudget. POST /{id}
+     with daily_budget or lifetime_budget. (Ad-set budget under CBO is
+     handled by falling back to the campaign budget.)
+
+  3. Rename — renameCampaign, renameAd. POST /{id} with name.
+
+  4. Creation — createCampaign (POST /act_{id}/campaigns),
+     createAdSet (POST /act_{id}/adsets), createAdCreative
+     (POST /act_{id}/adcreatives), createAd (POST /act_{id}/ads). All
+     newly created entities default to status=PAUSED so the user reviews
+     the change in chat (and in Ads Manager) before launching.
+
+  5. Comprehensive updates — updateCampaign covers bid_strategy,
+     start_time/stop_time, special_ad_categories. updateAdSet covers
+     targeting (geo / age / gender / interest / placement spec),
+     optimization_goal, billing_event, bid_amount/bid_strategy, schedule,
+     and Advantage+ promoted_object. updateAdCreative swaps the creative
+     on an existing ad to support A/B testing and creative refresh.
 
 We need Advanced Access because our users are managing their own Meta Ads
-accounts, not accounts owned by NotFair's developers. Standard Access blocks
-campaign creation on those user-owned accounts (Meta returns code 100), so
-the core "create me a new traffic campaign" use case cannot be served
-without Advanced Access.
+accounts, not accounts owned by NotFair's developers. Standard Access
+blocks campaign creation and most mutations on user-owned accounts (Meta
+returns code 100), so the core "create me a new traffic campaign" and
+"pause my underperformers" use cases cannot be served without it.
 
-Adds value: lets users run their Meta Ads from a chat interface instead of
-clicking through Ads Manager UI. Each tool returns a before / after snapshot
-so the agent can confirm the change landed and the user can approve before
-the next action.
+Adds value: lets users run the entire Meta Ads life cycle from a chat
+interface instead of clicking through Ads Manager UI. Each write tool
+returns a before / after snapshot so the agent can confirm the change
+landed, and the user can approve in chat before the next action is taken.
 
-Necessary because: every write tool listed above hits the Marketing API
-mutation endpoints, which require ads_management.
+Necessary because: every write tool listed above hits Meta's Marketing
+API mutation endpoints (POST against campaigns / adsets / adcreatives /
+ads), which require ads_management.
 ```
 
-**Screencast (60-90s):**
+**Screencast (90-120s):**
 
 1. (5s) Open Claude with the NotFair MCP server connected
 2. (10s) Type: *"List my Meta ad campaigns"* → show `listCampaigns` calling, results
-3. (15s) Type: *"Pause the campaign called 'Promoting bulkgpt.ai'"* → show `pauseCampaign` running, response confirming `status: PAUSED`
-4. (10s) Switch to Ads Manager — show the campaign is now Paused
-5. (15s) Type: *"Re-enable that campaign"* → show `enableCampaign`, response confirming
-6. (10s) Type: *"Update its daily budget to $10"* → show `updateCampaignBudget`, response confirming new budget
+3. (10s) Type: *"Pause the campaign called 'Promoting bulkgpt.ai'"* → show `pauseCampaign` running, response confirming `status: PAUSED`; refresh Ads Manager to verify
+4. (10s) Type: *"Re-enable that campaign"* → show `enableCampaign`, response confirming
+5. (10s) Type: *"Update its daily budget to $10"* → show `updateCampaignBudget`, response confirming new budget
+6. (15s) Type: *"Create a new paused traffic campaign called 'Demo'"* → show `createCampaign` returning a new id; refresh Ads Manager to verify the campaign exists and is paused
+7. (15s) Type: *"Add an ad set targeting US 25–45 with a $5/day budget"* → show `createAdSet` running with a targeting spec, returning a new ad-set id
+8. (15s) Type: *"Now create the ad creative with my Oncall247 page and link it as a new ad"* → show `listPages` resolving the page id, `createAdCreative` minting a creative, and `createAd` linking creative to ad set; refresh Ads Manager to verify the new ad
+9. (10s) Type: *"Change the ad set's optimization goal to LANDING_PAGE_VIEWS"* → show `updateAdSet` mutating optimization_goal, response confirming
 
 ---
 
@@ -322,97 +411,22 @@ management.
 
 ---
 
-## pages_manage_ads
+## pages_manage_ads — DROPPED (out of scope)
 
-**Description:**
-
-```
-NotFair lets users manage their Meta-side advertising — including boosted
-Page posts — conversationally through AI agents. Boosted Page posts cannot
-be paused via the standard Ads API; Meta returns code 100 because the
-lifecycle is owned by the Page promote system. When a user says "pause
-that boosted post," the agent must use Page-level mutation to end the
-active boost.
-
-We use pages_manage_ads in two tools:
-
-  1. pausePromotedPost(postId) — sets `is_published=false` on the Page
-     post, which ends every active boost on it. Reversible.
-
-  2. resumePromotedPost(postId) — sets `is_published=true` to restore a
-     paused post.
-
-We do not modify Page profile data, settings, branding, or any
-non-promotion content. The only mutation is publishing/unpublishing posts
-that the user explicitly asks the agent to pause or resume.
-
-Adds value: pauses boosted posts via natural-language requests instead of
-forcing the user to navigate Page Promote UI in Ads Manager.
-
-Necessary because Meta's `/{ad_id}` POST status=PAUSED returns code 100 on
-boosted-post ad types, so the standard pauseAd path cannot fulfill these
-user requests.
-```
-
-**Screencast (~45s):**
-
-1. (5s) Open Claude with the NotFair MCP server connected
-2. (5s) Show the boosted post in Ads Manager — currently Active
-3. (10s) Type: *"Pause my boosted post about [topic]"*
-4. (15s) Show the agent calling `pausePromotedPost`, response confirming
-5. (10s) Refresh Ads Manager — show the post now unpublished / promotion ended
+Page-level management is out of scope for this submission. The tools that
+would have justified this scope (`listPageAds` via `/{pageId}/ads_posts`,
+`listLeadGenForms` via `/{pageId}/leadgen_forms`) have been removed from
+`lib/mcp/meta-tools/read-tools.ts`. Do not request `pages_manage_ads` in
+the App Review form or the Login Configuration.
 
 ---
 
-## pages_read_engagement
+## pages_read_engagement — DROPPED (out of scope)
 
-**Description:**
-
-```
-NotFair is an AI-agent platform (MCP server) that lets Page Admins manage
-their Meta advertising conversationally through Claude, Cursor, and other
-AI assistants. When an admin asks the agent "how is my boosted post
-performing organically?" or "are my Page posts driving the engagement my
-ads are paying for?", the agent needs to read the underlying Page post's
-engagement metrics. Meta's standard Ads Insights API only returns ad-level
-performance (CPM, CPC, ROAS); the post's organic reach, impressions,
-reactions, and comment / share volume require pages_read_engagement.
-
-How we use it. One tool, getPagePostInsights(postId):
-
-  1. Calls /{post_id}/insights for aggregate impressions, reach,
-     engaged-users, reactions-by-type, and click counts.
-  2. Calls /{post_id}?fields=likes.summary,comments.summary,shares for
-     aggregate like / comment / share counts (never the underlying records).
-  3. Surfaces those numbers back to the user via the AI agent.
-
-What we do NOT read. Individual comment text, individual reactor identities
-(PSIDs, names, profile pictures), follower lists, message threads, or any
-other per-user data. The only thing the tool returns is aggregate counts
-and Meta's standard insight metrics — exactly the "aggregated and
-de-identified or anonymized information" allowed under Meta's stated policy.
-
-Value for the Page Admin. Lets an admin compare paid vs organic performance
-on a boosted post in a single conversational request — "is the boost
-amplifying real interest, or am I just buying impressions on a flat post?"
-— without exporting CSVs from Page Insights and re-joining them with Ads
-Manager exports. This directly serves the allowed usage of "helping a Page
-Admin administer and manage a Page" by surfacing the engagement signal
-that determines whether a boost is worth keeping running.
-
-Why it's necessary. Page-level engagement metrics are not exposed by the
-standard Ads Insights API. Without pages_read_engagement, the agent cannot
-answer the most common follow-up question after "pause my boost" — namely,
-"should I have paused it? what did it actually do?" — and the admin is
-forced to switch to Page Insights in a separate tab, defeating the purpose
-of conversational management.
-```
-
-**Screencast (~40s):**
-
-1. (5s) Open Claude with the NotFair MCP server connected
-2. (15s) Type: *"How is my boosted post about [topic] performing organically?"*
-3. (20s) Show the agent calling `getPagePostInsights` with the post id, then surfacing the metrics (impressions, reach, likes, comments, shares)
+Page-level engagement reads are out of scope. `getPagePostInsights` has
+been removed from `lib/mcp/meta-tools/read-tools.ts`. Do not request
+`pages_read_engagement` in the App Review form or the Login
+Configuration.
 
 ---
 
@@ -511,22 +525,40 @@ To test the Meta integration:
   2. Sign in with the test user credentials below; complete the OAuth flow
   3. Open Claude Desktop or claude.ai with the NotFair MCP server connected
      (instructions: https://www.notfair.co/setup-meta-ads)
-  4. Ask: "list my Meta ad campaigns" — verify results return
-  5. Ask: "pause the campaign named [X]" — verify pause in Ads Manager
-  6. Ask: "what Pages can I use for ads?" — verify Page list returns
-  7. Ask: "how is my boosted post about [topic] performing?" — verify
-     engagement metrics return
-  8. Ask: "create a paused traffic campaign with $5/day budget targeting US"
-     — verify the new campaign appears in Ads Manager (paused)
+  4. Ask: "list my Meta ad accounts" — verify accounts return (ads_read,
+     business_management)
+  5. Ask: "list my Meta ad campaigns" — verify results return (ads_read)
+  6. Ask: "pause the campaign named [X]" — verify pause in Ads Manager
+     (ads_management)
+  7. Ask: "re-enable that campaign" — verify enable (ads_management)
+  8. Ask: "update its daily budget to $10" — verify new budget
+     (ads_management)
+  9. Ask: "what Pages can I use for ads?" — verify Page list returns
+     (pages_show_list — needed to attach a Page identity to ad creatives)
+ 10. Ask: "create a paused traffic campaign with $5/day budget" — verify
+     the new campaign appears in Ads Manager (paused) (ads_management)
+ 11. Ask: "add a paused ad set targeting US 25–45 under that campaign" —
+     verify a new ad set is created (ads_management)
+ 12. Ask: "create an ad creative using my [Page name] page linking to
+     https://www.example.com" — verify a new creative id is returned
+     (ads_management + pages_show_list)
+ 13. Ask: "create a paused ad in that ad set using the new creative" —
+     verify the ad appears in Ads Manager paused (ads_management)
+ 14. Ask: "change the ad set's optimization goal to LANDING_PAGE_VIEWS"
+     — verify the change in Ads Manager (ads_management)
 
 Test user credentials:
   Email: <CREATE A META TEST USER VIA APP DASHBOARD → ROLES → TEST USERS>
   Password: <SET WHEN CREATING THE TEST USER>
 
 Notes:
-- The test user's account has been pre-attached to a Page and an Ad
-  account they can manage.
-- All write operations are reversible via the inverse tool (pause↔enable).
+- The test user's account has been pre-attached to at least one Page (for
+  ad-creative identity) and one Ad account they can manage.
+- All write operations are reversible via the inverse tool (pause↔enable),
+  and creates default to status=PAUSED so nothing spends without explicit
+  user approval.
+- Page-level management (boosted-post pause/resume, Page post insights,
+  Page lead-gen forms) is intentionally out of scope for this submission.
 ```
 
 You'll need to actually create the test user in App Dashboard → Roles → Test
@@ -537,17 +569,30 @@ test Ad account they can manage.
 
 ## Order of operations
 
-1. **Update Login configuration** at `/create-login-configuration/...` — tick all 8 permissions (5 already + 3 new).
-2. **Edit submission** to drop `catalog_management` if still listed.
-3. **Record one master screencast** (~3 min) covering every flow. Re-upload across permissions where possible.
-4. For each permission:
-   - Click **Get started**
-   - Paste the description from this doc
-   - Upload the screencast
-   - Tick the agreement checkbox
-   - Click **Save**
+1. **Update Login configuration** at `/create-login-configuration/...` —
+   tick the six in-scope permissions (`ads_management`, `ads_read`,
+   `business_management`, `pages_show_list`, `public_profile`, `email`).
+   Untick `pages_manage_ads` and `pages_read_engagement` if currently
+   ticked.
+2. **Edit submission** to drop `catalog_management`, `pages_manage_ads`,
+   and `pages_read_engagement` from the requested permissions list.
+3. **Record one master screencast** (~2.5 min) covering: connect Meta →
+   list accounts → list campaigns → pause/enable → budget update →
+   list Pages → create new paused campaign. Re-upload across permissions
+   where possible.
+4. For each in-scope permission, click **Get started**, paste the
+   description from this doc, upload the screencast, tick the agreement
+   checkbox, and click **Save**:
+   - ads_management
+   - Ads Management Standard Access
+   - ads_read
+   - business_management
+   - Business Asset User Profile Access
+   - pages_show_list
+   - (`public_profile` and `email` are auto-granted; just tick the
+     compliance checkbox)
 5. Complete the **Data handling** and **Reviewer instructions** sections.
-6. Verify all 8 permissions show the green check.
+6. Verify all in-scope permissions show the green check.
 7. Click **Submit for review**.
 
 Expected Meta turnaround: 5–14 days, often with a back-and-forth round.
