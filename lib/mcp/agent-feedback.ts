@@ -8,7 +8,7 @@ import { typedResult } from "./types";
 import type { ToolRegistrar } from "./types";
 
 /**
- * `suggestImprovement` — agent-as-informant feedback channel.
+ * `fileInternalNotFairToolFeedback` — internal agent-as-informant feedback channel.
  *
  * The AI agent is the actual "user" of an MCP, and uniquely positioned to
  * critique tool design: it reads tool descriptions, executes workflows, and
@@ -44,11 +44,11 @@ const FEEDBACK_CATEGORIES = [
   "other",
 ] as const;
 
-const SUGGEST_IMPROVEMENT_DESCRIPTION = `Help NotFair make these tools work better for the user you're helping right now — and for every other user whose agent runs into the same wall.
+const FILE_INTERNAL_TOOL_FEEDBACK_DESCRIPTION = `Internal NotFair tool-feedback channel. Privately report MCP/tool friction that got in the way of helping the user — unclear descriptions, missing capabilities, clunky workflows, confusing errors, or duplicate tools.
 
-The user is asking you to accomplish something through these tools. When a tool description, parameter, error message, or workflow gets in the way of giving them a great answer, that friction is on us to fix, not on you to work around. Tell us about it here and we will fix it. The user benefits in their next session; every other agent serving every other user benefits too.
+This is not customer support, not user feedback, and not a success/quality rating. It is an internal NotFair engineering signal. When tool design gets in the way of a real user task, file one concrete report here so we can fix the tool surface. The user benefits in their next session; every other agent serving every other user benefits too.
 
-CALL THIS WHEN:
+AUTO-SURFACE THIS WHEN:
 - A tool description was unclear and you weren't sure how to use it.
 - You wanted to accomplish something for the user but no tool existed for it.
 - A workflow took many tool calls when one bulk operation could have replaced them.
@@ -148,7 +148,7 @@ async function resolveUserEmail(
       if (row?.email) return row.email;
     }
   } catch (err) {
-    console.error("[suggestImprovement] email lookup failed:", err);
+    console.error("[fileInternalNotFairToolFeedback] email lookup failed:", err);
   }
   return null;
 }
@@ -163,9 +163,9 @@ function quoteBlock(text: string, maxLen = 600): string {
 
 export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) => {
   server.registerTool(
-    "suggestImprovement",
+    "fileInternalNotFairToolFeedback",
     {
-      description: SUGGEST_IMPROVEMENT_DESCRIPTION,
+      description: FILE_INTERNAL_TOOL_FEEDBACK_DESCRIPTION,
       inputSchema: {
         category: z
           .enum(FEEDBACK_CATEGORIES)
@@ -270,13 +270,13 @@ export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) =
         try {
           await postToSlack(slackText);
         } catch (err) {
-          console.error("[suggestImprovement] Slack post failed:", err);
+          console.error("[fileInternalNotFairToolFeedback] Slack post failed:", err);
         }
       });
 
       return typedResult(
         { recorded: true, remaining_calls: remaining },
-        "Thank you. Your suggestion has been recorded and forwarded to the NotFair team — we'll use it to improve the experience for the user you're helping.",
+        "Internal NotFair tool-feedback report recorded. Continue the user task — no user-visible follow-up is needed unless the friction blocked completion.",
       );
     },
   );

@@ -653,7 +653,7 @@ No properties.
 **Phase:** 1
 **Category:** quality_signal
 **Platform:** PostHog (server)
-**Trigger:** Fires when an AI agent calls the `suggestImprovement` MCP tool to flag a tool-design issue (unclear description, missing capability, ergonomic friction, unhelpful error message, workflow gap, or duplicate tools). One event per call. Per-session rate-limited to 5 calls per hour; rate-limited calls are NOT tracked (the tool returns `recorded: false`).
+**Trigger:** Fires when an AI agent calls the `fileInternalNotFairToolFeedback` MCP tool to flag a tool-design issue (unclear description, missing capability, ergonomic friction, unhelpful error message, workflow gap, or duplicate tools). One event per call. Per-session rate-limited to 5 calls per hour; rate-limited calls are NOT tracked (the tool returns `recorded: false`).
 **Hypothesis:** We believe tracking this tells us how AI agents — our highest-volume "users" — perceive the NotFair tool surface, which lets us prioritize tool-description fixes, missing-capability roadmap items, and ergonomic improvements that per-event telemetry (`ai_change_failed`, etc.) cannot surface. Pairs with Slack notifications for real-time triage and a weekly digest grouped by `affected_tool` + `category` for pattern detection.
 
 | Property | Type | Example | Description |

@@ -99,9 +99,9 @@ When a write tool returns \`success: false\`, check \`structuredContent.nextTool
 
 When a rejection's \`error\` field lists actual existing entities (e.g. \`removeNegativeKeyword\` reporting the campaign's real negative keywords), treat that list as ground truth — your planning data was stale or hallucinated. Re-plan against the listed entities before issuing more writes; do not bulk-retry the same plan.
 
-Helping NotFair improve — \`suggestImprovement\`:
+Auto-surface internal tool feedback — \`fileInternalNotFairToolFeedback\`:
 
-The user is depending on you to give them a great answer through these tools. If a tool description, capability, error message, or workflow is getting in the way of that, call \`suggestImprovement\` with a specific observation and a concrete fix. The user does not see this channel — it routes to the NotFair team so we can make the tools work better for them. See the tool's own description for the full guidance.`;
+The user is depending on you to give them a great answer through these tools. If tool design gets in the way of a real task — unclear description, missing capability, confusing error, duplicate tools, or a workflow that should be bulked — call \`fileInternalNotFairToolFeedback\` with a specific observation and concrete fix. This is an internal NotFair engineering channel, not customer support and not user-visible. See the tool's own description for the full guidance.`;
 
 /**
  * Register every Google Ads MCP tool + the playbooks resources.

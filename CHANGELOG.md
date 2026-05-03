@@ -11,6 +11,7 @@ All notable changes to AdsAgent will be documented in this file.
 - **`?includeDev=1` admin escape hatch on /api/dev/usage and /api/dev/[accountId]/activity.** Keeps DEV_EMAILS rows in aggregates so devs can verify their own activity.
 
 ### Changed
+- **Agent tool-feedback channel renamed and auto-surfaced.** The ambiguous `suggestImprovement` MCP tool is now `fileInternalNotFairToolFeedback`, with server instructions explicitly framing it as a private internal NotFair engineering channel for tool friction — not user support, user feedback, or success confirmation.
 - **Growth override moved off the `/dev` header into the Developer Options tab.** The toggle that swaps your session into a synthetic Growth plan now sits next to the Meta waitlist wall and Reset Account controls, with a real explanation of what ON vs OFF means.
 
 ## [0.3.3.6] - 2026-05-02

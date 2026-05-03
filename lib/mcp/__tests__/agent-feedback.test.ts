@@ -1,5 +1,5 @@
 /**
- * Unit tests for the `suggestImprovement` MCP tool.
+ * Unit tests for the `fileInternalNotFairToolFeedback` MCP tool.
  *
  * Exercises the tool registrar directly: validation, PostHog event shape,
  * Slack post fire-and-forget behavior, and the per-session rate limit.
@@ -110,12 +110,12 @@ beforeEach(() => {
   _resetSessionCountsForTest();
 });
 
-describe("suggestImprovement tool", () => {
-  it("registers a tool named suggestImprovement with the expected schema", () => {
+describe("fileInternalNotFairToolFeedback tool", () => {
+  it("registers a tool named fileInternalNotFairToolFeedback with the expected schema", () => {
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
-    expect(server.tools["suggestImprovement"]).toBeDefined();
-    const inputSchema = server.tools["suggestImprovement"].config.inputSchema;
+    expect(server.tools["fileInternalNotFairToolFeedback"]).toBeDefined();
+    const inputSchema = server.tools["fileInternalNotFairToolFeedback"].config.inputSchema;
     expect(Object.keys(inputSchema)).toEqual(
       expect.arrayContaining(["category", "affected_tool", "observation", "suggestion", "user_goal"]),
     );
@@ -124,7 +124,7 @@ describe("suggestImprovement tool", () => {
   it("fires PostHog event with full property set on a valid call", async () => {
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
 
     expect(trackServerEvent).toHaveBeenCalledTimes(1);
     const [userId, eventName, props] = trackServerEvent.mock.calls[0];
@@ -145,7 +145,7 @@ describe("suggestImprovement tool", () => {
   it("posts to Slack fire-and-forget without awaiting", async () => {
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     // Allow microtasks to drain so the void-promise can flush.
     await Promise.resolve();
     expect(postToSlack).toHaveBeenCalledTimes(1);
@@ -159,7 +159,7 @@ describe("suggestImprovement tool", () => {
     postToSlack.mockRejectedValueOnce(new Error("slack down"));
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
-    const result = await server.call("suggestImprovement", VALID_INPUT);
+    const result = await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     expect(result).toBeDefined();
     // PostHog event still fires regardless of Slack outcome.
     expect(trackServerEvent).toHaveBeenCalledTimes(1);
@@ -170,13 +170,13 @@ describe("suggestImprovement tool", () => {
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
 
     for (let i = 0; i < 5; i++) {
-      await server.call("suggestImprovement", VALID_INPUT);
+      await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     }
     expect(trackServerEvent).toHaveBeenCalledTimes(5);
 
     // 6th call: rate-limited, no PostHog event, no Slack post.
     const beforeSlack = postToSlack.mock.calls.length;
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     expect(trackServerEvent).toHaveBeenCalledTimes(5);
     expect(postToSlack.mock.calls.length).toBe(beforeSlack);
   });
@@ -192,12 +192,12 @@ describe("suggestImprovement tool", () => {
 
     // Burn out session 100's quota.
     activeIdx = 0;
-    for (let i = 0; i < 5; i++) await server.call("suggestImprovement", VALID_INPUT);
+    for (let i = 0; i < 5; i++) await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     expect(trackServerEvent).toHaveBeenCalledTimes(5);
 
     // Session 200 still has full quota.
     activeIdx = 1;
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     expect(trackServerEvent).toHaveBeenCalledTimes(6);
   });
 
@@ -205,7 +205,7 @@ describe("suggestImprovement tool", () => {
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
     await expect(
-      server.call("suggestImprovement", { ...VALID_INPUT, observation: "too short" }),
+      server.call("fileInternalNotFairToolFeedback", { ...VALID_INPUT, observation: "too short" }),
     ).rejects.toThrow();
     expect(trackServerEvent).not.toHaveBeenCalled();
   });
@@ -214,7 +214,7 @@ describe("suggestImprovement tool", () => {
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
     await expect(
-      server.call("suggestImprovement", { ...VALID_INPUT, category: "vibes" }),
+      server.call("fileInternalNotFairToolFeedback", { ...VALID_INPUT, category: "vibes" }),
     ).rejects.toThrow();
   });
 
@@ -222,7 +222,7 @@ describe("suggestImprovement tool", () => {
     dbEmailResult = [{ email: "alice@notfair.co" }];
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     await Promise.resolve();
 
     const [, , props] = trackServerEvent.mock.calls[0];
@@ -237,7 +237,7 @@ describe("suggestImprovement tool", () => {
     dbEmailResult = [];
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     await Promise.resolve();
 
     const [, , props] = trackServerEvent.mock.calls[0];
@@ -251,7 +251,7 @@ describe("suggestImprovement tool", () => {
     const authWithoutSession: AuthContext = { ...VALID_AUTH, sessionId: undefined as never };
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => authWithoutSession);
-    await server.call("suggestImprovement", VALID_INPUT);
+    await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
     await Promise.resolve();
 
     const [, , props] = trackServerEvent.mock.calls[0];
@@ -262,7 +262,7 @@ describe("suggestImprovement tool", () => {
     const server = makeServer();
     registerAgentFeedbackTools(server as never, () => VALID_AUTH);
     const long = "a".repeat(2000);
-    await server.call("suggestImprovement", {
+    await server.call("fileInternalNotFairToolFeedback", {
       ...VALID_INPUT,
       observation: long.slice(0, 1000), // schema caps at 1000
       suggestion: long.slice(0, 1000),

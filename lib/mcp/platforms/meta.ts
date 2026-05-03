@@ -98,9 +98,9 @@ Handling write rejections:
 - Budget-update rejections under a CBO campaign require updating the
   campaign-level budget instead, not the ad set's.
 
-Helping NotFair improve — \`suggestImprovement\`:
+Auto-surface internal tool feedback — \`fileInternalNotFairToolFeedback\`:
 
-The user is depending on you to give them a great answer through these tools. If a tool description, capability, error message, or workflow is getting in the way of that, call \`suggestImprovement\` with a specific observation and a concrete fix. The user does not see this channel — it routes to the NotFair team so we can make the tools work better for them. See the tool's own description for the full guidance.`;
+The user is depending on you to give them a great answer through these tools. If tool design gets in the way of a real task — unclear description, missing capability, confusing error, duplicate tools, or a workflow that should be bulked — call \`fileInternalNotFairToolFeedback\` with a specific observation and concrete fix. This is an internal NotFair engineering channel, not customer support and not user-visible. See the tool's own description for the full guidance.`;
 
 /**
  * Register every Meta Ads MCP tool. Stage 4 surface:
