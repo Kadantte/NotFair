@@ -127,32 +127,6 @@ function NavItem({
     );
 }
 
-function GoogleAdsNavIcon({ className }: { className?: string }) {
-    return (
-        <Image
-            src="/google-ads-icon.svg"
-            alt=""
-            width={18}
-            height={18}
-            className={className}
-            aria-hidden="true"
-        />
-    );
-}
-
-function MetaNavIcon({ className }: { className?: string }) {
-    return (
-        <Image
-            src="/meta-icon.svg"
-            alt=""
-            width={18}
-            height={18}
-            className={className}
-            aria-hidden="true"
-        />
-    );
-}
-
 function MobileNavItem({
     href,
     icon: Icon,
@@ -576,26 +550,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </>
             )}
             {(isCollapsed || !isOnChat || sidebarThreads.length === 0) && <div className="flex-1" />}
-
-            {/* Link platforms — sits in its own section above the footer. */}
-            <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem
-                    href="/manage-ads-accounts/google-ads"
-                    icon={GoogleAdsNavIcon}
-                    label="Link Google Ads"
-                    active={pathname.startsWith('/manage-ads-accounts/google-ads')}
-                    collapsed={isCollapsed}
-                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
-                />
-                <NavItem
-                    href="/manage-ads-accounts/meta-ads"
-                    icon={MetaNavIcon}
-                    label="Link Meta Ads"
-                    active={pathname.startsWith('/manage-ads-accounts/meta-ads')}
-                    collapsed={isCollapsed}
-                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
-                />
-            </div>
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">

@@ -5,22 +5,18 @@ import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
 
 export const metadata = buildMetadata({
-  title: "Find and Fix Google & Meta Ads Issues from Claude | NotFair",
+  title: "Find and Fix Google Ads Issues from Claude | NotFair",
   description:
-    "Give Claude live Google Ads and Meta Ads access to diagnose issues, recommend fixes, and execute keyword, audience, ad, and budget changes only after approval.",
+    "Give Claude live Google Ads access to diagnose issues, recommend fixes, and execute keyword, ad, budget, and negative changes only after approval.",
   path: "/",
   keywords: [
     "find Google Ads issues with Claude",
-    "find Meta Ads issues with Claude",
     "run Google Ads from Claude",
-    "run Meta Ads from Claude",
     "Claude Google Ads",
-    "Claude Meta Ads",
     "Google Ads MCP",
-    "Meta Ads MCP",
-    "AI ads operator",
-    "ads campaign automation",
-    "ads approval workflow",
+    "AI Google Ads operator",
+    "Google Ads campaign automation",
+    "Google Ads approval workflow",
   ],
 });
 

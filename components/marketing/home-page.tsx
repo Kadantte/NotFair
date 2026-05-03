@@ -70,7 +70,7 @@ function ConnectClaudeCTA({
         </span>
       ) : (
         <>
-          {label ?? "Get started free"}
+          {label ?? "Connect Google Ads"}
           {!label && <ArrowRight className="ml-1 h-5 w-5" />}
         </>
       )}
@@ -84,29 +84,29 @@ const useCases = [
     answer: "Found 3 high-spend ad groups with weak search terms, explained the likely cause, and drafted the fixes.",
   },
   {
-    prompt: "Compare Google and Meta CPA last month.",
-    answer: "Pulled spend, conversions, and CPA across both platforms — flagged 2 Meta ad sets and 1 Google ad group to rebalance.",
+    prompt: "What should I fix before raising budget?",
+    answer: "Prioritized missing negatives, loose-match keywords, and 2 landing-page mismatches before budget changes.",
   },
   {
-    prompt: "Refresh Meta creative on tired ad sets.",
-    answer: "Spotted 4 ad sets with creative fatigue, drafted new variants and budget shifts before approval.",
+    prompt: "Clean up last week's search terms.",
+    answer: "Recommended a negative list, queued 23 keyword changes, and estimated the impact before approval.",
   },
 ];
 
 const flowSteps = [
   {
     title: "Connect",
-    desc: "Connect Google Ads, Meta Ads, or both. Add GA4, Search Console, or CRM when you want revenue-level context.",
+    desc: "Connect Google Ads once. Add GA4, Search Console, or CRM when you want revenue-level context.",
     visual: "sources",
   },
   {
     title: "Diagnose",
-    desc: "Ask Claude what is wrong, what changed, or what to fix next across either platform. NotFair gives it live campaign context.",
+    desc: "Ask Claude what is wrong, what changed, or what to fix next. NotFair gives it live campaign context.",
     visual: "prompts",
   },
   {
     title: "Execute",
-    desc: "Claude recommends the fixes and drafts campaign changes for Google or Meta. Nothing writes until you approve.",
+    desc: "Claude recommends the fixes and drafts campaign changes. Nothing writes until you approve.",
     visual: "approve",
   },
 ] as const;
@@ -120,7 +120,7 @@ const capabilityCards = [
   {
     icon: Zap,
     title: "Turn recommendations into changes",
-    desc: "Move from diagnosis to bulk keyword edits, negatives, audiences, ads, ad sets, budgets, and scripts without clicking through Google or Meta.",
+    desc: "Move from diagnosis to bulk keyword edits, negatives, ads, ad groups, budgets, and scripts without clicking through Google Ads.",
   },
   {
     icon: Shield,
@@ -146,24 +146,20 @@ const audienceCards = [
 
 const faqs = [
   {
-    q: "Which ad platforms does NotFair support?",
-    a: "Google Ads and Meta Ads (Facebook + Instagram). Connect either, or both, and Claude can diagnose and act across them in the same conversation.",
-  },
-  {
     q: "Will NotFair make changes without approval?",
-    a: "No. NotFair can analyze freely, but write actions are shown before they run. You approve every campaign change on Google or Meta.",
+    a: "No. NotFair can analyze freely, but write actions are shown before they run. You approve every campaign change.",
   },
   {
     q: "Do I need to know exactly what to change?",
-    a: "No. You can start with the business problem: leads are expensive, spend looks wrong, or performance changed. Claude can diagnose the likely issues across Google and Meta, recommend fixes, and draft the campaign edits.",
+    a: "No. You can start with the business problem: leads are expensive, spend looks wrong, or performance changed. Claude can diagnose the likely issues, recommend fixes, and draft the campaign edits.",
   },
   {
     q: "Who is this built for?",
-    a: "AI-native founders, marketers, agencies, and portfolio builders who actively operate Google Ads or Meta Ads accounts and want to turn plain-English strategy into safe campaign execution.",
+    a: "AI-native founders, marketers, agencies, and portfolio builders who actively operate Google Ads accounts and want to turn plain-English strategy into safe campaign execution.",
   },
   {
     q: "What can Claude change through NotFair?",
-    a: "On Google Ads: keywords, negatives, bids, budgets, ads, ad groups, campaign settings, and scripts. On Meta Ads: campaigns, ad sets, ads, budgets, and creative — all with approval-gated writes.",
+    a: "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, scripts, and reporting workflows — with approval-gated writes.",
   },
 ];
 
@@ -432,26 +428,9 @@ function HeroMockup() {
               </p>
               <div className="mt-3 flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-[11px] font-medium text-[#4CAF6E]">
-                  <span className="inline-flex items-center gap-1">
-                    <Image
-                      src="/google-ads-icon.svg"
-                      alt=""
-                      width={12}
-                      height={12}
-                      aria-hidden="true"
-                      className="h-3 w-3"
-                    />
-                    <Image
-                      src="/meta-icon.svg"
-                      alt=""
-                      width={12}
-                      height={12}
-                      aria-hidden="true"
-                      className="h-3 w-3"
-                    />
-                  </span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
                   <span className="sm:hidden">NotFair MCP</span>
-                  <span className="hidden sm:inline">NotFair · Google + Meta Ads MCP</span>
+                  <span className="hidden sm:inline">NotFair · Google Ads MCP</span>
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]">
@@ -494,32 +473,11 @@ function ToolLine({ name, args, done }: { name: string; args: string; done: bool
 
 function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }) {
   if (visual === "sources") {
-    const sources: { label: string; iconSrc?: string }[] = [
-      { label: "Google Ads", iconSrc: "/google-ads-icon.svg" },
-      { label: "Meta Ads", iconSrc: "/meta-icon.svg" },
-      { label: "GA4" },
-      { label: "CRM" },
-    ];
     return (
       <div className="grid grid-cols-2 gap-2 text-sm">
-        {sources.map((item) => (
-          <div
-            key={item.label}
-            className="flex items-center gap-2 rounded-xl border border-[#3D3C36] bg-[#1A1917] p-3 text-[#E8E4DD]"
-          >
-            {item.iconSrc ? (
-              <Image
-                src={item.iconSrc}
-                alt=""
-                width={14}
-                height={14}
-                aria-hidden="true"
-                className="h-3.5 w-3.5 shrink-0"
-              />
-            ) : (
-              <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#4CAF6E]" />
-            )}
-            {item.label}
+        {["Google Ads", "GA4", "CRM", "Search Console"].map((item) => (
+          <div key={item} className="rounded-xl border border-[#3D3C36] bg-[#1A1917] p-3 text-[#E8E4DD]">
+            {item}
           </div>
         ))}
       </div>
@@ -529,7 +487,7 @@ function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }
   if (visual === "prompts") {
     return (
       <div className="space-y-2 text-sm">
-        {["Why did CPA rise on Google?", "What should I fix on Meta?", "Compare both platforms"].map((item) => (
+        {["Why did CPA rise?", "What should I fix?", "Clean up search terms"].map((item) => (
           <div key={item} className="rounded-full border border-[#3D3C36] bg-[#1A1917] px-3 py-2 text-[#C4C0B6]">
             {item}
           </div>
@@ -543,7 +501,7 @@ function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[#E8E4DD]">Apply recommended fixes?</p>
-          <p className="mt-1 text-xs text-[#C4C0B6]">23 negatives · 4 ad set budget shifts · fully reviewable</p>
+          <p className="mt-1 text-xs text-[#C4C0B6]">23 negatives · 80 keyword edits · fully reviewable</p>
         </div>
         <span className="rounded-full bg-[#4CAF6E] px-3 py-1 text-xs font-semibold text-[#1A1917]">
           Approve
@@ -592,7 +550,7 @@ export function HomePage({
                 }}
               />
               <span className="text-[#E8E4DD]">
-                Diagnose and fix Google &amp; Meta Ads from Claude — approval-gated writes, live on GitHub
+                Diagnose and fix Google Ads from Claude — approval-gated writes, live on GitHub
               </span>
               <GitHubStarBadge stars={githubStars} />
             </a>
@@ -606,13 +564,13 @@ export function HomePage({
               className="text-center lg:text-left"
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                AI Google + Meta Ads strategist + execution layer
+                AI Google Ads strategist + execution layer
               </p>
               <h1 className="font-display mx-auto mt-4 max-w-3xl text-5xl font-bold leading-[0.98] tracking-tight text-[#E8E4DD] sm:text-6xl lg:mx-0 lg:text-7xl">
                 Find what’s wrong. Fix it from Claude.
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#C4C0B6] lg:mx-0">
-                NotFair gives Claude live Google Ads and Meta Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.
+                NotFair gives Claude live Google Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
@@ -626,32 +584,6 @@ export function HomePage({
                     disconnectedLabel="Run free audit"
                     connectedLabel="View audit"
                   />
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs text-[#7A7770] lg:justify-start">
-                  <span className="uppercase tracking-[0.18em]">Works with</span>
-                  <span className="inline-flex items-center gap-1.5 text-[#C4C0B6]">
-                    <Image
-                      src="/google-ads-icon.svg"
-                      alt=""
-                      width={14}
-                      height={14}
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5"
-                    />
-                    Google Ads
-                  </span>
-                  <span className="text-[#3D3C36]">·</span>
-                  <span className="inline-flex items-center gap-1.5 text-[#C4C0B6]">
-                    <Image
-                      src="/meta-icon.svg"
-                      alt=""
-                      width={14}
-                      height={14}
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5"
-                    />
-                    Meta Ads
-                  </span>
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-[#C4C0B6] lg:justify-start">
                   <span>Diagnose issues</span>
@@ -832,16 +764,16 @@ export function HomePage({
       <section className="px-4 pb-24">
         <div className="container mx-auto max-w-5xl rounded-[32px] border border-[#4CAF6E]/25 bg-[#4CAF6E]/5 p-8 text-center sm:p-12">
           <h2 className="font-display text-3xl font-bold tracking-tight text-[#E8E4DD] sm:text-5xl">
-            Let Claude find and fix your next Google or Meta Ads issue.
+            Let Claude find and fix your next Google Ads issue.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[#C4C0B6]">
-            Connect Google Ads, Meta Ads, or both — ask what to fix, then approve the recommended changes.
+            Connect your account, ask what to fix, and approve the recommended changes.
           </p>
           <div className="mt-8 flex justify-center">
             <ConnectClaudeCTA session={session} position="final" />
           </div>
           <p className="mx-auto mt-5 max-w-md text-xs leading-relaxed text-[#C4C0B6]">
-            By connecting your ad accounts, you agree to our{" "}
+            By connecting Google Ads, you agree to our{" "}
             <Link href="/privacy" className="font-medium text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]">
               Privacy Policy
             </Link>{" "}
