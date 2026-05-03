@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DeltaBadge } from '@/components/delta-badge';
 import { formatAction, formatValue, ENTITY_BADGE_COLORS } from '@/lib/operations-format';
 import { OutreachPanel } from './outreach-panel';
-import { formatTime, formatBytes, errorRateColor, DEV_RANGE_OPTIONS, RangePicker } from '@/lib/dev-format';
+import { formatTime, formatBytes, errorRateColor, DEV_RANGE_OPTIONS, RangePicker, Picker } from '@/lib/dev-format';
 import type { ActivityCall, ActivityStats, ActivityPayload } from '@/lib/dev-types';
 
 type Operation = {
@@ -84,6 +84,12 @@ type AccountDetail = {
     auditHistory: AuditSnapshot[];
 };
 
+const PLATFORM_OPTIONS = [
+    { label: 'All', value: 'all' as const },
+    { label: 'Google Ads', value: 'google_ads' as const },
+    { label: 'Meta Ads', value: 'meta_ads' as const },
+] as const;
+
 let cachedDetail: { accountId: string; data: AccountDetail } | null = null;
 const activityCache = new Map<string, ActivityPayload>();
 
@@ -97,14 +103,15 @@ export default function DevAccountDetailPage() {
 
     // Activity section state
     const [activityDays, setActivityDays] = useState(30);
+    const [activityPlatform, setActivityPlatform] = useState<'all' | 'google_ads' | 'meta_ads'>('all');
     const [activityData, setActivityData] = useState<ActivityPayload | null>(
-        activityCache.get(`${accountId}|30`) ?? null,
+        activityCache.get(`${accountId}|30|all|0`) ?? null,
     );
     const [activityLoading, setActivityLoading] = useState(!activityData);
     const [expandedCallId, setExpandedCallId] = useState<number | null>(null);
 
-    const fetchActivity = useCallback(async (days: number, background = false) => {
-        const key = `${accountId}|${days}`;
+    const fetchActivity = useCallback(async (days: number, platform: 'all' | 'google_ads' | 'meta_ads' = 'all', background = false) => {
+        const key = `${accountId}|${days}|${platform}|0`;
         const cached = activityCache.get(key);
         if (cached) {
             setActivityData(cached);
@@ -112,7 +119,9 @@ export default function DevAccountDetailPage() {
         }
         if (!background || !cached) setActivityLoading(true);
         try {
-            const res = await fetch(`/api/dev/${accountId}/activity?days=${days}`, { credentials: 'include' });
+            const params = new URLSearchParams({ days: String(days) });
+            if (platform !== 'all') params.set('platform', platform);
+            const res = await fetch(`/api/dev/${accountId}/activity?${params}`, { credentials: 'include' });
             if (!res.ok) return;
             const payload: ActivityPayload = await res.json();
             setActivityData(payload);
@@ -123,8 +132,9 @@ export default function DevAccountDetailPage() {
     }, [accountId]);
 
     useEffect(() => {
-        fetchActivity(activityDays, !!activityCache.get(`${accountId}|${activityDays}`));
-    }, [fetchActivity, activityDays, accountId]);
+        const key = `${accountId}|${activityDays}|${activityPlatform}|0`;
+        fetchActivity(activityDays, activityPlatform, !!activityCache.get(key));
+    }, [fetchActivity, activityDays, activityPlatform, accountId]);
 
     const fetchDetail = useCallback(async (background = false) => {
         if (!background) setLoading(true);
@@ -191,9 +201,9 @@ export default function DevAccountDetailPage() {
                     <Button
                         onClick={() => {
                             cachedDetail = null;
-                            activityCache.delete(`${accountId}|${activityDays}`);
+                            activityCache.delete(`${accountId}|${activityDays}|${activityPlatform}|0`);
                             fetchDetail(false);
-                            fetchActivity(activityDays, false);
+                            fetchActivity(activityDays, activityPlatform, false);
                         }}
                         disabled={loading}
                         variant="outline"
@@ -399,13 +409,28 @@ export default function DevAccountDetailPage() {
 
                         {/* ── Activity section ── */}
                         <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/60 overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-3 border-b border-[#3D3C36]">
+                            <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-3 border-b border-[#3D3C36]">
                                 <h2 className="text-sm font-semibold text-[#E8E4DD]">Activity</h2>
-                                <RangePicker
-                                    options={DEV_RANGE_OPTIONS}
-                                    value={activityDays}
-                                    onChange={setActivityDays}
-                                />
+                                <div className="flex items-center gap-2">
+                                    <Picker
+                                        options={PLATFORM_OPTIONS}
+                                        value={activityPlatform}
+                                        onChange={(v) => {
+                                            setActivityPlatform(v);
+                                            activityCache.clear();
+                                            fetchActivity(activityDays, v);
+                                        }}
+                                    />
+                                    <RangePicker
+                                        options={DEV_RANGE_OPTIONS}
+                                        value={activityDays}
+                                        onChange={(v) => {
+                                            setActivityDays(v);
+                                            const key = `${accountId}|${v}|${activityPlatform}|0`;
+                                            fetchActivity(v, activityPlatform, !!activityCache.get(key));
+                                        }}
+                                    />
+                                </div>
                             </div>
 
                             {activityLoading && !activityData ? (

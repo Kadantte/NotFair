@@ -16,11 +16,14 @@ import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, dedupeCount, dedupeEr
  * ?source=   — optional client_source filter, applied ONLY to `daily`
  * ?platform= — optional ad-platform filter (`google_ads` | `meta_ads`),
  *              applied to ALL queries so the whole tab reflects one platform
+ * ?includeDev=1   — admin escape hatch: keep DEV_EMAILS rows in aggregates
  */
 
 const PLATFORM_START = new Date("2026-03-25T00:00:00Z");
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { data: unknown; ts: number }>();
+
+type Platform = "google_ads" | "meta_ads";
 
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
@@ -294,6 +297,8 @@ export async function GET(request: Request) {
 
   // Only cache when no source filter is applied (source-filtered calls are
   // the minority path and shouldn't pollute the shared cache).
+  // platform, includeDev are already baked into cacheKey so different filters
+  // never overwrite each other's entries.
   if (!source) {
     cache.set(cacheKey, { data: payload, ts: Date.now() });
   }

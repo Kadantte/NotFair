@@ -80,8 +80,8 @@ export function ChartTooltipShell({
 
 // ─── Range picker ─────────────────────────────────────────────────────────────
 
-/** Pill-style range selector. `options` should be readonly tuples like DEV_RANGE_OPTIONS. */
-export function RangePicker<T extends number>({
+/** Pill-style picker. Works with any value type (number, string, etc.). */
+export function Picker<T extends string | number>({
     options,
     value,
     onChange,
@@ -94,7 +94,7 @@ export function RangePicker<T extends number>({
         <div className="inline-flex rounded-md border border-[#3D3C36] bg-[#1A1917] p-0.5">
             {options.map((opt) => (
                 <button
-                    key={opt.value}
+                    key={String(opt.value)}
                     type="button"
                     onClick={() => onChange(opt.value)}
                     className={`rounded px-2.5 py-1 text-[11px] font-medium transition min-h-[32px] ${
@@ -108,4 +108,17 @@ export function RangePicker<T extends number>({
             ))}
         </div>
     );
+}
+
+/** Pill-style range selector. `options` should be readonly tuples like DEV_RANGE_OPTIONS. */
+export function RangePicker<T extends number>({
+    options,
+    value,
+    onChange,
+}: {
+    options: readonly { label: string; value: T }[];
+    value: T;
+    onChange: (v: T) => void;
+}) {
+    return <Picker options={options} value={value} onChange={onChange} />;
 }

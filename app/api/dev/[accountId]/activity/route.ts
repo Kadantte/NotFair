@@ -14,7 +14,11 @@ import { errorRate } from "@/lib/dev-format-pure";
  * Gated by requireDevEmail() — same as all dev-admin routes.
  *
  * GET /api/dev/[accountId]/activity?days=30
+ * ?platform=      — optional platform filter: "google_ads" | "meta_ads" (default: all)
+ * ?includeDev=1   — admin escape hatch: parse + cache-key only (no new filter added)
  */
+
+type Platform = "google_ads" | "meta_ads";
 
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -32,8 +36,16 @@ export async function GET(
   const rawDays = parseInt(url.searchParams.get("days") || "30", 10);
   const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 30;
   const fresh = url.searchParams.get("fresh") === "1";
+  const includeDev = url.searchParams.get("includeDev") === "1";
 
-  const cacheKey = `${accountId}|${days}`;
+  // Validate platform param
+  const rawPlatform = url.searchParams.get("platform") || null;
+  if (rawPlatform !== null && rawPlatform !== "google_ads" && rawPlatform !== "meta_ads") {
+    return Response.json({ error: "Invalid platform. Must be 'google_ads' or 'meta_ads'." }, { status: 400 });
+  }
+  const platform = rawPlatform as Platform | null;
+
+  const cacheKey = `${accountId}|${days}|${platform ?? "all"}|${includeDev ? "1" : "0"}`;
   if (!fresh) {
     const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
@@ -42,10 +54,13 @@ export async function GET(
   }
 
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const whereBase = and(
+
+  const baseClauses = [
     eq(schema.operations.accountId, accountId),
     gte(schema.operations.createdAt, since),
-  );
+  ];
+  if (platform) baseClauses.push(eq(schema.operations.platform, platform));
+  const whereBase = and(...baseClauses);
 
   const [statsRow, recentCalls] = await Promise.all([
     // Aggregate stats for the window. Dedupe by request_id.

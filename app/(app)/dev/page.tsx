@@ -36,6 +36,7 @@ import {
 import type { UsageStats } from '@/lib/dev-types';
 
 const CHART_MARGIN = { top: 4, right: 8, left: 0, bottom: 32 };
+
 const CHART_CURSOR = { fill: '#3D3C36', opacity: 0.4 };
 const LEGEND_STYLE = { color: '#C4C0B6', fontSize: 12, paddingTop: 8 };
 
@@ -812,7 +813,7 @@ export default function DevPage() {
                                 <h2 className="text-base font-semibold text-[#E8E4DD]">
                                     Volume + Errors ({DEV_RANGE_OPTIONS.find(o => o.value === usageDays)?.label ?? `${usageDays}d`})
                                 </h2>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     {/* Source filter — chart-only per plan */}
                                     <div className="flex items-center gap-1.5">
                                         <Filter className="w-3.5 h-3.5 text-[#C4C0B6]" />
