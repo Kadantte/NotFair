@@ -89,6 +89,33 @@ function formatDateShort(iso: string, year = false): string {
     return parseTs(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(year && { year: 'numeric' }) });
 }
 
+function attributionTone(attribution?: CustomerAttribution) {
+    const source = attribution?.source?.toLowerCase() ?? '';
+    if (source.includes('reddit')) return 'border-[#FF6B35]/30 bg-[#FF6B35]/10 text-[#FFB199]';
+    if (source.includes('google')) return 'border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#7DDA9D]';
+    if (source.includes('x') || source.includes('twitter')) return 'border-[#6AA9FF]/30 bg-[#6AA9FF]/10 text-[#9BC4FF]';
+    if (attribution?.referrer) return 'border-[#D4882A]/30 bg-[#D4882A]/10 text-[#E1A95E]';
+    return 'border-[#3D3C36] bg-[#1A1917]/70 text-[#C4C0B6]';
+}
+
+function attributionDetailLabel(attribution: CustomerAttribution): string {
+    if (attribution.campaign) return `campaign=${attribution.campaign}`;
+    if (attribution.term) return `term=${attribution.term}`;
+    if (attribution.content) return `content=${attribution.content}`;
+    if (attribution.referrer) {
+        try {
+            return new URL(attribution.referrer).hostname.replace(/^www\./, '');
+        } catch {
+            return attribution.referrer.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] || attribution.referrer;
+        }
+    }
+    return '—';
+}
+
+function attributionDisplayLabel(attribution: CustomerAttribution): string {
+    return attribution.label === 'Unknown source' ? 'Unknown' : attribution.label;
+}
+
 
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
@@ -103,6 +130,17 @@ type CustomerAccount = {
     country?: string | null;
     flag?: string | null;
 };
+type CustomerAttribution = {
+    source: string | null;
+    medium: string | null;
+    campaign: string | null;
+    term: string | null;
+    content: string | null;
+    referrer: string | null;
+    label: string;
+    detail: string | null;
+};
+
 type Customer = {
     userId: string | null;
     googleEmail: string | null;
@@ -116,6 +154,7 @@ type Customer = {
     writes: number;
     totalOps: number;
     dailyBudgetUsd: number | null;
+    attribution: CustomerAttribution;
     outreachStatus: 'contacted' | 'drafted' | 'none';
     lastContactedAt: string | null;
     errorsCount: number;
@@ -599,9 +638,9 @@ export default function DevPage() {
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-                <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                <div className="flex w-full items-center justify-between gap-3 px-4 py-2 sm:px-6 sm:py-4">
                     <div className="min-w-0">
-                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
+                        <h1 className="text-lg sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
                         <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -623,31 +662,31 @@ export default function DevPage() {
                             disabled={loading || loadingCustomers || loadingContacts}
                             variant="outline"
                             size="sm"
-                            className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5"
+                            className="h-8 border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 sm:h-9"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                             <span className="hidden sm:inline">Refresh</span>
                         </Button>
                     </div>
                 </div>
-                <div className="flex gap-0 px-4 sm:px-6 border-t border-[#3D3C36]/50">
+                <div className="flex gap-0 px-2 sm:px-6 border-t border-[#3D3C36]/50">
                     {(['customers', 'usage', 'outreach', 'developer'] as const).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2.5 text-[13px] font-medium capitalize transition-colors border-b-2 -mb-px ${
+                            className={`flex-1 px-2 py-2 text-[12px] font-medium capitalize transition-colors border-b-2 -mb-px sm:flex-none sm:px-4 sm:py-2.5 sm:text-[13px] ${
                                 activeTab === tab
                                     ? 'border-[#4CAF6E] text-[#E8E4DD]'
                                     : 'border-transparent text-[#C4C0B6] hover:text-[#E8E4DD]'
                             }`}
                         >
-                            {tab === 'developer' ? 'Developer Options' : tab}
+                            {tab === 'developer' ? <><span className="sm:hidden">Options</span><span className="hidden sm:inline">Developer Options</span></> : tab}
                         </button>
                     ))}
                 </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 space-y-6 sm:space-y-8">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-6 space-y-5 sm:space-y-8">
                 {error && (
                     <div className="bg-[#C45D4A]/10 border border-[#C45D4A]/30 rounded-lg p-3 sm:p-4 flex items-center gap-3 text-[#C45D4A]">
                         <AlertCircle className="w-5 h-5 shrink-0" />
@@ -1143,18 +1182,21 @@ export default function DevPage() {
                     </div>
                 ) : (
                     <div>
-                        <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD] mb-3 sm:mb-4">
+                        <h2 className="hidden text-base font-semibold text-[#E8E4DD] mb-4 sm:block sm:text-lg">
                             Customers
                             <span className="ml-2 font-mono text-xs text-[#C4C0B6] font-normal">{customers.length}</span>
                         </h2>
                         <>
                         {/* Mobile: card layout */}
                             <div className="sm:hidden mb-3 flex items-center gap-2">
-                                <label className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">Sort</label>
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[15px] font-semibold text-[#E8E4DD]">Customers <span className="font-mono text-xs font-normal text-[#C4C0B6]">{customers.length}</span></div>
+                                </div>
                                 <select
+                                    aria-label="Sort customers"
                                     value={sortKey}
                                     onChange={(e) => setSortKey(e.target.value as CustomerSortKey)}
-                                    className="flex-1 bg-[#24231F] border border-[#3D3C36] rounded-md px-2 py-1.5 text-xs text-[#E8E4DD]"
+                                    className="h-9 w-[154px] rounded-lg border border-[#3D3C36] bg-[#24231F] px-2 text-xs text-[#E8E4DD]"
                                 >
                                     <option value="operations">Operations</option>
                                     <option value="errorRate">Error Rate (30d)</option>
@@ -1167,119 +1209,146 @@ export default function DevPage() {
                                 <button
                                     type="button"
                                     onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
-                                    className="p-1.5 rounded-md border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD]"
+                                    className="grid h-9 w-9 place-items-center rounded-lg border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD]"
                                     title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
                                 >
                                     {sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
                                 </button>
                             </div>
-                            <div className="sm:hidden space-y-2">
+                            <div className="sm:hidden space-y-3">
                                 {sortedCustomers.map((c) => {
                                     const { hasBudget, currency, flag, country, annualUsd, annualLocal } = deriveBudgetDisplay(c);
+                                    const totalCampaigns = c.accounts.reduce((s, a) => s + (a.activeCampaigns ?? 0), 0);
+                                    const attribution = c.attribution ?? {
+                                        source: null,
+                                        medium: null,
+                                        campaign: null,
+                                        term: null,
+                                        content: null,
+                                        referrer: null,
+                                        label: 'Unknown source',
+                                        detail: null,
+                                    };
+                                    const hasUtm = !!(attribution.source || attribution.medium || attribution.campaign || attribution.term || attribution.content);
+                                    const sourceDetail = attributionDetailLabel(attribution);
+                                    const sourceLabel = attributionDisplayLabel(attribution);
+                                    const captureLabel = hasUtm ? 'UTM' : attribution.referrer ? 'Referrer' : null;
                                     return (
-                                    <div key={c.userId ?? c.primaryAccountId} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="min-w-0">
+                                    <div
+                                        key={c.userId ?? c.primaryAccountId}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => router.push(`/dev/${c.primaryAccountId}`)}
+                                        onMouseEnter={() => router.prefetch(`/dev/${c.primaryAccountId}`)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') router.push(`/dev/${c.primaryAccountId}`);
+                                        }}
+                                        className="rounded-2xl border border-[#3D3C36] bg-[#24231F]/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.16)] transition-colors active:bg-[#2E2D28]/80"
+                                    >
+                                        <div className="mb-2.5 flex items-start gap-3">
+                                            <div className="min-w-0 flex-1">
                                                 {c.googleEmail ? (
                                                     <button
                                                         type="button"
                                                         onClick={(e) => handleCopyEmail(c.googleEmail!, e)}
-                                                        className="group/email inline-flex items-center gap-1.5 text-sm text-[#E8E4DD] truncate max-w-full hover:text-[#4CAF6E] transition-colors"
+                                                        className="group/email flex max-w-full items-center gap-1.5 text-left text-[15px] font-medium leading-5 text-[#E8E4DD] hover:text-[#4CAF6E] transition-colors"
                                                     >
                                                         <span className="truncate">{c.googleEmail}</span>
                                                         {copiedEmail === c.googleEmail ? (
-                                                            <Check className="w-3 h-3 shrink-0 text-[#4CAF6E]" />
+                                                            <Check className="h-3.5 w-3.5 shrink-0 text-[#4CAF6E]" />
                                                         ) : (
-                                                            <Copy className="w-3 h-3 shrink-0 opacity-60" />
+                                                            <Copy className="h-3.5 w-3.5 shrink-0 opacity-50" />
                                                         )}
                                                     </button>
                                                 ) : (
-                                                    <div className="text-sm text-[#E8E4DD] truncate">{c.userId || 'Unknown'}</div>
+                                                    <div className="truncate text-[15px] font-medium leading-5 text-[#E8E4DD]">{c.userId || 'Unknown customer'}</div>
                                                 )}
-                                                <div className="flex items-center gap-1.5 text-xs text-[#C4C0B6]/60 font-mono">
-                                                    <span>{c.primaryAccountId}</span>
+                                                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                                                    <span className="font-mono text-[11px] text-[#C4C0B6]/55">{c.primaryAccountId}</span>
                                                     {flag && <span className="text-[13px] leading-none" title={country ?? undefined}>{flag}</span>}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => handleViewAs(c.primaryAccountId, e)}
-                                                    disabled={impersonatingAccountId === c.primaryAccountId}
-                                                    className="p-1.5 rounded-md text-[#C4C0B6] hover:bg-[#D4882A]/15 hover:text-[#D4882A] transition-colors disabled:opacity-50"
-                                                    title="View as this account"
-                                                >
-                                                    {impersonatingAccountId === c.primaryAccountId
-                                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                        : <Eye className="w-3.5 h-3.5" />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 mb-2 px-2 py-1.5 rounded-md bg-[#1A1917]/60 border border-[#3D3C36]/50">
-                                            {hasBudget && (
-                                                <div className="flex-1">
-                                                    <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Annual Budget</div>
-                                                    <div className="text-sm text-[#4CAF6E] font-mono tabular-nums font-medium">
-                                                        {annualUsd != null ? formatCurrency(annualUsd, 'USD', { compact: true }) : '—'}
-                                                    </div>
-                                                    {currency && currency !== 'USD' && (
-                                                        <div className="text-[10px] text-[#C4C0B6]/60 font-mono">≈ {formatCurrency(annualLocal, currency, { compact: true })}/yr</div>
+                                                    {c.outreachStatus === 'drafted' && (
+                                                        <span className="rounded-full border border-[#D4882A]/30 bg-[#D4882A]/10 px-2 py-0.5 text-[10px] font-semibold text-[#D4882A]">Draft</span>
+                                                    )}
+                                                    {c.outreachStatus === 'contacted' && (
+                                                        <span className="rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#4CAF6E]">Sent</span>
                                                     )}
                                                 </div>
-                                            )}
-                                            <div className={hasBudget ? '' : 'flex-1'}>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Operations</div>
-                                                {c.totalOps > 0 ? (
-                                                    <>
-                                                        <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{c.totalOps.toLocaleString()}</div>
-                                                        <div className="text-[10px] text-[#C4C0B6]/60 font-mono">{c.reads.toLocaleString()}r · {c.writes.toLocaleString()}w</div>
-                                                    </>
-                                                ) : (
-                                                    <div className="text-sm text-[#C4C0B6]/40">—</div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleViewAs(c.primaryAccountId, e)}
+                                                disabled={impersonatingAccountId === c.primaryAccountId}
+                                                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#3D3C36] bg-[#1A1917]/60 text-[#C4C0B6] transition-colors hover:border-[#D4882A]/40 hover:bg-[#D4882A]/15 hover:text-[#D4882A] disabled:opacity-50"
+                                                title="View as this account"
+                                            >
+                                                {impersonatingAccountId === c.primaryAccountId
+                                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                    : <Eye className="h-4 w-4" />}
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 divide-x divide-[#3D3C36]/60 rounded-xl border border-[#3D3C36]/60 bg-[#1A1917]/55 overflow-hidden">
+                                            <div className="bg-[#4CAF6E]/[0.04] px-2.5 py-2">
+                                                <div className="text-[9px] font-semibold uppercase tracking-widest text-[#C4C0B6]/60">Budget</div>
+                                                <div className="mt-1 truncate font-mono text-[14px] font-semibold tabular-nums text-[#4CAF6E]">
+                                                    {hasBudget && annualUsd != null ? formatCurrency(annualUsd, 'USD', { compact: true }) : '—'}
+                                                </div>
+                                                {currency && currency !== 'USD' && (
+                                                    <div className="mt-0.5 truncate font-mono text-[9px] text-[#C4C0B6]/45">≈ {formatCurrency(annualLocal, currency, { compact: true })}</div>
                                                 )}
                                             </div>
-                                            <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Errors (30d)</div>
+                                            <div className="px-2.5 py-2">
+                                                <div className="text-[9px] font-semibold uppercase tracking-widest text-[#C4C0B6]/60">Ops</div>
+                                                <div className="mt-1 font-mono text-[14px] font-semibold tabular-nums text-[#E8E4DD]">{c.totalOps > 0 ? c.totalOps.toLocaleString() : '—'}</div>
+                                                {c.totalOps > 0 && <div className="mt-0.5 font-mono text-[9px] text-[#C4C0B6]/45">{c.reads.toLocaleString()}r · {c.writes.toLocaleString()}w</div>}
+                                            </div>
+                                            <div className="px-2.5 py-2">
+                                                <div className="text-[9px] font-semibold uppercase tracking-widest text-[#C4C0B6]/60">Errors</div>
                                                 {c.calls30d > 0 ? (
-                                                    <div className={`text-sm font-mono tabular-nums font-medium ${errorRateColor(c.errorRate)}`}>
-                                                        {c.errorsCount} ({c.errorRate.toFixed(1)}%)
+                                                    <div className={`mt-1 font-mono text-[14px] font-semibold tabular-nums ${errorRateColor(c.errorRate)}`}>
+                                                        {c.errorRate.toFixed(1)}%
                                                     </div>
                                                 ) : (
-                                                    <div className="text-sm text-[#C4C0B6]/40">—</div>
+                                                    <div className="mt-1 font-mono text-[14px] text-[#C4C0B6]/40">—</div>
                                                 )}
+                                                {c.calls30d > 0 && <div className="mt-0.5 font-mono text-[9px] text-[#C4C0B6]/45">{c.errorsCount}/{c.calls30d} calls</div>}
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-3 text-center">
-                                            <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Accounts</div>
-                                                <div className="text-sm text-[#E8E4DD] font-mono tabular-nums">{c.accountCount}</div>
+
+                                        <div className="mt-2 flex min-h-10 items-center justify-between gap-3 rounded-xl border border-[#3D3C36]/45 bg-[#1A1917]/35 px-3 py-1.5">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-[#C4C0B6]/55">Source</span>
+                                                <span className={`max-w-[122px] truncate rounded-full border px-2 py-0.5 text-[10px] font-medium ${attributionTone(attribution)}`} title={attribution.referrer ?? attribution.detail ?? undefined}>
+                                                    {sourceLabel}
+                                                </span>
+                                                {captureLabel && <span className="shrink-0 text-[10px] text-[#C4C0B6]/55">{captureLabel}</span>}
                                             </div>
-                                            <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">First Seen</div>
-                                                <div className="text-[11px] text-[#C4C0B6] font-mono">{formatDateShort(c.firstSeen, true)}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Last Active</div>
-                                                <div className="text-[11px] text-[#C4C0B6] font-mono">{formatDateShort(c.lastActive)}</div>
+                                            <div className="min-w-0 max-w-[38%] truncate text-right font-mono text-[10px] text-[#C4C0B6]/65" title={attribution.referrer ?? attribution.detail ?? undefined}>
+                                                {sourceDetail}
                                             </div>
                                         </div>
+
                                         {c.accounts.length > 0 && (
-                                            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
-                                                {c.accounts.map((a) => {
-                                                    const annualUsdAcct = a.dailyBudgetUsd != null ? a.dailyBudgetUsd * DAYS_PER_YEAR : null;
-                                                    return (
-                                                        <div key={a.id} className="flex items-center justify-between text-[10px] bg-[#1A1917] border border-[#3D3C36]/50 rounded px-1.5 py-1 text-[#C4C0B6] font-mono">
-                                                            <span className="truncate mr-2 inline-flex items-center gap-1">
-                                                                {a.flag && <span title={a.country ?? undefined}>{a.flag}</span>}
-                                                                <span className="truncate">{a.name || a.id}</span>
-                                                            </span>
-                                                            {annualUsdAcct != null && (
-                                                                <span className="text-[#4CAF6E] whitespace-nowrap">{formatCurrency(annualUsdAcct, 'USD', { compact: true })}/yr · {a.activeCampaigns ?? 0} campaigns</span>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                            <details className="mt-2 rounded-lg border border-[#3D3C36]/45 bg-[#1A1917]/25" onClick={(e) => e.stopPropagation()}>
+                                                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-[11px] text-[#C4C0B6]">
+                                                    <span className="min-w-0 truncate">Seen <span className="font-mono text-[#E8E4DD]">{formatDateShort(c.firstSeen)}</span> → <span className="font-mono text-[#E8E4DD]">{formatDateShort(c.lastActive)}</span></span>
+                                                    <span className="shrink-0"><span className="font-mono text-[#E8E4DD]">{c.accountCount}</span> acct · <span className="font-mono text-[#E8E4DD]">{totalCampaigns}</span> camp</span>
+                                                </summary>
+                                                <div className="space-y-1 border-t border-[#3D3C36]/45 p-2">
+                                                    {c.accounts.map((a) => {
+                                                        const annualUsdAcct = a.dailyBudgetUsd != null ? a.dailyBudgetUsd * DAYS_PER_YEAR : null;
+                                                        return (
+                                                            <Link key={a.id} href={`/dev/${a.id}`} prefetch onClick={(e) => e.stopPropagation()} className="flex items-center justify-between gap-2 rounded-md border border-[#3D3C36]/40 bg-[#1A1917] px-2 py-1.5 font-mono text-[10px] text-[#C4C0B6] transition-colors hover:border-[#4CAF6E]/30 hover:text-[#E8E4DD]">
+                                                                <span className="inline-flex min-w-0 items-center gap-1 truncate">
+                                                                    {a.flag && <span title={a.country ?? undefined}>{a.flag}</span>}
+                                                                    <span className="truncate">{a.name || a.id}</span>
+                                                                </span>
+                                                                <span className="shrink-0 text-[#4CAF6E]">{annualUsdAcct != null ? `${formatCurrency(annualUsdAcct, 'USD', { compact: true })}/yr` : 'no budget'}</span>
+                                                            </Link>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </details>
                                         )}
                                     </div>
                                     );

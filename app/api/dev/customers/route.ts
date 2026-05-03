@@ -5,6 +5,60 @@ import { devEmailSqlList, excludeDevOpsFilter, dedupeCount, dedupeErrorCount } f
 import { parseCustomerIds } from "@/lib/google-ads";
 import { getUsdRates, getCurrencyInfo, toUsd } from "@/lib/currency";
 
+type Attribution = {
+  source: string | null;
+  medium: string | null;
+  campaign: string | null;
+  term: string | null;
+  content: string | null;
+  referrer: string | null;
+  label: string;
+  detail: string | null;
+};
+
+function safeString(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function formatReferrer(referrer: string | null): string | null {
+  if (!referrer) return null;
+  try {
+    return new URL(referrer).hostname.replace(/^www\./, "");
+  } catch {
+    return referrer.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || referrer;
+  }
+}
+
+function deriveAttribution(meta: Record<string, unknown> | null | undefined): Attribution {
+  const source = safeString(meta?.utm_source);
+  const medium = safeString(meta?.utm_medium);
+  const campaign = safeString(meta?.utm_campaign);
+  const term = safeString(meta?.utm_term);
+  const content = safeString(meta?.utm_content);
+  const referrer = safeString(meta?.signup_referrer);
+  const referrerHost = formatReferrer(referrer);
+
+  const label = source && medium
+    ? `${source} / ${medium}`
+    : source
+      ? source
+      : referrerHost
+        ? referrerHost
+        : "Unknown source";
+
+  const detail = campaign
+    ? `campaign: ${campaign}`
+    : term
+      ? `term: ${term}`
+      : content
+        ? `content: ${content}`
+        : referrerHost && referrer
+          ? referrer
+          : null;
+
+  return { source, medium, campaign, term, content, referrer, label, detail };
+}
+
 // Single-tenant admin cache: dev dashboard is hit by a tiny set of authorized
 // users, and the underlying data (sessions, ops counts, account snapshots)
 // changes on the order of minutes. A 60s TTL turns repeat refreshes into a
@@ -47,12 +101,13 @@ export async function GET(request: Request) {
     for (const a of accounts) allAccountIds.add(a.id);
     return { ...c, accounts };
   });
+  const userIds = [...new Set(parsed.map((c) => c.userId).filter((id): id is string => !!id))];
 
   // Batch-fetch account snapshots, operation counts, contacts (for outreach
-  // status), and FX rates in parallel. Gmail draft recipients are deferred
-  // to /api/dev/customers/drafts so the table can render without waiting on
-  // multi-second Gmail round-trips.
-  const [snapshots, opsCounts, errorCounts30d, contactsByEmail, usdRates] = await Promise.all([
+  // status), first-touch attribution, and FX rates in parallel. Gmail draft
+  // recipients are deferred to /api/dev/customers/drafts so the table can render
+  // without waiting on multi-second Gmail round-trips.
+  const [snapshots, opsCounts, errorCounts30d, contactsByEmail, attributionByUser, usdRates] = await Promise.all([
     // Account snapshots (budgets, campaigns)
     (async () => {
       const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
@@ -141,6 +196,26 @@ export async function GET(request: Request) {
       }
       return map;
     })(),
+    // Supabase Auth stores first-touch UTM/referrer on user metadata during the
+    // OAuth callback. Querying auth.users here keeps attribution visible without
+    // adding a new app-table migration.
+    (async () => {
+      const map = new Map<string, Attribution>();
+      if (userIds.length === 0) return map;
+      try {
+        const rows = await db().execute(sql<{ id: string; raw_user_meta_data: Record<string, unknown> | null }>`
+          select id::text as id, raw_user_meta_data
+          from auth.users
+          where id::text in (${sql.join(userIds.map((id) => sql`${id}`), sql`,`)})
+        `);
+        for (const r of rows as unknown as Array<{ id: string; raw_user_meta_data: Record<string, unknown> | null }>) {
+          map.set(r.id, deriveAttribution(r.raw_user_meta_data));
+        }
+      } catch (err) {
+        console.warn("[dev/customers] Failed to read auth.users attribution:", err);
+      }
+      return map;
+    })(),
     getUsdRates(),
   ]);
 
@@ -204,6 +279,7 @@ export async function GET(request: Request) {
       writes: totalWrites,
       totalOps: totalReads + totalWrites,
       dailyBudgetUsd: totalDailyBudgetUsd,
+      attribution: c.userId ? attributionByUser.get(c.userId) ?? deriveAttribution(null) : deriveAttribution(null),
       outreachStatus,
       lastContactedAt: contact?.lastContactedAt ?? null,
       errorsCount: totalErrors30d,
