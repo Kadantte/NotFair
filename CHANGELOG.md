@@ -4,6 +4,11 @@ All notable changes to AdsAgent will be documented in this file.
 
 
 
+## [0.3.3.6] - 2026-05-02
+
+### Changed
+- **Pricing copy: removed Meta Ads mentions.** Free and Growth plan feature lists no longer reference Meta Ads connect, unlimited operations, or bulk workflows. Meta Ads isn't launching, so removing the promise from the pricing surface (homepage, /pricing, /upgrade).
+
 ## [0.3.3.5] - 2026-05-02
 
 ### Added

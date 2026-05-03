@@ -43,7 +43,6 @@ export const FREE_FEATURES = [
   "Then 300 MCP operations/mo, free forever",
   "No credit card required",
   "Connect Google Ads to Claude, Cursor, and any MCP client",
-  "Connect Meta Ads to Claude, Cursor, and any MCP client",
   "Diagnose account issues and draft campaign changes",
   "Preview bid, budget, keyword, audience, and ad edits before approval",
   "Community support",
@@ -51,11 +50,9 @@ export const FREE_FEATURES = [
 
 export const GROWTH_FEATURES = [
   "Unlimited Google Ads operations",
-  "Unlimited Meta Ads operations",
   "Everything in Free",
   "Approval-gated writes for campaign changes",
   "Bulk Google Ads workflows — keywords, ads, budgets, scripts",
-  "Bulk Meta Ads workflows — ad sets, audiences, creative, budgets",
   "Latest OpenAI and Anthropic model support in chat (GPT-5.4, Claude Opus 4.7)",
   "Cancel any time — no contracts",
 ];
