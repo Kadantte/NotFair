@@ -8,6 +8,7 @@ All notable changes to AdsAgent will be documented in this file.
 
 ### Added
 - **Platform filter on the `/dev` Usage tab.** Three pill buttons — All platforms / Google Ads / Meta Ads — at the top of the tab. Selection drives totals, daily chart, top users, top tools, and the new-users count, so the whole tab reflects one platform. New users are now scoped per platform (a Google Ads veteran taking their first Meta action counts as new in the Meta view).
+- **`?includeDev=1` admin escape hatch on /api/dev/usage and /api/dev/[accountId]/activity.** Keeps DEV_EMAILS rows in aggregates so devs can verify their own activity.
 
 ### Changed
 - **Growth override moved off the `/dev` header into the Developer Options tab.** The toggle that swaps your session into a synthetic Growth plan now sits next to the Meta waitlist wall and Reset Account controls, with a real explanation of what ON vs OFF means.
