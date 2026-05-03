@@ -204,9 +204,16 @@ export function formatDate(d: Date): string {
 }
 
 export function getDateRange(days: number): { start: string; end: string } {
+  const parsed = Math.floor(Number(days));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      `ads.helpers.getDateRange(days): \`days\` must be a positive integer (received ${JSON.stringify(days)}). ` +
+      `Example: ads.helpers.getDateRange(7) returns { start, end } for the last 7 days.`,
+    );
+  }
   const end = new Date();
   const start = new Date();
-  start.setDate(end.getDate() - Math.max(days - 1, 0));
+  start.setDate(end.getDate() - (parsed - 1));
   return { start: formatDate(start), end: formatDate(end) };
 }
 
