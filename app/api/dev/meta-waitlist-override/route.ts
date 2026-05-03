@@ -21,7 +21,9 @@ export async function GET() {
 
   const store = await cookies();
   const value = store.get(META_WAITLIST_OVERRIDE_COOKIE)?.value;
-  const state: State = value === "off" ? "off" : "on";
+  // Default for devs is "off" (wall hidden). The dev only sees "on" when
+  // they've explicitly opted in to preview the customer-facing wall.
+  const state: State = value === "on" ? "on" : "off";
   return NextResponse.json({ state });
 }
 

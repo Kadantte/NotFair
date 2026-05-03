@@ -5,9 +5,11 @@ import { getSession } from "@/lib/session";
 
 /**
  * Cookie that lets a developer toggle the Meta waitlist wall on/off so they
- * can preview both UX states. Default (cookie absent or "on") = wall on.
- * "off" = wall hidden — but **only honored** when the session belongs to a
- * dev. Non-dev customers can set this cookie all day; the gate ignores it.
+ * can preview both UX states. Default for devs (cookie absent) = wall OFF
+ * so DEV_EMAILS users can use Meta features end-to-end without bouncing
+ * through the join-waitlist flow on every fresh session. Devs who want to
+ * preview the customer-facing wall can flip the toggle on in /dev. Non-dev
+ * customers always see the wall regardless of cookie state.
  */
 export const META_WAITLIST_OVERRIDE_COOKIE = "dev_meta_waitlist_override";
 
@@ -16,12 +18,11 @@ type WallOverrideState = "on" | "off";
 /**
  * Should the Meta waitlist wall be shown for the current session?
  *
- * Returns true for:
- *   - non-dev users (always)
- *   - devs who haven't toggled the override off
+ * Non-dev users: always true (everyone outside DEV_EMAILS sees the wall
+ * until Meta App Review is approved).
  *
- * Returns false only when a dev has explicitly set the override cookie to
- * "off" — letting them preview the underlying connect/manage UX.
+ * Devs: false by default. Returns true only when a dev has explicitly set
+ * the override cookie to "on" to preview the customer-facing wall.
  */
 export async function isMetaWaitlistWallEnabled(): Promise<boolean> {
   const session = await getSession();
@@ -30,11 +31,12 @@ export async function isMetaWaitlistWallEnabled(): Promise<boolean> {
 
   const store = await cookies();
   const value = store.get(META_WAITLIST_OVERRIDE_COOKIE)?.value;
-  // For devs only: "off" disables the wall; anything else (or absent)
-  // keeps it on — same default as a customer.
-  return value !== "off";
+  // For devs only: cookie absent (or "off") → wall hidden; "on" → wall shown.
+  return value === "on";
 }
 
 export function readMetaWaitlistOverrideValue(value: string | undefined): WallOverrideState {
-  return value === "off" ? "off" : "on";
+  // Mirrors the dev gate: explicit "on" means show the wall; everything else
+  // (absent, "off", malformed) means hide it.
+  return value === "on" ? "on" : "off";
 }
