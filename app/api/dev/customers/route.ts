@@ -1,7 +1,7 @@
 import { db, schema } from "@/lib/db";
-import { sql, desc, inArray, isNotNull } from "drizzle-orm";
+import { sql, desc, inArray, isNotNull, and, gte } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
-import { devEmailSqlList } from "@/lib/dev-ops-filter";
+import { devEmailSqlList, excludeDevOpsFilter, dedupeCount, dedupeErrorCount } from "@/lib/dev-ops-filter";
 import { parseCustomerIds } from "@/lib/google-ads";
 import { getUsdRates, getCurrencyInfo, toUsd } from "@/lib/currency";
 
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   // status), and FX rates in parallel. Gmail draft recipients are deferred
   // to /api/dev/customers/drafts so the table can render without waiting on
   // multi-second Gmail round-trips.
-  const [snapshots, opsCounts, contactsByEmail, usdRates] = await Promise.all([
+  const [snapshots, opsCounts, errorCounts30d, contactsByEmail, usdRates] = await Promise.all([
     // Account snapshots (budgets, campaigns)
     (async () => {
       const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       }
       return map;
     })(),
-    // Operations counts per account
+    // Operations counts per account (all time)
     (async () => {
       const map = new Map<string, { reads: number; writes: number; lastOp: string | null }>();
       if (allAccountIds.size > 0) {
@@ -88,6 +88,33 @@ export async function GET(request: Request) {
           .groupBy(schema.operations.accountId);
         for (const { accountId, reads, writes, lastOp } of rows) {
           map.set(accountId, { reads: Number(reads), writes: Number(writes), lastOp });
+        }
+      }
+      return map;
+    })(),
+    // Error counts per account for the last 30 days. Deduped by request_id
+    // so bulk fan-out tools don't inflate error counts.
+    (async () => {
+      const map = new Map<string, { calls: number; errorsCount: number }>();
+      if (allAccountIds.size > 0) {
+        const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const rows = await db()
+          .select({
+            accountId: schema.operations.accountId,
+            calls: dedupeCount(schema.operations),
+            errorsCount: dedupeErrorCount(schema.operations),
+          })
+          .from(schema.operations)
+          .where(
+            and(
+              inArray(schema.operations.accountId, [...allAccountIds]),
+              gte(schema.operations.createdAt, since30d),
+              excludeDevOpsFilter(),
+            ),
+          )
+          .groupBy(schema.operations.accountId);
+        for (const { accountId, calls, errorsCount } of rows) {
+          map.set(accountId, { calls: Number(calls), errorsCount: Number(errorsCount) });
         }
       }
       return map;
@@ -123,12 +150,19 @@ export async function GET(request: Request) {
     let totalWrites = 0;
     let lastOp: string | null = null;
     let totalDailyBudgetUsd: number | null = null;
+    let totalCalls30d = 0;
+    let totalErrors30d = 0;
     const accounts = c.accounts.map((a) => {
       const ops = opsCounts.get(a.id);
       if (ops) {
         totalReads += ops.reads;
         totalWrites += ops.writes;
         if (ops.lastOp && (!lastOp || ops.lastOp > lastOp)) lastOp = ops.lastOp;
+      }
+      const errs = errorCounts30d.get(a.id);
+      if (errs) {
+        totalCalls30d += errs.calls;
+        totalErrors30d += errs.errorsCount;
       }
       const snap = snapshots.get(a.id);
       const dailyBudgetUsd =
@@ -155,6 +189,8 @@ export async function GET(request: Request) {
     if (contact?.status === "contacted") outreachStatus = "contacted";
     else if (contact?.hasDraft) outreachStatus = "drafted";
 
+    const errorRate = totalCalls30d > 0 ? (totalErrors30d / totalCalls30d) * 100 : 0;
+
     return {
       userId: c.userId,
       googleEmail: c.googleEmail,
@@ -170,6 +206,9 @@ export async function GET(request: Request) {
       dailyBudgetUsd: totalDailyBudgetUsd,
       outreachStatus,
       lastContactedAt: contact?.lastContactedAt ?? null,
+      errorsCount: totalErrors30d,
+      calls30d: totalCalls30d,
+      errorRate,
     };
   });
 
