@@ -57,6 +57,20 @@ export type GraphRequest = {
   params?: Record<string, string | number | boolean | undefined>;
   /** "GET" (default), "POST", or "DELETE". POST encodes params as the body. */
   method?: GraphMethod;
+  /**
+   * Run the call through Meta's `execution_options=["validate_only"]` mode.
+   * Meta runs full validation (auth, schema, permissions, account state,
+   * CBO checks, etc.) and returns the same success/error envelope as a real
+   * write — but does not persist any change.
+   *
+   * Only meaningful for POST/DELETE writes; ignored for GET. Set internally
+   * by Meta write tools when `auth.testMode === true` (integration-test
+   * bearer token); never exposed as an MCP tool input. Customer-facing prod
+   * traffic never sets this.
+   *
+   * Docs: https://developers.facebook.com/docs/marketing-api/validation/
+   */
+  validateOnly?: boolean;
 };
 
 export type GraphResponse<T = unknown> = {
@@ -93,6 +107,11 @@ export async function metaGraph<T = unknown>(
   for (const [key, value] of Object.entries(req.params ?? {})) {
     if (value === undefined || value === null) continue;
     params.set(key, String(value));
+  }
+  // Validate-only mode is for write paths only — GETs ignore execution_options
+  // and we don't want to mutate the read URL with a no-op param.
+  if (req.validateOnly && method !== "GET") {
+    params.set("execution_options", JSON.stringify(["validate_only"]));
   }
 
   // Token goes in Authorization header so it doesn't end up in URL access

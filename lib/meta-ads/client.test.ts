@@ -88,6 +88,46 @@ describe("metaGraph", () => {
     expect(body).not.toContain("access_token");
   });
 
+  it("injects execution_options=['validate_only'] on POST when validateOnly=true", async () => {
+    const { stub, calls } = makeFetchStub([{ body: { success: true } }]);
+    vi.stubGlobal("fetch", stub);
+
+    await metaGraph("tok", {
+      path: "/123",
+      method: "POST",
+      params: { status: "PAUSED" },
+      validateOnly: true,
+    });
+
+    const body = calls[0].init?.body as string;
+    expect(body).toContain("execution_options=");
+    // URL-decode and check the array shape Meta accepts.
+    const decoded = decodeURIComponent(body);
+    expect(decoded).toContain('execution_options=["validate_only"]');
+  });
+
+  it("does NOT inject execution_options on GET (read endpoints don't accept it)", async () => {
+    const { stub, calls } = makeFetchStub([{ body: { id: "1" } }]);
+    vi.stubGlobal("fetch", stub);
+
+    await metaGraph("tok", { path: "/me", validateOnly: true });
+    expect(calls[0].url).not.toContain("execution_options");
+  });
+
+  it("does NOT inject execution_options when validateOnly is unset (prod default)", async () => {
+    const { stub, calls } = makeFetchStub([{ body: { success: true } }]);
+    vi.stubGlobal("fetch", stub);
+
+    await metaGraph("tok", {
+      path: "/123",
+      method: "POST",
+      params: { status: "PAUSED" },
+      // validateOnly omitted
+    });
+    const body = calls[0].init?.body as string;
+    expect(body).not.toContain("execution_options");
+  });
+
   it("throws MetaApiError on 200 + body.error envelope", async () => {
     const { stub } = makeFetchStub([
       {

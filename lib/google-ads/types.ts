@@ -54,6 +54,16 @@ export type AuthContext = {
   userAgent?: string | null;
   /** mcp_sessions.id for MCP paths. Null for chat/agent paths. */
   sessionId?: number | null;
+  /**
+   * True when the request is from an integration-test bearer token (Meta:
+   * `oat_meta_ads_test_*`). When set, Meta write tools auto-apply Graph API
+   * `execution_options=["validate_only"]` so the call goes through the full
+   * validation pipeline without persisting state. Prod customer tokens can
+   * never set this — production tokens use a hex-only prefix that cannot
+   * collide with `_test_`. Set by `handler-factory.resolveAuth`; never set
+   * elsewhere.
+   */
+  testMode?: boolean;
 };
 
 /**

@@ -24,6 +24,7 @@ import {
 import { resolveToolAuth } from "@/lib/mcp/helpers";
 import { execMetaWrite } from "@/lib/mcp/meta-tools/exec";
 import { metaGraph, withActPrefix } from "@/lib/meta-ads/client";
+import type { AuthContext } from "@/lib/google-ads";
 
 type StatusValue = "ACTIVE" | "PAUSED";
 
@@ -54,16 +55,30 @@ async function fetchEntitySnapshot(
   }
 }
 
+/**
+ * Single chokepoint for every Meta write POST. Auto-applies validate-only mode
+ * when the caller's auth came from an integration-test token. Customer-facing
+ * tokens never have testMode set, so this is a no-op for prod traffic.
+ */
+async function metaWritePost(
+  auth: AuthContext,
+  path: string,
+  params: Record<string, string | number | boolean | undefined>,
+): Promise<Record<string, unknown>> {
+  return metaGraph<Record<string, unknown>>(auth.refreshToken, {
+    path,
+    method: "POST",
+    params,
+    validateOnly: !!auth.testMode,
+  });
+}
+
 async function setStatus(
-  accessToken: string,
+  auth: AuthContext,
   entityId: string,
   status: StatusValue,
 ): Promise<Record<string, unknown>> {
-  return metaGraph<Record<string, unknown>>(accessToken, {
-    path: `/${entityId}`,
-    method: "POST",
-    params: { status },
-  });
+  return metaWritePost(auth, `/${entityId}`, { status });
 }
 
 const CAMPAIGN_FIELDS =
@@ -93,7 +108,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
       return execMetaWrite(targetAuth, async () => {
         const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
-        await setStatus(targetAuth.refreshToken, campaignId, "PAUSED");
+        await setStatus(targetAuth, campaignId, "PAUSED");
         const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
         return {
           success: true,
@@ -127,7 +142,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
       return execMetaWrite(targetAuth, async () => {
         const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
-        await setStatus(targetAuth.refreshToken, campaignId, "ACTIVE");
+        await setStatus(targetAuth, campaignId, "ACTIVE");
         const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
         return {
           success: true,
@@ -159,7 +174,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
         return execMetaWrite(targetAuth, async () => {
           const before = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
-          await setStatus(targetAuth.refreshToken, adSetId, "PAUSED");
+          await setStatus(targetAuth, adSetId, "PAUSED");
           const after = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
           return {
             success: true,
@@ -192,7 +207,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
         return execMetaWrite(targetAuth, async () => {
           const before = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
-          await setStatus(targetAuth.refreshToken, adSetId, "ACTIVE");
+          await setStatus(targetAuth, adSetId, "ACTIVE");
           const after = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
           return {
             success: true,
@@ -225,7 +240,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
         return execMetaWrite(targetAuth, async () => {
           const before = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
-          await setStatus(targetAuth.refreshToken, adId, "PAUSED");
+          await setStatus(targetAuth, adId, "PAUSED");
           const after = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
           return {
             success: true,
@@ -258,7 +273,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
         const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
         return execMetaWrite(targetAuth, async () => {
           const before = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
-          await setStatus(targetAuth.refreshToken, adId, "ACTIVE");
+          await setStatus(targetAuth, adId, "ACTIVE");
           const after = await fetchEntitySnapshot(targetAuth.refreshToken, adId, AD_FIELDS);
           return {
             success: true,
@@ -325,11 +340,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
         const params: Record<string, string | number> = {};
         if (dailyBudget) params.daily_budget = dailyBudget;
         if (lifetimeBudget) params.lifetime_budget = lifetimeBudget;
-        await metaGraph(targetAuth.refreshToken, {
-          path: `/${campaignId}`,
-          method: "POST",
-          params,
-        });
+        await metaWritePost(targetAuth, `/${campaignId}`, params);
         const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
         return {
           success: true,
@@ -381,11 +392,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
         const params: Record<string, string | number> = {};
         if (dailyBudget) params.daily_budget = dailyBudget;
         if (lifetimeBudget) params.lifetime_budget = lifetimeBudget;
-        await metaGraph(targetAuth.refreshToken, {
-          path: `/${adSetId}`,
-          method: "POST",
-          params,
-        });
+        await metaWritePost(targetAuth, `/${adSetId}`, params);
         const after = await fetchEntitySnapshot(targetAuth.refreshToken, adSetId, ADSET_FIELDS);
         return {
           success: true,
@@ -419,11 +426,7 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
       const { targetAuth, targetId } = resolveToolAuth(currentAuth, accountId);
       return execMetaWrite(targetAuth, async () => {
         const before = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
-        await metaGraph(targetAuth.refreshToken, {
-          path: `/${campaignId}`,
-          method: "POST",
-          params: { name },
-        });
+        await metaWritePost(targetAuth, `/${campaignId}`, { name });
         const after = await fetchEntitySnapshot(targetAuth.refreshToken, campaignId, CAMPAIGN_FIELDS);
         return {
           success: true,
@@ -431,6 +434,78 @@ export const registerMetaWriteTools: ToolRegistrar = (server, currentAuth) => {
           entityType: "campaign",
           entityId: campaignId,
           accountId: targetId,
+          before,
+          after,
+        };
+      });
+    }),
+  );
+
+  // ─── pausePromotedPost ──────────────────────────────────────────────────
+  // Boosted page-post ads cannot have their status mutated via the standard
+  // `/{ad_id}` POST status=PAUSED route — Meta's Ads API rejects with code
+  // 100 because the lifecycle is owned by the Page promote system. The
+  // documented workaround is to unpublish the underlying post, which ends
+  // every active boost on it. Requires `pages_manage_ads`.
+  const POST_FIELDS =
+    "id,created_time,is_published,permalink_url,promotion_status";
+
+  server.registerTool(
+    "pausePromotedPost",
+    {
+      description:
+        "End a Page post's active boost / promotion. Use this when the user wants to pause a boosted post — `pauseAd` returns code 100 on those because Meta's Ads API doesn't allow direct status writes on Page-managed promotions. This sets `is_published=false` on the post, which ends every active boost. Reversible via `resumePromotedPost`. The post stays on the Page (just hidden from non-admins until republished).",
+      inputSchema: {
+        postId: z
+          .string()
+          .describe(
+            "Page post id in `<page_id>_<post_id>` form (matches `effective_object_story_id` on the boosted-post ad's creative).",
+          ),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    safeTypedHandler<{ postId: string }, WriteEnvelope>(async ({ postId }) => {
+      const auth = currentAuth();
+      return execMetaWrite(auth, async () => {
+        const before = await fetchEntitySnapshot(auth.refreshToken, postId, POST_FIELDS);
+        await metaWritePost(auth, `/${postId}`, { is_published: false });
+        const after = await fetchEntitySnapshot(auth.refreshToken, postId, POST_FIELDS);
+        return {
+          success: true,
+          action: "pausePromotedPost",
+          entityType: "ad",
+          entityId: postId,
+          accountId: auth.customerId,
+          before,
+          after,
+        };
+      });
+    }),
+  );
+
+  // ─── resumePromotedPost ─────────────────────────────────────────────────
+  server.registerTool(
+    "resumePromotedPost",
+    {
+      description:
+        "Re-publish a Page post that was paused via `pausePromotedPost`. Sets `is_published=true`. Note: this only restores the post — it does NOT automatically re-activate any prior boost. The user has to re-create the boost in Ads Manager or Page promote UI to resume paid delivery.",
+      inputSchema: {
+        postId: z.string(),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    safeTypedHandler<{ postId: string }, WriteEnvelope>(async ({ postId }) => {
+      const auth = currentAuth();
+      return execMetaWrite(auth, async () => {
+        const before = await fetchEntitySnapshot(auth.refreshToken, postId, POST_FIELDS);
+        await metaWritePost(auth, `/${postId}`, { is_published: true });
+        const after = await fetchEntitySnapshot(auth.refreshToken, postId, POST_FIELDS);
+        return {
+          success: true,
+          action: "resumePromotedPost",
+          entityType: "ad",
+          entityId: postId,
+          accountId: auth.customerId,
           before,
           after,
         };

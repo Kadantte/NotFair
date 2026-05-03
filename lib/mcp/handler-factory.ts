@@ -182,6 +182,16 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
       // resolver only joins against the table relevant for this MCP.
 
       if (config.platform === "meta_ads") {
+        // Integration-test tokens (`oat_meta_ads_test_*`) opt into Graph API
+        // validate-only mode for writes. We reject these in production as
+        // defense-in-depth: prod tokens use 64 hex chars and physically
+        // cannot start with `_test_`, but this guarantees a leaked test
+        // token can't trigger validate-only writes against a customer.
+        const isTestToken = bearerToken.startsWith("oat_meta_ads_test_");
+        if (isTestToken && process.env.NODE_ENV === "production") {
+          throw new Error("Test tokens are not accepted in production.");
+        }
+
         const [row] = await db()
           .select({
             connection: schema.adPlatformConnections,
@@ -231,6 +241,7 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
             userAgent,
             sessionToken: bearerToken,
             sessionId: null,
+            testMode: isTestToken,
           };
         }
         // Token not found → fall through to the "session not found" throw below.

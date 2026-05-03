@@ -324,4 +324,142 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
       });
     }),
   );
+
+  // ─── listPages ──────────────────────────────────────────────────────────
+  // Surfaces the Pages a user manages so the agent can pick a `page_id` for
+  // ad-creative `object_story_spec`. Reads `/me/accounts` (directly-managed
+  // Pages) and, when a `businessId` is provided, also `/{businessId}/owned_pages`
+  // so business-managed Pages are reachable. Requires `pages_show_list`.
+  server.registerTool(
+    "listPages",
+    {
+      description:
+        "List the Facebook Pages the connected user manages, so the agent can pick a Page identity for ad creatives (every ad's `object_story_spec.page_id` requires a Page the user has rights to). Returns id + name only — does NOT read Page content, posts, comments, or engagement. Optional `businessId` also includes Pages owned by that Business Manager.",
+      inputSchema: {
+        businessId: z
+          .string()
+          .optional()
+          .describe(
+            "Business Manager id (numeric, no prefix). When set, also returns Pages owned by that business.",
+          ),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .default(50)
+          .describe("Max total Pages returned across both sources."),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    safeTypedHandler(async ({ businessId, limit }) => {
+      const auth = currentAuth();
+      return execMetaRead(auth, auth.customerId, "listPages", async () => {
+        const direct = await metaGraphAllPages<{ id: string; name?: string }>(
+          auth.refreshToken,
+          { path: "/me/accounts", params: { fields: "id,name" } },
+          { maxRows: limit },
+        );
+        let owned: Array<{ id: string; name?: string }> = [];
+        if (businessId) {
+          try {
+            owned = await metaGraphAllPages<{ id: string; name?: string }>(
+              auth.refreshToken,
+              { path: `/${businessId}/owned_pages`, params: { fields: "id,name" } },
+              { maxRows: limit },
+            );
+          } catch {
+            // Permissions / business-membership errors shouldn't tank the
+            // direct-managed list — return what we have.
+            owned = [];
+          }
+        }
+        // Deduplicate by id; preserve direct-managed first.
+        const seen = new Set<string>();
+        const merged: Array<{ id: string; name: string }> = [];
+        for (const p of [...direct, ...owned]) {
+          if (!p?.id || seen.has(p.id)) continue;
+          seen.add(p.id);
+          merged.push({ id: p.id, name: p.name ?? "" });
+          if (merged.length >= limit) break;
+        }
+        return {
+          rowCount: merged.length,
+          pages: merged,
+        };
+      });
+    }),
+  );
+
+  // ─── getPagePostInsights ────────────────────────────────────────────────
+  // Aggregate engagement on a Page post backing a boosted-post ad — needed
+  // when the user asks "how is my boosted post performing organically?" The
+  // standard Ads Insights API only returns ad-level metrics; the underlying
+  // post's organic engagement requires `pages_read_engagement`.
+  server.registerTool(
+    "getPagePostInsights",
+    {
+      description:
+        "Aggregate engagement metrics for a Page post (typically the post backing a boosted-post ad). Returns impressions, reach, reactions, comments_count, shares_count — aggregate counts only, never individual user data. Pair with `getInsights` to compare paid + organic performance on a boosted post.",
+      inputSchema: {
+        postId: z
+          .string()
+          .describe(
+            "Page post id in `<page_id>_<post_id>` form (matches `effective_object_story_id` on a boosted-post ad's creative).",
+          ),
+        metrics: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Insight metric names. Defaults to a sensible set: post_impressions, post_impressions_unique, post_engaged_users, post_reactions_by_type_total, post_clicks.",
+          ),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    safeTypedHandler(async ({ postId, metrics }) => {
+      const auth = currentAuth();
+      return execMetaRead(auth, auth.customerId, "getPagePostInsights", async () => {
+        const metricList = (metrics && metrics.length > 0
+          ? metrics
+          : [
+              "post_impressions",
+              "post_impressions_unique",
+              "post_engaged_users",
+              "post_reactions_by_type_total",
+              "post_clicks",
+            ]
+        ).join(",");
+        const [insightsRes, summaryRes] = await Promise.all([
+          metaGraph<{ data: unknown[] }>(auth.refreshToken, {
+            path: `/${postId}/insights`,
+            params: { metric: metricList },
+          }),
+          metaGraph<Record<string, unknown>>(auth.refreshToken, {
+            path: `/${postId}`,
+            params: {
+              fields:
+                "id,created_time,permalink_url,likes.summary(true).limit(0),comments.summary(true).limit(0),shares",
+            },
+          }),
+        ]);
+        const summary = summaryRes as {
+          id?: string;
+          created_time?: string;
+          permalink_url?: string;
+          likes?: { summary?: { total_count?: number } };
+          comments?: { summary?: { total_count?: number } };
+          shares?: { count?: number };
+        };
+        return {
+          postId: summary.id ?? postId,
+          createdTime: summary.created_time ?? null,
+          permalinkUrl: summary.permalink_url ?? null,
+          likeCount: summary.likes?.summary?.total_count ?? null,
+          commentCount: summary.comments?.summary?.total_count ?? null,
+          shareCount: summary.shares?.count ?? null,
+          insights: insightsRes?.data ?? [],
+        };
+      });
+    }),
+  );
 };
