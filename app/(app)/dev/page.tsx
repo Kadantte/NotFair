@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Activity, Check, Copy, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Check, Copy, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -20,10 +20,20 @@ import {
     Tooltip,
     Legend,
     ResponsiveContainer,
-    BarChart,
     Bar,
+    ComposedChart,
+    Line,
+    AreaChart,
+    Area,
 } from 'recharts';
-import type { TooltipProps } from 'recharts';
+import {
+    errorRateColor,
+    SOURCE_LABELS,
+    DEV_RANGE_OPTIONS,
+    ChartTooltipShell,
+    RangePicker,
+} from '@/lib/dev-format';
+import type { UsageStats } from '@/lib/dev-types';
 
 const CHART_MARGIN = { top: 4, right: 8, left: 0, bottom: 32 };
 const CHART_CURSOR = { fill: '#3D3C36', opacity: 0.4 };
@@ -32,59 +42,6 @@ const LEGEND_STYLE = { color: '#C4C0B6', fontSize: 12, paddingTop: 8 };
 function formatYTick(v: number): string {
     return v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v);
 }
-
-function UsageTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey?: string; value?: number; color?: string }>; label?: string }) {
-    if (!active || !payload?.length) return null;
-    const reads = (payload.find((p) => p.dataKey === 'reads')?.value ?? 0) as number;
-    const writes = (payload.find((p) => p.dataKey === 'writes')?.value ?? 0) as number;
-    return (
-        <div className="bg-[#2E2D28] border border-[#3D3C36] rounded-lg px-3 py-2 shadow-lg text-xs font-mono">
-            <div className="text-[#C4C0B6] mb-1.5">{label}</div>
-            <div className="flex items-center gap-2 text-[#4CAF6E]">
-                <span className="w-2 h-2 rounded-sm bg-[#4CAF6E] inline-block" />
-                {reads.toLocaleString()} reads
-            </div>
-            <div className="flex items-center gap-2 text-[#D4882A] mt-0.5">
-                <span className="w-2 h-2 rounded-sm bg-[#D4882A] inline-block" />
-                {writes.toLocaleString()} writes
-            </div>
-            <div className="text-[#E8E4DD] mt-1 pt-1 border-t border-[#3D3C36]">
-                {(reads + writes).toLocaleString()} total
-            </div>
-        </div>
-    );
-}
-
-type DailyUsage = {
-    date: string;
-    reads: number;
-    writes: number;
-    total: number;
-};
-
-type UsageSource = {
-    source: string;
-    ops: number;
-};
-
-const SOURCE_LABELS: Record<string, string> = {
-    'claude-code': 'Claude Code',
-    'claude-desktop': 'Claude Desktop',
-    'anthropic/toolbox': 'Toolbox',
-    'claude-ai': 'Claude.ai',
-    'mcp-remote': 'MCP Remote',
-    'adsagent-chat': 'Chat',
-    'chat': 'Chat (web)',
-};
-
-function sourceLabel(source: string): string {
-    return SOURCE_LABELS[source] ?? source;
-}
-
-type DevStats = {
-    dailyUsage: DailyUsage[];
-    sources: UsageSource[];
-};
 
 function formatCurrency(amount: number, currencyCode?: string | null, opts: { compact?: boolean } = {}): string {
     const fractionDigits = opts.compact ? 0 : 2;
@@ -131,21 +88,6 @@ function formatDateShort(iso: string, year = false): string {
     return parseTs(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(year && { year: 'numeric' }) });
 }
 
-/** Format a YYYY-MM-DD local-date string for chart labels (no tz math). */
-function formatChartDate(isoDate: string, full = false): string {
-    const [y, m, d] = isoDate.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString(undefined, full
-        ? { weekday: 'short', month: 'short', day: 'numeric' }
-        : { month: 'short', day: 'numeric' });
-}
-
-function localDateKey(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
 
 
 type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
@@ -175,9 +117,12 @@ type Customer = {
     dailyBudgetUsd: number | null;
     outreachStatus: 'contacted' | 'drafted' | 'none';
     lastContactedAt: string | null;
+    errorsCount: number;
+    calls30d: number;
+    errorRate: number;
 };
 
-type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive';
+type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive' | 'errorRate';
 type SortDir = 'asc' | 'desc';
 
 type ResetPreview = {
@@ -200,7 +145,8 @@ function readStoredTab(): Tab {
     return raw && VALID_TABS.has(raw as Tab) ? (raw as Tab) : 'customers';
 }
 
-let cachedStats: DevStats | null = null;
+// Module-level cache keyed by "days|source" per CLAUDE.md stale-while-revalidate pattern.
+const usageStatsCache = new Map<string, UsageStats>();
 let cachedContacts: Contact[] | null = null;
 let cachedCustomers: Customer[] | null = null;
 let cachedDraftEmails: Set<string> | null = null;
@@ -208,8 +154,9 @@ let cachedDraftEmails: Set<string> | null = null;
 export default function DevPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<Tab>('customers');
-    const [stats, setStats] = useState<DevStats | null>(cachedStats);
-    const [loading, setLoading] = useState(!cachedStats);
+    const [usageDays, setUsageDays] = useState(30);
+    const [stats, setStats] = useState<UsageStats | null>(usageStatsCache.get('30|all') ?? null);
+    const [loading, setLoading] = useState(!usageStatsCache.has('30|all'));
     const [error, setError] = useState<string | null>(null);
     const [contacts, setContacts] = useState<Contact[]>(cachedContacts ?? []);
     const [loadingContacts, setLoadingContacts] = useState(!cachedContacts);
@@ -382,6 +329,9 @@ export default function DevPage() {
                 case 'lastActive':
                     cmp = new Date(a.lastActive).getTime() - new Date(b.lastActive).getTime();
                     break;
+                case 'errorRate':
+                    cmp = a.errorRate - b.errorRate;
+                    break;
             }
             return sortDir === 'asc' ? cmp : -cmp;
         });
@@ -433,25 +383,31 @@ export default function DevPage() {
         }
     }, []);
 
-    const fetchStats = useCallback(async (background = false, source = 'all', fresh = false) => {
-        if (!background) setLoading(true);
+    const fetchStats = useCallback(async ({ days, source = 'all', background = false, fresh = false }: { days: number; source?: string; background?: boolean; fresh?: boolean }) => {
+        const cacheKey = `${days}|${source}`;
+        const cached = usageStatsCache.get(cacheKey);
+        if (cached && !fresh) {
+            setStats(cached);
+            if (background) return;
+        }
+        if (!background || !cached) setLoading(true);
         setError(null);
         try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const params = new URLSearchParams({ tz });
+            const params = new URLSearchParams({ tz, days: String(days) });
             if (source !== 'all') params.set('source', source);
             if (fresh) params.set('fresh', '1');
-            const res = await fetch(`/api/dev?${params}`, { credentials: 'include' });
+            const res = await fetch(`/api/dev/usage?${params}`, { credentials: 'include' });
             if (res.status === 403) {
                 setError('Access denied');
                 return;
             }
             if (!res.ok) throw new Error('Failed to fetch');
-            const data: DevStats = await res.json();
+            const data: UsageStats = await res.json();
             setStats(data);
-            cachedStats = data;
+            usageStatsCache.set(cacheKey, data);
         } catch {
-            setError('Failed to load dev stats');
+            setError('Failed to load usage stats');
         } finally {
             setLoading(false);
         }
@@ -532,11 +488,12 @@ export default function DevPage() {
             // Out-of-band Gmail drafts — non-blocking.
             if (!cachedDraftEmails) fetchDraftEmails();
         } else if (activeTab === 'usage') {
-            fetchStats(!!cachedStats, usageSource);
+            const cacheKey = `${usageDays}|${usageSource}`;
+            fetchStats({ days: usageDays, source: usageSource, background: !!usageStatsCache.get(cacheKey) });
         } else if (activeTab === 'outreach') {
             fetchContacts(!!cachedContacts);
         }
-    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource]);
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchContacts, fetchDraftEmails, usageSource, usageDays]);
 
     // Idle prefetch of the other heavy tab so the first switch is instant.
     useEffect(() => {
@@ -544,7 +501,7 @@ export default function DevPage() {
         const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
             ?? ((cb: () => void) => window.setTimeout(cb, 800));
         const handle = idle(() => {
-            if (activeTab === 'customers' && !cachedStats) fetchStats(true, usageSource);
+            if (activeTab === 'customers' && !usageStatsCache.has(`${usageDays}|${usageSource}`)) fetchStats({ days: usageDays, source: usageSource, background: true });
             else if (activeTab === 'usage' && !cachedCustomers) {
                 fetchCustomers(true);
                 if (!cachedDraftEmails) fetchDraftEmails();
@@ -554,7 +511,7 @@ export default function DevPage() {
             const cancel = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
             if (cancel && typeof handle === 'number') cancel(handle);
         };
-    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource]);
+    }, [activeTab, tabRestored, fetchCustomers, fetchStats, fetchDraftEmails, usageSource, usageDays]);
 
     async function handleCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
@@ -627,41 +584,6 @@ export default function DevPage() {
         }
     }
 
-    const usageChart = useMemo(() => {
-        if (!stats) return null;
-        const byDate = new Map(stats.dailyUsage.map(d => [d.date, d]));
-        const days: DailyUsage[] = [];
-        const now = new Date();
-        const start = new Date(2026, 2, 25); // March 25, 2026
-        const msPerDay = 24 * 60 * 60 * 1000;
-        const spanDays = Math.max(1, Math.floor((now.getTime() - start.getTime()) / msPerDay) + 1);
-        for (let i = 0; i < spanDays; i++) {
-            const d = new Date(start);
-            d.setDate(d.getDate() + i);
-            const key = localDateKey(d);
-            const existing = byDate.get(key);
-            days.push({
-                date: formatChartDate(key),
-                reads: existing?.reads ?? 0,
-                writes: existing?.writes ?? 0,
-                total: existing?.total ?? 0,
-            });
-        }
-        const totalOps = days.reduce((s, d) => s + d.total, 0);
-        const totalReads = days.reduce((s, d) => s + d.reads, 0);
-        const totalWrites = days.reduce((s, d) => s + d.writes, 0);
-        const activeDays = days.filter(d => d.total > 0).length;
-        const avgPerActive = activeDays > 0 ? Math.round(totalOps / activeDays) : 0;
-        const peak = days.reduce((m, d) => d.total > m.total ? d : m, days[0]);
-        const summaryCards = totalOps === 0 ? [] : [
-            { label: 'Total (30d)', value: totalOps.toLocaleString(), sub: `${activeDays} active day${activeDays === 1 ? '' : 's'}`, color: '#E8E4DD' },
-            { label: 'Reads', value: totalReads.toLocaleString(), sub: `${Math.round((totalReads / totalOps) * 100)}%`, color: '#4CAF6E' },
-            { label: 'Writes', value: totalWrites.toLocaleString(), sub: `${Math.round((totalWrites / totalOps) * 100)}%`, color: '#D4882A' },
-            { label: 'Avg / active day', value: avgPerActive.toLocaleString(), sub: 'ops', color: '#E8E4DD' },
-            { label: 'Peak day', value: peak.total.toLocaleString(), sub: peak.date, color: '#E8E4DD' },
-        ];
-        return { days, totalOps, summaryCards };
-    }, [stats]);
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
             <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
@@ -693,19 +615,9 @@ export default function DevPage() {
                                 </span>
                             </Button>
                         )}
-                        <Link href="/dev/telemetry/google-ads" prefetch>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5"
-                            >
-                                <Activity className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Telemetry</span>
-                            </Button>
-                        </Link>
                         <Button
                             onClick={() => {
-                                cachedStats = null;
+                                usageStatsCache.clear();
                                 cachedContacts = null;
                                 cachedCustomers = null;
                                 cachedDraftEmails = null;
@@ -713,7 +625,7 @@ export default function DevPage() {
                                     fetchCustomers(false, true);
                                     fetchDraftEmails();
                                 } else if (activeTab === 'usage') {
-                                    fetchStats(false, usageSource, true);
+                                    fetchStats({ days: usageDays, source: usageSource, fresh: true });
                                 } else {
                                     fetchContacts(false);
                                 }
@@ -756,87 +668,422 @@ export default function DevPage() {
                 {activeTab === 'usage' && (loading && !stats ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-2 border-[#4CAF6E] border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading dev stats...</p>
+                        <p className="text-[#C4C0B6] animate-pulse text-sm">Loading usage stats...</p>
                     </div>
                 ) : stats ? (
                     <>
-                        {/* Daily API Usage */}
-                        <div>
-                            <div className="flex items-center justify-between mb-3 sm:mb-4">
-                                <h2 className="text-base sm:text-lg font-semibold text-[#E8E4DD]">API Usage by Day</h2>
-                                {stats.sources.length > 1 && (
-                                    <div className="flex items-center gap-2">
+                        {/* ── Stat tiles ── */}
+                        {(() => {
+                            const currCallsRate = stats.totals.calls > 0
+                                ? (stats.totals.errors / stats.totals.calls) * 100 : 0;
+                            const prevCallsRate = stats.prevTotals.calls != null
+                                && stats.prevTotals.errors != null
+                                && stats.prevTotals.calls > 0
+                                ? (stats.prevTotals.errors / stats.prevTotals.calls) * 100 : null;
+
+                            type Tile = {
+                                label: string;
+                                display: string;
+                                curr: number;
+                                prev: number | null;
+                                isErrorRate?: boolean;
+                                noTrend?: boolean;
+                                sub?: string;
+                                absoluteDelta?: boolean;
+                            };
+
+                            const tiles: Tile[] = [
+                                { label: 'Total Calls', display: stats.totals.calls.toLocaleString(), curr: stats.totals.calls, prev: stats.prevTotals.calls },
+                                { label: 'Error Rate', display: `${currCallsRate.toFixed(1)}%`, curr: currCallsRate, prev: prevCallsRate, isErrorRate: true },
+                                { label: 'Active Users', display: stats.totals.activeUsers.toLocaleString(), curr: stats.totals.activeUsers, prev: stats.prevTotals.activeUsers, absoluteDelta: true },
+                                { label: 'New Users', display: stats.totals.newUsers.toLocaleString(), curr: stats.totals.newUsers, prev: null, noTrend: true, sub: 'this period' },
+                            ];
+
+                            return (
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                                {tiles.map((tile) => {
+                                    let trendChip: React.ReactNode = null;
+                                    if (!tile.noTrend) {
+                                        if (tile.isErrorRate) {
+                                            if (prevCallsRate != null) {
+                                                const delta = currCallsRate - prevCallsRate;
+                                                const absDelta = Math.abs(delta).toFixed(1);
+                                                trendChip = delta > 0.05 ? (
+                                                    <span className="text-[11px] font-medium text-[#C45D4A]">▲ {absDelta}pp vs prev {usageDays}d</span>
+                                                ) : delta < -0.05 ? (
+                                                    <span className="text-[11px] font-medium text-[#5DBE82]">▼ {absDelta}pp vs prev {usageDays}d</span>
+                                                ) : (
+                                                    <span className="text-[11px] text-[#C4C0B6]">≈ flat vs prev {usageDays}d</span>
+                                                );
+                                            } else {
+                                                trendChip = <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
+                                            }
+                                        } else if (tile.absoluteDelta) {
+                                            if (tile.prev === null) {
+                                                trendChip = <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
+                                            } else {
+                                                const absDelta = tile.curr - tile.prev;
+                                                trendChip = absDelta > 0 ? (
+                                                    <span className="text-[11px] font-medium text-[#4CAF6E]">▲ {absDelta} vs prev {usageDays}d</span>
+                                                ) : absDelta < 0 ? (
+                                                    <span className="text-[11px] text-[#C4C0B6]">▼ {Math.abs(absDelta)} vs prev {usageDays}d</span>
+                                                ) : (
+                                                    <span className="text-[11px] text-[#C4C0B6]">≈ flat vs prev {usageDays}d</span>
+                                                );
+                                            }
+                                        } else {
+                                            if (tile.prev === null) {
+                                                trendChip = <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
+                                            } else if (tile.prev > 0) {
+                                                const pct = ((tile.curr - tile.prev) / tile.prev) * 100;
+                                                const absPct = Math.abs(pct).toFixed(0);
+                                                trendChip = pct >= 1 ? (
+                                                    <span className="text-[11px] font-medium text-[#4CAF6E]">▲ {absPct}% vs prev {usageDays}d</span>
+                                                ) : pct <= -1 ? (
+                                                    <span className="text-[11px] text-[#C4C0B6]">▼ {absPct}% vs prev {usageDays}d</span>
+                                                ) : (
+                                                    <span className="text-[11px] text-[#C4C0B6]">≈ flat vs prev {usageDays}d</span>
+                                                );
+                                            } else {
+                                                trendChip = <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
+                                            }
+                                        }
+                                    } else if (tile.sub) {
+                                        trendChip = <span className="text-[11px] text-[#C4C0B6]">{tile.sub}</span>;
+                                    }
+                                    return (
+                                        <div key={tile.label} className="border border-[#3D3C36] rounded-lg bg-[#24231F] px-4 py-3">
+                                            <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-1">{tile.label}</div>
+                                            <div className="text-[22px] sm:text-[26px] font-semibold font-mono tabular-nums text-[#E8E4DD] leading-none">{tile.display}</div>
+                                            <div className="mt-1">{trendChip}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            );
+                        })()}
+
+                        {/* ── Volume + errors chart ── */}
+                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-[#3D3C36]">
+                                <h2 className="text-base font-semibold text-[#E8E4DD]">
+                                    Volume + Errors ({DEV_RANGE_OPTIONS.find(o => o.value === usageDays)?.label ?? `${usageDays}d`})
+                                </h2>
+                                <div className="flex items-center gap-2">
+                                    {/* Source filter — chart-only per plan */}
+                                    <div className="flex items-center gap-1.5">
                                         <Filter className="w-3.5 h-3.5 text-[#C4C0B6]" />
                                         <select
                                             value={usageSource}
                                             onChange={(e) => {
                                                 setUsageSource(e.target.value);
-                                                cachedStats = null;
+                                                usageStatsCache.clear();
+                                                fetchStats({ days: usageDays, source: e.target.value });
                                             }}
-                                            className="text-sm bg-[#24231F] border border-[#3D3C36] rounded-lg px-3 py-1.5 text-[#E8E4DD] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]"
+                                            className="text-xs bg-[#24231F] border border-[#3D3C36] rounded px-2 py-1 text-[#E8E4DD] focus:outline-none focus:ring-1 focus:ring-[#4CAF6E]"
                                         >
                                             <option value="all">All sources</option>
-                                            {stats.sources.map((s) => (
-                                                <option key={s.source} value={s.source}>
-                                                    {sourceLabel(s.source)} ({s.ops.toLocaleString()})
-                                                </option>
+                                            {Object.entries(SOURCE_LABELS).map(([key, label]) => (
+                                                <option key={key} value={key}>{label}</option>
                                             ))}
                                         </select>
+                                    </div>
+                                    <RangePicker
+                                        options={DEV_RANGE_OPTIONS}
+                                        value={usageDays}
+                                        onChange={(v) => {
+                                            setUsageDays(v);
+                                            const key = `${v}|${usageSource}`;
+                                            fetchStats({ days: v, source: usageSource, background: !!usageStatsCache.get(key) });
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            {stats.daily.length === 0 ? (
+                                <p className="text-sm text-[#C4C0B6] text-center py-8">No API usage in this range.</p>
+                            ) : (
+                                <div className="p-4">
+                                    <ResponsiveContainer width="100%" height={280}>
+                                        <ComposedChart
+                                            data={stats.daily.map(d => ({
+                                                ...d,
+                                                date: d.day.slice(5), // MM-DD
+                                                errorPct: (d.reads + d.writes) > 0
+                                                    ? (d.errors / (d.reads + d.writes)) * 100
+                                                    : 0,
+                                            }))}
+                                            margin={CHART_MARGIN}
+                                            barCategoryGap="30%"
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                                                tickLine={false}
+                                                angle={-45}
+                                                textAnchor="end"
+                                                interval="preserveStartEnd"
+                                                minTickGap={20}
+                                            />
+                                            <YAxis
+                                                yAxisId="vol"
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickFormatter={formatYTick}
+                                                width={40}
+                                            />
+                                            <YAxis
+                                                yAxisId="err"
+                                                orientation="right"
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C45D4A', fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                                                width={36}
+                                            />
+                                            <Tooltip
+                                                cursor={CHART_CURSOR}
+                                                content={({ active, payload, label }) => {
+                                                    if (!active || !payload?.length) return null;
+                                                    const reads = (payload.find(p => p.dataKey === 'reads')?.value ?? 0) as number;
+                                                    const writes = (payload.find(p => p.dataKey === 'writes')?.value ?? 0) as number;
+                                                    const errPct = (payload.find(p => p.dataKey === 'errorPct')?.value ?? 0) as number;
+                                                    return (
+                                                        <ChartTooltipShell label={label}>
+                                                            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                                                                <span className="w-2 h-2 rounded-sm bg-[#4CAF6E] inline-block" />
+                                                                {reads.toLocaleString()} reads
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[#D4882A] mt-0.5">
+                                                                <span className="w-2 h-2 rounded-sm bg-[#D4882A] inline-block" />
+                                                                {writes.toLocaleString()} writes
+                                                            </div>
+                                                            {errPct > 0 && (
+                                                                <div className="flex items-center gap-2 text-[#C45D4A] mt-0.5">
+                                                                    <span className="w-2 h-2 rounded-full bg-[#C45D4A] inline-block" />
+                                                                    {errPct.toFixed(1)}% error rate
+                                                                </div>
+                                                            )}
+                                                            <div className="text-[#E8E4DD] mt-1 pt-1 border-t border-[#3D3C36]">
+                                                                {(reads + writes).toLocaleString()} total
+                                                            </div>
+                                                        </ChartTooltipShell>
+                                                    );
+                                                }}
+                                            />
+                                            <Legend wrapperStyle={LEGEND_STYLE} />
+                                            <Bar yAxisId="vol" dataKey="reads" name="Reads" stackId="a" fill="#4CAF6E" fillOpacity={0.75} />
+                                            <Bar yAxisId="vol" dataKey="writes" name="Writes" stackId="a" fill="#D4882A" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
+                                            <Line yAxisId="err" type="monotone" dataKey="errorPct" name="Error %" dot={{ r: 3, fill: '#C45D4A', strokeWidth: 0 }} stroke="#C45D4A" strokeWidth={1.5} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── DAU chart ── */}
+                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-[#3D3C36]">
+                                <div>
+                                    <h2 className="text-base font-semibold text-[#E8E4DD]">
+                                        Daily Active Users
+                                    </h2>
+                                    {stats.daily.length > 0 && (() => {
+                                        const dauValues = stats.daily.map(d => d.dau);
+                                        const peak = Math.max(...dauValues);
+                                        const avg = Math.round(dauValues.reduce((a, b) => a + b, 0) / dauValues.length);
+                                        const today = dauValues[dauValues.length - 1] ?? 0;
+                                        return (
+                                            <p className="text-[11px] text-[#C4C0B6] mt-0.5 font-mono tabular-nums">
+                                                today {today} · avg {avg} · peak {peak}
+                                            </p>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                            {stats.daily.length === 0 ? (
+                                <p className="text-sm text-[#C4C0B6] text-center py-8">No active users in this range.</p>
+                            ) : (
+                                <div className="p-4">
+                                    <ResponsiveContainer width="100%" height={180}>
+                                        <AreaChart
+                                            data={stats.daily.map(d => ({
+                                                ...d,
+                                                date: d.day.slice(5), // MM-DD
+                                            }))}
+                                            margin={CHART_MARGIN}
+                                        >
+                                            <defs>
+                                                <linearGradient id="dauFill" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#4CAF6E" stopOpacity={0.35} />
+                                                    <stop offset="100%" stopColor="#4CAF6E" stopOpacity={0.02} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                                                tickLine={false}
+                                                angle={-45}
+                                                textAnchor="end"
+                                                interval="preserveStartEnd"
+                                                minTickGap={20}
+                                            />
+                                            <YAxis
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                allowDecimals={false}
+                                                width={32}
+                                            />
+                                            <Tooltip
+                                                cursor={CHART_CURSOR}
+                                                content={({ active, payload, label }) => {
+                                                    if (!active || !payload?.length) return null;
+                                                    const dau = (payload.find(p => p.dataKey === 'dau')?.value ?? 0) as number;
+                                                    return (
+                                                        <ChartTooltipShell label={label}>
+                                                            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                                                                <span className="w-2 h-2 rounded-sm bg-[#4CAF6E] inline-block" />
+                                                                {dau.toLocaleString()} active {dau === 1 ? 'user' : 'users'}
+                                                            </div>
+                                                        </ChartTooltipShell>
+                                                    );
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="dau"
+                                                stroke="#4CAF6E"
+                                                strokeWidth={1.5}
+                                                fill="url(#dauFill)"
+                                                dot={{ r: 2.5, fill: '#4CAF6E', strokeWidth: 0 }}
+                                                activeDot={{ r: 4, fill: '#4CAF6E', strokeWidth: 0 }}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Two-column: top users by errors + top tools ── */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                            {/* Top users by errors */}
+                            <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-[#3D3C36]">
+                                    <h2 className="text-sm font-semibold text-[#E8E4DD]">Top Users by Errors</h2>
+                                    <p className="text-[11px] text-[#C4C0B6] mt-0.5">Click a row to open their account</p>
+                                </div>
+                                {stats.topUsersByErrors.length === 0 ? (
+                                    <div className="px-4 py-8 text-center text-sm text-[#5DBE82]">
+                                        No errors in this range.
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-[#3D3C36]/50">
+                                        {stats.topUsersByErrors.map((u) => {
+                                            const rate = u.calls > 0 ? (u.errors / u.calls) * 100 : 0;
+                                            const rateColor = errorRateColor(rate);
+                                            const target = u.primaryAccountId ? `/dev/${u.primaryAccountId}` : null;
+                                            const row = (
+                                                <div className="flex items-start gap-3 px-4 py-2.5">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-[13px] font-mono text-[#E8E4DD] truncate">
+                                                            {u.googleEmail ?? u.userId ?? 'Unknown'}
+                                                        </div>
+                                                        <div className="text-[11px] text-[#C4C0B6] font-mono mt-0.5">
+                                                            {u.errors.toLocaleString()} errs / {u.calls.toLocaleString()} calls
+                                                        </div>
+                                                        {u.topErrorClasses.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {u.topErrorClasses.map((cls) => (
+                                                                    <span key={cls} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#C45D4A]/10 text-[#C45D4A] border border-[#C45D4A]/20">
+                                                                        {cls}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className={`shrink-0 font-mono text-sm tabular-nums font-semibold ${rateColor}`}>
+                                                        {rate.toFixed(1)}%
+                                                    </div>
+                                                </div>
+                                            );
+                                            return target ? (
+                                                <Link
+                                                    key={u.userId ?? u.googleEmail ?? 'u'}
+                                                    href={target}
+                                                    prefetch
+                                                    className="block hover:bg-[#2E2D28] transition-colors cursor-pointer"
+                                                >
+                                                    {row}
+                                                </Link>
+                                            ) : (
+                                                <div key={u.userId ?? u.googleEmail ?? 'u'} className="block">
+                                                    {row}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
 
-                            {!usageChart || usageChart.totalOps === 0 ? (
-                                <p className="text-sm text-[#C4C0B6] text-center py-8">No API usage in the last 30 days</p>
-                            ) : (
-                                <>
-                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
-                                        {usageChart.summaryCards.map(s => (
-                                            <div key={s.label} className="border border-[#3D3C36] rounded-lg bg-[#24231F]/40 px-3 py-2.5">
-                                                <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">{s.label}</div>
-                                                <div className="mt-1 text-lg sm:text-xl font-semibold font-mono tabular-nums" style={{ color: s.color }}>{s.value}</div>
-                                                <div className="text-[11px] text-[#C4C0B6] mt-0.5 truncate">{s.sub}</div>
-                                            </div>
-                                        ))}
+                            {/* Top tools */}
+                            <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-[#3D3C36]">
+                                    <h2 className="text-sm font-semibold text-[#E8E4DD]">Top Tools</h2>
+                                </div>
+                                {stats.topTools.length === 0 ? (
+                                    <div className="px-4 py-8 text-center text-sm text-[#C4C0B6]">
+                                        No tool calls yet.
                                     </div>
-
-                                    <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 p-4">
-                                        <ResponsiveContainer width="100%" height={320}>
-                                            <BarChart
-                                                data={usageChart.days}
-                                                margin={CHART_MARGIN}
-                                                barCategoryGap="30%"
-                                            >
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    stroke="#3D3C36"
-                                                    tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                                                    tickLine={false}
-                                                    angle={-45}
-                                                    textAnchor="end"
-                                                    interval="preserveStartEnd"
-                                                    minTickGap={20}
-                                                />
-                                                <YAxis
-                                                    stroke="#3D3C36"
-                                                    tick={{ fill: '#C4C0B6', fontSize: 11 }}
-                                                    tickLine={false}
-                                                    axisLine={false}
-                                                    tickFormatter={formatYTick}
-                                                    width={40}
-                                                />
-                                                <Tooltip cursor={CHART_CURSOR} content={<UsageTooltip />} />
-                                                <Legend wrapperStyle={LEGEND_STYLE} />
-                                                <Bar dataKey="reads" name="Reads" stackId="a" fill="#4CAF6E" fillOpacity={0.75} />
-                                                <Bar dataKey="writes" name="Writes" stackId="a" fill="#D4882A" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </>
-                            )}
+                                ) : (() => {
+                                    const maxCalls = Math.max(...stats.topTools.map(t => t.calls), 1);
+                                    return (
+                                        <div className="px-4 py-3 space-y-2.5 max-h-[480px] overflow-y-auto">
+                                            {stats.topTools.map((t) => {
+                                                const rate = t.calls > 0 ? (t.errors / t.calls) * 100 : 0;
+                                                const hasWarning = rate >= 5;
+                                                const barColor = rate >= 15
+                                                    ? 'bg-[#C45D4A]/50'
+                                                    : rate >= 5
+                                                        ? 'bg-[#D4882A]/40'
+                                                        : 'bg-[#4CAF6E]/30';
+                                                return (
+                                                    <div key={t.toolName ?? 'unknown'}>
+                                                        <div className="flex items-center justify-between gap-2 mb-1 text-[12px]">
+                                                            <span className="font-mono text-[#E8E4DD] truncate min-w-0">
+                                                                {t.toolName ?? '—'}
+                                                                {hasWarning && <span className="ml-1 text-[#D4882A]">⚠</span>}
+                                                            </span>
+                                                            <div className="flex shrink-0 items-center gap-3 font-mono text-[11px]">
+                                                                {rate > 0 && (
+                                                                    <span className={errorRateColor(rate)}>
+                                                                        {rate.toFixed(1)}%
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-[#C4C0B6]">{t.calls.toLocaleString()}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="h-1.5 overflow-hidden rounded bg-[#1A1917]">
+                                                            <div
+                                                                className={`h-full rounded transition-all ${barColor}`}
+                                                                style={{ width: `${(t.calls / maxCalls) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
                         </div>
-
                     </>
                 ) : null)}
 
@@ -866,6 +1113,7 @@ export default function DevPage() {
                                     className="flex-1 bg-[#24231F] border border-[#3D3C36] rounded-md px-2 py-1.5 text-xs text-[#E8E4DD]"
                                 >
                                     <option value="operations">Operations</option>
+                                    <option value="errorRate">Error Rate (30d)</option>
                                     <option value="budget">Annual Budget (USD)</option>
                                     <option value="accounts">Accounts</option>
                                     <option value="lastActive">Last Active</option>
@@ -946,6 +1194,16 @@ export default function DevPage() {
                                                     <div className="text-sm text-[#C4C0B6]/40">—</div>
                                                 )}
                                             </div>
+                                            <div>
+                                                <div className="text-[10px] text-[#C4C0B6] uppercase tracking-widest">Errors (30d)</div>
+                                                {c.calls30d > 0 ? (
+                                                    <div className={`text-sm font-mono tabular-nums font-medium ${errorRateColor(c.errorRate)}`}>
+                                                        {c.errorsCount} ({c.errorRate.toFixed(1)}%)
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm text-[#C4C0B6]/40">—</div>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-3 text-center">
                                             <div>
@@ -993,6 +1251,7 @@ export default function DevPage() {
                                                 { key: 'email' as const, label: 'Customer' },
                                                 { key: 'accounts' as const, label: 'Accounts' },
                                                 { key: 'operations' as const, label: 'Operations' },
+                                                { key: 'errorRate' as const, label: 'Errors (30d)' },
                                                 { key: 'budget' as const, label: 'Annual Budget' },
                                                 { key: 'firstSeen' as const, label: 'First Seen' },
                                                 { key: 'lastActive' as const, label: 'Last Active' },
@@ -1077,6 +1336,15 @@ export default function DevPage() {
                                                         <div>
                                                             <div className="text-sm text-[#E8E4DD] font-mono tabular-nums font-medium">{c.totalOps.toLocaleString()}</div>
                                                             <div className="text-[10px] text-[#C4C0B6]/60 font-mono">{c.reads.toLocaleString()}r · {c.writes.toLocaleString()}w</div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm text-[#C4C0B6]/40">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                    {c.calls30d > 0 ? (
+                                                        <div className={`font-mono tabular-nums text-sm font-medium ${errorRateColor(c.errorRate)}`}>
+                                                            {c.errorsCount} ({c.errorRate.toFixed(1)}%)
                                                         </div>
                                                     ) : (
                                                         <span className="text-sm text-[#C4C0B6]/40">—</span>
