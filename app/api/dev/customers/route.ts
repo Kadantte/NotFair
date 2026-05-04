@@ -1,10 +1,12 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc, inArray, isNotNull, and, gte } from "drizzle-orm";
+import { after } from "next/server";
 import { requireDevEmail } from "@/lib/dev-access";
 import { OP_TYPE } from "@/lib/db/tracking";
 import { devEmailSqlList, excludeDevOpsFilter, operationErrorRowCount, operationRowCount, operationTypeRowCount } from "@/lib/dev-ops-filter";
 import { parseCustomerIds } from "@/lib/google-ads";
 import { getUsdRates, getCurrencyInfo, toUsd } from "@/lib/currency";
+import { refreshStaleAccountSnapshots } from "@/lib/google-ads/account-snapshot-refresh";
 
 type Attribution = {
   source: string | null;
@@ -67,6 +69,50 @@ function deriveAttribution(meta: Record<string, unknown> | null | undefined): At
 const CACHE_TTL_MS = 60_000;
 let cache: { data: unknown; ts: number } | null = null;
 
+const SNAPSHOT_REFRESH_DEBOUNCE_MS = 5 * 60_000;
+const MAX_DEV_VIEW_SNAPSHOT_REFRESHES = 10;
+const queuedSnapshotRefreshes = new Map<string, number>();
+
+function coalesceZero(value: number | null | undefined) {
+  return value ?? 0;
+}
+
+function timestampMs(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function enqueueSuspiciousSnapshotRefresh(accountIds: string[]) {
+  const now = Date.now();
+  const uniqueIds = [...new Set(accountIds)]
+    .filter((accountId) => {
+      const queuedAt = queuedSnapshotRefreshes.get(accountId) ?? 0;
+      return now - queuedAt >= SNAPSHOT_REFRESH_DEBOUNCE_MS;
+    })
+    .slice(0, MAX_DEV_VIEW_SNAPSHOT_REFRESHES);
+
+  if (uniqueIds.length === 0) return;
+  for (const accountId of uniqueIds) queuedSnapshotRefreshes.set(accountId, now);
+
+  after(async () => {
+    try {
+      const result = await refreshStaleAccountSnapshots({
+        accountIds: uniqueIds,
+        limit: uniqueIds.length,
+        minOps: 20,
+      });
+      if (result.refreshed > 0 || result.failed > 0) {
+        console.log(
+          `[dev/customers] refreshed stale account snapshots: refreshed=${result.refreshed}; failed=${result.failed}; accounts=${uniqueIds.join(",")}`,
+        );
+      }
+    } catch (error) {
+      console.warn("[dev/customers] Failed to refresh suspicious account snapshots:", error);
+    }
+  });
+}
+
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
   if (denied) return denied;
@@ -111,7 +157,7 @@ export async function GET(request: Request) {
   const [snapshots, opsCounts, errorCounts30d, contactsByEmail, attributionByUser, usdRates] = await Promise.all([
     // Account snapshots (budgets, campaigns)
     (async () => {
-      const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null }>();
+      const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null; lastSyncedAt: Date | null }>();
       if (allAccountIds.size > 0) {
         const rows = await db()
           .select({
@@ -119,6 +165,7 @@ export async function GET(request: Request) {
             dailyBudget: schema.accounts.dailyBudget,
             activeCampaigns: schema.accounts.activeCampaigns,
             currencyCode: schema.accounts.currencyCode,
+            lastSyncedAt: schema.accounts.lastSyncedAt,
           })
           .from(schema.accounts)
           .where(inArray(schema.accounts.accountId, [...allAccountIds]));
@@ -228,8 +275,10 @@ export async function GET(request: Request) {
     let totalDailyBudgetUsd: number | null = null;
     let totalCalls30d = 0;
     let totalErrors30d = 0;
+    const suspiciousSnapshotAccountIds: string[] = [];
     const accounts = c.accounts.map((a) => {
       const ops = opsCounts.get(a.id);
+      const opTotal = (ops?.reads ?? 0) + (ops?.writes ?? 0);
       if (ops) {
         totalReads += ops.reads;
         totalWrites += ops.writes;
@@ -245,14 +294,30 @@ export async function GET(request: Request) {
         snap?.dailyBudget != null ? toUsd(snap.dailyBudget, snap.currencyCode, usdRates) : null;
       if (dailyBudgetUsd != null) totalDailyBudgetUsd = (totalDailyBudgetUsd ?? 0) + dailyBudgetUsd;
       const info = getCurrencyInfo(snap?.currencyCode);
+      const snapshotMissing = !snap;
+      const snapshotSyncedAtMs = timestampMs(snap?.lastSyncedAt);
+      const lastOpMs = timestampMs(ops?.lastOp);
+      const snapshotOlderThanUsage = lastOpMs != null
+        && (snapshotSyncedAtMs == null || snapshotSyncedAtMs < lastOpMs);
+      const zeroWithUsage = !!snap
+        && coalesceZero(snap.dailyBudget) === 0
+        && coalesceZero(snap.activeCampaigns) === 0
+        && opTotal >= 20
+        && snapshotOlderThanUsage;
+      if ((snapshotMissing && opTotal > 0) || zeroWithUsage) {
+        suspiciousSnapshotAccountIds.push(a.id);
+      }
       return {
         ...a,
         ...(snap ?? {}),
         dailyBudgetUsd,
         country: info?.country ?? null,
         flag: info?.flag ?? null,
+        snapshotStatus: snapshotMissing ? "missing" : zeroWithUsage ? "stale" : "ok",
       };
     });
+
+    enqueueSuspiciousSnapshotRefresh(suspiciousSnapshotAccountIds);
 
     // lastActive = most recent of session creation or any operation on their accounts
     const lastActive = lastOp && (lastOp as string) > c.lastSessionAt ? lastOp : c.lastSessionAt;

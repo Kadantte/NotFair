@@ -5,6 +5,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/account-snapshots",
+      "schedule": "15 * * * *"
+    },
+    {
       "path": "/api/cron/impact-monitor",
       "schedule": "30 6 * * *"
     },
