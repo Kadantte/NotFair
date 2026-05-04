@@ -49,9 +49,10 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
-                    <NavLink href="/pricing" label="Pricing" className="hidden sm:inline" />
+                    <NavLink href="/mcp" label="MCP" className="hidden sm:inline" />
                     <NavLink href="/google-ads-claude-connector-setup-guide" label="Google Ads Claude Connector Setup Guide" className="hidden lg:inline" />
                     <SetupGuidesMenu className="hidden md:flex" />
+                    <NavLink href="/pricing" label="Pricing" className="hidden sm:inline" />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"

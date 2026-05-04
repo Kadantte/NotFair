@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-05-01.
+> Source of truth for all analytics events. Last updated: 2026-05-03.
 > Platform: PostHog. Check here before adding a new event.
 
 
@@ -675,6 +675,52 @@ No properties.
 ```
 
 **Files:** `lib/mcp/agent-feedback.ts`
+
+---
+
+## mcp_client_tab_selected
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks one of the AI-client tabs (Claude / OpenClaw / Codex / Cursor / Hermes) on the `/mcp` marketing page. Does **not** fire on the auto-cycling hero pill, on URL-driven deep-link landings (`/mcp?tab=hermes`), or on first paint — only on a deliberate click.
+**Hypothesis:** We believe tracking which MCP client tab users open tells us where to invest docs and integration polish — does Codex pull share from Claude after we ship the one-liner? Is Hermes adoption real or curiosity? `from_client` lets us see hopping patterns (e.g. "Codex viewers also try Cursor") which informs cross-linking. Pair with `mcp_setup_copied` (same `client` enum) to compute view → copy conversion per platform.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `client` | string | `"openclaw"` | The tab the user just opened. Enum: `claude`, `openclaw`, `codex`, `cursor`, `hermes`. |
+| `from_client` | string | `"claude"` | The tab that was active before this click — same enum as `client`. Use to analyze tab-hopping. |
+
+```json
+{ "event": "mcp_client_tab_selected", "properties": { "client": "openclaw", "from_client": "claude" } }
+```
+
+**Notes:** The `/mcp` URL also reflects the active tab (`?tab=<id>`) so external traffic can be attributed to a specific platform via standard `$pageview` filtering — no separate event is fired on URL-init by design (deep links would otherwise inflate counts without representing user intent on this page).
+
+**Files:** `components/marketing/mcp-page.tsx`
+
+---
+
+## mcp_setup_copied
+
+**Phase:** 1
+**Category:** activation
+**Platform:** PostHog (client)
+**Trigger:** Fires when a user clicks the copy button on any field inside the `/mcp` setup-step cards. The `/mcp` page is the unified, multi-platform setup hub — distinct from the older single-platform setup pages (`connector_credential_copied`, `install_command_copied`) which remain in place for `/connect/*` and per-client guides.
+**Hypothesis:** Copying the URL/JSON/prompt is the last user action before they leave `/mcp` to paste it into their AI client — a strong activation signal. Pair with `account_connected` to compute /mcp → activation rate per platform, and identify clients where users get to the copy step but never come back (likely a paste/auth-flow problem on that client's side).
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `client` | string | `"cursor"` | Which platform tab the copy happened on. Enum: `claude`, `openclaw`, `codex`, `cursor`, `hermes`. |
+| `field` | string | `"mcp_json"` | What was copied. Enum varies by `client`. **`claude`**: `name`, `server_url`. **`openclaw`**: `prompt`. **`codex`**: `codex_command`. **`cursor`**: `mcp_json`. **`hermes`**: `prompt`. |
+
+```json
+{ "event": "mcp_setup_copied", "properties": { "client": "cursor", "field": "mcp_json" } }
+```
+
+**Notes:** Distinct from `connector_credential_copied` (Claude-only `/connect/claude-connector` and `/google-ads-claude-connector-setup-guide`) and `install_command_copied` (`/connect/{claude-code,codex,any-mcp}` and matching marketing pages). Those events stay; this one is scoped to the `/mcp` hub specifically. If the older setup pages eventually migrate to use the `/mcp` UX, the older events should be deprecated in favor of this one.
+
+**Files:** `components/marketing/mcp-page.tsx`
 
 ---
 

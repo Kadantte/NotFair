@@ -6,6 +6,7 @@ import { SITE_URL } from "@/lib/seo";
 
 const publicMarketingRoutes = [
   "/",
+  "/mcp",
   "/google-ads-audit",
   "/google-ads-claude",
   "/google-ads-claude-connector-setup-guide",
@@ -25,6 +26,7 @@ const publicMarketingRoutes = [
 
 const highPriorityRoutes = new Set([
   "/",
+  "/mcp",
   "/google-ads-audit",
   "/google-ads-claude",
   "/google-ads-claude-connector-setup-guide",
