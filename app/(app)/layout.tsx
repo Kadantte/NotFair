@@ -434,8 +434,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     active={pathname === '/operations'}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
-                    disabled={isMetaActive}
-                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Operations'); }}
                 />
                 <NavItem
                     href="/chat"

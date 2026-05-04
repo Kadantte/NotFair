@@ -345,7 +345,7 @@ export async function logRead(opts: LogReadOpts) {
 
 export async function getChanges(
   accountId: string,
-  options: { limit?: number; offset?: number; campaignId?: string } = {},
+  options: { limit?: number; offset?: number; campaignId?: string; platform?: "google_ads" | "meta_ads" } = {},
 ) {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
   const offset = Math.max(options.offset ?? 0, 0);
@@ -358,6 +358,9 @@ export async function getChanges(
   ];
   if (options.campaignId) {
     conditions.push(eq(schema.operations.campaignId, options.campaignId));
+  }
+  if (options.platform) {
+    conditions.push(eq(schema.operations.platform, options.platform));
   }
 
   const [rows, countResult] = await Promise.all([

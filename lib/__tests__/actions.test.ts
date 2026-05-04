@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  mockGetSession,
   mockGetSessionAuth,
   mockGetAuthContext,
   mockGetChanges,
@@ -13,6 +14,7 @@ const {
   mockPauseCampaign,
   mockRemoveCampaign,
 } = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
   mockGetSessionAuth: vi.fn(),
   mockGetAuthContext: vi.fn(),
   mockGetChanges: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock("next/server", () => ({
 }));
 
 vi.mock("@/lib/session", () => ({
+  getSession: mockGetSession,
   getSessionAuth: mockGetSessionAuth,
   getAuthContext: mockGetAuthContext,
 }));
@@ -274,6 +277,49 @@ describe("app/actions", () => {
     it("falls back to the generic message when the error has no extractable text", async () => {
       const msg = await listCampaignsCatch({});
       expect(msg).toBe("Failed to list campaigns.");
+    });
+  });
+
+  describe("getChangesAction platform routing", () => {
+    it("routes to the active Meta accountId with platform=meta_ads filter", async () => {
+      mockGetSession.mockResolvedValue({
+        connected: true,
+        activePlatform: "meta_ads",
+        activeMetaAccountId: "123456789",
+        customerId: "",
+        pendingSetup: true,
+        metaAccounts: [{ id: "123456789", name: "My Meta Account" }],
+      });
+      mockGetChanges.mockResolvedValue({ items: [], total: 0 });
+
+      const { getChangesAction } = await import("@/app/actions");
+      await getChangesAction({ limit: 10, offset: 0 });
+
+      expect(mockGetChanges).toHaveBeenCalledWith("123456789", {
+        limit: 10,
+        offset: 0,
+        platform: "meta_ads",
+      });
+    });
+
+    it("routes to the Google customerId with platform=google_ads filter", async () => {
+      mockGetSession.mockResolvedValue({
+        connected: true,
+        activePlatform: "google_ads",
+        activeMetaAccountId: null,
+        customerId: "1301265570",
+        pendingSetup: false,
+        metaAccounts: [],
+      });
+      mockGetChanges.mockResolvedValue({ items: [], total: 0 });
+
+      const { getChangesAction } = await import("@/app/actions");
+      await getChangesAction({ limit: 25 });
+
+      expect(mockGetChanges).toHaveBeenCalledWith("1301265570", {
+        limit: 25,
+        platform: "google_ads",
+      });
     });
   });
 });
