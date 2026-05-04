@@ -195,8 +195,19 @@ function describeGoogleAdsError(error: unknown, fallback: string): string {
 
 export async function getChangesAction(options: { limit?: number; offset?: number; campaignId?: string } = {}) {
     return requireAuth(async () => {
-        const { customerId } = await getSessionAuth();
-        return getChanges(customerId, options);
+        // Resolve from session (not getSessionAuth) so Meta-only users — who
+        // have customerId="" — aren't rejected. The page is platform-aware:
+        // when Meta is active we scope to the Meta accountId + platform so
+        // Google rows from the same user don't bleed in.
+        const session = await getSession();
+        if (!session.connected) throw new Error("Not authenticated");
+        if (session.activePlatform === "meta_ads") {
+            const accountId = session.activeMetaAccountId ?? "";
+            if (!accountId) throw new Error("Not authenticated");
+            return getChanges(accountId, { ...options, platform: "meta_ads" });
+        }
+        if (!session.customerId) throw new Error("Not authenticated");
+        return getChanges(session.customerId, { ...options, platform: "google_ads" });
     });
 }
 

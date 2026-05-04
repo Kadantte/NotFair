@@ -3,6 +3,12 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.4.3] - 2026-05-03
+
+### Added
+- **Operations history now works for Meta accounts.** When Meta is the active platform in the navbar, `/operations` shows changes made on the active Meta ad account, scoped by platform so Google rows from the same user don't bleed in. The sidebar's Operations link is no longer disabled when Meta is active. Undo stays Google-only — Meta change rows simply don't show a Revert button.
+
+
 ## [0.3.4.2] - 2026-05-03
 
 ### Changed
