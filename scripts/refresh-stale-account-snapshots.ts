@@ -1,6 +1,6 @@
 /**
- * Refresh derived `accounts` snapshots when the cache is stale relative to
- * account-changing writes, or suspiciously zero despite meaningful usage.
+ * Refresh derived `accounts` snapshots when the cache is missing, stale relative
+ * to account-changing writes, or suspiciously zero despite meaningful usage.
  *
  * Safe by default: dry-run only unless --apply is passed.
  *
@@ -67,14 +67,18 @@ type CandidateRow = {
   lastOperationAt: Date | null;
   lastSnapshotWriteAt: Date | null;
   googleEmail: string | null;
-};
-
-type AuthRow = {
   refreshToken: string;
   sessionLoginCustomerId: string | null;
   entryLoginCustomerId: string | null;
   hasEntryLoginCustomerId: boolean;
-  googleEmail: string | null;
+  reason: "missing-snapshot" | "write-after-snapshot" | "zero-with-usage";
+};
+
+type SummaryRow = {
+  connectedAccounts: number;
+  missingSnapshots: number;
+  staleAfterWrite: number;
+  zeroWithUsage: number;
 };
 
 function numberArg(name: string, fallback: number) {
@@ -87,7 +91,7 @@ function numberArg(name: string, fallback: number) {
   return value;
 }
 
-function loginCustomerIdFor(row: AuthRow) {
+function loginCustomerIdFor(row: Pick<CandidateRow, "hasEntryLoginCustomerId" | "entryLoginCustomerId" | "sessionLoginCustomerId">) {
   if (row.hasEntryLoginCustomerId) {
     return row.entryLoginCustomerId ?? undefined;
   }
@@ -101,6 +105,53 @@ async function main() {
   const limit = numberArg("--limit", 50);
 
   try {
+    const [summary] = await sql<SummaryRow[]>`
+      WITH op_stats AS (
+        SELECT
+          account_id,
+          count(*)::int AS operations,
+          max(created_at) AS last_operation_at,
+          max(created_at) FILTER (
+            WHERE op_type = 1 AND tool_name = ANY(${SNAPSHOT_WRITE_TOOLS})
+          ) AS last_snapshot_write_at
+        FROM operations
+        GROUP BY account_id
+      ), latest_account_session AS (
+        SELECT DISTINCT ON (entry->>'id')
+          entry->>'id' AS account_id
+        FROM mcp_sessions s
+        CROSS JOIN LATERAL jsonb_array_elements(s.customer_ids::jsonb) entry
+        WHERE s.customer_ids IS NOT NULL
+          AND s.customer_ids != '[]'
+          AND coalesce(entry->>'id', '') <> ''
+          AND coalesce(s.refresh_token, '') <> ''
+        ORDER BY entry->>'id', s.created_at DESC
+      ), classified AS (
+        SELECT
+          las.account_id,
+          a.account_id IS NULL AS missing_snapshot,
+          (
+            o.last_snapshot_write_at IS NOT NULL
+            AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_snapshot_write_at)
+          ) AS stale_after_write,
+          (
+            coalesce(a.daily_budget, 0) = 0
+            AND coalesce(a.active_campaigns, 0) = 0
+            AND coalesce(o.operations, 0) >= ${minOps}
+            AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_operation_at)
+          ) AS zero_with_usage
+        FROM latest_account_session las
+        LEFT JOIN accounts a ON a.account_id = las.account_id
+        LEFT JOIN op_stats o ON o.account_id = las.account_id
+      )
+      SELECT
+        count(*)::int AS "connectedAccounts",
+        count(*) FILTER (WHERE missing_snapshot)::int AS "missingSnapshots",
+        count(*) FILTER (WHERE stale_after_write)::int AS "staleAfterWrite",
+        count(*) FILTER (WHERE zero_with_usage)::int AS "zeroWithUsage"
+      FROM classified
+    `;
+
     const candidates = await sql<CandidateRow[]>`
       WITH op_stats AS (
         SELECT
@@ -113,97 +164,110 @@ async function main() {
           ) AS last_snapshot_write_at
         FROM operations
         GROUP BY account_id
-      ), latest_session AS (
+      ), latest_account_session AS (
         SELECT DISTINCT ON (entry->>'id')
           entry->>'id' AS account_id,
+          s.refresh_token AS refresh_token,
+          s.login_customer_id AS session_login_customer_id,
+          entry->>'loginCustomerId' AS entry_login_customer_id,
+          (entry ? 'loginCustomerId') AS has_entry_login_customer_id,
           s.google_email
         FROM mcp_sessions s
         CROSS JOIN LATERAL jsonb_array_elements(s.customer_ids::jsonb) entry
-        WHERE s.customer_ids IS NOT NULL AND s.customer_ids != '[]'
+        WHERE s.customer_ids IS NOT NULL
+          AND s.customer_ids != '[]'
+          AND coalesce(entry->>'id', '') <> ''
+          AND coalesce(s.refresh_token, '') <> ''
         ORDER BY entry->>'id', s.created_at DESC
+      ), classified AS (
+        SELECT
+          las.account_id,
+          las.refresh_token,
+          las.session_login_customer_id,
+          las.entry_login_customer_id,
+          las.has_entry_login_customer_id,
+          las.google_email,
+          a.daily_budget,
+          a.active_campaigns,
+          a.last_synced_at,
+          coalesce(o.operations, 0)::int AS operations,
+          coalesce(o.writes, 0)::int AS writes,
+          o.last_operation_at,
+          o.last_snapshot_write_at,
+          CASE
+            WHEN a.account_id IS NULL THEN 'missing-snapshot'
+            WHEN o.last_snapshot_write_at IS NOT NULL
+              AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_snapshot_write_at)
+              THEN 'write-after-snapshot'
+            WHEN coalesce(a.daily_budget, 0) = 0
+              AND coalesce(a.active_campaigns, 0) = 0
+              AND coalesce(o.operations, 0) >= ${minOps}
+              AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_operation_at)
+              THEN 'zero-with-usage'
+            ELSE NULL
+          END AS reason
+        FROM latest_account_session las
+        LEFT JOIN accounts a ON a.account_id = las.account_id
+        LEFT JOIN op_stats o ON o.account_id = las.account_id
       )
       SELECT
-        a.account_id AS "accountId",
-        a.daily_budget AS "currentDailyBudget",
-        a.active_campaigns AS "currentActiveCampaigns",
-        a.last_synced_at AS "lastSyncedAt",
-        o.operations,
-        o.writes,
-        o.last_operation_at AS "lastOperationAt",
-        o.last_snapshot_write_at AS "lastSnapshotWriteAt",
-        ls.google_email AS "googleEmail"
-      FROM accounts a
-      JOIN op_stats o ON o.account_id = a.account_id
-      LEFT JOIN latest_session ls ON ls.account_id = a.account_id
-      WHERE
-        (
-          o.last_snapshot_write_at IS NOT NULL
-          AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_snapshot_write_at)
-        )
-        OR (
-          coalesce(a.daily_budget, 0) = 0
-          AND coalesce(a.active_campaigns, 0) = 0
-          AND o.operations >= ${minOps}
-          AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_operation_at)
-        )
+        account_id AS "accountId",
+        daily_budget AS "currentDailyBudget",
+        active_campaigns AS "currentActiveCampaigns",
+        last_synced_at AS "lastSyncedAt",
+        operations,
+        writes,
+        last_operation_at AS "lastOperationAt",
+        last_snapshot_write_at AS "lastSnapshotWriteAt",
+        google_email AS "googleEmail",
+        refresh_token AS "refreshToken",
+        session_login_customer_id AS "sessionLoginCustomerId",
+        entry_login_customer_id AS "entryLoginCustomerId",
+        has_entry_login_customer_id AS "hasEntryLoginCustomerId",
+        reason
+      FROM classified
+      WHERE reason IS NOT NULL
       ORDER BY
-        (o.last_snapshot_write_at IS NOT NULL AND (a.last_synced_at IS NULL OR a.last_synced_at < o.last_snapshot_write_at)) DESC,
-        o.operations DESC
+        (reason = 'missing-snapshot') DESC,
+        operations DESC,
+        account_id ASC
       LIMIT ${limit}
     `;
 
-    console.log(`stale/suspicious account snapshots: ${candidates.length}`);
+    console.log(
+      `snapshot backlog: connected=${summary?.connectedAccounts ?? 0}; ` +
+      `missing=${summary?.missingSnapshots ?? 0}; ` +
+      `staleAfterWrite=${summary?.staleAfterWrite ?? 0}; ` +
+      `zeroWithUsage=${summary?.zeroWithUsage ?? 0}`,
+    );
+    console.log(`candidates selected: ${candidates.length}`);
     console.log(`mode: ${shouldApply ? "apply" : "dry-run"}; minOps=${minOps}; limit=${limit}`);
 
     if (candidates.length === 0) return;
 
     let refreshed = 0;
-    let skipped = 0;
     let failed = 0;
 
     for (const c of candidates) {
-      const reason = c.lastSnapshotWriteAt && (!c.lastSyncedAt || c.lastSyncedAt < c.lastSnapshotWriteAt)
-        ? "write-after-snapshot"
-        : "zero-with-usage";
       console.log(
         `${shouldApply ? "refresh" : "would refresh"} ${c.accountId}` +
         ` email=${c.googleEmail ?? "unknown"}` +
-        ` reason=${reason}` +
+        ` reason=${c.reason}` +
         ` ops=${c.operations}` +
         ` writes=${c.writes}` +
         ` current=${c.currentDailyBudget ?? "null"}/${c.currentActiveCampaigns ?? "null"}` +
+        ` loginCustomerId=${loginCustomerIdFor(c) ?? "direct"}` +
         ` lastSynced=${c.lastSyncedAt?.toISOString() ?? "null"}` +
         ` lastSnapshotWrite=${c.lastSnapshotWriteAt?.toISOString() ?? "null"}`,
       );
 
       if (!shouldApply) continue;
 
-      const authRows = await sql<AuthRow[]>`
-        SELECT
-          s.refresh_token AS "refreshToken",
-          s.login_customer_id AS "sessionLoginCustomerId",
-          entry->>'loginCustomerId' AS "entryLoginCustomerId",
-          (entry ? 'loginCustomerId') AS "hasEntryLoginCustomerId",
-          s.google_email AS "googleEmail"
-        FROM mcp_sessions s
-        CROSS JOIN LATERAL jsonb_array_elements(s.customer_ids::jsonb) entry
-        WHERE entry->>'id' = ${c.accountId}
-        ORDER BY s.created_at DESC
-        LIMIT 1
-      `;
-
-      const auth = authRows[0];
-      if (!auth) {
-        skipped++;
-        console.warn(`skip ${c.accountId}: no MCP session auth found`);
-        continue;
-      }
-
       try {
         await syncAccountSnapshot({
-          refreshToken: auth.refreshToken,
+          refreshToken: c.refreshToken,
           customerId: c.accountId,
-          loginCustomerId: loginCustomerIdFor(auth),
+          loginCustomerId: loginCustomerIdFor(c),
         });
         refreshed++;
       } catch (error) {
@@ -217,7 +281,7 @@ async function main() {
       return;
     }
 
-    console.log(`\nDone. refreshed=${refreshed}; skipped=${skipped}; failed=${failed}`);
+    console.log(`\nDone. refreshed=${refreshed}; failed=${failed}`);
   } finally {
     await sql.end({ timeout: 5 });
   }

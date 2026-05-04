@@ -8,7 +8,6 @@ import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
-const TOPRANK_REPO = "https://github.com/nowork-studio/toprank";
 const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/settings/connectors?modal=add-custom-connector";
 
 const DEFAULT_AUDIT_PROMPT =
@@ -105,91 +104,16 @@ export function ConnectorSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={3} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Install the toprank plugin on Claude Desktop App{" "}
-            <span className="font-normal text-[#C4C0B6]/70">
-              (not available on Claude web)
-            </span>
-          </h3>
-        </div>
-        <div className="ml-11 space-y-3">
-          <p className="text-base leading-relaxed text-[#C4C0B6]">
-            In the same <strong className="text-[#E8E4DD]">Customize</strong>{" "}
-            panel of the Claude Desktop App, find{" "}
-            <strong className="text-[#E8E4DD]">Personal plugins</strong>, click{" "}
-            <strong className="text-[#E8E4DD]">+</strong>, then choose{" "}
-            <strong className="text-[#E8E4DD]">Browse plugins</strong>. Paste the{" "}
-            <a
-              href={TOPRANK_REPO}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
-            >
-              toprank
-            </a>{" "}
-            repo URL into the{" "}
-            <strong className="text-[#E8E4DD]">Add marketplace</strong> dialog
-            and click <strong className="text-[#E8E4DD]">Sync</strong>. Toprank
-            ships with pre-made paid-ads and SEO skills that teach Claude how
-            to diagnose, optimize, and manage your campaigns alongside the NotFair
-            connector.
-          </p>
-          <CopyableField
-            label="Marketplace URL"
-            value={TOPRANK_REPO}
-            trackingField="plugin_marketplace_url"
-            surface={surface}
-          />
-          <SetupScreenshot
-            src="/connector-setup/04a-browse-plugins.png"
-            alt="Customize panel with Personal plugins, click the plus icon and choose Browse plugins"
-            surface={surface}
-          />
-          <SetupScreenshot
-            src="/connector-setup/04b-add-marketplace.png"
-            alt="Add marketplace dialog with the toprank GitHub URL pasted, then click Sync"
-            surface={surface}
-          />
-        </div>
-      </div>
-
-      {/* Step 4 */}
-      <div id="step-4" className="space-y-3 scroll-mt-24">
-        <div className="flex items-baseline gap-3">
-          <StepNumber n={4} />
-          <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Enable {connectorName} in a chat
-          </h3>
-        </div>
-        <div className="ml-11 space-y-3">
-          <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Open a new Claude chat, click the{" "}
-            <strong className="text-[#E8E4DD]">+</strong> button, go to{" "}
-            <strong className="text-[#E8E4DD]">Connectors</strong>, and toggle{" "}
-            <strong className="text-[#E8E4DD]">{connectorName}</strong> on.
-          </p>
-          <SetupScreenshot
-            src="/connector-setup/04-enable-in-chat.png"
-            alt="In a Claude chat, open the + menu and toggle the NotFair connector on"
-            surface={surface}
-          />
-        </div>
-      </div>
-
-      {/* Step 5 */}
-      <div id="step-5" className="space-y-3 scroll-mt-24">
-        <div className="flex items-baseline gap-3">
-          <StepNumber n={5} />
-          <h3 className="text-lg font-semibold text-[#E8E4DD]">
             Ask Claude about your ads
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Try a prompt like{" "}
+            Open a new Claude chat and try a prompt like{" "}
             <em className="text-[#E8E4DD]">
               &ldquo;{examplePrompt}&rdquo;
             </em>{" "}
-            Claude will call NotFair tools to read your account and respond
+            Claude will use the NotFair connector to read your account and respond
             with specific, data-backed insights.
           </p>
           <SetupScreenshot

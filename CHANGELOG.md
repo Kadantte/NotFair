@@ -3,6 +3,11 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.4.2] - 2026-05-03
+
+### Changed
+- **Claude connector setup is now a 3-step flow.** Removed the separate toprank plugin install and per-chat connector toggle steps from the shared Claude connector guide, so users go from opening Claude Connectors to configuring NotFair to asking Claude about their ads. The Google Ads and Meta Ads setup guide headings and HowTo schema now match the shorter flow.
+
 
 ## [0.3.4.1] - 2026-05-03
 

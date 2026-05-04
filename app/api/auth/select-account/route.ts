@@ -37,11 +37,10 @@ export async function POST(request: Request) {
 
   // Validate accounts shape — accept optional loginCustomerId for manager-routed accounts
   const validAccounts = accounts.filter(
-    (a: unknown): a is { id: string; name: string; loginCustomerId?: string } =>
-      typeof a === "object" &&
-      a !== null &&
-      "id" in a &&
-      typeof (a as any).id === "string",
+    (a: unknown): a is { id: string; name: string; loginCustomerId?: string } => {
+      if (typeof a !== "object" || a === null || !("id" in a)) return false;
+      return typeof (a as Record<string, unknown>).id === "string";
+    },
   );
 
   if (validAccounts.length === 0) {
@@ -183,10 +182,11 @@ export async function POST(request: Request) {
       );
   }
 
-  // Snapshot account budget/info for dev dashboard (runs after response is sent)
-  const selectedIds = validAccounts.map((a) => a.id);
+  // Snapshot account budget/info for dev dashboard (runs after response is sent).
+  // Use the server-authorized customerIds JSON so MCC-routed accounts keep loginCustomerId.
+  const selectedAccounts = parseCustomerIds(customerIds);
   after(async () => {
-    syncAccountSnapshots(session.refreshToken, selectedIds).catch((err) => {
+    syncAccountSnapshots(session.refreshToken, selectedAccounts).catch((err) => {
       console.error("[sync-account] Failed to snapshot on select:", err);
     });
   });

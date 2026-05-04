@@ -1,6 +1,6 @@
 import { db, schema } from "@/lib/db";
 import { getAccountInfo, getAccountBudgetSummary } from "./reads";
-import type { AuthContext } from "./types";
+import type { AuthContext, ConnectedAccount } from "./types";
 
 /**
  * Fetch account info + budget summary from Google Ads and upsert into
@@ -36,13 +36,20 @@ export async function syncAccountSnapshot(auth: AuthContext) {
  * Sync multiple accounts in parallel, swallowing individual failures
  * so one bad account doesn't block the rest.
  */
+type SnapshotAccountInput = string | Pick<ConnectedAccount, "id" | "loginCustomerId">;
+
+function normalizeSnapshotAccount(account: SnapshotAccountInput): Pick<ConnectedAccount, "id" | "loginCustomerId"> {
+  return typeof account === "string" ? { id: account } : account;
+}
+
 export async function syncAccountSnapshots(
   refreshToken: string,
-  accountIds: string[],
+  accounts: SnapshotAccountInput[],
 ) {
   await Promise.allSettled(
-    accountIds.map((customerId) =>
-      syncAccountSnapshot({ refreshToken, customerId }),
-    ),
+    accounts.map((account) => {
+      const { id, loginCustomerId } = normalizeSnapshotAccount(account);
+      return syncAccountSnapshot({ refreshToken, customerId: id, loginCustomerId });
+    }),
   );
 }

@@ -440,9 +440,12 @@ async function createOrRedirectGoogleAdsSession({
       expiresAt: expiresAt.toISOString(),
     });
 
-    // Snapshot account budget/info for dev dashboard (runs after response is sent)
+    // Snapshot account budget/info for dev dashboard (runs after response is sent).
+    // Preserve per-account loginCustomerId so MCC-routed client accounts can be queried.
     after(async () => {
-      syncAccountSnapshots(refreshToken, [account.id]).catch((err) => {
+      syncAccountSnapshots(refreshToken, [
+        { id: account.id, loginCustomerId: account.loginCustomerId ?? null },
+      ]).catch((err) => {
         console.error("[sync-account] Failed to snapshot on connect:", err);
       });
     });
@@ -582,10 +585,10 @@ async function reuseExistingSession({
   const customerName = deriveCustomerName(existingSession.customerIds);
 
   // Re-sync account snapshots on returning login (runs after response is sent)
-  const reusedIds = parseCustomerIds(existingSession.customerIds).map((a) => a.id);
-  if (reusedIds.length > 0) {
+  const reusedAccounts = parseCustomerIds(existingSession.customerIds);
+  if (reusedAccounts.length > 0) {
     after(async () => {
-      syncAccountSnapshots(refreshToken, reusedIds).catch((err) => {
+      syncAccountSnapshots(refreshToken, reusedAccounts).catch((err) => {
         console.error("[sync-account] Failed to snapshot on reuse:", err);
       });
     });

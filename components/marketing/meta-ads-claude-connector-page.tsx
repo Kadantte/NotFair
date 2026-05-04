@@ -141,7 +141,7 @@ export function MetaAdsClaudeConnectorPage() {
               How to install
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Add the Meta Ads connector to Claude in 5 steps
+              Add the Meta Ads connector to Claude in 3 steps
             </h2>
             <p className="mt-3 text-sm text-[#C4C0B6]">
               Free · No credit card · No Client ID or Secret needed
