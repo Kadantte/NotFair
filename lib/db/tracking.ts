@@ -2,6 +2,7 @@ import { db, schema } from "./index";
 import { eq, and, gt, gte, lt, lte, desc, inArray, sql } from "drizzle-orm";
 import type { WriteResult } from "@/lib/google-ads";
 import { maybeFireRedditFirstWrite } from "@/lib/reddit-first-write";
+import { maybeFireXFirstWrite } from "@/lib/x-first-write";
 import { trackServerEvent } from "@/lib/analytics-server";
 import {
   IMPACT_CORRELATION_DISCLAIMER,
@@ -284,6 +285,7 @@ export async function logChange(opts: LogChangeOpts) {
 
     if (inserted && userId && writeResult.success) {
       void maybeFireRedditFirstWrite({ userId, justInsertedId: inserted.id });
+      void maybeFireXFirstWrite({ userId, justInsertedId: inserted.id });
     }
 
     return inserted;

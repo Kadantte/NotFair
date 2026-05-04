@@ -1,7 +1,7 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-05-03.
-> Platform: PostHog. Check here before adding a new event.
+> Source of truth for all analytics events. Last updated: 2026-05-04.
+> Platforms: PostHog, X Ads CAPI. Check here before adding a new event.
 
 
 
@@ -947,6 +947,30 @@ No properties.
 ```
 
 **Files:** `components/welcome-page.tsx`
+
+---
+
+## x_first_write_lead_conversion
+
+**Phase:** 1
+**Category:** activation | paid_acquisition
+**Platform:** X Ads Conversion API (server)
+**Trigger:** Fires after `logChange` inserts a successful write row (`operations.op_type = 1`, `success = 1`) and that user has no earlier successful write. The first-write detector checks prior successful write rows by `operations.id < justInsertedId`, then sends X a `Lead`-configured conversion event with the stable dedupe key `first-write-${userId}`.
+**Hypothesis:** We believe tracking first successful write as the X lead-generation conversion tells X which acquired users reached NotFair's D0 Write Users activation metric, which lets paid campaigns optimize for users who plausibly become WAW instead of read-only signups.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `event_id` | string | `"tw-q27qa-q27qc"` | X Ads event ID configured in Ads Manager. Defaults to the current lead-generation event, override with `X_EVENT_ID`. |
+| `conversion_id` | string | `"first-write-user_abc123"` | Stable dedupe key sent to X. |
+| `identifiers.hashed_email` | string | `"0c7e..."` | SHA-256 hash of the latest session's normalized Google email. Required for this server-side path because first write does not reliably have `twclid`. |
+| `value` | string | `"1"` | Nominal conversion value. |
+| `price_currency` | string | `"USD"` | Conversion currency. |
+
+```json
+{ "conversions": [{ "event_id": "tw-q27qa-q27qc", "conversion_id": "first-write-user_abc123", "identifiers": [{ "hashed_email": "0c7e..." }], "value": "1", "price_currency": "USD" }] }
+```
+
+**Files:** `lib/db/tracking.ts`, `lib/x-first-write.ts`, `lib/x-capi.ts`
 
 ---
 

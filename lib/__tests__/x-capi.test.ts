@@ -1,0 +1,122 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { sendXConversion } from "../x-capi";
+
+const BASE = "https://ads-api.x.com/12/measurement/conversions";
+
+describe("sendXConversion", () => {
+  const originalEnv = { ...process.env };
+  const fetchMock = vi.fn();
+  const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+    warnSpy.mockClear();
+    errorSpy.mockClear();
+    process.env.X_PIXEL_ID = "q27qa";
+    process.env.X_EVENT_ID = "tw-q27qa-q27qc";
+    process.env.X_CONVERSION_ACCESS_TOKEN = "secret-token";
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env = { ...originalEnv };
+  });
+
+  it("skips when the access token is missing", async () => {
+    delete process.env.X_CONVERSION_ACCESS_TOKEN;
+
+    await sendXConversion({
+      conversionId: "conv-123",
+      email: "a@b.com",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips when no attribution identifiers are provided", async () => {
+    await sendXConversion({
+      conversionId: "conv-123",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("posts a well-formed payload with a normalized SHA-256 email identifier", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    await sendXConversion({
+      conversionId: "first-write-user-42",
+      email: "  FOO@BAR.com ",
+      valueDecimal: 1,
+      currency: "USD",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${BASE}/q27qa`);
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer secret-token");
+    expect(init.headers["Content-Type"]).toBe("application/json");
+
+    const body = JSON.parse(init.body);
+    expect(body.conversions).toHaveLength(1);
+    const [conversion] = body.conversions;
+    expect(conversion.event_id).toBe("tw-q27qa-q27qc");
+    expect(conversion.conversion_id).toBe("first-write-user-42");
+    expect(conversion.identifiers).toEqual([
+      {
+        hashed_email:
+          "0c7e6a405862e402eb76a70f8a26fc732d07c32931e9fae9ab1582911d2e8a3b",
+      },
+    ]);
+    expect(conversion.value).toBe("1");
+    expect(conversion.price_currency).toBe("USD");
+    expect(Date.parse(conversion.conversion_time)).not.toBeNaN();
+  });
+
+  it("honors custom pixel and event ids", async () => {
+    process.env.X_PIXEL_ID = "pixel_custom";
+    process.env.X_EVENT_ID = "tw-pixel_custom-event_custom";
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    await sendXConversion({
+      conversionId: "conv-custom",
+      email: "a@b.com",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${BASE}/pixel_custom`);
+    expect(JSON.parse(init.body).conversions[0].event_id).toBe(
+      "tw-pixel_custom-event_custom",
+    );
+  });
+
+  it("logs and swallows non-2xx responses", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("bad request", { status: 400 }));
+
+    await sendXConversion({
+      conversionId: "conv-123",
+      email: "a@b.com",
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[x-capi] failed",
+      expect.objectContaining({ status: 400 }),
+    );
+  });
+
+  it("logs and swallows network exceptions", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("network down"));
+
+    await sendXConversion({
+      conversionId: "conv-123",
+      email: "a@b.com",
+    });
+
+    expect(errorSpy).toHaveBeenCalledWith("[x-capi] exception", expect.any(Error));
+  });
+});

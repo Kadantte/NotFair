@@ -3,6 +3,15 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.4.4] - 2026-05-04
+
+### Added
+- **X lead-generation conversion now fires on first successful write.** The write logging path sends the X Ads CAPI event only when a user reaches their first-ever successful AI write, using a stable `first-write-${userId}` conversion ID and hashed Google email for matching.
+
+### Fixed
+- **X CAPI payload now matches the current X Ads API.** Server-side conversion posts use `ads-api.x.com` and `price_currency`, with tests covering payload shape, custom event IDs, missing attribution, and failure handling.
+
+
 ## [0.3.4.3] - 2026-05-03
 
 ### Added

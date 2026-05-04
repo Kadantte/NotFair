@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-const X_CAPI_BASE = "https://ads-api.twitter.com/12/measurement/conversions";
+const X_CAPI_BASE = "https://ads-api.x.com/12/measurement/conversions";
 
 export type XConversionInput = {
   conversionId: string;
@@ -45,7 +45,7 @@ export async function sendXConversion(event: XConversionInput): Promise<void> {
         identifiers: identifiers,
         conversion_id: event.conversionId,
         ...(event.valueDecimal !== undefined ? { value: event.valueDecimal.toString() } : {}),
-        ...(event.currency ? { currency: event.currency } : {}),
+        ...(event.currency ? { price_currency: event.currency } : {}),
       },
     ],
   };
