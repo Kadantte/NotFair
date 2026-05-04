@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { HomePage } from "@/components/marketing/home-page";
 import { buildHomepageJsonLd, buildFaqJsonLd, buildMetadata } from "@/lib/seo";
 import { homepageFaq } from "@/lib/marketing-pages";
@@ -64,7 +65,9 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <HomePage githubStars={stars} pricing={pricing} />
+      <Suspense fallback={null}>
+        <HomePage githubStars={stars} pricing={pricing} />
+      </Suspense>
     </>
   );
 }

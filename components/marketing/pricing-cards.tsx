@@ -50,6 +50,7 @@ export const FREE_FEATURES = [
 
 export const GROWTH_FEATURES = [
   "Unlimited Google Ads operations",
+  "Unlimited Google Ads accounts",
   "Everything in Free",
   "Approval-gated writes for campaign changes",
   "Bulk Google Ads workflows — keywords, ads, budgets, scripts",

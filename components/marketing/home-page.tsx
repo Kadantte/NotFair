@@ -7,19 +7,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUp,
-  Briefcase,
   ChevronDown,
   ChevronRight,
   Check,
-  Clock3,
   Loader2,
-  Shield,
-  Store,
-  TrendingUp,
-  Zap,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
-import { fadeInUp, AuditCTA } from "@/components/marketing/audit-cta";
+import { AuditCTA } from "@/components/marketing/audit-cta";
+import { McpSetupHero } from "@/components/marketing/mcp-setup-hero";
+import { MarketingEngineSection } from "@/components/marketing/marketing-engine-section";
 import { GitHubStarBadge } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
@@ -78,108 +74,74 @@ function ConnectClaudeCTA({
   );
 }
 
-const useCases = [
+const HOME_FAQ_ITEMS: { q: string; a: string }[] = [
   {
-    prompt: "Why did leads get more expensive this month?",
-    answer: "Found 3 high-spend ad groups with weak search terms, explained the likely cause, and drafted the fixes.",
+    q: "Will NotFair make changes without my approval?",
+    a: "No. NotFair can read your account freely, but every write tool surfaces a diff first. You confirm before anything hits Google Ads — and any change is reversible with a single tool call.",
   },
   {
-    prompt: "What should I fix before raising budget?",
-    answer: "Prioritized missing negatives, loose-match keywords, and 2 landing-page mismatches before budget changes.",
+    q: "Which AI clients does this work with?",
+    a: "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex, Cursor, Cline, OpenClaw, Hermes Agent, and custom MCP clients. The server URL is the same — only the per-client config differs.",
   },
   {
-    prompt: "Clean up last week's search terms.",
-    answer: "Recommended a negative list, queued 23 keyword changes, and estimated the impact before approval.",
-  },
-];
-
-const flowSteps = [
-  {
-    title: "Connect",
-    desc: "Connect Google Ads once. Add GA4, Search Console, or CRM when you want revenue-level context.",
-    visual: "sources",
+    q: "Do I need to know what to fix before I start?",
+    a: "No. Lead with the business problem — leads got expensive, ROAS slipped, something changed. The agent diagnoses the likely cause, ranks fixes by spend at risk, and drafts the campaign edits for your approval.",
   },
   {
-    title: "Diagnose",
-    desc: "Ask Claude what is wrong, what changed, or what to fix next. NotFair gives it live campaign context.",
-    visual: "prompts",
+    q: "What can the agent actually change?",
+    a: "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts, and reporting workflows — all on Google Ads. Every write is approval-gated and logged.",
   },
   {
-    title: "Execute",
-    desc: "Claude recommends the fixes and drafts campaign changes. Nothing writes until you approve.",
-    visual: "approve",
-  },
-] as const;
-
-const capabilityCards = [
-  {
-    icon: TrendingUp,
-    title: "Find what to fix",
-    desc: "Claude can inspect spend, search terms, structure, and performance to surface the issues you may not know to ask for.",
+    q: "How does authentication work?",
+    a: "OAuth 2.0 with PKCE by default — Claude.ai and Codex run it automatically. For clients that don't support OAuth, generate a Bearer token at notfair.co/connect. Either way, NotFair never asks an LLM to handle credentials directly.",
   },
   {
-    icon: Zap,
-    title: "Turn recommendations into changes",
-    desc: "Move from diagnosis to bulk keyword edits, negatives, ads, ad groups, budgets, and scripts without clicking through Google Ads.",
-  },
-  {
-    icon: Shield,
-    title: "Approve every write",
-    desc: "Claude can recommend and draft campaign changes, but NotFair keeps the final write reviewable and explicit.",
+    q: "Is there a free tier?",
+    a: "Yes. Connecting and running audits is free, no credit card. The Free plan includes 7 days of unlimited access, then 300 MCP operations per month forever. Upgrade to Growth when Claude becomes your daily ads operator.",
   },
 ];
 
-const audienceCards = [
-  {
-    icon: Store,
-    title: "Hands-on operators",
-    desc: "For founders and marketers who want Claude to find issues, explain the fix, and help execute safely.",
-    bullets: ["Ask what to fix next", "Understand the recommendation", "Final approval stays with you"],
-  },
-  {
-    icon: Briefcase,
-    title: "Agencies and portfolio builders",
-    desc: "For teams managing multiple accounts, vertical sites, or local-service clients who need diagnostic and execution leverage.",
-    bullets: ["Repeatable audits and playbooks", "More accounts per strategist", "Reviewable change history"],
-  },
-];
-
-const faqs = [
-  {
-    q: "Will NotFair make changes without approval?",
-    a: "No. NotFair can analyze freely, but write actions are shown before they run. You approve every campaign change.",
-  },
-  {
-    q: "Do I need to know exactly what to change?",
-    a: "No. You can start with the business problem: leads are expensive, spend looks wrong, or performance changed. Claude can diagnose the likely issues, recommend fixes, and draft the campaign edits.",
-  },
-  {
-    q: "Who is this built for?",
-    a: "AI-native founders, marketers, agencies, and portfolio builders who actively operate Google Ads accounts and want to turn plain-English strategy into safe campaign execution.",
-  },
-  {
-    q: "What can Claude change through NotFair?",
-    a: "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, scripts, and reporting workflows — with approval-gated writes.",
-  },
-];
-
-function FAQItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
+function AccordionFaqItem({ q, a, defaultOpen }: { q: string; a: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(!!defaultOpen);
   return (
     <div className="border-b border-[#3D3C36]">
       <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-4 py-5 text-left"
+        type="button"
+        onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        className="flex w-full items-baseline justify-between gap-6 py-6 text-left transition-colors hover:bg-[#1F1E1A]/40"
       >
-        <span className="text-base font-medium text-[#E8E4DD]">{q}</span>
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 text-[#C4C0B6] transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <span className="font-display text-lg font-semibold text-[#E8E4DD] md:text-xl">
+          {q}
+        </span>
+        <span
+          aria-hidden="true"
+          className={`mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#3D3C36] text-[#C4C0B6] transition-transform duration-200 ${
+            open ? "rotate-45 border-[#4CAF6E]/40 text-[#4CAF6E]" : ""
+          }`}
+        >
+          <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <line x1="6" y1="1" x2="6" y2="11" />
+            <line x1="1" y1="6" x2="11" y2="6" />
+          </svg>
+        </span>
       </button>
-      {open && (
-        <p className="pb-5 text-sm leading-relaxed text-[#C4C0B6]">{a}</p>
-      )}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="answer"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <p className="max-w-2xl pb-6 pr-12 text-base leading-relaxed text-[#C4C0B6]">
+              {a}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -471,46 +433,6 @@ function ToolLine({ name, args, done }: { name: string; args: string; done: bool
   );
 }
 
-function FlowVisual({ visual }: { visual: (typeof flowSteps)[number]["visual"] }) {
-  if (visual === "sources") {
-    return (
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        {["Google Ads", "GA4", "CRM", "Search Console"].map((item) => (
-          <div key={item} className="rounded-xl border border-[#3D3C36] bg-[#1A1917] p-3 text-[#E8E4DD]">
-            {item}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (visual === "prompts") {
-    return (
-      <div className="space-y-2 text-sm">
-        {["Why did CPA rise?", "What should I fix?", "Clean up search terms"].map((item) => (
-          <div key={item} className="rounded-full border border-[#3D3C36] bg-[#1A1917] px-3 py-2 text-[#C4C0B6]">
-            {item}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-2xl border border-[#4CAF6E]/30 bg-[#4CAF6E]/5 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-[#E8E4DD]">Apply recommended fixes?</p>
-          <p className="mt-1 text-xs text-[#C4C0B6]">23 negatives · 80 keyword edits · fully reviewable</p>
-        </div>
-        <span className="rounded-full bg-[#4CAF6E] px-3 py-1 text-xs font-semibold text-[#1A1917]">
-          Approve
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function HomePage({
   githubStars = null,
   pricing,
@@ -522,13 +444,13 @@ export function HomePage({
 
   return (
     <>
-      <section className="relative overflow-hidden px-4 pb-16 pt-4 sm:pb-20 sm:pt-5">
+      <section className="relative overflow-hidden border-b border-[#3D3C36] px-4 pb-20 pt-6 sm:pb-24 sm:pt-8">
         <div className="container mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mb-4 flex justify-center sm:mb-5"
+            className="mb-6 flex justify-center sm:mb-8"
           >
             <a
               href="https://github.com/nowork-studio/toprank"
@@ -598,135 +520,12 @@ export function HomePage({
         </div>
       </section>
 
-      <section className="px-4 pb-16 sm:pb-20">
-        <motion.div
-          className="container mx-auto max-w-6xl"
-          variants={fadeInUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-60px" }}
-        >
-          <div className="mb-8 max-w-2xl">
-            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              Examples
-            </p>
-            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] sm:text-4xl">
-              Ask what to fix. Review the recommendation.
-            </h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {useCases.map((item) => (
-              <div key={item.prompt} className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-5">
-                <p className="text-sm font-medium text-[#4CAF6E]">You ask</p>
-                <p className="mt-2 text-lg font-semibold leading-snug text-[#E8E4DD]">“{item.prompt}”</p>
-                <div className="mt-5 rounded-2xl bg-[#1A1917] p-4">
-                  <p className="text-sm font-medium text-[#C4C0B6]">NotFair answers</p>
-                  <p className="mt-2 text-sm leading-relaxed text-[#E8E4DD]">{item.answer}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
+      <McpSetupHero surface="home" />
 
-      <section className="px-4 pb-16 sm:pb-20">
+      <MarketingEngineSection />
+
+      <section className="border-t border-[#3D3C36] px-4 py-16 sm:py-20">
         <div className="container mx-auto max-w-6xl">
-          <div className="mb-8 max-w-2xl">
-            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              How it works
-            </p>
-            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] sm:text-4xl">
-              Connect. Diagnose. Execute.
-            </h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {flowSteps.map((step, index) => (
-              <div key={step.title} className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-5">
-                <div className="mb-5 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4CAF6E] text-sm font-bold text-[#1A1917]">
-                    {index + 1}
-                  </span>
-                  <h3 className="text-xl font-semibold text-[#E8E4DD]">{step.title}</h3>
-                </div>
-                <FlowVisual visual={step.visual} />
-                <p className="mt-5 text-sm leading-relaxed text-[#C4C0B6]">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-16 sm:pb-20">
-        <div className="container mx-auto max-w-6xl">
-          <div className="grid gap-4 md:grid-cols-3">
-            {capabilityCards.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.title} className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-6">
-                  <Icon className="h-5 w-5 text-[#4CAF6E]" />
-                  <h3 className="mt-4 text-xl font-semibold text-[#E8E4DD]">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">{item.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-16 sm:pb-20">
-        <div className="container mx-auto max-w-6xl">
-          <div className="grid gap-4 md:grid-cols-2">
-            {audienceCards.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.title} className="rounded-3xl border border-[#3D3C36] bg-[#24231F] p-6 sm:p-8">
-                  <div className="flex items-center gap-3">
-                    <Icon className="h-5 w-5 text-[#4CAF6E]" />
-                    <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">{item.title}</p>
-                  </div>
-                  <h2 className="font-display mt-4 text-2xl font-semibold tracking-tight text-[#E8E4DD] sm:text-3xl">
-                    {item.desc}
-                  </h2>
-                  <div className="mt-6 grid gap-2">
-                    {item.bullets.map((bullet) => (
-                      <div key={bullet} className="flex items-center gap-2 text-sm text-[#C4C0B6]">
-                        <Check className="h-4 w-4 text-[#4CAF6E]" />
-                        {bullet}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-16 sm:pb-20">
-        <div className="container mx-auto max-w-6xl rounded-3xl border border-[#3D3C36] bg-[#201F1B] p-6 sm:p-8">
-          <div className="grid gap-5 md:grid-cols-3">
-            {[
-              { icon: TrendingUp, title: "Issues surfaced", desc: "Find wasted spend, weak queries, and structural problems first." },
-              { icon: Clock3, title: "Manual work compressed", desc: "Turn recommendations into one reviewed workflow." },
-              { icon: Shield, title: "You approve writes", desc: "No silent campaign changes." },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.title} className="flex gap-3">
-                  <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#4CAF6E]" />
-                  <div>
-                    <h3 className="font-semibold text-[#E8E4DD]">{item.title}</h3>
-                    <p className="mt-1 text-sm text-[#C4C0B6]">{item.desc}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-16 sm:pb-20">
-        <div className="container mx-auto max-w-5xl">
           <PricingSection {...pricing} page="homepage" />
           <p className="mt-6 text-sm text-[#C4C0B6]">
             Spending $50K+/mo?{" "}
@@ -748,41 +547,67 @@ export function HomePage({
         </div>
       </section>
 
-      <section className="px-4 pb-16">
-        <div className="container mx-auto max-w-3xl">
-          <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] sm:text-4xl">
-            Common questions
+
+      {/* ── FAQ accordion ── */}
+      <section className="border-t border-[#3D3C36] px-4 py-20 md:py-28">
+        <div className="container mx-auto max-w-6xl">
+          <div className="flex items-center gap-4 text-[11px] font-medium uppercase tracking-[0.22em] text-[#C4C0B6]/70">
+            <span>FAQ</span>
+            <span className="h-px flex-1 bg-[#3D3C36]" />
+            <span className="font-mono">{HOME_FAQ_ITEMS.length} answers</span>
+          </div>
+          <h2 className="font-display mt-8 max-w-3xl text-3xl font-bold uppercase leading-[1.05] tracking-tight text-[#E8E4DD] md:text-4xl">
+            Common questions.
           </h2>
-          <div className="mt-6">
-            {faqs.map((faq) => (
-              <FAQItem key={faq.q} q={faq.q} a={faq.a} />
+
+          <div className="mt-10 border-t border-[#3D3C36]">
+            {HOME_FAQ_ITEMS.map((item, i) => (
+              <AccordionFaqItem
+                key={item.q}
+                q={item.q}
+                a={item.a}
+                defaultOpen={i === 0}
+              />
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-4 pb-24">
-        <div className="container mx-auto max-w-5xl rounded-[32px] border border-[#4CAF6E]/25 bg-[#4CAF6E]/5 p-8 text-center sm:p-12">
-          <h2 className="font-display text-3xl font-bold tracking-tight text-[#E8E4DD] sm:text-5xl">
-            Let Claude find and fix your next Google Ads issue.
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-[#C4C0B6]">
-            Connect your account, ask what to fix, and approve the recommended changes.
-          </p>
-          <div className="mt-8 flex justify-center">
-            <ConnectClaudeCTA session={session} position="final" />
+      {/* ── Closing — final CTA ── */}
+      <section className="border-t border-[#3D3C36] px-4 py-20 md:py-28">
+        <div className="container mx-auto max-w-6xl">
+          {/* Editorial closer */}
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#C4C0B6]/70">
+              Closing
+            </p>
+            <h2
+              className="mt-6 text-3xl leading-snug text-[#E8E4DD] md:text-5xl md:leading-[1.1]"
+              style={{ fontFamily: "Newsreader, Georgia, serif", fontStyle: "italic" }}
+            >
+              Now go find what&apos;s wrong.
+            </h2>
+            <div className="mt-10 flex justify-center">
+              <ConnectClaudeCTA session={session} position="final" />
+            </div>
+            <p className="mx-auto mt-6 max-w-md text-[11px] leading-relaxed text-[#C4C0B6]">
+              Free to connect · By connecting, you agree to our{" "}
+              <Link
+                href="/privacy"
+                className="text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]"
+              >
+                Privacy Policy
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/terms"
+                className="text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]"
+              >
+                Terms
+              </Link>
+              .
+            </p>
           </div>
-          <p className="mx-auto mt-5 max-w-md text-xs leading-relaxed text-[#C4C0B6]">
-            By connecting Google Ads, you agree to our{" "}
-            <Link href="/privacy" className="font-medium text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]">
-              Privacy Policy
-            </Link>{" "}
-            and{" "}
-            <Link href="/terms" className="font-medium text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]">
-              Terms of Service
-            </Link>
-            .
-          </p>
         </div>
       </section>
     </>
