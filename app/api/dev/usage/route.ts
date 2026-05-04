@@ -1,15 +1,16 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc, and, eq, gte, lt, isNotNull, inArray, type SQL } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
-import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, dedupeCount, dedupeErrorCount } from "@/lib/dev-ops-filter";
+import { OP_TYPE } from "@/lib/db/tracking";
+import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, operationErrorRowCount, operationRowCount, operationTypeRowCount } from "@/lib/dev-ops-filter";
 
 /**
  * Unified usage+errors endpoint for the /dev Usage tab.
  * Returns stat tiles (totals + prev-period for trends), a per-day breakdown
  * for the volume+errors chart, top 10 users by error count, and top 20 tools.
  *
- * All counts dedupe by coalesce(request_id, id::text) so bulk fan-out tools
- * (bulkAddKeywords, moveKeywords, etc.) don't inflate call totals.
+ * Counts are operation-row based so bulk fan-out tools match billing and quota
+ * semantics: a 50-keyword bulk add is 50 writes, not 1 logical tool call.
  *
  * ?days=30   — window size, 1–90 (default 30)
  * ?tz=...    — IANA timezone name for the day boundaries in `daily`
@@ -22,8 +23,6 @@ import { excludeDevOpsFilter, excludeDevOpsFilterForAlias, dedupeCount, dedupeEr
 const PLATFORM_START = new Date("2026-03-25T00:00:00Z");
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { data: unknown; ts: number }>();
-
-type Platform = "google_ads" | "meta_ads";
 
 export async function GET(request: Request) {
   const denied = await requireDevEmail();
@@ -110,8 +109,8 @@ export async function GET(request: Request) {
     // ── Current-window totals ──────────────────────────────────────────────────
     db()
       .select({
-        calls: dedupeCount(schema.operations),
-        errors: dedupeErrorCount(schema.operations),
+        calls: operationRowCount(schema.operations),
+        errors: operationErrorRowCount(schema.operations),
         activeUsers: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
       })
       .from(schema.operations)
@@ -120,8 +119,8 @@ export async function GET(request: Request) {
     // ── Previous-window totals ────────────────────────────────────────────────
     db()
       .select({
-        calls: dedupeCount(schema.operations),
-        errors: dedupeErrorCount(schema.operations),
+        calls: operationRowCount(schema.operations),
+        errors: operationErrorRowCount(schema.operations),
         activeUsers: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
       })
       .from(schema.operations)
@@ -149,13 +148,13 @@ export async function GET(request: Request) {
       ),
 
     // ── Per-day breakdown (source-filtered for chart only) ────────────────────
-    // Dedupe by (op_type, request_id) so fan-out writes don't double-count.
+    // Count operation rows so bulk write volume matches user-facing usage.
     db()
       .select({
         day: sql<string>`to_char(${localDate}, 'YYYY-MM-DD')`,
-        reads: sql<number>`count(distinct case when ${schema.operations.opType} = 0 then coalesce(${schema.operations.requestId}, ${schema.operations.id}::text) end)::int`,
-        writes: sql<number>`count(distinct case when ${schema.operations.opType} = 1 then coalesce(${schema.operations.requestId}, ${schema.operations.id}::text) end)::int`,
-        errors: dedupeErrorCount(schema.operations),
+        reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
+        writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
+        errors: operationErrorRowCount(schema.operations),
         dau: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
       })
       .from(schema.operations)
@@ -168,8 +167,8 @@ export async function GET(request: Request) {
     db()
       .select({
         userId: schema.operations.userId,
-        calls: dedupeCount(schema.operations),
-        errors: dedupeErrorCount(schema.operations),
+        calls: operationRowCount(schema.operations),
+        errors: operationErrorRowCount(schema.operations),
         googleEmail: sql<string | null>`max(${schema.mcpSessions.googleEmail})`,
         primaryAccountId: sql<string | null>`max(${schema.mcpSessions.customerId})`,
       })
@@ -180,45 +179,39 @@ export async function GET(request: Request) {
       )
       .where(and(whereRecent, isNotNull(schema.operations.userId)))
       .groupBy(schema.operations.userId)
-      .having(sql`${dedupeErrorCount(schema.operations)} > 0`)
-      .orderBy(desc(dedupeErrorCount(schema.operations)))
+      .having(sql`${operationErrorRowCount(schema.operations)} > 0`)
+      .orderBy(desc(operationErrorRowCount(schema.operations)))
       .limit(10),
 
     // ── Top 20 tools by call volume ───────────────────────────────────────────
     db()
       .select({
         toolName: schema.operations.toolName,
-        calls: dedupeCount(schema.operations),
-        errors: dedupeErrorCount(schema.operations),
+        calls: operationRowCount(schema.operations),
+        errors: operationErrorRowCount(schema.operations),
         p50: sql<number>`coalesce((
-          SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY t.lat)
-          FROM (
-            SELECT MAX(latency_ms) AS lat
-            FROM operations o2
-            WHERE o2.tool_name = ${schema.operations.toolName}
-              AND o2.created_at >= ${sinceIso}::timestamp
-              ${devExcludeForAlias(sql`o2.user_id`)}
-              ${platform ? sql`AND o2.platform = ${platform}` : sql``}
-            GROUP BY COALESCE(o2.request_id, o2.id::text)
-          ) t
+          SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY o2.latency_ms)
+          FROM operations o2
+          WHERE o2.tool_name = ${schema.operations.toolName}
+            AND o2.created_at >= ${sinceIso}::timestamp
+            AND o2.latency_ms IS NOT NULL
+            ${devExcludeForAlias(sql`o2.user_id`)}
+            ${platform ? sql`AND o2.platform = ${platform}` : sql``}
         ), 0)::int`,
         p95: sql<number>`coalesce((
-          SELECT percentile_disc(0.95) WITHIN GROUP (ORDER BY t.lat)
-          FROM (
-            SELECT MAX(latency_ms) AS lat
-            FROM operations o2
-            WHERE o2.tool_name = ${schema.operations.toolName}
-              AND o2.created_at >= ${sinceIso}::timestamp
-              ${devExcludeForAlias(sql`o2.user_id`)}
-              ${platform ? sql`AND o2.platform = ${platform}` : sql``}
-            GROUP BY COALESCE(o2.request_id, o2.id::text)
-          ) t
+          SELECT percentile_disc(0.95) WITHIN GROUP (ORDER BY o2.latency_ms)
+          FROM operations o2
+          WHERE o2.tool_name = ${schema.operations.toolName}
+            AND o2.created_at >= ${sinceIso}::timestamp
+            AND o2.latency_ms IS NOT NULL
+            ${devExcludeForAlias(sql`o2.user_id`)}
+            ${platform ? sql`AND o2.platform = ${platform}` : sql``}
         ), 0)::int`,
       })
       .from(schema.operations)
       .where(and(whereRecent, isNotNull(schema.operations.toolName)))
       .groupBy(schema.operations.toolName)
-      .orderBy(desc(dedupeCount(schema.operations)))
+      .orderBy(desc(operationRowCount(schema.operations)))
       .limit(20),
   ]);
 
@@ -234,7 +227,7 @@ export async function GET(request: Request) {
       .select({
         userId: schema.operations.userId,
         errorClass: schema.operations.errorClass,
-        cnt: dedupeCount(schema.operations),
+        cnt: operationRowCount(schema.operations),
       })
       .from(schema.operations)
       .where(
@@ -245,7 +238,7 @@ export async function GET(request: Request) {
         ),
       )
       .groupBy(schema.operations.userId, schema.operations.errorClass)
-      .orderBy(desc(dedupeCount(schema.operations)));
+      .orderBy(desc(operationRowCount(schema.operations)));
 
     for (const row of errorClassRows) {
       if (!row.userId || !row.errorClass) continue;

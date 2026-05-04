@@ -3,6 +3,12 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.4.5] - 2026-05-04
+
+### Fixed
+- **`/dev` usage metrics now count bulk operation rows consistently.** Usage charts, customer tables, per-account activity, legacy dev summaries, and billing-style helper names all treat a 50-keyword bulk add as 50 writes/errors instead of mixing request-level and row-level counting.
+
+
 ## [0.3.4.4] - 2026-05-04
 
 ### Added

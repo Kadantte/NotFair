@@ -37,20 +37,17 @@ export function excludeDevOpsFilterForAlias(userIdRef: SQL): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM mcp_sessions s WHERE s.user_id = ${userIdRef} AND lower(s.google_email) IN (${devEmailSqlList()}))`;
 }
 
-/**
- * Deduplication COUNT for fan-out tools: counts distinct logical operations by
- * coalescing `request_id` (shared by all rows of a bulk tool call) with `id`
- * (unique row fallback). Eliminates inflation from bulkAddKeywords, moveKeywords, etc.
- *
- * Returns `SQL<number>` suitable for use in `.select({})`.
- */
-export function dedupeCount(ops: typeof schema.operations): SQL<number> {
-  return sql<number>`count(distinct coalesce(${ops.requestId}, ${ops.id}::text))::int`;
+/** Count billable operation rows. Bulk fan-out rows count individually. */
+export function operationRowCount(ops: typeof schema.operations): SQL<number> {
+  return sql<number>`count(distinct ${ops.id})::int`;
 }
 
-/**
- * Like `dedupeCount` but only counts rows where `error_class IS NOT NULL`.
- */
-export function dedupeErrorCount(ops: typeof schema.operations): SQL<number> {
-  return sql<number>`count(distinct case when ${ops.errorClass} is not null then coalesce(${ops.requestId}, ${ops.id}::text) end)::int`;
+/** Count billable operation rows for one operation type. */
+export function operationTypeRowCount(ops: typeof schema.operations, opType: number): SQL<number> {
+  return sql<number>`count(distinct ${ops.id}) filter (where ${ops.opType} = ${opType})::int`;
+}
+
+/** Count failed/rejected operation rows. Bulk fan-out rows count individually. */
+export function operationErrorRowCount(ops: typeof schema.operations): SQL<number> {
+  return sql<number>`count(distinct ${ops.id}) filter (where ${ops.errorClass} is not null)::int`;
 }

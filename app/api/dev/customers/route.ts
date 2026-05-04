@@ -1,7 +1,8 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc, inArray, isNotNull, and, gte } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
-import { devEmailSqlList, excludeDevOpsFilter, dedupeCount, dedupeErrorCount } from "@/lib/dev-ops-filter";
+import { OP_TYPE } from "@/lib/db/tracking";
+import { devEmailSqlList, excludeDevOpsFilter, operationErrorRowCount, operationRowCount, operationTypeRowCount } from "@/lib/dev-ops-filter";
 import { parseCustomerIds } from "@/lib/google-ads";
 import { getUsdRates, getCurrencyInfo, toUsd } from "@/lib/currency";
 
@@ -134,8 +135,8 @@ export async function GET(request: Request) {
         const rows = await db()
           .select({
             accountId: schema.operations.accountId,
-            reads: sql<number>`count(*) filter (where ${schema.operations.opType} = 0)`.as("reads"),
-            writes: sql<number>`count(*) filter (where ${schema.operations.opType} = 1)`.as("writes"),
+            reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
+            writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
             lastOp: sql<string | null>`max(${schema.operations.createdAt})`.as("last_op"),
           })
           .from(schema.operations)
@@ -147,8 +148,8 @@ export async function GET(request: Request) {
       }
       return map;
     })(),
-    // Error counts per account for the last 30 days. Deduped by request_id
-    // so bulk fan-out tools don't inflate error counts.
+    // Error counts per account for the last 30 days. Count operation rows so
+    // bulk fan-out tools match the all-time Operations column and billing.
     (async () => {
       const map = new Map<string, { calls: number; errorsCount: number }>();
       if (allAccountIds.size > 0) {
@@ -156,8 +157,8 @@ export async function GET(request: Request) {
         const rows = await db()
           .select({
             accountId: schema.operations.accountId,
-            calls: dedupeCount(schema.operations),
-            errorsCount: dedupeErrorCount(schema.operations),
+            calls: operationRowCount(schema.operations),
+            errorsCount: operationErrorRowCount(schema.operations),
           })
           .from(schema.operations)
           .where(

@@ -2,6 +2,7 @@ import { getSession } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { sql, desc, eq, and } from "drizzle-orm";
 import { OP_TYPE, CODE_TO_ENTITY, ENTITY_CODE, resolveToolLabel } from "@/lib/db/tracking";
+import { operationRowCount, operationTypeRowCount } from "@/lib/dev-ops-filter";
 
 export async function GET(
   request: Request,
@@ -49,9 +50,9 @@ export async function GET(
       return db()
         .select({
           date: sql<string>`${localDate}`.as("date"),
-          reads: sql<number>`(count(*) filter (where ${schema.operations.opType} = 0))::int`.as("reads"),
-          writes: sql<number>`(count(*) filter (where ${schema.operations.opType} = 1))::int`.as("writes"),
-          total: sql<number>`count(*)::int`.as("total"),
+          reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
+          writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
+          total: operationRowCount(schema.operations),
         })
         .from(schema.operations)
         .where(
@@ -68,8 +69,8 @@ export async function GET(
     db()
       .select({
         campaignId: schema.operations.campaignId,
-        ops: sql<number>`count(*)::int`.as("ops"),
-        writes: sql<number>`(count(*) filter (where ${schema.operations.opType} = 1))::int`.as("writes"),
+        ops: operationRowCount(schema.operations),
+        writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
         lastOp: sql<string>`max(${schema.operations.createdAt})`.as("last_op"),
       })
       .from(schema.operations)
@@ -80,7 +81,7 @@ export async function GET(
         ),
       )
       .groupBy(schema.operations.campaignId)
-      .orderBy(desc(sql`count(*)`))
+      .orderBy(desc(operationRowCount(schema.operations)))
       .limit(50),
 
     // Audit snapshots (most recent 20)

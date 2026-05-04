@@ -1,7 +1,8 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
-import { excludeDevOpsFilter } from "@/lib/dev-ops-filter";
+import { OP_TYPE } from "@/lib/db/tracking";
+import { excludeDevOpsFilter, operationRowCount, operationTypeRowCount } from "@/lib/dev-ops-filter";
 
 // 60s admin cache keyed by tz+source. Usage stats roll up 30 days, so a
 // minute of staleness is invisible.
@@ -49,9 +50,9 @@ export async function GET(request: Request) {
     db()
       .select({
         date: sql<string>`${localDate}`.as("date"),
-        reads: sql<number>`(count(*) filter (where ${schema.operations.opType} = 0))::int`.as("reads"),
-        writes: sql<number>`(count(*) filter (where ${schema.operations.opType} = 1))::int`.as("writes"),
-        total: sql<number>`count(*)::int`.as("total"),
+        reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
+        writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
+        total: operationRowCount(schema.operations),
       })
       .from(schema.operations)
       .where(whereClause)
@@ -61,12 +62,12 @@ export async function GET(request: Request) {
     db()
       .select({
         source: sql<string>`coalesce(${schema.operations.clientSource}, 'chat')`.as("source"),
-        ops: sql<number>`count(*)::int`.as("ops"),
+        ops: operationRowCount(schema.operations),
       })
       .from(schema.operations)
       .where(sql`${timeFilter} and ${excludeDevs}`)
       .groupBy(sql`coalesce(${schema.operations.clientSource}, 'chat')`)
-      .orderBy(desc(sql`count(*)`)),
+      .orderBy(desc(operationRowCount(schema.operations))),
   ]);
 
   const payload = { dailyUsage, sources };

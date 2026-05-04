@@ -1,7 +1,7 @@
 import { db, schema } from "@/lib/db";
 import { sql, desc, eq, and, gte } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
-import { dedupeCount, dedupeErrorCount } from "@/lib/dev-ops-filter";
+import { operationErrorRowCount, operationRowCount } from "@/lib/dev-ops-filter";
 import { errorRate } from "@/lib/dev-format-pure";
 
 /**
@@ -10,7 +10,7 @@ import { errorRate } from "@/lib/dev-format-pure";
  *   - aggregated stats (calls, errors, error rate, p50 latency, last call)
  *   - recent calls (errors-first, limit 50), with expandable args/error message
  *
- * Dedupes by request_id to prevent fan-out inflation.
+ * Counts operation rows so bulk fan-out volume matches billing and /usage.
  * Gated by requireDevEmail() — same as all dev-admin routes.
  *
  * GET /api/dev/[accountId]/activity?days=30
@@ -63,11 +63,11 @@ export async function GET(
   const whereBase = and(...baseClauses);
 
   const [statsRow, recentCalls] = await Promise.all([
-    // Aggregate stats for the window. Dedupe by request_id.
+    // Aggregate stats for the window. Count operation rows.
     db()
       .select({
-        calls: dedupeCount(schema.operations),
-        errors: dedupeErrorCount(schema.operations),
+        calls: operationRowCount(schema.operations),
+        errors: operationErrorRowCount(schema.operations),
         p50: sql<number>`coalesce(percentile_disc(0.5) within group (order by ${schema.operations.latencyMs}), 0)::int`,
         lastCallAt: sql<string | null>`max(${schema.operations.createdAt})`,
       })
