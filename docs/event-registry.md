@@ -848,12 +848,12 @@ No properties.
 **Phase:** 1
 **Category:** funnel_entry
 **Platform:** PostHog (client)
-**Trigger:** Fires when a user clicks the "Set up Meta Ads MCP" CTA inside the Meta-unsupported modal (sidebar gate for Campaigns/Audit/Impact Monitor/Operations/Chat when Meta is the active platform).
+**Trigger:** Fires when a user clicks the "Set up Meta Ads MCP" CTA inside the Meta-unsupported modal (sidebar gate for Campaigns/Audit/Impact Monitor/Chat when Meta is the active platform). Operations is no longer gated — Meta accounts now have their own change history feed on `/operations`.
 **Hypothesis:** Pairs with `meta_unsupported_modal_shown` to compute "shown→clicked" conversion. A high rate validates that users blocked from in-app surfaces willingly route to MCP setup; a low rate signals the in-app feature gap is more painful than the MCP path is appealing.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `feature` | string | `"Campaigns"` | Which gated feature triggered the modal. Enum: `Campaigns`, `Audit`, `Impact Monitor`, `Operations`, `Chat`. |
+| `feature` | string | `"Campaigns"` | Which gated feature triggered the modal. Enum: `Campaigns`, `Audit`, `Impact Monitor`, `Chat`. |
 | `location` | string | `"meta_unsupported_modal"` | Constant — distinguishes from any future MCP CTAs. |
 
 ```json
@@ -869,12 +869,12 @@ No properties.
 **Phase:** 1
 **Category:** funnel_entry
 **Platform:** PostHog (client)
-**Trigger:** Fires when the Meta-unsupported modal opens — i.e. a user with Meta as the active platform clicks one of the disabled sidebar items (Campaigns, Audit, Impact Monitor, Operations, Chat).
-**Hypothesis:** Concrete demand signal for which Google in-app surface to port to Meta first. The `feature` property ranks user intent (e.g. if Audit is shown 3× as often as Operations, prioritize Meta Audit).
+**Trigger:** Fires when the Meta-unsupported modal opens — i.e. a user with Meta as the active platform clicks one of the disabled sidebar items (Campaigns, Audit, Impact Monitor, Chat). Operations was removed from this gate in v0.3.4.3 once Meta change history shipped.
+**Hypothesis:** Concrete demand signal for which Google in-app surface to port to Meta first. The `feature` property ranks user intent (e.g. if Audit is shown 3× as often as Campaigns, prioritize Meta Audit).
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `feature` | string | `"Campaigns"` | Which gated feature the user tried to open. Enum: `Campaigns`, `Audit`, `Impact Monitor`, `Operations`, `Chat`. |
+| `feature` | string | `"Campaigns"` | Which gated feature the user tried to open. Enum: `Campaigns`, `Audit`, `Impact Monitor`, `Chat`. |
 
 ```json
 { "event": "meta_unsupported_modal_shown", "properties": { "feature": "Campaigns" } }
