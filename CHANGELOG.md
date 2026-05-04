@@ -4,6 +4,12 @@ All notable changes to AdsAgent will be documented in this file.
 
 
 
+## [0.3.4.1] - 2026-05-03
+
+### Added
+- **`/dev` tabs are now URL-routed sub-routes.** Each tab gets its own URL: `/dev/customers`, `/dev/usage`, `/dev/outreach`, `/dev/developer`. You can deep-link, refresh, share, and use the back button without losing your place. `/dev` redirects to `/dev/customers`.
+- **New `/dev/waitlist` tab.** Shows every signup across all waitlist keys (currently `meta_ads`) with key, email, user, and joined-at, plus a key filter dropdown. Backed by `GET /api/dev/waitlist` (dev-email gated).
+
 ## [0.3.4.0] - 2026-05-02
 
 ### Added
