@@ -9,7 +9,7 @@ import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 import type { AuthContext } from "@/lib/google-ads";
 import { getAccountBudgetSummary } from "@/lib/google-ads/reads";
 import { getCurrencyInfo, getUsdRates, toUsd } from "@/lib/currency";
-import { getChanges, getUndoableChange, markRolledBack, logChange } from "@/lib/db/tracking";
+import { getChanges, getUndoableChange, markRolledBack, logChange, logRead } from "@/lib/db/tracking";
 import { executeUndoForChange } from "@/lib/mcp/write-tools";
 import { getUsageInfo, getDailyUsage } from "@/lib/mcp/rate-limit";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
@@ -130,6 +130,22 @@ function normalizeBiddingStrategy(strategy: string | number | null | undefined):
     }
 }
 
+async function logWebAppRead(opts: {
+    accountId: string;
+    userId: string | null | undefined;
+    toolName: string;
+    campaignId?: string | null;
+}) {
+    if (isDemoCustomerId(opts.accountId)) return;
+
+    await logRead({
+        ...opts,
+        campaignId: opts.campaignId ?? null,
+        clientSource: "web-app",
+    });
+    after(flushServerEvents);
+}
+
 async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
     try {
         return await fn();
@@ -243,12 +259,17 @@ function mapCampaigns(response: Awaited<ReturnType<typeof listCampaigns>>) {
 export async function listCampaignsAction(options?: { skipCache?: boolean }) {
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
+        const { auth, session } = await getAuthContext();
         const { customerId } = auth;
 
         if (!options?.skipCache) {
             const cached = campaignsCache.get(customerId);
             if (cached && Date.now() - cached.ts < CAMPAIGNS_CACHE_TTL) {
+                await logWebAppRead({
+                    accountId: customerId,
+                    userId: session.userId,
+                    toolName: "list_campaigns",
+                });
                 return cached.data;
             }
         } else {
@@ -259,6 +280,11 @@ export async function listCampaignsAction(options?: { skipCache?: boolean }) {
         const campaigns = mapCampaigns(response);
 
         campaignsCache.set(customerId, { data: campaigns, ts: Date.now() });
+        await logWebAppRead({
+            accountId: customerId,
+            userId: session.userId,
+            toolName: "list_campaigns",
+        });
 
         return campaigns;
     } catch (error) {
@@ -275,8 +301,14 @@ export async function invalidateCampaignsCache() {
 export async function getConversionActionsAction() {
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
-        return await getConversionActions(auth);
+        const { auth, session } = await getAuthContext();
+        const result = await getConversionActions(auth);
+        await logWebAppRead({
+            accountId: auth.customerId,
+            userId: session.userId,
+            toolName: "get_conversion_actions",
+        });
+        return result;
     } catch (error) {
         console.error("Get Conversion Actions Error:", error);
         return [];
@@ -287,8 +319,15 @@ export async function getConversionActionsAction() {
 export async function getImpressionShareAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
-        return await getImpressionShare(auth, campaignId, 30);
+        const { auth, session } = await getAuthContext();
+        const result = await getImpressionShare(auth, campaignId, 30);
+        await logWebAppRead({
+            accountId: auth.customerId,
+            userId: session.userId,
+            campaignId,
+            toolName: "get_impression_share",
+        });
+        return result;
     } catch (error) {
         console.error("Get Impression Share Error:", error);
         return null;
@@ -299,8 +338,14 @@ export async function getImpressionShareAction(campaignId: string) {
 export async function getSearchTermReportAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
+        const { auth, session } = await getAuthContext();
         const result = await getSearchTermReport(auth, campaignId, 30, 20);
+        await logWebAppRead({
+            accountId: auth.customerId,
+            userId: session.userId,
+            campaignId,
+            toolName: "get_search_term_report",
+        });
         return result.searchTerms;
     } catch (error) {
         console.error("Get Search Term Report Error:", error);
@@ -384,7 +429,7 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
 
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
+        const { auth, session } = await getAuthContext();
         const { customerId } = auth;
         if (isDemoCustomerId(customerId)) {
             const perf = demoGetCampaignPerformance(campaignId, { startDate: effectiveStartDate, endDate: effectiveEndDate });
@@ -415,7 +460,7 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
             ORDER BY segments.date ASC
         `);
 
-        return (response as CampaignHistoryRow[]).map((row) => ({
+        const history = (response as CampaignHistoryRow[]).map((row) => ({
             date: row.segments.date,
             impressions: row.metrics.impressions || 0,
             clicks: row.metrics.clicks || 0,
@@ -424,6 +469,13 @@ export async function getCampaignHistoryAction(campaignId: string, startDate?: s
             averageCpc: micros(row.metrics.average_cpc ?? undefined),
             conversions: row.metrics.conversions || 0,
         }));
+        await logWebAppRead({
+            accountId: customerId,
+            userId: session.userId,
+            campaignId,
+            toolName: "get_campaign_performance",
+        });
+        return history;
     } catch (error) {
         console.error("Get Campaign History Error:", error);
         throw new Error(describeGoogleAdsError(error, "Failed to fetch campaign history."));
@@ -437,7 +489,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
 
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
+        const { auth, session } = await getAuthContext();
         const { customerId } = auth;
         if (isDemoCustomerId(customerId)) {
             const result = demoGetKeywords(campaignId, 30, 50);
@@ -473,7 +525,7 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
             LIMIT 50
         `);
 
-        return (response as unknown as CampaignKeywordRow[]).map((row) => ({
+        const keywords = (response as unknown as CampaignKeywordRow[]).map((row) => ({
             id: String(row.ad_group_criterion?.criterion_id ?? ""),
             text: row.ad_group_criterion?.keyword?.text ?? "",
             status: row.ad_group_criterion?.status ?? "UNKNOWN",
@@ -484,6 +536,13 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
             cost: row.metrics.cost_micros ? (row.metrics.cost_micros / 1000000) : 0,
             averageCpc: row.metrics.average_cpc ? (row.metrics.average_cpc / 1000000) : 0
         }));
+        await logWebAppRead({
+            accountId: customerId,
+            userId: session.userId,
+            campaignId,
+            toolName: "get_keywords",
+        });
+        return keywords;
     } catch (error) {
         console.error("Get Campaign Keywords Error:", error);
         throw new Error(describeGoogleAdsError(error, "Failed to fetch campaign keywords."));
@@ -494,9 +553,9 @@ export async function getCampaignKeywordsAction(campaignId: string, startDate?: 
 export async function getCampaignAdsAction(campaignId: string) {
     return requireAuth(async () => {
     try {
-        const { auth } = await getAuthContext();
+        const { auth, session } = await getAuthContext();
         const result = await listAds(auth, campaignId);
-        return result.ads.map((ad) => ({
+        const ads = result.ads.map((ad) => ({
             adId: ad.adId,
             status: ad.status,
             type: ad.type,
@@ -509,6 +568,13 @@ export async function getCampaignAdsAction(campaignId: string) {
             cost: ad.cost,
             conversions: ad.conversions,
         }));
+        await logWebAppRead({
+            accountId: auth.customerId,
+            userId: session.userId,
+            campaignId,
+            toolName: "list_ads",
+        });
+        return ads;
     } catch (error) {
         console.error("Get Campaign Ads Error:", error);
         throw new Error(describeGoogleAdsError(error, "Failed to fetch campaign ads."));
@@ -601,8 +667,8 @@ export async function getSmartCampaignAdsAction(campaignId: string) {
             const result = await getSmartCampaignAds(auth, campaignId);
             console.log("[getSmartCampaignAdsAction] returned", result.length, "ads");
             return result;
-        } catch (error: any) {
-            console.error("[getSmartCampaignAdsAction] FAILED:", error?.message ?? error);
+        } catch (error) {
+            console.error("[getSmartCampaignAdsAction] FAILED:", error instanceof Error ? error.message : error);
             return [];
         }
     });

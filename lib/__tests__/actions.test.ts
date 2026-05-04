@@ -7,6 +7,7 @@ const {
   mockGetUndoableChange,
   mockMarkRolledBack,
   mockLogChange,
+  mockLogRead,
   mockExecuteUndoForChange,
   mockListCampaigns,
   mockPauseCampaign,
@@ -18,6 +19,7 @@ const {
   mockGetUndoableChange: vi.fn(),
   mockMarkRolledBack: vi.fn(),
   mockLogChange: vi.fn(),
+  mockLogRead: vi.fn(),
   mockExecuteUndoForChange: vi.fn(),
   mockListCampaigns: vi.fn(),
   mockPauseCampaign: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock("@/lib/db/tracking", () => ({
   getUndoableChange: mockGetUndoableChange,
   markRolledBack: mockMarkRolledBack,
   logChange: mockLogChange,
+  logRead: mockLogRead,
 }));
 
 vi.mock("@/lib/mcp/write-tools", () => ({
@@ -92,6 +95,7 @@ describe("app/actions", () => {
     });
 
     mockLogChange.mockResolvedValue(null);
+    mockLogRead.mockResolvedValue(undefined);
   });
 
   it("normalizes numeric campaign statuses for the campaigns page", async () => {
@@ -132,6 +136,12 @@ describe("app/actions", () => {
       "PAUSED",
       "REMOVED",
     ]);
+    expect(mockLogRead).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: "1301265570",
+      userId: "user-1",
+      toolName: "list_campaigns",
+      clientSource: "web-app",
+    }));
   });
 
   it("logs and returns success when deleting a campaign succeeds", async () => {

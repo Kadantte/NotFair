@@ -17,7 +17,7 @@ import { getAuthContext, getSession } from "@/lib/session";
 import { unsupportedFeatureRedirect } from "@/lib/onboarding-redirect";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { getChanges, getImpact, logChange } from "@/lib/db/tracking";
+import { getChanges, getImpact, logChange, logRead } from "@/lib/db/tracking";
 import { flushServerEvents } from "@/lib/analytics-server";
 import { computeHealthScore, type HealthInput } from "@/lib/dashboard/health-score";
 import { detectIssues, type SearchTermData, type KeywordData, type CampaignPerfData } from "@/lib/dashboard/issues";
@@ -37,6 +37,21 @@ async function requireAuth<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function logDashboardRead(opts: {
+  accountId: string;
+  userId: string | null | undefined;
+  toolName: string;
+  campaignId?: string | null;
+}) {
+  if (isDemoCustomerId(opts.accountId)) return;
+
+  await logRead({
+    ...opts,
+    campaignId: opts.campaignId ?? null,
+    clientSource: "dashboard",
+  });
+}
+
 // ─── Dashboard Data Fetcher (two-phase for perceived performance) ───
 
 export type DashboardOverview = Awaited<ReturnType<typeof getDashboardOverview>>;
@@ -51,6 +66,13 @@ export async function getDashboardOverview() {
     const { auth, session } = await getAuthContext();
 
     const campaigns = await listCampaigns(auth, { limit: 50, days: 30 });
+    await logDashboardRead({
+      accountId: session.customerId,
+      userId: session.userId,
+      toolName: "list_campaigns",
+    });
+    after(flushServerEvents);
+
     const enabledCampaigns = campaigns.filter(
       (c) => c.status === "ENABLED" || c.status === 2,
     );
@@ -115,6 +137,12 @@ export async function getDashboardDetails() {
     const { auth, session } = await getAuthContext();
 
     const campaigns = await listCampaigns(auth, { limit: 50, days: 30 });
+    await logDashboardRead({
+      accountId: session.customerId,
+      userId: session.userId,
+      toolName: "list_campaigns",
+    });
+
     const enabledCampaigns = campaigns.filter(
       (c) => c.status === "ENABLED" || c.status === 2,
     );
@@ -145,6 +173,12 @@ export async function getDashboardDetails() {
         topCampaigns.map(async (c) => {
           try {
             const result = await getSearchTermReport(auth, c.id, 30, 50);
+            await logDashboardRead({
+              accountId: session.customerId,
+              userId: session.userId,
+              campaignId: c.id,
+              toolName: "get_search_term_report",
+            });
             return { campaignId: c.id, campaignName: c.name, terms: result.searchTerms as SearchTermData[] };
           } catch {
             return { campaignId: c.id, campaignName: c.name, terms: [] };
@@ -155,6 +189,12 @@ export async function getDashboardDetails() {
         topCampaigns.map(async (c) => {
           try {
             const result = await getKeywords(auth, c.id, 30, 50);
+            await logDashboardRead({
+              accountId: session.customerId,
+              userId: session.userId,
+              campaignId: c.id,
+              toolName: "get_keywords",
+            });
             return { campaignId: c.id, keywords: result.keywords as KeywordData[] };
           } catch {
             return { campaignId: c.id, keywords: [] };
@@ -165,6 +205,12 @@ export async function getDashboardDetails() {
         topCampaigns.map(async (c) => {
           try {
             const result = await getImpressionShare(auth, c.id, 30);
+            await logDashboardRead({
+              accountId: session.customerId,
+              userId: session.userId,
+              campaignId: c.id,
+              toolName: "get_impression_share",
+            });
             return {
               campaignId: c.id,
               campaignName: c.name,
@@ -187,7 +233,16 @@ export async function getDashboardDetails() {
           }
         }),
       ),
-      getRecommendations(auth).catch(() => ({ recommendations: [] })),
+      getRecommendations(auth)
+        .then(async (result) => {
+          await logDashboardRead({
+            accountId: session.customerId,
+            userId: session.userId,
+            toolName: "get_recommendations",
+          });
+          return result;
+        })
+        .catch(() => ({ recommendations: [] })),
       getChanges(session.customerId, { limit: 10 }),
     ]);
 
@@ -248,6 +303,8 @@ export async function getDashboardDetails() {
       impressionShare: impressionShareResults,
       recommendations: (recommendationsResult.recommendations ?? []) as RecommendationData[],
     });
+
+    after(flushServerEvents);
 
     return {
       issues,
