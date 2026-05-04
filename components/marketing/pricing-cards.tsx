@@ -48,13 +48,27 @@ export const FREE_FEATURES = [
   "Community support",
 ];
 
-export const GROWTH_FEATURES = [
+/** Growth-only differentiators — what you get on Growth that you don't on Free. */
+export const GROWTH_HEADLINE_FEATURES = [
   "Unlimited Google Ads operations",
   "Unlimited Google Ads accounts",
-  "Everything in Free",
-  "Approval-gated writes for campaign changes",
-  "Bulk Google Ads workflows — keywords, ads, budgets, scripts",
+  "Bulk workflows — keywords, ads, budgets, scripts",
+  "Full change history & one-call undo",
+  "Priority email support",
+];
+
+/** Inherited from Free, surfaced explicitly so Growth doesn't look thin. */
+export const GROWTH_INHERITED_FEATURES = [
+  "All MCP clients — Claude, Codex, Cursor, OpenClaw, Hermes",
+  "Diagnose issues and draft campaign changes",
+  "Preview every edit before approval",
   "Cancel any time — no contracts",
+];
+
+/** Backwards-compat flat list for any consumer that still wants a single array. */
+export const GROWTH_FEATURES = [
+  ...GROWTH_HEADLINE_FEATURES,
+  ...GROWTH_INHERITED_FEATURES,
 ];
 
 export const MANAGED_FEATURES = [
@@ -362,9 +376,23 @@ export function PricingCards({
             )}
           </div>
           <ul className="mt-8 space-y-3">
-            {GROWTH_FEATURES.map((f) => (
+            {GROWTH_HEADLINE_FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
+                <span suppressHydrationWarning className="font-medium">{f}</span>
+              </li>
+            ))}
+            <li
+              aria-hidden="true"
+              className="flex items-center gap-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4C0B6]/70"
+            >
+              <span className="h-px flex-1 bg-[#3D3C36]" />
+              <span>Plus everything in Free</span>
+              <span className="h-px flex-1 bg-[#3D3C36]" />
+            </li>
+            {GROWTH_INHERITED_FEATURES.map((f) => (
+              <li key={f} className="flex items-start gap-3 text-sm text-[#C4C0B6]">
+                <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]/70" />
                 <span suppressHydrationWarning>{f}</span>
               </li>
             ))}
