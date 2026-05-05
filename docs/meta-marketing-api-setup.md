@@ -79,11 +79,15 @@ Sidebar: **Facebook Login for Business → Configurations → Create configurati
   - `pages_read_engagement` (Meta-required sibling of `ads_management`;
     used by `getPagePostInsights` for paid-vs-organic comparison on
     boosted-post ads)
-  - `instagram_basic`
 - Assets to request:
   - Ad accounts (read + manage)
   - Pages (read — identity + aggregate post engagement; no management)
-  - Instagram accounts (read)
+
+> **Do not add `instagram_basic`.** No NotFair tool consumes the Instagram
+> Graph endpoints, so requesting it would fail App Review (no per-permission
+> justification or screencast). Page-based ad creatives that target Instagram
+> placements work via the existing `pages_show_list` Page identity — they do
+> not require Instagram-side scopes.
 
 Save. Note the **Configuration ID** — required in the OAuth URL.
 
@@ -94,9 +98,9 @@ Sidebar: **Facebook Login for Business → Settings**
 Valid OAuth Redirect URIs:
 
 ```
-https://www.notfair.co/api/auth/meta/callback
-https://notfair.co/api/auth/meta/callback
-http://localhost:3000/api/auth/meta/callback
+https://www.notfair.co/api/oauth/meta/callback
+https://notfair.co/api/oauth/meta/callback
+http://localhost:3000/api/oauth/meta/callback
 ```
 
 Allowed Domains for the JavaScript SDK: `notfair.co` (only if using JS SDK).
@@ -212,7 +216,6 @@ Request **advanced access** for each:
 - `business_management`
 - `pages_show_list`
 - `pages_read_engagement` (Meta-required sibling of `ads_management`)
-- `instagram_basic`
 
 > Page-level *management* permissions (`pages_manage_ads`,
 > `pages_manage_posts`) are intentionally **not** requested — Page-level

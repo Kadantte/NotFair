@@ -24,9 +24,12 @@ section's checkbox is ticked and screencast is uploaded.
 | Public URL | https://www.notfair.co |
 | Privacy policy | https://www.notfair.co/privacy |
 | Terms of service | https://www.notfair.co/terms |
-| Business | Bulkgpt (id 1211081106225236) |
+| Data deletion instructions | https://www.notfair.co/data-deletion |
+| Meta App owner business | Bulkgpt (id 1211081106225236) — the business that holds the App in the developer portal |
+| Legal entity (data controller) | NotFair.co business (id 1391075768301297) — used for the Data Handling "responsible entity" field |
 | What it is | AI-agent MCP server that lets users manage their Meta Ads conversationally through Claude, Cursor, and other AI assistants |
 | OAuth resource path | `/api/mcp/meta_ads` |
+| OAuth callback path | `/api/oauth/meta/callback` |
 | Token prefix | `oat_meta_ads_` |
 | Demo ad account | BulkgptAds (`act_820665925968376`) |
 | Demo Page | Oncall247 (id `108561168972321`) |
@@ -131,6 +134,15 @@ ads_management,ads_read,business_management,pages_show_list,pages_read_engagemen
 
 Standard Access and Business Asset User Profile Access are *features*
 attached to permissions in the App Review UI, not separate OAuth scopes.
+
+> ⚠️ **VERIFY against the live Login Configuration before submitting.**
+> The single source of truth is the Meta Login Configuration in the
+> developer portal — this doc is a *target* state, not an audit log.
+> Open <https://developers.facebook.com/apps/2032476734312233/create-login-configuration/>,
+> compare the ticked permissions against the list above, and reconcile
+> any difference (add or untick) before you click Submit. `instagram_basic`
+> in particular must NOT be ticked: no NotFair tool calls Instagram
+> Graph endpoints, so it has no per-permission justification.
 
 ---
 
@@ -544,9 +556,12 @@ from Meta:
   `NotFair, Inc.`).
 - If sole proprietor → personal name (`Yuting Zhong`).
 
-The Meta App is registered under the **NotFair.co business** (id
-`1391075768301297`), so use whatever entity name matches that business
-record on Meta's side.
+The legal-entity field must match the **NotFair.co business** record
+on Meta's side (id `1391075768301297`) — this is the data controller,
+not the App-owner business (Bulkgpt, id `1211081106225236`) listed in
+the Key Facts table at the top of this doc. The two business ids are
+both real and intentional: Bulkgpt holds the Meta App in the developer
+portal, NotFair.co is the legal entity that controls user data.
 
 ### responsible-2 — Country
 
@@ -597,7 +612,7 @@ To test the Meta integration:
   1. Go to https://www.notfair.co and click "Connect Meta Ads"
   2. Sign in with the test user credentials below; complete the OAuth flow
   3. Open Claude Desktop or claude.ai with the NotFair MCP server connected
-     (instructions: https://www.notfair.co/setup-meta-ads)
+     (instructions: https://www.notfair.co/meta-ads-claude-connector-setup-guide)
   4. Ask: "list my Meta ad accounts" — verify accounts return (ads_read,
      business_management)
   5. Ask: "list my Meta ad campaigns" — verify results return (ads_read)
