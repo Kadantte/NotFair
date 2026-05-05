@@ -135,6 +135,8 @@ describe("response-types — registry completeness", () => {
       createCalloutAsset: true,
       linkCalloutToAccount: true,
       removeCalloutFromAccount: true,
+      createImageAsset: true,
+      linkImageAsset: true,
       createBiddingStrategy: true,
       updateBiddingStrategy: true,
       removeBiddingStrategy: true,

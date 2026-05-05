@@ -76,6 +76,10 @@ Tool-selection heuristic — pick ONE path per user question:
    write tools (\`pauseKeyword\`, \`updateBid\`, \`createCampaign\`, etc.). Never
    wrap mutations in \`runScript\` — writes happen through dedicated tools
    with guardrails and change-tracking.
+   To add image creative, call \`createImageAsset\` with a public HTTPS PNG/JPEG URL,
+   then \`linkImageAsset\` at the customer, campaign, ad group, or PMAX asset
+   group level. Use \`MARKETING_IMAGE\` for 1.91:1 and
+   \`SQUARE_MARKETING_IMAGE\` for 1:1.
 
 Humanized response contract — applies to every \`runScript\` row:
 

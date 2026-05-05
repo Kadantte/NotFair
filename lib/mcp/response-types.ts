@@ -49,7 +49,7 @@ export type StructuredShape<T> = [T] extends [null | undefined]
 
 // ─── Write-tool shared response ────────────────────────────────────
 //
-// 48 of 50 write tools fan out through `execWrite`, which returns
+// Most write tools fan out through `execWrite`, which returns
 // `WriteResult & { changeId: number | null }`. Declare the shape once and
 // alias each tool to it.
 
@@ -88,7 +88,7 @@ export type RunScriptResponse = { value: unknown } | { items: unknown[] } | Reco
 
 // ─── Write-tool responses ──────────────────────────────────────────
 //
-// 48 aliases of `WriteToolResponse`. Named per-tool so contract tests and
+// Aliases of `WriteToolResponse`. Named per-tool so contract tests and
 // JSON Schema generation can address each tool individually.
 
 // Keyword management
@@ -141,6 +141,10 @@ export type EnablePmaxAssetGroupResponse = WriteToolResponse;
 export type CreateCalloutAssetResponse = WriteToolResponse;
 export type LinkCalloutToAccountResponse = WriteToolResponse;
 export type RemoveCalloutFromAccountResponse = WriteToolResponse;
+
+// Image assets
+export type CreateImageAssetResponse = WriteToolResponse;
+export type LinkImageAssetResponse = WriteToolResponse;
 
 // Bidding strategies
 export type CreateBiddingStrategyResponse = WriteToolResponse;
@@ -220,7 +224,7 @@ export interface McpToolResponseRegistry {
   // Code mode (sandboxed GAQL — owns all reads not covered above)
   runScript: RunScriptResponse;
 
-  // Write tools (50)
+  // Write tools
   pauseKeyword: PauseKeywordResponse;
   enableKeyword: EnableKeywordResponse;
   addKeyword: AddKeywordResponse;
@@ -261,6 +265,8 @@ export interface McpToolResponseRegistry {
   createCalloutAsset: CreateCalloutAssetResponse;
   linkCalloutToAccount: LinkCalloutToAccountResponse;
   removeCalloutFromAccount: RemoveCalloutFromAccountResponse;
+  createImageAsset: CreateImageAssetResponse;
+  linkImageAsset: LinkImageAssetResponse;
   createBiddingStrategy: CreateBiddingStrategyResponse;
   updateBiddingStrategy: UpdateBiddingStrategyResponse;
   removeBiddingStrategy: RemoveBiddingStrategyResponse;

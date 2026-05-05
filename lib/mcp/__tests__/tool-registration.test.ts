@@ -259,6 +259,13 @@ describe("MCP read tools — handler execution", () => {
 describe("MCP write tools — smoke", () => {
   beforeEach(resetMocks);
 
+  it("registers image asset write tools", () => {
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const names = harness.listToolNames();
+    expect(names).toContain("createImageAsset");
+    expect(names).toContain("linkImageAsset");
+  });
+
   it("pauseKeyword flows through execWrite and returns a WriteResult with changeId", async () => {
     // pauseKeyword pre-queries every keyword in the campaign (positives +
     // negatives) so it can both compute blast radius and detect "agent tried
@@ -288,6 +295,34 @@ describe("MCP write tools — smoke", () => {
       changeId: 1,
     });
     expect(mockMutateResources).toHaveBeenCalledTimes(1);
+  });
+
+  it("linkImageAsset flows through execWrite and creates an asset link", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { ad_group_asset_result: { resource_name: "customers/1234567890/adGroupAssets/111~999~19" } },
+      ],
+    });
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("linkImageAsset", {
+      assetId: "999",
+      fieldType: "SQUARE_MARKETING_IMAGE",
+      level: "ad_group",
+      adGroupId: "111",
+    });
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: true,
+      action: "link_image_asset",
+      entityId: "999",
+      changeId: 1,
+    });
+    expect(mockMutateResources.mock.calls[0][0][0].resource).toMatchObject({
+      ad_group: "customers/1234567890/adGroups/111",
+      asset: "customers/1234567890/assets/999",
+      field_type: 19,
+    });
   });
 
   it("bulkPauseKeywords fails atomically when pre-validation finds a negative keyword", async () => {

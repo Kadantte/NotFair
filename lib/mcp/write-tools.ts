@@ -46,6 +46,9 @@ import {
   createCalloutAsset,
   linkCalloutToAccount,
   removeCalloutFromAccount,
+  createImageAsset,
+  fetchImageAssetFromUrl,
+  linkImageAsset,
   createBiddingStrategy,
   updateBiddingStrategy,
   removeBiddingStrategy,
@@ -66,7 +69,7 @@ import {
   createAdVariationExperiment,
   SUPPORTED_EXPERIMENT_TYPES,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, LinkImageAssetLevel } from "@/lib/google-ads";
 import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite, execRead } from "@/lib/tools/execute";
@@ -1351,6 +1354,56 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return typedResult(result);
   }));
 
+  // ─── Image Assets ────────────────────────────────────────────────
+
+  server.registerTool("createImageAsset", {
+    description: "Upload a PNG/JPEG image asset from an HTTPS URL. Use MARKETING_IMAGE for exact 1.91:1 images (min 600x314, e.g. 1200x628) or SQUARE_MARKETING_IMAGE for exact 1:1 images (min 300x300). The asset is created but not served until linked with linkImageAsset. Returns changeId + assetId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      imageUrl: z.string().url().describe("Public HTTPS URL for the PNG/JPEG image to upload. Max 5 MB."),
+      name: z.string().min(1).max(255).describe("Asset name shown in Google Ads, e.g. 'Spring promo landscape'"),
+      fieldType: z.enum(["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE"]).describe("Intended serving slot; used to pre-validate image dimensions before upload."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, imageUrl, name, fieldType }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, async () => {
+      const image = await fetchImageAssetFromUrl(imageUrl);
+      return createImageAsset(targetAuth, {
+        imageBytes: image.imageBytes,
+        mimeType: image.mimeType,
+        fieldType: fieldType as ImageAssetFieldType,
+        name,
+      });
+    });
+    return typedResult(result);
+  }));
+
+  server.registerTool("linkImageAsset", {
+    description: "Link an existing image asset so it can serve at the customer, campaign, ad group, or Performance Max asset group level. Create the asset first with createImageAsset, then link it with MARKETING_IMAGE or SQUARE_MARKETING_IMAGE. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Image asset ID (returned by createImageAsset, or query asset WHERE asset.type = IMAGE via runScript)"),
+      fieldType: z.enum(["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE"]).describe("Serving slot for the image link."),
+      level: z.enum(["customer", "campaign", "ad_group", "asset_group"]).describe("Where to attach the image asset."),
+      campaignId: z.string().optional().describe("Required when level=campaign. Optional for logging when linking to an ad group or asset group."),
+      adGroupId: z.string().optional().describe("Required when level=ad_group."),
+      assetGroupId: z.string().optional().describe("Required when level=asset_group (Performance Max)."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, fieldType, level, campaignId, adGroupId, assetGroupId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, campaignId ?? null, () => linkImageAsset(targetAuth, {
+      assetId,
+      fieldType: fieldType as ImageAssetFieldType,
+      level: level as LinkImageAssetLevel,
+      campaignId,
+      adGroupId,
+      assetGroupId,
+    }));
+    return typedResult(result);
+  }));
+
   // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97) ─────────
 
   server.registerTool("createBiddingStrategy", {
@@ -1840,7 +1893,7 @@ async function findKeywordContext(
     LIMIT 1
   `);
 
-  const row = (result as any[])[0];
+  const row = (result as Array<{ ad_group?: { id?: string | number }; campaign?: { id?: string | number } }>)[0];
   const adGroupId = String(row?.ad_group?.id);
   const campaignId = String(row?.campaign?.id);
   if (!adGroupId || adGroupId === "undefined") return null;
