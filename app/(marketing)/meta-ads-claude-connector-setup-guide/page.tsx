@@ -41,7 +41,7 @@ const faqItems = [
   {
     question: "Do I need a Meta Business account?",
     answer:
-      "You need a personal or business Facebook account with access to at least one ad account, either as a direct user or via a Business Manager. NotFair connects via the standard Meta Login for Business OAuth flow with `ads_management`, `ads_read`, and `business_management` scopes.",
+      "You need a personal or business Facebook account with access to at least one ad account, either as a direct user or via a Business Manager. NotFair connects via the standard Meta Login for Business OAuth flow.",
   },
   {
     question: "Do I need to write any code?",

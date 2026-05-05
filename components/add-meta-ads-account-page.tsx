@@ -215,11 +215,6 @@ function NotConnected({ onConnect }: { onConnect: () => void }) {
             <MetaMonoIcon className="mr-2 h-4 w-4" />
             Connect Meta
           </Button>
-          <p className="mt-3 text-xs text-[#C4C0B6]/70">
-            Permissions requested: <code className="font-mono-jb">ads_management</code>,{" "}
-            <code className="font-mono-jb">ads_read</code>,{" "}
-            <code className="font-mono-jb">business_management</code>.
-          </p>
         </div>
       </div>
     </div>
