@@ -3,6 +3,18 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.5.1] - 2026-05-05
+
+### Added
+- **MCP regression eval prompts now cover the new failure modes.** Added reusable eval cases for repeated nested enum humanization, `runScript` reserved-name shadowing, and bulk bid retries after campaign bidding changes.
+
+### Fixed
+- **Google Ads enum humanization now recurses through repeated nested messages.** GAQL responses now add `_name` companions for enum fields inside arrays such as RSA headline `pinned_field` and campaign frequency cap event types.
+- **`runScript` now rejects SDK namespace shadowing before execution.** Scripts that redeclare reserved globals like `ads` now fail with a clear parse-time error and source line instead of a later reference error.
+- **Bulk bid prevalidation now reads from `ad_group_criterion`.** Keyword bid updates no longer depend on `keyword_view` visibility immediately after campaign-level changes.
+- **X CAPI diagnostics now validate OAuth request construction without sending by default.** The diagnostic script prints redacted OAuth header structure and only posts live traffic when explicitly requested.
+
+
 ## [0.3.5.0] - 2026-05-04
 
 ### Added

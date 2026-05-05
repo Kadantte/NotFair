@@ -29,6 +29,15 @@ describe("humanize — module bootstrap", () => {
     expect(_enumNameForPath("campaign.bidding_strategy_type", 9)).toBe(
       "TARGET_SPEND",
     );
+    expect(
+      _enumNameForPath(
+        "ad_group_ad.ad.responsive_search_ad.headlines.pinned_field",
+        2,
+      ),
+    ).toBe("HEADLINE_1");
+    expect(_enumNameForPath("campaign.frequency_caps.key.event_type", 2)).toBe(
+      "IMPRESSION",
+    );
   });
 
   it("returns undefined for unknown paths and unknown integers", () => {
@@ -113,6 +122,56 @@ describe("humanizeGaqlRows — enum augmentation", () => {
     ];
     humanizeGaqlRows(rows);
     expect(rows[0].metrics).toEqual({ impressions: 1234, clicks: 56 });
+  });
+
+  it("augments enum integers inside repeated nested message fields", () => {
+    const rows = [
+      {
+        ad_group_ad: {
+          ad: {
+            responsive_search_ad: {
+              headlines: [
+                { text: "Pinned first", pinned_field: 2 },
+                { text: "Unpinned", pinned_field: 0 },
+              ],
+            },
+          },
+        },
+      },
+    ];
+    humanizeGaqlRows(rows);
+    expect(rows[0].ad_group_ad.ad.responsive_search_ad.headlines).toEqual([
+      { text: "Pinned first", pinned_field: 2, pinned_field_name: "HEADLINE_1" },
+      { text: "Unpinned", pinned_field: 0, pinned_field_name: "UNSPECIFIED" },
+    ]);
+  });
+
+  it("augments enum integers at repeated nested array depth", () => {
+    const rows = [
+      {
+        campaign: {
+          frequency_caps: [
+            {
+              key: {
+                event_type: 2,
+                level: 4,
+                time_unit: 3,
+              },
+              cap: 5,
+            },
+          ],
+        },
+      },
+    ];
+    humanizeGaqlRows(rows);
+    expect(rows[0].campaign.frequency_caps[0].key).toMatchObject({
+      event_type: 2,
+      event_type_name: "IMPRESSION",
+      level: 4,
+      level_name: "CAMPAIGN",
+      time_unit: 3,
+      time_unit_name: "WEEK",
+    });
   });
 });
 

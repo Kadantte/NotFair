@@ -117,16 +117,46 @@ describe("runScriptInSandbox", () => {
     expect(r.result).toBe("caught:upstream 400");
   });
 
-  it("warns when script variables shadow host namespaces", async () => {
+  it("rejects script variables that shadow host namespaces before execution", async () => {
+    let called = false;
     const r = await runScriptInSandbox({
       code: `
+        await ads.gaql("SELECT campaign.id FROM campaign");
         const ads = [];
         return ads.length;
       `,
+      host: { ads: { gaql: async () => { called = true; return {}; } } },
+    });
+    expect(r.ok).toBe(false);
+    expect(called).toBe(false);
+    expect(r.logs).toEqual([]);
+    expect(r.error).toMatchObject({
+      name: "SyntaxError",
+      message: expect.stringContaining("Variable 'ads' shadows the SDK namespace at line 3"),
+      line: 3,
+    });
+  });
+
+  it.each([
+    ["const declaration", "const ads = [];", 1],
+    ["let declaration", "let ads = [];", 1],
+    ["var declaration", "var ads = [];", 1],
+    ["function parameter", "function foo(ads) { return ads; }", 1],
+    ["function declaration", "function ads() { return []; }", 1],
+    ["object destructuring", "const { ads } = something;", 1],
+    ["destructuring assignment", "({ ads } = something);", 1],
+    ["for-of binding", "for (const ads of []) {}", 1],
+  ])("rejects reserved-name shadowing via %s", async (_label, code, line) => {
+    const r = await runScriptInSandbox({
+      code,
       host: { ads: { gaql: async () => ({}) } },
     });
-    expect(r.ok).toBe(true);
-    expect(r.logs.some((line) => line.includes("shadows the SDK namespace"))).toBe(true);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatchObject({
+      name: "SyntaxError",
+      message: expect.stringContaining("Variable 'ads' shadows the SDK namespace"),
+      line,
+    });
   });
 
   it("isolates the script from host globals (no fetch, no process, no require)", async () => {

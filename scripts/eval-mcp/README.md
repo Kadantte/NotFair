@@ -69,6 +69,8 @@ npm run eval:mcp:compare -- baseline my-change
   analysis). Each prompt in `prompts-chat.json` carries an optional `criteria` field that the
   judge applies on top of the standard 7-dim rubric — case-specific bars and AUTOMATIC FAILURES
   per prompt (e.g. "agent must call write tools, not stall in clarifying questions").
+  Use `prompts-regressions.json` for focused MCP bug regressions that should be run before and
+  after fixing a specific tool behavior.
 
 ### Chat-followup eval (`--prompts prompts-chat.json`)
 
@@ -97,6 +99,33 @@ Run the read-only subset with no flag — safe by default:
 ```bash
 npm run eval:mcp -- --label chat-readonly --prompts prompts-chat.json
 ```
+
+### MCP regression eval (`--prompts prompts-regressions.json`)
+
+Focused cases for recent MCP tool-feedback bugs:
+
+| id | Tests |
+|---|---|
+| `rsa-pinned-field-humanization` | `runScript` RSA asset rows include `_name` companions for repeated nested `pinned_field` enum values. |
+| `runscript-reserved-name-shadowing` | `runScript` rejects `const ads = ...` style SDK namespace shadowing before execution with a line-specific error. |
+| `bulk-bid-after-bidding-transition` | After `updateCampaignBidding`, `bulkUpdateBids` can address criterion IDs returned by `listKeywords`. |
+
+Run the safe subset:
+
+```bash
+npm run eval:mcp -- --label mcp-regression-readonly --prompts prompts-regressions.json
+```
+
+Run the write-gated bid consistency case only against a test account containing a campaign named
+`MCP EVAL - BID CONSISTENCY` with at least two enabled positive keywords:
+
+```bash
+EVAL_ALLOW_WRITES=1 npm run eval:mcp -- --label mcp-regression-writes --prompts prompts-regressions.json --only bulk-bid-after-bidding-transition
+```
+
+The RSA case is data-dependent: it validates the real failure only when the account has a pinned
+responsive search ad. The deterministic guard for that bug should still live in unit tests over the
+GAQL humanizer.
 
 ## Interpreting results
 

@@ -1,4 +1,7 @@
-import { fields as adsFields } from "google-ads-api/build/src/protos/autogen/fields";
+import {
+  fieldDataTypes as adsFieldDataTypes,
+  fields as adsFields,
+} from "google-ads-api/build/src/protos/autogen/fields";
 import { enums as adsEnums } from "google-ads-api/build/src/protos/autogen/enums";
 
 // ─── Humanized Response Contract ─────────────────────────────────────
@@ -42,8 +45,95 @@ const ENUM_NAME_BY_PATH: Record<string, Record<number, string>> = (() => {
     }
     if (Object.keys(nameByValue).length > 0) out[path] = nameByValue;
   }
+  Object.assign(out, enumMapsFromFieldDataTypes());
   return out;
 })();
+
+type FieldSchema = Record<string, unknown>;
+
+function enumMapsFromFieldDataTypes(): Record<string, Record<number, string>> {
+  const out: Record<string, Record<number, string>> = {};
+  let schema: FieldSchema;
+  try {
+    schema = JSON.parse(adsFieldDataTypes) as FieldSchema;
+  } catch {
+    return out;
+  }
+
+  for (const [path, node] of Object.entries(schema)) {
+    if (!isGaqlRootPath(path)) continue;
+    walkFieldSchema(schema, node, path, out, new Set());
+  }
+  return out;
+}
+
+function walkFieldSchema(
+  schema: FieldSchema,
+  node: unknown,
+  path: string,
+  out: Record<string, Record<number, string>>,
+  seenRefs: Set<string>,
+) {
+  const resolved = resolveFieldSchemaRef(schema, node, seenRefs);
+  if (!resolved || typeof resolved !== "object" || Array.isArray(resolved)) return;
+
+  const enumMap = enumMapFromSchemaNode(resolved);
+  if (enumMap) {
+    out[path] = enumMap;
+    return;
+  }
+
+  for (const [key, child] of Object.entries(resolved)) {
+    walkFieldSchema(schema, child, `${path}.${key}`, out, new Set(seenRefs));
+  }
+}
+
+function resolveFieldSchemaRef(
+  schema: FieldSchema,
+  node: unknown,
+  seenRefs: Set<string>,
+): unknown {
+  let current = node;
+  while (
+    current &&
+    typeof current === "object" &&
+    !Array.isArray(current) &&
+    typeof (current as { $ref?: unknown }).$ref === "string"
+  ) {
+    const ref = (current as { $ref: string }).$ref;
+    if (seenRefs.has(ref)) return undefined;
+    seenRefs.add(ref);
+    current = resolveJsonPointer(schema, ref);
+  }
+  return current;
+}
+
+function resolveJsonPointer(schema: FieldSchema, ref: string): unknown {
+  if (!ref.startsWith("#/")) return undefined;
+  return ref
+    .slice(2)
+    .split("/")
+    .reduce<unknown>((node, part) => {
+      if (!node || typeof node !== "object" || Array.isArray(node)) return undefined;
+      return (node as FieldSchema)[part];
+    }, schema);
+}
+
+function enumMapFromSchemaNode(node: object): Record<number, string> | undefined {
+  const entries = Object.entries(node);
+  if (entries.length === 0 || !entries.every(([, value]) => typeof value === "number")) {
+    return undefined;
+  }
+  const nameByValue: Record<number, string> = {};
+  for (const [name, value] of entries) {
+    if (Number.isInteger(value)) nameByValue[value] = name;
+  }
+  return Object.keys(nameByValue).length > 0 ? nameByValue : undefined;
+}
+
+function isGaqlRootPath(path: string): boolean {
+  return /^[a-z][a-z0-9_]*$/.test(path);
+}
 
 /** Exposed for tests. */
 export function _enumNameForPath(path: string, value: number): string | undefined {

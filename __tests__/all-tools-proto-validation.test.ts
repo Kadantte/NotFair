@@ -675,10 +675,12 @@ describe("protobuf validation: bulk operations", () => {
     mockQuery.mockResolvedValueOnce([
       {
         campaign: { bidding_strategy_type: "MANUAL_CPC" },
+        ad_group: { id: "111" },
         ad_group_criterion: { criterion_id: "222", cpc_bid_micros: 1_000_000 },
       },
       {
         campaign: { bidding_strategy_type: "MANUAL_CPC" },
+        ad_group: { id: "111" },
         ad_group_criterion: { criterion_id: "333", cpc_bid_micros: 2_000_000 },
       },
     ]);

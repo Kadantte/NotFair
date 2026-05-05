@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { sendXConversion } from "../x-capi";
+import { buildXConversionRequest, sendXConversion } from "../x-capi";
 
 const BASE = "https://ads-api.x.com/12/measurement/conversions";
 
@@ -43,6 +43,21 @@ describe("sendXConversion", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("builds a dry-run OAuth 1.0a request without calling fetch", () => {
+    const request = buildXConversionRequest({
+      conversionId: "dry-run-123",
+      email: "a@b.com",
+      valueDecimal: 1,
+      currency: "USD",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(request?.url).toBe(`${BASE}/q27qa`);
+    expect(request?.init.method).toBe("POST");
+    expect(request?.init.headers["Content-Type"]).toBe("application/json");
+    expect(request?.init.headers.Authorization).toMatch(/^OAuth /);
+  });
+
   it("skips when no attribution identifiers are provided", async () => {
     await sendXConversion({
       conversionId: "conv-123",
@@ -68,7 +83,6 @@ describe("sendXConversion", () => {
     expect(init.method).toBe("POST");
     expect(init.headers["Content-Type"]).toBe("application/json");
 
-    // OAuth 1.0a authorization header structure
     const auth: string = init.headers.Authorization;
     expect(auth.startsWith("OAuth ")).toBe(true);
     expect(auth).toContain('oauth_consumer_key="ck-test"');

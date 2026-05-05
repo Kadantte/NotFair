@@ -569,6 +569,42 @@ describe("MCP write tools — smoke", () => {
       summary: { total: 1, wouldSucceed: 0, wouldFail: 1 },
     });
     expect(JSON.stringify(structured.errors)).toContain("BID_CHANGE_EXCEEDS_GUARDRAIL");
+    expect(mockQuery.mock.calls[0][0]).toContain("FROM ad_group_criterion");
+    expect(mockQuery.mock.calls[0][0]).not.toContain("FROM keyword_view");
     expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("bulkUpdateBids validates keyword existence from ad_group_criterion before mutating", async () => {
+    const keywordRow = {
+      campaign: { id: "100", status: "ENABLED", bidding_strategy_type: "MANUAL_CPC" },
+      ad_group: { id: "111", status: "ENABLED" },
+      ad_group_criterion: {
+        criterion_id: "222",
+        status: "ENABLED",
+        negative: false,
+        cpc_bid_micros: 1_000_000,
+        keyword: { match_type: "PHRASE" },
+      },
+    };
+    mockQuery.mockResolvedValueOnce([keywordRow]).mockResolvedValueOnce([keywordRow]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkUpdateBids", {
+      updates: [
+        { campaignId: "100", adGroupId: "111", criterionId: "222", newBidDollars: 1.1 },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      executed: true,
+      summary: { total: 1, succeeded: 1, failed: 0 },
+    });
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    for (const call of mockQuery.mock.calls) {
+      expect(call[0]).toContain("FROM ad_group_criterion");
+      expect(call[0]).not.toContain("FROM keyword_view");
+    }
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
 });

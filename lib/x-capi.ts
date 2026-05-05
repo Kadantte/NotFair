@@ -9,7 +9,7 @@ export type XConversionInput = {
   currency?: string;
 };
 
-// RFC3986 percent encoding — stricter than encodeURIComponent (encodes ! * ' ( )).
+// RFC3986 percent encoding, stricter than encodeURIComponent.
 function rfc3986(value: string): string {
   return encodeURIComponent(value).replace(
     /[!*'()]/g,
@@ -18,8 +18,8 @@ function rfc3986(value: string): string {
 }
 
 // Build OAuth 1.0a Authorization header for a JSON POST. JSON body bytes are
-// intentionally excluded from the signature base string — Twitter Ads API
-// signs only OAuth params + URL query params for non-form-encoded requests.
+// intentionally excluded from the signature base string because X Ads API signs
+// OAuth params plus URL query params for non-form-encoded requests.
 function oauth1Header(params: {
   method: string;
   url: string;
@@ -64,7 +64,10 @@ function oauth1Header(params: {
   );
 }
 
-export async function sendXConversion(event: XConversionInput): Promise<void> {
+export function buildXConversionRequest(event: XConversionInput): {
+  url: string;
+  init: RequestInit & { headers: Record<string, string>; body: string };
+} | null {
   const pixelId = process.env.X_PIXEL_ID ?? "q27qa";
   const eventId = process.env.X_EVENT_ID ?? "tw-q27qa-q27qc";
   const consumerKey = process.env.X_CONSUMER_KEY;
@@ -73,12 +76,7 @@ export async function sendXConversion(event: XConversionInput): Promise<void> {
   const accessTokenSecret = process.env.X_ACCESS_TOKEN_SECRET;
 
   if (!consumerKey || !consumerSecret || !accessToken || !accessTokenSecret) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        "[x-capi] X OAuth 1.0a credentials missing; skipping server-side X event",
-      );
-    }
-    return;
+    return null;
   }
 
   const identifiers: Array<{ [key: string]: string }> = [];
@@ -92,8 +90,7 @@ export async function sendXConversion(event: XConversionInput): Promise<void> {
   }
 
   if (identifiers.length === 0) {
-    console.warn("[x-capi] no attribution signals (email); X requires at least one for CAPI");
-    return;
+    return null;
   }
 
   const body = {
@@ -101,7 +98,7 @@ export async function sendXConversion(event: XConversionInput): Promise<void> {
       {
         conversion_time: new Date().toISOString(),
         event_id: eventId,
-        identifiers: identifiers,
+        identifiers,
         conversion_id: event.conversionId,
         ...(event.valueDecimal !== undefined ? { value: event.valueDecimal.toString() } : {}),
         ...(event.currency ? { price_currency: event.currency } : {}),
@@ -110,24 +107,50 @@ export async function sendXConversion(event: XConversionInput): Promise<void> {
   };
 
   const url = `${X_CAPI_BASE}/${encodeURIComponent(pixelId)}`;
-  const authorization = oauth1Header({
-    method: "POST",
+  return {
     url,
-    consumerKey,
-    consumerSecret,
-    accessToken,
-    accessTokenSecret,
-  });
-
-  try {
-    const res = await fetch(url, {
+    init: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authorization,
+        Authorization: oauth1Header({
+          method: "POST",
+          url,
+          consumerKey,
+          consumerSecret,
+          accessToken,
+          accessTokenSecret,
+        }),
       },
       body: JSON.stringify(body),
-    });
+    },
+  };
+}
+
+export async function sendXConversion(event: XConversionInput): Promise<void> {
+  const hasCredentials = Boolean(
+    process.env.X_CONSUMER_KEY &&
+    process.env.X_CONSUMER_SECRET &&
+    process.env.X_ACCESS_TOKEN &&
+    process.env.X_ACCESS_TOKEN_SECRET,
+  );
+  if (!hasCredentials) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[x-capi] X OAuth 1.0a credentials missing; skipping server-side X event",
+      );
+    }
+    return;
+  }
+
+  const request = buildXConversionRequest(event);
+  if (!request) {
+    console.warn("[x-capi] no attribution signals (email); X requires at least one for CAPI");
+    return;
+  }
+
+  try {
+    const res = await fetch(request.url, request.init);
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

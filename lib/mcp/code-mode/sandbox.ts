@@ -1,3 +1,4 @@
+import { parse } from "acorn";
 import {
   newAsyncContext,
   type QuickJSAsyncContext,
@@ -66,10 +67,49 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
   const maxLogChars = opts.maxLogChars ?? DEFAULT_MAX_LOG_CHARS;
   const maxReturnBytes = opts.maxReturnBytes ?? DEFAULT_MAX_RETURN_BYTES;
 
+  const startedAt = Date.now();
+  let reservedNameError: ReservedNameFinding | undefined;
+  try {
+    reservedNameError = findReservedNamespaceShadowing(opts.code, opts.host);
+  } catch (e) {
+    const err = e as { message?: string; loc?: { line?: number; column?: number } };
+    return {
+      ok: false,
+      resultTruncated: false,
+      logs: [],
+      logsTruncated: false,
+      error: {
+        name: "SyntaxError",
+        message: err.message ?? String(e),
+        line: err.loc?.line ? Math.max(1, err.loc.line - 1) : undefined,
+        column: err.loc?.column !== undefined ? err.loc.column + 1 : undefined,
+      },
+      timedOut: false,
+      elapsedMs: Date.now() - startedAt,
+    };
+  }
+  if (reservedNameError) {
+    return {
+      ok: false,
+      resultTruncated: false,
+      logs: [],
+      logsTruncated: false,
+      error: {
+        name: "SyntaxError",
+        message:
+          `Variable '${reservedNameError.name}' shadows the SDK namespace at line ${reservedNameError.line}. ` +
+          `Rename to '${reservedNameError.name}Rows', 'adList', 'campaignAds', etc.`,
+        line: reservedNameError.line,
+        column: reservedNameError.column,
+      },
+      timedOut: false,
+      elapsedMs: Date.now() - startedAt,
+    };
+  }
+
   const ctx = await newAsyncContext();
   const runtime = ctx.runtime;
 
-  const startedAt = Date.now();
   const deadline = startedAt + timeoutMs;
   let timedOut = false;
   runtime.setInterruptHandler(() => {
@@ -100,7 +140,6 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     installConsole(ctx, appendLog);
     installHostApis(ctx, runtime, opts.host);
     if (opts.bootstrap) runBootstrap(ctx, opts.bootstrap);
-    warnOnReservedNamespaceShadowing(opts.code, opts.host, appendLog);
 
     const wrapped = `(async () => {\n${opts.code}\n})()`;
     const evalResult = await ctx.evalCodeAsync(wrapped, "script.js");
@@ -175,24 +214,174 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
   }
 }
 
-function warnOnReservedNamespaceShadowing(
+type AstNode = {
+  type?: string;
+  loc?: { start: { line: number; column: number } };
+  [key: string]: unknown;
+};
+
+type ReservedNameFinding = {
+  name: string;
+  line: number;
+  column: number;
+};
+
+function findReservedNamespaceShadowing(
   code: string,
   host: HostApi,
-  appendLog: (line: string) => void,
-) {
-  for (const namespace of Object.keys(host)) {
-    const pattern = new RegExp(`\\b(?:const|let|var)\\s+${escapeRegExp(namespace)}\\b`);
-    if (pattern.test(code)) {
-      appendLog(
-        `[warn] variable '${namespace}' shadows the SDK namespace. ` +
-        `Use a different local name such as '${namespace}Rows' or 'adList'.`,
-      );
-    }
-  }
+): ReservedNameFinding | undefined {
+  const reservedNames = new Set(Object.keys(host));
+  if (reservedNames.size === 0) return undefined;
+
+  const wrapped = `async function __user_script__() {\n${code}\n}`;
+  const ast = parse(wrapped, {
+    ecmaVersion: "latest",
+    locations: true,
+    sourceType: "script",
+  }) as unknown as AstNode;
+
+  return findBindingShadow(ast, reservedNames);
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function findBindingShadow(
+  node: unknown,
+  reservedNames: Set<string>,
+): ReservedNameFinding | undefined {
+  if (!node || typeof node !== "object" || Array.isArray(node)) return undefined;
+  const ast = node as AstNode;
+
+  switch (ast.type) {
+    case "VariableDeclarator": {
+      const finding = findPatternShadow(ast.id, reservedNames);
+      if (finding) return finding;
+      break;
+    }
+    case "FunctionDeclaration":
+    case "FunctionExpression":
+    case "ClassDeclaration":
+    case "ClassExpression": {
+      const idFinding = findPatternShadow(ast.id, reservedNames);
+      if (idFinding) return idFinding;
+      if (ast.type === "ClassDeclaration" || ast.type === "ClassExpression") break;
+      for (const param of (ast.params as unknown[] | undefined) ?? []) {
+        const paramFinding = findPatternShadow(param, reservedNames);
+        if (paramFinding) return paramFinding;
+      }
+      break;
+    }
+    case "ArrowFunctionExpression": {
+      for (const param of (ast.params as unknown[] | undefined) ?? []) {
+        const paramFinding = findPatternShadow(param, reservedNames);
+        if (paramFinding) return paramFinding;
+      }
+      break;
+    }
+    case "CatchClause": {
+      const finding = findPatternShadow(ast.param, reservedNames);
+      if (finding) return finding;
+      break;
+    }
+    case "AssignmentExpression": {
+      const finding = findAssignmentTargetShadow(ast.left, reservedNames);
+      if (finding) return finding;
+      break;
+    }
+    case "ImportSpecifier":
+    case "ImportDefaultSpecifier":
+    case "ImportNamespaceSpecifier": {
+      const finding = findPatternShadow(ast.local, reservedNames);
+      if (finding) return finding;
+      break;
+    }
+  }
+
+  for (const [key, value] of Object.entries(ast)) {
+    if (
+      key === "id" ||
+      key === "params" ||
+      key === "param" ||
+      key === "local" ||
+      key === "loc" ||
+      key === "start" ||
+      key === "end" ||
+      key === "range"
+    ) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const child of value) {
+        const finding = findBindingShadow(child, reservedNames);
+        if (finding) return finding;
+      }
+    } else {
+      const finding = findBindingShadow(value, reservedNames);
+      if (finding) return finding;
+    }
+  }
+  return undefined;
+}
+
+function findAssignmentTargetShadow(
+  target: unknown,
+  reservedNames: Set<string>,
+): ReservedNameFinding | undefined {
+  if (!target || typeof target !== "object" || Array.isArray(target)) return undefined;
+  const ast = target as AstNode;
+  if (
+    ast.type === "Identifier" ||
+    ast.type === "ObjectPattern" ||
+    ast.type === "ArrayPattern" ||
+    ast.type === "AssignmentPattern" ||
+    ast.type === "RestElement"
+  ) {
+    return findPatternShadow(ast, reservedNames);
+  }
+  return undefined;
+}
+
+function findPatternShadow(
+  pattern: unknown,
+  reservedNames: Set<string>,
+): ReservedNameFinding | undefined {
+  if (!pattern || typeof pattern !== "object" || Array.isArray(pattern)) return undefined;
+  const ast = pattern as AstNode;
+
+  if (ast.type === "Identifier" && typeof ast.name === "string" && reservedNames.has(ast.name)) {
+    return astLocation(ast, ast.name);
+  }
+
+  if (ast.type === "Property") {
+    return findPatternShadow(ast.value, reservedNames);
+  }
+
+  if (ast.type === "RestElement") {
+    return findPatternShadow(ast.argument, reservedNames);
+  }
+
+  if (ast.type === "AssignmentPattern") {
+    return findPatternShadow(ast.left, reservedNames);
+  }
+
+  for (const value of Object.values(ast)) {
+    if (Array.isArray(value)) {
+      for (const child of value) {
+        const finding = findPatternShadow(child, reservedNames);
+        if (finding) return finding;
+      }
+    } else {
+      const finding = findPatternShadow(value, reservedNames);
+      if (finding) return finding;
+    }
+  }
+  return undefined;
+}
+
+function astLocation(node: AstNode, name: string): ReservedNameFinding {
+  return {
+    name,
+    line: Math.max(1, (node.loc?.start.line ?? 2) - 1),
+    column: (node.loc?.start.column ?? 0) + 1,
+  };
 }
 
 // ─── Internals ──────────────────────────────────────────────────────────

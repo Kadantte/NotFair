@@ -124,19 +124,23 @@ export async function bulkUpdateBids(
       .map((u) => Number(u.criterionId))
       .filter((n) => Number.isInteger(n) && n > 0);
     if (validIds.length === 0) continue; // every criterionId malformed — let the downstream "Keyword not found" path report
+    const adGroupIds = [...new Set(group.map((u) => safeEntityId(u.adGroupId)))].join(",");
     const criterionIds = validIds.join(",");
     const rows = await customer.query(`
       SELECT
         campaign.bidding_strategy_type,
+        ad_group.id,
         ad_group_criterion.criterion_id,
         ad_group_criterion.cpc_bid_micros
-      FROM keyword_view
+      FROM ad_group_criterion
       WHERE campaign.id = ${campId}
+        AND ad_group.id IN (${adGroupIds})
         AND ad_group_criterion.criterion_id IN (${criterionIds})
     `);
     for (const row of rows as any[]) {
       const critId = String(row.ad_group_criterion?.criterion_id ?? "");
-      preCheckData.set(`${campaignId}:${critId}`, {
+      const adGroupId = String(row.ad_group?.id ?? "");
+      preCheckData.set(`${campaignId}:${adGroupId}:${critId}`, {
         strategy: normalizeBiddingStrategyName(row.campaign?.bidding_strategy_type),
         bidMicros: row.ad_group_criterion?.cpc_bid_micros ?? 0,
       });
@@ -149,7 +153,7 @@ export async function bulkUpdateBids(
 
   for (const u of updates) {
     const newBidMicros = toMicros(u.newBidDollars);
-    const data = preCheckData.get(`${u.campaignId}:${u.criterionId}`);
+    const data = preCheckData.get(`${u.campaignId}:${u.adGroupId}:${u.criterionId}`);
 
     if (!data) {
       results.push({ success: false, action: "update_bid", entityId: u.criterionId, beforeValue: "N/A", afterValue: String(newBidMicros), error: "Keyword not found", input: u });
@@ -344,7 +348,7 @@ async function preValidateCriterionBulkMutation<T extends BulkPauseKeywordInput 
           ad_group_criterion.cpc_bid_micros,
           ad_group_criterion.negative,
           ad_group_criterion.keyword.match_type
-        FROM keyword_view
+        FROM ad_group_criterion
         WHERE campaign.id = ${safeEntityId(campaignId)}
           AND ad_group.id IN (${[...new Set(group.map((k) => safeEntityId(k.adGroupId)))].join(",")})
           AND ad_group_criterion.criterion_id IN (${validIds.join(",")})
