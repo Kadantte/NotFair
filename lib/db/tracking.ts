@@ -50,6 +50,9 @@ export const TOOL_CODE = {
   rename_ad_group: 40,
   update_bidding: 41,
   update_goal_config: 42,
+  update_geo_target_type: 52,
+  add_proximity_target: 53,
+  remove_proximity_target: 54,
   // Reads (20+)
   get_account_info: 20,
   list_campaigns: 21,

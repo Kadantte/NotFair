@@ -2,6 +2,30 @@ import { getCustomer } from "./client";
 import { extractErrorMessage, normalizeCustomerId, safeEntityId } from "./helpers";
 import type { AdScheduleSlot, AuthContext, UpdateCampaignSettingsParams, WriteResult } from "./types";
 
+// PositiveGeoTargetType: API v22 numeric values
+const POSITIVE_GEO_TARGET_TYPE_MAP: Record<string, number> = {
+  PRESENCE_OR_INTEREST: 5,
+  PRESENCE: 7,
+};
+const POSITIVE_GEO_TARGET_TYPE_REVERSE: Record<number, string> = Object.fromEntries(
+  Object.entries(POSITIVE_GEO_TARGET_TYPE_MAP).map(([k, v]) => [v, k]),
+);
+
+// NegativeGeoTargetType: API v22 numeric values
+const NEGATIVE_GEO_TARGET_TYPE_MAP: Record<string, number> = {
+  PRESENCE_OR_INTEREST: 4,
+  PRESENCE: 5,
+};
+const NEGATIVE_GEO_TARGET_TYPE_REVERSE: Record<number, string> = Object.fromEntries(
+  Object.entries(NEGATIVE_GEO_TARGET_TYPE_MAP).map(([k, v]) => [v, k]),
+);
+
+// ProximityRadiusUnits: API v22 numeric values
+const PROXIMITY_RADIUS_UNITS_MAP: Record<string, number> = {
+  MILES: 2,
+  KILOMETERS: 3,
+};
+
 // Numeric protobuf enum values from google-ads-api enums.
 const DAY_OF_WEEK_MAP: Record<string, number> = {
   MONDAY: 2, TUESDAY: 3, WEDNESDAY: 4, THURSDAY: 5, FRIDAY: 6, SATURDAY: 7, SUNDAY: 8,
@@ -162,7 +186,65 @@ export async function updateCampaignSettings(
     }
   }
 
-  // 2. Add location targeting criteria
+  // 2. Update geo target type setting
+  if (params.positiveGeoTargetType !== undefined || params.negativeGeoTargetType !== undefined) {
+    try {
+      // Fetch current for beforeValue
+      const current = await customer.query(`
+        SELECT
+          campaign.geo_target_type_setting.positive_geo_target_type,
+          campaign.geo_target_type_setting.negative_geo_target_type
+        FROM campaign
+        WHERE campaign.id = ${cid}
+        LIMIT 1
+      `);
+      const gts = (current as any[])[0]?.campaign?.geo_target_type_setting ?? {};
+
+      const geoTargetSetting: Record<string, number> = {};
+      if (params.positiveGeoTargetType !== undefined) {
+        geoTargetSetting.positive_geo_target_type = POSITIVE_GEO_TARGET_TYPE_MAP[params.positiveGeoTargetType];
+      }
+      if (params.negativeGeoTargetType !== undefined) {
+        geoTargetSetting.negative_geo_target_type = NEGATIVE_GEO_TARGET_TYPE_MAP[params.negativeGeoTargetType];
+      }
+
+      await customer.mutateResources([
+        {
+          entity: "campaign" as any,
+          operation: "update",
+          resource: {
+            resource_name: campaignResourceName,
+            geo_target_type_setting: geoTargetSetting,
+          },
+        },
+      ]);
+
+      results.push({
+        success: true,
+        action: "update_geo_target_type",
+        entityId: campaignId,
+        beforeValue: JSON.stringify({
+          positive: gts.positive_geo_target_type != null ? (POSITIVE_GEO_TARGET_TYPE_REVERSE[gts.positive_geo_target_type] ?? gts.positive_geo_target_type) : null,
+          negative: gts.negative_geo_target_type != null ? (NEGATIVE_GEO_TARGET_TYPE_REVERSE[gts.negative_geo_target_type] ?? gts.negative_geo_target_type) : null,
+        }),
+        afterValue: JSON.stringify({
+          positive: params.positiveGeoTargetType ?? null,
+          negative: params.negativeGeoTargetType ?? null,
+        }),
+      });
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "update_geo_target_type",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: "",
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  // 3. Add location targeting criteria
   const locAdds = [
     ...(params.locationTargeting?.add ?? []).map((g) => ({ geo: g, negative: false })),
     ...(params.negativeLocationTargeting?.add ?? []).map((g) => ({ geo: g, negative: true })),
@@ -206,7 +288,7 @@ export async function updateCampaignSettings(
     }
   }
 
-  // 3. Remove location targeting criteria
+  // 4. Remove location targeting criteria
   // Separate positive and negative removals to avoid conflating them
   const positiveRemoves = (params.locationTargeting?.remove ?? []).map((g) => ({ geo: g, negative: false }));
   const negativeRemoves = (params.negativeLocationTargeting?.remove ?? []).map((g) => ({ geo: g, negative: true }));
@@ -290,7 +372,7 @@ export async function updateCampaignSettings(
     }
   }
 
-  // 4. Replace ad schedule
+  // 5. Replace ad schedule
   if (params.adSchedule) {
     try {
       const expanded = expandSlots(params.adSchedule.set);
@@ -397,8 +479,124 @@ export async function updateCampaignSettings(
     }
   }
 
+  // 6. Add proximity targeting criteria
+  if ((params.proximityTargeting?.add ?? []).length > 0) {
+    const adds = params.proximityTargeting!.add!;
+    try {
+      const operations = adds.map((p) => ({
+        entity: "campaign_criterion" as any,
+        operation: "create" as const,
+        resource: {
+          campaign: campaignResourceName,
+          proximity: {
+            geo_point: {
+              latitude_in_micro_degrees: p.latitudeMicroDegrees,
+              longitude_in_micro_degrees: p.longitudeMicroDegrees,
+            },
+            radius: p.radius,
+            radius_units: PROXIMITY_RADIUS_UNITS_MAP[p.radiusUnits],
+          },
+        },
+      }));
+
+      await customer.mutateResources(operations as any);
+
+      results.push({
+        success: true,
+        action: "add_proximity_target",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: JSON.stringify(adds.map((p) => ({
+          lat: p.latitudeMicroDegrees,
+          lng: p.longitudeMicroDegrees,
+          radius: p.radius,
+          units: p.radiusUnits,
+          label: p.label ?? null,
+        }))),
+      });
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "add_proximity_target",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: JSON.stringify(adds.map((p) => p.label ?? `${p.latitudeMicroDegrees},${p.longitudeMicroDegrees}`)),
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
+  // 7. Remove proximity targeting criteria
+  if ((params.proximityTargeting?.remove ?? []).length > 0) {
+    const criterionIds = params.proximityTargeting!.remove!;
+    try {
+      const criteriaResult = await customer.query(`
+        SELECT
+          campaign_criterion.resource_name,
+          campaign_criterion.criterion_id,
+          campaign_criterion.proximity.radius,
+          campaign_criterion.proximity.radius_units
+        FROM campaign_criterion
+        WHERE campaign.id = ${cid}
+          AND campaign_criterion.type = 'PROXIMITY'
+        LIMIT 200
+      `);
+
+      const toRemove = criterionIds
+        .map((crit) => {
+          const match = (criteriaResult as any[]).find((r) =>
+            String(r.campaign_criterion?.criterion_id ?? "") === String(crit),
+          );
+          return match ? {
+            resourceName: match.campaign_criterion.resource_name as string,
+            criterionId: crit,
+          } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+      if (toRemove.length > 0) {
+        await customer.mutateResources(
+          toRemove.map(({ resourceName }) => ({
+            entity: "campaign_criterion" as any,
+            operation: "remove" as const,
+            resource: resourceName as any,
+          })) as any,
+        );
+
+        results.push({
+          success: true,
+          action: "remove_proximity_target",
+          entityId: campaignId,
+          beforeValue: JSON.stringify(toRemove.map((t) => t.criterionId)),
+          afterValue: "",
+        });
+      }
+
+      const notFound = criterionIds.filter((id) => !toRemove.some((t) => t.criterionId === id));
+      if (notFound.length > 0) {
+        results.push({
+          success: false,
+          action: "remove_proximity_target",
+          entityId: campaignId,
+          beforeValue: "",
+          afterValue: "",
+          error: `Proximity criteria not found for criterion IDs: ${notFound.join(", ")}`,
+        });
+      }
+    } catch (error) {
+      results.push({
+        success: false,
+        action: "remove_proximity_target",
+        entityId: campaignId,
+        beforeValue: "",
+        afterValue: "",
+        error: extractErrorMessage(error),
+      });
+    }
+  }
+
   if (results.length === 0) {
-    return { success: false, results: [], error: "No settings to update — provide at least one of: networks, locationTargeting, negativeLocationTargeting, adSchedule" };
+    return { success: false, results: [], error: "No settings to update — provide at least one of: networks, locationTargeting, negativeLocationTargeting, adSchedule, positiveGeoTargetType, negativeGeoTargetType, proximityTargeting" };
   }
 
   return {

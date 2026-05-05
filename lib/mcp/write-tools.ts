@@ -957,7 +957,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Campaign Settings ──────────────────────────────────────────
 
   server.registerTool("updateCampaignSettings", {
-    description: "Update campaign network targeting, location targeting, and/or ad schedule. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Ad schedule: replace the entire schedule with a list of slots (use dayOfWeek 'ALL' as a shortcut for all 7 days; pass an empty array to clear the schedule and run 24/7). NOTE: If the campaign uses smart bidding (TARGET_CPA/TARGET_ROAS/MAXIMIZE_CONVERSIONS/MAXIMIZE_CONVERSION_VALUE), schedule restrictions are respected but can hurt performance by removing learning signal. Prefer 24/7 schedules unless you have strong evidence specific hours are unprofitable. Returns a changeId per mutation plus any warnings.",
+    description: "Update campaign network targeting, location targeting, and/or ad schedule. Networks: toggle Google Search, Search Partners, Display Network. Locations: add/remove geo targets (positive or negative) by geo target constant ID (e.g. '2840' for US, '200840' for Seattle-Tacoma DMA). Ad schedule: replace the entire schedule with a list of slots (use dayOfWeek 'ALL' as a shortcut for all 7 days; pass an empty array to clear the schedule and run 24/7). NOTE: If the campaign uses smart bidding (TARGET_CPA/TARGET_ROAS/MAXIMIZE_CONVERSIONS/MAXIMIZE_CONVERSION_VALUE), schedule restrictions are respected but can hurt performance by removing learning signal. Prefer 24/7 schedules unless you have strong evidence specific hours are unprofitable. Returns a changeId per mutation plus any warnings. Geo intent: set positiveGeoTargetType to PRESENCE (only people physically in the area) or PRESENCE_OR_INTEREST (default — also includes people searching for the area). Proximity: add radius-based targeting (5-mile circles) by lat/lng via proximityTargeting.add; remove by criterionId via proximityTargeting.remove (get criterionIds from getCampaignSettings or runScript).",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -1001,9 +1001,45 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         })
         .optional()
         .describe("Ad schedule (dayparting) — REPLACES the entire current schedule. For smart-bidding campaigns, non-24/7 schedules can reduce learning signal; the tool returns a SMART_BIDDING_SCHEDULE_RESTRICTION warning when detected."),
+      positiveGeoTargetType: z
+        .enum(["PRESENCE", "PRESENCE_OR_INTEREST"])
+        .optional()
+        .describe(
+          "Who sees ads based on location intent. PRESENCE: only people physically in the targeted area. " +
+          "PRESENCE_OR_INTEREST: people in OR interested in the area (Google default). " +
+          "Use PRESENCE for purely local intent; use PRESENCE_OR_INTEREST for broader reach.",
+        ),
+      negativeGeoTargetType: z
+        .enum(["PRESENCE", "PRESENCE_OR_INTEREST"])
+        .optional()
+        .describe(
+          "Who is excluded based on excluded locations. PRESENCE: exclude people physically there. " +
+          "PRESENCE_OR_INTEREST: exclude people in or interested in the excluded area.",
+        ),
+      proximityTargeting: z
+        .object({
+          add: z
+            .array(
+              z.object({
+                latitudeMicroDegrees: z.number().int().min(-90_000_000).max(90_000_000).describe("Latitude in micro-degrees (degrees × 1,000,000). e.g. 47608013 for 47.608013° N"),
+                longitudeMicroDegrees: z.number().int().min(-180_000_000).max(180_000_000).describe("Longitude in micro-degrees (degrees × 1,000,000). e.g. -122335167 for -122.335167° W"),
+                radius: z.number().min(0.1).describe("Radius value, minimum 0.1. e.g. 5.0"),
+                radiusUnits: z.enum(["MILES", "KILOMETERS"]).describe("Unit for the radius"),
+                label: z.string().optional().describe("Optional human-readable label for logging, e.g. 'Downtown Seattle'"),
+              }),
+            )
+            .optional()
+            .describe("Proximity circles to add. Each defines a lat/lng center + radius."),
+          remove: z
+            .array(z.string())
+            .optional()
+            .describe("Criterion IDs of proximity targets to remove. Get IDs from getCampaignSettings or runScript on campaign_criterion WHERE type = 'PROXIMITY'."),
+        })
+        .optional()
+        .describe("Radius-based proximity targeting — target people within N miles/km of a lat/lng point."),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting, adSchedule }) => {
+  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting, adSchedule, positiveGeoTargetType, negativeGeoTargetType, proximityTargeting }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
 
@@ -1012,6 +1048,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     if (locationTargeting) params.locationTargeting = locationTargeting;
     if (negativeLocationTargeting) params.negativeLocationTargeting = negativeLocationTargeting;
     if (adSchedule) params.adSchedule = adSchedule;
+    if (positiveGeoTargetType) params.positiveGeoTargetType = positiveGeoTargetType;
+    if (negativeGeoTargetType) params.negativeGeoTargetType = negativeGeoTargetType;
+    if (proximityTargeting) params.proximityTargeting = proximityTargeting;
 
     const t0 = performance.now();
     const result = await updateCampaignSettings(authForAccount(auth, accountId), campaignId, params);

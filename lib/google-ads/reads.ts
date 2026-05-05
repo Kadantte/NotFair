@@ -1408,6 +1408,10 @@ export async function getCampaignSettings(
 
   const c = (campaignResult as any[])[0]?.campaign ?? {};
   const ns = c.network_settings ?? {};
+  const gts = c.geo_target_type_setting ?? {};
+  // API v22 numeric → string for positive and negative geo target types
+  const POSITIVE_GEO_REVERSE: Record<number, string> = { 5: "PRESENCE_OR_INTEREST", 7: "PRESENCE" };
+  const NEGATIVE_GEO_REVERSE: Record<number, string> = { 4: "PRESENCE_OR_INTEREST", 5: "PRESENCE" };
 
   // Split combined criteria by type
   // google-ads-api returns enum fields as numeric values, not strings
@@ -1473,6 +1477,8 @@ export async function getCampaignSettings(
       searchPartners: ns.target_search_network ?? false,
       displayNetwork: ns.target_content_network ?? false,
     },
+    positiveGeoTargetType: gts.positive_geo_target_type != null ? (POSITIVE_GEO_REVERSE[gts.positive_geo_target_type] ?? null) : null,
+    negativeGeoTargetType: gts.negative_geo_target_type != null ? (NEGATIVE_GEO_REVERSE[gts.negative_geo_target_type] ?? null) : null,
     locationTargeting: locations,
     proximityTargeting: proximityTargets.length > 0 ? proximityTargets : null,
     adSchedule: adSchedule.length > 0 ? adSchedule : null,

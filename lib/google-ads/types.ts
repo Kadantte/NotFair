@@ -207,6 +207,12 @@ export interface UpdateCampaignSettingsParams {
     /** Replace the entire ad schedule with these slots. Pass [] to clear (run all hours, all days). */
     set: AdScheduleSlot[];
   };
+  positiveGeoTargetType?: "PRESENCE" | "PRESENCE_OR_INTEREST";
+  negativeGeoTargetType?: "PRESENCE" | "PRESENCE_OR_INTEREST";
+  proximityTargeting?: {
+    add?: ProximityTarget[];
+    remove?: string[]; // criterion IDs returned by getCampaignSettings or runScript
+  };
 }
 
 export interface AdScheduleSlot {
@@ -220,4 +226,16 @@ export interface AdScheduleSlot {
   startMinute?: "ZERO" | "FIFTEEN" | "THIRTY" | "FORTY_FIVE";
   /** Defaults to "ZERO" */
   endMinute?: "ZERO" | "FIFTEEN" | "THIRTY" | "FORTY_FIVE";
+}
+
+export interface ProximityTarget {
+  /** Latitude in micro-degrees. e.g. 47608013 for 47.608013° N (Seattle) */
+  latitudeMicroDegrees: number;
+  /** Longitude in micro-degrees. e.g. -122335167 for -122.335167° W */
+  longitudeMicroDegrees: number;
+  /** Radius value, e.g. 5 */
+  radius: number;
+  radiusUnits: "MILES" | "KILOMETERS";
+  /** Optional human-readable label for logging */
+  label?: string;
 }
