@@ -138,9 +138,18 @@ export type PausePmaxAssetGroupResponse = WriteToolResponse;
 export type EnablePmaxAssetGroupResponse = WriteToolResponse;
 
 // Callouts
+export type AddCalloutAssetResponse = WriteToolResponse;
 export type CreateCalloutAssetResponse = WriteToolResponse;
+export type LinkCalloutAssetResponse = WriteToolResponse;
 export type LinkCalloutToAccountResponse = WriteToolResponse;
+export type UnlinkCalloutAssetResponse = WriteToolResponse;
 export type RemoveCalloutFromAccountResponse = WriteToolResponse;
+
+// Structured snippets
+export type AddStructuredSnippetAssetResponse = WriteToolResponse;
+export type CreateStructuredSnippetAssetResponse = WriteToolResponse;
+export type LinkStructuredSnippetAssetResponse = WriteToolResponse;
+export type UnlinkStructuredSnippetAssetResponse = WriteToolResponse;
 
 // Image assets
 export type CreateImageAssetResponse = WriteToolResponse;
@@ -262,9 +271,16 @@ export interface McpToolResponseRegistry {
   pausePmaxAssetGroup: PausePmaxAssetGroupResponse;
   enablePmaxAssetGroup: EnablePmaxAssetGroupResponse;
   updateCampaignLanguages: UpdateCampaignLanguagesResponse;
+  addCalloutAsset: AddCalloutAssetResponse;
   createCalloutAsset: CreateCalloutAssetResponse;
+  linkCalloutAsset: LinkCalloutAssetResponse;
   linkCalloutToAccount: LinkCalloutToAccountResponse;
+  unlinkCalloutAsset: UnlinkCalloutAssetResponse;
   removeCalloutFromAccount: RemoveCalloutFromAccountResponse;
+  addStructuredSnippetAsset: AddStructuredSnippetAssetResponse;
+  createStructuredSnippetAsset: CreateStructuredSnippetAssetResponse;
+  linkStructuredSnippetAsset: LinkStructuredSnippetAssetResponse;
+  unlinkStructuredSnippetAsset: UnlinkStructuredSnippetAssetResponse;
   createImageAsset: CreateImageAssetResponse;
   linkImageAsset: LinkImageAssetResponse;
   createBiddingStrategy: CreateBiddingStrategyResponse;

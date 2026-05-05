@@ -43,9 +43,17 @@ import {
   pausePmaxAssetGroup,
   enablePmaxAssetGroup,
   updateCampaignLanguages,
+  addCalloutAsset,
   createCalloutAsset,
+  linkCalloutAsset,
   linkCalloutToAccount,
+  unlinkCalloutAsset,
   removeCalloutFromAccount,
+  addStructuredSnippetAsset,
+  createStructuredSnippetAsset,
+  linkStructuredSnippetAsset,
+  unlinkStructuredSnippetAsset,
+  STRUCTURED_SNIPPET_HEADERS,
   createImageAsset,
   fetchImageAssetFromUrl,
   linkImageAsset,
@@ -69,7 +77,7 @@ import {
   createAdVariationExperiment,
   SUPPORTED_EXPERIMENT_TYPES,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, LinkImageAssetLevel } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, LinkImageAssetLevel, AssetExtensionMutationResult } from "@/lib/google-ads";
 import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite, execRead } from "@/lib/tools/execute";
@@ -186,6 +194,65 @@ function buildBulkSkipped<T>(issues: Array<BulkValidationWithInput<T>>) {
       ...(issue.alternativeTool ? { alternativeTool: issue.alternativeTool } : {}),
       ...(issue.fix ? { fix: issue.fix } : {}),
     }));
+}
+
+const assetExtensionTargetSchema = z.discriminatedUnion("level", [
+  z.object({ level: z.literal("account") }),
+  z.object({
+    level: z.literal("campaign"),
+    campaignId: z.string().describe("Campaign ID to link the asset to"),
+  }),
+  z.object({
+    level: z.literal("ad_group"),
+    adGroupId: z.string().describe("Ad group ID to link the asset to"),
+  }),
+]);
+
+type AssetExtensionToolTarget = z.infer<typeof assetExtensionTargetSchema>;
+
+function firstCampaignTargetId(targets: AssetExtensionToolTarget[] | undefined): string | null {
+  return targets?.find((target) => target.level === "campaign")?.campaignId ?? null;
+}
+
+function linkedCampaignIds(result: AssetExtensionMutationResult): string[] {
+  const ids = [
+    ...(result.linksCreated ?? []),
+    ...(result.linksRemoved ?? []),
+  ].flatMap((link) => (link.campaignId ? [link.campaignId] : []));
+  return [...new Set(ids)];
+}
+
+async function execAssetExtensionWrite(
+  auth: AuthContext,
+  targetId: string,
+  initialCampaignId: string | null,
+  fn: () => Promise<AssetExtensionMutationResult>,
+) {
+  const t0 = performance.now();
+  const first = await execWrite(auth, targetId, initialCampaignId, fn);
+  if (!first.success) return first;
+
+  const overrideLatencyMs = Math.round(performance.now() - t0);
+  const extraCampaignIds = linkedCampaignIds(first).filter((campaignId) => campaignId !== initialCampaignId);
+  if (extraCampaignIds.length === 0) return first;
+
+  const extraLogs = await Promise.all(
+    extraCampaignIds.map((campaignId) =>
+      execWrite(
+        auth,
+        targetId,
+        campaignId,
+        async () => ({ ...first, campaignId }),
+        undefined,
+        { overrideLatencyMs },
+      ),
+    ),
+  );
+
+  return {
+    ...first,
+    changeIds: [first.changeId, ...extraLogs.map((log) => log.changeId)],
+  };
 }
 
 export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
@@ -1314,8 +1381,27 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
 
   // ─── Callout Extensions (RMF C.75) ───────────────────────────────
 
+  server.registerTool("addCalloutAsset", {
+    description: "Create a callout extension and link it to account, campaign, or ad group targets in one workflow. Use this for user requests like 'add these callouts to these campaigns'. Callout text must be ≤25 chars. Defaults to account-level when targets is omitted. Returns changeId, assetId, and link resource names.",
+    inputSchema: {
+      accountId: accountIdParam,
+      text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
+      targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific extensions."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, text, targets }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execAssetExtensionWrite(
+      auth,
+      targetId,
+      firstCampaignTargetId(targets),
+      () => addCalloutAsset(targetAuth, { text, targets }),
+    );
+    return typedResult(result);
+  }));
+
   server.registerTool("createCalloutAsset", {
-    description: "Create a callout extension (≤25 char snippet shown under text ads, e.g. 'Free shipping'). Set linkToAccount=true to link it at the customer (account) level in the same call, which is what RMF C.75 requires. Returns changeId + assetId.",
+    description: "Low-level compatibility tool: create a callout extension (≤25 char snippet shown under text ads, e.g. 'Free shipping'). Prefer addCalloutAsset for new workflows because it supports account/campaign/ad group targets. Set linkToAccount=true to link it at the customer/account level. Returns changeId + assetId.",
     inputSchema: {
       accountId: accountIdParam,
       text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
@@ -1328,8 +1414,22 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return typedResult(result);
   }));
 
+  server.registerTool("linkCalloutAsset", {
+    description: "Link an existing callout asset to an account, campaign, or ad group target. Prefer addCalloutAsset when creating a new callout. Returns changeId and link resource names.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
+      target: assetExtensionTargetSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, target }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => linkCalloutAsset(targetAuth, { assetId, target }));
+    return typedResult(result);
+  }));
+
   server.registerTool("linkCalloutToAccount", {
-    description: "Link an existing callout asset to the customer (account) level so it can serve across all campaigns. Returns changeId.",
+    description: "Compatibility tool: link an existing callout asset to the customer/account level so it can serve across all campaigns. Prefer linkCalloutAsset for campaign/ad group targeting. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
@@ -1341,8 +1441,22 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return typedResult(result);
   }));
 
+  server.registerTool("unlinkCalloutAsset", {
+    description: "Remove a callout asset link from an account, campaign, or ad group target. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
+      target: assetExtensionTargetSchema,
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, target }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkCalloutAsset(targetAuth, { assetId, target }));
+    return typedResult(result);
+  }));
+
   server.registerTool("removeCalloutFromAccount", {
-    description: "Remove a callout's account-level link. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
+    description: "Compatibility tool: remove a callout's account-level link. The underlying asset is preserved (assets are shared/immutable). Prefer unlinkCalloutAsset for campaign/ad group links. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
@@ -1351,6 +1465,71 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, assetId }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, null, () => removeCalloutFromAccount(targetAuth, assetId));
+    return typedResult(result);
+  }));
+
+  // ─── Structured Snippet Extensions ───────────────────────────────
+
+  server.registerTool("addStructuredSnippetAsset", {
+    description: `Create a structured snippet asset and link it to account, campaign, or ad group targets in one workflow. Use this for requests like "add Services snippets to these 4 campaigns". Values must be 3-10 items, each ≤25 chars. Valid headers: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. Alias accepted: Service catalog -> Services. Defaults to account-level when targets is omitted. Returns changeId, assetId, and link resource names.`,
+    inputSchema: {
+      accountId: accountIdParam,
+      header: z.string().describe(`Structured snippet header. Must be one of: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. "Service catalog" is accepted and normalized to "Services".`),
+      values: z.array(z.string().min(1).max(25)).min(3).max(10).describe("Snippet values, 3-10 items, each ≤25 chars"),
+      targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific snippets."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, header, values, targets }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execAssetExtensionWrite(
+      auth,
+      targetId,
+      firstCampaignTargetId(targets),
+      () => addStructuredSnippetAsset(targetAuth, { header, values, targets }),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("createStructuredSnippetAsset", {
+    description: `Low-level tool: create a structured snippet asset. Prefer addStructuredSnippetAsset for new workflows because it supports account/campaign/ad group targets. Values must be 3-10 items, each ≤25 chars. Valid headers: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. Alias accepted: Service catalog -> Services. Set linkToAccount=true to link it at account level. Returns changeId + assetId.`,
+    inputSchema: {
+      accountId: accountIdParam,
+      header: z.string().describe(`Structured snippet header. Must be one of: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. "Service catalog" is accepted and normalized to "Services".`),
+      values: z.array(z.string().min(1).max(25)).min(3).max(10).describe("Snippet values, 3-10 items, each ≤25 chars"),
+      linkToAccount: z.boolean().default(false).describe("Also link the new asset at the customer/account level"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, header, values, linkToAccount }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => createStructuredSnippetAsset(targetAuth, { header, values, linkToAccount }));
+    return typedResult(result);
+  }));
+
+  server.registerTool("linkStructuredSnippetAsset", {
+    description: "Link an existing structured snippet asset to an account, campaign, or ad group target. Prefer addStructuredSnippetAsset when creating a new snippet. Returns changeId and link resource names.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Structured snippet asset ID (query asset WHERE asset.type = STRUCTURED_SNIPPET via runScript)"),
+      target: assetExtensionTargetSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, target }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => linkStructuredSnippetAsset(targetAuth, { assetId, target }));
+    return typedResult(result);
+  }));
+
+  server.registerTool("unlinkStructuredSnippetAsset", {
+    description: "Remove a structured snippet asset link from an account, campaign, or ad group target. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Structured snippet asset ID (query asset WHERE asset.type = STRUCTURED_SNIPPET via runScript)"),
+      target: assetExtensionTargetSchema,
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, target }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkStructuredSnippetAsset(targetAuth, { assetId, target }));
     return typedResult(result);
   }));
 

@@ -3,6 +3,16 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.6.0] - 2026-05-05
+
+### Added
+- **Google Ads MCP users can now create and attach structured snippet assets.** New tools support account, campaign, and ad group structured snippet links so agents can fill missing campaign snippets from marketing plans.
+- **Callout and structured snippet asset writes now share the same extension plumbing.** The shared path keeps asset creation, scope linking, status normalization, and operation telemetry consistent across extension types.
+
+### Changed
+- **Callout asset creation is now atomic when initial links are requested.** Create-and-link requests use a single Google Ads mutate with temporary resource references, reducing orphaned assets if a link operation fails.
+
+
 ## [0.3.5.1] - 2026-05-05
 
 ### Added

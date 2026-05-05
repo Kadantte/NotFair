@@ -52,6 +52,7 @@ vi.mock("@/lib/tools/execute", () => ({
 import { registerReadTools } from "../read-tools";
 import { registerWriteTools } from "../write-tools";
 import { clearCache } from "@/lib/google-ads";
+import { execWrite } from "@/lib/tools/execute";
 import { buildHarness, TEST_AUTH, expectOk, expectError } from "./harness";
 
 // ─── Shared setup ────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ import { buildHarness, TEST_AUTH, expectOk, expectError } from "./harness";
 function resetMocks() {
   mockQuery.mockReset();
   mockMutateResources.mockReset();
+  vi.mocked(execWrite).mockClear();
   mockQuery.mockResolvedValue([]);
   mockMutateResources.mockResolvedValue({ mutate_operation_responses: [] });
   // `getCachedCustomer` memoises GAQL responses by (userId, customerId, query).
@@ -264,6 +266,10 @@ describe("MCP write tools — smoke", () => {
     const names = harness.listToolNames();
     expect(names).toContain("createImageAsset");
     expect(names).toContain("linkImageAsset");
+    expect(names).toContain("addCalloutAsset");
+    expect(names).toContain("linkCalloutAsset");
+    expect(names).toContain("addStructuredSnippetAsset");
+    expect(names).toContain("linkStructuredSnippetAsset");
   });
 
   it("pauseKeyword flows through execWrite and returns a WriteResult with changeId", async () => {
@@ -323,6 +329,36 @@ describe("MCP write tools — smoke", () => {
       asset: "customers/1234567890/assets/999",
       field_type: 19,
     });
+  });
+
+  it("addStructuredSnippetAsset flows through execWrite and links to campaigns", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { asset_result: { resource_name: "customers/1234567890/assets/999" } },
+        { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~12" } },
+        { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/200~999~12" } },
+      ],
+    });
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("addStructuredSnippetAsset", {
+      header: "Services",
+      values: ["Plumbing", "Electrical", "HVAC"],
+      targets: [
+        { level: "campaign", campaignId: "100" },
+        { level: "campaign", campaignId: "200" },
+      ],
+    });
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: true,
+      action: "add_structured_snippet_asset",
+      entityId: "999",
+      changeId: 1,
+      changeIds: [1, 1],
+    });
+    expect(mockMutateResources.mock.calls[0][0]).toHaveLength(3);
+    expect(vi.mocked(execWrite).mock.calls.map((call) => call[2])).toEqual(["100", "200"]);
   });
 
   it("bulkPauseKeywords fails atomically when pre-validation finds a negative keyword", async () => {

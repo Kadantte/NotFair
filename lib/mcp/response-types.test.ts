@@ -17,7 +17,9 @@ import type {
 type Equals<A, B> =
   (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 
-function assert<T extends true>(_value: T): void {}
+function assert<T extends true>(value: T): void {
+  void value;
+}
 
 describe("response-types — structuredContent shape modelling", () => {
   it("wraps arrays as { items: T[] }", () => {
@@ -132,9 +134,16 @@ describe("response-types — registry completeness", () => {
       pausePmaxAssetGroup: true,
       enablePmaxAssetGroup: true,
       updateCampaignLanguages: true,
+      addCalloutAsset: true,
       createCalloutAsset: true,
+      linkCalloutAsset: true,
       linkCalloutToAccount: true,
+      unlinkCalloutAsset: true,
       removeCalloutFromAccount: true,
+      addStructuredSnippetAsset: true,
+      createStructuredSnippetAsset: true,
+      linkStructuredSnippetAsset: true,
+      unlinkStructuredSnippetAsset: true,
       createImageAsset: true,
       linkImageAsset: true,
       createBiddingStrategy: true,
@@ -159,10 +168,13 @@ describe("response-types — registry completeness", () => {
 
 describe("safeTypedHandler", () => {
   it("wraps the return value via typedResult — JSON in text channel", async () => {
-    const handler = safeTypedHandler(async (_args: { id: string }) => ({
-      name: "Acme",
-      budget: 100,
-    }));
+    const handler = safeTypedHandler(async (args: { id: string }) => {
+      expect(args.id).toBe("1");
+      return {
+        name: "Acme",
+        budget: 100,
+      };
+    });
     const result = await handler({ id: "1" });
     expect(result.structuredContent).toBeUndefined();
     expect(result.content[0]).toEqual({

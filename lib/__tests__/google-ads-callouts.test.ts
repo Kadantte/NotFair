@@ -18,7 +18,9 @@ vi.mock("google-ads-api", () => ({
 }));
 
 import {
+  addCalloutAsset,
   createCalloutAsset,
+  linkCalloutAsset,
   linkCalloutToAccount,
   removeCalloutFromAccount,
   listCalloutAssets,
@@ -28,26 +30,88 @@ const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
 
 describe("callouts (RMF C.75)", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockCustomerFactory.mockReset();
+    mockMutateResources.mockReset();
+    mockQuery.mockReset();
     mockCustomerFactory.mockReturnValue({
       mutateResources: mockMutateResources,
       query: mockQuery,
     });
   });
 
+  describe("addCalloutAsset", () => {
+    it("creates a callout and links it to campaign targets", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+          { campaign_asset_result: { resource_name: "customers/1301265570/campaignAssets/123~999~11" } },
+        ],
+      });
+
+      const result = await addCalloutAsset(auth, {
+        text: "Free shipping",
+        targets: [{ level: "campaign", campaignId: "123" }],
+      });
+
+      expect(result).toMatchObject({
+        success: true,
+        action: "add_callout_asset",
+        entityId: "999",
+        assetType: "CALLOUT",
+      });
+      expect(mockMutateResources).toHaveBeenCalledTimes(1);
+      expect(mockMutateResources.mock.calls[0][0]).toEqual([
+        {
+          entity: "asset",
+          operation: "create",
+          resource: {
+            resource_name: "customers/1301265570/assets/-1",
+            callout_asset: { callout_text: "Free shipping" },
+          },
+        },
+        {
+          entity: "campaign_asset",
+          operation: "create",
+          resource: {
+            campaign: "customers/1301265570/campaigns/123",
+            asset: "customers/1301265570/assets/-1",
+            field_type: 11,
+          },
+        },
+      ]);
+    });
+
+    it("does not default explicit empty targets to account-level serving", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+        ],
+      });
+
+      const result = await addCalloutAsset(auth, {
+        text: "Free shipping",
+        targets: [],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.linksCreated).toEqual([]);
+      expect(mockMutateResources).toHaveBeenCalledTimes(1);
+      expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
+      expect(mockMutateResources.mock.calls[0][0][0]).toMatchObject({
+        entity: "asset",
+        operation: "create",
+      });
+    });
+  });
+
   describe("createCalloutAsset", () => {
     it("creates asset and links to customer when linkToAccount=true", async () => {
-      mockMutateResources
-        .mockResolvedValueOnce({
-          mutate_operation_responses: [
-            { asset_result: { resource_name: "customers/1301265570/assets/999" } },
-          ],
-        })
-        .mockResolvedValueOnce({
-          mutate_operation_responses: [
-            { customer_asset_result: { resource_name: "customers/1301265570/customerAssets/999~10" } },
-          ],
-        });
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+          { customer_asset_result: { resource_name: "customers/1301265570/customerAssets/999~11" } },
+        ],
+      });
 
       const result = await createCalloutAsset(auth, { text: "Free shipping", linkToAccount: true });
 
@@ -57,14 +121,15 @@ describe("callouts (RMF C.75)", () => {
         entityId: "999",
         afterValue: "Free shipping",
       });
-      expect(mockMutateResources).toHaveBeenCalledTimes(2);
+      expect(mockMutateResources).toHaveBeenCalledTimes(1);
       // Asset mutation sets callout_asset.callout_text
       expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
+        resource_name: "customers/1301265570/assets/-1",
         callout_asset: { callout_text: "Free shipping" },
       });
-      // Customer_asset link uses CALLOUT field_type = 10
-      expect(mockMutateResources.mock.calls[1][0][0].resource).toEqual({
-        asset: "customers/1301265570/assets/999",
+      // Customer_asset link references the temporary asset in the same atomic mutate.
+      expect(mockMutateResources.mock.calls[0][0][1].resource).toEqual({
+        asset: "customers/1301265570/assets/-1",
         field_type: 11,
       });
     });
@@ -114,6 +179,26 @@ describe("callouts (RMF C.75)", () => {
       expect(result.success).toBe(true);
       expect(result.action).toBe("link_callout_to_account");
       expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
+        asset: "customers/1301265570/assets/5",
+        field_type: 11,
+      });
+    });
+  });
+
+  describe("linkCalloutAsset", () => {
+    it("creates an ad-group callout link", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { ad_group_asset_result: { resource_name: "customers/1301265570/adGroupAssets/111~5~11" } },
+        ],
+      });
+      const result = await linkCalloutAsset(auth, {
+        assetId: "5",
+        target: { level: "ad_group", adGroupId: "111" },
+      });
+      expect(result.success).toBe(true);
+      expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
+        ad_group: "customers/1301265570/adGroups/111",
         asset: "customers/1301265570/assets/5",
         field_type: 11,
       });

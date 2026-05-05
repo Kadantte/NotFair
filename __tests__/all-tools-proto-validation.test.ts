@@ -19,9 +19,9 @@ const services = protos.google.ads.googleads.v22.services;
 
 // ─── Shared mock infrastructure ─────────────────────────────────────
 
-const capturedOps: Array<
-  { entity: string; operation: string; resource: unknown }[]
-> = [];
+type CapturedOperation = { entity: string; operation: string; resource: unknown };
+
+const capturedOps: CapturedOperation[][] = [];
 
 const mockMutateResources = vi.fn();
 const mockQuery = vi.fn();
@@ -79,6 +79,10 @@ import {
   bulkPauseKeywords,
   bulkAddKeywords,
   moveKeywords,
+  addCalloutAsset,
+  linkCalloutAsset,
+  addStructuredSnippetAsset,
+  unlinkStructuredSnippetAsset,
   type AuthContext,
 } from "@/lib/google-ads";
 
@@ -146,7 +150,7 @@ function resetMocks() {
   capturedOps.length = 0;
   mockMutateResources.mockReset();
   mockQuery.mockReset();
-  mockMutateResources.mockImplementation((ops: any[]) => {
+  mockMutateResources.mockImplementation((ops: CapturedOperation[]) => {
     capturedOps.push(ops);
     return Promise.resolve(defaultMutateResponse());
   });
@@ -173,7 +177,7 @@ describe("protobuf validation: keyword management", () => {
   });
 
   it("addKeyword", async () => {
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: Array<{ entity: string; operation: string; resource: unknown }>) => {
       capturedOps.push(ops);
       return Promise.resolve(
         defaultMutateResponse({
@@ -255,7 +259,7 @@ describe("protobuf validation: campaign management", () => {
   beforeEach(resetMocks);
 
   it("createSearchCampaign", async () => {
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: Array<{ entity: string; operation: string; resource: unknown }>) => {
       capturedOps.push(ops);
       return Promise.resolve(
         defaultMutateResponse({
@@ -542,7 +546,7 @@ describe("protobuf validation: ad group management", () => {
   beforeEach(resetMocks);
 
   it("createAdGroup", async () => {
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve(
         defaultMutateResponse({
@@ -573,7 +577,7 @@ describe("protobuf validation: ad management", () => {
   beforeEach(resetMocks);
 
   it("createAd", async () => {
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve(
         defaultMutateResponse({
@@ -720,7 +724,7 @@ describe("protobuf validation: bulk operations", () => {
 
   it("bulkAddKeywords", async () => {
     // bulkAddKeywords does a single batch mutate and returns responses per keyword
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve({
         mutate_operation_responses: [
@@ -758,7 +762,7 @@ describe("protobuf validation: bulk operations", () => {
     ]);
 
     // Step 2: addKeyword to destination
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve({
         mutate_operation_responses: [
@@ -779,12 +783,85 @@ describe("protobuf validation: bulk operations", () => {
     ]);
 
     // The pauseKeyword mutate call
-    mockMutateResources.mockImplementationOnce((ops: any[]) => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve(defaultMutateResponse());
     });
 
     await moveKeywords(AUTH, "100", "200", "300", ["222"], "PHRASE");
+    assertAllCapturedOpsEncode();
+  });
+});
+
+describe("protobuf validation: asset extensions", () => {
+  beforeEach(resetMocks);
+
+  it("addCalloutAsset creates an asset and campaign_asset link", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            { asset_result: { resource_name: "customers/1234567890/assets/999" } },
+            { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~11" } },
+          ],
+        }),
+      );
+    });
+
+    await addCalloutAsset(AUTH, {
+      text: "Free shipping",
+      targets: [{ level: "campaign", campaignId: "100" }],
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("linkCalloutAsset creates an ad_group_asset link", async () => {
+    await linkCalloutAsset(AUTH, {
+      assetId: "999",
+      target: { level: "ad_group", adGroupId: "111" },
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("addStructuredSnippetAsset creates an asset and campaign_asset links", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            { asset_result: { resource_name: "customers/1234567890/assets/999" } },
+            { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~12" } },
+            { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/200~999~12" } },
+          ],
+        }),
+      );
+    });
+
+    await addStructuredSnippetAsset(AUTH, {
+      header: "Services",
+      values: ["Plumbing", "Electrical", "HVAC"],
+      targets: [
+        { level: "campaign", campaignId: "100" },
+        { level: "campaign", campaignId: "200" },
+      ],
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("unlinkStructuredSnippetAsset removes link resources as strings", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign_asset: {
+          resource_name: "customers/1234567890/campaignAssets/100~999~12",
+        },
+      },
+    ]);
+
+    await unlinkStructuredSnippetAsset(AUTH, {
+      assetId: "999",
+      target: { level: "campaign", campaignId: "100" },
+    });
     assertAllCapturedOpsEncode();
   });
 });
