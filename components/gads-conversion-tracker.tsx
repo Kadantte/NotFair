@@ -7,10 +7,12 @@ declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
     rdt?: (...args: unknown[]) => void;
+    twq?: (...args: unknown[]) => void;
   }
 }
 
 const CONVERSION_SEND_TO = "AW-18054900065/_E3uCKKHoJMcEOHSn6FD";
+const X_EVENT_ID = "tw-q27qa-q27qc";
 
 function readCookie(name: string): string | null {
   const prefix = `${name}=`;
@@ -49,6 +51,14 @@ export function GadsConversionTracker() {
         "SignUp",
         redditConversionId ? { conversionId: redditConversionId } : undefined,
       );
+    }
+
+    if (typeof window.twq === "function") {
+      window.twq("event", X_EVENT_ID, {
+        value: 1.0,
+        currency: "USD",
+        ...(redditConversionId ? { conversion_id: redditConversionId } : {}),
+      });
     }
   }, []);
 

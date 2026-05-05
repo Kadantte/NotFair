@@ -4,6 +4,13 @@ import { sendXConversion } from "../x-capi";
 
 const BASE = "https://ads-api.x.com/12/measurement/conversions";
 
+const OAUTH_ENV = {
+  X_CONSUMER_KEY: "ck-test",
+  X_CONSUMER_SECRET: "cs-test",
+  X_ACCESS_TOKEN: "at-test",
+  X_ACCESS_TOKEN_SECRET: "ats-test",
+};
+
 describe("sendXConversion", () => {
   const originalEnv = { ...process.env };
   const fetchMock = vi.fn();
@@ -17,7 +24,7 @@ describe("sendXConversion", () => {
     errorSpy.mockClear();
     process.env.X_PIXEL_ID = "q27qa";
     process.env.X_EVENT_ID = "tw-q27qa-q27qc";
-    process.env.X_CONVERSION_ACCESS_TOKEN = "secret-token";
+    Object.assign(process.env, OAUTH_ENV);
   });
 
   afterEach(() => {
@@ -25,8 +32,8 @@ describe("sendXConversion", () => {
     process.env = { ...originalEnv };
   });
 
-  it("skips when the access token is missing", async () => {
-    delete process.env.X_CONVERSION_ACCESS_TOKEN;
+  it("skips when any OAuth 1.0a credential is missing", async () => {
+    delete process.env.X_ACCESS_TOKEN_SECRET;
 
     await sendXConversion({
       conversionId: "conv-123",
@@ -59,8 +66,18 @@ describe("sendXConversion", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${BASE}/q27qa`);
     expect(init.method).toBe("POST");
-    expect(init.headers.Authorization).toBe("Bearer secret-token");
     expect(init.headers["Content-Type"]).toBe("application/json");
+
+    // OAuth 1.0a authorization header structure
+    const auth: string = init.headers.Authorization;
+    expect(auth.startsWith("OAuth ")).toBe(true);
+    expect(auth).toContain('oauth_consumer_key="ck-test"');
+    expect(auth).toContain('oauth_token="at-test"');
+    expect(auth).toContain('oauth_signature_method="HMAC-SHA1"');
+    expect(auth).toContain('oauth_version="1.0"');
+    expect(auth).toMatch(/oauth_signature="[^"]+"/);
+    expect(auth).toMatch(/oauth_nonce="[a-f0-9]+"/);
+    expect(auth).toMatch(/oauth_timestamp="\d+"/);
 
     const body = JSON.parse(init.body);
     expect(body.conversions).toHaveLength(1);
