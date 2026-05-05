@@ -23,7 +23,7 @@ import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
 import { buildMetaAuthorizeUrl } from "@/lib/meta-ads/oauth";
-import { isMetaWaitlistWallEnabled } from "@/lib/meta-waitlist";
+import { isWaitlistApproved } from "@/lib/waitlist";
 
 function getSafeNext(next: string | null): string {
   if (!next || !next.startsWith("/")) return "/connect?platform=meta_ads&status=connected";
@@ -88,8 +88,9 @@ export async function GET(request: Request) {
 
   // The waitlist wall is UX only unless the OAuth start endpoint enforces the
   // same policy. Existing connected users may still re-authorize; unconnected
-  // users need approval (or dev override) before we create a Meta OAuth state.
-  if (!existingMetaConnection && await isMetaWaitlistWallEnabled()) {
+  // users need approval (granted from /dev/waitlist) before we create a Meta
+  // OAuth state.
+  if (!existingMetaConnection && !(await isWaitlistApproved("meta_ads"))) {
     return NextResponse.redirect(new URL("/manage-ads-accounts/meta-ads", requestUrl));
   }
 

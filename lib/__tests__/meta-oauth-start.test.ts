@@ -4,14 +4,17 @@ const {
   mockCookieGet,
   mockSelectQueues,
   mockStoreOAuthNonce,
-  mockIsMetaWaitlistWallEnabled,
+  mockIsWaitlistApproved,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectQueues: [] as unknown[][],
   mockStoreOAuthNonce: vi.fn(async (nonce: string) => {
     void nonce;
   }),
-  mockIsMetaWaitlistWallEnabled: vi.fn(async () => true),
+  mockIsWaitlistApproved: vi.fn(async (key: string) => {
+    void key;
+    return false;
+  }),
 }));
 
 vi.mock("next/headers", () => ({
@@ -66,8 +69,8 @@ vi.mock("@/lib/meta-ads/oauth", () => ({
     `https://facebook.test/dialog/oauth?state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`,
 }));
 
-vi.mock("@/lib/meta-waitlist", () => ({
-  isMetaWaitlistWallEnabled: () => mockIsMetaWaitlistWallEnabled(),
+vi.mock("@/lib/waitlist", () => ({
+  isWaitlistApproved: (key: string) => mockIsWaitlistApproved(key),
 }));
 
 describe("Meta OAuth start route", () => {
@@ -75,7 +78,7 @@ describe("Meta OAuth start route", () => {
     vi.clearAllMocks();
     mockSelectQueues.length = 0;
     mockCookieGet.mockReturnValue({ value: "session-token" });
-    mockIsMetaWaitlistWallEnabled.mockResolvedValue(true);
+    mockIsWaitlistApproved.mockResolvedValue(false);
   });
 
   it("blocks unconnected users at the server-side waitlist gate", async () => {
@@ -108,8 +111,8 @@ describe("Meta OAuth start route", () => {
     expect(mockStoreOAuthNonce).toHaveBeenCalledTimes(1);
   });
 
-  it("allows approved or dev-unblocked new users through when the wall helper returns false", async () => {
-    mockIsMetaWaitlistWallEnabled.mockResolvedValue(false);
+  it("allows approved new users through to the Meta dialog", async () => {
+    mockIsWaitlistApproved.mockResolvedValue(true);
     mockSelectQueues.push(
       [{ id: 1, userId: "user_1" }],
       [],
