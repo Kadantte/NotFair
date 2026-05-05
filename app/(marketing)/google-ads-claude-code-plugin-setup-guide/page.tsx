@@ -91,7 +91,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 4,
         name: "Ask Claude about your Google Ads",
-        text: "Try a prompt like 'Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.' Claude calls NotFair tools and answers with live data.",
+        text: "Try a prompt like 'Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.' Claude calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-4", SITE_URL).toString(),
       },
     ],

@@ -8,7 +8,7 @@ import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 type Surface = "marketing" | "in_app";
 
 const DEFAULT_AUDIT_PROMPT =
-  "Audit my connected Google Ads account and tell me the 3 biggest optimization opportunities.";
+  "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring";
 
 export function CodexSetupSteps({
   surface,

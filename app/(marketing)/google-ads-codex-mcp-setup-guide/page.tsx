@@ -79,7 +79,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 3,
         name: "Ask Codex about your ads",
-        text: "Try a prompt like 'Diagnose my connected Google Ads account and tell me the 3 biggest issues to fix.' Codex calls NotFair tools and answers with live data.",
+        text: "Try a prompt like 'Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.' Codex calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-codex-mcp-setup-guide#step-3", SITE_URL).toString(),
       },
     ],
