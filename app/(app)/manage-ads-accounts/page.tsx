@@ -4,8 +4,7 @@ import { eq } from "drizzle-orm";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { isMetaWaitlistWallEnabled } from "@/lib/meta-waitlist";
-import { hasJoinedWaitlist } from "@/lib/waitlist";
+import { hasJoinedWaitlist, isWaitlistApproved } from "@/lib/waitlist";
 import { BrandLockup } from "@/components/brand-lockup";
 import { OnboardingSignOut } from "@/components/onboarding-sign-out";
 import { MetaWaitlistCard } from "@/components/meta-waitlist";
@@ -88,10 +87,10 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
     />
   );
   // Meta App Review is still pending — gate the entry behind a join-waitlist
-  // card for everyone except devs who've toggled the wall off in /dev. The
-  // gate also fires if the user has already joined, so the card shows
-  // "You're on the list" instead of the CTA.
-  const metaWallEnabled = await isMetaWaitlistWallEnabled();
+  // card. Approved users (granted from /dev/waitlist) bypass the wall and
+  // see the regular connect card. The gate also fires when the user has
+  // already joined, so the card shows "You're on the list" instead of CTA.
+  const metaWallEnabled = !(await isWaitlistApproved("meta_ads"));
   const metaWaitlistJoined = metaWallEnabled ? await hasJoinedWaitlist("meta_ads") : false;
 
   const metaHref = hasMeta

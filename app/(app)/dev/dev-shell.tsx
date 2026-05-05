@@ -193,6 +193,7 @@ type WaitlistRow = {
     email: string | null;
     metadata: Record<string, unknown>;
     createdAt: string;
+    approvedAt: string | null;
 };
 
 // Module-level cache keyed by "days|source|platform" per CLAUDE.md stale-while-revalidate pattern.
@@ -224,6 +225,7 @@ export function DevShell() {
     const [waitlist, setWaitlist] = useState<WaitlistRow[]>(cachedWaitlist ?? []);
     const [loadingWaitlist, setLoadingWaitlist] = useState(!cachedWaitlist);
     const [waitlistKeyFilter, setWaitlistKeyFilter] = useState<string>('all');
+    const [approvingWaitlistId, setApprovingWaitlistId] = useState<number | null>(null);
     const [sortKey, setSortKey] = useState<CustomerSortKey>('operations');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [importing, setImporting] = useState(false);
@@ -238,8 +240,6 @@ export function DevShell() {
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
     const [growthOverride, setGrowthOverride] = useState<'on' | 'off' | null>(null);
     const [togglingGrowthOverride, setTogglingGrowthOverride] = useState(false);
-    const [metaWaitlistWall, setMetaWaitlistWall] = useState<'on' | 'off' | null>(null);
-    const [togglingMetaWaitlistWall, setTogglingMetaWaitlistWall] = useState(false);
     const [resetPreview, setResetPreview] = useState<ResetPreview | null>(null);
     const [loadingResetPreview, setLoadingResetPreview] = useState(false);
     const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -253,13 +253,6 @@ export function DevShell() {
             .then((data) => {
                 if (cancelled || !data) return;
                 setGrowthOverride(data.state === 'off' ? 'off' : 'on');
-            })
-            .catch(() => { /* dev-only endpoint, fine if it 403s */ });
-        fetch('/api/dev/meta-waitlist-override', { credentials: 'include' })
-            .then((r) => r.ok ? r.json() : null)
-            .then((data) => {
-                if (cancelled || !data) return;
-                setMetaWaitlistWall(data.state === 'off' ? 'off' : 'on');
             })
             .catch(() => { /* dev-only endpoint, fine if it 403s */ });
         return () => { cancelled = true; };
@@ -328,30 +321,6 @@ export function DevShell() {
             setError('Failed to toggle growth override');
         } finally {
             setTogglingGrowthOverride(false);
-        }
-    }
-
-    async function toggleMetaWaitlistWall() {
-        if (metaWaitlistWall === null) return;
-        const next = metaWaitlistWall === 'on' ? 'off' : 'on';
-        setTogglingMetaWaitlistWall(true);
-        try {
-            const res = await fetch('/api/dev/meta-waitlist-override', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ enabled: next === 'on' }),
-            });
-            if (!res.ok) throw new Error('Failed');
-            const data = await res.json();
-            setMetaWaitlistWall(data.state === 'off' ? 'off' : 'on');
-            // The wall is server-rendered on /manage-ads-accounts, so refresh
-            // route caches so the toggle is visible without a hard reload.
-            router.refresh();
-        } catch {
-            setError('Failed to toggle Meta waitlist wall');
-        } finally {
-            setTogglingMetaWaitlistWall(false);
         }
     }
 
@@ -540,6 +509,29 @@ export function DevShell() {
             setLoadingWaitlist(false);
         }
     }, []);
+
+    async function toggleWaitlistApproval(id: number, approved: boolean) {
+        setApprovingWaitlistId(id);
+        try {
+            const res = await fetch('/api/dev/waitlist', {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, approved }),
+            });
+            if (!res.ok) throw new Error('Failed');
+            const data = (await res.json()) as { id: number; approvedAt: string | null };
+            setWaitlist((prev) => {
+                const next = prev.map((w) => (w.id === data.id ? { ...w, approvedAt: data.approvedAt } : w));
+                cachedWaitlist = next;
+                return next;
+            });
+        } catch {
+            setError(approved ? 'Failed to approve signup' : 'Failed to revoke approval');
+        } finally {
+            setApprovingWaitlistId(null);
+        }
+    }
 
     // Lazy-load per tab. Only fetch what the user is looking at; prefetch
     // the other heavy tab (the user typically alternates customers/usage)
@@ -1741,42 +1733,6 @@ export function DevShell() {
                             </div>
                         </div>
 
-                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F] p-4 sm:p-5">
-                            <div className="flex items-start gap-3">
-                                <div className="shrink-0 rounded-md bg-[#1877F2]/15 p-2">
-                                    <Eye className="w-4 h-4 text-[#1877F2]" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="text-sm font-semibold text-[#E8E4DD]">Meta waitlist wall</h3>
-                                    <p className="mt-1 text-xs text-[#C4C0B6] leading-relaxed">
-                                        Meta App Review is pending — non-developer customers always see a
-                                        &ldquo;Coming soon, join waitlist&rdquo; wall on{' '}
-                                        <code className="font-mono text-[#E8E4DD]">/manage-ads-accounts</code>{' '}
-                                        and{' '}
-                                        <code className="font-mono text-[#E8E4DD]">/manage-ads-accounts/meta-ads</code>.
-                                        Toggle off to preview the underlying connect/manage UX as a developer.
-                                    </p>
-                                    <div className="mt-3">
-                                        <Button
-                                            onClick={toggleMetaWaitlistWall}
-                                            disabled={metaWaitlistWall === null || togglingMetaWaitlistWall}
-                                            variant="outline"
-                                            size="sm"
-                                            className={`gap-1.5 ${metaWaitlistWall === 'on'
-                                                ? 'border-[#D4882A]/40 bg-[#D4882A]/[0.08] text-[#D4882A] hover:bg-[#D4882A]/[0.14]'
-                                                : 'border-[#4CAF6E]/40 bg-[#4CAF6E]/[0.08] text-[#4CAF6E] hover:bg-[#4CAF6E]/[0.14]'
-                                            }`}
-                                        >
-                                            {togglingMetaWaitlistWall
-                                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                : <Eye className="w-3.5 h-3.5" />}
-                                            Wall: {metaWaitlistWall === 'on' ? 'ON (customer view)' : metaWaitlistWall === 'off' ? 'OFF (preview underlying UX)' : '…'}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="border border-[#C45D4A]/30 rounded-xl bg-[#C45D4A]/[0.04] p-4 sm:p-5">
                             <div className="flex items-start gap-3">
                                 <div className="shrink-0 rounded-md bg-[#C45D4A]/15 p-2">
@@ -1866,21 +1822,58 @@ export function DevShell() {
                             }
                             return (
                                 <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
-                                    <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-4 gap-y-0 px-4 py-2 border-b border-[#3D3C36] text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
+                                    <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-4 gap-y-0 px-4 py-2 border-b border-[#3D3C36] text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest">
                                         <span>Key</span>
                                         <span>Email</span>
                                         <span>User</span>
                                         <span>Joined</span>
+                                        <span className="text-right">Approval</span>
                                     </div>
                                     <div className="divide-y divide-[#3D3C36]/50 max-h-[32rem] overflow-y-auto">
-                                        {rows.map((w) => (
-                                            <div key={w.id} className="grid grid-cols-[auto_1fr_auto_auto] gap-x-4 items-center px-4 py-2.5 hover:bg-[#24231F]/60 transition-colors">
-                                                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#1877F2]/10 text-[#9BC4FF] border border-[#1877F2]/20">{w.key}</span>
-                                                <span className="text-[13px] font-mono text-[#E8E4DD] truncate min-w-0">{w.email ?? '—'}</span>
-                                                <span className="text-[12px] font-mono text-[#C4C0B6] truncate">{w.userId ?? <span className="italic text-[#C4C0B6]/60">anon</span>}</span>
-                                                <span className="text-[12px] font-mono text-[#C4C0B6] tabular-nums whitespace-nowrap">{formatDateTime(w.createdAt)}</span>
-                                            </div>
-                                        ))}
+                                        {rows.map((w) => {
+                                            const isApproved = !!w.approvedAt;
+                                            const busy = approvingWaitlistId === w.id;
+                                            const canApprove = !!w.userId;
+                                            return (
+                                                <div key={w.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-4 items-center px-4 py-2.5 hover:bg-[#24231F]/60 transition-colors">
+                                                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#1877F2]/10 text-[#9BC4FF] border border-[#1877F2]/20">{w.key}</span>
+                                                    <span className="text-[13px] font-mono text-[#E8E4DD] truncate min-w-0">{w.email ?? '—'}</span>
+                                                    <span className="text-[12px] font-mono text-[#C4C0B6] truncate">{w.userId ?? <span className="italic text-[#C4C0B6]/60">anon</span>}</span>
+                                                    <span className="text-[12px] font-mono text-[#C4C0B6] tabular-nums whitespace-nowrap">{formatDateTime(w.createdAt)}</span>
+                                                    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                                                        {isApproved && (
+                                                            <span
+                                                                title={`Approved ${formatDateTime(w.approvedAt!)}`}
+                                                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#4CAF6E]/10 text-[#7DDA9D] border border-[#4CAF6E]/30"
+                                                            >
+                                                                Approved
+                                                            </span>
+                                                        )}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={busy || !canApprove}
+                                                            onClick={() => toggleWaitlistApproval(w.id, !isApproved)}
+                                                            title={canApprove
+                                                                ? (isApproved ? 'Revoke approval' : 'Approve this signup')
+                                                                : 'Anonymous signup — needs a user id to approve'}
+                                                            className={`gap-1.5 h-7 px-2 text-[11px] ${isApproved
+                                                                ? 'border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD]'
+                                                                : 'border-[#4CAF6E]/40 bg-[#4CAF6E]/10 hover:bg-[#4CAF6E]/20 text-[#7DDA9D]'}`}
+                                                        >
+                                                            {busy ? (
+                                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                            ) : isApproved ? (
+                                                                <X className="w-3 h-3" />
+                                                            ) : (
+                                                                <Check className="w-3 h-3" />
+                                                            )}
+                                                            {isApproved ? 'Revoke' : 'Approve'}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             );

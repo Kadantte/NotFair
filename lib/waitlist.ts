@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
 
@@ -106,6 +106,29 @@ export async function hasJoinedWaitlist(key: WaitlistKey): Promise<boolean> {
       and(
         eq(schema.waitlistSignups.key, key),
         eq(schema.waitlistSignups.userId, session.userId),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
+/**
+ * Has the current session been manually approved off the waitlist for
+ * `key`? Approved users bypass the waitlist wall and can use the gated
+ * feature. Approval is granted from /dev/waitlist.
+ */
+export async function isWaitlistApproved(key: WaitlistKey): Promise<boolean> {
+  const session = await getSession();
+  if (!session.connected || !session.userId) return false;
+
+  const [row] = await db()
+    .select({ id: schema.waitlistSignups.id })
+    .from(schema.waitlistSignups)
+    .where(
+      and(
+        eq(schema.waitlistSignups.key, key),
+        eq(schema.waitlistSignups.userId, session.userId),
+        isNotNull(schema.waitlistSignups.approvedAt),
       ),
     )
     .limit(1);

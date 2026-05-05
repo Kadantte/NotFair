@@ -105,10 +105,4 @@ export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(COOKIE_NAMES.impersonate);
   response.cookies.delete(COOKIE_NAMES.profile);
   response.cookies.delete(COOKIE_NAMES.activePlatform);
-  // Dev-only preview-state cookies that should never persist across a
-  // sign-out / sign-in boundary. The gates that read these cookies already
-  // require an active dev session, so leaving them set after sign-out only
-  // creates surprise on the next dev sign-in (e.g. dev forgets they had
-  // the Meta waitlist wall toggled on for a previous preview session).
-  response.cookies.delete("dev_meta_waitlist_override");
 }

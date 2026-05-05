@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { isMetaWaitlistWallEnabled } from "@/lib/meta-waitlist";
-import { hasJoinedWaitlist } from "@/lib/waitlist";
+import { hasJoinedWaitlist, isWaitlistApproved } from "@/lib/waitlist";
 import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
 import { MetaWaitlistWall } from "@/components/meta-waitlist";
 
@@ -21,9 +20,9 @@ export default async function AddMetaAdsAccountPagePath() {
   }
 
   // Meta App Review is pending — block the connect/manage UX behind a
-  // join-waitlist wall for everyone except devs who've toggled the wall
-  // off in /dev (Developer Options → "Meta waitlist wall").
-  if (await isMetaWaitlistWallEnabled()) {
+  // join-waitlist wall. Approved users (granted from /dev/waitlist) bypass
+  // the wall and can use the connect/manage UX.
+  if (!(await isWaitlistApproved("meta_ads"))) {
     const joined = await hasJoinedWaitlist("meta_ads");
     return <MetaWaitlistWall initialJoined={joined} source="meta_ads_page" />;
   }

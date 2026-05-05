@@ -641,4 +641,7 @@ export const waitlistSignups = pgTable("waitlist_signups", {
   /** Free-form context: source page, plan tier, referral, etc. */
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  /** When set, this signup has been manually approved from /dev/waitlist
+   * and the user bypasses the waitlist wall for `key`. */
+  approvedAt: timestamp("approved_at"),
 });
