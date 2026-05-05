@@ -60,6 +60,40 @@ describe("buildAdsHost bootstrap surface", () => {
     expect(out.keys).toContain("changeEvents");
   });
 
+  it("exposes a canonical auditPack with the important factual surfaces", async () => {
+    const { host, bootstrap } = buildAdsHost(STUB_AUTH, "1234567890");
+    const r = await runScriptInSandbox({
+      code: `
+        const pack = ads.queries.auditPack("2026-01-01", "2026-01-31");
+        return {
+          count: pack.length,
+          names: pack.map(q => q.name),
+          searchTermsQuery: pack.find(q => q.name === "searchTerms").query,
+          changeEventsQuery: pack.find(q => q.name === "changeEvents").query,
+        };
+      `,
+      host,
+      bootstrap,
+    });
+
+    expect(r.ok).toBe(true);
+    const out = r.result as { count: number; names: string[]; searchTermsQuery: string; changeEventsQuery: string };
+    expect(out.count).toBe(20);
+    expect(out.names).toEqual(expect.arrayContaining([
+      "campaigns",
+      "searchTerms",
+      "ads",
+      "conversionActions",
+      "campaignAssets",
+      "sharedNegativeKeywordLists",
+      "pausedCampaigns",
+      "customerManagerLinks",
+      "changeEvents",
+    ]));
+    expect(out.searchTermsQuery).toContain("FROM search_term_view");
+    expect(out.changeEventsQuery).toContain("FROM change_event");
+  });
+
   it("exposes pure helpers that behave identically to the host versions", async () => {
     const { host, bootstrap } = buildAdsHost(STUB_AUTH, "1234567890");
     const r = await runScriptInSandbox({

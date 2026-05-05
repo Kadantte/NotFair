@@ -10,6 +10,18 @@ exports[`audit queries > queryAccountInfo — matches snapshot 1`] = `
     "
 `;
 
+exports[`audit queries > queryAdGroupAssets — matches snapshot 1`] = `
+"
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name, ad_group.status,
+        ad_group_asset.field_type
+      FROM ad_group_asset
+      WHERE campaign.status = 'ENABLED'
+        AND ad_group.status != 'REMOVED'
+    "
+`;
+
 exports[`audit queries > queryAdGroups — LIMIT 1000 1`] = `
 "
       SELECT
@@ -87,7 +99,7 @@ exports[`audit queries > queryCampaigns — substitutes date range 1`] = `
     "
 `;
 
-exports[`audit queries > queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 10000 1`] = `
+exports[`audit queries > queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 500 1`] = `
 "
       SELECT
         change_event.change_date_time,
@@ -103,7 +115,7 @@ exports[`audit queries > queryChangeEvents — uses >= / <= (BETWEEN not support
       WHERE change_event.change_date_time >= '2026-01-01 00:00:00'
         AND change_event.change_date_time <= '2026-01-30 23:59:59'
       ORDER BY change_event.change_date_time DESC
-      LIMIT 10000
+      LIMIT 500
     "
 `;
 
@@ -136,6 +148,18 @@ exports[`audit queries > queryConvertingSearchTerms — LIMIT 500, conversions >
         AND metrics.conversions > 0
       ORDER BY metrics.conversions DESC
       LIMIT 500
+    "
+`;
+
+exports[`audit queries > queryCustomerManagerLinks — exposes manager access 1`] = `
+"
+      SELECT
+        customer_manager_link.manager_customer,
+        customer_manager_link.manager_link_id,
+        customer_manager_link.status
+      FROM customer_manager_link
+      WHERE customer_manager_link.status != 'REMOVED'
+      LIMIT 100
     "
 `;
 
@@ -236,6 +260,19 @@ exports[`audit queries > queryNetworkSegmentation — date range 1`] = `
     "
 `;
 
+exports[`audit queries > queryPausedCampaigns — exposes paused campaigns 1`] = `
+"
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        campaign.advertising_channel_type, campaign.bidding_strategy_type,
+        campaign_budget.amount_micros
+      FROM campaign
+      WHERE campaign.status = 'PAUSED'
+      ORDER BY campaign.name ASC
+      LIMIT 500
+    "
+`;
+
 exports[`audit queries > queryQualityScores — matches snapshot 1`] = `
 "
       SELECT
@@ -265,6 +302,30 @@ exports[`audit queries > querySearchTerms — date range + LIMIT 2000 1`] = `
         AND campaign.status = 'ENABLED'
       ORDER BY metrics.cost_micros DESC
       LIMIT 2000
+    "
+`;
+
+exports[`audit queries > querySharedNegativeKeywordLists — filters shared negative lists 1`] = `
+"
+      SELECT
+        shared_set.id, shared_set.name, shared_set.type,
+        shared_set.member_count, shared_set.status
+      FROM shared_set
+      WHERE shared_set.type = 'NEGATIVE_KEYWORDS'
+        AND shared_set.status != 'REMOVED'
+      ORDER BY shared_set.name ASC
+    "
+`;
+
+exports[`audit queries > querySharedNegativeKeywordMembers — reads shared negative keywords 1`] = `
+"
+      SELECT
+        shared_set.id, shared_set.name, shared_set.status,
+        shared_criterion.keyword.text,
+        shared_criterion.keyword.match_type
+      FROM shared_criterion
+      WHERE shared_set.type = 'NEGATIVE_KEYWORDS'
+        AND shared_set.status != 'REMOVED'
     "
 `;
 

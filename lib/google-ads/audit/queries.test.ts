@@ -16,6 +16,11 @@ import {
   queryNegativeKeywords,
   queryNetworkSegmentation,
   queryCampaignAssets,
+  queryAdGroupAssets,
+  querySharedNegativeKeywordLists,
+  querySharedNegativeKeywordMembers,
+  queryPausedCampaigns,
+  queryCustomerManagerLinks,
   queryLandingPages,
   queryChangeEvents,
   queryDailyCampaignMetrics,
@@ -105,19 +110,48 @@ describe("audit queries", () => {
     expect(queryCampaignAssets()).toMatchSnapshot();
   });
 
+  it("queryAdGroupAssets — matches snapshot", () => {
+    expect(queryAdGroupAssets()).toMatchSnapshot();
+  });
+
+  it("querySharedNegativeKeywordLists — filters shared negative lists", () => {
+    const q = querySharedNegativeKeywordLists();
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("shared_set.type = 'NEGATIVE_KEYWORDS'");
+  });
+
+  it("querySharedNegativeKeywordMembers — reads shared negative keywords", () => {
+    const q = querySharedNegativeKeywordMembers();
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("FROM shared_criterion");
+  });
+
+  it("queryPausedCampaigns — exposes paused campaigns", () => {
+    const q = queryPausedCampaigns();
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("campaign.status = 'PAUSED'");
+  });
+
+  it("queryCustomerManagerLinks — exposes manager access", () => {
+    const q = queryCustomerManagerLinks();
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("FROM customer_manager_link");
+  });
+
   it("queryLandingPages — LIMIT 200", () => {
     const q = queryLandingPages("2026-01-01", "2026-01-30");
     expect(q).toMatchSnapshot();
     expect(q).toContain("LIMIT 200");
   });
 
-  it("queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 10000", () => {
+  it("queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 500", () => {
     const q = queryChangeEvents("2026-01-01", "2026-01-30");
     expect(q).toMatchSnapshot();
     expect(q).toContain("change_event.change_date_time >= '2026-01-01 00:00:00'");
     expect(q).toContain("change_event.change_date_time <= '2026-01-30 23:59:59'");
     expect(q).toContain("ORDER BY change_event.change_date_time DESC");
-    expect(q).toContain("LIMIT 10000");
+    expect(q).toContain("LIMIT 500");
+    expect(q).not.toContain("LIMIT 10000");
     expect(q).not.toContain("BETWEEN");
   });
 

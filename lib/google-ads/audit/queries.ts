@@ -308,11 +308,78 @@ export function queryChangeEvents(start: string, end: string): string {
       WHERE change_event.change_date_time >= '${start} 00:00:00'
         AND change_event.change_date_time <= '${end} 23:59:59'
       ORDER BY change_event.change_date_time DESC
-      LIMIT 10000
+      LIMIT 500
     `;
 }
 
-/** Q18: Per-day per-campaign metrics for pre/post-change splits. */
+
+/** Q18: Ad group assets / extensions. */
+export function queryAdGroupAssets(): string {
+  return `
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        ad_group.id, ad_group.name, ad_group.status,
+        ad_group_asset.field_type
+      FROM ad_group_asset
+      WHERE campaign.status = 'ENABLED'
+        AND ad_group.status != 'REMOVED'
+    `;
+}
+
+/** Q19: Shared negative keyword lists. */
+export function querySharedNegativeKeywordLists(): string {
+  return `
+      SELECT
+        shared_set.id, shared_set.name, shared_set.type,
+        shared_set.member_count, shared_set.status
+      FROM shared_set
+      WHERE shared_set.type = 'NEGATIVE_KEYWORDS'
+        AND shared_set.status != 'REMOVED'
+      ORDER BY shared_set.name ASC
+    `;
+}
+
+/** Q20: Members of shared negative keyword lists. */
+export function querySharedNegativeKeywordMembers(): string {
+  return `
+      SELECT
+        shared_set.id, shared_set.name, shared_set.status,
+        shared_criterion.keyword.text,
+        shared_criterion.keyword.match_type
+      FROM shared_criterion
+      WHERE shared_set.type = 'NEGATIVE_KEYWORDS'
+        AND shared_set.status != 'REMOVED'
+    `;
+}
+
+/** Q21: Paused/non-removed campaigns so stale cruft is visible in audits. */
+export function queryPausedCampaigns(): string {
+  return `
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        campaign.advertising_channel_type, campaign.bidding_strategy_type,
+        campaign_budget.amount_micros
+      FROM campaign
+      WHERE campaign.status = 'PAUSED'
+      ORDER BY campaign.name ASC
+      LIMIT 500
+    `;
+}
+
+/** Q22: Manager links visible from this customer. Useful for agency/access audits. */
+export function queryCustomerManagerLinks(): string {
+  return `
+      SELECT
+        customer_manager_link.manager_customer,
+        customer_manager_link.manager_link_id,
+        customer_manager_link.status
+      FROM customer_manager_link
+      WHERE customer_manager_link.status != 'REMOVED'
+      LIMIT 100
+    `;
+}
+
+/** Q23: Per-day per-campaign metrics for pre/post-change splits. */
 export function queryDailyCampaignMetrics(start: string, end: string): string {
   return `
       SELECT

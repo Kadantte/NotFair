@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { hasJoinedWaitlist, isWaitlistApproved } from "@/lib/waitlist";
+import { isMetaWaitlistWallEnabled } from "@/lib/meta-waitlist";
+import { hasJoinedWaitlist } from "@/lib/waitlist";
 import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
 import { MetaWaitlistWall } from "@/components/meta-waitlist";
 
@@ -17,14 +18,6 @@ export default async function AddMetaAdsAccountPagePath() {
   const session = await getSession();
   if (!session.connected) {
     redirect("/login?next=%2Fmanage-ads-accounts%2Fmeta-ads");
-  }
-
-  // Meta App Review is pending — block the connect/manage UX behind a
-  // join-waitlist wall. Approved users (granted from /dev/waitlist) bypass
-  // the wall and can use the connect/manage UX.
-  if (!(await isWaitlistApproved("meta_ads"))) {
-    const joined = await hasJoinedWaitlist("meta_ads");
-    return <MetaWaitlistWall initialJoined={joined} source="meta_ads_page" />;
   }
 
   const userId = session.userId;
@@ -86,6 +79,15 @@ export default async function AddMetaAdsAccountPagePath() {
           : null,
       };
     }
+  }
+
+  // Meta App Review is pending — block NEW connect flows behind a
+  // join-waitlist wall for everyone except devs who've toggled the wall
+  // off in /dev. Existing connected users must still reach manage/disconnect
+  // so they can revoke Meta tokens and invalidate issued MCP access.
+  if (!connection && await isMetaWaitlistWallEnabled()) {
+    const joined = await hasJoinedWaitlist("meta_ads");
+    return <MetaWaitlistWall initialJoined={joined} source="meta_ads_page" />;
   }
 
   return <AddMetaAdsAccountPage initialConnection={connection} />;

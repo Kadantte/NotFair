@@ -75,7 +75,7 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
   // ─── Change History (NotFair-originated) ─────────────────────────
 
   server.registerTool("getChanges", {
-    description: "Recent changes made to the account via NotFair. Each change has a changeId usable with undoChange. Reads NotFair's internal change log (Postgres), not Google's change_event API — for Google-side edits use runScript with `SELECT ... FROM change_event`.",
+    description: "Recent changes made to the account via NotFair. Each change has a changeId usable with undoChange. Also returns derived `changeGroups` that group atomic write rows into likely user-intent episodes by requestId/scope/time so agents don't misread bulk edits as isolated one-offs. Reads NotFair's internal change log (Postgres), not Google's change_event API — for Google-side edits use runScript with `SELECT ... FROM change_event`.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().optional(),

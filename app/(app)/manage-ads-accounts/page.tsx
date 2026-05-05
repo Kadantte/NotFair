@@ -96,7 +96,7 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
   const metaHref = hasMeta
     ? "/manage-ads-accounts/meta-ads"
     : `/api/oauth/meta/start?next=${encodeURIComponent(next ?? "/manage-ads-accounts/meta-ads")}`;
-  const metaCard = metaWallEnabled ? (
+  const metaCard = metaWallEnabled && !hasMeta ? (
     <MetaWaitlistCard initialJoined={metaWaitlistJoined} source="hub" />
   ) : (
     <PlatformCard

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Loader2, RefreshCw, Unplug, AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
 
@@ -66,6 +66,11 @@ export function AddMetaAdsAccountPage({
             onConnectionChange={setConnection}
             onReauthorize={handleConnect}
           />
+          <DisconnectCard
+            disabled={updating}
+            setError={setError}
+            onDisconnected={() => setConnection(null)}
+          />
           <div className="mt-6 rounded-2xl border border-[#3D3C36] bg-[#24231F] p-5">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
@@ -84,97 +89,9 @@ export function AddMetaAdsAccountPage({
               </Link>
             </div>
           </div>
-          <DisconnectCard
-            disabled={updating}
-            setError={setError}
-            onDisconnected={() => setConnection(null)}
-          />
         </>
       )}
     </ManageAdsAccountsShell>
-  );
-}
-
-function DisconnectCard({
-  disabled,
-  setError,
-  onDisconnected,
-}: {
-  disabled: boolean;
-  setError: (v: string | null) => void;
-  onDisconnected: () => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  const [pending, setPending] = useState(false);
-
-  const handleClick = useCallback(async () => {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/auth/disconnect-meta", {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body.error) {
-        setError(body.error_description ?? body.error ?? "Failed to disconnect");
-        return;
-      }
-      onDisconnected();
-      setConfirming(false);
-    } catch {
-      setError("Network error — please retry.");
-    } finally {
-      setPending(false);
-    }
-  }, [confirming, setError, onDisconnected]);
-
-  return (
-    <div className="mt-6 rounded-2xl border border-[#C45D4A]/30 bg-[#C45D4A]/[0.04] p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="shrink-0 rounded-md bg-[#C45D4A]/15 p-2">
-            <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#E8E4DD]">Disconnect Meta Ads</p>
-            <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
-              Removes the saved authorization, revokes the access token at Meta, and invalidates
-              any MCP tokens issued for this connection. Your historical NotFair data is kept;
-              you can reconnect any time.
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {confirming && !pending && (
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="h-9 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-            >
-              Cancel
-            </button>
-          )}
-          <Button
-            type="button"
-            onClick={handleClick}
-            disabled={disabled || pending}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#C45D4A] px-4 text-sm font-semibold text-[#E8E4DD] hover:bg-[#A84A3A] disabled:opacity-50"
-          >
-            {pending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Unplug className="h-4 w-4" />
-            )}
-            {confirming ? "Confirm disconnect" : "Disconnect"}
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -215,6 +132,11 @@ function NotConnected({ onConnect }: { onConnect: () => void }) {
             <MetaMonoIcon className="mr-2 h-4 w-4" />
             Connect Meta
           </Button>
+          <p className="mt-3 text-xs text-[#C4C0B6]/70">
+            Permissions requested: <code className="font-mono-jb">ads_management</code>,{" "}
+            <code className="font-mono-jb">ads_read</code>,{" "}
+            <code className="font-mono-jb">business_management</code>.
+          </p>
         </div>
       </div>
     </div>
@@ -432,6 +354,90 @@ function Connected({
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DisconnectCard({
+  disabled,
+  setError,
+  onDisconnected,
+}: {
+  disabled: boolean;
+  setError: (v: string | null) => void;
+  onDisconnected: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  const handleClick = useCallback(async () => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/disconnect-meta", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.error) {
+        setError(body.error_description ?? body.error ?? "Failed to disconnect");
+        return;
+      }
+      onDisconnected();
+      setConfirming(false);
+    } catch {
+      setError("Network error — please retry.");
+    } finally {
+      setPending(false);
+    }
+  }, [confirming, setError, onDisconnected]);
+
+  return (
+    <div className="mt-6 rounded-2xl border border-[#C45D4A]/30 bg-[#C45D4A]/[0.04] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="shrink-0 rounded-md bg-[#C45D4A]/15 p-2">
+            <AlertTriangle className="h-4 w-4 text-[#C45D4A]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[#E8E4DD]">Disconnect Meta Ads</p>
+            <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
+              Removes the saved authorization, revokes the access token at Meta, and invalidates
+              any MCP tokens issued for this connection. Your historical NotFair data is kept;
+              you can reconnect any time.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {confirming && !pending && (
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="h-9 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
+            >
+              Cancel
+            </button>
+          )}
+          <Button
+            type="button"
+            onClick={handleClick}
+            disabled={disabled || pending}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#C45D4A] px-4 text-sm font-semibold text-[#E8E4DD] hover:bg-[#A84A3A] disabled:opacity-50"
+          >
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Unplug className="h-4 w-4" />
+            )}
+            {confirming ? "Confirm disconnect" : "Disconnect"}
+          </Button>
+        </div>
       </div>
     </div>
   );

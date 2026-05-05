@@ -1671,12 +1671,44 @@ export function buildContinuationHint(
   return `${cause}${tail}`;
 }
 
+export type GaqlReportMeta = {
+  asOf: string;
+  customerId: string;
+  loginCustomerId: string | null;
+  resource: string | null;
+  dateRange: { start: string; end: string; source: "between" | "during"; days?: number } | null;
+  currencyCode: string | null;
+  timeZone: string | null;
+  selectedFieldCount: number;
+  requestedLimit: number;
+  effectiveLimit: number;
+  fetchedRowCount: number;
+  returnedRowCount: number;
+  truncated: boolean;
+  excludeRemovedParents: boolean;
+  reportingLagDays: number | null;
+  filters: {
+    campaignStatuses: { included: string[]; excluded: string[] };
+    adGroupStatuses: { included: string[]; excluded: string[] };
+    campaignTypes: { included: string[]; excluded: string[] };
+  };
+  dataCompleteness: {
+    rows: "complete" | "truncated";
+    searchTerms?: "privacy_threshold_limited";
+    changeEvents?: "last_30_days_only";
+    removedParents?: "excluded" | "included";
+    reportingLag?: "same_day_or_realtime" | "lagged" | "unknown";
+  };
+  warnings: string[];
+};
+
 export type GaqlReport = {
   rowCount: number;
   requestedLimit: number;
   fetchedRowCount: number;
   truncated: boolean;
   truncationReason: "row_limit" | "byte_budget" | null;
+  meta: GaqlReportMeta;
   summary?: GaqlSummary;
   continuationHint?: string;
   rows: unknown[];
@@ -1994,6 +2026,128 @@ export function clampChangeEventDateWindow(query: string, today: Date = new Date
   );
 }
 
+function buildGaqlReportMeta(args: {
+  auth: AuthContext;
+  query: string;
+  selectFields: string[];
+  effectiveLimit: number;
+  fetchedRowCount: number;
+  returnedRowCount: number;
+  truncated: boolean;
+  excludeRemovedParents: boolean;
+  rows: unknown[];
+}): GaqlReportMeta {
+  const resource = extractFromResource(args.query);
+  const dateRange = extractDateRangeMetadata(args.query);
+  const asOf = new Date();
+  const reportingLagDays = dateRange?.source === "between" ? reportingLagDaysFromEndDate(dateRange.end, asOf) : null;
+  const filters = {
+    campaignStatuses: extractEnumFilterMetadata(args.query, "campaign.status"),
+    adGroupStatuses: extractEnumFilterMetadata(args.query, "ad_group.status"),
+    campaignTypes: extractEnumFilterMetadata(args.query, "campaign.advertising_channel_type"),
+  };
+  const warnings: string[] = [];
+  if (args.truncated) warnings.push("Result set was truncated; use continuationHint or narrower filters before making exhaustive claims.");
+  if (resource === "search_term_view") warnings.push("Search term data can be limited by Google Ads privacy thresholds.");
+  if (resource === "change_event") warnings.push("change_event only exposes the last 30 days of Google-side changes.");
+  if (!dateRange && /\bmetrics\./i.test(args.query)) warnings.push("Metrics query has no explicit date range; confirm this is intentional.");
+  if (reportingLagDays !== null && reportingLagDays > 0) warnings.push(`Metrics end date is ${reportingLagDays} day${reportingLagDays === 1 ? "" : "s"} before asOf; call this out when interpreting recent performance.`);
+
+  return {
+    asOf: asOf.toISOString(),
+    customerId: args.auth.customerId,
+    loginCustomerId: args.auth.loginCustomerId ?? null,
+    resource,
+    dateRange,
+    currencyCode: inferNestedString(args.rows, ["customer", "currency_code"]),
+    timeZone: inferNestedString(args.rows, ["customer", "time_zone"]),
+    selectedFieldCount: args.selectFields.length,
+    requestedLimit: args.effectiveLimit,
+    effectiveLimit: args.effectiveLimit,
+    fetchedRowCount: args.fetchedRowCount,
+    returnedRowCount: args.returnedRowCount,
+    truncated: args.truncated,
+    excludeRemovedParents: args.excludeRemovedParents,
+    reportingLagDays,
+    filters,
+    dataCompleteness: {
+      rows: args.truncated ? "truncated" : "complete",
+      ...(resource === "search_term_view" ? { searchTerms: "privacy_threshold_limited" as const } : {}),
+      ...(resource === "change_event" ? { changeEvents: "last_30_days_only" as const } : {}),
+      removedParents: args.excludeRemovedParents ? "excluded" : "included",
+      reportingLag: reportingLagDays == null ? "unknown" : reportingLagDays <= 0 ? "same_day_or_realtime" : "lagged",
+    },
+    warnings,
+  };
+}
+
+function extractDateRangeMetadata(query: string): GaqlReportMeta["dateRange"] {
+  const between = query.match(/\bsegments\.date\s+BETWEEN\s+['"](\d{4}-\d{2}-\d{2})['"]\s+AND\s+['"](\d{4}-\d{2}-\d{2})['"]/i);
+  if (between) return { start: between[1], end: between[2], source: "between", days: daysBetweenIsoDates(between[1], between[2]) };
+
+  const changeEvent = query.match(/\bchange_event\.change_date_time\s*>=\s*['"](\d{4}-\d{2}-\d{2})[^'"]*['"][\s\S]*?\bchange_event\.change_date_time\s*<=\s*['"](\d{4}-\d{2}-\d{2})/i);
+  if (changeEvent) return { start: changeEvent[1], end: changeEvent[2], source: "between", days: daysBetweenIsoDates(changeEvent[1], changeEvent[2]) };
+
+  const during = query.match(/\bsegments\.date\s+DURING\s+([A-Z0-9_]+)/i);
+  if (during) return { start: during[1], end: during[1], source: "during" };
+  return null;
+}
+
+function extractEnumFilterMetadata(
+  query: string,
+  field: string,
+): { included: string[]; excluded: string[] } {
+  const whereMatch = query.match(/\sWHERE\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i);
+  const whereClause = whereMatch?.[1] ?? "";
+  const escaped = field.replace(/\./g, "\\.");
+  const included = new Set<string>();
+  const excluded = new Set<string>();
+
+  const comparison = new RegExp(String.raw`\b${escaped}\s*(=|!=|<>)\s*['"]?([A-Z_]+)['"]?`, "gi");
+  for (const match of whereClause.matchAll(comparison)) {
+    const target = match[1] === "=" ? included : excluded;
+    target.add(match[2].toUpperCase());
+  }
+
+  const listComparison = new RegExp(String.raw`\b${escaped}\s*(NOT\s+IN|IN)\s*\(([^)]*)\)`, "gi");
+  for (const match of whereClause.matchAll(listComparison)) {
+    const target = /NOT\s+IN/i.test(match[1]) ? excluded : included;
+    const values = match[2].match(/[A-Z_]+/gi) ?? [];
+    for (const value of values) target.add(value.toUpperCase());
+  }
+
+  return { included: [...included], excluded: [...excluded] };
+}
+
+function reportingLagDaysFromEndDate(end: string, asOf: Date): number | null {
+  const endDate = new Date(`${end}T00:00:00Z`);
+  if (Number.isNaN(endDate.getTime())) return null;
+  const asOfDate = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()));
+  return Math.max(0, Math.round((asOfDate.getTime() - endDate.getTime()) / 86_400_000));
+}
+
+function inferNestedString(rows: unknown[], path: string[]): string | null {
+  for (const row of rows) {
+    let cursor: unknown = row;
+    for (const key of path) {
+      if (typeof cursor !== "object" || cursor === null || !(key in cursor)) {
+        cursor = undefined;
+        break;
+      }
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    if (typeof cursor === "string" && cursor.length > 0) return cursor;
+  }
+  return null;
+}
+
+function daysBetweenIsoDates(start: string, end: string): number | undefined {
+  const startDate = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return undefined;
+  return Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
+}
+
 export async function runSafeGaqlReport(
   auth: AuthContext,
   rawQuery: string,
@@ -2091,6 +2245,17 @@ export async function runSafeGaqlReport(
       fetchedRowCount: fetched.length,
       truncated,
       truncationReason: reason,
+      meta: buildGaqlReportMeta({
+        auth,
+        query,
+        selectFields,
+        effectiveLimit,
+        fetchedRowCount: fetched.length,
+        returnedRowCount: rowsOut.length,
+        truncated,
+        excludeRemovedParents: options.excludeRemovedParents ?? DEFAULT_EXCLUDE_REMOVED_PARENTS,
+        rows: fetched,
+      }),
       ...(summary ? { summary } : {}),
       ...(hint ? { continuationHint: hint } : {}),
       rows: rowsOut,

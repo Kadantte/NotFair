@@ -38,13 +38,16 @@ Async RPCs:
 - options.excludeRemovedParents defaults to true. Rows under REMOVED campaigns/ad groups are filtered out server-side because most audits need current serving state. Pass \`{ excludeRemovedParents: false }\` only for historical analysis.
 
 Pre-built GAQL strings (sync, no RPC cost):
-- Parameterless: ads.queries.accountInfo | geoTargeting | qualityScores | adGroups | conversionActions | audienceSegmentCheck | negativeKeywords | campaignAssets
+- Parameterless: ads.queries.accountInfo | geoTargeting | qualityScores | adGroups | conversionActions | audienceSegmentCheck | negativeKeywords | campaignAssets | adGroupAssets | sharedNegativeKeywordLists | sharedNegativeKeywordMembers | pausedCampaigns | customerManagerLinks
 - Date-windowed builders (call with YYYY-MM-DD): ads.queries.campaigns(start,end) | keywords | searchTerms | convertingSearchTerms | zeroConversionKeywords | ads | devicePerformance | networkSegmentation | landingPages | changeEvents | dailyCampaignMetrics
+- Canonical audit pack: ads.queries.auditPack(start,end) -> 20 named queries covering setup, campaigns, keywords, search terms, ads/assets, negatives, conversion actions, paused campaigns, manager links, and recent Google-side change events. Prefer this for account audits instead of hand-selecting a narrow subset.
 
 Sync helpers: ads.helpers.getDateRange(days), formatDate, micros, toMicros, normalizeCustomerId, daysBetween, extractChangedFields, generateBrandVariants
 Constants: ads.constants.RESOURCE_CHANGE_OP, CHANGE_RESOURCE_TYPE, CHANGE_CLIENT_TYPE (numeric enum → label maps)
 
-── HUMANIZED RESPONSES (every gaql/gaqlParallel row) ──
+── HUMANIZED RESPONSES + REPORT METADATA ──
+
+Every GaqlReport includes meta: asOf, resource, dateRange/days, currencyCode/timeZone when selected, reportingLagDays, row limits/truncation, removed-parent behavior, campaign/ad-group status filters, campaign type filters, and data-completeness warnings. Read meta before making freshness/exhaustiveness claims.
 
 Rows are augmented post-fetch so you can read the LLM-friendly form directly:
 - Enum integer fields get a sibling \`<field>_name\` (canonical Google Ads enum name). Read \`bidding_strategy_type_name === "MAXIMIZE_CONVERSIONS"\`, not the integer 10. Avoids the BiddingStrategyType landmines (10=MAX_CONVERSIONS, 11=MAX_CONVERSION_VALUE, 9=TARGET_SPEND/MaxClicks, 15=TARGET_IMPRESSION_SHARE).
@@ -75,19 +78,9 @@ Rules: top-level await works; no fetch/require/process/fs; return value must be 
 ── CANONICAL AUDIT (one call, wide net, filter in-script) ──
 
   const { start, end } = ads.helpers.getDateRange(30);
-  const r = await ads.gaqlParallel([
-    { name: "acct",  query: ads.queries.accountInfo },
-    { name: "camps", query: ads.queries.campaigns(start, end) },
-    { name: "kws",   query: ads.queries.keywords(start, end), limit: 500 },
-    { name: "st",    query: ads.queries.searchTerms(start, end), limit: 500 },
-    { name: "zero",  query: ads.queries.zeroConversionKeywords(start, end) },
-    { name: "lp",    query: ads.queries.landingPages(start, end) },
-    { name: "qs",    query: ads.queries.qualityScores },
-    { name: "ads",   query: ads.queries.ads(start, end) },
-    { name: "neg",   query: ads.queries.negativeKeywords },
-    { name: "chg",   query: ads.queries.changeEvents(start, end), limit: 200 },
-  ]);
-  const worstCampaigns = (r.camps.rows ?? [])
+  const r = await ads.gaqlParallel(ads.queries.auditPack(start, end));
+  // Inspect r.campaigns.meta / r.searchTerms.meta for freshness, filters, and truncation before concluding.
+  const worstCampaigns = (r.campaigns.rows ?? [])
     .map(c => ({
       name: c.campaign.name,
       spend: c.metrics.cost_micros / 1e6,
@@ -95,7 +88,7 @@ Rules: top-level await works; no fetch/require/process/fs; return value must be 
       convRate: c.metrics.conversions / (c.metrics.clicks || 1),
     }))
     .sort((a, b) => b.cpa - a.cpa).slice(0, 5);
-  const topZeroConvKws = (r.zero.rows ?? []).slice(0, 10).map(k => ({
+  const topZeroConvKws = (r.zeroConversionKeywords.rows ?? []).slice(0, 10).map(k => ({
     text: k.ad_group_criterion.keyword.text,
     spend: k.metrics.cost_micros / 1e6,
   }));

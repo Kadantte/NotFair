@@ -379,9 +379,47 @@ export async function getChanges(
       .where(and(...conditions)),
   ]);
 
+  let changeGroups = buildChangeGroups(rows);
+  const requestIdsOnPage = Array.from(new Set(changeGroups.flatMap((group) => group.requestIds)));
+  const requestCounts = requestIdsOnPage.length === 0
+    ? []
+    : await db()
+      .select({ requestId: schema.operations.requestId, count: sql<number>`count(*)::int` })
+      .from(schema.operations)
+      .where(and(...conditions, inArray(schema.operations.requestId, requestIdsOnPage)))
+      .groupBy(schema.operations.requestId);
+  const totalByRequestId = new Map(
+    requestCounts
+      .filter((row): row is { requestId: string; count: number } => typeof row.requestId === "string")
+      .map((row) => [row.requestId, Number(row.count)]),
+  );
+  changeGroups = changeGroups.map((group) => {
+    const totalOperationCount = group.requestIds.length === 0
+      ? group.operationCount
+      : group.requestIds.reduce((sum, requestId) => sum + (totalByRequestId.get(requestId) ?? 0), 0) || group.operationCount;
+    const pageOperationCount = group.operationCount;
+    const id = group.grouping === "request" && group.requestIds.length === 1
+      ? `cg_request_${group.requestIds[0]}`
+      : group.id;
+    return {
+      ...group,
+      id,
+      pageOperationCount,
+      totalOperationCount,
+      partial: totalOperationCount > pageOperationCount,
+    };
+  });
+
+  const changeGroupByOperationId = new Map<number, string>();
+  for (const group of changeGroups) {
+    for (const operationId of group.operationIds) changeGroupByOperationId.set(operationId, group.id);
+  }
+
   return {
+    changeGroups,
     items: rows.map((row) => ({
       id: row.id,
+      changeGroupId: changeGroupByOperationId.get(row.id) ?? `change_${row.id}`,
       action: resolveToolLabel(row),
       entityType: CODE_TO_ENTITY[row.entityCode ?? ENTITY_CODE.unknown] ?? "unknown",
       entityId: row.entityId ?? "",
@@ -394,6 +432,216 @@ export async function getChanges(
     })),
     total: Number(countResult[0]?.count ?? 0),
   };
+}
+
+// ─── Change Grouping (derived, no new schema) ───────────────────────
+
+type OperationRow = typeof schema.operations.$inferSelect;
+
+export type ChangeGroup = {
+  id: string;
+  summary: string;
+  theme: string;
+  actionFamily: string;
+  startedAt: Date;
+  endedAt: Date;
+  /** Number of operations visible in this getChanges page. */
+  pageOperationCount: number;
+  /** Total operations known for request-backed groups across all pages. */
+  totalOperationCount: number;
+  /** True when this page only contains part of the user-intent episode. */
+  partial: boolean;
+  operationCount: number;
+  operationIds: number[];
+  requestIds: string[];
+  campaignIds: string[];
+  scope: string;
+  grouping: "request" | "heuristic";
+  sampleLabels: string[];
+};
+
+const CHANGE_GROUP_GAP_MS = 10 * 60 * 1000;
+
+export function buildChangeGroups(rows: OperationRow[]): ChangeGroup[] {
+  if (rows.length === 0) return [];
+
+  const sorted = [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const groups: Array<{
+    rows: OperationRow[];
+    family: string;
+    scope: string;
+    grouping: "request" | "heuristic";
+  }> = [];
+
+  for (const row of sorted) {
+    const family = actionFamily(resolveToolLabel(row));
+    const scope = operationScope(row);
+    const requestId = row.requestId ?? null;
+
+    let group = requestId
+      ? groups.find((candidate) => candidate.rows.some((r) => r.requestId === requestId))
+      : null;
+
+    // requestId is authoritative: never merge a new request into a heuristic
+    // episode just because the write happened nearby, and never let a later
+    // untagged write get absorbed into a request-backed group.
+    if (!group && requestId) {
+      group = { rows: [], family, scope, grouping: "request" };
+      groups.push(group);
+    }
+
+    if (!group) {
+      group = [...groups]
+        .reverse()
+        .find((candidate) => {
+          if (candidate.grouping === "request") return false;
+          const last = candidate.rows.at(-1);
+          if (!last || last.requestId) return false;
+          const gapMs = row.createdAt.getTime() - last.createdAt.getTime();
+          return (
+            gapMs >= 0 &&
+            gapMs <= CHANGE_GROUP_GAP_MS &&
+            candidate.family === family &&
+            candidate.scope === scope &&
+            (row.userId ?? "") === (last.userId ?? "") &&
+            (row.sessionId ?? null) === (last.sessionId ?? null) &&
+            (row.clientSource ?? "") === (last.clientSource ?? "")
+          );
+        }) ?? null;
+    }
+
+    if (!group) {
+      group = { rows: [], family, scope, grouping: "heuristic" };
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+
+  return groups
+    .map((group) => serializeChangeGroup(group.rows, group.family, group.scope, group.grouping))
+    .sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime());
+}
+
+function serializeChangeGroup(
+  rows: OperationRow[],
+  family: string,
+  scope: string,
+  grouping: "request" | "heuristic",
+): ChangeGroup {
+  const first = rows[0];
+  const last = rows.at(-1) ?? first;
+  const labels = rows.map((row) => row.label).filter((value): value is string => !!value);
+  const sampleLabels = Array.from(new Set(labels)).slice(0, 5);
+  const campaignIds = Array.from(new Set(rows.map((row) => row.campaignId).filter((value): value is string => !!value)));
+  const requestIds = Array.from(new Set(rows.map((row) => row.requestId).filter((value): value is string => !!value)));
+  const families = Array.from(new Set(rows.map((row) => actionFamily(resolveToolLabel(row)))));
+  const scopes = Array.from(new Set(rows.map(operationScope)));
+  const effectiveFamily = families.length === 1 ? family : "mixed";
+  const effectiveScope = scopes.length === 1 ? scope : "multi_scope";
+
+  return {
+    id: `cg_${first.id}_${last.id}_${rows.length}`,
+    summary: summarizeChangeGroup(effectiveFamily, rows, sampleLabels),
+    theme: themeForFamily(effectiveFamily),
+    actionFamily: effectiveFamily,
+    startedAt: first.createdAt,
+    endedAt: last.createdAt,
+    pageOperationCount: rows.length,
+    totalOperationCount: rows.length,
+    partial: false,
+    operationCount: rows.length,
+    operationIds: rows.map((row) => row.id),
+    requestIds,
+    campaignIds,
+    scope: effectiveScope,
+    grouping,
+    sampleLabels,
+  };
+}
+
+function actionFamily(action: string) {
+  const normalized = action.replace(/[_\s-]/g, "").toLowerCase();
+  if (normalized.includes("remove") && (normalized.includes("negative") || normalized.includes("keywordfromnegativelist"))) return "remove_negative_keyword";
+  if (normalized.includes("negative") || normalized.includes("keywordtonegativelist")) return "negative_keyword";
+  if (normalized.includes("bulkpausekeywords") || normalized.includes("pausekeyword")) return "pause_keyword";
+  if (normalized.includes("bulkaddkeywords") || normalized.includes("addkeyword")) return "add_keyword";
+  if (normalized.includes("bulkupdatebids") || normalized.includes("updatebid")) return "bid_update";
+  if (normalized.includes("budget")) return "budget_change";
+  if (normalized.includes("bidding")) return "bidding_change";
+  if (normalized.includes("conversionaction")) return "conversion_tracking";
+  if (normalized.includes("trackingtemplate")) return "tracking_template";
+  if (normalized.includes("adassets") || normalized.includes("adfinalurl") || normalized.includes("createad") || normalized.includes("pausead") || normalized.includes("enablead")) return "ad_creative";
+  if (normalized.includes("campaignsettings") || normalized.includes("campaignlanguages") || normalized.includes("campaigngoals")) return "campaign_settings";
+  if (normalized.includes("experiment")) return "experiment";
+  if (normalized.includes("campaign")) return "campaign_change";
+  if (normalized.includes("adgroup")) return "ad_group_change";
+  return normalized || "other";
+}
+
+function themeForFamily(family: string) {
+  switch (family) {
+    case "negative_keyword":
+    case "remove_negative_keyword": return "search_intent_hygiene";
+    case "pause_keyword": return "waste_reduction";
+    case "add_keyword": return "keyword_expansion";
+    case "bid_update": return "bid_management";
+    case "budget_change": return "budget_allocation";
+    case "bidding_change": return "bidding_strategy";
+    case "conversion_tracking": return "measurement";
+    case "tracking_template": return "tracking";
+    case "ad_creative": return "creative_quality";
+    case "campaign_settings": return "campaign_configuration";
+    case "experiment": return "experimentation";
+    case "mixed": return "multi_action_change";
+    default: return "account_change";
+  }
+}
+
+function summarizeChangeGroup(family: string, rows: OperationRow[], sampleLabels: string[]) {
+  const count = rows.length;
+  const plural = count === 1 ? "" : "s";
+  const sample = sampleLabels.length > 0 ? ` (e.g. ${sampleLabels.slice(0, 3).join(", ")})` : "";
+  switch (family) {
+    case "negative_keyword": return `Added/updated ${count} negative keyword operation${plural}${sample}`;
+    case "remove_negative_keyword": return `Removed ${count} negative keyword/list operation${plural}${sample}`;
+    case "pause_keyword": return `Paused ${count} keyword${plural}${sample}`;
+    case "add_keyword": return `Added ${count} keyword${plural}${sample}`;
+    case "bid_update": return `Updated ${count} keyword bid${plural}`;
+    case "budget_change": return `Changed ${count} campaign budget${plural}`;
+    case "bidding_change": return `Changed ${count} bidding strategy setting${plural}`;
+    case "conversion_tracking": return `Changed ${count} conversion action${plural}`;
+    case "tracking_template": return `Changed ${count} tracking template setting${plural}`;
+    case "ad_creative": return `Changed ${count} ad/creative item${plural}`;
+    case "campaign_settings": return `Changed ${count} campaign setting${plural}`;
+    case "experiment": return `Changed ${count} experiment item${plural}`;
+    case "mixed": return `Made ${count} operations in one request${sample}`;
+    default: return `Made ${count} ${family} operation${plural}${sample}`;
+  }
+}
+
+function operationScope(row: OperationRow) {
+  const args = isRecord(row.args) ? row.args : {};
+  const keys = [
+    "sharedSetId",
+    "campaignId",
+    "adGroupId",
+    "assetGroupId",
+    "biddingStrategyId",
+    "conversionActionId",
+    "experimentResourceName",
+    "level",
+  ];
+  const parts = keys
+    .map((key) => [key, args[key]] as const)
+    .filter(([, value]) => typeof value === "string" && value.length > 0)
+    .map(([key, value]) => `${key}:${value}`);
+  if (parts.length > 0) return parts.join("|");
+  if (row.campaignId) return `campaignId:${row.campaignId}`;
+  return "account";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // ─── Impact Attribution ─────────────────────────────────────────────

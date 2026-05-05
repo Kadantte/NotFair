@@ -25,6 +25,11 @@ import {
   queryNegativeKeywords,
   queryNetworkSegmentation,
   queryCampaignAssets,
+  queryAdGroupAssets,
+  querySharedNegativeKeywordLists,
+  querySharedNegativeKeywordMembers,
+  queryPausedCampaigns,
+  queryCustomerManagerLinks,
   queryLandingPages,
   queryChangeEvents,
   queryDailyCampaignMetrics,
@@ -187,6 +192,11 @@ function buildBootstrap(): string {
     audienceSegmentCheck: queryAudienceSegmentCheck(),
     negativeKeywords: queryNegativeKeywords(),
     campaignAssets: queryCampaignAssets(),
+    adGroupAssets: queryAdGroupAssets(),
+    sharedNegativeKeywordLists: querySharedNegativeKeywordLists(),
+    sharedNegativeKeywordMembers: querySharedNegativeKeywordMembers(),
+    pausedCampaigns: queryPausedCampaigns(),
+    customerManagerLinks: queryCustomerManagerLinks(),
   };
 
   // Date-parameterized query builders serialize their source so the sandbox
@@ -242,6 +252,34 @@ function buildBootstrap(): string {
       for (const [k, src] of Object.entries(windowedSources)) {
         ads.queries[k] = (0, eval)("(" + src + ")");
       }
+
+      // Canonical wide-net query pack for account audits. It is intentionally
+      // factual rather than opinionated: agents still synthesize the answer,
+      // but the important surfaces are hard to forget. Usage:
+      //   const { start, end } = ads.helpers.getDateRange(90);
+      //   const r = await ads.gaqlParallel(ads.queries.auditPack(start, end));
+      ads.queries.auditPack = (start, end) => [
+        { name: "acct", query: ads.queries.accountInfo, limit: 1 },
+        { name: "campaigns", query: ads.queries.campaigns(start, end), limit: 500 },
+        { name: "keywords", query: ads.queries.keywords(start, end), limit: 2000 },
+        { name: "searchTerms", query: ads.queries.searchTerms(start, end), limit: 2000 },
+        { name: "convertingSearchTerms", query: ads.queries.convertingSearchTerms(start, end), limit: 500 },
+        { name: "zeroConversionKeywords", query: ads.queries.zeroConversionKeywords(start, end), limit: 500 },
+        { name: "qualityScores", query: ads.queries.qualityScores, limit: 2000 },
+        { name: "ads", query: ads.queries.ads(start, end), limit: 1000 },
+        { name: "adGroups", query: ads.queries.adGroups, limit: 1000 },
+        { name: "conversionActions", query: ads.queries.conversionActions, limit: 500 },
+        { name: "negativeKeywords", query: ads.queries.negativeKeywords, limit: 1000 },
+        { name: "sharedNegativeKeywordLists", query: ads.queries.sharedNegativeKeywordLists, limit: 100 },
+        { name: "sharedNegativeKeywordMembers", query: ads.queries.sharedNegativeKeywordMembers, limit: 2000 },
+        { name: "campaignAssets", query: ads.queries.campaignAssets, limit: 1000 },
+        { name: "adGroupAssets", query: ads.queries.adGroupAssets, limit: 1000 },
+        { name: "networkSegmentation", query: ads.queries.networkSegmentation(start, end), limit: 1000 },
+        { name: "landingPages", query: ads.queries.landingPages(start, end), limit: 500 },
+        { name: "pausedCampaigns", query: ads.queries.pausedCampaigns, limit: 500 },
+        { name: "customerManagerLinks", query: ads.queries.customerManagerLinks, limit: 100 },
+        { name: "changeEvents", query: ads.queries.changeEvents(start, end), limit: 500 },
+      ];
       Object.freeze(ads.queries);
 
       // Static enum maps from the change_event resource. Inverse lookups

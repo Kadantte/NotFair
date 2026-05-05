@@ -3,6 +3,21 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.5.0] - 2026-05-04
+
+### Added
+- **Operations history now groups related writes into change groups.** `getChanges` returns derived `changeGroups` with request-aware IDs, page vs total operation counts, partial-page detection, campaign scope, themes, and per-operation `changeGroupId` values without adding a new table.
+- **Audit and code-mode GAQL reports now include safer metadata.** `runScript` results expose query resource, date range, selected-field count, truncation state, status filters, currency/time zone hints, reporting lag, and privacy/completeness warnings so agents can explain data limits correctly.
+- **Canonical audit packs now inspect more account surfaces.** Audits include ad group assets, shared negative keyword lists and members, paused campaigns, and manager links.
+
+### Changed
+- **Meta Ads waitlist gating now preserves connected-user account management.** Existing Meta-connected users can still manage or disconnect their integration while new connection flows remain behind the waitlist wall. Devs can preview the wall from `/dev`.
+
+### Fixed
+- **Meta OAuth start now enforces the waitlist server-side.** Direct visits to `/api/oauth/meta/start` no longer bypass the wall for unapproved, unconnected users; existing connections can still reauthorize.
+- **Audit change-event queries now respect the advertised 500-row cap.** The canonical audit pack no longer accidentally requests 10,000 Google-side change events.
+
+
 ## [0.3.4.5] - 2026-05-04
 
 ### Fixed

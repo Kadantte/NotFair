@@ -461,6 +461,44 @@ describe("runSafeGaqlReport limit + truncation", () => {
     expect(result.continuationHint).toBeUndefined();
   });
 
+  it("returns a self-describing metadata envelope", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        customer: { currency_code: "USD", time_zone: "America/Los_Angeles" },
+        campaign: { id: "1" },
+        metrics: { clicks: 5 },
+      },
+    ]);
+
+    const result = await runSafeGaqlReport(
+      auth,
+      "SELECT customer.currency_code, customer.time_zone, campaign.id, metrics.clicks FROM campaign WHERE segments.date BETWEEN '2026-04-01' AND '2026-04-30'",
+      10,
+    );
+
+    expect(result.meta).toMatchObject({
+      customerId: "130-126-5570",
+      loginCustomerId: null,
+      resource: "campaign",
+      currencyCode: "USD",
+      timeZone: "America/Los_Angeles",
+      dateRange: { start: "2026-04-01", end: "2026-04-30", source: "between", days: 30 },
+      returnedRowCount: 1,
+      fetchedRowCount: 1,
+      truncated: false,
+      excludeRemovedParents: true,
+      filters: {
+        campaignStatuses: { included: [], excluded: ["REMOVED"] },
+        adGroupStatuses: { included: [], excluded: [] },
+        campaignTypes: { included: [], excluded: [] },
+      },
+      dataCompleteness: { rows: "complete", removedParents: "excluded", reportingLag: "lagged" },
+    });
+    expect(result.meta.reportingLagDays).toEqual(expect.any(Number));
+    expect(result.meta.asOf).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.meta.selectedFieldCount).toBeGreaterThanOrEqual(4);
+  });
+
   it("marks truncated and slices rows when fetched > limit", async () => {
     const rows = Array.from({ length: 11 }, (_, i) => ({
       campaign: { id: String(i) },
