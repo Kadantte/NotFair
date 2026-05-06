@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Languages } from "lucide-react";
+import type { MouseEvent } from "react";
 import { localeLabels, locales, type AppLocale } from "@/i18n/locales";
 import { persistLocalePreference } from "@/i18n/locale-preference";
 
@@ -44,6 +45,12 @@ export function LanguageSwitcher({ className = "", mode = "links" }: LanguageSwi
     window.location.assign(`${canonicalPathname}${window.location.search}${window.location.hash}`);
   }
 
+  function switchHomeLocale(event: MouseEvent<HTMLAnchorElement>, nextLocale: AppLocale) {
+    event.preventDefault();
+    persistLocalePreference(nextLocale);
+    window.location.assign(`${getLocalizedHomeHref(nextLocale)}${window.location.search}${window.location.hash}`);
+  }
+
   return (
     <div className={`group relative ${className}`}>
       <button
@@ -79,9 +86,9 @@ export function LanguageSwitcher({ className = "", mode = "links" }: LanguageSwi
             <Link
               key={entry}
               href={getLocalizedHomeHref(entry)}
-              prefetch
+              prefetch={false}
               aria-current={active ? "page" : undefined}
-              onClick={() => persistLocalePreference(entry)}
+              onClick={(event) => switchHomeLocale(event, entry)}
               className={className}
             >
               {localeLabels[entry]}

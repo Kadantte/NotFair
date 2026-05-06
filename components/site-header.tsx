@@ -46,14 +46,14 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                 {/* Left: brand + nav */}
                 <div className="flex items-center gap-8">
                     <Link href="/" className="flex items-center">
-                        <BrandLockup size="md" />
+                        <BrandLockup size="sm" />
                     </Link>
                 </div>
 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
                     <NavLink href="/mcp" label="MCP" className="hidden sm:inline" />
-                    <NavLink href="/google-ads-claude-connector-setup-guide" label={t("setupGuide")} className="hidden lg:inline" />
+                    <NavLink href="/google-ads-claude-connector-setup-guide" label={t("setupGuideShort")} className="hidden xl:inline" />
                     <SetupGuidesMenu className="hidden md:flex" />
                     <NavLink href="/pricing" label={t("pricing")} className="hidden sm:inline" />
                     <LanguageSwitcher className="hidden lg:block" />

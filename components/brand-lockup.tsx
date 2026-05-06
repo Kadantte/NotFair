@@ -23,7 +23,7 @@ export function BrandLockup({
 }) {
     const s = SIZES[size];
     return (
-        <span className={`inline-flex items-center ${s.gap} ${className}`}>
+        <span className={`inline-flex items-center ${s.gap} whitespace-nowrap ${className}`}>
             <Image
                 src="/notfiar_logo/notfair-mark-dark.svg"
                 alt={BRAND_NAME}
@@ -34,7 +34,7 @@ export function BrandLockup({
                 style={{ height: s.mark }}
             />
             <span aria-hidden="true" className={`w-px ${s.divider} ${dividerClassName}`} />
-            <span className={`${s.text} font-sans font-black tracking-tighter ${textClassName} ${s.stroke}`}>
+            <span className={`${s.text} font-sans font-black tracking-tighter whitespace-nowrap ${textClassName} ${s.stroke}`}>
                 Not Fair
             </span>
         </span>

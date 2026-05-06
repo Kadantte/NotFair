@@ -2,6 +2,14 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.11.2] - 2026-05-06
+
+### Fixed
+- **Language switching now lands on the selected language.** Choosing English or another language from the homepage switcher no longer gets redirected to a different localized route after locale prefetches.
+
+### Changed
+- **Localized homepage navigation is less crowded.** The header uses a shorter setup label and a compact brand lockup so translated navigation stays readable at desktop widths.
+
 ## [0.3.11.1] - 2026-05-06
 
 ### Fixed

@@ -5,6 +5,7 @@
   },
   "Header": {
     "setupGuide": "Guide de configuration Claude Connector pour Google Ads",
+    "setupGuideShort": "Configurer Claude",
     "pricing": "Tarifs",
     "bookDemo": "Reserver une demo",
     "startNow": "Commencer"
