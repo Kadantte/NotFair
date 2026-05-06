@@ -98,6 +98,25 @@ export async function loadMessages(threadId: string) {
     .orderBy(schema.chatMessages.createdAt);
 }
 
+/**
+ * Ownership-gated message read. Returns null when the thread doesn't exist
+ * or doesn't belong to userId — callers map that to 404 / empty hydration.
+ */
+export async function loadMessagesIfOwned(threadId: string, userId: string) {
+  const [thread] = await db()
+    .select({ id: schema.chatThreads.id })
+    .from(schema.chatThreads)
+    .where(
+      and(
+        eq(schema.chatThreads.id, threadId),
+        eq(schema.chatThreads.userId, userId),
+      ),
+    )
+    .limit(1);
+  if (!thread) return null;
+  return loadMessages(threadId);
+}
+
 export async function saveMessage(msg: {
   id: string;
   threadId: string;

@@ -2,6 +2,15 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.9.2] - 2026-05-06
+
+### Changed
+- **Clicking Chat now opens a fresh thread instead of resuming the most recent one.** Prior threads stay accessible from the sidebar; the default is a clean slate.
+- **Empty chat state matches Claude's UX.** Welcome heading, composer, and prompt suggestions are vertically centered when there are no messages, instead of pinning the input to the bottom of an empty viewport.
+
+### Fixed
+- **Faster chat opens.** Replaced the `/chat` redirect's thread-list DB lookup with a direct redirect, and converted the thread page to a server component that pre-loads messages server-side — eliminates two cold client-side fetches (`/api/auth/session` and `/api/chat/threads/[id]/messages`) on every chat open.
+
 ## [0.3.9.1] - 2026-05-06
 
 ### Fixed

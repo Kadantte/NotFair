@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { loadMessages } from "@/lib/db/chat";
-import { db, schema } from "@/lib/db";
-import { and, eq } from "drizzle-orm";
+import { loadMessagesIfOwned } from "@/lib/db/chat";
 
 export async function GET(
   _request: Request,
@@ -18,23 +16,9 @@ export async function GET(
   }
 
   const { threadId } = await params;
-
-  // Verify thread belongs to this user
-  const [thread] = await db()
-    .select({ id: schema.chatThreads.id })
-    .from(schema.chatThreads)
-    .where(
-      and(
-        eq(schema.chatThreads.id, threadId),
-        eq(schema.chatThreads.userId, userId),
-      ),
-    )
-    .limit(1);
-
-  if (!thread) {
+  const messages = await loadMessagesIfOwned(threadId, userId);
+  if (messages === null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
-  const messages = await loadMessages(threadId);
   return NextResponse.json({ messages });
 }
