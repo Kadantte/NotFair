@@ -15,6 +15,12 @@ All notable changes to NotFair will be documented in this file.
 ### Added
 - **The `/dev/customers` dashboard is easier to scan at scale.** Dev users can now search customers by email, user id, account id/name, currency, country, and attribution fields, with results paginated in fixed 50-customer pages.
 
+### Fixed
+- **`runScript` now auto-promotes non-date `segments.*` predicate fields into SELECT.** GAQL queries that filter on segments such as `segments.conversion_action_category` no longer fail with Google’s “field must also be selected” footgun; date segments stay unselected to preserve metric granularity.
+
+### Changed
+- **`ads.gaqlParallel` now fails the call when any subquery errors unless `partial: true` is explicitly requested.** This prevents dashboards and audit scripts from accidentally treating partial result maps as successful complete runs.
+
 ## [0.3.11.2] - 2026-05-06
 
 ### Fixed

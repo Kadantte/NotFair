@@ -315,13 +315,26 @@ describe("runSafeGaqlReport validation", () => {
     ).rejects.toThrow(/forbidden/);
   });
 
-  it("rejects non-date segment filters that are missing from SELECT", async () => {
-    await expect(
-      runSafeGaqlReport(
-        auth,
-        "SELECT metrics.conversions FROM customer WHERE segments.conversion_action = 'customers/123/conversionActions/456'",
-      ),
-    ).rejects.toThrow(/segments\.conversion_action/);
+  it("auto-adds non-date segment filters that are missing from SELECT", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT metrics.conversions FROM customer WHERE segments.conversion_action = 'customers/123/conversionActions/456'",
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    expect(selectClause).toMatch(/\bsegments\.conversion_action\b/);
+  });
+
+  it("auto-adds non-date segment filters from HAVING", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id, metrics.conversions FROM campaign HAVING segments.conversion_action_category = 'LEAD'",
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    expect(selectClause).toMatch(/\bsegments\.conversion_action_category\b/);
   });
 
   it("allows date filters without selecting segments.date", async () => {

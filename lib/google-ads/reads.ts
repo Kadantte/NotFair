@@ -2218,7 +2218,7 @@ export async function runSafeGaqlReport(
     throw new Error("The query contains forbidden keywords.");
   }
 
-  validateSegmentsInWhereAreSelected(query);
+  query = promoteSegmentsInFiltersToSelect(query);
   validateChangeEventFilter(query);
   validateMetricsOnConversionAction(query);
   validateEnumLiteralsInWhere(query);
@@ -2318,10 +2318,38 @@ export async function runSafeGaqlReport(
   return response;
 }
 
-function validateSegmentsInWhereAreSelected(query: string) {
+function addFieldsToSelect(query: string, fieldsToAdd: string[]): string {
+  if (fieldsToAdd.length === 0) return query;
+  const selectMatch = query.match(/^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\s+)/i);
+  if (!selectMatch) return query;
+
+  const selected = new Set(
+    selectMatch[2]
+      .split(",")
+      .map((field) => field.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const missing = fieldsToAdd.filter((field) => !selected.has(field.toLowerCase()));
+  if (missing.length === 0) return query;
+
+  const [full, prefix, fields, suffix] = selectMatch;
+  const merged = `${fields.trimEnd().replace(/,\s*$/, "")}, ${missing.join(", ")}`;
+  return query.replace(full, `${prefix}${merged}${suffix}`);
+}
+
+/**
+ * Google Ads requires most `segments.*` fields used in predicates to also be
+ * present in SELECT (query_error=16). That is a GAQL footgun, not a useful
+ * caller contract, so promote those segment fields automatically instead of
+ * forcing agents to retry.
+ *
+ * Date/time period segments are intentionally exempt: Google allows them as
+ * filters without selecting them, and selecting them would change metric
+ * granularity by splitting rows by date/week/month.
+ */
+export function promoteSegmentsInFiltersToSelect(query: string): string {
   const selectMatch = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i);
-  const whereMatch = query.match(/\sWHERE\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i);
-  if (!selectMatch || !whereMatch) return;
+  if (!selectMatch) return query;
 
   const selected = new Set(
     selectMatch[1]
@@ -2331,19 +2359,21 @@ function validateSegmentsInWhereAreSelected(query: string) {
   );
   const missing = new Set<string>();
   const segmentRegex = /\bsegments\.[a-z_]+\b/gi;
-  for (const match of whereMatch[1].matchAll(segmentRegex)) {
-    const field = match[0].toLowerCase();
-    if (SEGMENT_WHERE_SELECT_EXEMPTIONS.has(field)) continue;
-    if (!selected.has(field)) missing.add(field);
+
+  const predicateClauses = [
+    query.match(/\sWHERE\s+([\s\S]*?)(?:\sHAVING\s|\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i)?.[1],
+    query.match(/\sHAVING\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i)?.[1],
+  ].filter((clause): clause is string => typeof clause === "string");
+
+  for (const clause of predicateClauses) {
+    for (const match of clause.matchAll(segmentRegex)) {
+      const field = match[0].toLowerCase();
+      if (SEGMENT_WHERE_SELECT_EXEMPTIONS.has(field)) continue;
+      if (!selected.has(field)) missing.add(field);
+    }
   }
 
-  if (missing.size > 0) {
-    const fields = [...missing].sort();
-    throw new Error(
-      `GAQL segment filter must also be selected: ${fields.join(", ")}. ` +
-      `Add ${fields.join(", ")} to the SELECT clause or remove it from WHERE.`,
-    );
-  }
+  return addFieldsToSelect(query, [...missing].sort());
 }
 
 function applyRemovedParentFilters(query: string): string {
@@ -2376,12 +2406,7 @@ function applyRemovedParentFilters(query: string): string {
 
   let result = query;
   if (selectFieldsToAdd.length > 0) {
-    const selectMatch = result.match(/^(\s*SELECT\s+)([\s\S]+?)(\s+FROM\s+)/i);
-    if (selectMatch) {
-      const [full, prefix, fields, suffix] = selectMatch;
-      const merged = `${fields.trimEnd().replace(/,\s*$/, "")}, ${selectFieldsToAdd.join(", ")}`;
-      result = result.replace(full, `${prefix}${merged}${suffix}`);
-    }
+    result = addFieldsToSelect(result, selectFieldsToAdd);
   }
 
   const insertionPoint = findTrailingClauseIndex(result);

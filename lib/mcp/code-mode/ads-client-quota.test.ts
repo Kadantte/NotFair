@@ -246,7 +246,7 @@ describe("runScript op counting", () => {
       expect(mockExecRead).not.toHaveBeenCalled();
     });
 
-    it("per-task errors do NOT short-circuit: remaining tasks still run, total op count unchanged", async () => {
+    it("fails the whole gaqlParallel call by default when any task errors, after dispatching all tasks", async () => {
       // Task 2 (index 1) will fail at the RPC layer; others succeed.
       let call = 0;
       mockExecRead.mockImplementation(
@@ -258,7 +258,25 @@ describe("runScript op counting", () => {
       );
       const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
 
-      const out = (await host.ads.gaqlParallel(makeQueries(5))) as Record<string, unknown>;
+      await expect(host.ads.gaqlParallel(makeQueries(5))).rejects.toThrow(
+        /ads\.gaqlParallel failed \(1\/5 query\): RPC boom/,
+      );
+
+      expect(mockExecRead).toHaveBeenCalledTimes(5);
+    });
+
+    it("keeps per-task errors soft when partial=true", async () => {
+      let call = 0;
+      mockExecRead.mockImplementation(
+        async (_a: unknown, _t: unknown, _n: unknown, fn: () => Promise<unknown>) => {
+          call += 1;
+          if (call === 2) throw new Error("RPC boom");
+          return fn();
+        },
+      );
+      const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
+
+      const out = (await host.ads.gaqlParallel(makeQueries(5), { partial: true })) as Record<string, unknown>;
 
       expect(mockExecRead).toHaveBeenCalledTimes(5);
       expect(out.q1).toEqual({ error: "RPC boom" });
@@ -306,7 +324,7 @@ describe("runScript op counting", () => {
       expect(mockExecRead).toHaveBeenCalledTimes(5);
     });
 
-    it("non-RateLimit per-task errors stay soft (script gets { error } for those, others still succeed)", async () => {
+    it("non-RateLimit per-task errors fail the call by default", async () => {
       mockEnforceRateLimit.mockResolvedValue(undefined);
       let call = 0;
       mockExecRead.mockImplementation(
@@ -318,14 +336,11 @@ describe("runScript op counting", () => {
       );
       const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
 
-      const out = (await host.ads.gaqlParallel(makeQueries(5))) as Record<
-        string,
-        unknown
-      >;
+      await expect(host.ads.gaqlParallel(makeQueries(5))).rejects.toThrow(
+        /ads\.gaqlParallel failed \(1\/5 query\): bad GAQL syntax/,
+      );
 
       expect(mockExecRead).toHaveBeenCalledTimes(5);
-      expect(out.q2).toEqual({ error: "bad GAQL syntax" });
-      expect(out.q0).toEqual({ rows: [] });
     });
 
     it("labels runSafeGaqlReport failures with the gaqlParallel query name", async () => {
@@ -335,18 +350,17 @@ describe("runScript op counting", () => {
         .mockResolvedValueOnce({ rows: [] });
       const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
 
-      const out = (await host.ads.gaqlParallel([
-        { name: "campaigns", query: "SELECT campaign.id FROM campaign" },
-        { name: "conversionActions", query: "SELECT metrics.conversions FROM conversion_action" },
-        { name: "keywords", query: "SELECT ad_group_criterion.criterion_id FROM keyword_view" },
-      ])) as Record<string, unknown>;
+      await expect(
+        host.ads.gaqlParallel([
+          { name: "campaigns", query: "SELECT campaign.id FROM campaign" },
+          { name: "conversionActions", query: "SELECT metrics.conversions FROM conversion_action" },
+          { name: "keywords", query: "SELECT ad_group_criterion.criterion_id FROM keyword_view" },
+        ]),
+      ).rejects.toThrow(
+        'ads.gaqlParallel failed (1/3 query): gaqlParallel query "conversionActions" failed: bad field',
+      );
 
       expect(mockExecRead).toHaveBeenCalledTimes(3);
-      expect(out.conversionActions).toEqual({
-        error: 'gaqlParallel query "conversionActions" failed: bad field',
-      });
-      expect(out.campaigns).toEqual({ rows: [] });
-      expect(out.keywords).toEqual({ rows: [] });
     });
 
     it("passes options through unchanged to each task's runSafeGaqlReport", async () => {
@@ -373,6 +387,22 @@ describe("runScript op counting", () => {
         STUB_AUTH,
         "SELECT ad_group.id FROM ad_group",
         200, // default
+        { excludeRemovedParents: false },
+      );
+    });
+
+    it("uses partial=true only for gaqlParallel error handling, not GAQL execution options", async () => {
+      const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
+
+      await host.ads.gaqlParallel(
+        [{ name: "a", query: "SELECT campaign.id FROM campaign" }],
+        { partial: true, excludeRemovedParents: false },
+      );
+
+      expect(mockRunSafeGaqlReport).toHaveBeenCalledWith(
+        STUB_AUTH,
+        "SELECT campaign.id FROM campaign",
+        200,
         { excludeRemovedParents: false },
       );
     });

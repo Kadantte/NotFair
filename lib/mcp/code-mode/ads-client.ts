@@ -68,6 +68,10 @@ type GaqlOptions = {
   excludeRemovedParents?: boolean;
 };
 
+type GaqlParallelOptions = GaqlOptions & {
+  partial?: boolean;
+};
+
 /**
  * Build the host-side `ads` namespace exposed to scripts.
  *
@@ -94,7 +98,11 @@ export function buildAdsHost(
     const limit = isPlainObject(limitArg)
       ? DEFAULT_LIMIT
       : normalizeLimit(limitArg, DEFAULT_LIMIT, MAX_LIMIT);
-    const options = normalizeGaqlOptions(isPlainObject(limitArg) ? limitArg : optionsArg);
+    const rawOptions = normalizeGaqlOptions(isPlainObject(limitArg) ? limitArg : optionsArg);
+    if (rawOptions.partial != null) {
+      throw new Error("GAQL option `partial` only applies to ads.gaqlParallel().");
+    }
+    const options = gaqlExecutionOptions(rawOptions);
     const report = await execRead(auth, targetId, "run_script_gaql", () =>
       runSafeGaqlReport(auth, query, limit, options),
     );
@@ -109,7 +117,9 @@ export function buildAdsHost(
         "Example: await ads.gaqlParallel([{ name: 'campaigns', query: 'SELECT campaign.id FROM campaign', limit: 100 }])",
       );
     }
-    const options = normalizeGaqlOptions(optionsArg);
+    const rawOptions = normalizeGaqlOptions(optionsArg);
+    const partial = rawOptions.partial ?? false;
+    const options = gaqlExecutionOptions(rawOptions);
     if (queriesArg.length === 0) return {};
     if (queriesArg.length > MAX_PARALLEL_QUERIES) {
       throw new Error(
@@ -156,13 +166,25 @@ export function buildAdsHost(
 
     // If a task crossed the cap mid-fan-out (race between the pre-check above
     // and the per-task enforceRateLimit), surface the RateLimitError to the
-    // script instead of burying it in an { error } map. Other kinds of throws
-    // (bad GAQL, RPC flake) stay per-task so the script can still use the
-    // partial results.
+    // script instead of burying it in an { error } map.
     for (const r of results) {
       if (r.status === "rejected" && r.reason instanceof RateLimitError) {
         throw r.reason;
       }
+    }
+
+    const failures = results
+      .map((r, i) => ({ result: r, name: tasks[i].name }))
+      .filter((entry): entry is { result: PromiseRejectedResult; name: string } =>
+        entry.result.status === "rejected",
+      );
+    if (!partial && failures.length > 0) {
+      const messages = failures.map(({ result }) =>
+        result.reason instanceof Error ? result.reason.message : String(result.reason),
+      );
+      throw new Error(
+        `ads.gaqlParallel failed (${failures.length}/${tasks.length} quer${failures.length === 1 ? "y" : "ies"}): ${messages.join("; ")}`,
+      );
     }
 
     const out: Record<string, unknown> = {};
@@ -305,6 +327,14 @@ function buildBootstrap(): string {
   `;
 }
 
+function gaqlExecutionOptions(options: GaqlParallelOptions): GaqlOptions {
+  return {
+    ...(options.excludeRemovedParents != null
+      ? { excludeRemovedParents: options.excludeRemovedParents }
+      : {}),
+  };
+}
+
 function expectString(value: unknown, errMsg: string): string {
   if (typeof value !== "string" || value.length === 0) throw new Error(errMsg);
   return value;
@@ -317,7 +347,7 @@ function normalizeLimit(value: unknown, fallback: number, max: number): number {
   return Math.min(n, max);
 }
 
-function normalizeGaqlOptions(value: unknown): GaqlOptions {
+function normalizeGaqlOptions(value: unknown): GaqlParallelOptions {
   if (value == null) return {};
   if (typeof value !== "object" || Array.isArray(value)) {
     throw new Error(
@@ -325,12 +355,18 @@ function normalizeGaqlOptions(value: unknown): GaqlOptions {
     );
   }
   const raw = value as Record<string, unknown>;
-  const out: GaqlOptions = {};
+  const out: GaqlParallelOptions = {};
   if (raw.excludeRemovedParents != null) {
     if (typeof raw.excludeRemovedParents !== "boolean") {
       throw new Error("GAQL option `excludeRemovedParents` must be a boolean.");
     }
     out.excludeRemovedParents = raw.excludeRemovedParents;
+  }
+  if (raw.partial != null) {
+    if (typeof raw.partial !== "boolean") {
+      throw new Error("GAQL option `partial` must be a boolean.");
+    }
+    out.partial = raw.partial;
   }
   return out;
 }
