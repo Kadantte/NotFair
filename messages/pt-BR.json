@@ -169,7 +169,16 @@
     "pickGoogleAccountsBody": "Escolha as contas do Google Ads que o NotFair deve gerenciar.",
     "connectMcpTitle": "Conectar ao Google Ads MCP",
     "connectMcpBody": "Conecte Claude, Codex ou qualquer cliente MCP às suas contas do Google Ads.",
-    "connectMcpCta": "Conectar MCP"
+    "connectMcpCta": "Conectar MCP",
+    "disconnectGoogle": {
+      "title": "Desconectar Google Ads",
+      "body": "Remove a autorização salva, revoga o token no Google e encerra sua sessão no NotFair. Seus dados do Google Ads permanecem intactos; você pode reconectar a qualquer momento.",
+      "button": "Desconectar",
+      "confirm": "Confirmar desconexão",
+      "cancel": "Cancelar",
+      "failed": "Falha ao desconectar",
+      "networkError": "Erro de rede – tente novamente."
+    }
   },
   "UserMenu": {
     "account": "Conta",

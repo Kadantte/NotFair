@@ -6,6 +6,7 @@ import { getCurrentRefreshToken, getSession } from "@/lib/session";
 import { listConnectableAccounts } from "@/lib/google-ads";
 import { AccountSelector, type SelectableAccount } from "@/components/account-selector";
 import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
+import { DisconnectGoogleCard } from "@/components/disconnect-google-card";
 
 /**
  * Page for managing the user's Google ad-account selection.
@@ -83,6 +84,7 @@ export default async function AddGoogleAdsAccountPagePath() {
             {t("tryDifferentGoogle")}
           </Link>
         </div>
+        <DisconnectGoogleCard />
       </ManageAdsAccountsShell>
     );
   }
@@ -123,6 +125,7 @@ export default async function AddGoogleAdsAccountPagePath() {
           </div>
         </div>
       )}
+      <DisconnectGoogleCard />
     </ManageAdsAccountsShell>
   );
 }

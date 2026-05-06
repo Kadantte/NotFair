@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.10.1] - 2026-05-06
+
+### Added
+- **Disconnect Google Ads.** Users can now fully remove their Google Ads connection from NotFair via a Disconnect button on `/manage-ads-accounts/google-ads`. Revokes the OAuth grant at Google, deletes saved authorization and any issued MCP tokens, and signs the user out. Available on both the connected state and the no-Google-Ads-found empty state. Localized across all six locales.
+
 ## [0.3.10.0] - 2026-05-06
 
 ### Added
