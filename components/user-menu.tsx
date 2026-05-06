@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { CreditCard, LogOut } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,6 +53,7 @@ function titleCase(s: string): string {
 
 export function UserMenu() {
   const router = useRouter();
+  const t = useTranslations("UserMenu");
   const [session, setSession] = useState<SessionShape | null>(null);
   const [sub, setSub] = useState<SubscriptionShape | null>(null);
   const [loading, setLoading] = useState<null | "portal" | "signout">(null);
@@ -112,7 +114,7 @@ export function UserMenu() {
         <button
           type="button"
           suppressHydrationWarning
-          title={email ?? "Account"}
+          title={email ?? t("account")}
           className="flex h-9 w-9 items-center justify-center rounded-full text-[#C4C0B6] transition-all duration-200 ease-out hover:ring-2 hover:ring-[#E8E4DD]/15"
         >
           {picture && !imgFailed ? (
@@ -144,7 +146,7 @@ export function UserMenu() {
         {/* Profile header */}
         <div className="px-2 py-1.5">
           <p className="truncate text-[11px] font-mono uppercase tracking-wider text-[#C4C0B6]">
-            Signed in as
+            {t("signedInAs")}
           </p>
           {displayName && (
             <p className="mt-0.5 truncate text-[13px] font-semibold text-[#E8E4DD]">
@@ -169,7 +171,7 @@ export function UserMenu() {
           className="cursor-pointer text-[13px] text-[#E8E4DD] focus:bg-[#2E2D28] focus:text-[#E8E4DD]"
         >
           <CreditCard className="mr-2 h-4 w-4" />
-          {loading === "portal" ? "Opening portal…" : "Manage subscription"}
+          {loading === "portal" ? t("openingPortal") : t("manageSubscription")}
         </DropdownMenuItem>
 
         <DropdownMenuItem
@@ -181,7 +183,7 @@ export function UserMenu() {
           className="cursor-pointer text-[13px] text-[#E8E4DD] focus:bg-[#2E2D28] focus:text-[#E8E4DD]"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          {loading === "signout" ? "Signing out…" : "Sign out"}
+          {loading === "signout" ? t("signingOut") : t("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

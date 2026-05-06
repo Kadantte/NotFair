@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Plus } from 'lucide-react';
 import { trackEvent } from '@/lib/analytics';
@@ -35,6 +36,7 @@ type AccountData = {
 let cachedAccountData: AccountData | null = null;
 
 export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
+    const t = useTranslations('AccountSwitcher');
     const [data, setData] = useState<AccountData | null>(cachedAccountData);
     const [open, setOpen] = useState(false);
     const [switching, setSwitching] = useState(false);
@@ -76,7 +78,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
         data.activePlatform === 'meta_ads'
             ? data.metaAccounts.find((a) => a.id === data.activeMetaId)
             : data.googleAccounts.find((a) => a.id === data.activeGoogleId);
-    const displayName = activeAccount?.name || activeAccount?.id || 'Account';
+    const displayName = activeAccount?.name || activeAccount?.id || t('account');
 
     // Disable account switching during impersonation to prevent mutating the real user's session
     const canSwitch = !data.impersonating;
@@ -167,7 +169,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#C4C0B6] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
             >
                 <Plus className="h-4 w-4" />
-                <span>Add account</span>
+                <span>{t('addAccount')}</span>
             </Link>
         </>
     );
@@ -179,7 +181,7 @@ export function AccountSwitcher({ collapsed }: { collapsed: boolean }) {
                     type="button"
                     onClick={() => canSwitch && setOpen(!open)}
                     className={`flex h-10 w-10 items-center justify-center rounded-lg text-[#C4C0B6] transition hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${!canSwitch ? 'cursor-default opacity-60' : ''}`}
-                    title={data.impersonating ? `Viewing as ${displayName}` : displayName}
+                    title={data.impersonating ? t('viewingAs', { account: displayName }) : displayName}
                 >
                     <PlatformIcon platform={data.activePlatform} size={20} />
                 </button>

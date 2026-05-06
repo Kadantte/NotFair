@@ -1,0 +1,233 @@
+{
+  "LocaleSwitcher": {
+    "label": "ภาษา",
+    "current": "ภาษาปัจจุบัน"
+  },
+  "Header": {
+    "setupGuide": "คู่มือตั้งค่า Google Ads Claude Connector",
+    "pricing": "ราคา",
+    "bookDemo": "จองเดโม",
+    "startNow": "เริ่มเลย"
+  },
+  "Footer": {
+    "description": "วิเคราะห์และจัดการ Google Ads ด้วย AI สำหรับ Claude ค้นหาปัญหา ร่างการแก้ไข และอนุมัติทุกการเปลี่ยนแปลงก่อนใช้งานจริง",
+    "articles": "บทความ",
+    "company": "บริษัท",
+    "privacy": "นโยบายความเป็นส่วนตัว",
+    "terms": "เงื่อนไขการใช้บริการ",
+    "rights": "สงวนลิขสิทธิ์",
+    "setupGuideLinks": {
+      "googleAdsClaudeConnector": "คู่มือตั้งค่า Google Ads Claude Connector",
+      "googleAdsClaudeCode": "คู่มือตั้งค่า Google Ads Claude Code Plugin",
+      "googleAdsCodex": "คู่มือตั้งค่า Google Ads Codex MCP",
+      "googleAdsMcp": "เซิร์ฟเวอร์ MCP สำหรับ Google Ads (ทุกไคลเอนต์)",
+      "metaAdsClaudeConnector": "คู่มือตั้งค่า Meta Ads Claude Connector",
+      "metaAdsClaudeCode": "คู่มือตั้งค่า Meta Ads Claude Code Plugin",
+      "metaAdsCodex": "คู่มือตั้งค่า Meta Ads Codex MCP",
+      "metaAdsMcp": "เซิร์ฟเวอร์ MCP สำหรับ Meta Ads (ทุกไคลเอนต์)"
+    }
+  },
+  "CTA": {
+    "connecting": "กำลังเชื่อมต่อ...",
+    "connectGoogleAds": "เชื่อมต่อ Google Ads",
+    "runFreeAudit": "ตรวจฟรี",
+    "viewAudit": "ดูผลตรวจ"
+  },
+  "Home": {
+    "githubBanner": "วิเคราะห์และแก้ Google Ads จาก Claude - ทุกการเขียนต้องอนุมัติ และเปิดบน GitHub",
+    "eyebrow": "นักวางกลยุทธ์ Google Ads ด้วย AI + ชั้นปฏิบัติการ",
+    "headline": "หาให้เจอว่าอะไรผิด แล้วแก้จาก Claude",
+    "subhead": "NotFair ให้ Claude เข้าถึง Google Ads แบบสดเพื่อวิเคราะห์ปัญหา แนะนำวิธีแก้ และแก้แคมเปญหลังจากคุณอนุมัติเท่านั้น",
+    "trustItems": [
+      "วิเคราะห์ปัญหา",
+      "ร่างวิธีแก้",
+      "อนุมัติทุกการเขียน"
+    ],
+    "chat": {
+      "initialQuestion": "ทำไมต้นทุนลีดแพงขึ้น และควรแก้อะไร?",
+      "followUpQuestion": "ใช้ negative keywords และการแก้ไข keyword ที่อนุมัติแล้ว",
+      "intro": "ฉันจะตรวจ spend, search terms, โครงสร้าง และการเปลี่ยนแปลงล่าสุดก่อนแนะนำวิธีแก้",
+      "foundSummary": "พบ 3 ปัญหา และร่างรายการแก้ไขตามลำดับความสำคัญแล้ว",
+      "findingsTitle": "พบ {count} ปัญหาที่ควรแก้:",
+      "finding1": "34% ของ spend มาจากคำค้นหาที่ match กว้างเกินไป",
+      "finding2": "แนะนำ negative keywords 23 รายการเพื่อบล็อกการค้นหาที่ไม่เกี่ยวข้อง",
+      "finding3": "ควรแยก ad group 4 กลุ่มก่อนเพิ่มงบ",
+      "permission1": "NotFair ต้องการรัน",
+      "permission2": "เพื่อใช้ negatives 23 รายการ และแก้ keyword 80 รายการ",
+      "approve": "อนุมัติ",
+      "approveOnce": "อนุมัติครั้งเดียว",
+      "deny": "ปฏิเสธ",
+      "placeholder": "ถามว่าควรแก้อะไรต่อ",
+      "demo": "เดโม"
+    },
+    "engineTitle": "เครื่องมือการตลาดครบชุดอยู่ใน agent ของคุณ",
+    "engineBody": "วิเคราะห์ ตรวจบัญชี เขียนการเปลี่ยนแปลง และ undo - ทั้งหมดผ่าน MCP connection เดียวต่อบัญชีโฆษณา",
+    "highSpend": "ใช้จ่าย $50K+/เดือน?",
+    "letsTalk": "คุยกัน",
+    "faqLabel": "FAQ",
+    "answers": "{count} คำตอบ",
+    "faqTitle": "คำถามที่พบบ่อย",
+    "faq": [
+      {
+        "q": "NotFair จะเปลี่ยนบัญชีโดยไม่ขออนุมัติไหม?",
+        "a": "ไม่ NotFair อ่านบัญชีได้ แต่เครื่องมือที่เขียนข้อมูลจะแสดง diff ก่อนเสมอ คุณต้องยืนยันก่อนส่งไปยัง Google Ads และทุกการเปลี่ยนแปลงย้อนกลับได้ด้วย tool call เดียว"
+      },
+      {
+        "q": "ใช้กับ AI client อะไรได้บ้าง?",
+        "a": "ใช้ได้กับทุกอย่างที่รองรับ MCP Streamable HTTP transport เช่น Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex, Cursor, Cline, OpenClaw, Hermes Agent และ MCP client ที่คุณสร้างเอง URL server เหมือนกัน ต่างกันแค่ config ของแต่ละ client"
+      },
+      {
+        "q": "ต้องรู้ก่อนไหมว่าควรแก้อะไร?",
+        "a": "ไม่ต้อง เริ่มจากปัญหาธุรกิจ เช่น lead แพงขึ้น ROAS ลด หรือมีบางอย่างเปลี่ยนไป agent จะวิเคราะห์สาเหตุที่น่าจะเป็น จัดลำดับวิธีแก้ตาม spend ที่เสี่ยง และร่างการแก้แคมเปญให้อนุมัติ"
+      },
+      {
+        "q": "agent เปลี่ยนอะไรได้จริงบ้าง?",
+        "a": "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts และ reporting workflows บน Google Ads ทุกการเขียนต้องผ่านการอนุมัติและถูกบันทึกไว้"
+      },
+      {
+        "q": "การยืนยันตัวตนทำงานอย่างไร?",
+        "a": "ค่าเริ่มต้นคือ OAuth 2.0 พร้อม PKCE ซึ่ง Claude.ai และ Codex ทำให้อัตโนมัติ สำหรับ client ที่ไม่รองรับ OAuth ให้สร้าง Bearer token ที่ notfair.co/connect ไม่ว่าแบบไหน NotFair จะไม่ให้ LLM จัดการ credential โดยตรง"
+      },
+      {
+        "q": "มีแพ็กเกจฟรีไหม?",
+        "a": "มี เชื่อมต่อและตรวจ audit ได้ฟรี ไม่ต้องใช้บัตรเครดิต แพ็กเกจ Free ให้ใช้งานไม่จำกัด 7 วัน จากนั้นมี 300 MCP operations ต่อเดือนฟรีตลอดไป อัปเกรดเป็น Growth เมื่อ Claude กลายเป็น operator โฆษณาประจำวันของคุณ"
+      }
+    ],
+    "closingLabel": "ปิดท้าย",
+    "closingHeadline": "ไปหาให้เจอว่าอะไรผิด",
+    "legalPrefix": "เชื่อมต่อฟรี - เมื่อเชื่อมต่อ คุณยอมรับ",
+    "legalAnd": "และ"
+  },
+  "Connect": {
+    "headline": "เชื่อมต่อบัญชี Google Ads",
+    "body": "ลงชื่อเข้าใช้ด้วย Google เพื่อให้ NotFair ค้นหาบัญชีโฆษณาและเตรียมการตั้งค่า MCP ให้คุณ",
+    "signInWithGoogle": "ลงชื่อเข้าใช้ด้วย Google",
+    "oauthNote": "OAuth ช่วยให้ข้อมูลเข้าสู่ระบบไม่ถูกส่งให้ไคลเอนต์ AI",
+    "or": "หรือ",
+    "demoIntro": "อยากดูก่อนใช้งานจริงไหม เปิดพื้นที่เดโมแบบอ่านอย่างเดียวได้เลย",
+    "startingDemo": "กำลังเริ่มเดโม...",
+    "exploreDemo": "ลองใช้โหมดเดโม",
+    "demoNote": "ข้อมูลเดโมเป็นข้อมูลจำลองและปลอดภัยสำหรับการทดลองคลิก",
+    "authFailed": "ยืนยันตัวตนไม่สำเร็จ โปรดลองอีกครั้ง",
+    "demoFailed": "เริ่มโหมดเดโมไม่ได้ โปรดลองอีกครั้ง",
+    "helpAria": "จองความช่วยเหลือในการตั้งค่า",
+    "needHelp": "ต้องการความช่วยเหลือ?",
+    "error": {
+      "scopeHeadline": "ต้องให้สิทธิ์ Google Ads",
+      "scopeBody": "NotFair ไม่สามารถอ่านแคมเปญหรือแก้ไขได้หากไม่มีสิทธิ์ Google Ads เมื่อดำเนินการต่อ โปรดเปิดสิทธิ์นี้ไว้บนหน้าขออนุญาตของ Google",
+      "scopeHelper": "มองหาช่องอนุญาตสำหรับดู แก้ไข สร้าง และลบบัญชีและข้อมูล Google Ads หากปิดช่องนี้ NotFair จะมองไม่เห็นแคมเปญของคุณ",
+      "scopeCta": "ดำเนินการต่อและอนุญาต Google Ads",
+      "genericHeadline": "เราเชื่อมต่อบัญชีของคุณไม่สำเร็จ",
+      "genericBody": "มีบางอย่างผิดพลาด โปรดลองอีกครั้ง หากยังเกิดปัญหา ติดต่อเราได้",
+      "genericCta": "ลองอีกครั้งด้วย Google"
+    }
+  },
+  "AccountSelector": {
+    "headline": "เลือกบัญชีโฆษณา",
+    "body": "เลือกบัญชีที่ต้องการให้ NotFair จัดการ",
+    "directAccess": "เข้าถึงโดยตรง",
+    "saveFailed": "บันทึกการเลือกบัญชีไม่สำเร็จ",
+    "saving": "กำลังบันทึก...",
+    "connecting": "กำลังเชื่อมต่อ...",
+    "save": "บันทึก ({count})",
+    "connect": "เชื่อมต่อ {count}",
+    "selectAll": "เลือกทั้งหมด",
+    "clear": "ล้าง",
+    "selectedCount": "เลือก {selected} จาก {total}",
+    "viaManager": "ผ่านบัญชีผู้จัดการ",
+    "viaManagerLower": "ผ่าน {manager}",
+    "unsavedChanges": "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก"
+  },
+  "ManageAdsAccounts": {
+    "back": "กลับไปที่แพลตฟอร์ม",
+    "addGoogleTitle": "เพิ่มบัญชี Google Ads",
+    "addGoogleDescription": "เชื่อมต่อหรืออัปเดตบัญชี Google Ads ที่ NotFair สามารถจัดการได้",
+    "manageMetaTitle": "จัดการบัญชี Meta Ads",
+    "addMetaTitle": "เพิ่มบัญชี Meta Ads",
+    "addMetaDescription": "เชื่อมต่อ Meta Ads เมื่อบัญชีของคุณได้รับอนุมัติสำหรับเบต้า",
+    "firstHeadline": "เชื่อมต่อแพลตฟอร์มโฆษณาเพื่อดำเนินการต่อ",
+    "firstBody": "เลือกบัญชีโฆษณาที่ต้องการให้ NotFair จัดการ คุณเพิ่มบัญชีอื่นภายหลังได้",
+    "firstNote": "NotFair จะทำงานเฉพาะบัญชีที่คุณเลือกอย่างชัดเจนเท่านั้น",
+    "headline": "จัดการบัญชีโฆษณา",
+    "body": "เพิ่มแพลตฟอร์มและเลือกบัญชีโฆษณาที่ใช้งานได้ใน NotFair",
+    "thisGoogleAccount": "บัญชี Google นี้",
+    "noGoogleAccountWarning": "ไม่พบบัญชี Google Ads ภายใต้",
+    "switchGoogleAccount": "เปลี่ยนบัญชี Google",
+    "enumerationError": "ดึงรายการบัญชี Google Ads ไม่สำเร็จ",
+    "noGoogleHeadline": "ไม่มีบัญชี Google Ads ในตัวตนนี้",
+    "noGoogleBodyBefore": "บัญชี Google ที่คุณใช้เข้าสู่ระบบไม่มีบัญชี Google Ads ลองใช้ตัวตน Google อื่นที่มีสิทธิ์ Ads หรือสร้างบัญชี Google Ads ที่",
+    "noGoogleBodyAfter": " แล้วกลับมาใหม่",
+    "tryDifferentGoogle": "ลองใช้บัญชี Google อื่น",
+    "selectGoogleHeadline": "เลือกบัญชี Google Ads ของคุณ",
+    "manageGoogleHeadline": "จัดการบัญชี Google Ads",
+    "googleSelectorBody": "คุณต้องการจัดการบัญชี Google Ads ใดบ้าง?",
+    "pickGoogleAccountsBody": "เลือกบัญชี Google Ads ที่ต้องการให้ NotFair จัดการ",
+    "connectMcpTitle": "เชื่อมต่อกับ Google Ads MCP",
+    "connectMcpBody": "เชื่อม Claude, Codex หรือไคลเอนต์ MCP ใดๆ เข้ากับบัญชี Google Ads ของคุณ",
+    "connectMcpCta": "เชื่อมต่อ MCP"
+  },
+  "UserMenu": {
+    "account": "บัญชี",
+    "signedInAs": "ลงชื่อเข้าใช้เป็น",
+    "openingPortal": "กำลังเปิดพอร์ทัล...",
+    "manageSubscription": "จัดการสมาชิก",
+    "signingOut": "กำลังออกจากระบบ...",
+    "signOut": "ออกจากระบบ"
+  },
+  "AccountSwitcher": {
+    "account": "บัญชี",
+    "viewingAs": "กำลังดูเป็น {account}",
+    "addAccount": "เพิ่มบัญชี"
+  },
+  "AppNav": {
+    "connectMcp": "เชื่อมต่อ MCP",
+    "campaigns": "แคมเปญ",
+    "audit": "ตรวจสอบ",
+    "impactMonitor": "ติดตามผลกระทบ",
+    "operations": "ปฏิบัติการ",
+    "chat": "แชท",
+    "newChat": "แชทใหม่",
+    "usage": "การใช้งาน",
+    "upgrade": "อัปเกรด",
+    "pricing": "ราคา",
+    "joinDiscord": "เข้าร่วม Discord",
+    "home": "หน้าแรก",
+    "impact": "ผลกระทบ",
+    "free": "ฟรี",
+    "notAvailableForPlatform": "ไม่พร้อมใช้กับแพลตฟอร์มที่เลือก",
+    "trialEndsTodayAria": "สิทธิ์ใช้งานไม่จำกัดสิ้นสุดวันนี้ - อัปเกรดเพื่อใช้งานต่อ",
+    "trialDaysLeftAria": "สิทธิ์ใช้งานไม่จำกัดเหลือ {days} วัน - อัปเกรดเพื่อใช้งานต่อ",
+    "trialEndsToday": "สิทธิ์ใช้งานไม่จำกัดสิ้นสุดวันนี้",
+    "trialDaysLeft": "สิทธิ์ใช้งานไม่จำกัดเหลือ {days} วัน",
+    "monthlyCapReachedAria": "ถึงขีดจำกัดฟรีรายเดือนแล้ว - อัปเกรดเป็น Growth เพื่อใช้งานไม่จำกัด",
+    "monthlyCapReached": "ถึงขีดจำกัดฟรีรายเดือนแล้ว - อัปเกรดเพื่อใช้งานไม่จำกัด",
+    "monthlyLimitNearAria": "ใกล้ถึงขีดจำกัดฟรีรายเดือน - อัปเกรดเป็น Growth",
+    "monthlyLimitNear": "ใกล้ถึงขีดจำกัดรายเดือน - อัปเกรดเพื่อใช้งานไม่จำกัด",
+    "trialEndingSoonAria": "ทดลองใช้ฟรีใกล้สิ้นสุด - อัปเกรดเป็น Growth",
+    "freeTrialEndsToday": "ทดลองใช้ฟรีสิ้นสุดวันนี้ - อัปเกรดเพื่อใช้งานไม่จำกัดต่อ",
+    "freeTrialDaysLeft": "ทดลองใช้ฟรีเหลือ {days} วัน - อัปเกรดเพื่อใช้งานไม่จำกัดต่อ",
+    "capReachedShort": "ถึงขีดจำกัด - อัปเกรด",
+    "monthlyLimitNearShort": "ใกล้ถึงขีดจำกัด - อัปเกรด",
+    "freeTrialEndsTodayShort": "ทดลองใช้สิ้นสุดวันนี้ - อัปเกรด",
+    "freeTrialDaysLeftShort": "ทดลองใช้เหลือ {days} วัน - อัปเกรด",
+    "trialEndsTodayShort": "ทดลองใช้สิ้นสุดวันนี้ - อัปเกรด",
+    "trialDaysLeftShort": "เหลือ {days} วัน - อัปเกรด"
+  },
+  "Login": {
+    "headline": "ลงชื่อเข้าใช้ {brand}",
+    "subhead": "จัดการ Google Ads ด้วย AI",
+    "signInWithGoogle": "ลงชื่อเข้าใช้ด้วย Google",
+    "or": "หรือ",
+    "sendMagicLink": "ส่งลิงก์เข้าสู่ระบบ",
+    "emailHelp": "เราจะส่งลิงก์เข้าสู่ระบบไปยังอีเมลของคุณ ไม่ต้องใช้รหัสผ่าน",
+    "emailSent": "ตรวจสอบอีเมลของคุณสำหรับลิงก์เข้าสู่ระบบ",
+    "errors": {
+      "consentDenied": "คุณยกเลิกการลงชื่อเข้าใช้ โปรดลองอีกครั้งและกดอนุญาตเพื่อให้สิทธิ์",
+      "scopeDenied": "ยังไม่ได้ให้สิทธิ์ Google Ads โปรดลองอีกครั้งและเปิดช่อง Google Ads ไว้บนหน้าขออนุญาต",
+      "missingCode": "การยืนยันตัวตนถูกขัดจังหวะ โปรดลองลงชื่อเข้าใช้อีกครั้ง",
+      "expired": "เซสชันลงชื่อเข้าใช้หมดอายุ โปรดลองอีกครั้ง",
+      "tokenExchange": "ยืนยันตัวตน Google ไม่สำเร็จ โปรดลองอีกครั้งในอีกสักครู่",
+      "generic": "ยืนยันตัวตนไม่สำเร็จ โปรดลองอีกครั้ง"
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ExternalLink, AlertCircle, Loader2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
@@ -64,24 +65,30 @@ type ErrorCopy = {
     };
 };
 
-function getErrorCopy(reason: ErrorReason, opts: { fallbackMessage?: string | null }): ErrorCopy {
+type ConnectTranslator = ReturnType<typeof useTranslations>;
+
+function getErrorCopy(
+    reason: ErrorReason,
+    opts: { fallbackMessage?: string | null; t: ConnectTranslator },
+): ErrorCopy {
+    const { t } = opts;
     switch (reason) {
         case 'scope_denied':
         case 'scope_denied_retry':
             return {
-                headline: 'Google Ads access is required',
-                body: "NotFair can't read your campaigns or make changes without the Google Ads permission. When you continue, please keep that permission checked on Google's consent screen.",
-                helper: "Look for the checkbox labelled \"See, edit, create, and delete your Google Ads accounts and data.\" If you uncheck it, NotFair has no way to see your campaigns.",
-                primaryCta: { label: 'Continue and allow Google Ads access', prompt: 'consent' },
+                headline: t('error.scopeHeadline'),
+                body: t('error.scopeBody'),
+                helper: t('error.scopeHelper'),
+                primaryCta: { label: t('error.scopeCta'), prompt: 'consent' },
             };
         case 'load_accounts_failed':
         case 'session_error':
         case 'generic':
         default:
             return {
-                headline: "We couldn't finish connecting your account",
-                body: opts.fallbackMessage?.trim() || 'Something went wrong on our end. Please try again — if it keeps failing, reach out and we can help.',
-                primaryCta: { label: 'Try again with Google' },
+                headline: t('error.genericHeadline'),
+                body: opts.fallbackMessage?.trim() || t('error.genericBody'),
+                primaryCta: { label: t('error.genericCta') },
             };
     }
 }
@@ -112,6 +119,7 @@ function connectPathForTab(tab: SetupTab): string {
 
 
 function ConnectContent({ initialSession, slug }: { initialSession: Session; slug?: string[] }) {
+    const t = useTranslations('Connect');
     const isGhl = slug?.[0] === 'gohighlevel' || slug?.[0] === 'go-high-level' || slug?.[0] === 'ghl';
     const { activeTab: baseTab } = isGhl ? { activeTab: 'connector' as const } : parseSetupSlug(slug);
     const activeTab: SetupTab = isGhl ? 'gohighlevel' : baseTab;
@@ -154,7 +162,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         try {
             await startGoogleConnect(currentConnectPath, prompt ? { prompt } : undefined);
         } catch (error) {
-            setError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
+            setError(error instanceof Error ? error.message : t('authFailed'));
         }
     }
 
@@ -171,14 +179,14 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
             });
             const data = await res.json();
             if (!res.ok) {
-                setError(data.error ?? 'Failed to start demo');
+                setError(data.error ?? t('demoFailed'));
                 setDemoStarting(false);
                 return;
             }
             trackEvent('demo_mode_started');
             window.location.assign(data.redirectUrl ?? '/dashboard');
         } catch {
-            setError('Failed to start demo');
+            setError(t('demoFailed'));
             setDemoStarting(false);
         }
     }
@@ -194,7 +202,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     {!hasGoogleCustomer && session.connected && <MissingPlatformWarning platform="google_ads" />}
                     {(error || isKnownReason(errorReason)) && (() => {
                         const reason: ErrorReason = isKnownReason(errorReason) ? errorReason : 'generic';
-                        const copy = getErrorCopy(reason, { fallbackMessage: error });
+                        const copy = getErrorCopy(reason, { fallbackMessage: error, t });
                         return (
                             <div className="mb-8 rounded-lg border border-[#C45D4A]/30 bg-[#C45D4A]/10 p-5">
                                 <div className="flex items-start gap-3">
@@ -224,26 +232,26 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                         <GoHighLevelConnectSurface session={session} />
                     ) : !token ? (
                         <div className="flex flex-col items-center space-y-6 pt-12 text-center">
-                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect Google Ads</h2>
+                            <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">{t('headline')}</h2>
                             <p className="max-w-md text-lg text-[#C4C0B6]">
-                                Sign in with your Google Ads account, then choose the Claude or MCP client you want to set up.
+                                {t('body')}
                             </p>
                             <Button
                                 size="lg"
                                 onClick={() => beginGoogleSignIn()}
                                 className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-105 hover:bg-[#3D9A5C]"
                             >
-                                Sign in with Google <ExternalLink className="ml-2 h-5 w-5" />
+                                {t('signInWithGoogle')} <ExternalLink className="ml-2 h-5 w-5" />
                             </Button>
-                            <p className="text-xs text-[#C4C0B6]/60">OAuth 2.0 — we never see your password.</p>
+                            <p className="text-xs text-[#C4C0B6]/60">{t('oauthNote')}</p>
                             <div className="flex w-full max-w-sm items-center gap-3 pt-4">
                                 <div className="h-px flex-1 bg-[#3D3C36]" />
-                                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]/60">or</span>
+                                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]/60">{t('or')}</span>
                                 <div className="h-px flex-1 bg-[#3D3C36]" />
                             </div>
                             <div className="flex flex-col items-center space-y-2">
                                 <p className="max-w-md text-sm text-[#C4C0B6]">
-                                    Don&apos;t have a Google Ads account yet? Try NotFair with sample data.
+                                    {t('demoIntro')}
                                 </p>
                                 <Button
                                     onClick={startDemoSession}
@@ -252,12 +260,12 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                     className="h-11 rounded-full border-[#3D3C36] bg-[#24231F] px-6 text-sm font-medium text-[#E8E4DD] hover:bg-[#2E2D28] hover:text-[#E8E4DD] disabled:opacity-60"
                                 >
                                     {demoStarting ? (
-                                        <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Starting demo…</span>
+                                        <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t('startingDemo')}</span>
                                     ) : (
-                                        <>Explore with demo data</>
+                                        <>{t('exploreDemo')}</>
                                     )}
                                 </Button>
-                                <p className="text-xs text-[#C4C0B6]/60">Simulated ecommerce clothing brand · 30 days of data · no sign-up required</p>
+                                <p className="text-xs text-[#C4C0B6]/60">{t('demoNote')}</p>
                             </div>
                         </div>
                     ) : (
@@ -296,10 +304,10 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     }).catch(() => {});
                 }}
                 className="fixed bottom-6 right-6 z-30 inline-flex items-center gap-2 rounded-full border border-[#4CAF6E]/60 bg-[#4CAF6E] px-5 py-3 text-sm font-semibold text-[#1A1917] shadow-lg shadow-[#4CAF6E]/30 ring-2 ring-[#4CAF6E]/20 transition hover:bg-[#5BC07F] hover:shadow-xl hover:shadow-[#4CAF6E]/40"
-                aria-label="Need help? Book a call"
+                aria-label={t('helpAria')}
             >
                 <Calendar className="h-4 w-4" />
-                Need help?
+                {t('needHelp')}
             </a>
         </section>
     );

@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
+import { useTranslations } from "next-intl";
 
 export const fadeInUp = {
   hidden: { opacity: 0, y: 16 },
@@ -33,6 +34,7 @@ export function AuditCTA({
   disconnectedDestination?: string;
 }) {
   const [loading, setLoading] = useState(false);
+  const t = useTranslations("CTA");
 
   function handleCTA() {
     if (loading) return;
@@ -68,6 +70,8 @@ export function AuditCTA({
   const secondaryStyles =
     "bg-transparent text-[#E8E4DD] border border-[#4CAF6E]/50 hover:border-[#4CAF6E] hover:bg-[#4CAF6E]/10";
   const spinnerColor = variant === "secondary" ? "border-[#E8E4DD]" : "border-[#1A1917]";
+  const activeConnectedLabel = connectedLabel === "View Your Audit" ? t("viewAudit") : connectedLabel;
+  const activeDisconnectedLabel = disconnectedLabel === "Audit Now" ? t("runFreeAudit") : disconnectedLabel;
 
   return (
     <Button
@@ -78,11 +82,11 @@ export function AuditCTA({
       {loading ? (
         <span className="inline-flex items-center gap-2">
           <span className={`${spinnerSize} animate-spin rounded-full border-2 ${spinnerColor} border-t-transparent`} />
-          Connecting...
+          {t("connecting")}
         </span>
       ) : (
         <>
-          {session.connected ? connectedLabel : disconnectedLabel}
+          {session.connected ? activeConnectedLabel : activeDisconnectedLabel}
           <ArrowRight className={arrowSize} />
         </>
       )}

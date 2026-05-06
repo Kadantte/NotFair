@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail } from "lucide-react";
 import { startGoogleConnect } from "@/lib/google-oauth";
@@ -26,6 +27,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
+  const t = useTranslations("Login");
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/campaigns";
   const errorParam = searchParams.get("error");
@@ -39,19 +41,19 @@ function LoginForm() {
     if (errorParam !== "auth_failed") return "";
     switch (reasonParam) {
       case AUTH_ERROR_REASON.CONSENT_DENIED:
-        return "You cancelled the sign-in. Please try again and click \"Allow\" to grant access.";
+        return t("errors.consentDenied");
       case AUTH_ERROR_REASON.SCOPE_DENIED:
-        return "Google Ads permission was not granted. Please try again and keep the \"Google Ads\" checkbox checked on the consent screen.";
+        return t("errors.scopeDenied");
       case AUTH_ERROR_REASON.MISSING_CODE:
-        return "Authentication was interrupted. Please try signing in again.";
+        return t("errors.missingCode");
       case AUTH_ERROR_REASON.NONCE_MISMATCH:
       case AUTH_ERROR_REASON.MISSING_COOKIE:
       case AUTH_ERROR_REASON.MISSING_STATE:
-        return "Your sign-in session expired. Please try again.";
+        return t("errors.expired");
       case AUTH_ERROR_REASON.TOKEN_EXCHANGE:
-        return "Google authentication failed. Please try again in a moment.";
+        return t("errors.tokenExchange");
       default:
-        return "Authentication failed. Please try again.";
+        return t("errors.generic");
     }
   });
 
@@ -64,7 +66,7 @@ function LoginForm() {
       setError(
         error instanceof Error
           ? error.message
-          : "Authentication failed. Please try again.",
+          : t("errors.generic"),
       );
       setGoogleLoading(false);
     }
@@ -90,16 +92,16 @@ function LoginForm() {
     if (error) {
       setError(error.message);
     } else {
-      setMessage("Check your email for the login link!");
+      setMessage(t("emailSent"));
     }
   }
 
   return (
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-[#E8E4DD]">Sign in to {BRAND_NAME}</h1>
+        <h1 className="text-3xl font-bold text-[#E8E4DD]">{t("headline", { brand: BRAND_NAME })}</h1>
         <p className="text-[#C4C0B6] text-sm">
-          Manage your Google Ads with AI
+          {t("subhead")}
         </p>
       </div>
 
@@ -142,14 +144,14 @@ function LoginForm() {
                 fill="#EA4335"
               />
             </svg>
-            Sign in with Google
+            {t("signInWithGoogle")}
           </>
         )}
       </Button>
 
       <div className="flex items-center gap-3">
         <div className="flex-1 h-px bg-[#3D3C36]" />
-        <span className="text-[#C4C0B6] text-xs uppercase">or</span>
+        <span className="text-[#C4C0B6] text-xs uppercase">{t("or")}</span>
         <div className="flex-1 h-px bg-[#3D3C36]" />
       </div>
 
@@ -172,14 +174,14 @@ function LoginForm() {
           ) : (
             <>
               <Mail className="w-4 h-4 mr-2" />
-              Send magic link
+              {t("sendMagicLink")}
             </>
           )}
         </Button>
       </form>
 
       <p className="text-[#C4C0B6] text-xs text-center">
-        We'll send a sign-in link to your email. No password needed.
+        {t("emailHelp")}
       </p>
     </div>
   );

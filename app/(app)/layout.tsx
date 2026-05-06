@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
@@ -14,6 +15,7 @@ import { onThreadEvent } from '@/lib/thread-events';
 import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
 import { BrandLockup } from '@/components/brand-lockup';
+import { LanguageSwitcher } from '@/components/language-switcher';
 import { trackEvent } from '@/lib/analytics';
 import { getUsageSummaryAction } from '@/app/actions';
 import { BRAND_NAME } from '@/lib/brand';
@@ -78,6 +80,7 @@ function NavItem({
     onClick,
     disabled = false,
     onDisabledClick,
+    disabledTitle = "Not available for the active platform",
 }: {
     href: string;
     icon: React.ElementType;
@@ -87,6 +90,7 @@ function NavItem({
     onClick?: () => void;
     disabled?: boolean;
     onDisabledClick?: () => void;
+    disabledTitle?: string;
 }) {
     const buttonClass = `h-10 rounded-lg px-3 transition-all duration-200 ease-out hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD] ${
         active
@@ -112,7 +116,7 @@ function NavItem({
                 variant="ghost"
                 onClick={onDisabledClick}
                 className={buttonClass}
-                title="Not available for the active platform"
+                title={disabledTitle}
             >
                 {buttonInner}
             </Button>
@@ -154,6 +158,7 @@ function MobileNavItem({
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const t = useTranslations('AppNav');
     const router = useRouter();
     const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
     const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false);
@@ -186,14 +191,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         fetch('/api/chat/threads', { credentials: 'include' })
             .then(r => r.json())
             .then(({ threads }) => {
-                if (threads) setSidebarThreads(threads.map((t: { id: string; title: string | null; updatedAt: string }) => ({
-                    id: t.id,
-                    title: t.title ?? 'New chat',
-                    updatedAt: t.updatedAt,
+                if (threads) setSidebarThreads(threads.map((thread: { id: string; title: string | null; updatedAt: string }) => ({
+                    id: thread.id,
+                    title: thread.title ?? t('newChat'),
+                    updatedAt: thread.updatedAt,
                 })));
             })
             .catch(() => {});
-    }, []);
+    }, [t]);
 
     // Fetch threads on mount and when "refresh" event fires
     useEffect(() => {
@@ -204,7 +209,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     // Close mobile menu only when navigation changes the route.
     useEffect(() => {
-        setMobileMenuOpen(false);
+        const timeout = window.setTimeout(() => setMobileMenuOpen(false), 0);
+        return () => window.clearTimeout(timeout);
     }, [pathname]);
 
     // Lock body scroll and handle Escape key when mobile menu is open
@@ -252,7 +258,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 setInTrial(false);
             })
             .finally(() => setAuthLoaded(true));
-    }, []);
+    }, [pathname, router]);
 
     useEffect(() => {
         if (!authLoaded || !isAuthenticated) return;
@@ -277,9 +283,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!authLoaded || !isAuthenticated) return;
         if (plan !== 'free' || inTrial) {
-            setUsageExceeded(false);
-            setUsageNearLimit(false);
-            return;
+            const timeout = window.setTimeout(() => {
+                setUsageExceeded(false);
+                setUsageNearLimit(false);
+            }, 0);
+            return () => window.clearTimeout(timeout);
         }
         getUsageSummaryAction()
             .then(info => {
@@ -308,7 +316,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const newId = crypto.randomUUID();
         setSidebarThreads(prev => [{
             id: newId,
-            title: 'New chat',
+            title: t('newChat'),
             updatedAt: new Date().toISOString(),
         }, ...prev]);
         router.push(`/chat/${newId}`);
@@ -389,7 +397,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 isCollapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
                             }`}
                         >
-                            Connect MCP
+                            {t('connectMcp')}
                         </span>
                     </Button>
                 </Link>
@@ -400,37 +408,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <NavItem
                     href="/campaigns"
                     icon={LayoutDashboard}
-                    label="Campaigns"
+                    label={t('campaigns')}
                     active={pathname.startsWith('/campaigns')}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                     disabled={isMetaActive}
-                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Campaigns'); }}
+                    disabledTitle={t('notAvailableForPlatform')}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal(t('campaigns')); }}
                 />
                 <NavItem
                     href="/audit"
                     icon={ClipboardCheck}
-                    label="Audit"
+                    label={t('audit')}
                     active={pathname === '/audit'}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                     disabled={isMetaActive}
-                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Audit'); }}
+                    disabledTitle={t('notAvailableForPlatform')}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal(t('audit')); }}
                 />
                 <NavItem
                     href="/impact-monitor"
                     icon={Gauge}
-                    label="Impact Monitor"
+                    label={t('impactMonitor')}
                     active={pathname.startsWith('/impact-monitor')}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                     disabled={isMetaActive}
-                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal('Impact Monitor'); }}
+                    disabledTitle={t('notAvailableForPlatform')}
+                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal(t('impactMonitor')); }}
                 />
                 <NavItem
                     href="/operations"
                     icon={Activity}
-                    label="Operations"
+                    label={t('operations')}
                     active={pathname === '/operations'}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
@@ -438,7 +449,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <NavItem
                     href="/chat"
                     icon={MessageSquare}
-                    label="Chat"
+                    label={t('chat')}
                     active={pathname.startsWith('/chat')}
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
@@ -463,7 +474,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     isCollapsed ? 'max-w-0 opacity-0' : 'ml-2.5 max-w-32 opacity-100'
                                 }`}
                             >
-                                New chat
+                                {t('newChat')}
                             </span>
                         </Button>
                     </div>
@@ -551,11 +562,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem href="/usage" icon={Gauge} label="Usage" active={pathname === '/usage'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
+                <NavItem href="/usage" icon={Gauge} label={t('usage')} active={pathname === '/usage'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
                 <NavItem
                     href="/upgrade"
                     icon={Rocket}
-                    label={isFree ? 'Upgrade' : 'Pricing'}
+                    label={isFree ? t('upgrade') : t('pricing')}
                     active={pathname === '/upgrade'}
                     collapsed={isCollapsed}
                     onClick={() => {
@@ -574,7 +585,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             isCollapsed ? 'max-w-0 opacity-0' : 'ml-3 max-w-32 opacity-100'
                         }`}
                     >
-                        Join Discord
+                        {t('joinDiscord')}
                     </span>
                 </DiscordLink>
             </div>
@@ -641,8 +652,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     page: pathname,
                                 })}
                                 aria-label={badge.daysLeft === 0
-                                    ? 'Unlimited access ends today — upgrade to keep it'
-                                    : `Unlimited access · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left — upgrade to keep it`}
+                                    ? t('trialEndsTodayAria')
+                                    : t('trialDaysLeftAria', { days: badge.daysLeft })}
                                 className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold tracking-wide ring-1 ring-inset transition-colors ${
                                     badge.endingSoon
                                         ? 'bg-[#D4882A]/15 text-[#D4882A] ring-[#D4882A]/35 hover:bg-[#D4882A]/22'
@@ -656,14 +667,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 )}
                                 <span>
                                     {badge.daysLeft === 0
-                                        ? 'Unlimited access ends today'
-                                        : `Unlimited access · ${badge.daysLeft} day${badge.daysLeft === 1 ? '' : 's'} left`}
+                                        ? t('trialEndsToday')
+                                        : t('trialDaysLeft', { days: badge.daysLeft })}
                                 </span>
                             </Link>
                         )}
                         {badge.kind === 'free' && (
                             <span className="inline-flex h-5 items-center rounded-full bg-[#E8E4DD]/8 px-2 text-[11px] font-semibold tracking-wide text-[#C4C0B6]">
-                                Free
+                                {t('free')}
                             </span>
                         )}
                         {planLoaded && usageExceeded && (
@@ -672,14 +683,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 prefetch
                                 onClick={() => trackEvent('upgrade_clicked', { location: 'usage_exceeded_badge', page: pathname })}
                                 className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#C45D4A] bg-[#C45D4A] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(196,93,74,0.18)] transition-all hover:bg-[#B54E3D] hover:shadow-[0_0_0_4px_rgba(196,93,74,0.28)]"
-                                aria-label="Monthly free cap reached — upgrade to Growth for unlimited operations"
+                                aria-label={t('monthlyCapReachedAria')}
                             >
                                 <span className="relative flex h-2 w-2 shrink-0">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
                                 </span>
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                <span>Free monthly cap reached — upgrade for unlimited</span>
+                                <span>{t('monthlyCapReached')}</span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                             </Link>
                         )}
@@ -689,10 +700,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 prefetch
                                 onClick={() => trackEvent('upgrade_clicked', { location: 'usage_near_limit_badge', page: pathname })}
                                 className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#D4882A] bg-[#D4882A] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(212,136,42,0.18)] transition-all hover:bg-[#B8731F] hover:shadow-[0_0_0_4px_rgba(212,136,42,0.28)]"
-                                aria-label="Approaching monthly free cap — upgrade to Growth for unlimited operations"
+                                aria-label={t('monthlyLimitNearAria')}
                             >
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                <span>Approaching monthly limit — upgrade for unlimited</span>
+                                <span>{t('monthlyLimitNear')}</span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                             </Link>
                         )}
@@ -702,13 +713,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 prefetch
                                 onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ending_soon_badge', page: pathname })}
                                 className="group hidden lg:inline-flex items-center gap-2 rounded-md border border-[#D4882A] bg-[#D4882A] px-3 py-1.5 text-[13px] font-semibold text-white shadow-[0_0_0_3px_rgba(212,136,42,0.18)] transition-all hover:bg-[#B8731F] hover:shadow-[0_0_0_4px_rgba(212,136,42,0.28)]"
-                                aria-label="Free trial ending soon — upgrade to Growth"
+                                aria-label={t('trialEndingSoonAria')}
                             >
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                                 <span>
                                     {trialDaysLeft === 0
-                                        ? 'Free trial ends today — upgrade to keep unlimited access'
-                                        : `Free trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} — upgrade to keep unlimited access`}
+                                        ? t('freeTrialEndsToday')
+                                        : t('freeTrialDaysLeft', { days: trialDaysLeft ?? 0 })}
                                 </span>
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                             </Link>
@@ -716,6 +727,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <FeedbackButton />
+                        <LanguageSwitcher mode="cookie" className="hidden sm:block" />
                         {planLoaded && isFree && (
                             <Link href="/upgrade" prefetch onClick={() => trackEvent('upgrade_clicked', { location: 'header', page: pathname })}>
                                 <Button
@@ -723,7 +735,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     variant="ghost"
                                     className="h-8 rounded-md px-4 text-[13px] font-semibold text-[#1A1917] bg-[#4CAF6E] hover:bg-[#3D9A5C] hover:text-[#1A1917]"
                                 >
-                                    Upgrade
+                                    {t('upgrade')}
                                 </Button>
                             </Link>
                         )}
@@ -737,7 +749,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         prefetch
                         onClick={() => trackEvent('upgrade_clicked', { location: 'usage_exceeded_banner', page: pathname })}
                         className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#C45D4A]/60 bg-[#C45D4A] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#B54E3D] lg:hidden"
-                        aria-label="Free monthly cap reached — upgrade to Growth for unlimited operations"
+                        aria-label={t('monthlyCapReachedAria')}
                     >
                         <span className="relative flex h-2 w-2 shrink-0">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
@@ -745,9 +757,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </span>
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:inline">
-                            Free monthly cap reached — upgrade for unlimited
+                            {t('monthlyCapReached')}
                         </span>
-                        <span className="sm:hidden">Cap reached — upgrade</span>
+                        <span className="sm:hidden">{t('capReachedShort')}</span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                     </Link>
                 )}
@@ -757,13 +769,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         prefetch
                         onClick={() => trackEvent('upgrade_clicked', { location: 'usage_near_limit_banner', page: pathname })}
                         className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#D4882A]/60 bg-[#D4882A] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#B8731F] lg:hidden"
-                        aria-label="Approaching monthly free cap — upgrade to Growth for unlimited operations"
+                        aria-label={t('monthlyLimitNearAria')}
                     >
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:inline">
-                            Approaching monthly limit — upgrade for unlimited
+                            {t('monthlyLimitNear')}
                         </span>
-                        <span className="sm:hidden">Near monthly limit — upgrade</span>
+                        <span className="sm:hidden">{t('monthlyLimitNearShort')}</span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                     </Link>
                 )}
@@ -773,18 +785,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         prefetch
                         onClick={() => trackEvent('upgrade_clicked', { location: 'trial_ending_soon_banner', page: pathname })}
                         className="group flex shrink-0 items-center justify-center gap-2 border-b border-[#D4882A]/60 bg-[#D4882A] px-4 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-[#B8731F] lg:hidden"
-                        aria-label="Free trial ending soon — upgrade to Growth"
+                        aria-label={t('trialEndingSoonAria')}
                     >
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:inline">
                             {trialDaysLeft === 0
-                                ? 'Free trial ends today — upgrade to keep access'
-                                : `Free trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} — upgrade to keep access`}
+                                ? t('freeTrialEndsTodayShort')
+                                : t('freeTrialDaysLeftShort', { days: trialDaysLeft ?? 0 })}
                         </span>
                         <span className="sm:hidden">
                             {trialDaysLeft === 0
-                                ? 'Trial ends today — upgrade'
-                                : `${trialDaysLeft}d left — upgrade`}
+                                ? t('trialEndsTodayShort')
+                                : t('trialDaysLeftShort', { days: trialDaysLeft ?? 0 })}
                         </span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                     </Link>
@@ -799,11 +811,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile bottom navigation */}
             <nav className="flex md:hidden shrink-0 border-t border-[#3D3C36] bg-[#24231F]">
-                <MobileNavItem href="/dashboard" icon={Home} label="Home" active={pathname === '/dashboard'} />
-                <MobileNavItem href="/campaigns" icon={LayoutDashboard} label="Campaigns" active={pathname.startsWith('/campaigns')} />
-                <MobileNavItem href="/audit" icon={ClipboardCheck} label="Audit" active={pathname === '/audit'} />
-                <MobileNavItem href="/impact-monitor" icon={Gauge} label="Impact" active={pathname.startsWith('/impact-monitor')} />
-                <MobileNavItem href="/chat" icon={MessageSquare} label="Chat" active={pathname.startsWith('/chat')} />
+                <MobileNavItem href="/dashboard" icon={Home} label={t('home')} active={pathname === '/dashboard'} />
+                <MobileNavItem href="/campaigns" icon={LayoutDashboard} label={t('campaigns')} active={pathname.startsWith('/campaigns')} />
+                <MobileNavItem href="/audit" icon={ClipboardCheck} label={t('audit')} active={pathname === '/audit'} />
+                <MobileNavItem href="/impact-monitor" icon={Gauge} label={t('impact')} active={pathname.startsWith('/impact-monitor')} />
+                <MobileNavItem href="/chat" icon={MessageSquare} label={t('chat')} active={pathname.startsWith('/chat')} />
             </nav>
 
             <MetaUnsupportedModal

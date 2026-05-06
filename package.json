@@ -1,6 +1,6 @@
 {
   "name": "norfair",
-  "version": "0.3.6.1",
+  "version": "0.3.7.0",
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "engines": {
@@ -53,6 +53,7 @@
     "lucide-react": "^0.563.0",
     "mcp-handler": "^1.1.0",
     "next": "16.1.6",
+    "next-intl": "^4.11.0",
     "postgres": "^3.4.8",
     "posthog-js": "^1.364.7",
     "posthog-node": "^5.28.11",

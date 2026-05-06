@@ -1,14 +1,127 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import createMiddleware from "next-intl/middleware";
+import { routing } from "@/i18n/routing";
+import { defaultLocale, locales, type AppLocale } from "@/i18n/locales";
 import { updateSession } from "@/lib/supabase/middleware";
 
+const intlMiddleware = createMiddleware(routing);
+const LOCALE_COOKIE = "NEXT_LOCALE";
+const LOCALE_HEADER = "X-NEXT-INTL-LOCALE";
+
+const APP_PATH_PREFIXES = [
+  "/connect",
+  "/login",
+  "/manage-ads-accounts",
+  "/dashboard",
+  "/campaigns",
+  "/operations",
+  "/tools",
+  "/chat",
+  "/audit",
+  "/impact-monitor",
+  "/upgrade",
+  "/usage",
+  "/dev",
+  "/outreach",
+] as const;
+
+function isAppPath(pathname: string): boolean {
+  return APP_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function getPathLocale(pathname: string): AppLocale | null {
+  return locales.find((locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`)) ?? null;
+}
+
+function normalizePathname(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function isLocalizedHomePath(pathname: string): boolean {
+  const normalizedPathname = normalizePathname(pathname);
+  return normalizedPathname === "/" || locales.some((locale) => normalizedPathname === `/${locale}`);
+}
+
+function detectLocale(request: NextRequest): AppLocale {
+  const pathLocale = getPathLocale(request.nextUrl.pathname);
+  if (pathLocale) return pathLocale;
+
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
+  if (locales.includes(cookieLocale as AppLocale)) return cookieLocale as AppLocale;
+
+  const accepted = request.headers.get("accept-language") ?? "";
+  const candidates = accepted
+    .split(",")
+    .map((part) => part.trim().split(";")[0]?.toLowerCase())
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (candidate === "pt-br" || candidate.startsWith("pt-br-")) return "pt-BR";
+    const primary = candidate.split("-")[0];
+    if (primary === "fr") return "fr";
+    if (primary === "de") return "de";
+    if (primary === "th") return "th";
+    if (primary === "pt") return "pt-BR";
+    if (primary === "es") return "es";
+    if (primary === "en") return "en";
+  }
+
+  return defaultLocale;
+}
+
+function setLocaleCookie(response: NextResponse, locale: AppLocale) {
+  response.cookies.set(LOCALE_COOKIE, locale, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+}
+
+function nextWithLocale(request: NextRequest, locale: AppLocale) {
+  const headers = new Headers(request.headers);
+  headers.set(LOCALE_HEADER, locale);
+
+  const response = NextResponse.next({
+    request: {
+      headers,
+    },
+  });
+  setLocaleCookie(response, locale);
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
-  return await updateSession(request);
+  const { pathname } = request.nextUrl;
+  const pathLocale = getPathLocale(pathname);
+
+  if (pathLocale && !isLocalizedHomePath(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.slice(`/${pathLocale}`.length) || "/";
+
+    const response = NextResponse.redirect(url);
+    setLocaleCookie(response, pathLocale);
+    return response;
+  }
+
+  if (isAppPath(pathname)) {
+    const response = await updateSession(request);
+    if (!request.cookies.has(LOCALE_COOKIE)) {
+      setLocaleCookie(response, detectLocale(request));
+    }
+    return response;
+  }
+
+  if (!isLocalizedHomePath(pathname)) {
+    return nextWithLocale(request, detectLocale(request));
+  }
+
+  return intlMiddleware(request);
 }
 
 export const config = {
   matcher: [
-    // Run on all routes except static assets and API routes.
+    // Run on all routes except static assets, internal assets, API routes, and files.
     // API routes use their own auth (MCP Bearer tokens, Google Ads OAuth).
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|api/).*)",
+    "/((?!api|_next/static|_next/image|_vercel|.*\\..*).*)",
   ],
 };

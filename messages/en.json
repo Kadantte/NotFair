@@ -1,0 +1,233 @@
+{
+  "LocaleSwitcher": {
+    "label": "Language",
+    "current": "Current language"
+  },
+  "Header": {
+    "setupGuide": "Google Ads Claude Connector Setup Guide",
+    "pricing": "Pricing",
+    "bookDemo": "Book a Demo",
+    "startNow": "Start now"
+  },
+  "Footer": {
+    "description": "AI-powered Google Ads diagnosis and execution for Claude. Find issues, draft fixes, and approve every write.",
+    "articles": "Articles",
+    "company": "Company",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "rights": "All rights reserved.",
+    "setupGuideLinks": {
+      "googleAdsClaudeConnector": "Google Ads Claude Connector Setup Guide",
+      "googleAdsClaudeCode": "Google Ads Claude Code Plugin Setup Guide",
+      "googleAdsCodex": "Google Ads Codex MCP Setup Guide",
+      "googleAdsMcp": "Google Ads MCP Server (any client)",
+      "metaAdsClaudeConnector": "Meta Ads Claude Connector Setup Guide",
+      "metaAdsClaudeCode": "Meta Ads Claude Code Plugin Setup Guide",
+      "metaAdsCodex": "Meta Ads Codex MCP Setup Guide",
+      "metaAdsMcp": "Meta Ads MCP Server (any client)"
+    }
+  },
+  "CTA": {
+    "connecting": "Connecting...",
+    "connectGoogleAds": "Connect Google Ads",
+    "runFreeAudit": "Run free audit",
+    "viewAudit": "View audit"
+  },
+  "Home": {
+    "githubBanner": "Diagnose and fix Google Ads from Claude - approval-gated writes, live on GitHub",
+    "eyebrow": "AI Google Ads strategist + execution layer",
+    "headline": "Find what's wrong. Fix it from Claude.",
+    "subhead": "NotFair gives Claude live Google Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.",
+    "trustItems": [
+      "Diagnose issues",
+      "Draft fixes",
+      "Approve every write"
+    ],
+    "chat": {
+      "initialQuestion": "Why did leads get more expensive, and what should I fix?",
+      "followUpQuestion": "Apply the approved negative and keyword changes.",
+      "intro": "I'll inspect spend, search terms, structure, and recent changes before recommending fixes.",
+      "foundSummary": "Found 3 issues and drafted a prioritized fix list",
+      "findingsTitle": "Found {count} issues to fix:",
+      "finding1": "34% of spend is coming from loose-match queries",
+      "finding2": "23 negatives recommended to block mismatched searches",
+      "finding3": "4 ad groups should be split before budget increases",
+      "permission1": "NotFair wants to run",
+      "permission2": "to apply 23 negatives and 80 keyword edits",
+      "approve": "Approve",
+      "approveOnce": "Approve once",
+      "deny": "Deny",
+      "placeholder": "Ask what to fix next",
+      "demo": "demo"
+    },
+    "engineTitle": "A Complete Marketing Engine Inside Your Agent",
+    "engineBody": "Diagnostics, audits, writes, and undo - all driven by one MCP connection per ad account.",
+    "highSpend": "Spending $50K+/mo?",
+    "letsTalk": "Let's talk",
+    "faqLabel": "FAQ",
+    "answers": "{count} answers",
+    "faqTitle": "Common questions.",
+    "faq": [
+      {
+        "q": "Will NotFair make changes without my approval?",
+        "a": "No. NotFair can read your account freely, but every write tool surfaces a diff first. You confirm before anything hits Google Ads - and any change is reversible with a single tool call."
+      },
+      {
+        "q": "Which AI clients does this work with?",
+        "a": "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex, Cursor, Cline, OpenClaw, Hermes Agent, and custom MCP clients. The server URL is the same - only the per-client config differs."
+      },
+      {
+        "q": "Do I need to know what to fix before I start?",
+        "a": "No. Lead with the business problem - leads got expensive, ROAS slipped, something changed. The agent diagnoses the likely cause, ranks fixes by spend at risk, and drafts the campaign edits for your approval."
+      },
+      {
+        "q": "What can the agent actually change?",
+        "a": "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts, and reporting workflows - all on Google Ads. Every write is approval-gated and logged."
+      },
+      {
+        "q": "How does authentication work?",
+        "a": "OAuth 2.0 with PKCE by default - Claude.ai and Codex run it automatically. For clients that don't support OAuth, generate a Bearer token at notfair.co/connect. Either way, NotFair never asks an LLM to handle credentials directly."
+      },
+      {
+        "q": "Is there a free tier?",
+        "a": "Yes. Connecting and running audits is free, no credit card. The Free plan includes 7 days of unlimited access, then 300 MCP operations per month forever. Upgrade to Growth when Claude becomes your daily ads operator."
+      }
+    ],
+    "closingLabel": "Closing",
+    "closingHeadline": "Now go find what's wrong.",
+    "legalPrefix": "Free to connect - By connecting, you agree to our",
+    "legalAnd": "and"
+  },
+  "Connect": {
+    "headline": "Connect your Google Ads account",
+    "body": "Sign in with Google so NotFair can find your ad accounts and prepare your MCP setup.",
+    "signInWithGoogle": "Sign in with Google",
+    "oauthNote": "OAuth keeps your credentials out of the AI client.",
+    "or": "or",
+    "demoIntro": "Want to see the product first? Open a read-only demo workspace.",
+    "startingDemo": "Starting demo...",
+    "exploreDemo": "Explore demo mode",
+    "demoNote": "Demo data is synthetic and safe to click through.",
+    "authFailed": "Authentication failed. Please try again.",
+    "demoFailed": "Could not start demo mode. Please try again.",
+    "helpAria": "Book setup help",
+    "needHelp": "Need help?",
+    "error": {
+      "scopeHeadline": "Google Ads access is required",
+      "scopeBody": "NotFair cannot read your campaigns or make changes without the Google Ads permission. When you continue, keep that permission checked on Google's consent screen.",
+      "scopeHelper": "Look for the checkbox labelled \"See, edit, create, and delete your Google Ads accounts and data.\" If you uncheck it, NotFair cannot see your campaigns.",
+      "scopeCta": "Continue and allow Google Ads access",
+      "genericHeadline": "We could not finish connecting your account",
+      "genericBody": "Something went wrong on our end. Please try again. If it keeps failing, reach out and we can help.",
+      "genericCta": "Try again with Google"
+    }
+  },
+  "AccountSelector": {
+    "headline": "Choose ad accounts",
+    "body": "Select the accounts you want NotFair to manage.",
+    "directAccess": "Direct access",
+    "saveFailed": "Could not save account selection",
+    "saving": "Saving...",
+    "connecting": "Connecting...",
+    "save": "Save{count, plural, =0 {} other { (#)}}",
+    "connect": "Connect{count, plural, =0 {} other { #}}",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "selectedCount": "{selected} of {total} selected",
+    "viaManager": "Via manager",
+    "viaManagerLower": "via {manager}",
+    "unsavedChanges": "Unsaved changes"
+  },
+  "ManageAdsAccounts": {
+    "back": "Back to platforms",
+    "addGoogleTitle": "Add Google Ads account",
+    "addGoogleDescription": "Connect or update the Google Ads accounts NotFair can manage.",
+    "manageMetaTitle": "Manage Meta Ads accounts",
+    "addMetaTitle": "Add Meta Ads account",
+    "addMetaDescription": "Connect Meta Ads when your account is approved for the beta.",
+    "firstHeadline": "Connect an ad platform to continue",
+    "firstBody": "Choose the ad accounts you want NotFair to manage. You can add more later.",
+    "firstNote": "NotFair only acts on accounts you explicitly select.",
+    "headline": "Manage ad accounts",
+    "body": "Add platforms and choose which ad accounts are available inside NotFair.",
+    "thisGoogleAccount": "this Google account",
+    "noGoogleAccountWarning": "No Google Ads account under",
+    "switchGoogleAccount": "Switch Google account",
+    "enumerationError": "Failed to enumerate Google ad accounts",
+    "noGoogleHeadline": "No Google Ads accounts on this identity",
+    "noGoogleBodyBefore": "The Google account you signed in with does not own any Google Ads accounts. Try a different Google identity that has Ads access, or create a Google Ads account at",
+    "noGoogleBodyAfter": " and come back.",
+    "tryDifferentGoogle": "Try a different Google account",
+    "selectGoogleHeadline": "Select your Google Ads accounts",
+    "manageGoogleHeadline": "Manage Google Ads accounts",
+    "googleSelectorBody": "Which Google Ads accounts do you want to manage?",
+    "pickGoogleAccountsBody": "Pick the Google Ads accounts you want NotFair to manage.",
+    "connectMcpTitle": "Connect to Google Ads MCP",
+    "connectMcpBody": "Wire Claude, Codex, or any MCP client to your Google Ads accounts.",
+    "connectMcpCta": "Connect MCP"
+  },
+  "UserMenu": {
+    "account": "Account",
+    "signedInAs": "Signed in as",
+    "openingPortal": "Opening portal...",
+    "manageSubscription": "Manage subscription",
+    "signingOut": "Signing out...",
+    "signOut": "Sign out"
+  },
+  "AccountSwitcher": {
+    "account": "Account",
+    "viewingAs": "Viewing as {account}",
+    "addAccount": "Add account"
+  },
+  "AppNav": {
+    "connectMcp": "Connect MCP",
+    "campaigns": "Campaigns",
+    "audit": "Audit",
+    "impactMonitor": "Impact Monitor",
+    "operations": "Operations",
+    "chat": "Chat",
+    "newChat": "New chat",
+    "usage": "Usage",
+    "upgrade": "Upgrade",
+    "pricing": "Pricing",
+    "joinDiscord": "Join Discord",
+    "home": "Home",
+    "impact": "Impact",
+    "free": "Free",
+    "notAvailableForPlatform": "Not available for the active platform",
+    "trialEndsTodayAria": "Unlimited access ends today - upgrade to keep it",
+    "trialDaysLeftAria": "Unlimited access - {days, plural, one {# day} other {# days}} left - upgrade to keep it",
+    "trialEndsToday": "Unlimited access ends today",
+    "trialDaysLeft": "Unlimited access - {days, plural, one {# day} other {# days}} left",
+    "monthlyCapReachedAria": "Monthly free cap reached - upgrade to Growth for unlimited operations",
+    "monthlyCapReached": "Free monthly cap reached - upgrade for unlimited",
+    "monthlyLimitNearAria": "Approaching monthly free cap - upgrade to Growth for unlimited operations",
+    "monthlyLimitNear": "Approaching monthly limit - upgrade for unlimited",
+    "trialEndingSoonAria": "Free trial ending soon - upgrade to Growth",
+    "freeTrialEndsToday": "Free trial ends today - upgrade to keep unlimited access",
+    "freeTrialDaysLeft": "Free trial ends in {days, plural, one {# day} other {# days}} - upgrade to keep unlimited access",
+    "capReachedShort": "Cap reached - upgrade",
+    "monthlyLimitNearShort": "Near monthly limit - upgrade",
+    "freeTrialEndsTodayShort": "Free trial ends today - upgrade to keep access",
+    "freeTrialDaysLeftShort": "Free trial ends in {days, plural, one {# day} other {# days}} - upgrade to keep access",
+    "trialEndsTodayShort": "Trial ends today - upgrade",
+    "trialDaysLeftShort": "{days}d left - upgrade"
+  },
+  "Login": {
+    "headline": "Sign in to {brand}",
+    "subhead": "Manage your Google Ads with AI",
+    "signInWithGoogle": "Sign in with Google",
+    "or": "or",
+    "sendMagicLink": "Send magic link",
+    "emailHelp": "We'll send a sign-in link to your email. No password needed.",
+    "emailSent": "Check your email for the login link!",
+    "errors": {
+      "consentDenied": "You cancelled the sign-in. Please try again and click \"Allow\" to grant access.",
+      "scopeDenied": "Google Ads permission was not granted. Please try again and keep the \"Google Ads\" checkbox checked on the consent screen.",
+      "missingCode": "Authentication was interrupted. Please try signing in again.",
+      "expired": "Your sign-in session expired. Please try again.",
+      "tokenExchange": "Google authentication failed. Please try again in a moment.",
+      "generic": "Authentication failed. Please try again."
+    }
+  }
+}

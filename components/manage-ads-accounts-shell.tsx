@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { ArrowLeft } from "lucide-react";
 
 /**
@@ -10,13 +11,15 @@ import { ArrowLeft } from "lucide-react";
  * in the page itself — this shell is intentionally small to avoid forcing
  * Google's MCC grouping and Meta's BM/currency badges through one shape.
  */
-export function ManageAdsAccountsShell({
+export async function ManageAdsAccountsShell({
   error,
   children,
 }: {
   error?: string | null;
   children: React.ReactNode;
 }) {
+  const t = await getTranslations("ManageAdsAccounts");
+
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
@@ -27,7 +30,7 @@ export function ManageAdsAccountsShell({
             className="mb-6 inline-flex items-center gap-1.5 text-sm text-[#C4C0B6] transition hover:text-[#E8E4DD]"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Manage Ads Platform</span>
+            <span>{t("back")}</span>
           </Link>
           {error && (
             <div className="mb-6 rounded-lg border border-[#C45D4A]/40 bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">

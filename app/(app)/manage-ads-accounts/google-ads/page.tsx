@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { ArrowRight } from "lucide-react";
 import { getCurrentRefreshToken, getSession } from "@/lib/session";
 import { listConnectableAccounts } from "@/lib/google-ads";
@@ -24,6 +25,7 @@ import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
  *      and pick a different Google identity.
  */
 export default async function AddGoogleAdsAccountPagePath() {
+  const t = await getTranslations("ManageAdsAccounts");
   const session = await getSession();
   if (!session.connected) {
     redirect("/login?next=%2Fmanage-ads-accounts%2Fgoogle-ads");
@@ -45,7 +47,7 @@ export default async function AddGoogleAdsAccountPagePath() {
         ...(a.loginCustomerName ? { loginCustomerName: a.loginCustomerName } : {}),
       }));
     } catch (e) {
-      enumerationError = e instanceof Error ? e.message : "Failed to enumerate Google ad accounts";
+      enumerationError = e instanceof Error ? e.message : t("enumerationError");
     }
   }
 
@@ -61,11 +63,9 @@ export default async function AddGoogleAdsAccountPagePath() {
     return (
       <ManageAdsAccountsShell>
         <div className="rounded-2xl border border-[#3D3C36] bg-[#24231F] p-6">
-          <h2 className="text-lg font-semibold text-[#E8E4DD]">No Google Ads accounts on this identity</h2>
+          <h2 className="text-lg font-semibold text-[#E8E4DD]">{t("noGoogleHeadline")}</h2>
           <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
-            The Google account you signed in with doesn&apos;t own any Google
-            Ads accounts. Try a different Google identity that has Ads
-            access, or create a Google Ads account at{" "}
+            {t("noGoogleBodyBefore")}{" "}
             <a
               href="https://ads.google.com/"
               target="_blank"
@@ -73,14 +73,14 @@ export default async function AddGoogleAdsAccountPagePath() {
               className="underline hover:text-[#E8E4DD]"
             >
               ads.google.com
-            </a>{" "}
-            and come back.
+            </a>
+            {t("noGoogleBodyAfter")}
           </p>
           <Link
             href="/api/auth/signin?prompt=select_account+consent&next=%2Fmanage-ads-accounts%2Fgoogle-ads"
             className="mt-5 inline-flex h-10 items-center rounded-lg bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] hover:bg-[#3D9A5C]"
           >
-            Try a different Google account
+            {t("tryDifferentGoogle")}
           </Link>
         </div>
       </ManageAdsAccountsShell>
@@ -100,16 +100,16 @@ export default async function AddGoogleAdsAccountPagePath() {
         preselectedIds={preselectedIds}
         next="/connect/google-ads?connected=1"
         submitEndpoint="/api/auth/select-account"
-        headline={session.pendingSetup ? "Select your Google Ads accounts" : "Manage Google Ads accounts"}
-        body="Which Google Ads accounts do you want to manage?"
+        headline={session.pendingSetup ? t("selectGoogleHeadline") : t("manageGoogleHeadline")}
+        body={t("googleSelectorBody")}
       />
       {showMcpCta && (
         <div className="mt-6 rounded-2xl border border-[#3D3C36] bg-[#24231F] p-5">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#E8E4DD]">Connect to Google Ads MCP</p>
+              <p className="text-sm font-semibold text-[#E8E4DD]">{t("connectMcpTitle")}</p>
               <p className="mt-1 text-sm text-[#C4C0B6]">
-                Wire Claude, Codex, or any MCP client to your Google Ads accounts.
+                {t("connectMcpBody")}
               </p>
             </div>
             <Link
@@ -117,7 +117,7 @@ export default async function AddGoogleAdsAccountPagePath() {
               prefetch
               className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
             >
-              Connect MCP
+              {t("connectMcpCta")}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

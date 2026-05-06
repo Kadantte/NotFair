@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NotFair
+
+NotFair is a Next.js app for connecting Google Ads and Meta Ads accounts to AI agents through MCP. The app includes the marketing site, OAuth/connect flows, account-management UI, MCP server routes, developer dashboards, and shared tooling for campaign reads and writes.
 
 ## Getting Started
 
-First, run the development server:
+Use pnpm for all local commands. The repo enforces this in `preinstall`.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Useful commands:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm lint
+pnpm test
+pnpm test:live
+pnpm build
+pnpm db:generate
+pnpm db:migrate
+```
 
-## Learn More
+## Internationalization
 
-To learn more about Next.js, take a look at the following resources:
+The app uses `next-intl` with these locales:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `en` - English
+- `fr` - French
+- `de` - German
+- `th` - Thai
+- `pt-BR` - Brazilian Portuguese
+- `es` - Spanish
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Translation messages live in `messages/*.json`. Locale configuration lives in `i18n/locales.ts`, `i18n/routing.ts`, and `i18n/request.ts`.
+
+Localized home pages are available at `/fr`, `/de`, `/th`, `/pt-BR`, and `/es`. Non-home public pages and app routes stay on canonical paths while the proxy preserves the user's locale preference in the `NEXT_LOCALE` cookie.
+
+## Documentation
+
+- [AGENTS.md](AGENTS.md) - repository instructions for coding agents.
+- [CLAUDE.md](CLAUDE.md) - project-specific agent conventions, frontend performance rules, and deploy configuration.
+- [CHANGELOG.md](CHANGELOG.md) - release history.
+- [DESIGN.md](DESIGN.md) - visual system and product aesthetic.
+- [TODOS.md](TODOS.md) - deferred work and follow-ups.
+- [docs/anthropic-review.md](docs/anthropic-review.md) - Anthropic MCP review credentials and setup copy.
+- [docs/data-request-policy.md](docs/data-request-policy.md) - operational data request policy.
+- [docs/event-registry.md](docs/event-registry.md) - analytics event registry.
+- [docs/mcp-10x-redesign-prompt.md](docs/mcp-10x-redesign-prompt.md) - MCP dashboard redesign execution prompt.
+- [docs/meta-app-review.md](docs/meta-app-review.md) - Meta App Review submission copy.
+- [docs/meta-marketing-api-setup.md](docs/meta-marketing-api-setup.md) - Meta Marketing API setup guide.
+- [docs/multi-platform-mcp-design.md](docs/multi-platform-mcp-design.md) - multi-platform MCP architecture.
+- [docs/north-stars.md](docs/north-stars.md) - Weekly Active Writers and D0 Write Users metric definitions.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Production deploys automatically from `main` through Vercel Git integration.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Production URL: [https://www.notfair.co](https://www.notfair.co)
+
+Health check: [https://www.notfair.co/api/health](https://www.notfair.co/api/health)

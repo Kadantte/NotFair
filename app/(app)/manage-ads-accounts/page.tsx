@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { db, schema } from "@/lib/db";
@@ -37,6 +38,7 @@ type Props = {
  *      pages.
  */
 export default async function ManageAdsAccountsPage({ searchParams }: Props) {
+  const t = await getTranslations("ManageAdsAccounts");
   const sp = await searchParams;
   const next = sp.next && sp.next.startsWith("/") ? sp.next : null;
 
@@ -77,12 +79,19 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
     `/api/auth/signin?prompt=select_account+consent&next=${encodeURIComponent(next ?? "/manage-ads-accounts")}`;
 
   const googleCard = isAdsLess ? (
-    <AdsLessGoogleEntry switchHref={switchGoogleHref} googleEmail={googleEmail} />
+    <AdsLessGoogleEntry
+      switchHref={switchGoogleHref}
+      googleEmail={googleEmail}
+      title={t("addGoogleTitle")}
+      fallbackAccount={t("thisGoogleAccount")}
+      switchLabel={t("switchGoogleAccount")}
+      warning={t("noGoogleAccountWarning")}
+    />
   ) : (
     <PlatformCard
       href={googleHref}
-      title="Add Google Ads account"
-      description="Connect a Google Ads customer or MCC."
+      title={t("addGoogleTitle")}
+      description={t("addGoogleDescription")}
       iconSrc="/google-ads-icon.svg"
     />
   );
@@ -101,8 +110,8 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
   ) : (
     <PlatformCard
       href={metaHref}
-      title={hasMeta ? "Manage Meta Ads accounts" : "Add Meta Ads account"}
-      description="Connect a Facebook + Instagram ad account."
+      title={hasMeta ? t("manageMetaTitle") : t("addMetaTitle")}
+      description={t("addMetaDescription")}
       iconSrc="/meta-icon.svg"
     />
   );
@@ -118,11 +127,10 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
           <div className="w-full max-w-xl">
             <div className="mb-8 text-center">
               <h1 className="text-3xl font-bold text-[#E8E4DD]">
-                Connect your first ad account
+                {t("firstHeadline")}
               </h1>
               <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
-                NotFair needs at least one ad account to get to work.
-                Pick a platform below to continue.
+                {t("firstBody")}
               </p>
             </div>
             <div className="space-y-3">
@@ -130,7 +138,7 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
               {metaCard}
             </div>
             <p className="mt-6 text-center text-xs text-[#C4C0B6]/70">
-              You can add more platforms later from the navbar account menu.
+              {t("firstNote")}
             </p>
           </div>
         </div>
@@ -143,9 +151,9 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
         <div className="mx-auto max-w-2xl">
           <header className="mb-8">
-            <h1 className="text-2xl font-semibold text-[#E8E4DD]">Add ad account</h1>
+            <h1 className="text-2xl font-semibold text-[#E8E4DD]">{t("headline")}</h1>
             <p className="mt-1.5 text-sm text-[#C4C0B6]">
-              Pick the platform you want to connect to NotFair.
+              {t("body")}
             </p>
           </header>
           <div className="space-y-3">
@@ -161,9 +169,17 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
 function AdsLessGoogleEntry({
   switchHref,
   googleEmail,
+  title,
+  fallbackAccount,
+  warning,
+  switchLabel,
 }: {
   switchHref: string;
   googleEmail: string | null;
+  title: string;
+  fallbackAccount: string;
+  warning: string;
+  switchLabel: string;
 }) {
   return (
     <div className="rounded-xl border border-[#D4882A]/40 bg-[#D4882A]/[0.04] px-5 py-4">
@@ -179,24 +195,23 @@ function AdsLessGoogleEntry({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-base font-medium text-[#E8E4DD]">Add Google Ads account</p>
+          <p className="text-base font-medium text-[#E8E4DD]">{title}</p>
           <p className="mt-1 inline-flex items-start gap-1.5 text-sm text-[#D4882A]">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              No Google Ads account under{" "}
+              {warning}{" "}
               {googleEmail ? (
                 <span className="font-medium text-[#E8E4DD]">{googleEmail}</span>
               ) : (
-                "this Google account"
+                fallbackAccount
               )}
-              . Switch to a Google account that has Ads access.
             </span>
           </p>
           <Link
             href={switchHref}
             className="mt-3 inline-flex h-9 items-center rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] hover:bg-[#3D9A5C]"
           >
-            Switch Google account
+            {switchLabel}
           </Link>
         </div>
       </div>

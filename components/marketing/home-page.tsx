@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import {
   ArrowRight,
   ArrowUp,
@@ -35,6 +36,7 @@ function ConnectClaudeCTA({
   position: "hero" | "final";
 }) {
   const [loading, setLoading] = useState(false);
+  const t = useTranslations("CTA");
 
   function handleClick() {
     if (loading) return;
@@ -62,44 +64,17 @@ function ConnectClaudeCTA({
       {loading ? (
         <span className="inline-flex items-center gap-2">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-black border-t-transparent" />
-          Connecting...
+          {t("connecting")}
         </span>
       ) : (
         <>
-          {label ?? "Connect Google Ads"}
+          {label ?? t("connectGoogleAds")}
           {!label && <ArrowRight className="ml-1 h-5 w-5" />}
         </>
       )}
     </Button>
   );
 }
-
-const HOME_FAQ_ITEMS: { q: string; a: string }[] = [
-  {
-    q: "Will NotFair make changes without my approval?",
-    a: "No. NotFair can read your account freely, but every write tool surfaces a diff first. You confirm before anything hits Google Ads — and any change is reversible with a single tool call.",
-  },
-  {
-    q: "Which AI clients does this work with?",
-    a: "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex, Cursor, Cline, OpenClaw, Hermes Agent, and custom MCP clients. The server URL is the same — only the per-client config differs.",
-  },
-  {
-    q: "Do I need to know what to fix before I start?",
-    a: "No. Lead with the business problem — leads got expensive, ROAS slipped, something changed. The agent diagnoses the likely cause, ranks fixes by spend at risk, and drafts the campaign edits for your approval.",
-  },
-  {
-    q: "What can the agent actually change?",
-    a: "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts, and reporting workflows — all on Google Ads. Every write is approval-gated and logged.",
-  },
-  {
-    q: "How does authentication work?",
-    a: "OAuth 2.0 with PKCE by default — Claude.ai and Codex run it automatically. For clients that don't support OAuth, generate a Bearer token at notfair.co/connect. Either way, NotFair never asks an LLM to handle credentials directly.",
-  },
-  {
-    q: "Is there a free tier?",
-    a: "Yes. Connecting and running audits is free, no credit card. The Free plan includes 7 days of unlimited access, then 300 MCP operations per month forever. Upgrade to Growth when Claude becomes your daily ads operator.",
-  },
-];
 
 function AccordionFaqItem({ q, a, defaultOpen }: { q: string; a: string; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(!!defaultOpen);
@@ -194,9 +169,6 @@ const lineTransition = {
   ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
 };
 
-const initialQuestion = "Why did leads get more expensive, and what should I fix?";
-const followUpQuestion = "Apply the approved negative and keyword changes.";
-
 function ChatReveal({ show, children }: { show: boolean; children: ReactNode }) {
   return (
     <div className="relative">
@@ -242,9 +214,10 @@ function SmoothListItem({ children, delay = 0, className }: { children: ReactNod
 
 function HeroMockup() {
   const reached = useChatStep();
+  const t = useTranslations("Home.chat");
   const has = (k: StepKey) => reached.has(k);
   const sent = has("user");
-  const inputText = !sent ? initialQuestion : has("followUp") ? followUpQuestion : "";
+  const inputText = !sent ? t("initialQuestion") : has("followUp") ? t("followUpQuestion") : "";
 
   return (
     <motion.div
@@ -266,7 +239,7 @@ function HeroMockup() {
             </span>
             <span>Claude + NotFair</span>
             <span className="text-[#5A5852]">·</span>
-            <span className="text-[#4CAF6E]">demo</span>
+            <span className="text-[#4CAF6E]">{t("demo")}</span>
           </div>
         </div>
 
@@ -275,7 +248,7 @@ function HeroMockup() {
             <ChatReveal show={has("user")}>
               <div className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-[#2E2D28] px-4 py-2.5 text-sm text-[#E8E4DD]">
-                  {initialQuestion}
+                  {t("initialQuestion")}
                 </div>
               </div>
             </ChatReveal>
@@ -283,7 +256,7 @@ function HeroMockup() {
             <ChatReveal show={has("intro")}>
               <p className="text-sm leading-relaxed text-[#E8E4DD]">
                 <SmoothLine>
-                  I’ll inspect spend, search terms, structure, and recent changes before recommending fixes.
+                  {t("intro")}
                 </SmoothLine>
               </p>
             </ChatReveal>
@@ -306,7 +279,7 @@ function HeroMockup() {
                   <ChatReveal show={has("toolSummary")}>
                     <div className="flex items-center gap-2 text-[#9B9689]">
                       <Check className="h-3 w-3 shrink-0 text-[#4CAF6E]" />
-                      <span className="truncate">Found 3 issues and drafted a prioritized fix list</span>
+                      <span className="truncate">{t("foundSummary")}</span>
                     </div>
                   </ChatReveal>
                 </div>
@@ -317,21 +290,21 @@ function HeroMockup() {
               <div className="space-y-2">
                 <p className="text-sm leading-relaxed text-[#E8E4DD]">
                   <SmoothLine>
-                    Found <span className="font-semibold">3 issues</span> to fix:
+                    {t("findingsTitle", { count: 3 })}
                   </SmoothLine>
                 </p>
                 <ul className="space-y-1.5 pl-1 text-sm leading-relaxed text-[#C4C0B6]">
                   <SmoothListItem delay={0.12} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">34%</span> of spend is coming from loose-match queries</span>
+                    <span>{t("finding1")}</span>
                   </SmoothListItem>
                   <SmoothListItem delay={0.24} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">23</span> negatives recommended to block mismatched searches</span>
+                    <span>{t("finding2")}</span>
                   </SmoothListItem>
                   <SmoothListItem delay={0.36} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span><span className="font-mono-jb font-semibold text-[#E8E4DD]">4</span> ad groups should be split before budget increases</span>
+                    <span>{t("finding3")}</span>
                   </SmoothListItem>
                 </ul>
               </div>
@@ -341,11 +314,11 @@ function HeroMockup() {
               <div className="rounded-xl border border-[#E8B931]/30 bg-[#E8B931]/[0.04] p-3">
                 <p className="text-xs leading-relaxed text-[#C4C0B6]">
                   <SmoothLine>
-                    <span className="font-semibold text-[#E8E4DD]">NotFair</span> wants to run{" "}
+                    <span className="font-semibold text-[#E8E4DD]">{t("permission1")}</span>{" "}
                     <span className="font-mono-jb text-[#E8B931]">applyRecommendedFixes</span>
                   </SmoothLine>
                   <SmoothLine delay={0.12}>
-                    to apply 23 negatives and 80 keyword edits
+                    {t("permission2")}
                   </SmoothLine>
                 </p>
                 <motion.div
@@ -355,13 +328,13 @@ function HeroMockup() {
                   className="mt-3 grid grid-cols-3 gap-1.5"
                 >
                   <button className="rounded-lg bg-[#E8E4DD] px-2 py-2 text-xs font-semibold text-[#1A1917]">
-                    Approve
+                    {t("approve")}
                   </button>
                   <button className="rounded-lg border border-[#4D4C46] bg-[#2E2D28] px-2 py-2 text-xs font-medium text-[#E8E4DD]">
-                    Approve once
+                    {t("approveOnce")}
                   </button>
                   <button className="rounded-lg border border-[#4D4C46] bg-[#2E2D28] px-2 py-2 text-xs font-medium text-[#E8E4DD]">
-                    Deny
+                    {t("deny")}
                   </button>
                 </motion.div>
               </div>
@@ -381,7 +354,7 @@ function HeroMockup() {
                     transition={{ duration: 0.25, ease: "easeOut" }}
                     className="inline-block"
                   >
-                    {inputText || "Ask what to fix next"}
+                    {inputText || t("placeholder")}
                   </motion.span>
                 </AnimatePresence>
                 {!sent && (
@@ -441,6 +414,10 @@ export function HomePage({
   pricing: Omit<PricingSectionProps, "page">;
 }) {
   const session = useSession();
+  const t = useTranslations("Home");
+  const ctaT = useTranslations("CTA");
+  const faqItems = t.raw("faq") as { q: string; a: string }[];
+  const trustItems = t.raw("trustItems") as string[];
 
   return (
     <>
@@ -472,7 +449,7 @@ export function HomePage({
                 }}
               />
               <span className="text-[#E8E4DD]">
-                Diagnose and fix Google Ads from Claude — approval-gated writes, live on GitHub
+                {t("githubBanner")}
               </span>
               <GitHubStarBadge stars={githubStars} />
             </a>
@@ -486,13 +463,13 @@ export function HomePage({
               className="text-center lg:text-left"
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                AI Google Ads strategist + execution layer
+                {t("eyebrow")}
               </p>
               <h1 className="font-display mx-auto mt-4 max-w-3xl text-5xl font-bold leading-[0.98] tracking-tight text-[#E8E4DD] sm:text-6xl lg:mx-0 lg:text-7xl">
-                Find what’s wrong. Fix it from Claude.
+                {t("headline")}
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#C4C0B6] lg:mx-0">
-                NotFair gives Claude live Google Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.
+                {t("subhead")}
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
@@ -503,14 +480,14 @@ export function HomePage({
                     page="homepage"
                     position="hero"
                     variant="secondary"
-                    disconnectedLabel="Run free audit"
-                    connectedLabel="View audit"
+                    disconnectedLabel={ctaT("runFreeAudit")}
+                    connectedLabel={ctaT("viewAudit")}
                   />
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-[#C4C0B6] lg:justify-start">
-                  <span>Diagnose issues</span>
-                  <span>Draft fixes</span>
-                  <span>Approve every write</span>
+                  {trustItems.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
                 </div>
               </div>
             </motion.div>
@@ -522,13 +499,13 @@ export function HomePage({
 
       <McpSetupHero surface="home" />
 
-      <MarketingEngineSection />
+      <MarketingEngineSection title={t("engineTitle")} body={t("engineBody")} />
 
       <section className="border-t border-[#3D3C36] px-4 py-16 sm:py-20">
         <div className="container mx-auto max-w-6xl">
           <PricingSection {...pricing} page="homepage" />
           <p className="mt-6 text-sm text-[#C4C0B6]">
-            Spending $50K+/mo?{" "}
+            {t("highSpend")}{" "}
             <Link
               href={`mailto:${CONTACT_EMAIL}`}
               onClick={() =>
@@ -541,7 +518,7 @@ export function HomePage({
               }
               className="inline-block py-2 font-medium text-[#4CAF6E] underline underline-offset-4 hover:text-[#3D9A5C]"
             >
-              Let&rsquo;s talk
+              {t("letsTalk")}
             </Link>
           </p>
         </div>
@@ -552,16 +529,16 @@ export function HomePage({
       <section className="border-t border-[#3D3C36] px-4 py-20 md:py-28">
         <div className="container mx-auto max-w-6xl">
           <div className="flex items-center gap-4 text-[11px] font-medium uppercase tracking-[0.22em] text-[#C4C0B6]/70">
-            <span>FAQ</span>
+            <span>{t("faqLabel")}</span>
             <span className="h-px flex-1 bg-[#3D3C36]" />
-            <span className="font-mono">{HOME_FAQ_ITEMS.length} answers</span>
+            <span className="font-mono">{t("answers", { count: faqItems.length })}</span>
           </div>
           <h2 className="font-display mt-8 max-w-3xl text-3xl font-bold uppercase leading-[1.05] tracking-tight text-[#E8E4DD] md:text-4xl">
-            Common questions.
+            {t("faqTitle")}
           </h2>
 
           <div className="mt-10 border-t border-[#3D3C36]">
-            {HOME_FAQ_ITEMS.map((item, i) => (
+            {faqItems.map((item, i) => (
               <AccordionFaqItem
                 key={item.q}
                 q={item.q}
@@ -579,26 +556,26 @@ export function HomePage({
           {/* Editorial closer */}
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#C4C0B6]/70">
-              Closing
+              {t("closingLabel")}
             </p>
             <h2
               className="mt-6 text-3xl leading-snug text-[#E8E4DD] md:text-5xl md:leading-[1.1]"
               style={{ fontFamily: "Newsreader, Georgia, serif", fontStyle: "italic" }}
             >
-              Now go find what&apos;s wrong.
+              {t("closingHeadline")}
             </h2>
             <div className="mt-10 flex justify-center">
               <ConnectClaudeCTA session={session} position="final" />
             </div>
             <p className="mx-auto mt-6 max-w-md text-[11px] leading-relaxed text-[#C4C0B6]">
-              Free to connect · By connecting, you agree to our{" "}
+              {t("legalPrefix")}{" "}
               <Link
                 href="/privacy"
                 className="text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]"
               >
                 Privacy Policy
               </Link>{" "}
-              and{" "}
+              {t("legalAnd")}{" "}
               <Link
                 href="/terms"
                 className="text-[#E8E4DD] underline underline-offset-4 hover:text-[#4CAF6E]"

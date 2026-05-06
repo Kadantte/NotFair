@@ -1,6 +1,17 @@
 # Changelog
 
-All notable changes to AdsAgent will be documented in this file.
+All notable changes to NotFair will be documented in this file.
+
+
+## [0.3.7.0] - 2026-05-06
+
+### Added
+- **International users can now use NotFair in French, German, Thai, Brazilian Portuguese, and Spanish.** Browser language detection routes localized home visits automatically, while the language switcher lets users change language from marketing and app surfaces.
+- **Core onboarding and account-management flows now use localized product copy.** Login, connect, account selection, account switching, navigation, footer, homepage, and audit CTAs now read from shared translation bundles.
+
+### Fixed
+- **Non-English browsers no longer get sent to missing localized public pages.** Public pages such as pricing, MCP guides, and OAuth callbacks stay on working canonical routes while preserving the user's locale preference.
+- **Translation bundles are now covered by regression tests.** The suite checks locale routing behavior plus message-key and placeholder parity across all supported languages.
 
 
 ## [0.3.6.1] - 2026-05-06

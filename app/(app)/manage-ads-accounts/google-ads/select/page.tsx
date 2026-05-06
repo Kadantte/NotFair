@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { AccountSelector, type SelectableAccount } from '@/components/account-selector';
 import { getSession } from '@/lib/session';
-import { parseCustomerIds } from '@/lib/google-ads';
 
 type Props = {
     searchParams: Promise<{
@@ -25,6 +25,7 @@ type Props = {
  * /manage-ads-accounts where they pick a platform.
  */
 export default async function GoogleAdsSelectRoute({ searchParams }: Props) {
+    const t = await getTranslations('ManageAdsAccounts');
     const sp = await searchParams;
 
     const accounts = parseAccounts(sp.accounts);
@@ -71,8 +72,8 @@ export default async function GoogleAdsSelectRoute({ searchParams }: Props) {
                         preselectedIds={preselected}
                         next={next}
                         submitEndpoint="/api/auth/select-account"
-                        headline={mode === 'update' ? 'Manage Google Ads accounts' : 'Select your Google Ads accounts'}
-                        body="Pick the Google Ads accounts you want NotFair to manage."
+                        headline={mode === 'update' ? t('manageGoogleHeadline') : t('selectGoogleHeadline')}
+                        body={t('pickGoogleAccountsBody')}
                     />
                 </div>
             </div>

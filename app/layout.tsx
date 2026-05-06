@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import { AppToaster } from "@/components/app-toaster";
 import "./sonner.css";
 import "./globals.css";
@@ -83,7 +85,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getSession();
+  const [locale, messages, session] = await Promise.all([
+    getLocale(),
+    getMessages(),
+    getSession(),
+  ]);
   const bootstrapUser = session.connected && session.userId
     ? {
         distinctId: session.userId,
@@ -96,7 +102,7 @@ export default async function RootLayout({
     : null;
 
   return (
-    <html lang="en" suppressHydrationWarning className="h-full" style={{ colorScheme: "dark" }}>
+    <html lang={locale} suppressHydrationWarning className="h-full" style={{ colorScheme: "dark" }}>
       <head>
         <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
         <link
@@ -140,11 +146,13 @@ export default async function RootLayout({
           a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
           twq('config','q27qa');`}
         </Script>
-        <PostHogProvider bootstrapUser={bootstrapUser}>
-          <GadsConversionTracker />
-          {children}
-          <AppToaster />
-        </PostHogProvider>
+        <NextIntlClientProvider messages={messages}>
+          <PostHogProvider bootstrapUser={bootstrapUser}>
+            <GadsConversionTracker />
+            {children}
+            <AppToaster />
+          </PostHogProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

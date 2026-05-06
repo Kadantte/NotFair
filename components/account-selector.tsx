@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -55,9 +56,12 @@ export function AccountSelector({
     preselectedIds = [],
     next,
     submitEndpoint,
-    headline = 'Select accounts',
-    body = 'Pick the accounts you want NotFair to manage.',
+    headline,
+    body,
 }: AccountSelectorProps) {
+    const t = useTranslations('AccountSelector');
+    const displayHeadline = headline ?? t('headline');
+    const displayBody = body ?? t('body');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(
         () => new Set(preselectedIds.filter((id) => accounts.some((a) => a.id === id))),
     );
@@ -67,7 +71,7 @@ export function AccountSelector({
     // populated), so subsequent saves must use the cookie session — keep
     // sending the pendingToken would 404 against the empty-customerId
     // lookup at /api/auth/select-account.
-    const [activePendingToken, setActivePendingToken] = useState<string | null>(pendingToken);
+    const [activePendingToken] = useState<string | null>(pendingToken);
 
     // Re-seed only when the candidate-id SET changes (e.g. nav between
     // platforms). Server re-renders pass new array references with the same
@@ -97,7 +101,7 @@ export function AccountSelector({
                     key,
                     label: a.loginCustomerId
                         ? a.loginCustomerName || `Manager ${a.loginCustomerId}`
-                        : 'Direct access',
+                        : t('directAccess'),
                     isManager: !!a.loginCustomerId,
                     accounts: [],
                 });
@@ -105,7 +109,7 @@ export function AccountSelector({
             groups.get(key)!.accounts.push(a);
         }
         return Array.from(groups.values());
-    }, [accounts]);
+    }, [accounts, t]);
 
     function toggleAccount(id: string) {
         setSelectedIds((prev) => {
@@ -149,7 +153,7 @@ export function AccountSelector({
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || data.error) {
-                setError(typeof data.error === 'string' ? data.error : 'Failed to save selection.');
+                setError(typeof data.error === 'string' ? data.error : t('saveFailed'));
                 setSubmitting(false);
                 return;
             }
@@ -159,23 +163,23 @@ export function AccountSelector({
             // that when present, otherwise fall back to /connect/google-ads.
             window.location.assign(data.redirectUrl ?? '/connect/google-ads?connected=1');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to save selection.');
+            setError(err instanceof Error ? err.message : t('saveFailed'));
             setSubmitting(false);
         }
     }
 
     const saveLabel = submitting
-        ? mode === 'update' ? 'Saving…' : 'Connecting…'
+        ? mode === 'update' ? t('saving') : t('connecting')
         : mode === 'update'
-            ? `Save${selectedIds.size ? ` (${selectedIds.size})` : ''}`
-            : `Connect${selectedIds.size ? ` ${selectedIds.size}` : ''}`;
+            ? t('save', { count: selectedIds.size })
+            : t('connect', { count: selectedIds.size });
 
     return (
         <div className="mx-auto max-w-2xl">
             <header className="mb-6 flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-semibold text-[#E8E4DD]">{headline}</h1>
-                    <p className="mt-1.5 text-sm text-[#C4C0B6]">{body}</p>
+                    <h1 className="text-2xl font-semibold text-[#E8E4DD]">{displayHeadline}</h1>
+                    <p className="mt-1.5 text-sm text-[#C4C0B6]">{displayBody}</p>
                 </div>
             </header>
 
@@ -189,7 +193,7 @@ export function AccountSelector({
                             disabled={submitting || allSelected}
                             className="rounded-md border border-[#3D3C36] bg-[#1A1917] px-2.5 py-1 text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-40"
                         >
-                            Select all
+                            {t('selectAll')}
                         </button>
                         <button
                             type="button"
@@ -197,11 +201,11 @@ export function AccountSelector({
                             disabled={submitting || noneSelected}
                             className="rounded-md border border-[#3D3C36] bg-[#1A1917] px-2.5 py-1 text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-40"
                         >
-                            Clear
+                            {t('clear')}
                         </button>
                     </div>
                     <span className="text-xs text-[#C4C0B6] tabular-nums">
-                        {selectedIds.size} of {accounts.length} selected
+                        {t('selectedCount', { selected: selectedIds.size, total: accounts.length })}
                     </span>
                 </div>
 
@@ -213,13 +217,13 @@ export function AccountSelector({
                                 <div className="flex items-center gap-2 bg-[#1A1917]/40 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#C4C0B6]/80">
                                     {group.isManager ? (
                                         <>
-                                            <span>Via manager</span>
+                                            <span>{t('viaManager')}</span>
                                             <span className="rounded border border-[#3D3C36] bg-[#1A1917] px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-[#E8E4DD]">
                                                 {group.label}
                                             </span>
                                         </>
                                     ) : (
-                                        <span>Direct access</span>
+                                        <span>{t('directAccess')}</span>
                                     )}
                                 </div>
                             )}
@@ -250,7 +254,7 @@ export function AccountSelector({
                                                     <p className="mt-0.5 text-xs text-[#C4C0B6]">
                                                         <code className="font-mono-jb">{account.id}</code>
                                                         {account.loginCustomerName && (
-                                                            <span> · via manager {account.loginCustomerName}</span>
+                                                            <span> · {t('viaManagerLower', { manager: account.loginCustomerName })}</span>
                                                         )}
                                                     </p>
                                                 </div>
@@ -268,7 +272,7 @@ export function AccountSelector({
 
             <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
                 {isDirty && !submitting && (
-                    <span className="mr-auto text-xs text-[#D4882A]">Unsaved changes</span>
+                    <span className="mr-auto text-xs text-[#D4882A]">{t('unsavedChanges')}</span>
                 )}
                 <Button
                     onClick={save}

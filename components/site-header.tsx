@@ -3,6 +3,8 @@ import { Star } from "lucide-react";
 import { AuditCTA } from "@/components/marketing/audit-cta";
 import { SetupGuidesMenu } from "@/components/setup-guides-menu";
 import { BrandLockup } from "@/components/brand-lockup";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useTranslations } from "next-intl";
 
 function formatStars(count: number): string {
     if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -37,6 +39,8 @@ function NavLink({ href, label, className = "" }: { href: string; label: string;
 }
 
 export function SiteHeader({ connected = false }: { connected?: boolean } = {}) {
+    const t = useTranslations("Header");
+
     return (
         <header className="sticky top-0 z-50 w-full border-b border-[#3D3C36] bg-[#1A1917]/90 backdrop-blur-sm">
             <div className="container mx-auto flex h-14 items-center justify-between gap-6 px-4 md:px-6">
@@ -50,23 +54,24 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
                     <NavLink href="/mcp" label="MCP" className="hidden sm:inline" />
-                    <NavLink href="/google-ads-claude-connector-setup-guide" label="Google Ads Claude Connector Setup Guide" className="hidden lg:inline" />
+                    <NavLink href="/google-ads-claude-connector-setup-guide" label={t("setupGuide")} className="hidden lg:inline" />
                     <SetupGuidesMenu className="hidden md:flex" />
-                    <NavLink href="/pricing" label="Pricing" className="hidden sm:inline" />
+                    <NavLink href="/pricing" label={t("pricing")} className="hidden sm:inline" />
+                    <LanguageSwitcher className="hidden lg:block" />
                     <a
                         href="https://cal.com/tong-chen-uuovdl/30min"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hidden h-9 items-center rounded-full border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-4 text-sm font-medium text-[#4CAF6E] transition-colors hover:border-[#4CAF6E]/60 hover:bg-[#4CAF6E]/20 sm:inline-flex"
                     >
-                        Book a Demo
+                        {t("bookDemo")}
                     </a>
                     <AuditCTA
                         session={{ connected }}
                         page="header"
                         size="sm"
-                        connectedLabel="Start now"
-                        disconnectedLabel="Start now"
+                        connectedLabel={t("startNow")}
+                        disconnectedLabel={t("startNow")}
                         connectedDestination="/connect"
                         disconnectedDestination="/connect"
                     />

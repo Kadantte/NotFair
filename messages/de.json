@@ -1,0 +1,233 @@
+{
+  "LocaleSwitcher": {
+    "label": "Sprache",
+    "current": "Aktuelle Sprache"
+  },
+  "Header": {
+    "setupGuide": "Google Ads Claude Connector Setup-Anleitung",
+    "pricing": "Preise",
+    "bookDemo": "Demo buchen",
+    "startNow": "Jetzt starten"
+  },
+  "Footer": {
+    "description": "KI-gestutzte Google Ads Diagnose und Ausfuhrung fur Claude. Probleme finden, Korrekturen vorbereiten und jeden Schreibzugriff freigeben.",
+    "articles": "Artikel",
+    "company": "Unternehmen",
+    "privacy": "Datenschutzerklarung",
+    "terms": "Nutzungsbedingungen",
+    "rights": "Alle Rechte vorbehalten.",
+    "setupGuideLinks": {
+      "googleAdsClaudeConnector": "Google Ads Claude Connector Einrichtungsanleitung",
+      "googleAdsClaudeCode": "Google Ads Claude Code Plugin Einrichtungsanleitung",
+      "googleAdsCodex": "Google Ads Codex MCP Einrichtungsanleitung",
+      "googleAdsMcp": "Google Ads MCP Server (jeder Client)",
+      "metaAdsClaudeConnector": "Meta Ads Claude Connector Einrichtungsanleitung",
+      "metaAdsClaudeCode": "Meta Ads Claude Code Plugin Einrichtungsanleitung",
+      "metaAdsCodex": "Meta Ads Codex MCP Einrichtungsanleitung",
+      "metaAdsMcp": "Meta Ads MCP Server (jeder Client)"
+    }
+  },
+  "CTA": {
+    "connecting": "Verbinde...",
+    "connectGoogleAds": "Google Ads verbinden",
+    "runFreeAudit": "Kostenlosen Audit starten",
+    "viewAudit": "Audit ansehen"
+  },
+  "Home": {
+    "githubBanner": "Google Ads aus Claude diagnostizieren und korrigieren - freigegebene Schreibzugriffe, live auf GitHub",
+    "eyebrow": "KI-Google-Ads-Stratege + Ausfuhrungsebene",
+    "headline": "Finden, was falsch lauft. Direkt aus Claude korrigieren.",
+    "subhead": "NotFair gibt Claude Live-Zugriff auf Google Ads, um Probleme zu diagnostizieren, Korrekturen zu empfehlen und Kampagnenanderungen erst nach Ihrer Freigabe auszufuhren.",
+    "trustItems": [
+      "Probleme diagnostizieren",
+      "Korrekturen entwerfen",
+      "Jeden Schreibzugriff freigeben"
+    ],
+    "chat": {
+      "initialQuestion": "Warum sind Leads teurer geworden, und was soll ich korrigieren?",
+      "followUpQuestion": "Wende die freigegebenen Negatives und Keyword-Anderungen an.",
+      "intro": "Ich prufe Ausgaben, Suchbegriffe, Struktur und aktuelle Anderungen, bevor ich Korrekturen empfehle.",
+      "foundSummary": "3 Probleme gefunden und eine priorisierte Korrekturliste erstellt",
+      "findingsTitle": "{count} Probleme zu beheben:",
+      "finding1": "34 % der Ausgaben kommen aus zu weit gefassten Suchanfragen",
+      "finding2": "23 negative Keywords empfohlen, um unpassende Suchanfragen zu blockieren",
+      "finding3": "4 Anzeigengruppen sollten vor Budgeterhohungen getrennt werden",
+      "permission1": "NotFair mochte ausfuhren",
+      "permission2": "um 23 Negatives und 80 Keyword-Edits anzuwenden",
+      "approve": "Freigeben",
+      "approveOnce": "Einmal freigeben",
+      "deny": "Ablehnen",
+      "placeholder": "Fragen Sie, was als Nachstes korrigiert werden soll",
+      "demo": "Demo"
+    },
+    "engineTitle": "Eine komplette Marketing-Engine in Ihrem Agenten",
+    "engineBody": "Diagnosen, Audits, Schreibzugriffe und Undo - alles uber eine MCP-Verbindung pro Ads-Konto.",
+    "highSpend": "Mehr als 50.000 $/Monat Spend?",
+    "letsTalk": "Sprechen wir",
+    "faqLabel": "FAQ",
+    "answers": "{count} Antworten",
+    "faqTitle": "Haufige Fragen.",
+    "faq": [
+      {
+        "q": "Nimmt NotFair Anderungen ohne meine Freigabe vor?",
+        "a": "Nein. NotFair kann Ihr Konto frei lesen, aber jedes Schreibwerkzeug zeigt zuerst einen Diff. Sie bestatigen, bevor etwas in Google Ads landet - und jede Anderung ist mit einem einzelnen Tool-Aufruf reversibel."
+      },
+      {
+        "q": "Mit welchen KI-Clients funktioniert das?",
+        "a": "Mit allem, was den MCP Streamable HTTP Transport spricht: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex, Cursor, Cline, OpenClaw, Hermes Agent und eigene MCP-Clients. Die Server-URL bleibt gleich - nur die Client-Konfiguration unterscheidet sich."
+      },
+      {
+        "q": "Muss ich vorher wissen, was repariert werden soll?",
+        "a": "Nein. Beginnen Sie mit dem Business-Problem - Leads wurden teurer, ROAS ist gefallen, etwas hat sich verandert. Der Agent diagnostiziert die wahrscheinliche Ursache, priorisiert Korrekturen nach gefahrdetem Spend und entwirft Kampagnenanderungen zur Freigabe."
+      },
+      {
+        "q": "Was kann der Agent tatsachlich andern?",
+        "a": "Keywords, Negatives, Gebote, Budgets, Anzeigen, Anzeigengruppen, Kampagneneinstellungen, Zielgruppen, Skripte und Reporting-Workflows - alles in Google Ads. Jeder Schreibzugriff ist freigabepflichtig und protokolliert."
+      },
+      {
+        "q": "Wie funktioniert die Authentifizierung?",
+        "a": "Standardmassig OAuth 2.0 mit PKCE - Claude.ai und Codex starten das automatisch. Fur Clients ohne OAuth erzeugen Sie unter notfair.co/connect einen Bearer Token. NotFair bittet niemals ein LLM, Zugangsdaten direkt zu verarbeiten."
+      },
+      {
+        "q": "Gibt es eine kostenlose Stufe?",
+        "a": "Ja. Verbindung und Audits sind kostenlos, ohne Kreditkarte. Free enthalt 7 Tage unbegrenzten Zugriff, danach dauerhaft 300 MCP-Operationen pro Monat. Wechseln Sie zu Growth, wenn Claude Ihr taglicher Ads-Operator wird."
+      }
+    ],
+    "closingLabel": "Schluss",
+    "closingHeadline": "Finden Sie jetzt, was falsch lauft.",
+    "legalPrefix": "Kostenlos verbinden - Durch die Verbindung akzeptieren Sie unsere",
+    "legalAnd": "und"
+  },
+  "Connect": {
+    "headline": "Google Ads-Konto verbinden",
+    "body": "Melden Sie sich mit Google an, damit NotFair Ihre Anzeigenkonten findet und die MCP-Einrichtung vorbereitet.",
+    "signInWithGoogle": "Mit Google anmelden",
+    "oauthNote": "OAuth hält Ihre Zugangsdaten aus dem KI-Client heraus.",
+    "or": "oder",
+    "demoIntro": "Möchten Sie das Produkt zuerst sehen? Öffnen Sie einen schreibgeschützten Demo-Arbeitsbereich.",
+    "startingDemo": "Demo wird gestartet...",
+    "exploreDemo": "Demo-Modus erkunden",
+    "demoNote": "Demo-Daten sind synthetisch und sicher zum Ausprobieren.",
+    "authFailed": "Authentifizierung fehlgeschlagen. Bitte erneut versuchen.",
+    "demoFailed": "Demo-Modus konnte nicht gestartet werden. Bitte erneut versuchen.",
+    "helpAria": "Hilfe bei der Einrichtung buchen",
+    "needHelp": "Brauchen Sie Hilfe?",
+    "error": {
+      "scopeHeadline": "Google Ads-Zugriff ist erforderlich",
+      "scopeBody": "NotFair kann Ihre Kampagnen ohne Google Ads-Berechtigung nicht lesen oder ändern. Lassen Sie diese Berechtigung beim Fortfahren auf dem Google-Zustimmungsbildschirm aktiviert.",
+      "scopeHelper": "Achten Sie auf die Checkbox zum Anzeigen, Bearbeiten, Erstellen und Löschen Ihrer Google Ads-Konten und -Daten. Wenn Sie sie deaktivieren, kann NotFair Ihre Kampagnen nicht sehen.",
+      "scopeCta": "Fortfahren und Google Ads-Zugriff erlauben",
+      "genericHeadline": "Wir konnten Ihr Konto nicht vollständig verbinden",
+      "genericBody": "Auf unserer Seite ist etwas schiefgelaufen. Bitte erneut versuchen. Wenn es weiter fehlschlägt, helfen wir Ihnen gerne.",
+      "genericCta": "Erneut mit Google versuchen"
+    }
+  },
+  "AccountSelector": {
+    "headline": "Anzeigenkonten auswählen",
+    "body": "Wählen Sie die Konten aus, die NotFair verwalten soll.",
+    "directAccess": "Direkter Zugriff",
+    "saveFailed": "Kontenauswahl konnte nicht gespeichert werden",
+    "saving": "Speichern...",
+    "connecting": "Verbinden...",
+    "save": "Speichern{count, plural, =0 {} other { (#)}}",
+    "connect": "Verbinden{count, plural, =0 {} other { #}}",
+    "selectAll": "Alle auswählen",
+    "clear": "Leeren",
+    "selectedCount": "{selected} von {total} ausgewählt",
+    "viaManager": "Über Manager",
+    "viaManagerLower": "über {manager}",
+    "unsavedChanges": "Nicht gespeicherte Änderungen"
+  },
+  "ManageAdsAccounts": {
+    "back": "Zurück zu Plattformen",
+    "addGoogleTitle": "Google Ads-Konto hinzufügen",
+    "addGoogleDescription": "Verbinden oder aktualisieren Sie die Google Ads-Konten, die NotFair verwalten darf.",
+    "manageMetaTitle": "Meta Ads-Konten verwalten",
+    "addMetaTitle": "Meta Ads-Konto hinzufügen",
+    "addMetaDescription": "Verbinden Sie Meta Ads, sobald Ihr Konto für die Beta freigegeben ist.",
+    "firstHeadline": "Verbinden Sie eine Anzeigenplattform, um fortzufahren",
+    "firstBody": "Wählen Sie die Anzeigenkonten aus, die NotFair verwalten soll. Weitere können Sie später hinzufügen.",
+    "firstNote": "NotFair handelt nur für Konten, die Sie ausdrücklich auswählen.",
+    "headline": "Anzeigenkonten verwalten",
+    "body": "Fügen Sie Plattformen hinzu und wählen Sie die Anzeigenkonten aus, die in NotFair verfügbar sind.",
+    "thisGoogleAccount": "diesem Google-Konto",
+    "noGoogleAccountWarning": "Kein Google Ads-Konto unter",
+    "switchGoogleAccount": "Google-Konto wechseln",
+    "enumerationError": "Google Ads-Konten konnten nicht geladen werden",
+    "noGoogleHeadline": "Keine Google Ads-Konten für diese Identität",
+    "noGoogleBodyBefore": "Das Google-Konto, mit dem Sie angemeldet sind, besitzt keine Google Ads-Konten. Verwenden Sie eine andere Google-Identität mit Ads-Zugriff oder erstellen Sie ein Google Ads-Konto unter",
+    "noGoogleBodyAfter": " und kommen Sie zurück.",
+    "tryDifferentGoogle": "Anderes Google-Konto versuchen",
+    "selectGoogleHeadline": "Google Ads-Konten auswählen",
+    "manageGoogleHeadline": "Google Ads-Konten verwalten",
+    "googleSelectorBody": "Welche Google Ads-Konten möchten Sie verwalten?",
+    "pickGoogleAccountsBody": "Wählen Sie die Google Ads-Konten aus, die NotFair verwalten soll.",
+    "connectMcpTitle": "Mit Google Ads MCP verbinden",
+    "connectMcpBody": "Verbinden Sie Claude, Codex oder einen beliebigen MCP-Client mit Ihren Google Ads-Konten.",
+    "connectMcpCta": "MCP verbinden"
+  },
+  "UserMenu": {
+    "account": "Konto",
+    "signedInAs": "Angemeldet als",
+    "openingPortal": "Portal wird geöffnet...",
+    "manageSubscription": "Abo verwalten",
+    "signingOut": "Abmelden...",
+    "signOut": "Abmelden"
+  },
+  "AccountSwitcher": {
+    "account": "Konto",
+    "viewingAs": "Ansicht als {account}",
+    "addAccount": "Konto hinzufügen"
+  },
+  "AppNav": {
+    "connectMcp": "MCP verbinden",
+    "campaigns": "Kampagnen",
+    "audit": "Audit",
+    "impactMonitor": "Impact-Monitor",
+    "operations": "Operationen",
+    "chat": "Chat",
+    "newChat": "Neuer Chat",
+    "usage": "Nutzung",
+    "upgrade": "Upgrade",
+    "pricing": "Preise",
+    "joinDiscord": "Discord beitreten",
+    "home": "Start",
+    "impact": "Impact",
+    "free": "Kostenlos",
+    "notAvailableForPlatform": "Für die aktive Plattform nicht verfügbar",
+    "trialEndsTodayAria": "Unbegrenzter Zugriff endet heute - upgraden, um ihn zu behalten",
+    "trialDaysLeftAria": "Unbegrenzter Zugriff - noch {days, plural, one {# Tag} other {# Tage}} - upgraden",
+    "trialEndsToday": "Unbegrenzter Zugriff endet heute",
+    "trialDaysLeft": "Unbegrenzter Zugriff - noch {days, plural, one {# Tag} other {# Tage}}",
+    "monthlyCapReachedAria": "Monatliches Gratis-Limit erreicht - upgraden Sie auf Growth für unbegrenzte Operationen",
+    "monthlyCapReached": "Monatliches Gratis-Limit erreicht - für unbegrenzt upgraden",
+    "monthlyLimitNearAria": "Monatliches Gratis-Limit fast erreicht - upgraden Sie auf Growth",
+    "monthlyLimitNear": "Monatslimit fast erreicht - für unbegrenzt upgraden",
+    "trialEndingSoonAria": "Kostenlose Testphase endet bald - upgraden Sie auf Growth",
+    "freeTrialEndsToday": "Kostenlose Testphase endet heute - upgraden, um unbegrenzten Zugriff zu behalten",
+    "freeTrialDaysLeft": "Kostenlose Testphase endet in {days, plural, one {# Tag} other {# Tagen}} - upgraden, um unbegrenzten Zugriff zu behalten",
+    "capReachedShort": "Limit erreicht - Upgrade",
+    "monthlyLimitNearShort": "Limit fast erreicht - Upgrade",
+    "freeTrialEndsTodayShort": "Testphase endet heute - Upgrade",
+    "freeTrialDaysLeftShort": "Testphase endet in {days, plural, one {# Tag} other {# Tagen}} - Upgrade",
+    "trialEndsTodayShort": "Testphase endet heute - Upgrade",
+    "trialDaysLeftShort": "{days} T übrig - Upgrade"
+  },
+  "Login": {
+    "headline": "Bei {brand} anmelden",
+    "subhead": "Google Ads mit KI verwalten",
+    "signInWithGoogle": "Mit Google anmelden",
+    "or": "oder",
+    "sendMagicLink": "Magic Link senden",
+    "emailHelp": "Wir senden einen Anmeldelink an Ihre E-Mail-Adresse. Kein Passwort nötig.",
+    "emailSent": "Prüfen Sie Ihre E-Mail für den Anmeldelink.",
+    "errors": {
+      "consentDenied": "Sie haben die Anmeldung abgebrochen. Bitte erneut versuchen und auf „Zulassen“ klicken.",
+      "scopeDenied": "Die Google Ads-Berechtigung wurde nicht erteilt. Bitte erneut versuchen und die „Google Ads“-Checkbox aktiviert lassen.",
+      "missingCode": "Die Authentifizierung wurde unterbrochen. Bitte erneut anmelden.",
+      "expired": "Ihre Anmeldesitzung ist abgelaufen. Bitte erneut versuchen.",
+      "tokenExchange": "Google-Authentifizierung fehlgeschlagen. Bitte gleich erneut versuchen.",
+      "generic": "Authentifizierung fehlgeschlagen. Bitte erneut versuchen."
+    }
+  }
+}
