@@ -1,5 +1,33 @@
 # Migration: `mcp_sessions` → `ad_platform_connections` + Supabase Auth
 
+## Status
+
+| Phase | Status |
+|---|---|
+| 1 — Dual-write Google connection state | **Shipped 2026-05-05, in bake** |
+| 2 — Reads + OAuth tokens move to connections | Not started |
+| 3 — Direct-bearer MCP cutoff | Not started |
+| 4 — Switch web cookie to Supabase Auth | Not started |
+| 5 — Drop `mcp_sessions` | Not started |
+
+### Phase 1 progress (as of 2026-05-05)
+
+- **Deploy commit:** `c74e4da` (`feat(connections): phase-1 dual-write google ads to ad_platform_connections`).
+- **Backfill applied:** 437 `ad_platform_connections` rows seeded (484 live `mcp_sessions` rows → 437 distinct users; 52 ads-less / pending; 47 multi-device duplicates collapsed).
+- **Invariant check:** OK at deploy time — every live `mcp_sessions` user has a matching `google_ads` connection row.
+- **Tests:** 1,286 passing (4 new dual-write assertions).
+- **Bake started:** 2026-05-05.
+- **Earliest phase-2 start:** 2026-05-12 (≥1 week of clean dual-write traffic).
+
+### Phase 1 bake-time checklist (must all be green before phase 2)
+
+- [ ] `pnpm db:check-google-connection-invariant` returns OK every day for 7 consecutive days.
+- [ ] Spot-check fresh signups: `SELECT count(*) FROM ad_platform_connections WHERE platform = 'google_ads' AND created_at > '2026-05-05'` is non-zero and grows daily — proves dual-write is firing for new users, not just the backfill.
+- [ ] Spot-check account-switch consistency: for users who switched accounts via the navbar post-deploy, `mcp_sessions.customer_id` and `ad_platform_connections.active_account_id` must match.
+- [ ] Re-run `pnpm db:backfill-google-connections --apply` immediately before kicking off phase 2 as a final sweep.
+
+If any check fails: identify the missing write site, fix it, re-run the backfill, and reset the bake clock.
+
 ## Goal
 
 Retire the `mcp_sessions` table entirely. Move Google Ads connection state to `ad_platform_connections` (where Meta already lives), let Supabase Auth own web sessions, and let `oauth_access_tokens` (RFC 6749) + `oauth_clients` (RFC 7591 DCR) own MCP authentication.
@@ -47,7 +75,9 @@ Five phases. Phases 1–2 are the bulk of the work. Phase 3 is the user-facing r
 
 ---
 
-### Phase 1 — Dual-write Google connection state to `ad_platform_connections`
+### Phase 1 — Dual-write Google connection state to `ad_platform_connections` ✅ SHIPPED
+
+**Status:** shipped on 2026-05-05 in `c74e4da`. In bake — see [Phase 1 progress](#phase-1-progress-as-of-2026-05-05) above.
 
 **Goal:** every write site for `mcp_sessions` Google data also upserts `ad_platform_connections` with `platform = "google_ads"`. Reads still go to `mcp_sessions`. Zero behavior change for users.
 
@@ -390,6 +420,19 @@ Today the MCP OAuth path checks `mcp_sessions.expiresAt`, not `oauth_access_toke
 | 5 | ~200 | 1 | — |
 | **Total** | **~2,300** | **8–11** | **~6–8 weeks** |
 
-## First PR
+## What shipped in phase 1 (`c74e4da`)
 
-Phase 1, part 1: add `lib/connections/google.ts` with `upsertGoogleConnection()` + dual-write in `mintAdsLessSession()`. Smallest, lowest-risk slice that exercises the helper end-to-end. Subsequent PRs add the other write sites incrementally.
+- `lib/connections/google.ts` — three helpers: `upsertGoogleConnection`, `refreshGoogleConnectionCredentials` (preserves curation), `setGoogleConnectionActiveAccount`.
+- `lib/db/schema.ts` — type-only extension to `accountIds` jsonb adding `loginCustomerId?: string \| null` per row (no migration; jsonb is permissive).
+- Dual-write at every Google `mcp_sessions` write site, each wrapped in `db().transaction()`:
+  - `app/auth/callback/route.ts` — `mintAdsLessSession`, single-account, multi-account-pending, `reuseExistingSession`.
+  - `app/api/auth/select-account/route.ts` — curated selection mirror.
+  - `app/api/auth/switch-account/route.ts` — `activeAccountId` flip via `setGoogleConnectionActiveAccount`.
+- `scripts/backfill-google-connections.ts` — dry-run by default, `--apply` to persist; idempotent on `(user_id, platform)`.
+- `scripts/check-google-connection-invariant.ts` — exits 1 if any live `mcp_sessions` user lacks a matching `google_ads` connection row.
+- npm scripts: `db:backfill-google-connections`, `db:check-google-connection-invariant`.
+- Tests: extended `auth-callback.test.ts` and `select-account-route.test.ts` with dual-write assertions.
+
+## Next action
+
+Run the bake-time checklist (top of doc) for ≥7 days. When all gates are green, kick off [Phase 2](#phase-2--reads--oauth-tokens-move-to-ad_platform_connections).
