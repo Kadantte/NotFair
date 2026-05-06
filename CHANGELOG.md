@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.13.0] - 2026-05-06
+
+### Added
+- **Claude and other MCP clients can now create, link, and unlink Google Ads sitelinks.** The Google Ads MCP exposes dedicated sitelink write tools for account, campaign, and ad-group targets, with validation, change logging, undo-compatible responses, and protobuf coverage so agents can execute sitelink work instead of sending users back to the Google Ads UI.
+
 ## [0.3.12.0] - 2026-05-06
 
 ### Changed

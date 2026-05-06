@@ -151,6 +151,12 @@ export type CreateStructuredSnippetAssetResponse = WriteToolResponse;
 export type LinkStructuredSnippetAssetResponse = WriteToolResponse;
 export type UnlinkStructuredSnippetAssetResponse = WriteToolResponse;
 
+// Sitelinks
+export type AddSitelinkAssetResponse = WriteToolResponse;
+export type CreateSitelinkAssetResponse = WriteToolResponse;
+export type LinkSitelinkAssetResponse = WriteToolResponse;
+export type UnlinkSitelinkAssetResponse = WriteToolResponse;
+
 // Image assets
 export type CreateImageAssetResponse = WriteToolResponse;
 export type LinkImageAssetResponse = WriteToolResponse;
@@ -281,6 +287,10 @@ export interface McpToolResponseRegistry {
   createStructuredSnippetAsset: CreateStructuredSnippetAssetResponse;
   linkStructuredSnippetAsset: LinkStructuredSnippetAssetResponse;
   unlinkStructuredSnippetAsset: UnlinkStructuredSnippetAssetResponse;
+  addSitelinkAsset: AddSitelinkAssetResponse;
+  createSitelinkAsset: CreateSitelinkAssetResponse;
+  linkSitelinkAsset: LinkSitelinkAssetResponse;
+  unlinkSitelinkAsset: UnlinkSitelinkAssetResponse;
   createImageAsset: CreateImageAssetResponse;
   linkImageAsset: LinkImageAssetResponse;
   createBiddingStrategy: CreateBiddingStrategyResponse;

@@ -1,0 +1,234 @@
+import { getCachedCustomer } from "./client";
+import {
+  createAssetExtensionWithLinks,
+  linkAssetExtension,
+  normalizeAssetExtensionTargets,
+  removeAssetExtensionLink,
+  type AssetExtensionMutationResult,
+  type AssetExtensionTarget,
+} from "./asset-extensions";
+import { isValidFinalUrl } from "./helpers";
+import type { AuthContext, WriteResult } from "./types";
+
+export type SitelinkAsset = {
+  assetId: string;
+  resourceName: string;
+  linkText: string;
+  finalUrls: string[];
+  description1: string;
+  description2: string;
+  linkedAtAccount: boolean;
+  accountLinkResourceName: string | null;
+};
+
+export type SitelinkAssetParams = {
+  linkText: string;
+  finalUrl: string;
+  description1?: string;
+  description2?: string;
+};
+
+export type AddSitelinkAssetParams = SitelinkAssetParams & {
+  targets?: AssetExtensionTarget[];
+};
+
+type SitelinkAssetRow = {
+  asset?: {
+    id?: string | number;
+    resource_name?: string;
+    final_urls?: string[];
+    sitelink_asset?: {
+      link_text?: string;
+      description1?: string;
+      description2?: string;
+    };
+  };
+};
+type CustomerAssetLinkRow = {
+  customer_asset?: {
+    asset?: string;
+    resource_name?: string;
+  };
+};
+
+function normalizeSitelinkInput(
+  params: SitelinkAssetParams,
+): { linkText?: string; finalUrl?: string; description1?: string; description2?: string; error?: string } {
+  const linkText = params.linkText.trim();
+  const finalUrl = params.finalUrl.trim();
+  const description1 = params.description1?.trim() ?? "";
+  const description2 = params.description2?.trim() ?? "";
+
+  if (!linkText) return { error: "Sitelink text cannot be empty" };
+  if (linkText.length > 25) return { error: "Sitelink text must be 25 characters or fewer" };
+  if (!isValidFinalUrl(finalUrl)) return { error: "Sitelink finalUrl must be a valid http(s) URL" };
+  if ((description1 && !description2) || (!description1 && description2)) {
+    return { error: "Sitelink descriptions must be provided as a pair: description1 and description2" };
+  }
+  if (description1.length > 35) return { error: "Sitelink description1 must be 35 characters or fewer" };
+  if (description2.length > 35) return { error: "Sitelink description2 must be 35 characters or fewer" };
+
+  return { linkText, finalUrl, description1, description2 };
+}
+
+function sitelinkAssetResource(input: {
+  linkText: string;
+  finalUrl: string;
+  description1?: string;
+  description2?: string;
+}): Record<string, unknown> {
+  return {
+    final_urls: [input.finalUrl],
+    sitelink_asset: {
+      link_text: input.linkText,
+      ...(input.description1 && input.description2
+        ? { description1: input.description1, description2: input.description2 }
+        : {}),
+    },
+  };
+}
+
+export async function listSitelinkAssets(auth: AuthContext): Promise<SitelinkAsset[]> {
+  const customer = getCachedCustomer(auth);
+
+  const assetsResult = await customer.query(`
+    SELECT
+      asset.id,
+      asset.resource_name,
+      asset.final_urls,
+      asset.sitelink_asset.link_text,
+      asset.sitelink_asset.description1,
+      asset.sitelink_asset.description2
+    FROM asset
+    WHERE asset.type = SITELINK
+    LIMIT 500
+  `);
+
+  const linksResult = await customer.query(`
+    SELECT
+      customer_asset.asset,
+      customer_asset.resource_name,
+      customer_asset.field_type,
+      customer_asset.status
+    FROM customer_asset
+    WHERE customer_asset.field_type = SITELINK
+      AND customer_asset.status != REMOVED
+  `);
+
+  const linkByAsset = new Map<string, string>();
+  for (const row of linksResult as CustomerAssetLinkRow[]) {
+    const assetResource = row.customer_asset?.asset;
+    const linkResource = row.customer_asset?.resource_name;
+    if (assetResource && linkResource) linkByAsset.set(assetResource, linkResource);
+  }
+
+  return (assetsResult as SitelinkAssetRow[]).map((row) => {
+    const assetResource = row.asset?.resource_name ?? "";
+    const accountLinkResourceName = linkByAsset.get(assetResource) ?? null;
+    return {
+      assetId: String(row.asset?.id ?? ""),
+      resourceName: assetResource,
+      linkText: row.asset?.sitelink_asset?.link_text ?? "",
+      finalUrls: row.asset?.final_urls ?? [],
+      description1: row.asset?.sitelink_asset?.description1 ?? "",
+      description2: row.asset?.sitelink_asset?.description2 ?? "",
+      linkedAtAccount: accountLinkResourceName !== null,
+      accountLinkResourceName,
+    };
+  });
+}
+
+export async function createSitelinkAsset(
+  auth: AuthContext,
+  params: SitelinkAssetParams & { linkToAccount?: boolean },
+): Promise<WriteResult> {
+  const normalized = normalizeSitelinkInput(params);
+  if (normalized.error) {
+    return {
+      success: false,
+      action: "create_sitelink_asset",
+      entityId: "",
+      beforeValue: "",
+      afterValue: JSON.stringify({ linkText: params.linkText, finalUrl: params.finalUrl }),
+      error: normalized.error,
+    };
+  }
+
+  const input = normalized as { linkText: string; finalUrl: string; description1?: string; description2?: string };
+  return createAssetExtensionWithLinks(auth, {
+    assetType: "SITELINK",
+    assetResource: sitelinkAssetResource(input),
+    targets: params.linkToAccount ? [{ level: "account" }] : [],
+    action: "create_sitelink_asset",
+    afterValue: `${input.linkText} -> ${input.finalUrl}`,
+    label: input.linkText,
+  });
+}
+
+export async function addSitelinkAsset(
+  auth: AuthContext,
+  params: AddSitelinkAssetParams,
+): Promise<AssetExtensionMutationResult> {
+  const normalized = normalizeSitelinkInput(params);
+  const targets = normalizeAssetExtensionTargets(params.targets);
+  if (params.targets !== undefined && targets.length === 0) {
+    return {
+      success: false,
+      action: "add_sitelink_asset",
+      entityId: "",
+      beforeValue: "",
+      afterValue: JSON.stringify({ linkText: params.linkText, finalUrl: params.finalUrl }),
+      error: "addSitelinkAsset requires at least one target when targets is provided. Omit targets to link at account level.",
+      assetType: "SITELINK",
+      assetId: "",
+      assetResourceName: "",
+    };
+  }
+  if (normalized.error) {
+    return {
+      success: false,
+      action: "add_sitelink_asset",
+      entityId: "",
+      beforeValue: "",
+      afterValue: JSON.stringify({ linkText: params.linkText, finalUrl: params.finalUrl }),
+      error: normalized.error,
+      assetType: "SITELINK",
+      assetId: "",
+      assetResourceName: "",
+    };
+  }
+
+  const input = normalized as { linkText: string; finalUrl: string; description1?: string; description2?: string };
+  return createAssetExtensionWithLinks(auth, {
+    assetType: "SITELINK",
+    assetResource: sitelinkAssetResource(input),
+    targets,
+    action: "add_sitelink_asset",
+    afterValue: `${input.linkText} -> ${input.finalUrl}`,
+    label: input.linkText,
+  });
+}
+
+export async function linkSitelinkAsset(
+  auth: AuthContext,
+  params: { assetId: string; target: AssetExtensionTarget },
+): Promise<AssetExtensionMutationResult> {
+  return linkAssetExtension(auth, {
+    assetType: "SITELINK",
+    assetId: params.assetId,
+    target: params.target,
+    action: "link_sitelink_asset",
+  });
+}
+
+export async function unlinkSitelinkAsset(
+  auth: AuthContext,
+  params: { assetId: string; target: AssetExtensionTarget },
+): Promise<AssetExtensionMutationResult> {
+  return removeAssetExtensionLink(auth, {
+    assetType: "SITELINK",
+    assetId: params.assetId,
+    target: params.target,
+    action: "unlink_sitelink_asset",
+  });
+}

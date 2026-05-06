@@ -14,6 +14,7 @@ export * from "./pmax";
 export * from "./asset-extensions";
 export * from "./callouts";
 export * from "./structured-snippets";
+export * from "./sitelinks";
 export * from "./image-assets";
 export * from "./bidding-strategies";
 export * from "./negative-keyword-lists";

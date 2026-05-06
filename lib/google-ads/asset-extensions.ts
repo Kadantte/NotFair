@@ -5,6 +5,7 @@ import type { AuthContext, WriteResult } from "./types";
 export const ASSET_EXTENSION_FIELD_TYPE = {
   CALLOUT: 11,
   STRUCTURED_SNIPPET: 12,
+  SITELINK: 13,
 } as const;
 
 export type AssetExtensionType = keyof typeof ASSET_EXTENSION_FIELD_TYPE;

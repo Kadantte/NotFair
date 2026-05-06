@@ -54,6 +54,10 @@ import {
   linkStructuredSnippetAsset,
   unlinkStructuredSnippetAsset,
   STRUCTURED_SNIPPET_HEADERS,
+  addSitelinkAsset,
+  createSitelinkAsset,
+  linkSitelinkAsset,
+  unlinkSitelinkAsset,
   createImageAsset,
   fetchImageAssetFromUrl,
   linkImageAsset,
@@ -1530,6 +1534,75 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }, safeHandler(async ({ accountId, assetId, target }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkStructuredSnippetAsset(targetAuth, { assetId, target }));
+    return typedResult(result);
+  }));
+
+  // ─── Sitelink Extensions ─────────────────────────────────────────
+
+  server.registerTool("addSitelinkAsset", {
+    description: "Create a sitelink extension and link it to account, campaign, or ad group targets in one workflow. Use this for requests like 'add these sitelinks to these campaigns'. Sitelink text must be ≤25 chars; descriptions are optional but must be supplied as a pair and each ≤35 chars. Defaults to account-level when targets is omitted. Returns changeId, assetId, and link resource names.",
+    inputSchema: {
+      accountId: accountIdParam,
+      linkText: z.string().min(1).max(25).describe("Sitelink text (≤25 chars), e.g. 'Pricing'"),
+      finalUrl: z.string().url().describe("Destination URL for the sitelink"),
+      description1: z.string().max(35).optional().describe("Optional sitelink description line 1 (≤35 chars). If provided, description2 is also required."),
+      description2: z.string().max(35).optional().describe("Optional sitelink description line 2 (≤35 chars). If provided, description1 is also required."),
+      targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific sitelinks."),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, targets }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execAssetExtensionWrite(
+      auth,
+      targetId,
+      firstCampaignTargetId(targets),
+      () => addSitelinkAsset(targetAuth, { linkText, finalUrl, description1, description2, targets }),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("createSitelinkAsset", {
+    description: "Low-level compatibility tool: create a sitelink extension. Prefer addSitelinkAsset for new workflows because it supports account/campaign/ad group targets. Set linkToAccount=true to link it at the customer/account level. Returns changeId + assetId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      linkText: z.string().min(1).max(25).describe("Sitelink text (≤25 chars), e.g. 'Pricing'"),
+      finalUrl: z.string().url().describe("Destination URL for the sitelink"),
+      description1: z.string().max(35).optional().describe("Optional sitelink description line 1 (≤35 chars). If provided, description2 is also required."),
+      description2: z.string().max(35).optional().describe("Optional sitelink description line 2 (≤35 chars). If provided, description1 is also required."),
+      linkToAccount: z.boolean().default(false).describe("Also link the new asset at the customer/account level"),
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, linkToAccount }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => createSitelinkAsset(targetAuth, { linkText, finalUrl, description1, description2, linkToAccount }));
+    return typedResult(result);
+  }));
+
+  server.registerTool("linkSitelinkAsset", {
+    description: "Link an existing sitelink asset to an account, campaign, or ad group target. Prefer addSitelinkAsset when creating a new sitelink. Returns changeId and link resource names.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
+      target: assetExtensionTargetSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, target }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => linkSitelinkAsset(targetAuth, { assetId, target }));
+    return typedResult(result);
+  }));
+
+  server.registerTool("unlinkSitelinkAsset", {
+    description: "Remove a sitelink asset link from an account, campaign, or ad group target. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
+      target: assetExtensionTargetSchema,
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, target }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkSitelinkAsset(targetAuth, { assetId, target }));
     return typedResult(result);
   }));
 

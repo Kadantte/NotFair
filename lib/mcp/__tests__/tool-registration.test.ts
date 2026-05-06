@@ -270,6 +270,8 @@ describe("MCP write tools — smoke", () => {
     expect(names).toContain("linkCalloutAsset");
     expect(names).toContain("addStructuredSnippetAsset");
     expect(names).toContain("linkStructuredSnippetAsset");
+    expect(names).toContain("addSitelinkAsset");
+    expect(names).toContain("linkSitelinkAsset");
   });
 
   it("pauseKeyword flows through execWrite and returns a WriteResult with changeId", async () => {
@@ -359,6 +361,83 @@ describe("MCP write tools — smoke", () => {
     });
     expect(mockMutateResources.mock.calls[0][0]).toHaveLength(3);
     expect(vi.mocked(execWrite).mock.calls.map((call) => call[2])).toEqual(["100", "200"]);
+  });
+
+  it("addSitelinkAsset flows through execWrite and links to campaigns", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { asset_result: { resource_name: "customers/1234567890/assets/999" } },
+        { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~13" } },
+      ],
+    });
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("addSitelinkAsset", {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+      description1: "See current plans",
+      description2: "Compare every option",
+      targets: [{ level: "campaign", campaignId: "100" }],
+    });
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: true,
+      action: "add_sitelink_asset",
+      entityId: "999",
+      changeId: 1,
+    });
+    expect(mockMutateResources.mock.calls[0][0][0].resource).toMatchObject({
+      final_urls: ["https://example.com/pricing"],
+      sitelink_asset: {
+        link_text: "Pricing",
+        description1: "See current plans",
+        description2: "Compare every option",
+      },
+    });
+    expect(mockMutateResources.mock.calls[0][0][1].resource).toMatchObject({
+      campaign: "customers/1234567890/campaigns/100",
+      field_type: 13,
+    });
+  });
+
+  it("createSitelinkAsset defaults to creating without account-level link", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { asset_result: { resource_name: "customers/1234567890/assets/999" } },
+      ],
+    });
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("createSitelinkAsset", {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+    });
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: true,
+      action: "create_sitelink_asset",
+      entityId: "999",
+      changeId: 1,
+    });
+    expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
+    expect(mockMutateResources.mock.calls[0][0][0].entity).toBe("asset");
+  });
+
+  it("addSitelinkAsset rejects an explicit empty targets array", async () => {
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("addSitelinkAsset", {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+      targets: [],
+    });
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: false,
+      action: "add_sitelink_asset",
+      error: expect.stringContaining("requires at least one target"),
+      changeId: 1,
+    });
+    expect(mockMutateResources).not.toHaveBeenCalled();
   });
 
   it("bulkPauseKeywords fails atomically when pre-validation finds a negative keyword", async () => {

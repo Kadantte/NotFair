@@ -83,6 +83,9 @@ import {
   linkCalloutAsset,
   addStructuredSnippetAsset,
   unlinkStructuredSnippetAsset,
+  addSitelinkAsset,
+  linkSitelinkAsset,
+  unlinkSitelinkAsset,
   type AuthContext,
 } from "@/lib/google-ads";
 
@@ -861,6 +864,53 @@ describe("protobuf validation: asset extensions", () => {
     await unlinkStructuredSnippetAsset(AUTH, {
       assetId: "999",
       target: { level: "campaign", campaignId: "100" },
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("addSitelinkAsset creates an asset and campaign_asset link", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            { asset_result: { resource_name: "customers/1234567890/assets/999" } },
+            { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~13" } },
+          ],
+        }),
+      );
+    });
+
+    await addSitelinkAsset(AUTH, {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+      description1: "See current plans",
+      description2: "Compare every option",
+      targets: [{ level: "campaign", campaignId: "100" }],
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("linkSitelinkAsset creates an account-level customer_asset link", async () => {
+    await linkSitelinkAsset(AUTH, {
+      assetId: "999",
+      target: { level: "account" },
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("unlinkSitelinkAsset removes link resources as strings", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        ad_group_asset: {
+          resource_name: "customers/1234567890/adGroupAssets/111~999~13",
+        },
+      },
+    ]);
+
+    await unlinkSitelinkAsset(AUTH, {
+      assetId: "999",
+      target: { level: "ad_group", adGroupId: "111" },
     });
     assertAllCapturedOpsEncode();
   });
