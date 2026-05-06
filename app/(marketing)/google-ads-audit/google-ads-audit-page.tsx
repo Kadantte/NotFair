@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import {
   Target,
   Layers,
@@ -17,101 +18,33 @@ import { allVerticalAuditPages } from "@/lib/vertical-audit-pages";
 
 /* ─────────────────────────────────────────────────────── Data ──────────── */
 
-const auditPasses = [
-  {
-    icon: AlertTriangle,
-    name: "Stop Wasting",
-    tag: "Pass 1",
-    description:
-      "Identifies non-converting keywords, irrelevant search terms, and structural waste — with exact dollar amounts so you know what to cut first.",
-  },
-  {
-    icon: TrendingUp,
-    name: "Capture More",
-    tag: "Pass 2",
-    description:
-      "Finds budget-constrained campaigns that are winning auctions but running out of gas, plus converting search terms you haven't added as keywords yet.",
-  },
-  {
-    icon: Layers,
-    name: "Fix Fundamentals",
-    tag: "Pass 3",
-    description:
-      "Surfaces structural issues — conversion tracking gaps, campaign organization, ad copy quality, and bidding strategy fit — that compound over time.",
-  },
-];
+type CardCopy = {
+  name: string;
+  tag?: string;
+  description: string;
+};
 
-const pulseMetrics = [
-  {
-    icon: DollarSign,
-    name: "Waste Rate",
-    description:
-      "What percentage of your spend goes to keywords and search terms with zero conversions. Lower is better.",
-  },
-  {
-    icon: BarChart3,
-    name: "Demand Captured",
-    description:
-      "How much of the available search demand you're actually showing up for on profitable campaigns. Higher is better.",
-  },
-  {
-    icon: Target,
-    name: "CPA",
-    description:
-      "Your cost per conversion. The audit tracks this over time so you can see the impact of changes.",
-  },
-];
+type FindingCopy = {
+  label: string;
+  finding: string;
+  impact: string;
+};
 
-const findings = [
-  {
-    label: "Search Term Waste",
-    finding: "47 irrelevant search terms",
-    impact: "$2,847/mo",
-    color: "#C45D4A",
-  },
-  {
-    label: "Keyword Performance",
-    finding: "23 keywords with zero conversions",
-    impact: "$1,200/mo wasted",
-    color: "#D4882A",
-  },
-  {
-    label: "Conversion Tracking",
-    finding: "Conversion tracking not verified",
-    impact: "Blind to results",
-    color: "#C45D4A",
-  },
-  {
-    label: "Impression Share",
-    finding: "Impression share lost to budget: 34%",
-    impact: "Ceiling on growth",
-    color: "#D4882A",
-  },
-];
+type StepCopy = {
+  num: string;
+  title: string;
+  desc: string;
+};
 
-const howItWorks = [
-  {
-    num: "1",
-    title: "Connect Google Ads",
-    desc: "One-click OAuth. Read-only access — we can't make changes until you explicitly approve them. Takes 30 seconds.",
-  },
-  {
-    num: "2",
-    title: "AI runs the analysis",
-    desc: "Our engine analyzes your campaigns, keywords, search terms, impression share, and conversion setup.",
-  },
-  {
-    num: "3",
-    title: "Get your fix list",
-    desc: "You get 3 pulse metrics, a prioritized 3-pass action plan, and the exact dollar impact of each fix.",
-  },
-];
+type MockPulseCopy = {
+  label: string;
+  value: string;
+};
 
-const mockPulse = [
-  { label: "Waste Rate", value: "18%", color: "#D4882A" },
-  { label: "Demand Captured", value: "42%", color: "#D4882A" },
-  { label: "CPA", value: "$34.20", color: "#E8E4DD" },
-];
+const auditPassIcons = [AlertTriangle, TrendingUp, Layers];
+const pulseMetricIcons = [DollarSign, BarChart3, Target];
+const findingColors = ["#C45D4A", "#D4882A", "#C45D4A", "#D4882A"];
+const mockPulseColors = ["#D4882A", "#D4882A", "#E8E4DD"];
 
 /* ─────────────────────────────────────────────── Sub-components ────────── */
 
@@ -119,6 +52,24 @@ const mockPulse = [
 
 export function GoogleAdsAuditPage() {
   const session = useSession();
+  const t = useTranslations("GoogleAdsAuditPage");
+  const auditPasses = (t.raw("auditPasses.items") as CardCopy[]).map((copy, index) => ({
+    ...copy,
+    icon: auditPassIcons[index],
+  }));
+  const pulseMetrics = (t.raw("pulseMetrics.items") as CardCopy[]).map((copy, index) => ({
+    ...copy,
+    icon: pulseMetricIcons[index],
+  }));
+  const findings = (t.raw("findings.items") as FindingCopy[]).map((copy, index) => ({
+    ...copy,
+    color: findingColors[index],
+  }));
+  const howItWorks = t.raw("howItWorks.items") as StepCopy[];
+  const mockPulse = (t.raw("mockPulse.items") as MockPulseCopy[]).map((copy, index) => ({
+    ...copy,
+    color: mockPulseColors[index],
+  }));
 
   return (
     <div className="bg-[#1A1917] text-[#E8E4DD]">
@@ -133,24 +84,23 @@ export function GoogleAdsAuditPage() {
               transition={{ duration: 0.6, ease: "easeOut" }}
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                Free · No credit card · 5 minutes
+                {t("hero.eyebrow")}
               </p>
               <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-[56px]">
-                Free Google Ads
+                {t("hero.title.line1")}
                 <br />
-                Audit — know exactly
+                {t("hero.title.line2")}
                 <br />
-                <span className="text-[#4CAF6E]">what to fix next.</span>
+                <span className="text-[#4CAF6E]">{t("hero.title.highlight")}</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                AI diagnoses your account in 5 minutes. See your waste rate,
-                missed opportunities, structural issues, and a 3-step fix list — free.
+                {t("hero.body")}
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3">
                 <AuditCTA session={session} page="google-ads-audit" size="lg" />
                 <p className="text-sm text-[#C4C0B6]">
-                  Just connect to Google — no forms, no credit card, nothing to fill in.
+                  {t("hero.note")}
                 </p>
               </div>
             </motion.div>
@@ -163,7 +113,7 @@ export function GoogleAdsAuditPage() {
               className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 md:p-8"
             >
               <p className="mb-5 text-xs font-semibold uppercase tracking-[0.15em] text-[#C4C0B6]">
-                Pulse Metrics
+                {t("sampleCard.title")}
               </p>
 
               <div className="grid grid-cols-3 gap-3">
@@ -175,7 +125,7 @@ export function GoogleAdsAuditPage() {
                 ))}
               </div>
 
-              <p className="mt-4 text-xs text-[#C4C0B6]">Sample audit result</p>
+              <p className="mt-4 text-xs text-[#C4C0B6]">{t("sampleCard.caption")}</p>
 
               <div className="mt-6 border-t border-[#3D3C36] pt-5">
                 <div className="flex items-center gap-2">
@@ -184,7 +134,7 @@ export function GoogleAdsAuditPage() {
                     <span className="font-semibold text-[#C45D4A]">
                       $4,047/mo
                     </span>{" "}
-                    in identified waste
+                    {t("sampleCard.wasteSuffix")}
                   </span>
                 </div>
               </div>
@@ -204,10 +154,10 @@ export function GoogleAdsAuditPage() {
             className="mb-12"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              3 action passes
+              {t("auditPasses.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              A prioritized fix list, not just a score.
+              {t("auditPasses.title")}
             </h2>
           </motion.div>
 
@@ -249,10 +199,10 @@ export function GoogleAdsAuditPage() {
             className="mt-12"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              3 pulse metrics
+              {t("pulseMetrics.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
-              Track progress over time.
+              {t("pulseMetrics.title")}
             </h2>
           </motion.div>
 
@@ -294,12 +244,10 @@ export function GoogleAdsAuditPage() {
               viewport={{ once: true, margin: "-60px" }}
             >
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-                What a typical audit finds.
+                {t("findings.title")}
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-                Most accounts running Google Ads for 6+ months have accumulated
-                significant waste. Here&apos;s what we commonly uncover in the first
-                analysis.
+                {t("findings.body")}
               </p>
             </motion.div>
 
@@ -346,10 +294,10 @@ export function GoogleAdsAuditPage() {
             className="mb-12"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              How it works
+              {t("howItWorks.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              From connect to insights in 5 minutes.
+              {t("howItWorks.title")}
             </h2>
           </motion.div>
 
@@ -399,15 +347,13 @@ export function GoogleAdsAuditPage() {
             className="mb-10 max-w-3xl"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              By industry
+              {t("verticals.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Google Ads audits tuned for your vertical.
+              {t("verticals.title")}
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-              Every industry leaks money in different places. Pick your vertical
-              for a version of this audit that knows the specific checks,
-              benchmarks, and fix patterns that matter for your account.
+              {t("verticals.body")}
             </p>
           </motion.div>
 
@@ -424,7 +370,7 @@ export function GoogleAdsAuditPage() {
                     {v.industry}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-[#C4C0B6]">
-                    Spend {v.spendRange} · CPC {v.cpcRange}
+                    {t("verticals.spendLabel")} {v.spendRange} · {t("verticals.cpcLabel")} {v.cpcRange}
                   </p>
                 </div>
                 <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[#4CAF6E] transition-transform group-hover:translate-x-0.5" />
@@ -446,18 +392,17 @@ export function GoogleAdsAuditPage() {
           >
             <div className="max-w-xl">
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-                Get your free audit now.
+                {t("finalCta.title")}
               </h2>
               <p className="mt-3 text-base text-[#C4C0B6]">
-                Takes 5 minutes. No changes made to your account. No credit card
-                required.
+                {t("finalCta.body")}
               </p>
             </div>
 
             <div className="flex flex-col items-start gap-3">
               <AuditCTA session={session} page="google-ads-audit" size="lg" />
               <p className="text-sm text-[#C4C0B6]">
-                Just connect to Google — no forms, no credit card, nothing to fill in.
+                {t("hero.note")}
               </p>
             </div>
           </motion.div>

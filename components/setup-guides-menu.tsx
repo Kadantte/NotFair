@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { SVGProps } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -84,8 +85,7 @@ function OpenAIIcon(props: SVGProps<SVGSVGElement>) {
 
 type Guide = {
     href: string;
-    title: string;
-    description: string;
+    key: string;
     icon: IconComponent;
     iconColor: string;
 };
@@ -107,29 +107,25 @@ const SECTIONS: GuideSection[] = [
         guides: [
             {
                 href: "/google-ads-claude-connector-setup-guide",
-                title: "Claude Cowork, Desktop, Web",
-                description: "Install NotFair as a custom MCP connector inside Claude.ai.",
+                key: "googleClaudeConnector",
                 icon: ClaudeIcon,
                 iconColor: "text-[#D97757]",
             },
             {
                 href: "/google-ads-claude-code-plugin-setup-guide",
-                title: "Claude Code",
-                description: "Install via Claude plugin.",
+                key: "googleClaudeCode",
                 icon: ClaudeIcon,
                 iconColor: "text-[#D97757]",
             },
             {
                 href: "/google-ads-codex-mcp-setup-guide",
-                title: "Codex",
-                description: "Add the NotFair MCP to OpenAI's Codex CLI with one command.",
+                key: "googleCodex",
                 icon: OpenAIIcon,
                 iconColor: "text-white",
             },
             {
                 href: "/google-ads-mcp",
-                title: "Any other client via MCP",
-                description: "Generic MCP config — works with Cursor, Cline, or any MCP-compatible client.",
+                key: "googleMcp",
                 icon: McpIcon,
                 iconColor: "text-[#E8E4DD]",
             },
@@ -141,29 +137,25 @@ const SECTIONS: GuideSection[] = [
         guides: [
             {
                 href: "/meta-ads-claude-connector-setup-guide",
-                title: "Claude Cowork, Desktop, Web",
-                description: "Install the NotFair Meta connector inside Claude.ai for Facebook + Instagram ads.",
+                key: "metaClaudeConnector",
                 icon: ClaudeIcon,
                 iconColor: "text-[#D97757]",
             },
             {
                 href: "/meta-ads-claude-code-plugin-setup-guide",
-                title: "Claude Code",
-                description: "Install via Claude plugin for Meta (Facebook + Instagram).",
+                key: "metaClaudeCode",
                 icon: ClaudeIcon,
                 iconColor: "text-[#D97757]",
             },
             {
                 href: "/meta-ads-codex-mcp-setup-guide",
-                title: "Codex",
-                description: "Add the NotFair Meta MCP to OpenAI's Codex CLI with one command.",
+                key: "metaCodex",
                 icon: OpenAIIcon,
                 iconColor: "text-white",
             },
             {
                 href: "/meta-ads-mcp",
-                title: "Any other client via MCP",
-                description: "Generic MCP config for Meta — works with Cursor, Cline, or any MCP-compatible client.",
+                key: "metaMcp",
                 icon: McpIcon,
                 iconColor: "text-[#E8E4DD]",
             },
@@ -172,6 +164,7 @@ const SECTIONS: GuideSection[] = [
 ];
 
 export function SetupGuidesMenu({ className = "" }: { className?: string }) {
+    const t = useTranslations("SetupGuidesMenu");
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,7 +214,7 @@ export function SetupGuidesMenu({ className = "" }: { className?: string }) {
                     open ? "text-[#E8E4DD]" : "text-[#C4C0B6] hover:text-[#E8E4DD]"
                 }`}
             >
-                More Setup Guides
+                {t("button")}
                 <ChevronDown
                     className={`h-3.5 w-3.5 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
                 />
@@ -239,10 +232,10 @@ export function SetupGuidesMenu({ className = "" }: { className?: string }) {
                 <div className="overflow-hidden rounded-xl border border-[#3D3C36] bg-[#24231F] shadow-2xl shadow-black/40">
                     <div className="border-b border-[#3D3C36] px-4 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4CAF6E]">
-                            More NotFair Setup Guides
+                            {t("title")}
                         </p>
                         <p className="mt-1 text-xs text-[#C4C0B6]">
-                            Access Google Ads and Meta Ads from any AI client via NotFair MCP.
+                            {t("description")}
                         </p>
                     </div>
                     <div className="grid grid-cols-2 divide-x divide-[#3D3C36]">
@@ -273,10 +266,10 @@ export function SetupGuidesMenu({ className = "" }: { className?: string }) {
                                                         </span>
                                                         <span className="min-w-0 flex-1">
                                                             <span className="block text-sm font-medium text-[#E8E4DD]">
-                                                                {guide.title}
+                                                                {t(`guides.${guide.key}.title`)}
                                                             </span>
                                                             <span className="mt-0.5 block text-xs leading-snug text-[#C4C0B6]">
-                                                                {guide.description}
+                                                                {t(`guides.${guide.key}.description`)}
                                                             </span>
                                                         </span>
                                                     </Link>

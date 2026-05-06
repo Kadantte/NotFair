@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ArrowRight, Terminal, Eye, Zap, MessageSquare } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
@@ -20,153 +21,48 @@ const MCP_CONFIG = `{
   }
 }`;
 
-const tools = [
-  {
-    name: "listCampaigns",
-    category: "Read",
-    description: "Pull live campaign performance, spend, and status",
-  },
-  {
-    name: "getKeywords",
-    category: "Read",
-    description: "Inspect keyword bids, Quality Scores, and impressions",
-  },
-  {
-    name: "getSearchTermReport",
-    category: "Read",
-    description: "Find irrelevant queries, weak match types, and budget leaks",
-  },
-  {
-    name: "getCampaignPerformance",
-    category: "Read",
-    description: "Deep-dive into campaign metrics over any date range",
-  },
-  {
-    name: "updateBid",
-    category: "Write",
-    description: "Adjust a keyword bid — reviewable before it applies",
-  },
-  {
-    name: "pauseCampaign",
-    category: "Write",
-    description: "Pause an underperforming campaign through Claude",
-  },
-  {
-    name: "addNegativeKeyword",
-    category: "Write",
-    description: "Block a wasted search term at the campaign or account level",
-  },
-  {
-    name: "createAd",
-    category: "Write",
-    description: "Write and launch new ad copy through natural conversation",
-  },
-];
+type ToolCopy = {
+  name: string;
+  category: "read" | "write";
+  description: string;
+};
 
-const steps = [
-  {
-    num: "1",
-    title: "Add NotFair to your MCP config",
-    desc: "Paste the config snippet into Claude Desktop, Claude Code, or Claude Cowork. One entry, no API keys needed at this step.",
-  },
-  {
-    num: "2",
-    title: "Connect your Google Ads account",
-    desc: "OAuth in one click at notfair.co. Read permissions only until you approve a specific change — your account stays safe.",
-  },
-  {
-    num: "3",
-    title: "Ask Claude anything about your campaigns",
-    desc: 'Try: "Why did CPA rise and what should I fix?" Claude pulls live data and answers with specifics — no CSV exports, no copy-paste.',
-  },
-];
+type StepCopy = {
+  num: string;
+  title: string;
+  desc: string;
+};
 
-const capabilities = [
-  {
-    icon: MessageSquare,
-    title: "Campaign diagnosis in natural language",
-    body: "Ask Claude what is wrong. It checks campaign structure, keyword health, search term quality, impression share, and ad copy — then gives you a prioritized fix list.",
-  },
-  {
-    icon: Zap,
-    title: "Find the issues you did not know to ask for",
-    body: 'In testing, mature accounts often have clear problems hiding in search terms, structure, match types, and budget allocation. Asking "what should I fix?" surfaces them immediately.',
-  },
-  {
-    icon: Eye,
-    title: "Every change is reviewable",
-    body: "NotFair never commits a change without your explicit approval. Claude shows you what it wants to do, you say yes or no. Human always in control.",
-  },
-  {
-    icon: Terminal,
-    title: "Works where you already work",
-    body: "Claude Desktop for solo marketers. Claude Code for developers managing campaigns. Claude Cowork for teams. One MCP config, all three clients.",
-  },
-];
+type CapabilityCopy = {
+  title: string;
+  body: string;
+};
 
-const FAQ_ITEMS: FaqItem[] = [
-  {
-    question: "How do I use Claude for Google Ads with NotFair?",
-    answer:
-      "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude what is wrong, why performance changed, what to fix next, or to draft approved bid, keyword, negative, and ad changes — all in natural conversation.",
-  },
-  {
-    question: "Does NotFair work with Claude Desktop, Claude Code, and Claude Cowork?",
-    answer:
-      "Yes. NotFair is a standard MCP server, so it works with any MCP-compatible Claude client. Add the same config snippet to Claude Desktop settings, your Claude Code MCP config, or Claude Cowork — it works identically in all three.",
-  },
-  {
-    question: "What Google Ads data can Claude see through NotFair?",
-    answer:
-      "Claude gets live access to campaign performance, keyword bids and Quality Scores, search term reports, ad copy, spend data, impression share, and conversion tracking status. It reads your actual account data in real time — no exports or manual uploads needed.",
-  },
-  {
-    question: "Can Claude make changes to my Google Ads account?",
-    answer:
-      "Yes, but only with your explicit approval at each step. Claude can propose bid changes, pause campaigns, add negative keywords, and write new ads — but every action is shown to you before it executes. You review and confirm. NotFair also logs every change so you can track impact.",
-  },
-  {
-    question: "Is this an official Google or Anthropic integration?",
-    answer:
-      "NotFair is an independent product built on Anthropic's open Model Context Protocol (MCP) standard and the Google Ads API. It is not an official Google product. MCP is the open standard Anthropic created for connecting AI to external tools — any developer can build MCP servers, and NotFair is one focused entirely on Google Ads.",
-  },
-  {
-    question: "What does setup actually take?",
-    answer:
-      "Under 2 minutes. Paste one JSON snippet into your MCP config, open notfair.co, click Connect Google Ads, complete the OAuth flow. That's it — Claude can now access your campaigns.",
-  },
-  {
-    question: "Do I need to know how to code to use this?",
-    answer:
-      "No coding required. Editing a JSON config file is the most technical step — it's copying and pasting one snippet. The rest is standard Google OAuth and talking to Claude in plain English.",
-  },
-];
+const capabilityIcons = [MessageSquare, Zap, Eye, Terminal];
 
 const RELATED_LINKS = [
-  {
-    href: "/google-ads-audit",
-    title: "Free Google Ads Audit",
-    description:
-      "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues.",
-  },
-  {
-    href: "/google-ads-mcp-server",
-    title: "Google Ads MCP Server",
-    description:
-      "Learn how NotFair's MCP server exposes your Google Ads data and actions to any MCP-compatible AI client.",
-  },
-  {
-    href: "/",
-    title: "NotFair Home",
-    description:
-      "The AI-powered Google Ads agent — connect your account and let Claude diagnose issues, recommend fixes, and manage approved changes through conversation.",
-  },
+  { href: "/google-ads-audit", key: "audit" },
+  { href: "/google-ads-mcp-server", key: "mcpServer" },
+  { href: "/", key: "home" },
 ];
 
 /* ─────────────────────────────────────────────────────── Page ──────────── */
 
 export function GoogleAdsClaudePage() {
   const session = useSession();
+  const t = useTranslations("GoogleAdsClaudePage");
+  const tools = t.raw("tools.items") as ToolCopy[];
+  const steps = t.raw("steps.items") as StepCopy[];
+  const capabilities = (t.raw("capabilities.items") as CapabilityCopy[]).map((copy, index) => ({
+    ...copy,
+    icon: capabilityIcons[index],
+  }));
+  const faqItems = t.raw("faq.items") as FaqItem[];
+  const relatedLinks = RELATED_LINKS.map(({ href, key }) => ({
+    href,
+    title: t(`related.links.${key}.title`),
+    description: t(`related.links.${key}.description`),
+  }));
 
   return (
     <div className="bg-[#1A1917] text-[#E8E4DD]">
@@ -183,20 +79,17 @@ export function GoogleAdsClaudePage() {
               transition={{ duration: 0.6, ease: "easeOut" }}
             >
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                Google Ads MCP Server
+                {t("hero.eyebrow")}
               </p>
               <h1 className="font-display mt-4 text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-[52px]">
-                Use Claude for
+                {t("hero.title.line1")}
                 <br />
-                Google Ads —
+                {t("hero.title.line2")}
                 <br />
-                <span className="text-[#4CAF6E]">live data, 2-minute setup.</span>
+                <span className="text-[#4CAF6E]">{t("hero.title.highlight")}</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#C4C0B6]">
-                NotFair is a Google Ads MCP server for Claude. Connect once and
-                Claude gets live access to your campaigns, keywords, spend, and
-                ad copy — then helps you diagnose, optimize, and manage through
-                natural conversation.
+                {t("hero.body")}
               </p>
 
               <div className="mt-8 flex flex-col items-start gap-3">
@@ -204,11 +97,11 @@ export function GoogleAdsClaudePage() {
                   session={session}
                   page="google-ads-claude"
                   size="lg"
-                  disconnectedLabel="Connect Google Ads to Claude"
-                  connectedLabel="Open Your Account"
+                  disconnectedLabel={t("hero.disconnectedLabel")}
+                  connectedLabel={t("hero.connectedLabel")}
                 />
                 <p className="text-sm text-[#C4C0B6]">
-                  Free audit included. No credit card required.
+                  {t("hero.note")}
                 </p>
               </div>
             </motion.div>
@@ -226,7 +119,7 @@ export function GoogleAdsClaudePage() {
                   claude_desktop_config.json
                 </span>
                 <span className="ml-auto rounded border border-[#3D3C36] px-1.5 py-0.5 font-mono text-[10px] text-[#C4C0B6]">
-                  Step 1
+                  {t("configCard.step")}
                 </span>
               </div>
               <pre className="overflow-x-auto p-5 font-mono text-sm leading-relaxed text-[#E8E4DD]">
@@ -234,18 +127,18 @@ export function GoogleAdsClaudePage() {
               </pre>
               <div className="border-t border-[#3D3C36] px-5 py-3">
                 <p className="text-xs text-[#C4C0B6]">
-                  Works in{" "}
+                  {t("configCard.worksIn")}{" "}
                   <span className="text-[#E8E4DD]">Claude Desktop</span>,{" "}
                   <span className="text-[#E8E4DD]">Claude Code</span>, and{" "}
                   <span className="text-[#E8E4DD]">Claude Cowork</span>.
-                  Then connect your Google Ads account at{" "}
+                  {" "}{t("configCard.thenConnect")}{" "}
                   <Link
                     href="/"
                     className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
                   >
                     notfair.co
                   </Link>
-                  .
+                  {t("configCard.suffix")}
                 </p>
               </div>
             </motion.div>
@@ -264,10 +157,10 @@ export function GoogleAdsClaudePage() {
             className="mb-12"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              How it works
+              {t("steps.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Connect Google Ads to Claude in 2 minutes.
+              {t("steps.title")}
             </h2>
           </motion.div>
 
@@ -316,16 +209,13 @@ export function GoogleAdsClaudePage() {
             className="mb-12"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              What you get
+              {t("capabilities.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              Claude AI for Google Ads — what it actually does.
+              {t("capabilities.title")}
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
-              Once connected, Claude has live access to your account. No more
-              exporting CSVs, copying tables into chat, or working from
-              screenshots. Ask a question, get a specific answer backed by
-              real data.
+              {t("capabilities.body")}
             </p>
           </motion.div>
 
@@ -369,15 +259,13 @@ export function GoogleAdsClaudePage() {
             className="mb-10"
           >
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-              MCP tools exposed
+              {t("tools.eyebrow")}
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              What Claude can read and change.
+              {t("tools.title")}
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
-              NotFair exposes a focused set of MCP tools. Read tools give
-              Claude live account context. Write tools let Claude propose
-              changes — each requiring your explicit approval before execution.
+              {t("tools.body")}
             </p>
           </motion.div>
 
@@ -392,13 +280,13 @@ export function GoogleAdsClaudePage() {
               <thead>
                 <tr className="border-b border-[#3D3C36] bg-[#24231F]">
                   <th className="px-5 py-3.5 text-left font-medium text-[#C4C0B6]">
-                    Tool
+                    {t("tools.columns.tool")}
                   </th>
                   <th className="px-5 py-3.5 text-left font-medium text-[#C4C0B6]">
-                    Type
+                    {t("tools.columns.type")}
                   </th>
                   <th className="hidden px-5 py-3.5 text-left font-medium text-[#C4C0B6] sm:table-cell">
-                    What it does
+                    {t("tools.columns.description")}
                   </th>
                 </tr>
               </thead>
@@ -418,12 +306,12 @@ export function GoogleAdsClaudePage() {
                     <td className="px-5 py-3.5">
                       <span
                         className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          tool.category === "Read"
+                          tool.category === "read"
                             ? "border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]"
                             : "border border-[#D4882A]/30 bg-[#D4882A]/10 text-[#D4882A]"
                         }`}
                       >
-                        {tool.category}
+                        {t(`tools.categories.${tool.category}`)}
                       </span>
                     </td>
                     <td className="hidden px-5 py-3.5 text-[#C4C0B6] sm:table-cell">
@@ -442,14 +330,14 @@ export function GoogleAdsClaudePage() {
             viewport={{ once: true, margin: "-40px" }}
             className="mt-4 text-sm text-[#C4C0B6]"
           >
-            Full tool reference at{" "}
+            {t("tools.referencePrefix")}{" "}
             <Link
               href="/google-ads-mcp-server"
               className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
             >
               /google-ads-mcp-server
             </Link>
-            .
+            {t("tools.referenceSuffix")}
           </motion.p>
         </div>
       </section>
@@ -466,15 +354,13 @@ export function GoogleAdsClaudePage() {
           >
             <div className="max-w-xl">
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                Free · No credit card
+                {t("auditCta.eyebrow")}
               </p>
               <h2 className="font-display mt-2 text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
-                Free audit when you connect.
+                {t("auditCta.title")}
               </h2>
               <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
-                Connect your Google Ads account and Claude immediately runs a
-                free diagnosis — surfacing wasted spend, missed opportunities, and
-                structural issues with a prioritized fix list.
+                {t("auditCta.body")}
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">
@@ -482,14 +368,14 @@ export function GoogleAdsClaudePage() {
                 session={session}
                 page="google-ads-claude"
                 size="lg"
-                disconnectedLabel="Get Free Audit"
-                connectedLabel="View Your Audit"
+                disconnectedLabel={t("auditCta.disconnectedLabel")}
+                connectedLabel={t("auditCta.connectedLabel")}
               />
               <Link
                 href="/google-ads-audit"
                 className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
               >
-                Learn about the audit
+                {t("auditCta.secondary")}
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
@@ -499,16 +385,16 @@ export function GoogleAdsClaudePage() {
 
       {/* ── FAQ ── */}
       <FaqSection
-        title="FAQ — Google Ads and Claude"
-        intro="Common questions from MCP builders and marketers setting up the Claude AI Google Ads workflow."
-        items={FAQ_ITEMS}
+        title={t("faq.title")}
+        intro={t("faq.intro")}
+        items={faqItems}
       />
 
       {/* ── Related Pages ── */}
       <LandingLinksSection
-        title="Related pages"
-        intro="Explore the full NotFair workflow for Google Ads and Claude."
-        links={RELATED_LINKS}
+        title={t("related.title")}
+        intro={t("related.intro")}
+        links={relatedLinks}
       />
 
       {/* ── Final CTA ── */}
@@ -523,11 +409,10 @@ export function GoogleAdsClaudePage() {
           >
             <div className="max-w-xl">
               <h2 className="font-display text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-                Connect Google Ads to Claude — now.
+                {t("finalCta.title")}
               </h2>
               <p className="mt-3 text-base text-[#C4C0B6]">
-                2-minute setup. Free audit included. Human in control of every
-                change.
+                {t("finalCta.body")}
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">
@@ -535,11 +420,11 @@ export function GoogleAdsClaudePage() {
                 session={session}
                 page="google-ads-claude"
                 size="lg"
-                disconnectedLabel="Connect Google Ads to Claude"
-                connectedLabel="Open Your Account"
+                disconnectedLabel={t("hero.disconnectedLabel")}
+                connectedLabel={t("hero.connectedLabel")}
               />
               <p className="text-sm text-[#C4C0B6]">
-                Paste one config snippet. OAuth. Done.
+                {t("finalCta.note")}
               </p>
             </div>
           </motion.div>

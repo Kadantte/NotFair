@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { trackEvent } from "@/lib/analytics";
@@ -20,31 +21,23 @@ import type { FaqItem } from "@/lib/seo";
 
 /* ─────────────────────────── Page-only data ─────────────────────────── */
 
-const USE_CASES = [
-    { label: "SMB founders", body: "Self-doers running their own Google or Meta spend. Replace the agency review call with a Claude conversation." },
-    { label: "Performance agencies", body: "Onboard a new account, audit it, and ship the fix list before the kickoff call ends." },
-    { label: "E-commerce ops", body: "Daily search-term sweeps, negative-list maintenance, and budget reshuffles run from a single agent prompt." },
-    { label: "Lead-gen teams", body: "Match search terms to MQL quality, tighten match types, and route budget toward the geos and keywords that close." },
-    { label: "Solo consultants", body: "Manage ten accounts the way you used to manage one. One MCP endpoint per client, one chat per question." },
-];
+type UseCase = {
+    label: string;
+    body: string;
+};
 
-const FAQ_ITEMS: FaqItem[] = [
-    { question: "What is NotFair MCP?", answer: "Two hosted Model Context Protocol servers — one for Google Ads, one for Meta Ads — that expose your accounts to MCP-compatible AI clients. Reads stream live campaign data; writes are proposed in chat and require explicit approval before they hit the ad platform." },
-    { question: "Which AI clients can I use?", answer: "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL stays the same — only the client-side config differs." },
-    { question: "Do I need to self-host anything?", answer: `No. Both servers are hosted by NotFair at ${MCP_SERVER_URL} and ${META_MCP_SERVER_URL}. You connect the underlying ad account once via OAuth and point your client at the URL.` },
-    { question: "How does authentication work?", answer: "OAuth 2.0 with PKCE is the default — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect or notfair.co/connect/meta-ads." },
-    { question: "Can the AI write to my ad accounts?", answer: "Only with explicit approval. Write tools propose changes, the client surfaces the diff, and you confirm before anything hits the Google Ads or Meta Marketing API. Read access is unrestricted; every write is gated." },
-    { question: "What does it cost?", answer: "Connecting and running audits is free with no credit card. Paid plans unlock higher usage limits and team features." },
-    { question: "Where do I find platform-specific configs?", answer: "The /google-ads-mcp and /meta-ads-mcp pages have generic JSON snippets that work in any MCP client. The per-client setup guides walk through Claude.ai, Claude Code, and Codex specifically." },
-];
+type RelatedLinkCopy = {
+    title: string;
+    description: string;
+};
 
 const RELATED_LINKS = [
-    { href: "/google-ads-mcp", title: "Google Ads MCP server", description: `Generic MCP config and tool list for ${MCP_CONNECTOR_NAME}.` },
-    { href: "/meta-ads-mcp", title: "Meta Ads MCP server", description: `Generic MCP config and tool list for ${META_MCP_CONNECTOR_NAME}.` },
-    { href: "/google-ads-claude-connector-setup-guide", title: "Claude Connector setup guide", description: "Install NotFair as a custom MCP connector inside Claude.ai Web, Desktop, or Cowork." },
-    { href: "/google-ads-claude-code-plugin-setup-guide", title: "Claude Code plugin setup guide", description: "Install NotFair in Claude Code via the toprank plugin marketplace." },
-    { href: "/google-ads-codex-mcp-setup-guide", title: "Codex MCP setup guide", description: "One-line install of the NotFair MCP for OpenAI's Codex CLI." },
-    { href: "/pricing", title: "Pricing", description: "Free to connect. Paid plans for higher usage and team features." },
+    { href: "/google-ads-mcp", key: "googleAdsMcp", connectorName: MCP_CONNECTOR_NAME },
+    { href: "/meta-ads-mcp", key: "metaAdsMcp", connectorName: META_MCP_CONNECTOR_NAME },
+    { href: "/google-ads-claude-connector-setup-guide", key: "claudeConnector" },
+    { href: "/google-ads-claude-code-plugin-setup-guide", key: "claudeCode" },
+    { href: "/google-ads-codex-mcp-setup-guide", key: "codex" },
+    { href: "/pricing", key: "pricing" },
 ];
 
 /* ─────────────────────────── Atoms ─────────────────────────── */
@@ -60,6 +53,26 @@ function ChapterBadge({ children }: { children: ReactNode }) {
 /* ─────────────────────────── Page ─────────────────────────── */
 
 export function McpPage() {
+    const t = useTranslations("McpPage");
+    const useCases = t.raw("useCases") as UseCase[];
+    const faqItems = (t.raw("faq.items") as FaqItem[]).map((item) => ({
+        question: item.question,
+        answer: item.answer
+            .replace("{googleServerUrl}", MCP_SERVER_URL)
+            .replace("{metaServerUrl}", META_MCP_SERVER_URL),
+    }));
+    const relatedLinks = RELATED_LINKS.map(({ href, key, connectorName }) => {
+        const copy = t.raw(`related.links.${key}`) as RelatedLinkCopy;
+
+        return {
+            href,
+            title: copy.title,
+            description: connectorName
+                ? copy.description.replace("{connectorName}", connectorName)
+                : copy.description,
+        };
+    });
+
     return (
         <div className="bg-[#1A1917] text-[#E8E4DD]">
             <McpSetupHero syncUrl surface="mcp" />
@@ -76,11 +89,11 @@ export function McpPage() {
                         transition={{ duration: 0.6, ease: "easeOut" }}
                         className="font-display text-2xl font-bold uppercase leading-[1.05] tracking-tight text-[#E8E4DD] md:text-4xl"
                     >
-                        Built for the people<br className="hidden md:block" /> spending the budget.
+                        {t("useCasesTitle.line1")}<br className="hidden md:block" /> {t("useCasesTitle.line2")}
                     </motion.h2>
 
                     <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {USE_CASES.map((uc) => (
+                        {useCases.map((uc) => (
                             <div
                                 key={uc.label}
                                 className="rounded-2xl border border-[#3D3C36] bg-[#24231F] p-7"
@@ -105,7 +118,7 @@ export function McpPage() {
                         transition={{ duration: 0.6, ease: "easeOut" }}
                     >
                         <h2 className="font-display text-2xl font-bold uppercase leading-[1.05] tracking-tight text-[#E8E4DD] md:text-4xl">
-                            Wire it up.<br /> Operate from chat.
+                            {t("cta.title.line1")}<br /> {t("cta.title.line2")}
                         </h2>
                         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
                             <Button
@@ -119,7 +132,7 @@ export function McpPage() {
                                 }}
                                 className="h-12 rounded-full bg-[#4CAF6E] px-7 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
                             >
-                                Connect Google Ads
+                                {t("cta.google")}
                             </Button>
                             <Link
                                 href="/connect/meta-ads"
@@ -132,11 +145,11 @@ export function McpPage() {
                                 }}
                                 className="inline-flex h-12 items-center justify-center rounded-full border border-[#3D3C36] bg-[#24231F] px-7 text-base font-semibold text-[#E8E4DD] transition hover:border-[#4D4C46] hover:bg-[#2E2D28]"
                             >
-                                Connect Meta Ads
+                                {t("cta.meta")}
                             </Link>
                         </div>
                         <p className="mt-6 text-sm text-[#C4C0B6]">
-                            Free · OAuth 2.0 · No credit card
+                            {t("cta.note")}
                         </p>
                     </motion.div>
                 </div>
@@ -144,16 +157,16 @@ export function McpPage() {
 
             {/* ── FAQ ── */}
             <FaqSection
-                title="FAQ — NotFair MCP"
-                intro="Common questions about authenticating, configuring, and operating the NotFair MCP servers."
-                items={FAQ_ITEMS}
+                title={t("faq.title")}
+                intro={t("faq.intro")}
+                items={faqItems}
             />
 
             {/* ── Related ── */}
             <LandingLinksSection
-                title="Server configs and per-client guides"
-                intro="Platform-specific configs and step-by-step setup walkthroughs for each supported client."
-                links={RELATED_LINKS}
+                title={t("related.title")}
+                intro={t("related.intro")}
+                links={relatedLinks}
             />
         </div>
     );

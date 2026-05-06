@@ -15,6 +15,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, ExternalLink } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { trackEvent } from "@/lib/analytics";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
@@ -52,6 +53,7 @@ export function CopyField({
     /** Optional callback fired after a successful copy — used for analytics. */
     onCopy?: () => void;
 }) {
+    const t = useTranslations("McpSetupHero.copyField");
     const [copied, setCopied] = useState(false);
     const [expanded, setExpanded] = useState(false);
     function copy() {
@@ -89,7 +91,7 @@ export function CopyField({
                 </code>
                 <button
                     onClick={copy}
-                    aria-label="Copy"
+                    aria-label={t("copy")}
                     className="mt-0.5 shrink-0 rounded p-1 text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
                 >
                     {copied ? <Check className="h-3.5 w-3.5 text-[#4CAF6E]" /> : <Copy className="h-3.5 w-3.5" />}
@@ -100,7 +102,7 @@ export function CopyField({
                     onClick={() => setExpanded((v) => !v)}
                     className="mt-1.5 text-[11px] font-medium text-[#4CAF6E] transition-colors hover:text-[#3D9A5C]"
                 >
-                    {expanded ? "Less" : "More"}
+                    {expanded ? t("less") : t("more")}
                 </button>
             ) : null}
         </div>
@@ -196,7 +198,7 @@ export type Platform = {
     nameColor: string;
     ringClass: string;
     pillBgClass: string;
-    steps: { title: string; body: ReactNode }[];
+    steps: string[];
 };
 
 export const PLATFORMS: Platform[] = [
@@ -207,60 +209,7 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#D97757]",
         ringClass: "ring-[#D97757]/40",
         pillBgClass: "bg-[#D97757]/15",
-        steps: [
-            {
-                title: "Open Claude settings",
-                body: (
-                    <>
-                        Open the Claude connectors page directly:
-                        <a
-                            href="https://claude.ai/customize/connectors?modal=add-custom-connector"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() =>
-                                trackEvent("mcp_step_clicked", {
-                                    client: "claude",
-                                    step: "open_connectors",
-                                })
-                            }
-                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-[12px] text-[#E8E4DD] transition-colors hover:border-[#4CAF6E]/60 hover:text-[#4CAF6E]"
-                        >
-                            Customize → Connectors
-                            <ExternalLink className="h-3 w-3" />
-                        </a>
-                    </>
-                ),
-            },
-            {
-                title: "Add a custom connector",
-                body: (
-                    <>
-                        Paste in to the modal:
-                        <CopyField
-                            label="Name"
-                            value={MCP_CONNECTOR_NAME}
-                            className="mt-3"
-                            onCopy={() => trackSetupCopied("claude", "name")}
-                        />
-                        <CopyField
-                            label="Remote MCP server URL"
-                            value={MCP_SERVER_URL}
-                            className="mt-2"
-                            onCopy={() => trackSetupCopied("claude", "server_url")}
-                        />
-                    </>
-                ),
-            },
-            {
-                title: "Sign in and start asking",
-                body: (
-                    <>
-                        After clicking <CodeInline>Add</CodeInline>, Claude opens a sign-in flow. Sign in with NotFair and you're all set. Try:{" "}
-                        <CodeInline>Audit my Google Ads account and rank fixes by impact.</CodeInline>
-                    </>
-                ),
-            },
-        ],
+        steps: ["openSettings", "addConnector", "signIn"],
     },
     {
         id: "openclaw",
@@ -269,31 +218,7 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#5B6CFF]/40",
         pillBgClass: "bg-[#5B6CFF]/15",
-        steps: [
-            {
-                title: "Send this prompt",
-                body: (
-                    <>
-                        Copy this prompt and send it in your agent's chat to start the connection:
-                        <CopyField
-                            value={`Connect to ${MCP_CONNECTOR_NAME} MCP at ${MCP_SERVER_URL} — it supports OAuth flow, discover at https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads. Run the OAuth flow, send me the link, poll until I authorize, and confirm once it succeeds.`}
-                            className="mt-3"
-                            prose
-                            onCopy={() => trackSetupCopied("openclaw", "prompt")}
-                        />
-                    </>
-                ),
-            },
-            {
-                title: "Sign in and start asking",
-                body: (
-                    <>
-                        Your agent replies with a sign-in link. Open it, sign in with NotFair, and you're all set. Try:{" "}
-                        <CodeInline>Audit my Google Ads account and rank fixes by impact.</CodeInline>
-                    </>
-                ),
-            },
-        ],
+        steps: ["sendPrompt", "signIn"],
     },
     {
         id: "codex",
@@ -302,30 +227,7 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#10A37F]/40",
         pillBgClass: "bg-[#10A37F]/15",
-        steps: [
-            {
-                title: "Install the MCP",
-                body: (
-                    <>
-                        Run this in your terminal:
-                        <CopyField
-                            value={`codex mcp add NotFair-GoogleAds --url ${MCP_SERVER_URL}`}
-                            className="mt-3"
-                            onCopy={() => trackSetupCopied("codex", "codex_command")}
-                        />
-                    </>
-                ),
-            },
-            {
-                title: "Sign in and start asking",
-                body: (
-                    <>
-                        After running the command, Codex auto-opens a sign-in link in your browser. Sign in with NotFair and you're all set. Try:{" "}
-                        <CodeInline>Audit my Google Ads account and rank fixes by impact.</CodeInline>
-                    </>
-                ),
-            },
-        ],
+        steps: ["install", "signIn"],
     },
     {
         id: "cursor",
@@ -334,49 +236,7 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#3D3C36]",
         pillBgClass: "bg-[#24231F]",
-        steps: [
-            {
-                title: "Open Tools & MCP",
-                body: (
-                    <>
-                        In Cursor, open <CodeInline>Settings → Tools & MCP</CodeInline> and click{" "}
-                        <CodeInline>+ Add new global MCP server</CodeInline>.
-                    </>
-                ),
-            },
-            {
-                title: "Paste the config",
-                body: (
-                    <>
-                        Add this entry to <CodeInline>mcpServers</CodeInline>:
-                        <CopyField
-                            value={JSON.stringify(
-                                {
-                                    [MCP_CONNECTOR_NAME]: {
-                                        transport: "http",
-                                        url: MCP_SERVER_URL,
-                                    },
-                                },
-                                null,
-                                2,
-                            )}
-                            className="mt-3"
-                            multiline
-                            onCopy={() => trackSetupCopied("cursor", "mcp_json")}
-                        />
-                    </>
-                ),
-            },
-            {
-                title: "Sign in and start asking",
-                body: (
-                    <>
-                        On first tool call, Cursor opens a sign-in link in your browser. Sign in with NotFair and you're all set. Try:{" "}
-                        <CodeInline>Audit my Google Ads account and rank fixes by impact.</CodeInline>
-                    </>
-                ),
-            },
-        ],
+        steps: ["openTools", "pasteConfig", "signIn"],
     },
     {
         id: "hermes",
@@ -385,33 +245,151 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#A78BFA]/40",
         pillBgClass: "bg-[#A78BFA]/15",
-        steps: [
-            {
-                title: "Send this prompt",
-                body: (
-                    <>
-                        Copy this prompt and send it in your agent's chat to start the connection:
-                        <CopyField
-                            value={`Connect to ${MCP_CONNECTOR_NAME} MCP at ${MCP_SERVER_URL} — it supports OAuth flow, discover at https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads. Run the OAuth flow, send me the link, poll until I authorize, and confirm once it succeeds.`}
-                            className="mt-3"
-                            prose
-                            onCopy={() => trackSetupCopied("hermes", "prompt")}
-                        />
-                    </>
-                ),
-            },
-            {
-                title: "Sign in and start asking",
-                body: (
-                    <>
-                        Your agent replies with a sign-in link. Open it, sign in with NotFair, and you're all set. Try:{" "}
-                        <CodeInline>Audit my Google Ads account and rank fixes by impact.</CodeInline>
-                    </>
-                ),
-            },
-        ],
+        steps: ["sendPrompt", "signIn"],
     },
 ];
+
+function agentConnectionPrompt() {
+    return `Connect to ${MCP_CONNECTOR_NAME} MCP at ${MCP_SERVER_URL} — it supports OAuth flow, discover at https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads. Run the OAuth flow, send me the link, poll until I authorize, and confirm once it succeeds.`;
+}
+
+function cursorConfig() {
+    return JSON.stringify(
+        {
+            [MCP_CONNECTOR_NAME]: {
+                transport: "http",
+                url: MCP_SERVER_URL,
+            },
+        },
+        null,
+        2,
+    );
+}
+
+function PlatformStepBody({ platformId, stepId }: { platformId: string; stepId: string }) {
+    const t = useTranslations("McpSetupHero");
+    const tryPrompt = <CodeInline>{t("tryPrompt")}</CodeInline>;
+
+    if (platformId === "claude" && stepId === "openSettings") {
+        return (
+            <>
+                {t("platforms.claude.openSettings.body")}
+                <a
+                    href="https://claude.ai/customize/connectors?modal=add-custom-connector"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() =>
+                        trackEvent("mcp_step_clicked", {
+                            client: "claude",
+                            step: "open_connectors",
+                        })
+                    }
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-[12px] text-[#E8E4DD] transition-colors hover:border-[#4CAF6E]/60 hover:text-[#4CAF6E]"
+                >
+                    {t("platforms.claude.openSettings.linkLabel")}
+                    <ExternalLink className="h-3 w-3" />
+                </a>
+            </>
+        );
+    }
+
+    if (platformId === "claude" && stepId === "addConnector") {
+        return (
+            <>
+                {t("platforms.claude.addConnector.body")}
+                <CopyField
+                    label={t("platforms.claude.addConnector.nameLabel")}
+                    value={MCP_CONNECTOR_NAME}
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("claude", "name")}
+                />
+                <CopyField
+                    label={t("platforms.claude.addConnector.urlLabel")}
+                    value={MCP_SERVER_URL}
+                    className="mt-2"
+                    onCopy={() => trackSetupCopied("claude", "server_url")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "claude" && stepId === "signIn") {
+        return t.rich("platforms.claude.signIn.body", {
+            add: () => <CodeInline>Add</CodeInline>,
+            tryPrompt: () => tryPrompt,
+        });
+    }
+
+    if ((platformId === "openclaw" || platformId === "hermes") && stepId === "sendPrompt") {
+        return (
+            <>
+                {t(`platforms.${platformId}.sendPrompt.body`)}
+                <CopyField
+                    value={agentConnectionPrompt()}
+                    className="mt-3"
+                    prose
+                    onCopy={() => trackSetupCopied(platformId, "prompt")}
+                />
+            </>
+        );
+    }
+
+    if ((platformId === "openclaw" || platformId === "hermes") && stepId === "signIn") {
+        return t.rich(`platforms.${platformId}.signIn.body`, {
+            tryPrompt: () => tryPrompt,
+        });
+    }
+
+    if (platformId === "codex" && stepId === "install") {
+        return (
+            <>
+                {t("platforms.codex.install.body")}
+                <CopyField
+                    value={`codex mcp add NotFair-GoogleAds --url ${MCP_SERVER_URL}`}
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("codex", "codex_command")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "codex" && stepId === "signIn") {
+        return t.rich("platforms.codex.signIn.body", {
+            tryPrompt: () => tryPrompt,
+        });
+    }
+
+    if (platformId === "cursor" && stepId === "openTools") {
+        return t.rich("platforms.cursor.openTools.body", {
+            settings: () => <CodeInline>Settings → Tools & MCP</CodeInline>,
+            addServer: () => <CodeInline>+ Add new global MCP server</CodeInline>,
+        });
+    }
+
+    if (platformId === "cursor" && stepId === "pasteConfig") {
+        return (
+            <>
+                {t.rich("platforms.cursor.pasteConfig.body", {
+                    mcpServers: () => <CodeInline>mcpServers</CodeInline>,
+                })}
+                <CopyField
+                    value={cursorConfig()}
+                    className="mt-3"
+                    multiline
+                    onCopy={() => trackSetupCopied("cursor", "mcp_json")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "cursor" && stepId === "signIn") {
+        return t.rich("platforms.cursor.signIn.body", {
+            tryPrompt: () => tryPrompt,
+        });
+    }
+
+    return null;
+}
 
 /* ─────────────────────────── Hero component ─────────────────────────── */
 
@@ -434,6 +412,7 @@ export function McpSetupHero({
     syncUrl = false,
     surface = "mcp",
 }: McpSetupHeroProps) {
+    const t = useTranslations("McpSetupHero");
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -454,9 +433,12 @@ export function McpSetupHero({
         if (!syncUrl || !urlTab) return;
         const idx = PLATFORMS.findIndex((p) => p.id === urlTab);
         if (idx < 0) return;
-        setPlatformId(PLATFORMS[idx].id);
-        setPillIndex(idx);
-        setPillPaused(true);
+        const timeout = window.setTimeout(() => {
+            setPlatformId(PLATFORMS[idx].id);
+            setPillIndex(idx);
+            setPillPaused(true);
+        }, 0);
+        return () => window.clearTimeout(timeout);
     }, [syncUrl, urlTab]);
 
     // Auto-cycle the hero pill until the user picks a tab.
@@ -515,7 +497,7 @@ export function McpSetupHero({
                     className="text-center"
                 >
                     <h1 className="font-display mx-auto max-w-4xl text-3xl font-bold uppercase leading-[1.05] tracking-tight text-[#E8E4DD] sm:text-4xl md:text-[44px] lg:text-[48px]">
-                        <span>Turn </span>
+                        <span>{t("headlinePrefix")} </span>
                         <AnimatePresence mode="wait" initial={false}>
                             <motion.span
                                 key={heroPlatform.id}
@@ -531,11 +513,11 @@ export function McpSetupHero({
                                 </span>
                             </motion.span>
                         </AnimatePresence>
-                        <span> Into Your Marketing Engine</span>
+                        <span> {t("headlineSuffix")}</span>
                     </h1>
 
                     <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
-                        Connect NotFair to Claude, OpenClaw, Codex, Cursor, or Hermes and operate Google Ads from a chat — diagnose, draft fixes, and approve every write.
+                        {t("intro")}
                     </p>
                 </motion.div>
 
@@ -576,17 +558,17 @@ export function McpSetupHero({
                 >
                     {active.steps.map((step, i) => (
                         <div
-                            key={i}
+                            key={step}
                             className="rounded-2xl border border-[#3D3C36] bg-[#24231F] p-6"
                         >
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4CAF6E] font-mono text-[12px] font-bold text-[#1A1917]">
                                 {i + 1}
                             </span>
                             <h3 className="font-display mt-4 text-lg font-semibold text-[#E8E4DD]">
-                                {step.title}
+                                {t(`platforms.${active.id}.${step}.title`)}
                             </h3>
                             <div className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
-                                {step.body}
+                                <PlatformStepBody platformId={active.id} stepId={step} />
                             </div>
                         </div>
                     ))}

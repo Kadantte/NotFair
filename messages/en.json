@@ -229,5 +229,1037 @@
       "tokenExchange": "Google authentication failed. Please try again in a moment.",
       "generic": "Authentication failed. Please try again."
     }
+  },
+  "SetupGuidesMenu": {
+    "button": "More Setup Guides",
+    "title": "More NotFair Setup Guides",
+    "description": "Access Google Ads and Meta Ads from any AI client via NotFair MCP.",
+    "guides": {
+      "googleClaudeConnector": {
+        "title": "Claude Cowork, Desktop, Web",
+        "description": "Install NotFair as a custom MCP connector inside Claude.ai."
+      },
+      "googleClaudeCode": {
+        "title": "Claude Code",
+        "description": "Install via Claude plugin."
+      },
+      "googleCodex": {
+        "title": "Codex",
+        "description": "Add the NotFair MCP to OpenAI's Codex CLI with one command."
+      },
+      "googleMcp": {
+        "title": "Any other client via MCP",
+        "description": "Generic MCP config - works with Cursor, Cline, or any MCP-compatible client."
+      },
+      "metaClaudeConnector": {
+        "title": "Claude Cowork, Desktop, Web",
+        "description": "Install the NotFair Meta connector inside Claude.ai for Facebook + Instagram ads."
+      },
+      "metaClaudeCode": {
+        "title": "Claude Code",
+        "description": "Install via Claude plugin for Meta (Facebook + Instagram)."
+      },
+      "metaCodex": {
+        "title": "Codex",
+        "description": "Add the NotFair Meta MCP to OpenAI's Codex CLI with one command."
+      },
+      "metaMcp": {
+        "title": "Any other client via MCP",
+        "description": "Generic MCP config for Meta - works with Cursor, Cline, or any MCP-compatible client."
+      }
+    }
+  },
+  "McpSetupHero": {
+    "headlinePrefix": "Turn",
+    "headlineSuffix": "Into Your Marketing Engine",
+    "intro": "Connect NotFair to Claude, OpenClaw, Codex, Cursor, or Hermes and operate Google Ads from a chat - diagnose, draft fixes, and approve every write.",
+    "tryPrompt": "Audit my Google Ads account and rank fixes by impact.",
+    "copyField": {
+      "copy": "Copy",
+      "more": "More",
+      "less": "Less"
+    },
+    "platforms": {
+      "claude": {
+        "openSettings": {
+          "title": "Open Claude settings",
+          "body": "Open the Claude connectors page directly:",
+          "linkLabel": "Customize -> Connectors"
+        },
+        "addConnector": {
+          "title": "Add a custom connector",
+          "body": "Paste in to the modal:",
+          "nameLabel": "Name",
+          "urlLabel": "Remote MCP server URL"
+        },
+        "signIn": {
+          "title": "Sign in and start asking",
+          "body": "After clicking <add></add>, Claude opens a sign-in flow. Sign in with NotFair and you are all set. Try: <tryPrompt></tryPrompt>"
+        }
+      },
+      "openclaw": {
+        "sendPrompt": {
+          "title": "Send this prompt",
+          "body": "Copy this prompt and send it in your agent's chat to start the connection:"
+        },
+        "signIn": {
+          "title": "Sign in and start asking",
+          "body": "Your agent replies with a sign-in link. Open it, sign in with NotFair, and you are all set. Try: <tryPrompt></tryPrompt>"
+        }
+      },
+      "codex": {
+        "install": {
+          "title": "Install the MCP",
+          "body": "Run this in your terminal:"
+        },
+        "signIn": {
+          "title": "Sign in and start asking",
+          "body": "After running the command, Codex auto-opens a sign-in link in your browser. Sign in with NotFair and you are all set. Try: <tryPrompt></tryPrompt>"
+        }
+      },
+      "cursor": {
+        "openTools": {
+          "title": "Open Tools & MCP",
+          "body": "In Cursor, open <settings></settings> and click <addServer></addServer>."
+        },
+        "pasteConfig": {
+          "title": "Paste the config",
+          "body": "Add this entry to <mcpServers></mcpServers>:"
+        },
+        "signIn": {
+          "title": "Sign in and start asking",
+          "body": "On first tool call, Cursor opens a sign-in link in your browser. Sign in with NotFair and you are all set. Try: <tryPrompt></tryPrompt>"
+        }
+      },
+      "hermes": {
+        "sendPrompt": {
+          "title": "Send this prompt",
+          "body": "Copy this prompt and send it in your agent's chat to start the connection:"
+        },
+        "signIn": {
+          "title": "Sign in and start asking",
+          "body": "Your agent replies with a sign-in link. Open it, sign in with NotFair, and you are all set. Try: <tryPrompt></tryPrompt>"
+        }
+      }
+    }
+  },
+  "MarketingEngine": {
+    "chat": {
+      "agentName": "NotFair",
+      "diagnose": {
+        "user": "Why did our cost-per-lead spike this week?",
+        "summary": "CPL up <value>42%</value> WoW. Three campaigns drove it:",
+        "rows": [
+          {
+            "name": "Brand-Search",
+            "delta": "+$1,820 spend - 0 conversions"
+          },
+          {
+            "name": "PMax-US",
+            "delta": "+$940 - CPA $38 -> $89"
+          },
+          {
+            "name": "LeadGen-Q4",
+            "delta": "search terms drifted to \"free\""
+          }
+        ],
+        "prompt": "Want me to draft 14 negatives + pause Brand-Search?",
+        "apply": "Apply both",
+        "showDiff": "Show diff"
+      },
+      "audit": {
+        "user": "Audit my Google Ads account and rank fixes by impact.",
+        "summary": "Ran 20 reads across spend, search terms, quality scores, and assets. Top issues by <value>spend at risk</value>:",
+        "rows": [
+          {
+            "rank": "01",
+            "issue": "Loose-match keywords burning $2.4k/wk",
+            "impact": "$2,400"
+          },
+          {
+            "rank": "02",
+            "issue": "Missing negatives on LeadGen-Q4",
+            "impact": "$1,180"
+          },
+          {
+            "rank": "03",
+            "issue": "PMax with no asset coverage",
+            "impact": "$640"
+          },
+          {
+            "rank": "04",
+            "issue": "3 ads disapproved (silent)",
+            "impact": "$310"
+          }
+        ],
+        "total": "Total recoverable: <value>$4,530/wk</value>. Open the fix list?"
+      },
+      "operate": {
+        "user": "Pause everything below 1.5 ROAS in the last 14 days.",
+        "summary": "Found <value>6 ad sets</value> matching. Diff before I apply:",
+        "headers": {
+          "adSet": "Ad set",
+          "spend": "14d spend",
+          "roas": "ROAS"
+        },
+        "rows": [
+          {
+            "name": "Retarget-Cart-V3",
+            "spend": "$1,240",
+            "roas": "0.8"
+          },
+          {
+            "name": "Cold-Lookalike-IG",
+            "spend": "$890",
+            "roas": "1.1"
+          },
+          {
+            "name": "Broad-Interest-FB",
+            "spend": "$610",
+            "roas": "1.3"
+          },
+          {
+            "name": "Influencer-Test-A",
+            "spend": "$420",
+            "roas": "0.4"
+          }
+        ],
+        "pauseAll": "Pause all 6",
+        "pickWhich": "Pick which",
+        "awaitingApproval": "awaiting approval"
+      },
+      "undo": {
+        "user": "Undo what you did at 14:32.",
+        "summary": "Found change <change>chg_8f21</change> - paused <campaign>Brand-Search</campaign> at 14:32 today.",
+        "before": "Before",
+        "after": "After undo",
+        "reverted": "Reverted. Anything else to roll back?",
+        "badge": "1 change reverted"
+      }
+    },
+    "chapters": [
+      {
+        "badge": "Diagnose",
+        "title": "Live context. Not yesterday's report.",
+        "body": "Your agent reads the same numbers you would open in the platform UI: cost, conversions, impression share, learning phase, frequency, quality score. No CSV exports, no stale dashboards.",
+        "reverse": false
+      },
+      {
+        "badge": "Audit",
+        "title": "Audits that already know what to fix.",
+        "body": "One prompt fans out 20 GAQL or Graph API reads in a single pass, scores findings by spend at risk, and returns a prioritized fix list. The audit ends with a button, not a PDF.",
+        "reverse": true
+      },
+      {
+        "badge": "Operate",
+        "title": "Pause, shift, rename, rewrite - from chat.",
+        "body": "Not a read-only audit tool. Every entity an account manager touches is exposed as a write tool, with a diff-and-approve gate before anything hits the ad platform.",
+        "reverse": false
+      },
+      {
+        "badge": "Approve & undo",
+        "title": "Every write is reviewed. Every write is reversible.",
+        "body": "Reads are unrestricted. Writes show you a diff before they land, and NotFair logs every change to its own history - one call rolls anything back.",
+        "reverse": true
+      }
+    ],
+    "heading": {
+      "title": "A Complete Marketing Engine Inside Your Agent",
+      "body": "Diagnostics, audits, writes, and undo — all driven by one MCP connection per ad account."
+    }
+  },
+  "Pricing": {
+    "status": {
+      "success": "Subscription succeeded.",
+      "cancelled": "Checkout cancelled. Nothing was charged."
+    },
+    "finePrint": "Prices in USD. Billed via Stripe. Cancel anytime from the billing portal - your access continues until the end of the current period.",
+    "header": {
+      "label": "Pricing",
+      "title": "Upgrade when Claude becomes your ads strategist and operator.",
+      "body": "Built for people who want AI to find issues and turn approved recommendations into campaign changes."
+    },
+    "interval": {
+      "yearly": "Yearly",
+      "save": "save 20%",
+      "monthly": "Monthly"
+    },
+    "plans": {
+      "free": {
+        "badge": "starter",
+        "description": "Unlimited access for 7 days. 300 free operations every month after.",
+        "period": "/forever",
+        "connectedCta": "Get Started",
+        "disconnectedCta": "Get started free",
+        "note": "No credit card required",
+        "features": [
+          "7 days of unlimited access - every feature, no caps",
+          "Then 300 MCP operations/mo, free forever",
+          "No credit card required",
+          "Connect Google Ads to Claude, Cursor, and any MCP client",
+          "Diagnose account issues and draft campaign changes",
+          "Preview bid, budget, keyword, audience, and ad edits before approval",
+          "Community support"
+        ]
+      },
+      "growth": {
+        "popular": "Most popular",
+        "badge": "unlimited",
+        "description": "For operators making real campaign changes.",
+        "monthPeriod": "/month",
+        "yearPrice": "{price}/year",
+        "plusFree": "Plus everything in Free",
+        "openingPortal": "Opening portal...",
+        "manageCta": "Manage subscription",
+        "redirecting": "Redirecting...",
+        "upgradeCta": "Upgrade to Growth",
+        "disconnectedCta": "Get Started",
+        "scheduledCancel": "Scheduled cancel",
+        "renews": "Renews {interval} on {date}",
+        "headlineFeatures": [
+          "Unlimited Google Ads operations",
+          "Unlimited Google Ads accounts",
+          "Bulk workflows - keywords, ads, budgets, scripts",
+          "Full change history & one-call undo",
+          "Priority email support"
+        ],
+        "inheritedFeatures": [
+          "All MCP clients - Claude, Codex, Cursor, OpenClaw, Hermes",
+          "Diagnose issues and draft campaign changes",
+          "Preview every edit before approval",
+          "Cancel any time - no contracts"
+        ]
+      },
+      "managed": {
+        "discount": "Limited time - 50% off",
+        "badge": "done-for-you",
+        "description": "We run your ads. You run your business.",
+        "spots": "<strong>50 spots</strong> left - price doubles after",
+        "adSpend": "of ad spend",
+        "startingFrom": "Starting from",
+        "guaranteed": "Guaranteed",
+        "guarantee": "5% improvement to your ads ROI - or you do not pay.",
+        "cta": "Claim your spot",
+        "features": [
+          "Everything in Growth",
+          "Dedicated ads strategist",
+          "Weekly & monthly performance reports",
+          "Campaign strategy & optimization",
+          "Custom audience & keyword research",
+          "Priority Slack/email support",
+          "Cancel any time - no contracts"
+        ]
+      }
+    },
+    "managedModal": {
+      "title": "Claim your managed spot",
+      "description": "Leave your details and our ads expert will reach out.",
+      "connectedDescription": "Our ads expert will reach out to you at {email}.",
+      "sent": "We'll be in touch soon!",
+      "messagePlaceholder": "Anything you'd like us to know? (optional)",
+      "namePlaceholder": "Your name",
+      "emailPlaceholder": "Your email",
+      "adsPlaceholder": "Tell us about your ads (optional)",
+      "sending": "Sending...",
+      "submit": "Submit"
+    }
+  },
+  "McpPage": {
+    "useCasesTitle": {
+      "line1": "Built for the people",
+      "line2": "spending the budget."
+    },
+    "useCases": [
+      {
+        "label": "SMB founders",
+        "body": "Self-doers running their own Google or Meta spend. Replace the agency review call with a Claude conversation."
+      },
+      {
+        "label": "Performance agencies",
+        "body": "Onboard a new account, audit it, and ship the fix list before the kickoff call ends."
+      },
+      {
+        "label": "E-commerce ops",
+        "body": "Daily search-term sweeps, negative-list maintenance, and budget reshuffles run from a single agent prompt."
+      },
+      {
+        "label": "Lead-gen teams",
+        "body": "Match search terms to MQL quality, tighten match types, and route budget toward the geos and keywords that close."
+      },
+      {
+        "label": "Solo consultants",
+        "body": "Manage ten accounts the way you used to manage one. One MCP endpoint per client, one chat per question."
+      }
+    ],
+    "cta": {
+      "title": {
+        "line1": "Wire it up.",
+        "line2": "Operate from chat."
+      },
+      "google": "Connect Google Ads",
+      "meta": "Connect Meta Ads",
+      "note": "Free · OAuth 2.0 · No credit card"
+    },
+    "faq": {
+      "title": "FAQ — NotFair MCP",
+      "intro": "Common questions about authenticating, configuring, and operating the NotFair MCP servers.",
+      "items": [
+        {
+          "question": "What is NotFair MCP?",
+          "answer": "Two hosted Model Context Protocol servers — one for Google Ads, one for Meta Ads — that expose your accounts to MCP-compatible AI clients. Reads stream live campaign data; writes are proposed in chat and require explicit approval before they hit the ad platform."
+        },
+        {
+          "question": "Which AI clients can I use?",
+          "answer": "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL stays the same — only the client-side config differs."
+        },
+        {
+          "question": "Do I need to self-host anything?",
+          "answer": "No. Both servers are hosted by NotFair at {googleServerUrl} and {metaServerUrl}. You connect the underlying ad account once via OAuth and point your client at the URL."
+        },
+        {
+          "question": "How does authentication work?",
+          "answer": "OAuth 2.0 with PKCE is the default — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect or notfair.co/connect/meta-ads."
+        },
+        {
+          "question": "Can the AI write to my ad accounts?",
+          "answer": "Only with explicit approval. Write tools propose changes, the client surfaces the diff, and you confirm before anything hits the Google Ads or Meta Marketing API. Read access is unrestricted; every write is gated."
+        },
+        {
+          "question": "What does it cost?",
+          "answer": "Connecting and running audits is free with no credit card. Paid plans unlock higher usage limits and team features."
+        },
+        {
+          "question": "Where do I find platform-specific configs?",
+          "answer": "The /google-ads-mcp and /meta-ads-mcp pages have generic JSON snippets that work in any MCP client. The per-client setup guides walk through Claude.ai, Claude Code, and Codex specifically."
+        }
+      ]
+    },
+    "related": {
+      "title": "Server configs and per-client guides",
+      "intro": "Platform-specific configs and step-by-step setup walkthroughs for each supported client.",
+      "links": {
+        "googleAdsMcp": {
+          "title": "Google Ads MCP server",
+          "description": "Generic MCP config and tool list for {connectorName}."
+        },
+        "metaAdsMcp": {
+          "title": "Meta Ads MCP server",
+          "description": "Generic MCP config and tool list for {connectorName}."
+        },
+        "claudeConnector": {
+          "title": "Claude Connector setup guide",
+          "description": "Install NotFair as a custom MCP connector inside Claude.ai Web, Desktop, or Cowork."
+        },
+        "claudeCode": {
+          "title": "Claude Code plugin setup guide",
+          "description": "Install NotFair in Claude Code via the toprank plugin marketplace."
+        },
+        "codex": {
+          "title": "Codex MCP setup guide",
+          "description": "One-line install of the NotFair MCP for OpenAI's Codex CLI."
+        },
+        "pricing": {
+          "title": "Pricing",
+          "description": "Free to connect. Paid plans for higher usage and team features."
+        }
+      }
+    }
+  },
+  "GoogleAdsMcpPage": {
+    "hero": {
+      "eyebrow": "Google Ads MCP server",
+      "title": "Hosted Google Ads MCP server",
+      "bodyBeforeLink": "NotFair ships a hosted",
+      "bodyBeforeCode": "server at",
+      "bodyAfterCode": ". Drop the generic config below into any MCP-compatible client so your AI can diagnose issues and draft fixes — auth via OAuth or Bearer token.",
+      "note": "Free · OAuth 2.0 · No credit card",
+      "specPrefix": "New to MCP? Read the spec at",
+      "specSuffix": "."
+    },
+    "config": {
+      "eyebrow": "Generic MCP config",
+      "title": "Two configs that work in any MCP client",
+      "body": "For client-specific walkthroughs (Claude.ai, Claude Code, Codex), see the per-client setup guides linked below."
+    },
+    "tools": {
+      "eyebrow": "Tools exposed",
+      "title": "What your AI client can read and change",
+      "body": "Read tools provide live account context. Write tools propose changes — every write requires explicit human approval before it hits the Google Ads API.",
+      "columns": {
+        "tool": "Tool",
+        "type": "Type",
+        "description": "What it does"
+      },
+      "categories": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "more": "and 60+ more",
+      "items": [
+        {
+          "name": "runScript",
+          "category": "read",
+          "description": "Sandboxed JS with GAQL fan-out — every analytical read goes through this one tool."
+        },
+        {
+          "name": "getRecommendations",
+          "category": "read",
+          "description": "Google's optimization suggestions with estimated impact."
+        },
+        {
+          "name": "getKeywordIdeas",
+          "category": "read",
+          "description": "Keyword Planner search volume, competition, and CPC estimates."
+        },
+        {
+          "name": "getChanges",
+          "category": "read",
+          "description": "NotFair's own change log — undoable with one call."
+        },
+        {
+          "name": "reviewChangeImpact",
+          "category": "read",
+          "description": "Before/after impact analysis on recent edits."
+        },
+        {
+          "name": "getResourceMetadata",
+          "category": "read",
+          "description": "GAQL schema discovery for custom queries."
+        },
+        {
+          "name": "updateBid",
+          "category": "write",
+          "description": "Adjust keyword or ad group bids — reviewable before apply."
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "Pause underperforming campaigns."
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "write",
+          "description": "Block irrelevant search terms after review."
+        },
+        {
+          "name": "createAd",
+          "category": "write",
+          "description": "Write and launch new ad copy through chat."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Ready to wire up your client?",
+      "body": "Sign in with Google to generate your credentials, then paste a config above into your MCP client.",
+      "button": "Sign in with Google to continue",
+      "secondary": "Or follow a per-client setup guide"
+    },
+    "faq": {
+      "title": "FAQ — NotFair MCP server",
+      "intro": "Common questions about authenticating, configuring, and using the NotFair Google Ads MCP server.",
+      "items": [
+        {
+          "question": "What is the NotFair Google Ads MCP server?",
+          "answer": "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools propose fixes that you approve in chat."
+        },
+        {
+          "question": "Which MCP clients are supported?",
+          "answer": "Any client that speaks the MCP Streamable HTTP transport — Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL is the same; only the client-side config differs."
+        },
+        {
+          "question": "Do I need to self-host anything?",
+          "answer": "No. The server is hosted at {serverUrl}. You just point your client at it and authenticate."
+        },
+        {
+          "question": "How does authentication work?",
+          "answer": "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect."
+        },
+        {
+          "question": "Is the MCP server free?",
+          "answer": "Yes. Connecting and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features."
+        },
+        {
+          "question": "Can the AI write to my account through this server?",
+          "answer": "Only with your explicit approval. Write tools propose changes, the client surfaces them, and you confirm before anything hits the Google Ads API. Read access is unrestricted; write access is gated."
+        }
+      ]
+    },
+    "related": {
+      "title": "Per-client setup guides",
+      "intro": "Walkthroughs for each supported client.",
+      "links": {
+        "claudeConnector": {
+          "title": "Claude Connector setup guide",
+          "description": "Install NotFair as a custom MCP connector inside Claude.ai Web, Desktop, or Cowork."
+        },
+        "claudeCode": {
+          "title": "Claude Code plugin setup guide",
+          "description": "Install NotFair in Claude Code via the toprank plugin marketplace."
+        },
+        "codex": {
+          "title": "Codex MCP setup guide",
+          "description": "One-line install of the NotFair MCP for OpenAI's Codex CLI."
+        }
+      }
+    }
+  },
+  "MetaAdsMcpPage": {
+    "hero": {
+      "eyebrow": "Meta Ads MCP server",
+      "title": "Hosted Meta Ads MCP server",
+      "bodyBeforeLink": "NotFair ships a hosted",
+      "bodyBeforeCode": "server at",
+      "bodyAfterCode": ". Drop the generic config below into any MCP-compatible client so your AI can diagnose Facebook + Instagram ad accounts and draft fixes — auth via OAuth or Bearer token.",
+      "note": "Free · OAuth 2.0 · No credit card",
+      "specPrefix": "New to MCP? Read the spec at",
+      "specSuffix": "."
+    },
+    "config": {
+      "eyebrow": "Generic MCP config",
+      "title": "Two configs that work in any MCP client",
+      "body": "For client-specific walkthroughs (Claude.ai, Claude Code, Codex), see the per-client setup guides linked below."
+    },
+    "tools": {
+      "eyebrow": "Tools exposed",
+      "title": "What your AI client can read and change",
+      "body": "Read tools provide live ad-account context. Write tools propose changes — every write requires explicit human approval before it hits the Meta Marketing API.",
+      "columns": {
+        "tool": "Tool",
+        "type": "Type",
+        "description": "What it does"
+      },
+      "categories": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "more": "and more",
+      "items": [
+        {
+          "name": "runScript",
+          "category": "read",
+          "description": "Sandboxed JS with Graph API fan-out — fan out 20 calls in one pass for audits and analysis."
+        },
+        {
+          "name": "getInsights",
+          "category": "read",
+          "description": "Performance insights with breakdowns: spend, impressions, clicks, CTR, CPC, CPM, conversions."
+        },
+        {
+          "name": "listCampaigns",
+          "category": "read",
+          "description": "List campaigns with status, objective, budget, bid strategy, and schedule."
+        },
+        {
+          "name": "listAdSets",
+          "category": "read",
+          "description": "Ad set details: optimization goal, billing event, daily/lifetime budget, targeting summary."
+        },
+        {
+          "name": "listAds",
+          "category": "read",
+          "description": "Ads with status, parent ad set/campaign, creative envelope, configured status."
+        },
+        {
+          "name": "getAdAccount",
+          "category": "read",
+          "description": "Account snapshot: currency, timezone, balance, amount spent, spend cap, parent BM."
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "Pause a Meta campaign — reversible via enableCampaign."
+        },
+        {
+          "name": "pauseAdSet",
+          "category": "write",
+          "description": "Pause an ad set without touching its parent campaign."
+        },
+        {
+          "name": "updateCampaignBudget",
+          "category": "write",
+          "description": "Update daily or lifetime budget on a Meta campaign."
+        },
+        {
+          "name": "renameCampaign",
+          "category": "write",
+          "description": "Rename a Meta campaign in place."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Ready to wire up your client?",
+      "body": "Sign in to NotFair, link your Meta ad accounts, then paste a config above into your MCP client.",
+      "button": "Sign in to continue",
+      "secondary": "Or follow a per-client setup guide"
+    },
+    "faq": {
+      "title": "FAQ — NotFair Meta MCP server",
+      "intro": "Common questions about authenticating, configuring, and using the NotFair Meta Ads MCP server.",
+      "items": [
+        {
+          "question": "What is the NotFair Meta Ads MCP server?",
+          "answer": "It's a hosted Model Context Protocol server that exposes your Meta ad accounts (Facebook + Instagram) to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools propose fixes that you approve in chat."
+        },
+        {
+          "question": "Which MCP clients are supported?",
+          "answer": "Any client that speaks the MCP Streamable HTTP transport — Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL is the same; only the client-side config differs."
+        },
+        {
+          "question": "Do I need to self-host anything?",
+          "answer": "No. The Meta Ads MCP server is hosted at {serverUrl}. You just point your client at it and authenticate."
+        },
+        {
+          "question": "How does authentication work?",
+          "answer": "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect/meta-ads."
+        },
+        {
+          "question": "Is the MCP server free?",
+          "answer": "Yes. Connecting to NotFair's Meta MCP is free with no credit card. Paid plans unlock higher usage limits and team features."
+        },
+        {
+          "question": "Can the AI write to my Meta ad accounts through this server?",
+          "answer": "Only with your explicit approval. Write tools propose changes (pause campaigns, adjust budgets, rename entities, etc.), the client surfaces them, and you confirm before anything hits the Meta Marketing API. Read access is unrestricted; write access is gated."
+        },
+        {
+          "question": "Does this work for both Facebook and Instagram ads?",
+          "answer": "Yes. Meta Ads covers both Facebook and Instagram inventory under a single ad account. The MCP exposes everything Meta surfaces through the Marketing API: campaigns, ad sets, ads, creative, audiences, insights, and the parent Business Manager."
+        }
+      ]
+    },
+    "related": {
+      "title": "Per-client setup guides",
+      "intro": "Walkthroughs for each supported client.",
+      "links": {
+        "claudeConnector": {
+          "title": "Meta Ads Claude Connector setup guide",
+          "description": "Install NotFair's Meta connector inside Claude.ai Web, Desktop, or Cowork."
+        },
+        "claudeCode": {
+          "title": "Meta Ads Claude Code plugin setup guide",
+          "description": "Install the NotFair plugin in Claude Code via the toprank marketplace for Meta Ads."
+        },
+        "codex": {
+          "title": "Meta Ads Codex MCP setup guide",
+          "description": "One-line install of the NotFair Meta MCP for OpenAI's Codex CLI."
+        }
+      }
+    }
+  },
+  "GoogleAdsClaudePage": {
+    "hero": {
+      "eyebrow": "Google Ads MCP Server",
+      "title": {
+        "line1": "Use Claude for",
+        "line2": "Google Ads —",
+        "highlight": "live data, 2-minute setup."
+      },
+      "body": "NotFair is a Google Ads MCP server for Claude. Connect once and Claude gets live access to your campaigns, keywords, spend, and ad copy — then helps you diagnose, optimize, and manage through natural conversation.",
+      "disconnectedLabel": "Connect Google Ads to Claude",
+      "connectedLabel": "Open Your Account",
+      "note": "Free audit included. No credit card required."
+    },
+    "configCard": {
+      "step": "Step 1",
+      "worksIn": "Works in",
+      "thenConnect": "Then connect your Google Ads account at",
+      "suffix": "."
+    },
+    "steps": {
+      "eyebrow": "How it works",
+      "title": "Connect Google Ads to Claude in 2 minutes.",
+      "items": [
+        {
+          "num": "1",
+          "title": "Add NotFair to your MCP config",
+          "desc": "Paste the config snippet into Claude Desktop, Claude Code, or Claude Cowork. One entry, no API keys needed at this step."
+        },
+        {
+          "num": "2",
+          "title": "Connect your Google Ads account",
+          "desc": "OAuth in one click at notfair.co. Read permissions only until you approve a specific change — your account stays safe."
+        },
+        {
+          "num": "3",
+          "title": "Ask Claude anything about your campaigns",
+          "desc": "Try: \"Why did CPA rise and what should I fix?\" Claude pulls live data and answers with specifics — no CSV exports, no copy-paste."
+        }
+      ]
+    },
+    "capabilities": {
+      "eyebrow": "What you get",
+      "title": "Claude AI for Google Ads — what it actually does.",
+      "body": "Once connected, Claude has live access to your account. No more exporting CSVs, copying tables into chat, or working from screenshots. Ask a question, get a specific answer backed by real data.",
+      "items": [
+        {
+          "title": "Campaign diagnosis in natural language",
+          "body": "Ask Claude what is wrong. It checks campaign structure, keyword health, search term quality, impression share, and ad copy — then gives you a prioritized fix list."
+        },
+        {
+          "title": "Find the issues you did not know to ask for",
+          "body": "In testing, mature accounts often have clear problems hiding in search terms, structure, match types, and budget allocation. Asking \"what should I fix?\" surfaces them immediately."
+        },
+        {
+          "title": "Every change is reviewable",
+          "body": "NotFair never commits a change without your explicit approval. Claude shows you what it wants to do, you say yes or no. Human always in control."
+        },
+        {
+          "title": "Works where you already work",
+          "body": "Claude Desktop for solo marketers. Claude Code for developers managing campaigns. Claude Cowork for teams. One MCP config, all three clients."
+        }
+      ]
+    },
+    "tools": {
+      "eyebrow": "MCP tools exposed",
+      "title": "What Claude can read and change.",
+      "body": "NotFair exposes a focused set of MCP tools. Read tools give Claude live account context. Write tools let Claude propose changes — each requiring your explicit approval before execution.",
+      "columns": {
+        "tool": "Tool",
+        "type": "Type",
+        "description": "What it does"
+      },
+      "categories": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "referencePrefix": "Full tool reference at",
+      "referenceSuffix": ".",
+      "items": [
+        {
+          "name": "listCampaigns",
+          "category": "read",
+          "description": "Pull live campaign performance, spend, and status"
+        },
+        {
+          "name": "getKeywords",
+          "category": "read",
+          "description": "Inspect keyword bids, Quality Scores, and impressions"
+        },
+        {
+          "name": "getSearchTermReport",
+          "category": "read",
+          "description": "Find irrelevant queries, weak match types, and budget leaks"
+        },
+        {
+          "name": "getCampaignPerformance",
+          "category": "read",
+          "description": "Deep-dive into campaign metrics over any date range"
+        },
+        {
+          "name": "updateBid",
+          "category": "write",
+          "description": "Adjust a keyword bid — reviewable before it applies"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "Pause an underperforming campaign through Claude"
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "write",
+          "description": "Block a wasted search term at the campaign or account level"
+        },
+        {
+          "name": "createAd",
+          "category": "write",
+          "description": "Write and launch new ad copy through natural conversation"
+        }
+      ]
+    },
+    "auditCta": {
+      "eyebrow": "Free · No credit card",
+      "title": "Free audit when you connect.",
+      "body": "Connect your Google Ads account and Claude immediately runs a free diagnosis — surfacing wasted spend, missed opportunities, and structural issues with a prioritized fix list.",
+      "disconnectedLabel": "Get Free Audit",
+      "connectedLabel": "View Your Audit",
+      "secondary": "Learn about the audit"
+    },
+    "faq": {
+      "title": "FAQ — Google Ads and Claude",
+      "intro": "Common questions from MCP builders and marketers setting up the Claude AI Google Ads workflow.",
+      "items": [
+        {
+          "question": "How do I use Claude for Google Ads with NotFair?",
+          "answer": "Add NotFair to your MCP config (one JSON snippet), connect your Google Ads account via OAuth at notfair.co, and Claude immediately gains live access to your campaigns. You can then ask Claude what is wrong, why performance changed, what to fix next, or to draft approved bid, keyword, negative, and ad changes — all in natural conversation."
+        },
+        {
+          "question": "Does NotFair work with Claude Desktop, Claude Code, and Claude Cowork?",
+          "answer": "Yes. NotFair is a standard MCP server, so it works with any MCP-compatible Claude client. Add the same config snippet to Claude Desktop settings, your Claude Code MCP config, or Claude Cowork — it works identically in all three."
+        },
+        {
+          "question": "What Google Ads data can Claude see through NotFair?",
+          "answer": "Claude gets live access to campaign performance, keyword bids and Quality Scores, search term reports, ad copy, spend data, impression share, and conversion tracking status. It reads your actual account data in real time — no exports or manual uploads needed."
+        },
+        {
+          "question": "Can Claude make changes to my Google Ads account?",
+          "answer": "Yes, but only with your explicit approval at each step. Claude can propose bid changes, pause campaigns, add negative keywords, and write new ads — but every action is shown to you before it executes. You review and confirm. NotFair also logs every change so you can track impact."
+        },
+        {
+          "question": "Is this an official Google or Anthropic integration?",
+          "answer": "NotFair is an independent product built on Anthropic's open Model Context Protocol (MCP) standard and the Google Ads API. It is not an official Google product. MCP is the open standard Anthropic created for connecting AI to external tools — any developer can build MCP servers, and NotFair is one focused entirely on Google Ads."
+        },
+        {
+          "question": "What does setup actually take?",
+          "answer": "Under 2 minutes. Paste one JSON snippet into your MCP config, open notfair.co, click Connect Google Ads, complete the OAuth flow. That's it — Claude can now access your campaigns."
+        },
+        {
+          "question": "Do I need to know how to code to use this?",
+          "answer": "No coding required. Editing a JSON config file is the most technical step — it's copying and pasting one snippet. The rest is standard Google OAuth and talking to Claude in plain English."
+        }
+      ]
+    },
+    "related": {
+      "title": "Related pages",
+      "intro": "Explore the full NotFair workflow for Google Ads and Claude.",
+      "links": {
+        "audit": {
+          "title": "Free Google Ads Audit",
+          "description": "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues."
+        },
+        "mcpServer": {
+          "title": "Google Ads MCP Server",
+          "description": "Learn how NotFair's MCP server exposes your Google Ads data and actions to any MCP-compatible AI client."
+        },
+        "home": {
+          "title": "NotFair Home",
+          "description": "The AI-powered Google Ads agent — connect your account and let Claude diagnose issues, recommend fixes, and manage approved changes through conversation."
+        }
+      }
+    },
+    "finalCta": {
+      "title": "Connect Google Ads to Claude — now.",
+      "body": "2-minute setup. Free audit included. Human in control of every change.",
+      "note": "Paste one config snippet. OAuth. Done."
+    }
+  },
+  "GoogleAdsAuditPage": {
+    "hero": {
+      "eyebrow": "Free · No credit card · 5 minutes",
+      "title": {
+        "line1": "Free Google Ads",
+        "line2": "Audit — know exactly",
+        "highlight": "what to fix next."
+      },
+      "body": "AI diagnoses your account in 5 minutes. See your waste rate, missed opportunities, structural issues, and a 3-step fix list — free.",
+      "note": "Just connect to Google — no forms, no credit card, nothing to fill in."
+    },
+    "sampleCard": {
+      "title": "Pulse Metrics",
+      "caption": "Sample audit result",
+      "wasteSuffix": "in identified waste"
+    },
+    "mockPulse": {
+      "items": [
+        {
+          "label": "Waste Rate",
+          "value": "18%"
+        },
+        {
+          "label": "Demand Captured",
+          "value": "42%"
+        },
+        {
+          "label": "CPA",
+          "value": "$34.20"
+        }
+      ]
+    },
+    "auditPasses": {
+      "eyebrow": "3 action passes",
+      "title": "A prioritized fix list, not just a score.",
+      "items": [
+        {
+          "name": "Stop Wasting",
+          "tag": "Pass 1",
+          "description": "Identifies non-converting keywords, irrelevant search terms, and structural waste — with exact dollar amounts so you know what to cut first."
+        },
+        {
+          "name": "Capture More",
+          "tag": "Pass 2",
+          "description": "Finds budget-constrained campaigns that are winning auctions but running out of gas, plus converting search terms you haven't added as keywords yet."
+        },
+        {
+          "name": "Fix Fundamentals",
+          "tag": "Pass 3",
+          "description": "Surfaces structural issues — conversion tracking gaps, campaign organization, ad copy quality, and bidding strategy fit — that compound over time."
+        }
+      ]
+    },
+    "pulseMetrics": {
+      "eyebrow": "3 pulse metrics",
+      "title": "Track progress over time.",
+      "items": [
+        {
+          "name": "Waste Rate",
+          "description": "What percentage of your spend goes to keywords and search terms with zero conversions. Lower is better."
+        },
+        {
+          "name": "Demand Captured",
+          "description": "How much of the available search demand you're actually showing up for on profitable campaigns. Higher is better."
+        },
+        {
+          "name": "CPA",
+          "description": "Your cost per conversion. The audit tracks this over time so you can see the impact of changes."
+        }
+      ]
+    },
+    "findings": {
+      "title": "What a typical audit finds.",
+      "body": "Most accounts running Google Ads for 6+ months have accumulated significant waste. Here's what we commonly uncover in the first analysis.",
+      "items": [
+        {
+          "label": "Search Term Waste",
+          "finding": "47 irrelevant search terms",
+          "impact": "$2,847/mo"
+        },
+        {
+          "label": "Keyword Performance",
+          "finding": "23 keywords with zero conversions",
+          "impact": "$1,200/mo wasted"
+        },
+        {
+          "label": "Conversion Tracking",
+          "finding": "Conversion tracking not verified",
+          "impact": "Blind to results"
+        },
+        {
+          "label": "Impression Share",
+          "finding": "Impression share lost to budget: 34%",
+          "impact": "Ceiling on growth"
+        }
+      ]
+    },
+    "howItWorks": {
+      "eyebrow": "How it works",
+      "title": "From connect to insights in 5 minutes.",
+      "items": [
+        {
+          "num": "1",
+          "title": "Connect Google Ads",
+          "desc": "One-click OAuth. Read-only access — we can't make changes until you explicitly approve them. Takes 30 seconds."
+        },
+        {
+          "num": "2",
+          "title": "AI runs the analysis",
+          "desc": "Our engine analyzes your campaigns, keywords, search terms, impression share, and conversion setup."
+        },
+        {
+          "num": "3",
+          "title": "Get your fix list",
+          "desc": "You get 3 pulse metrics, a prioritized 3-pass action plan, and the exact dollar impact of each fix."
+        }
+      ]
+    },
+    "verticals": {
+      "eyebrow": "By industry",
+      "title": "Google Ads audits tuned for your vertical.",
+      "body": "Every industry leaks money in different places. Pick your vertical for a version of this audit that knows the specific checks, benchmarks, and fix patterns that matter for your account.",
+      "spendLabel": "Spend",
+      "cpcLabel": "CPC"
+    },
+    "finalCta": {
+      "title": "Get your free audit now.",
+      "body": "Takes 5 minutes. No changes made to your account. No credit card required."
+    }
   }
 }

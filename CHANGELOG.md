@@ -3,6 +3,16 @@
 All notable changes to NotFair will be documented in this file.
 
 
+## [0.3.8.0] - 2026-05-06
+
+### Added
+- **Major marketing pages now read from localized message bundles.** MCP setup, pricing cards, setup guides, Google Ads MCP, Meta Ads MCP, Claude workflow, and Google Ads audit pages now use shared i18n copy instead of embedded English strings.
+- **French, German, Spanish, Brazilian Portuguese, and Thai bundles now include translated major-page marketing copy.** FAQ content, related links, setup steps, tool descriptions, CTAs, cards, and audit sections no longer fall back to visible English copy.
+
+### Fixed
+- **Translation regression tests now compare every string leaf in major marketing namespaces.** The guard covers array-backed cards and FAQ entries, with an allowlist only for stable brand, product, protocol, metric, and tool-name values.
+
+
 ## [0.3.7.1] - 2026-05-06
 
 ### Fixed

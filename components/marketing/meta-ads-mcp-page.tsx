@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
@@ -16,76 +17,31 @@ const SERVER_URL = META_MCP_SERVER_URL;
 
 const VISIBLE_TOOLS = 6;
 
-const TOOLS: { name: string; category: "Read" | "Write"; description: string }[] = [
-    { name: "runScript", category: "Read", description: "Sandboxed JS with Graph API fan-out — fan out 20 calls in one pass for audits and analysis." },
-    { name: "getInsights", category: "Read", description: "Performance insights with breakdowns: spend, impressions, clicks, CTR, CPC, CPM, conversions." },
-    { name: "listCampaigns", category: "Read", description: "List campaigns with status, objective, budget, bid strategy, and schedule." },
-    { name: "listAdSets", category: "Read", description: "Ad set details: optimization goal, billing event, daily/lifetime budget, targeting summary." },
-    { name: "listAds", category: "Read", description: "Ads with status, parent ad set/campaign, creative envelope, configured status." },
-    { name: "getAdAccount", category: "Read", description: "Account snapshot: currency, timezone, balance, amount spent, spend cap, parent BM." },
-    { name: "pauseCampaign", category: "Write", description: "Pause a Meta campaign — reversible via enableCampaign." },
-    { name: "pauseAdSet", category: "Write", description: "Pause an ad set without touching its parent campaign." },
-    { name: "updateCampaignBudget", category: "Write", description: "Update daily or lifetime budget on a Meta campaign." },
-    { name: "renameCampaign", category: "Write", description: "Rename a Meta campaign in place." },
-];
-
-const FAQ_ITEMS: FaqItem[] = [
-    {
-        question: "What is the NotFair Meta Ads MCP server?",
-        answer:
-            "It's a hosted Model Context Protocol server that exposes your Meta ad accounts (Facebook + Instagram) to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools propose fixes that you approve in chat.",
-    },
-    {
-        question: "Which MCP clients are supported?",
-        answer:
-            "Any client that speaks the MCP Streamable HTTP transport — Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL is the same; only the client-side config differs.",
-    },
-    {
-        question: "Do I need to self-host anything?",
-        answer:
-            `No. The Meta Ads MCP server is hosted at ${SERVER_URL}. You just point your client at it and authenticate.`,
-    },
-    {
-        question: "How does authentication work?",
-        answer:
-            "OAuth 2.0 with PKCE is the recommended flow — Claude.ai and Codex run it automatically. For clients that don't support OAuth, you can use a Bearer token via the Authorization header. Generate either at notfair.co/connect/meta-ads.",
-    },
-    {
-        question: "Is the MCP server free?",
-        answer:
-            "Yes. Connecting to NotFair's Meta MCP is free with no credit card. Paid plans unlock higher usage limits and team features.",
-    },
-    {
-        question: "Can the AI write to my Meta ad accounts through this server?",
-        answer:
-            "Only with your explicit approval. Write tools propose changes (pause campaigns, adjust budgets, rename entities, etc.), the client surfaces them, and you confirm before anything hits the Meta Marketing API. Read access is unrestricted; write access is gated.",
-    },
-    {
-        question: "Does this work for both Facebook and Instagram ads?",
-        answer:
-            "Yes. Meta Ads covers both Facebook and Instagram inventory under a single ad account. The MCP exposes everything Meta surfaces through the Marketing API: campaigns, ad sets, ads, creative, audiences, insights, and the parent Business Manager.",
-    },
-];
+type McpTool = {
+    name: string;
+    category: "read" | "write";
+    description: string;
+};
 
 const RELATED_LINKS = [
-    {
-        href: "/meta-ads-claude-connector-setup-guide",
-        title: "Meta Ads Claude Connector setup guide",
-        description: "Install NotFair's Meta connector inside Claude.ai Web, Desktop, or Cowork.",
-    },
-    {
-        href: "/meta-ads-claude-code-plugin-setup-guide",
-        title: "Meta Ads Claude Code plugin setup guide",
-        description: "Install the NotFair plugin in Claude Code via the toprank marketplace for Meta Ads.",
-    },
-    {
-        href: "/meta-ads-codex-mcp-setup-guide",
-        title: "Meta Ads Codex MCP setup guide",
-        description: "One-line install of the NotFair Meta MCP for OpenAI's Codex CLI.",
-    },
+    { href: "/meta-ads-claude-connector-setup-guide", key: "claudeConnector" },
+    { href: "/meta-ads-claude-code-plugin-setup-guide", key: "claudeCode" },
+    { href: "/meta-ads-codex-mcp-setup-guide", key: "codex" },
 ];
 
 export function MetaAdsMcpPage() {
+    const t = useTranslations("MetaAdsMcpPage");
+    const tools = t.raw("tools.items") as McpTool[];
+    const faqItems = (t.raw("faq.items") as FaqItem[]).map((item) => ({
+        question: item.question,
+        answer: item.answer.replace("{serverUrl}", SERVER_URL),
+    }));
+    const relatedLinks = RELATED_LINKS.map(({ href, key }) => ({
+        href,
+        title: t(`related.links.${key}.title`),
+        description: t(`related.links.${key}.description`),
+    }));
+
     return (
         <div className="bg-[#1A1917] text-[#E8E4DD]">
             {/* ── Hero ── */}
@@ -97,13 +53,13 @@ export function MetaAdsMcpPage() {
                         transition={{ duration: 0.6, ease: "easeOut" }}
                     >
                         <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                            Meta Ads MCP server
+                            {t("hero.eyebrow")}
                         </p>
                         <h1 className="font-display mx-auto mt-4 max-w-3xl text-4xl font-bold leading-[1.08] tracking-tight text-[#E8E4DD] md:text-5xl lg:text-[56px]">
-                            Hosted Meta Ads MCP server
+                            {t("hero.title")}
                         </h1>
                         <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#C4C0B6]">
-                            NotFair ships a hosted{" "}
+                            {t("hero.bodyBeforeLink")}{" "}
                             <a
                                 href="https://modelcontextprotocol.io/"
                                 target="_blank"
@@ -112,20 +68,17 @@ export function MetaAdsMcpPage() {
                             >
                                 Model Context Protocol
                             </a>{" "}
-                            server at{" "}
+                            {t("hero.bodyBeforeCode")}{" "}
                             <code className="rounded bg-[#24231F] px-1.5 py-0.5 font-mono text-sm text-[#E8E4DD]">
                                 {SERVER_URL}
                             </code>
-                            . Drop the generic config below into any MCP-compatible
-                            client so your AI can diagnose Facebook + Instagram ad
-                            accounts and draft fixes — auth via OAuth or Bearer
-                            token.
+                            {t("hero.bodyAfterCode")}
                         </p>
                         <p className="mt-6 text-sm text-[#C4C0B6]">
-                            Free · OAuth 2.0 · No credit card
+                            {t("hero.note")}
                         </p>
                         <p className="mt-3 text-xs text-[#C4C0B6]/70">
-                            New to MCP? Read the spec at{" "}
+                            {t("hero.specPrefix")}{" "}
                             <a
                                 href="https://modelcontextprotocol.io/"
                                 target="_blank"
@@ -135,7 +88,7 @@ export function MetaAdsMcpPage() {
                                 modelcontextprotocol.io
                                 <ExternalLink className="h-3 w-3" />
                             </a>
-                            .
+                            {t("hero.specSuffix")}
                         </p>
                     </motion.div>
                 </div>
@@ -152,15 +105,13 @@ export function MetaAdsMcpPage() {
                         className="mb-10 text-center"
                     >
                         <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                            Generic MCP config
+                            {t("config.eyebrow")}
                         </p>
                         <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-                            Two configs that work in any MCP client
+                            {t("config.title")}
                         </h2>
                         <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
-                            For client-specific walkthroughs (Claude.ai, Claude
-                            Code, Codex), see the per-client setup guides linked
-                            below.
+                            {t("config.body")}
                         </p>
                     </motion.div>
 
@@ -184,15 +135,13 @@ export function MetaAdsMcpPage() {
                         className="mb-8"
                     >
                         <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                            Tools exposed
+                            {t("tools.eyebrow")}
                         </p>
                         <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-                            What your AI client can read and change
+                            {t("tools.title")}
                         </h2>
                         <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
-                            Read tools provide live ad-account context. Write tools
-                            propose changes — every write requires explicit human
-                            approval before it hits the Meta Marketing API.
+                            {t("tools.body")}
                         </p>
                     </motion.div>
 
@@ -206,15 +155,15 @@ export function MetaAdsMcpPage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-[#3D3C36] bg-[#24231F]">
-                                    <th className="px-5 py-3 text-left font-medium text-[#C4C0B6]">Tool</th>
-                                    <th className="px-5 py-3 text-left font-medium text-[#C4C0B6]">Type</th>
+                                    <th className="px-5 py-3 text-left font-medium text-[#C4C0B6]">{t("tools.columns.tool")}</th>
+                                    <th className="px-5 py-3 text-left font-medium text-[#C4C0B6]">{t("tools.columns.type")}</th>
                                     <th className="hidden px-5 py-3 text-left font-medium text-[#C4C0B6] sm:table-cell">
-                                        What it does
+                                        {t("tools.columns.description")}
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {TOOLS.slice(0, VISIBLE_TOOLS).map((tool, i) => (
+                                {tools.slice(0, VISIBLE_TOOLS).map((tool, i) => (
                                     <tr
                                         key={tool.name}
                                         className={`border-b border-[#3D3C36] ${
@@ -229,12 +178,12 @@ export function MetaAdsMcpPage() {
                                         <td className="px-5 py-3">
                                             <span
                                                 className={`inline-block rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                                    tool.category === "Read"
+                                                    tool.category === "read"
                                                         ? "border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 text-[#4CAF6E]"
                                                         : "border border-[#D4882A]/30 bg-[#D4882A]/10 text-[#D4882A]"
                                                 }`}
                                             >
-                                                {tool.category}
+                                                {t(`tools.categories.${tool.category}`)}
                                             </span>
                                         </td>
                                         <td className="hidden px-5 py-3 text-[#C4C0B6] sm:table-cell">
@@ -247,7 +196,7 @@ export function MetaAdsMcpPage() {
                                         colSpan={3}
                                         className="px-5 py-3 text-center text-xs italic text-[#C4C0B6]/70"
                                     >
-                                        and more
+                                        {t("tools.more")}
                                     </td>
                                 </tr>
                             </tbody>
@@ -267,11 +216,10 @@ export function MetaAdsMcpPage() {
                         className="rounded-lg border border-[#3D3C36] bg-[#24231F] p-8 text-center"
                     >
                         <h2 className="font-display text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
-                            Ready to wire up your client?
+                            {t("cta.title")}
                         </h2>
                         <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#C4C0B6]">
-                            Sign in to NotFair, link your Meta ad accounts, then
-                            paste a config above into your MCP client.
+                            {t("cta.body")}
                         </p>
                         <div className="mt-6 flex flex-col items-center gap-3">
                             <Link
@@ -285,14 +233,14 @@ export function MetaAdsMcpPage() {
                                 }
                             >
                                 <Button className="h-12 rounded-lg bg-[#4CAF6E] px-6 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]">
-                                    Sign in to continue
+                                    {t("cta.button")}
                                 </Button>
                             </Link>
                             <Link
                                 href="/meta-ads-claude-connector-setup-guide"
                                 className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
                             >
-                                Or follow a per-client setup guide
+                                {t("cta.secondary")}
                                 <ArrowRight className="h-3.5 w-3.5" />
                             </Link>
                         </div>
@@ -302,16 +250,16 @@ export function MetaAdsMcpPage() {
 
             {/* ── FAQ ── */}
             <FaqSection
-                title="FAQ — NotFair Meta MCP server"
-                intro="Common questions about authenticating, configuring, and using the NotFair Meta Ads MCP server."
-                items={FAQ_ITEMS}
+                title={t("faq.title")}
+                intro={t("faq.intro")}
+                items={faqItems}
             />
 
             {/* ── Related Pages ── */}
             <LandingLinksSection
-                title="Per-client setup guides"
-                intro="Walkthroughs for each supported client."
-                links={RELATED_LINKS}
+                title={t("related.title")}
+                intro={t("related.intro")}
+                links={relatedLinks}
             />
         </div>
     );

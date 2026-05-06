@@ -229,5 +229,1037 @@
       "tokenExchange": "ยืนยันตัวตน Google ไม่สำเร็จ โปรดลองอีกครั้งในอีกสักครู่",
       "generic": "ยืนยันตัวตนไม่สำเร็จ โปรดลองอีกครั้ง"
     }
+  },
+  "SetupGuidesMenu": {
+    "button": "คู่มือตั้งค่าเพิ่มเติม",
+    "title": "คู่มือตั้งค่า NotFair เพิ่มเติม",
+    "description": "เข้าถึง Google Ads และ Meta Ads จากไคลเอนต์ AI ใดก็ได้ผ่าน NotFair MCP",
+    "guides": {
+      "googleClaudeConnector": {
+        "title": "Claude Cowork, Desktop และ Web",
+        "description": "ติดตั้ง NotFair เป็นคอนเนกเตอร์ MCP แบบกำหนดเองใน Claude.ai"
+      },
+      "googleClaudeCode": {
+        "title": "Claude Code",
+        "description": "ติดตั้งผ่านปลั๊กอิน Claude"
+      },
+      "googleCodex": {
+        "title": "Codex",
+        "description": "เพิ่ม NotFair MCP ให้ OpenAI Codex CLI ด้วยคำสั่งเดียว"
+      },
+      "googleMcp": {
+        "title": "ไคลเอนต์อื่นผ่าน MCP",
+        "description": "การตั้งค่า MCP ทั่วไป ใช้ได้กับ Cursor, Cline หรือไคลเอนต์ที่รองรับ MCP"
+      },
+      "metaClaudeConnector": {
+        "title": "Claude Cowork, Desktop และ Web",
+        "description": "ติดตั้งคอนเนกเตอร์ Meta ของ NotFair ใน Claude.ai สำหรับโฆษณา Facebook และ Instagram"
+      },
+      "metaClaudeCode": {
+        "title": "Claude Code",
+        "description": "ติดตั้งผ่านปลั๊กอิน Claude สำหรับ Meta (Facebook และ Instagram)"
+      },
+      "metaCodex": {
+        "title": "Codex",
+        "description": "เพิ่ม NotFair Meta MCP ให้ OpenAI Codex CLI ด้วยคำสั่งเดียว"
+      },
+      "metaMcp": {
+        "title": "ไคลเอนต์อื่นผ่าน MCP",
+        "description": "การตั้งค่า MCP ทั่วไปสำหรับ Meta ใช้ได้กับ Cursor, Cline หรือไคลเอนต์ที่รองรับ MCP"
+      }
+    }
+  },
+  "McpSetupHero": {
+    "headlinePrefix": "เปลี่ยน",
+    "headlineSuffix": "ให้เป็นเครื่องมือการตลาดของคุณ",
+    "intro": "เชื่อมต่อ NotFair กับ Claude, OpenClaw, Codex, Cursor หรือ Hermes แล้วจัดการ Google Ads จากแชต: วิเคราะห์ปัญหา ร่างวิธีแก้ และอนุมัติทุกการเขียนก่อนดำเนินการ",
+    "tryPrompt": "ตรวจสอบบัญชี Google Ads ของฉันและจัดอันดับวิธีแก้ตามผลกระทบ",
+    "copyField": {
+      "copy": "คัดลอก",
+      "more": "เพิ่มเติม",
+      "less": "ย่อ"
+    },
+    "platforms": {
+      "claude": {
+        "openSettings": {
+          "title": "เปิดการตั้งค่า Claude",
+          "body": "เปิดหน้า Connectors ของ Claude โดยตรง:",
+          "linkLabel": "ปรับแต่ง -> คอนเนกเตอร์"
+        },
+        "addConnector": {
+          "title": "เพิ่มคอนเนกเตอร์แบบกำหนดเอง",
+          "body": "วางข้อมูลนี้ในหน้าต่าง:",
+          "nameLabel": "ชื่อ",
+          "urlLabel": "URL เซิร์ฟเวอร์ MCP ระยะไกล"
+        },
+        "signIn": {
+          "title": "เข้าสู่ระบบแล้วเริ่มถาม",
+          "body": "หลังคลิก <add></add> Claude จะเปิดขั้นตอนเข้าสู่ระบบ เข้าสู่ระบบด้วย NotFair แล้วเริ่มได้เลย ลอง: <tryPrompt></tryPrompt>"
+        }
+      },
+      "openclaw": {
+        "sendPrompt": {
+          "title": "ส่งพรอมป์นี้",
+          "body": "คัดลอกพรอมป์นี้แล้วส่งในแชตของเอเจนต์เพื่อเริ่มเชื่อมต่อ:"
+        },
+        "signIn": {
+          "title": "เข้าสู่ระบบแล้วเริ่มถาม",
+          "body": "เอเจนต์จะตอบกลับด้วยลิงก์เข้าสู่ระบบ เปิดลิงก์ เข้าสู่ระบบด้วย NotFair แล้วเริ่มได้เลย ลอง: <tryPrompt></tryPrompt>"
+        }
+      },
+      "codex": {
+        "install": {
+          "title": "ติดตั้ง MCP",
+          "body": "รันคำสั่งนี้ในเทอร์มินัล:"
+        },
+        "signIn": {
+          "title": "เข้าสู่ระบบแล้วเริ่มถาม",
+          "body": "หลังรันคำสั่ง Codex จะเปิดลิงก์เข้าสู่ระบบในเบราว์เซอร์โดยอัตโนมัติ เข้าสู่ระบบด้วย NotFair แล้วเริ่มได้เลย ลอง: <tryPrompt></tryPrompt>"
+        }
+      },
+      "cursor": {
+        "openTools": {
+          "title": "เปิด Tools & MCP",
+          "body": "ใน Cursor ให้เปิด <settings></settings> แล้วคลิก <addServer></addServer>"
+        },
+        "pasteConfig": {
+          "title": "วางการตั้งค่า",
+          "body": "เพิ่มรายการนี้ใน <mcpServers></mcpServers>:"
+        },
+        "signIn": {
+          "title": "เข้าสู่ระบบแล้วเริ่มถาม",
+          "body": "เมื่อเรียกใช้เครื่องมือครั้งแรก Cursor จะเปิดลิงก์เข้าสู่ระบบในเบราว์เซอร์ เข้าสู่ระบบด้วย NotFair แล้วเริ่มได้เลย ลอง: <tryPrompt></tryPrompt>"
+        }
+      },
+      "hermes": {
+        "sendPrompt": {
+          "title": "ส่งพรอมป์นี้",
+          "body": "คัดลอกพรอมป์นี้แล้วส่งในแชตของเอเจนต์เพื่อเริ่มเชื่อมต่อ:"
+        },
+        "signIn": {
+          "title": "เข้าสู่ระบบแล้วเริ่มถาม",
+          "body": "เอเจนต์จะตอบกลับด้วยลิงก์เข้าสู่ระบบ เปิดลิงก์ เข้าสู่ระบบด้วย NotFair แล้วเริ่มได้เลย ลอง: <tryPrompt></tryPrompt>"
+        }
+      }
+    }
+  },
+  "MarketingEngine": {
+    "chat": {
+      "agentName": "NotFair",
+      "diagnose": {
+        "user": "ทำไม cost per lead ของเราถึงพุ่งขึ้นสัปดาห์นี้?",
+        "summary": "CPL เพิ่มขึ้น <value>42%</value> WoW มี 3 แคมเปญเป็นตัวขับเคลื่อน:",
+        "rows": [
+          {
+            "name": "Brand-Search",
+            "delta": "+$1,820 ใช้จ่าย - 0 conversion"
+          },
+          {
+            "name": "PMax-US",
+            "delta": "+$940 - CPA $38 -> $89"
+          },
+          {
+            "name": "LeadGen-Q4",
+            "delta": "search terms เริ่มไหลไปที่ \"ฟรี\""
+          }
+        ],
+        "prompt": "ให้ร่าง negative 14 รายการและ pause Brand-Search ไหม?",
+        "apply": "ใช้ทั้งคู่",
+        "showDiff": "ดู diff"
+      },
+      "audit": {
+        "user": "ตรวจสอบบัญชี Google Ads ของฉันและจัดอันดับวิธีแก้ตามผลกระทบ",
+        "summary": "รันการอ่าน 20 รายการจาก spend, search terms, quality scores และ assets ปัญหาหลักตาม <value>งบที่เสี่ยง</value>:",
+        "rows": [
+          {
+            "rank": "01",
+            "issue": "คีย์เวิร์ด match กว้างเผา $2.4k/สัปดาห์",
+            "impact": "$2,400"
+          },
+          {
+            "rank": "02",
+            "issue": "ขาด negative ใน LeadGen-Q4",
+            "impact": "$1,180"
+          },
+          {
+            "rank": "03",
+            "issue": "PMax ไม่มี asset coverage",
+            "impact": "$640"
+          },
+          {
+            "rank": "04",
+            "issue": "โฆษณา 3 รายการถูกปฏิเสธแบบเงียบ",
+            "impact": "$310"
+          }
+        ],
+        "total": "กู้คืนได้รวม: <value>$4,530/สัปดาห์</value> เปิดรายการแก้ไขไหม?"
+      },
+      "operate": {
+        "user": "Pause ทุกอย่างที่ต่ำกว่า 1.5 ROAS ใน 14 วันที่ผ่านมา",
+        "summary": "พบ <value>ad sets 6 รายการ</value> ที่ตรงเงื่อนไข Diff ก่อนใช้:",
+        "headers": {
+          "adSet": "ชุดโฆษณา",
+          "spend": "ค่าใช้จ่าย 14 วัน",
+          "roas": "ROAS"
+        },
+        "rows": [
+          {
+            "name": "Retarget-Cart-V3",
+            "spend": "$1,240",
+            "roas": "0.8"
+          },
+          {
+            "name": "Cold-Lookalike-IG",
+            "spend": "$890",
+            "roas": "1.1"
+          },
+          {
+            "name": "Broad-Interest-FB",
+            "spend": "$610",
+            "roas": "1.3"
+          },
+          {
+            "name": "Influencer-Test-A",
+            "spend": "$420",
+            "roas": "0.4"
+          }
+        ],
+        "pauseAll": "Pause ทั้ง 6",
+        "pickWhich": "เลือกเอง",
+        "awaitingApproval": "รออนุมัติ"
+      },
+      "undo": {
+        "user": "Undo สิ่งที่ทำไปตอน 14:32",
+        "summary": "พบ change <change>chg_8f21</change> - pause <campaign>Brand-Search</campaign> วันนี้เวลา 14:32",
+        "before": "ก่อนหน้า",
+        "after": "หลัง undo",
+        "reverted": "ย้อนกลับแล้ว มีอะไรให้ย้อนอีกไหม?",
+        "badge": "ย้อนกลับ 1 change แล้ว"
+      }
+    },
+    "chapters": [
+      {
+        "badge": "วิเคราะห์",
+        "title": "บริบทสด ไม่ใช่รายงานเมื่อวาน",
+        "body": "เอเจนต์อ่านตัวเลขเดียวกับที่คุณเปิดในแพลตฟอร์ม: cost, conversions, impression share, learning phase, frequency, quality score ไม่ต้อง export CSV และไม่ใช้ dashboard ที่ข้อมูลเก่า",
+        "reverse": false
+      },
+      {
+        "badge": "ออดิท",
+        "title": "Audit ที่รู้แล้วว่าควรแก้อะไร",
+        "body": "พรอมป์เดียวกระจายการอ่าน GAQL หรือ Graph API 20 ครั้งในรอบเดียว ให้คะแนนตามงบที่เสี่ยง และคืนรายการแก้ไขตามลำดับความสำคัญ Audit จบด้วยปุ่ม ไม่ใช่ PDF",
+        "reverse": true
+      },
+      {
+        "badge": "ดำเนินการ",
+        "title": "Pause, ย้าย, เปลี่ยนชื่อ, เขียนใหม่ จากแชต",
+        "body": "ไม่ใช่เครื่องมือ audit แบบอ่านอย่างเดียว ทุก entity ที่ผู้จัดการบัญชีแตะได้ถูกเปิดเป็น write tool พร้อม diff และการอนุมัติก่อนถึงแพลตฟอร์มโฆษณา",
+        "reverse": false
+      },
+      {
+        "badge": "อนุมัติและ undo",
+        "title": "ทุกการเขียนต้องตรวจ ทุกการเขียนย้อนกลับได้",
+        "body": "การอ่านทำได้อิสระ การเขียนจะแสดง diff ก่อนลงจริง และ NotFair บันทึกทุก change ในประวัติของตัวเอง หนึ่งคำสั่งย้อนกลับได้",
+        "reverse": true
+      }
+    ],
+    "heading": {
+      "title": "เครื่องมือการตลาดครบชุดในเอเจนต์ของคุณ",
+      "body": "วิเคราะห์ ออดิท เขียนการเปลี่ยนแปลง และย้อนกลับ — ทั้งหมดผ่านการเชื่อมต่อ MCP หนึ่งรายการต่อบัญชีโฆษณา"
+    }
+  },
+  "Pricing": {
+    "status": {
+      "success": "สมัครสมาชิกสำเร็จ",
+      "cancelled": "ยกเลิกการชำระเงินแล้ว ไม่มีการเรียกเก็บเงิน"
+    },
+    "finePrint": "ราคาเป็น USD เรียกเก็บผ่าน Stripe ยกเลิกได้ทุกเมื่อจากพอร์ทัลการชำระเงิน โดยสิทธิ์ใช้งานจะคงอยู่จนจบรอบปัจจุบัน",
+    "header": {
+      "label": "ราคา",
+      "title": "อัปเกรดเมื่อ Claude กลายเป็นนักวางกลยุทธ์และผู้ปฏิบัติการโฆษณาของคุณ",
+      "body": "สร้างมาสำหรับคนที่ต้องการให้ AI หาปัญหาและเปลี่ยนคำแนะนำที่อนุมัติแล้วให้เป็นการเปลี่ยนแปลงแคมเปญ"
+    },
+    "interval": {
+      "yearly": "รายปี",
+      "save": "ประหยัด 20%",
+      "monthly": "รายเดือน"
+    },
+    "plans": {
+      "free": {
+        "badge": "เริ่มต้น",
+        "description": "ใช้งานไม่จำกัด 7 วัน จากนั้นใช้ฟรี 300 operations ทุกเดือน",
+        "period": "/ตลอดไป",
+        "connectedCta": "เริ่มต้น",
+        "disconnectedCta": "เริ่มฟรี",
+        "note": "ไม่ต้องใช้บัตรเครดิต",
+        "features": [
+          "ใช้งานทุกฟีเจอร์ไม่จำกัด 7 วัน",
+          "จากนั้น 300 MCP operations/เดือน ฟรีตลอดไป",
+          "ไม่ต้องใช้บัตรเครดิต",
+          "เชื่อมต่อ Google Ads กับ Claude, Cursor และไคลเอนต์ MCP ใดก็ได้",
+          "วิเคราะห์ปัญหาบัญชีและร่างการเปลี่ยนแปลงแคมเปญ",
+          "ดูการแก้ไข bid, budget, keyword, audience และ ad ก่อนอนุมัติ",
+          "ซัพพอร์ตจากชุมชน"
+        ]
+      },
+      "growth": {
+        "popular": "ยอดนิยม",
+        "badge": "ไม่จำกัด",
+        "description": "สำหรับผู้ปฏิบัติการที่แก้แคมเปญจริง",
+        "monthPeriod": "/เดือน",
+        "yearPrice": "{price}/ปี",
+        "plusFree": "รวมทุกอย่างใน Free",
+        "openingPortal": "กำลังเปิดพอร์ทัล...",
+        "manageCta": "จัดการสมาชิก",
+        "redirecting": "กำลังเปลี่ยนเส้นทาง...",
+        "upgradeCta": "อัปเกรดเป็น Growth",
+        "disconnectedCta": "เริ่มต้น",
+        "scheduledCancel": "กำหนดยกเลิกแล้ว",
+        "renews": "ต่ออายุ {interval} วันที่ {date}",
+        "headlineFeatures": [
+          "Google Ads operations ไม่จำกัด",
+          "บัญชี Google Ads ไม่จำกัด",
+          "เวิร์กโฟลว์แบบกลุ่ม: คีย์เวิร์ด โฆษณา งบประมาณ สคริปต์",
+          "ประวัติการเปลี่ยนแปลงครบถ้วนและ undo ด้วยคำสั่งเดียว",
+          "ซัพพอร์ตอีเมลแบบสำคัญ"
+        ],
+        "inheritedFeatures": [
+          "ไคลเอนต์ MCP ทั้งหมด: Claude, Codex, Cursor, OpenClaw, Hermes",
+          "วิเคราะห์ปัญหาและร่างการเปลี่ยนแปลงแคมเปญ",
+          "ดูทุกการแก้ไขก่อนอนุมัติ",
+          "ยกเลิกได้ทุกเมื่อ ไม่มีสัญญา"
+        ]
+      },
+      "managed": {
+        "discount": "เวลาจำกัด - ลด 50%",
+        "badge": "ทำให้ครบ",
+        "description": "เราดูแลโฆษณา คุณดูแลธุรกิจ",
+        "spots": "เหลือ <strong>50 ที่</strong> - หลังจากนั้นราคาจะเพิ่มเป็นสองเท่า",
+        "adSpend": "ของงบโฆษณา",
+        "startingFrom": "เริ่มต้นที่",
+        "guaranteed": "รับประกัน",
+        "guarantee": "ROI โฆษณาดีขึ้น 5% หรือไม่ต้องจ่าย",
+        "cta": "จองที่ของคุณ",
+        "features": [
+          "ทุกอย่างใน Growth",
+          "นักกลยุทธ์โฆษณาเฉพาะ",
+          "รายงานประสิทธิภาพรายสัปดาห์และรายเดือน",
+          "กลยุทธ์และการปรับแคมเปญ",
+          "วิจัย audience และ keyword แบบกำหนดเอง",
+          "ซัพพอร์ต Slack/อีเมลแบบสำคัญ",
+          "ยกเลิกได้ทุกเมื่อ ไม่มีสัญญา"
+        ]
+      }
+    },
+    "managedModal": {
+      "title": "จองบริการจัดการโฆษณา",
+      "description": "ฝากข้อมูลไว้ แล้วผู้เชี่ยวชาญโฆษณาของเราจะติดต่อกลับ",
+      "connectedDescription": "ผู้เชี่ยวชาญโฆษณาของเราจะติดต่อคุณที่ {email}",
+      "sent": "เราจะติดต่อกลับเร็ว ๆ นี้",
+      "messagePlaceholder": "มีอะไรอยากให้เรารู้ไหม (ไม่บังคับ)",
+      "namePlaceholder": "ชื่อของคุณ",
+      "emailPlaceholder": "อีเมลของคุณ",
+      "adsPlaceholder": "เล่าเรื่องโฆษณาของคุณ (ไม่บังคับ)",
+      "sending": "กำลังส่ง...",
+      "submit": "ส่ง"
+    }
+  },
+  "McpPage": {
+    "useCasesTitle": {
+      "line1": "สร้างมาเพื่อคนที่",
+      "line2": "ดูแลงบโฆษณา"
+    },
+    "useCases": [
+      {
+        "label": "ผู้ก่อตั้ง SMB",
+        "body": "สำหรับทีมที่ดูแลค่าโฆษณา Google หรือ Meta เอง เปลี่ยนการประชุมรีวิวกับเอเจนซีให้เป็นบทสนทนากับ Claude"
+      },
+      {
+        "label": "เอเจนซี Performance",
+        "body": "เริ่มต้นบัญชีใหม่ ตรวจสอบ และส่งรายการแก้ไขก่อนจบคอล kickoff"
+      },
+      {
+        "label": "ทีมปฏิบัติการ e-commerce",
+        "body": "ตรวจคำค้นรายวัน ดูแลรายการคำเชิงลบ และย้ายงบจากพรอมป์เดียว"
+      },
+      {
+        "label": "ทีมสร้างลีด",
+        "body": "จับคู่คำค้นกับคุณภาพ MQL ปรับ match type และส่งงบไปยังพื้นที่กับคีย์เวิร์ดที่ปิดงานได้"
+      },
+      {
+        "label": "ที่ปรึกษาเดี่ยว",
+        "body": "จัดการสิบบัญชีเหมือนเดิมที่เคยจัดการหนึ่งบัญชี หนึ่ง MCP endpoint ต่อหนึ่งลูกค้า หนึ่งแชตต่อหนึ่งคำถาม"
+      }
+    ],
+    "cta": {
+      "title": {
+        "line1": "เชื่อมต่อได้เลย",
+        "line2": "จัดการผ่านแชต"
+      },
+      "google": "เชื่อมต่อ Google Ads",
+      "meta": "เชื่อมต่อ Meta Ads",
+      "note": "ฟรี · OAuth 2.0 · ไม่ต้องใช้บัตรเครดิต"
+    },
+    "faq": {
+      "title": "คำถามที่พบบ่อย — NotFair MCP",
+      "intro": "คำถามทั่วไปเกี่ยวกับการยืนยันตัวตน การตั้งค่า และการใช้งานเซิร์ฟเวอร์ MCP ของ NotFair",
+      "items": [
+        {
+          "question": "NotFair MCP คืออะไร?",
+          "answer": "เซิร์ฟเวอร์ Model Context Protocol แบบโฮสต์สองตัว ตัวหนึ่งสำหรับ Google Ads และอีกตัวสำหรับ Meta Ads เพื่อเปิดบัญชีของคุณให้ไคลเอนต์ AI ที่รองรับ MCP อ่านข้อมูลแคมเปญสดได้ ส่วนการเขียนจะถูกเสนอในแชตและต้องได้รับอนุมัติชัดเจนก่อนส่งไปยังแพลตฟอร์มโฆษณา"
+        },
+        {
+          "question": "ใช้ไคลเอนต์ AI ใดได้บ้าง?",
+          "answer": "ทุกไคลเอนต์ที่รองรับ MCP Streamable HTTP transport เช่น Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline และไคลเอนต์ MCP แบบกำหนดเอง URL เซิร์ฟเวอร์เหมือนเดิม เปลี่ยนเฉพาะการตั้งค่าฝั่งไคลเอนต์"
+        },
+        {
+          "question": "ต้องโฮสต์อะไรเองไหม?",
+          "answer": "ไม่ต้อง เซิร์ฟเวอร์ทั้งสองโฮสต์โดย NotFair ที่ {googleServerUrl} และ {metaServerUrl} คุณเชื่อมต่อบัญชีโฆษณาผ่าน OAuth ครั้งเดียว แล้วชี้ไคลเอนต์ไปยัง URL นั้น"
+        },
+        {
+          "question": "การยืนยันตัวตนทำงานอย่างไร?",
+          "answer": "ค่าเริ่มต้นคือ OAuth 2.0 พร้อม PKCE โดย Claude.ai และ Codex จะรันให้อัตโนมัติ สำหรับไคลเอนต์ที่ไม่รองรับ OAuth ให้ใช้ Bearer token ผ่านหัวข้อ Authorization สร้างได้ที่ notfair.co/connect หรือ notfair.co/connect/meta-ads"
+        },
+        {
+          "question": "AI เขียนข้อมูลในบัญชีโฆษณาของฉันได้ไหม?",
+          "answer": "ทำได้เฉพาะเมื่อคุณอนุมัติชัดเจน เครื่องมือเขียนจะเสนอการเปลี่ยนแปลง ไคลเอนต์แสดง diff แล้วคุณยืนยันก่อนส่งไปยัง Google Ads หรือ Meta Marketing API การอ่านเปิดได้เต็มที่ แต่การเขียนทุกครั้งมีด่านอนุมัติ"
+        },
+        {
+          "question": "มีค่าใช้จ่ายเท่าไร?",
+          "answer": "การเชื่อมต่อและรันออดิทใช้ฟรี ไม่ต้องใช้บัตรเครดิต แพ็กเกจแบบชำระเงินปลดล็อกลิมิตที่สูงขึ้นและฟีเจอร์ทีม"
+        },
+        {
+          "question": "จะหาการตั้งค่าเฉพาะแพลตฟอร์มได้ที่ไหน?",
+          "answer": "หน้า /google-ads-mcp และ /meta-ads-mcp มีตัวอย่าง JSON แบบทั่วไปที่ใช้กับไคลเอนต์ MCP ใดก็ได้ ส่วนคู่มือตามไคลเอนต์จะอธิบาย Claude.ai, Claude Code และ Codex โดยเฉพาะ"
+        }
+      ]
+    },
+    "related": {
+      "title": "การตั้งค่าเซิร์ฟเวอร์และคู่มือตามไคลเอนต์",
+      "intro": "การตั้งค่าเฉพาะแพลตฟอร์มและคู่มือทีละขั้นสำหรับไคลเอนต์ที่รองรับแต่ละตัว",
+      "links": {
+        "googleAdsMcp": {
+          "title": "เซิร์ฟเวอร์ MCP สำหรับ Google Ads",
+          "description": "การตั้งค่า MCP ทั่วไปและรายการเครื่องมือสำหรับ {connectorName}"
+        },
+        "metaAdsMcp": {
+          "title": "เซิร์ฟเวอร์ MCP สำหรับ Meta Ads",
+          "description": "การตั้งค่า MCP ทั่วไปและรายการเครื่องมือสำหรับ {connectorName}"
+        },
+        "claudeConnector": {
+          "title": "คู่มือตั้งค่า Claude Connector",
+          "description": "ติดตั้ง NotFair เป็นคอนเนกเตอร์ MCP แบบกำหนดเองใน Claude.ai Web, Desktop หรือ Cowork"
+        },
+        "claudeCode": {
+          "title": "คู่มือตั้งค่าปลั๊กอิน Claude Code",
+          "description": "ติดตั้ง NotFair ใน Claude Code ผ่านตลาดปลั๊กอิน toprank"
+        },
+        "codex": {
+          "title": "คู่มือตั้งค่า MCP สำหรับ Codex",
+          "description": "ติดตั้ง NotFair MCP สำหรับ OpenAI Codex CLI ด้วยคำสั่งเดียว"
+        },
+        "pricing": {
+          "title": "ราคา",
+          "description": "เชื่อมต่อฟรี แพ็กเกจชำระเงินสำหรับการใช้งานที่สูงขึ้นและฟีเจอร์ทีม"
+        }
+      }
+    }
+  },
+  "GoogleAdsMcpPage": {
+    "hero": {
+      "eyebrow": "เซิร์ฟเวอร์ MCP สำหรับ Google Ads",
+      "title": "เซิร์ฟเวอร์ Google Ads MCP แบบโฮสต์",
+      "bodyBeforeLink": "NotFair มีเซิร์ฟเวอร์",
+      "bodyBeforeCode": "ที่โฮสต์ไว้ที่",
+      "bodyAfterCode": ". วางการตั้งค่าทั่วไปด้านล่างในไคลเอนต์ที่รองรับ MCP เพื่อให้ AI ของคุณวิเคราะห์ปัญหาและเตรียมการแก้ไข — ยืนยันตัวตนด้วย OAuth หรือ token Bearer",
+      "note": "ฟรี · OAuth 2.0 · ไม่ต้องใช้บัตรเครดิต",
+      "specPrefix": "เพิ่งเริ่มใช้ MCP? อ่านสเปกได้ที่",
+      "specSuffix": "."
+    },
+    "config": {
+      "eyebrow": "การตั้งค่า MCP ทั่วไป",
+      "title": "การตั้งค่า 2 แบบที่ใช้ได้กับไคลเอนต์ MCP ทุกตัว",
+      "body": "สำหรับคู่มือตามไคลเอนต์ (Claude.ai, Claude Code, Codex) ให้ดูคู่มือที่ลิงก์ไว้ด้านล่าง"
+    },
+    "tools": {
+      "eyebrow": "เครื่องมือที่เปิดให้ใช้",
+      "title": "สิ่งที่ไคลเอนต์ AI ของคุณอ่านและเปลี่ยนได้",
+      "body": "เครื่องมืออ่านให้บริบทบัญชีแบบสด เครื่องมือเขียนเสนอการเปลี่ยนแปลง — ทุกการเขียนต้องได้รับอนุมัติจากคนอย่างชัดเจนก่อนส่งถึง Google Ads API",
+      "columns": {
+        "tool": "เครื่องมือ",
+        "type": "ประเภท",
+        "description": "หน้าที่"
+      },
+      "categories": {
+        "read": "อ่าน",
+        "write": "เขียน"
+      },
+      "more": "y más de 60",
+      "items": [
+        {
+          "name": "runScript",
+          "category": "อ่าน",
+          "description": "JS แบบ sandbox พร้อม GAQL fan-out การอ่านเชิงวิเคราะห์ทุกครั้งผ่านเครื่องมือนี้"
+        },
+        {
+          "name": "getRecommendations",
+          "category": "อ่าน",
+          "description": "คำแนะนำการปรับแต่งจาก Google พร้อมผลกระทบโดยประมาณ"
+        },
+        {
+          "name": "getKeywordIdeas",
+          "category": "อ่าน",
+          "description": "ปริมาณการค้นหา การแข่งขัน และค่าประมาณ CPC จาก Keyword Planner"
+        },
+        {
+          "name": "getChanges",
+          "category": "อ่าน",
+          "description": "บันทึกการเปลี่ยนแปลงของ NotFair ย้อนกลับได้ด้วยการเรียกครั้งเดียว"
+        },
+        {
+          "name": "reviewChangeImpact",
+          "category": "อ่าน",
+          "description": "วิเคราะห์ผลกระทบก่อนและหลังของการแก้ไขล่าสุด"
+        },
+        {
+          "name": "getResourceMetadata",
+          "category": "อ่าน",
+          "description": "ค้นหา schema ของ GAQL สำหรับ query แบบกำหนดเอง"
+        },
+        {
+          "name": "updateBid",
+          "category": "เขียน",
+          "description": "ปรับ bid ของคีย์เวิร์ดหรือ ad group และตรวจสอบได้ก่อนใช้จริง"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "เขียน",
+          "description": "หยุดแคมเปญที่ผลงานต่ำชั่วคราว"
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "เขียน",
+          "description": "บล็อกคำค้นที่ไม่เกี่ยวข้องหลังตรวจสอบ"
+        },
+        {
+          "name": "createAd",
+          "category": "เขียน",
+          "description": "เขียนและเปิดใช้ข้อความโฆษณาใหม่ผ่านแชต"
+        }
+      ]
+    },
+    "cta": {
+      "title": "พร้อมเชื่อมต่อไคลเอนต์ของคุณแล้วหรือยัง?",
+      "body": "ลงชื่อเข้าใช้ด้วย Google เพื่อสร้างข้อมูลรับรองของคุณ แล้ววางการตั้งค่าด้านบนในไคลเอนต์ MCP ของคุณ",
+      "button": "ลงชื่อเข้าใช้ด้วย Google",
+      "secondary": "หรือทำตามคู่มือตามไคลเอนต์"
+    },
+    "faq": {
+      "title": "คำถามที่พบบ่อย — เซิร์ฟเวอร์ MCP ของ NotFair",
+      "intro": "คำถามทั่วไปเกี่ยวกับการยืนยันตัวตน การตั้งค่า และการใช้เซิร์ฟเวอร์ Google Ads MCP ของ NotFair",
+      "items": [
+        {
+          "question": "เซิร์ฟเวอร์ Google Ads MCP ของ NotFair คืออะไร?",
+          "answer": "เป็นเซิร์ฟเวอร์ Model Context Protocol แบบโฮสต์ที่เปิดบัญชี Google Ads ของคุณให้ไคลเอนต์ AI ที่รองรับ MCP เครื่องมืออ่านให้บริบทแคมเปญแบบสด ส่วนเครื่องมือเขียนเสนอการแก้ไขให้คุณอนุมัติในแชต"
+        },
+        {
+          "question": "รองรับไคลเอนต์ MCP ใดบ้าง?",
+          "answer": "ไคลเอนต์ใดก็ได้ที่รองรับ MCP Streamable HTTP transport เช่น Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline และไคลเอนต์ MCP แบบกำหนดเอง URL เซิร์ฟเวอร์เหมือนกัน ต่างกันเฉพาะการตั้งค่าฝั่งไคลเอนต์"
+        },
+        {
+          "question": "ต้องโฮสต์อะไรเองไหม?",
+          "answer": "ไม่ต้อง เซิร์ฟเวอร์โฮสต์ที่ {serverUrl} แค่ชี้ไคลเอนต์ไปที่ URL นี้แล้วเข้าสู่ระบบ"
+        },
+        {
+          "question": "การยืนยันตัวตนทำงานอย่างไร?",
+          "answer": "OAuth 2.0 พร้อม PKCE เป็นวิธีที่แนะนำ โดย Claude.ai และ Codex จะรันให้อัตโนมัติ สำหรับไคลเอนต์ที่ไม่รองรับ OAuth ให้ใช้ Bearer token ผ่านหัวข้อ Authorization สร้างได้ที่ notfair.co/connect"
+        },
+        {
+          "question": "เซิร์ฟเวอร์ MCP ฟรีไหม?",
+          "answer": "ใช่ การเชื่อมต่อและรันออดิท Google Ads ฟรีใช้งานได้ฟรี ไม่ต้องใช้บัตรเครดิต แพ็กเกจชำระเงินปลดล็อกลิมิตที่สูงขึ้นและฟีเจอร์ทีม"
+        },
+        {
+          "question": "AI เขียนข้อมูลในบัญชีของฉันผ่านเซิร์ฟเวอร์นี้ได้ไหม?",
+          "answer": "เฉพาะเมื่อคุณอนุมัติชัดเจน เครื่องมือเขียนจะเสนอการเปลี่ยนแปลง ไคลเอนต์จะแสดงให้เห็น แล้วคุณยืนยันก่อนส่งไปยัง Google Ads API การอ่านเปิดได้เต็มที่ แต่การเขียนมีด่านอนุมัติ"
+        }
+      ]
+    },
+    "related": {
+      "title": "คู่มือตั้งค่าตามไคลเอนต์",
+      "intro": "คู่มือทีละขั้นสำหรับไคลเอนต์ที่รองรับแต่ละตัว",
+      "links": {
+        "claudeConnector": {
+          "title": "คู่มือตั้งค่า Claude Connector",
+          "description": "ติดตั้ง NotFair เป็นคอนเนกเตอร์ MCP แบบกำหนดเองใน Claude.ai Web, Desktop หรือ Cowork"
+        },
+        "claudeCode": {
+          "title": "คู่มือตั้งค่าปลั๊กอิน Claude Code",
+          "description": "ติดตั้ง NotFair ใน Claude Code ผ่านตลาดปลั๊กอิน toprank"
+        },
+        "codex": {
+          "title": "คู่มือตั้งค่า MCP สำหรับ Codex",
+          "description": "ติดตั้ง NotFair MCP สำหรับ OpenAI Codex CLI ด้วยคำสั่งเดียว"
+        }
+      }
+    }
+  },
+  "MetaAdsMcpPage": {
+    "hero": {
+      "eyebrow": "เซิร์ฟเวอร์ MCP สำหรับ Meta Ads",
+      "title": "เซิร์ฟเวอร์ Meta Ads MCP แบบโฮสต์",
+      "bodyBeforeLink": "NotFair มีเซิร์ฟเวอร์",
+      "bodyBeforeCode": "ที่โฮสต์ไว้ที่",
+      "bodyAfterCode": ". วางการตั้งค่าทั่วไปด้านล่างในไคลเอนต์ที่รองรับ MCP เพื่อให้ AI ของคุณวิเคราะห์บัญชี Facebook + Instagram Ads และเตรียมการแก้ไข — ยืนยันตัวตนด้วย OAuth หรือ token Bearer",
+      "note": "ฟรี · OAuth 2.0 · ไม่ต้องใช้บัตรเครดิต",
+      "specPrefix": "เพิ่งเริ่มใช้ MCP? อ่านสเปกได้ที่",
+      "specSuffix": "."
+    },
+    "config": {
+      "eyebrow": "การตั้งค่า MCP ทั่วไป",
+      "title": "การตั้งค่า 2 แบบที่ใช้ได้กับไคลเอนต์ MCP ทุกตัว",
+      "body": "สำหรับคู่มือตามไคลเอนต์ (Claude.ai, Claude Code, Codex) ให้ดูคู่มือที่ลิงก์ไว้ด้านล่าง"
+    },
+    "tools": {
+      "eyebrow": "เครื่องมือที่เปิดให้ใช้",
+      "title": "สิ่งที่ไคลเอนต์ AI ของคุณอ่านและเปลี่ยนได้",
+      "body": "เครื่องมืออ่านให้บริบทบัญชีโฆษณาแบบสด เครื่องมือเขียนเสนอการเปลี่ยนแปลง — ทุกการเขียนต้องได้รับอนุมัติจากคนอย่างชัดเจนก่อนส่งถึง Meta Marketing API",
+      "columns": {
+        "tool": "เครื่องมือ",
+        "type": "ประเภท",
+        "description": "หน้าที่"
+      },
+      "categories": {
+        "read": "อ่าน",
+        "write": "เขียน"
+      },
+      "more": "y más",
+      "items": [
+        {
+          "name": "runScript",
+          "category": "อ่าน",
+          "description": "JS แบบ sandbox พร้อม Graph API fan-out เรียก 20 ครั้งในรอบเดียวสำหรับออดิทและการวิเคราะห์"
+        },
+        {
+          "name": "getInsights",
+          "category": "อ่าน",
+          "description": "ข้อมูลเชิงลึกด้านผลงานพร้อม breakdown: ค่าใช้จ่าย impressions คลิก CTR CPC CPM conversions"
+        },
+        {
+          "name": "listCampaigns",
+          "category": "อ่าน",
+          "description": "แสดงแคมเปญพร้อมสถานะ วัตถุประสงค์ งบประมาณ กลยุทธ์ bid และกำหนดเวลา"
+        },
+        {
+          "name": "listAdSets",
+          "category": "อ่าน",
+          "description": "รายละเอียด ad set: เป้าหมายการปรับแต่ง billing event งบรายวัน/ตลอดอายุ และสรุป targeting"
+        },
+        {
+          "name": "listAds",
+          "category": "อ่าน",
+          "description": "โฆษณาพร้อมสถานะ ad set/แคมเปญหลัก ข้อมูล creative และสถานะที่ตั้งค่าไว้"
+        },
+        {
+          "name": "getAdAccount",
+          "category": "อ่าน",
+          "description": "ภาพรวมบัญชี: สกุลเงิน timezone ยอดคงเหลือ ยอดใช้จ่าย spend cap และ BM หลัก"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "เขียน",
+          "description": "หยุดแคมเปญ Meta ชั่วคราว ย้อนกลับได้ผ่าน enableCampaign"
+        },
+        {
+          "name": "pauseAdSet",
+          "category": "เขียน",
+          "description": "หยุด ad set ชั่วคราวโดยไม่แตะแคมเปญหลัก"
+        },
+        {
+          "name": "updateCampaignBudget",
+          "category": "เขียน",
+          "description": "อัปเดตงบรายวันหรือตลอดอายุของแคมเปญ Meta"
+        },
+        {
+          "name": "renameCampaign",
+          "category": "เขียน",
+          "description": "เปลี่ยนชื่อแคมเปญ Meta โดยตรง"
+        }
+      ]
+    },
+    "cta": {
+      "title": "พร้อมเชื่อมต่อไคลเอนต์ของคุณแล้วหรือยัง?",
+      "body": "ลงชื่อเข้าใช้ NotFair เชื่อมบัญชีโฆษณา Meta ของคุณ แล้ววางการตั้งค่าด้านบนในไคลเอนต์ MCP ของคุณ",
+      "button": "ลงชื่อเข้าใช้เพื่อดำเนินการต่อ",
+      "secondary": "หรือทำตามคู่มือตามไคลเอนต์"
+    },
+    "faq": {
+      "title": "คำถามที่พบบ่อย — เซิร์ฟเวอร์ Meta MCP ของ NotFair",
+      "intro": "คำถามทั่วไปเกี่ยวกับการยืนยันตัวตน การตั้งค่า และการใช้เซิร์ฟเวอร์ Meta Ads MCP ของ NotFair",
+      "items": [
+        {
+          "question": "เซิร์ฟเวอร์ Meta Ads MCP ของ NotFair คืออะไร?",
+          "answer": "เป็นเซิร์ฟเวอร์ Model Context Protocol แบบโฮสต์ที่เปิดบัญชีโฆษณา Meta (Facebook และ Instagram) ของคุณให้ไคลเอนต์ AI ที่รองรับ MCP เครื่องมืออ่านให้บริบทแคมเปญแบบสด ส่วนเครื่องมือเขียนเสนอการแก้ไขให้คุณอนุมัติในแชต"
+        },
+        {
+          "question": "รองรับไคลเอนต์ MCP ใดบ้าง?",
+          "answer": "ไคลเอนต์ใดก็ได้ที่รองรับ MCP Streamable HTTP transport เช่น Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline และไคลเอนต์ MCP แบบกำหนดเอง URL เซิร์ฟเวอร์เหมือนกัน ต่างกันเฉพาะการตั้งค่าฝั่งไคลเอนต์"
+        },
+        {
+          "question": "ต้องโฮสต์อะไรเองไหม?",
+          "answer": "ไม่ต้อง เซิร์ฟเวอร์ Meta Ads MCP โฮสต์ที่ {serverUrl} แค่ชี้ไคลเอนต์ไปที่ URL นี้แล้วเข้าสู่ระบบ"
+        },
+        {
+          "question": "การยืนยันตัวตนทำงานอย่างไร?",
+          "answer": "OAuth 2.0 พร้อม PKCE เป็นวิธีที่แนะนำ โดย Claude.ai และ Codex จะรันให้อัตโนมัติ สำหรับไคลเอนต์ที่ไม่รองรับ OAuth ให้ใช้ Bearer token ผ่านหัวข้อ Authorization สร้างได้ที่ notfair.co/connect/meta-ads"
+        },
+        {
+          "question": "เซิร์ฟเวอร์ MCP ฟรีไหม?",
+          "answer": "ใช่ การเชื่อมต่อกับ Meta MCP ของ NotFair ใช้ได้ฟรี ไม่ต้องใช้บัตรเครดิต แพ็กเกจชำระเงินปลดล็อกลิมิตที่สูงขึ้นและฟีเจอร์ทีม"
+        },
+        {
+          "question": "AI เขียนข้อมูลในบัญชีโฆษณา Meta ของฉันผ่านเซิร์ฟเวอร์นี้ได้ไหม?",
+          "answer": "เฉพาะเมื่อคุณอนุมัติชัดเจน เครื่องมือเขียนจะเสนอการเปลี่ยนแปลง เช่น หยุดแคมเปญ ปรับงบ หรือเปลี่ยนชื่อรายการ ไคลเอนต์จะแสดงให้เห็น แล้วคุณยืนยันก่อนส่งไปยัง Meta Marketing API การอ่านเปิดได้เต็มที่ แต่การเขียนมีด่านอนุมัติ"
+        },
+        {
+          "question": "ใช้ได้กับโฆษณาทั้ง Facebook และ Instagram ไหม?",
+          "answer": "ใช่ Meta Ads ครอบคลุมพื้นที่โฆษณา Facebook และ Instagram ภายใต้บัญชีโฆษณาเดียว MCP เปิดทุกอย่างที่ Meta ส่งผ่าน Marketing API: campaigns, ad sets, ads, creative, audiences, insights และ Business Manager หลัก"
+        }
+      ]
+    },
+    "related": {
+      "title": "คู่มือตั้งค่าตามไคลเอนต์",
+      "intro": "คู่มือทีละขั้นสำหรับไคลเอนต์ที่รองรับแต่ละตัว",
+      "links": {
+        "claudeConnector": {
+          "title": "คู่มือตั้งค่า Claude Connector สำหรับ Meta Ads",
+          "description": "ติดตั้งคอนเนกเตอร์ Meta ของ NotFair ใน Claude.ai Web, Desktop หรือ Cowork"
+        },
+        "claudeCode": {
+          "title": "คู่มือตั้งค่าปลั๊กอิน Claude Code สำหรับ Meta Ads",
+          "description": "ติดตั้งปลั๊กอิน NotFair ใน Claude Code ผ่านตลาด toprank สำหรับ Meta Ads"
+        },
+        "codex": {
+          "title": "คู่มือตั้งค่า Codex MCP สำหรับ Meta Ads",
+          "description": "ติดตั้ง NotFair Meta MCP สำหรับ OpenAI Codex CLI ด้วยคำสั่งเดียว"
+        }
+      }
+    }
+  },
+  "GoogleAdsClaudePage": {
+    "hero": {
+      "eyebrow": "เซิร์ฟเวอร์ MCP สำหรับ Google Ads",
+      "title": {
+        "line1": "ใช้ Claude กับ",
+        "line2": "Google Ads:",
+        "highlight": "ข้อมูลสด ตั้งค่าใน 2 นาที"
+      },
+      "body": "NotFair คือเซิร์ฟเวอร์ Google Ads MCP สำหรับ Claude เชื่อมต่อครั้งเดียวแล้ว Claude จะเข้าถึงแคมเปญ คีย์เวิร์ด ค่าใช้จ่าย และโฆษณาของคุณแบบสด — จากนั้นช่วยวิเคราะห์ เพิ่มประสิทธิภาพ และจัดการด้วยภาษาธรรมชาติ",
+      "disconnectedLabel": "เชื่อมต่อ Google Ads กับ Claude",
+      "connectedLabel": "เปิดบัญชีของคุณ",
+      "note": "รวมออดิทฟรี ไม่ต้องใช้บัตรเครดิต"
+    },
+    "configCard": {
+      "step": "ขั้นตอนที่ 1",
+      "worksIn": "ใช้งานได้ใน",
+      "thenConnect": "จากนั้นเชื่อมต่อบัญชี Google Ads ของคุณที่",
+      "suffix": "."
+    },
+    "steps": {
+      "eyebrow": "วิธีทำงาน",
+      "title": "เชื่อมต่อ Google Ads กับ Claude ใน 2 นาที",
+      "items": [
+        {
+          "num": "1",
+          "title": "เพิ่ม NotFair ในการตั้งค่า MCP ของคุณ",
+          "desc": "วาง snippet การตั้งค่าใน Claude Desktop, Claude Code หรือ Claude Cowork แค่รายการเดียว ขั้นตอนนี้ไม่ต้องใช้ API key"
+        },
+        {
+          "num": "2",
+          "title": "เชื่อมต่อบัญชี Google Ads ของคุณ",
+          "desc": "OAuth ในคลิกเดียวที่ notfair.co มีสิทธิ์อ่านเท่านั้นจนกว่าคุณจะอนุมัติการเปลี่ยนแปลงเฉพาะ บัญชีของคุณยังปลอดภัย"
+        },
+        {
+          "num": "3",
+          "title": "ถาม Claude ได้ทุกอย่างเกี่ยวกับแคมเปญของคุณ",
+          "desc": "ลองถามว่า “ทำไม CPA เพิ่มขึ้นและควรแก้อะไร?” Claude จะดึงข้อมูลสดและตอบแบบเจาะจง ไม่ต้อง export CSV หรือคัดลอกวาง"
+        }
+      ]
+    },
+    "capabilities": {
+      "eyebrow": "สิ่งที่คุณได้รับ",
+      "title": "Claude AI สำหรับ Google Ads — สิ่งที่ทำได้จริง",
+      "body": "เมื่อเชื่อมต่อแล้ว Claude จะเข้าถึงบัญชีของคุณแบบสด ไม่ต้องส่งออก CSV คัดลอกตารางเข้าแชต หรือทำงานจากภาพหน้าจออีกต่อไป ถามคำถามแล้วรับคำตอบเฉพาะที่อ้างอิงจากข้อมูลจริง",
+      "items": [
+        {
+          "title": "วิเคราะห์แคมเปญด้วยภาษาธรรมชาติ",
+          "body": "ถาม Claude ว่ามีอะไรผิดปกติ ระบบจะตรวจโครงสร้างแคมเปญ สุขภาพคีย์เวิร์ด คุณภาพคำค้น impression share และข้อความโฆษณา แล้วให้รายการแก้ไขที่จัดลำดับแล้ว"
+        },
+        {
+          "title": "ค้นหาปัญหาที่คุณไม่รู้ว่าควรถาม",
+          "body": "จากการทดสอบ บัญชีที่ใช้งานมานานมักมีปัญหาชัดเจนซ่อนอยู่ในคำค้น โครงสร้าง match type และการจัดสรรงบ แค่ถามว่า “ควรแก้อะไร?” ก็เห็นทันที"
+        },
+        {
+          "title": "ทุกการเปลี่ยนแปลงตรวจสอบได้",
+          "body": "NotFair จะไม่บันทึกการเปลี่ยนแปลงโดยไม่มีการอนุมัติชัดเจนจากคุณ Claude แสดงสิ่งที่ต้องการทำ แล้วคุณตอบ yes หรือ no มนุษย์ควบคุมเสมอ"
+        },
+        {
+          "title": "ทำงานในที่ที่คุณใช้อยู่แล้ว",
+          "body": "Claude Desktop สำหรับนักการตลาดเดี่ยว Claude Code สำหรับนักพัฒนาที่ดูแลแคมเปญ Claude Cowork สำหรับทีม การตั้งค่า MCP เดียวใช้ได้ทั้งสามไคลเอนต์"
+        }
+      ]
+    },
+    "tools": {
+      "eyebrow": "เครื่องมือ MCP ที่เปิดให้ใช้",
+      "title": "สิ่งที่ Claude อ่านและเปลี่ยนได้",
+      "body": "NotFair เปิดชุดเครื่องมือ MCP ที่โฟกัสชัดเจน เครื่องมืออ่านให้บริบทแบบสด เครื่องมือเขียนให้ Claude เสนอการเปลี่ยนแปลง — แต่ละรายการต้องได้รับอนุมัติจากคุณอย่างชัดเจนก่อนดำเนินการ",
+      "columns": {
+        "tool": "เครื่องมือ",
+        "type": "ประเภท",
+        "description": "หน้าที่"
+      },
+      "categories": {
+        "read": "อ่าน",
+        "write": "เขียน"
+      },
+      "referencePrefix": "ดูรายการเครื่องมือทั้งหมดได้ที่",
+      "referenceSuffix": ".",
+      "items": [
+        {
+          "name": "listCampaigns",
+          "category": "อ่าน",
+          "description": "ดึงผลงาน ค่าใช้จ่าย และสถานะแคมเปญแบบสด"
+        },
+        {
+          "name": "getKeywords",
+          "category": "อ่าน",
+          "description": "ตรวจ bid คีย์เวิร์ด Quality Scores และ impressions"
+        },
+        {
+          "name": "getSearchTermReport",
+          "category": "อ่าน",
+          "description": "ค้นหา query ที่ไม่เกี่ยวข้อง match type ที่อ่อน และงบที่รั่ว"
+        },
+        {
+          "name": "getCampaignPerformance",
+          "category": "อ่าน",
+          "description": "เจาะลึก metrics ของแคมเปญในช่วงวันที่ใดก็ได้"
+        },
+        {
+          "name": "updateBid",
+          "category": "เขียน",
+          "description": "ปรับ bid คีย์เวิร์ด และตรวจสอบได้ก่อนใช้จริง"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "เขียน",
+          "description": "หยุดแคมเปญผลงานต่ำผ่าน Claude"
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "เขียน",
+          "description": "บล็อกคำค้นที่เปลืองงบในระดับแคมเปญหรือบัญชี"
+        },
+        {
+          "name": "createAd",
+          "category": "เขียน",
+          "description": "เขียนและเปิดใช้ข้อความโฆษณาใหม่ผ่านบทสนทนาธรรมชาติ"
+        }
+      ]
+    },
+    "auditCta": {
+      "eyebrow": "ฟรี · ไม่ต้องใช้บัตรเครดิต",
+      "title": "รับการตรวจบัญชีฟรีเมื่อเชื่อมต่อ",
+      "body": "เชื่อมบัญชี Google Ads ของคุณ แล้ว Claude จะเรียกใช้การวิเคราะห์ฟรีทันที — ค่าใช้จ่ายที่สูญเปล่า โอกาสที่พลาด และปัญหาเชิงโครงสร้าง พร้อมรายการลำดับความสำคัญ",
+      "disconnectedLabel": "รับการตรวจบัญชีฟรี",
+      "connectedLabel": "ดูการตรวจบัญชีของคุณ",
+      "secondary": "เรียนรู้เกี่ยวกับการตรวจบัญชี"
+    },
+    "faq": {
+      "title": "คำถามที่พบบ่อย — Google Ads และ Claude",
+      "intro": "คำถามทั่วไปจากผู้สร้าง MCP และนักการตลาดที่ตั้งค่า workflow Claude AI สำหรับ Google Ads",
+      "items": [
+        {
+          "question": "ใช้ Claude กับ Google Ads ผ่าน NotFair อย่างไร?",
+          "answer": "เพิ่ม NotFair ในการตั้งค่า MCP ของคุณ (JSON snippet เดียว) เชื่อมต่อบัญชี Google Ads ผ่าน OAuth ที่ notfair.co แล้ว Claude จะเข้าถึงแคมเปญแบบสดได้ทันที จากนั้นคุณถามได้ว่าอะไรผิดปกติ ทำไมผลงานเปลี่ยน ควรแก้อะไรต่อ หรือให้ร่างการเปลี่ยนแปลง bid คีย์เวิร์ด negative และโฆษณาที่ต้องอนุมัติ ทั้งหมดผ่านบทสนทนาธรรมชาติ"
+        },
+        {
+          "question": "NotFair ใช้กับ Claude Desktop, Claude Code และ Claude Cowork ได้ไหม?",
+          "answer": "ใช่ NotFair เป็นเซิร์ฟเวอร์ MCP มาตรฐาน จึงใช้กับไคลเอนต์ Claude ที่รองรับ MCP ได้ทุกตัว เพิ่ม snippet เดียวกันใน Claude Desktop, การตั้งค่า MCP ของ Claude Code หรือ Claude Cowork แล้วใช้งานเหมือนกันทั้งสามที่"
+        },
+        {
+          "question": "Claude เห็นข้อมูล Google Ads ใดผ่าน NotFair ได้บ้าง?",
+          "answer": "Claude เข้าถึงผลงานแคมเปญ bid และ Quality Scores ของคีย์เวิร์ด รายงานคำค้น ข้อความโฆษณา ข้อมูลค่าใช้จ่าย impression share และสถานะ conversion tracking แบบสด โดยอ่านข้อมูลบัญชีจริงแบบเรียลไทม์ ไม่ต้อง export หรือ upload เอง"
+        },
+        {
+          "question": "Claude เปลี่ยนแปลงบัญชี Google Ads ของฉันได้ไหม?",
+          "answer": "ได้ แต่เฉพาะเมื่อคุณอนุมัติชัดเจนในแต่ละขั้น Claude เสนอการเปลี่ยน bid หยุดแคมเปญ เพิ่ม negative keywords และเขียนโฆษณาใหม่ได้ แต่ทุก action จะแสดงให้คุณเห็นก่อนทำจริง คุณตรวจและยืนยัน NotFair ยังบันทึกทุกการเปลี่ยนแปลงเพื่อให้ติดตามผลกระทบได้"
+        },
+        {
+          "question": "นี่เป็น integration อย่างเป็นทางการของ Google หรือ Anthropic ไหม?",
+          "answer": "NotFair เป็นผลิตภัณฑ์อิสระที่สร้างบนมาตรฐานเปิด Model Context Protocol (MCP) ของ Anthropic และ Google Ads API ไม่ใช่ผลิตภัณฑ์อย่างเป็นทางการของ Google MCP คือมาตรฐานเปิดที่ Anthropic สร้างเพื่อเชื่อม AI กับเครื่องมือภายนอก นักพัฒนาทุกคนสร้างเซิร์ฟเวอร์ MCP ได้ และ NotFair โฟกัสที่ Google Ads โดยเฉพาะ"
+        },
+        {
+          "question": "การตั้งค่าต้องทำอะไรจริง ๆ?",
+          "answer": "ไม่ถึง 2 นาที วาง JSON snippet ในการตั้งค่า MCP เปิด notfair.co คลิก Connect Google Ads แล้วทำ OAuth ให้เสร็จ เท่านี้ Claude ก็เข้าถึงแคมเปญของคุณได้"
+        },
+        {
+          "question": "ต้องเขียนโค้ดเป็นไหมถึงจะใช้ได้?",
+          "answer": "ไม่ต้องเขียนโค้ด ขั้นตอนที่เทคนิคที่สุดคือแก้ไฟล์ตั้งค่า JSON ซึ่งเป็นแค่การคัดลอกและวาง snippet ที่เหลือคือ OAuth ของ Google ตามปกติและคุยกับ Claude ด้วยภาษาธรรมชาติ"
+        }
+      ]
+    },
+    "related": {
+      "title": "หน้าที่เกี่ยวข้อง",
+      "intro": "สำรวจ workflow เต็มของ NotFair สำหรับ Google Ads และ Claude",
+      "links": {
+        "audit": {
+          "title": "ออดิท Google Ads ฟรี",
+          "description": "รับการวิเคราะห์ AI ฟรีสำหรับบัญชี Google Ads ของคุณ เพื่อหางบที่สูญเปล่า โอกาสที่พลาด และปัญหาเชิงโครงสร้าง"
+        },
+        "mcpServer": {
+          "title": "เซิร์ฟเวอร์ MCP สำหรับ Google Ads",
+          "description": "ดูว่าเซิร์ฟเวอร์ MCP ของ NotFair เปิดข้อมูลและ action ของ Google Ads ให้ไคลเอนต์ AI ที่รองรับ MCP อย่างไร"
+        },
+        "home": {
+          "title": "หน้าแรก NotFair",
+          "description": "เอเจนต์ Google Ads ที่ใช้ AI: เชื่อมต่อบัญชี แล้วให้ Claude วิเคราะห์ปัญหา แนะนำการแก้ไข และจัดการการเปลี่ยนแปลงที่อนุมัติผ่านบทสนทนา"
+        }
+      }
+    },
+    "finalCta": {
+      "title": "เชื่อมต่อ Google Ads กับ Claude ตอนนี้",
+      "body": "ตั้งค่าใน 2 นาที รวมการตรวจบัญชีฟรี คนควบคุมทุกการเปลี่ยนแปลง",
+      "note": "วางการตั้งค่า OAuth แล้วพร้อมใช้"
+    }
+  },
+  "GoogleAdsAuditPage": {
+    "hero": {
+      "eyebrow": "ฟรี · ไม่ต้องใช้บัตรเครดิต · 5 นาที",
+      "title": {
+        "line1": "ออดิท Google Ads",
+        "line2": "ฟรี — รู้ชัดเจนว่า",
+        "highlight": "ควรแก้อะไรต่อไป"
+      },
+      "body": "AI วิเคราะห์บัญชีของคุณใน 5 นาที ดูอัตราการสูญเปล่า โอกาสที่พลาด ปัญหาเชิงโครงสร้าง และรายการ 3 ขั้นตอน — ฟรี",
+      "note": "แค่เชื่อมต่อ Google — ไม่มีฟอร์ม ไม่มีบัตรเครดิต ไม่ต้องกรอกอะไร"
+    },
+    "sampleCard": {
+      "title": "เมตริก Pulse",
+      "caption": "ตัวอย่างผลการตรวจบัญชี",
+      "wasteSuffix": "เป็นค่าใช้จ่ายสูญเปล่าที่พบ"
+    },
+    "mockPulse": {
+      "items": [
+        {
+          "label": "อัตรางบสูญเปล่า",
+          "value": "18%"
+        },
+        {
+          "label": "ดีมานด์ที่จับได้",
+          "value": "42%"
+        },
+        {
+          "label": "CPA",
+          "value": "$34.20"
+        }
+      ]
+    },
+    "auditPasses": {
+      "eyebrow": "3 รอบการดำเนินการ",
+      "title": "รายการที่จัดลำดับความสำคัญ ไม่ใช่แค่คะแนน",
+      "items": [
+        {
+          "name": "Stop Wasting",
+          "tag": "รอบที่ 1",
+          "description": "ระบุคีย์เวิร์ดที่ไม่เกิด conversion คำค้นที่ไม่เกี่ยวข้อง และงบสูญเปล่าเชิงโครงสร้าง พร้อมจำนวนเงินที่ชัดเจนเพื่อรู้ว่าควรตัดอะไรก่อน"
+        },
+        {
+          "name": "Capture More",
+          "tag": "รอบที่ 2",
+          "description": "หาแคมเปญที่ติดข้อจำกัดงบซึ่งชนะ auction แต่หมดแรง รวมถึงคำค้นที่ convert แล้วแต่ยังไม่ได้เพิ่มเป็นคีย์เวิร์ด"
+        },
+        {
+          "name": "Fix Fundamentals",
+          "tag": "รอบที่ 3",
+          "description": "เผยปัญหาเชิงโครงสร้าง เช่น ช่องว่าง conversion tracking การจัดแคมเปญ คุณภาพข้อความโฆษณา และความเหมาะสมของกลยุทธ์ bid ซึ่งสะสมหนักขึ้นตามเวลา"
+        }
+      ]
+    },
+    "pulseMetrics": {
+      "eyebrow": "3 เมตริก Pulse",
+      "title": "ติดตามความคืบหน้าเมื่อเวลาผ่านไป",
+      "items": [
+        {
+          "name": "อัตรางบสูญเปล่า",
+          "description": "เปอร์เซ็นต์ของงบที่ไปยังคีย์เวิร์ดและคำค้นที่ไม่มี conversion ยิ่งต่ำยิ่งดี"
+        },
+        {
+          "name": "ดีมานด์ที่จับได้",
+          "description": "คุณแสดงผลได้มากแค่ไหนจากดีมานด์ค้นหาที่มีอยู่ในแคมเปญที่ทำกำไร ยิ่งสูงยิ่งดี"
+        },
+        {
+          "name": "CPA",
+          "description": "ต้นทุนต่อ conversion ของคุณ ออดิทติดตามค่านี้ตามเวลาเพื่อให้เห็นผลกระทบของการเปลี่ยนแปลง"
+        }
+      ]
+    },
+    "findings": {
+      "title": "การตรวจบัญชีทั่วไปพบอะไรบ้าง",
+      "body": "บัญชี Google Ads ส่วนใหญ่ที่ใช้งานมานานกว่า 6 เดือนมักสะสมค่าใช้จ่ายสูญเปล่าจำนวนมาก นี่คือสิ่งที่เรามักพบในการวิเคราะห์ครั้งแรก",
+      "items": [
+        {
+          "label": "งบสูญเปล่าจากคำค้น",
+          "finding": "คำค้นที่ไม่เกี่ยวข้อง 47 รายการ",
+          "impact": "$2,847/mo"
+        },
+        {
+          "label": "ผลงานคีย์เวิร์ด",
+          "finding": "คีย์เวิร์ด 23 รายการที่ไม่มี conversion",
+          "impact": "สูญเปล่า $1,200/เดือน"
+        },
+        {
+          "label": "การติดตาม Conversion",
+          "finding": "ยังไม่ได้ตรวจสอบ conversion tracking",
+          "impact": "มองไม่เห็นผลลัพธ์"
+        },
+        {
+          "label": "สัดส่วน Impression",
+          "finding": "เสีย impression share เพราะงบประมาณ: 34%",
+          "impact": "เพดานการเติบโต"
+        }
+      ]
+    },
+    "howItWorks": {
+      "eyebrow": "วิธีทำงาน",
+      "title": "จากการเชื่อมต่อถึง insight ใน 5 นาที",
+      "items": [
+        {
+          "num": "1",
+          "title": "เชื่อมต่อ Google Ads",
+          "desc": "OAuth ในคลิกเดียว สิทธิ์อ่านอย่างเดียว เราเปลี่ยนแปลงอะไรไม่ได้จนกว่าคุณจะอนุมัติชัดเจน ใช้เวลา 30 วินาที"
+        },
+        {
+          "num": "2",
+          "title": "AI รันการวิเคราะห์",
+          "desc": "เอนจินของเราวิเคราะห์แคมเปญ คีย์เวิร์ด คำค้น impression share และการตั้งค่า conversion"
+        },
+        {
+          "num": "3",
+          "title": "รับรายการแก้ไขของคุณ",
+          "desc": "คุณจะได้ 3 pulse metrics แผนปฏิบัติการ 3 รอบที่จัดลำดับแล้ว และผลกระทบเป็นเงินของแต่ละการแก้ไข"
+        }
+      ]
+    },
+    "verticals": {
+      "eyebrow": "ตามอุตสาหกรรม",
+      "title": "การตรวจ Google Ads ที่ปรับตามประเภทธุรกิจของคุณ",
+      "body": "แต่ละอุตสาหกรรมเสียเงินในจุดต่างกัน เลือกประเภทธุรกิจของคุณเพื่อรับการตรวจเวอร์ชันที่เข้าใจเช็ก benchmark และรูปแบบการแก้ไขที่เกี่ยวข้อง",
+      "spendLabel": "ค่าใช้จ่าย",
+      "cpcLabel": "CPC"
+    },
+    "finalCta": {
+      "title": "รับการตรวจบัญชีฟรีตอนนี้",
+      "body": "ใช้เวลา 5 นาที ไม่มีการเปลี่ยนแปลงใดๆ ในบัญชีของคุณ ไม่ต้องใช้บัตรเครดิต"
+    }
   }
 }

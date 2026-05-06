@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -20,18 +21,19 @@ export type PricingPage = "homepage" | "pricing" | "upgrade";
 export function CheckoutStatusBanner() {
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
+  const t = useTranslations("Pricing.status");
 
   if (status === "success") {
     return (
       <div className="mb-8 rounded-md border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-4 py-3 text-sm text-[#5DBE82]">
-        Subscription succeeded.
+        {t("success")}
       </div>
     );
   }
   if (status === "cancelled") {
     return (
       <div className="mb-8 rounded-md border border-[#3D3C36] bg-[#24231F] px-4 py-3 text-sm text-[#C4C0B6]">
-        Checkout cancelled. Nothing was charged.
+        {t("cancelled")}
       </div>
     );
   }
@@ -103,28 +105,32 @@ export interface PricingSectionProps {
 }
 
 export function PricingSection(props: PricingSectionProps) {
+  const t = useTranslations("Pricing");
+
   return (
     <div>
       <PricingHeader />
       <PricingCards {...props} />
       <p className="mt-12 max-w-2xl text-sm text-[#C4C0B6]">
-        Prices in USD. Billed via Stripe. Cancel anytime from the billing portal — your access continues until the end of the current period.
+        {t("finePrint")}
       </p>
     </div>
   );
 }
 
 export function PricingHeader() {
+  const t = useTranslations("Pricing.header");
+
   return (
     <div className="max-w-2xl">
       <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-        Pricing
+        {t("label")}
       </p>
       <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-        Upgrade when Claude becomes your ads strategist and operator.
+        {t("title")}
       </h2>
       <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
-        Built for people who want AI to find issues and turn approved recommendations into campaign changes.
+        {t("body")}
       </p>
     </div>
   );
@@ -140,6 +146,7 @@ export function PricingCards({
   hasStripeCustomer,
   page,
 }: PricingSectionProps) {
+  const t = useTranslations("Pricing");
   const [interval, setInterval] = useState<Interval>("year");
   const [loading, setLoading] = useState<null | "checkout" | "portal">(null);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +160,10 @@ export function PricingCards({
   const [managedSent, setManagedSent] = useState(false);
 
   const isOnGrowth = currentPlan === "growth";
+  const freeFeatures = t.raw("plans.free.features") as string[];
+  const growthHeadlineFeatures = t.raw("plans.growth.headlineFeatures") as string[];
+  const growthInheritedFeatures = t.raw("plans.growth.inheritedFeatures") as string[];
+  const managedFeatures = t.raw("plans.managed.features") as string[];
 
   function openManagedModal() {
     trackEvent("pricing_cta_clicked", {
@@ -257,13 +268,13 @@ export function PricingCards({
               : "text-[#C4C0B6] hover:text-[#E8E4DD]"
           }`}
         >
-          Yearly
+          {t("interval.yearly")}
           <span
             className={`ml-2 font-mono text-[10px] uppercase tracking-wider ${
               interval === "year" ? "text-[#1A1917]" : "text-[#5DBE82]"
             }`}
           >
-            save 20%
+            {t("interval.save")}
           </span>
         </button>
         <button
@@ -275,7 +286,7 @@ export function PricingCards({
               : "text-[#C4C0B6] hover:text-[#E8E4DD]"
           }`}
         >
-          Monthly
+          {t("interval.monthly")}
         </button>
       </div>
 
@@ -286,18 +297,18 @@ export function PricingCards({
           <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Free</h3>
             <span className="font-mono text-xs uppercase tracking-wider text-[#C4C0B6]">
-              starter
+              {t("plans.free.badge")}
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">Unlimited access for 7 days. 300 free operations every month after.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">{t("plans.free.description")}</p>
           <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
             <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
               {PRICING.freeMonthly}
             </span>
-            <span className="text-sm text-[#C4C0B6]">/forever</span>
+            <span className="text-sm text-[#C4C0B6]">{t("plans.free.period")}</span>
           </div>
           <ul className="mt-8 space-y-3">
-            {FREE_FEATURES.map((f) => (
+            {freeFeatures.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
                 <span suppressHydrationWarning>{f}</span>
@@ -318,7 +329,7 @@ export function PricingCards({
                 }
                 className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#3D3C36] bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#2E2D28]"
               >
-                Get Started
+                {t("plans.free.connectedCta")}
               </Link>
             ) : (
               <button
@@ -334,11 +345,11 @@ export function PricingCards({
                 }}
                 className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#3D3C36] bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#2E2D28]"
               >
-                Get started free
+                {t("plans.free.disconnectedCta")}
               </button>
             )}
             <p className="mt-3 text-center font-mono text-[11px] text-[#C4C0B6]">
-              No credit card required
+              {t("plans.free.note")}
             </p>
           </div>
         </div>
@@ -346,37 +357,37 @@ export function PricingCards({
         {/* Growth */}
         <div className="relative flex flex-col rounded-lg border border-[#4CAF6E] bg-gradient-to-b from-[#24231F] to-[#1F1E1A] p-6 sm:p-7 lg:p-8 shadow-[0_0_0_1px_rgba(76,175,110,0.15)]">
           <div className="absolute -top-3 left-6 rounded-full bg-[#4CAF6E] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#1A1917] sm:left-7 lg:left-8">
-            Most popular
+            {t("plans.growth.popular")}
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Growth</h3>
             <span className="font-mono text-xs uppercase tracking-wider text-[#4CAF6E]">
-              unlimited
+              {t("plans.growth.badge")}
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">For operators making real campaign changes.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">{t("plans.growth.description")}</p>
           <div className="mt-6 flex flex-wrap items-baseline gap-x-1 gap-y-1">
             {interval === "month" ? (
               <>
                 <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
                   {PRICING.growthMonthly}
                 </span>
-                <span className="text-sm text-[#C4C0B6]">/month</span>
+                <span className="text-sm text-[#C4C0B6]">{t("plans.growth.monthPeriod")}</span>
               </>
             ) : (
               <>
                 <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
                   {PRICING.growthYearlyMonthlyEquivalent}
                 </span>
-                <span className="text-sm text-[#C4C0B6]">/month</span>
+                <span className="text-sm text-[#C4C0B6]">{t("plans.growth.monthPeriod")}</span>
                 <span className="ml-2 text-sm text-[#C4C0B6]">
-                  {PRICING.growthYearly}/year
+                  {t("plans.growth.yearPrice", { price: PRICING.growthYearly })}
                 </span>
               </>
             )}
           </div>
           <ul className="mt-8 space-y-3">
-            {GROWTH_HEADLINE_FEATURES.map((f) => (
+            {growthHeadlineFeatures.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]" />
                 <span suppressHydrationWarning className="font-medium">{f}</span>
@@ -387,10 +398,10 @@ export function PricingCards({
               className="flex items-center gap-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4C0B6]/70"
             >
               <span className="h-px flex-1 bg-[#3D3C36]" />
-              <span>Plus everything in Free</span>
+              <span>{t("plans.growth.plusFree")}</span>
               <span className="h-px flex-1 bg-[#3D3C36]" />
             </li>
-            {GROWTH_INHERITED_FEATURES.map((f) => (
+            {growthInheritedFeatures.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#C4C0B6]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#4CAF6E]/70" />
                 <span suppressHydrationWarning>{f}</span>
@@ -405,7 +416,7 @@ export function PricingCards({
                 disabled={loading !== null}
                 className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#3D9A5C] disabled:opacity-60"
               >
-                {loading === "portal" ? "Opening portal…" : "Manage subscription"}
+                {loading === "portal" ? t("plans.growth.openingPortal") : t("plans.growth.manageCta")}
               </button>
             ) : (
               <button
@@ -415,10 +426,10 @@ export function PricingCards({
                 className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#4CAF6E] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#3D9A5C] disabled:opacity-60"
               >
                 {loading === "checkout" ? (
-                  "Redirecting…"
+                  t("plans.growth.redirecting")
                 ) : (
                   <>
-                    {connected ? "Upgrade to Growth" : "Get Started"}
+                    {connected ? t("plans.growth.upgradeCta") : t("plans.growth.disconnectedCta")}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
@@ -427,7 +438,7 @@ export function PricingCards({
             {isOnGrowth && scheduledCancelAt && (
               <div className="mt-4 flex items-center justify-center gap-2 rounded-md border border-[#D4882A]/40 bg-[#D4882A]/10 px-3 py-2 text-center">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-[#D4882A]">
-                  Scheduled cancel
+                  {t("plans.growth.scheduledCancel")}
                 </span>
                 <span className="text-sm font-semibold text-[#E8E4DD]">
                   {new Date(scheduledCancelAt).toLocaleDateString(undefined, {
@@ -440,7 +451,10 @@ export function PricingCards({
             )}
             {isOnGrowth && !scheduledCancelAt && currentPeriodEnd && (
               <p className="mt-3 text-center font-mono text-[11px] text-[#C4C0B6]">
-                Renews {currentInterval ?? ""} on {new Date(currentPeriodEnd).toLocaleDateString()}
+                {t("plans.growth.renews", {
+                  interval: currentInterval ?? "",
+                  date: new Date(currentPeriodEnd).toLocaleDateString(),
+                })}
               </p>
             )}
           </div>
@@ -449,17 +463,19 @@ export function PricingCards({
         {/* Managed */}
         <div className="relative hidden flex-col rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 sm:p-7 lg:p-8">
           <div className="absolute -top-3 right-6 rounded-full bg-[#C45D4A] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_2px_8px_rgba(196,93,74,0.4)] sm:right-7 lg:right-8">
-            Limited time · 50% off
+            {t("plans.managed.discount")}
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <h3 className="font-display text-2xl font-semibold text-[#E8E4DD]">Managed</h3>
             <span className="font-mono text-xs uppercase tracking-wider text-[#D4882A]">
-              done-for-you
+              {t("plans.managed.badge")}
             </span>
           </div>
-          <p className="mt-2 text-sm text-[#C4C0B6]">We run your ads. You run your business.</p>
+          <p className="mt-2 text-sm text-[#C4C0B6]">{t("plans.managed.description")}</p>
           <div className="mt-3 rounded-md border border-[#D4882A]/30 bg-[#D4882A]/10 px-3 py-2 text-sm font-medium text-[#D4882A]">
-            <span className="font-bold">50 spots</span> left — price doubles after
+            {t.rich("plans.managed.spots", {
+              strong: (chunks) => <span className="font-bold">{chunks}</span>,
+            })}
           </div>
           <div className="mt-6">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -467,23 +483,23 @@ export function PricingCards({
               <span className="font-display text-4xl font-bold text-[#E8E4DD] sm:text-5xl">
                 2.5%
               </span>
-              <span className="text-sm text-[#C4C0B6]">of ad spend</span>
+              <span className="text-sm text-[#C4C0B6]">{t("plans.managed.adSpend")}</span>
             </div>
             <p className="mt-2 text-sm text-[#C4C0B6]">
-              Starting from <span className="text-base text-[#C4C0B6] line-through">$999</span>{" "}
+              {t("plans.managed.startingFrom")} <span className="text-base text-[#C4C0B6] line-through">$999</span>{" "}
               <span className="text-base font-semibold text-[#E8E4DD]">{PRICING.managedMonthly}/mo</span>
             </p>
             <div className="mt-3 rounded-md border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-3 py-2">
               <p className="font-mono text-[10px] uppercase tracking-wider text-[#4CAF6E]">
-                Guaranteed
+                {t("plans.managed.guaranteed")}
               </p>
               <p className="mt-1 text-xs font-medium text-[#5DBE82]">
-                5% improvement to your ads ROI — or you don&apos;t pay.
+                {t("plans.managed.guarantee")}
               </p>
             </div>
           </div>
           <ul className="mt-8 space-y-3">
-            {MANAGED_FEATURES.map((f) => (
+            {managedFeatures.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-[#E8E4DD]">
                 <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#D4882A]" />
                 <span>{f}</span>
@@ -496,7 +512,7 @@ export function PricingCards({
               onClick={openManagedModal}
               className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#D4882A] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#C07A22]"
             >
-              Claim your spot
+              {t("plans.managed.cta")}
               <ArrowRight className="ml-2 h-4 w-4" />
             </button>
           </div>
@@ -519,19 +535,19 @@ export function PricingCards({
         <DialogContent className="border-[#3D3C36] bg-[#24231F] text-[#E8E4DD] sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle className="text-[16px] font-semibold text-[#E8E4DD]">
-              Claim your managed spot
+              {t("managedModal.title")}
             </DialogTitle>
             <DialogDescription className="text-[13px] text-[#C4C0B6]">
               {connected && email
-                ? `Our ads expert will reach out to you at ${email}.`
-                : "Leave your details and our ads expert will reach out."}
+                ? t("managedModal.connectedDescription", { email })
+                : t("managedModal.description")}
             </DialogDescription>
           </DialogHeader>
 
           {managedSent ? (
             <div className="flex flex-col items-center gap-2 py-6">
               <span className="text-[14px] font-medium text-[#4CAF6E]">
-                We&apos;ll be in touch soon!
+                {t("managedModal.sent")}
               </span>
             </div>
           ) : connected && email ? (
@@ -539,7 +555,7 @@ export function PricingCards({
               <textarea
                 value={managedMessage}
                 onChange={(e) => setManagedMessage(e.target.value)}
-                placeholder="Anything you'd like us to know? (optional)"
+                placeholder={t("managedModal.messagePlaceholder")}
                 rows={3}
                 className="w-full resize-none rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
                 autoFocus
@@ -550,7 +566,7 @@ export function PricingCards({
                 disabled={managedSending}
                 className="inline-flex h-10 w-full items-center justify-center rounded-full bg-[#D4882A] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#C07A22] disabled:opacity-60"
               >
-                {managedSending ? "Sending..." : "Submit"}
+                {managedSending ? t("managedModal.sending") : t("managedModal.submit")}
               </button>
             </div>
           ) : (
@@ -559,7 +575,7 @@ export function PricingCards({
                 type="text"
                 value={managedName}
                 onChange={(e) => setManagedName(e.target.value)}
-                placeholder="Your name"
+                placeholder={t("managedModal.namePlaceholder")}
                 className="w-full rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
                 autoFocus
               />
@@ -567,13 +583,13 @@ export function PricingCards({
                 type="email"
                 value={managedEmail}
                 onChange={(e) => setManagedEmail(e.target.value)}
-                placeholder="Your email"
+                placeholder={t("managedModal.emailPlaceholder")}
                 className="w-full rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
               />
               <textarea
                 value={managedMessage}
                 onChange={(e) => setManagedMessage(e.target.value)}
-                placeholder="Tell us about your ads (optional)"
+                placeholder={t("managedModal.adsPlaceholder")}
                 rows={3}
                 className="w-full resize-none rounded-md border border-[#3D3C36] bg-[#1A1917] px-3 py-2.5 text-[14px] text-[#E8E4DD] placeholder-[#C4C0B6]/50 outline-none transition focus:border-[#4CAF6E]/50"
               />
@@ -583,7 +599,7 @@ export function PricingCards({
                 disabled={!managedEmail.trim() || managedSending}
                 className="inline-flex h-10 w-full items-center justify-center rounded-full bg-[#D4882A] px-5 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#C07A22] disabled:opacity-60"
               >
-                {managedSending ? "Sending..." : "Submit"}
+                {managedSending ? t("managedModal.sending") : t("managedModal.submit")}
               </button>
             </div>
           )}
