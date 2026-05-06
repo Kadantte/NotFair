@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.11.1] - 2026-05-06
+
+### Fixed
+- **Supabase magic-link login now completes successfully.** Email sign-in links now return through a dedicated Supabase callback that exchanges the auth code, establishes the NotFair session, and preserves existing Google Ads connections when present. Existing links that were already sent to the Google Ads OAuth callback are forwarded to the Supabase callback instead of failing with a missing OAuth state.
+
 ## [0.3.11.0] - 2026-05-06
 
 ### Added

@@ -227,6 +227,19 @@ describe("Auth callback route — GET", () => {
     expect(response.headers.get("location")).toContain("/login?error=auth_failed");
   });
 
+  it("forwards state-less code callbacks to the Supabase magic-link handler", async () => {
+    const response = await GET(
+      makeRequest("http://localhost:3000/auth/callback?code=supabase-code&next=%2Fconnect%2Fmeta-ads"),
+    );
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/auth/supabase/callback");
+    expect(location.searchParams.get("code")).toBe("supabase-code");
+    expect(location.searchParams.get("next")).toBe("/connect/meta-ads");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("redirects to /login?error=auth_failed when Google token exchange fails", async () => {
     vi.stubGlobal(
       "fetch",

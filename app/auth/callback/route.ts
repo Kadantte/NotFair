@@ -682,6 +682,13 @@ export async function GET(request: Request) {
   const explicitNext = searchParams.get("next");
   const stateParam = searchParams.get("state");
 
+  if (code && !stateParam) {
+    const supabaseCallback = new URL("/auth/supabase/callback", origin);
+    supabaseCallback.searchParams.set("code", code);
+    if (explicitNext) supabaseCallback.searchParams.set("next", explicitNext);
+    return NextResponse.redirect(supabaseCallback);
+  }
+
   // Verify the OAuth state nonce matches the cookie to prevent CSRF
   const cookieStore = await cookies();
   const cookieNonce = cookieStore.get("oauth_nonce")?.value;
