@@ -678,6 +678,15 @@ describe("enrichGaqlError", () => {
     expect(out).toContain("getResourceMetadata");
   });
 
+  it("gives exact replacements for common hallucinated metric aliases", () => {
+    const out = enrichGaqlError(
+      "Unrecognized fields in the query: 'metrics.cost_per_conversion_micros', 'metrics.average_cpc_micros', 'metrics.impression_share'. (query_error=32)",
+    );
+    expect(out).toContain("metrics.cost_per_conversion` instead");
+    expect(out).toContain("metrics.average_cpc` instead");
+    expect(out).toContain("metrics.search_impression_share");
+  });
+
   it("does NOT classify metrics.conversion_value as virtual (real Google Ads field)", () => {
     const out = enrichGaqlError(
       "Unrecognized field in the query: 'metrics.conversion_value'. (query_error=32)",

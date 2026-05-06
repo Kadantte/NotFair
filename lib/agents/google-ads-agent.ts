@@ -35,6 +35,11 @@ function unwrapMcpResult(result: McpToolResult): unknown {
   }
 }
 
+function toolError(error: unknown): { error: string } {
+  if (error instanceof Error) return { error: error.message };
+  return { error: String(error) };
+}
+
 function adaptCollectedTool(collected: CollectedTool, mode: ToolPermissionMode): Tool {
   // Strip `accountId` — chat is single-account, so the MCP handler
   // resolves to the session's default customer when accountId is undefined.
@@ -48,11 +53,15 @@ function adaptCollectedTool(collected: CollectedTool, mode: ToolPermissionMode):
     inputSchema: z.object(inputShape),
     needsApproval: mode === "needs_approval",
     execute: async (args) => {
-      const result = await collected.handler({
-        ...(args as Record<string, unknown>),
-        accountId: undefined,
-      });
-      return unwrapMcpResult(result);
+      try {
+        const result = await collected.handler({
+          ...(args as Record<string, unknown>),
+          accountId: undefined,
+        });
+        return unwrapMcpResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
     },
   });
 }

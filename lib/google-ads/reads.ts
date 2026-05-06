@@ -1874,6 +1874,20 @@ export function rewriteVirtualNameFields(query: string): string {
  */
 export function enrichGaqlError(message: string): string {
   if (/Unrecognized fields? in the query/i.test(message)) {
+    const aliasTips: string[] = [];
+    if (/metrics\.average_cpc_micros\b/i.test(message)) {
+      aliasTips.push("`metrics.average_cpc_micros` is not a GAQL field; select `metrics.average_cpc` instead.");
+    }
+    if (/metrics\.cost_per_conversion_micros\b/i.test(message)) {
+      aliasTips.push("`metrics.cost_per_conversion_micros` is not a GAQL field; select `metrics.cost_per_conversion` instead.");
+    }
+    if (/metrics\.impression_share\b/i.test(message)) {
+      aliasTips.push("`metrics.impression_share` is not a GAQL field; for Search campaigns use `metrics.search_impression_share` (or call getResourceMetadata for the right channel-specific impression-share metric).");
+    }
+    if (aliasTips.length > 0) {
+      return `${message} Tip: ${aliasTips.join(" ")}`;
+    }
+
     // Check whether the unrecognized field is a MCP virtual field (_value /
     // _name siblings added after the query runs). They look like GAQL fields
     // but don't exist in the schema — a targeted hint beats the generic one.
