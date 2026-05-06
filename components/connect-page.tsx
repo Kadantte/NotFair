@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ExternalLink, AlertCircle, Loader2, Calendar } from 'lucide-react';
+import { ExternalLink, AlertCircle, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
 import { startGoogleConnect } from '@/lib/google-oauth';
@@ -166,32 +166,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         }
     }
 
-    const [demoStarting, setDemoStarting] = useState(false);
-    async function startDemoSession() {
-        if (demoStarting) return;
-        setDemoStarting(true);
-        setError(null);
-        setErrorReason(null);
-        try {
-            const res = await fetch('/api/demo/start', {
-                method: 'POST',
-                credentials: 'include',
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                setError(data.error ?? t('demoFailed'));
-                setDemoStarting(false);
-                return;
-            }
-            trackEvent('demo_mode_started');
-            window.location.assign(data.redirectUrl ?? '/dashboard');
-        } catch {
-            setError(t('demoFailed'));
-            setDemoStarting(false);
-        }
-    }
-
-
     const hasGoogleCustomer = session.connected && !session.pendingSetup && !!session.customerId;
 
     return (
@@ -244,29 +218,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                                 {t('signInWithGoogle')} <ExternalLink className="ml-2 h-5 w-5" />
                             </Button>
                             <p className="text-xs text-[#C4C0B6]/60">{t('oauthNote')}</p>
-                            <div className="flex w-full max-w-sm items-center gap-3 pt-4">
-                                <div className="h-px flex-1 bg-[#3D3C36]" />
-                                <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#C4C0B6]/60">{t('or')}</span>
-                                <div className="h-px flex-1 bg-[#3D3C36]" />
-                            </div>
-                            <div className="flex flex-col items-center space-y-2">
-                                <p className="max-w-md text-sm text-[#C4C0B6]">
-                                    {t('demoIntro')}
-                                </p>
-                                <Button
-                                    onClick={startDemoSession}
-                                    disabled={demoStarting}
-                                    variant="outline"
-                                    className="h-11 rounded-full border-[#3D3C36] bg-[#24231F] px-6 text-sm font-medium text-[#E8E4DD] hover:bg-[#2E2D28] hover:text-[#E8E4DD] disabled:opacity-60"
-                                >
-                                    {demoStarting ? (
-                                        <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t('startingDemo')}</span>
-                                    ) : (
-                                        <>{t('exploreDemo')}</>
-                                    )}
-                                </Button>
-                                <p className="text-xs text-[#C4C0B6]/60">{t('demoNote')}</p>
-                            </div>
                         </div>
                     ) : (
                         <McpSetupTabs

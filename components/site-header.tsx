@@ -3,6 +3,7 @@ import { Star } from "lucide-react";
 import { SetupGuidesMenu } from "@/components/setup-guides-menu";
 import { BrandLockup } from "@/components/brand-lockup";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { ConnectClaudeCTA } from "@/components/connect-claude-cta";
 import { useTranslations } from "next-intl";
 
 function formatStars(count: number): string {
@@ -37,7 +38,7 @@ function NavLink({ href, label, className = "" }: { href: string; label: string;
     );
 }
 
-export function SiteHeader({ connected = false }: { connected?: boolean } = {}) {
+export function SiteHeader() {
     const t = useTranslations("Header");
 
     return (
@@ -65,12 +66,11 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                     >
                         {t("bookDemo")}
                     </a>
-                    <Link
-                        href={connected ? "/dashboard" : "/connect"}
-                        className="inline-flex h-9 items-center rounded-full border border-[#4CAF6E] bg-[#4CAF6E] px-4 text-[13px] font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C]"
-                    >
-                        {t("startNow")}
-                    </Link>
+                    <ConnectClaudeCTA
+                        tracking={{ page: "header", position: "nav" }}
+                        label={t("startNow")}
+                        size="sm"
+                    />
                 </div>
             </div>
         </header>

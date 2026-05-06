@@ -17,8 +17,6 @@ import {
   demoGetKeywords,
   demoGetSearchTermReport,
   demoListCampaigns,
-  demoSparklineData,
-  demoWoWPerformance,
 } from "@/lib/demo/reads";
 import {
   demoAddNegativeKeyword,
@@ -199,21 +197,6 @@ describe("demo mode — reads (shape parity with real lib/google-ads)", () => {
     expect(pmax.impressionShare).toBeNull();
     const search = demoGetImpressionShare("900000000001", 30);
     expect(search.impressionShare).toBeGreaterThan(0);
-  });
-
-  it("demoSparklineData yields 7 days of totals across all campaigns", () => {
-    const data = demoSparklineData(7);
-    expect(data.cost.length).toBe(7);
-    expect(data.clicks.length).toBe(7);
-    expect(data.cost.every((c) => c > 0)).toBe(true);
-  });
-
-  it("demoWoWPerformance returns CPA for every campaign", () => {
-    const rows = demoWoWPerformance();
-    expect(rows).toHaveLength(5);
-    for (const r of rows) {
-      expect(typeof r.currentWeekCost).toBe("number");
-    }
   });
 
   it("demoGetKeywords keywords are cost > 0 for enabled campaign", () => {

@@ -11,7 +11,6 @@ const APP_PATH_PREFIXES = [
   "/connect",
   "/login",
   "/manage-ads-accounts",
-  "/dashboard",
   "/campaigns",
   "/operations",
   "/tools",

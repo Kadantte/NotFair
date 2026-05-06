@@ -108,13 +108,7 @@
     "body": "Inicia sesion con Google para que NotFair pueda encontrar tus cuentas publicitarias y preparar tu configuracion de MCP.",
     "signInWithGoogle": "Iniciar sesion con Google",
     "oauthNote": "OAuth mantiene tus credenciales fuera del cliente de IA.",
-    "or": "o",
-    "demoIntro": "Quieres ver el producto primero? Abre un espacio de demostracion de solo lectura.",
-    "startingDemo": "Iniciando demo...",
-    "exploreDemo": "Explorar modo demo",
-    "demoNote": "Los datos de demo son sinteticos y seguros para probar.",
     "authFailed": "La autenticacion fallo. Intentalo de nuevo.",
-    "demoFailed": "No se pudo iniciar el modo demo. Intentalo de nuevo.",
     "helpAria": "Reservar ayuda de configuracion",
     "needHelp": "Necesitas ayuda?",
     "error": {

@@ -20,7 +20,7 @@ export function AuditCTA({
   position,
   connectedLabel = "Open account",
   disconnectedLabel = "Connect Google Ads",
-  connectedDestination = "/dashboard",
+  connectedDestination = "/connect",
   disconnectedDestination = "/connect",
 }: {
   session: { connected: boolean };
