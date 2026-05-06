@@ -9,6 +9,20 @@ All font choices, colors, spacing, and aesthetic direction are defined there.
 Do not deviate without explicit user approval.
 In QA mode, flag any code that doesn't match DESIGN.md.
 
+## NotFair MCP Product Principle
+NotFair MCP should be boring infrastructure for smart agents.
+
+The MCP layer should provide reliable Google Ads primitives: clean data contracts,
+robust GAQL/runScript behavior, freshness/staleness metadata, operation provenance,
+guardrails, approvals, undo, and bulk-safe writes.
+
+The AI agent using MCP should handle the intelligence layer: diagnosing performance,
+prioritizing fixes, forming hypotheses, explaining tradeoffs, and deciding what
+actions to propose.
+
+Default bias: improve MCP as a trustworthy data/execution substrate, not as an
+over-opinionated "smart marketer" workflow app.
+
 ## Frontend Performance Patterns
 
 These are mandatory patterns for all frontend components. Follow them by default.
