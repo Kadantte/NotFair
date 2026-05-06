@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { RefreshCw, AlertCircle, ChevronRight, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Check, Copy, Sparkles, Trash2, AlertTriangle, ListChecks } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { RefreshCw, AlertCircle, ChevronRight, ChevronLeft, Loader2, X, Upload, Users, Send, ChevronDown, Eye, Filter, Clock, ArrowUpDown, ArrowUp, ArrowDown, Check, Copy, Search, Sparkles, Trash2, AlertTriangle, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     getContactsAction,
@@ -164,6 +164,40 @@ type Customer = {
 
 type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive' | 'errorRate';
 type SortDir = 'asc' | 'desc';
+const CUSTOMER_PAGE_SIZE = 50;
+
+function normalizedSearchText(...values: Array<string | number | null | undefined>): string {
+    return values
+        .filter((value): value is string | number => value !== null && value !== undefined)
+        .map((value) => String(value).toLowerCase())
+        .join(' ');
+}
+
+function customerMatchesSearch(customer: Customer, query: string): boolean {
+    if (!query) return true;
+    const attribution = customer.attribution;
+    const haystack = normalizedSearchText(
+        customer.googleEmail,
+        customer.userId,
+        customer.primaryAccountId,
+        customer.accountCount,
+        attribution?.label,
+        attribution?.detail,
+        attribution?.source,
+        attribution?.medium,
+        attribution?.campaign,
+        attribution?.term,
+        attribution?.content,
+        attribution?.referrer,
+        ...customer.accounts.flatMap((account) => [
+            account.id,
+            account.name,
+            account.currencyCode,
+            account.country,
+        ]),
+    );
+    return query.split(/\s+/).every((token) => haystack.includes(token));
+}
 
 type ResetPreview = {
     userId: string;
@@ -210,7 +244,6 @@ let cachedDraftEmails: Set<string> | null = null;
 let cachedWaitlist: WaitlistRow[] | null = null;
 
 export function DevShell() {
-    const router = useRouter();
     const pathname = usePathname();
     const activeTab = tabFromPathname(pathname);
     const [usageDays, setUsageDays] = useState(30);
@@ -226,6 +259,8 @@ export function DevShell() {
     const [loadingWaitlist, setLoadingWaitlist] = useState(!cachedWaitlist);
     const [waitlistKeyFilter, setWaitlistKeyFilter] = useState<string>('all');
     const [approvingWaitlistId, setApprovingWaitlistId] = useState<number | null>(null);
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [customerPage, setCustomerPage] = useState(1);
     const [sortKey, setSortKey] = useState<CustomerSortKey>('operations');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [importing, setImporting] = useState(false);
@@ -337,8 +372,14 @@ export function DevShell() {
     const metrics = useMemo(() => contacts.length > 0 ? deriveMetrics(contacts) : null, [contacts]);
     const filteredContacts = useMemo(() => statusFilter === 'all' ? contacts : contacts.filter((c) => c.status === statusFilter), [contacts, statusFilter]);
 
+    const normalizedCustomerSearch = customerSearch.trim().toLowerCase();
+
+    const filteredCustomers = useMemo(() => {
+        return customers.filter((customer) => customerMatchesSearch(customer, normalizedCustomerSearch));
+    }, [customers, normalizedCustomerSearch]);
+
     const sortedCustomers = useMemo(() => {
-        const sorted = [...customers];
+        const sorted = [...filteredCustomers];
         sorted.sort((a, b) => {
             let cmp = 0;
             switch (sortKey) {
@@ -368,7 +409,25 @@ export function DevShell() {
             return sortDir === 'asc' ? cmp : -cmp;
         });
         return sorted;
-    }, [customers, sortKey, sortDir]);
+    }, [filteredCustomers, sortKey, sortDir]);
+
+    const customerResultCount = sortedCustomers.length;
+    const customerPageCount = Math.max(1, Math.ceil(customerResultCount / CUSTOMER_PAGE_SIZE));
+    const boundedCustomerPage = Math.min(customerPage, customerPageCount);
+    const customerPageStartIndex = (boundedCustomerPage - 1) * CUSTOMER_PAGE_SIZE;
+    const paginatedCustomers = useMemo(() => {
+        return sortedCustomers.slice(customerPageStartIndex, customerPageStartIndex + CUSTOMER_PAGE_SIZE);
+    }, [sortedCustomers, customerPageStartIndex]);
+    const customerRangeStart = customerResultCount === 0 ? 0 : customerPageStartIndex + 1;
+    const customerRangeEnd = Math.min(customerPageStartIndex + CUSTOMER_PAGE_SIZE, customerResultCount);
+
+    useEffect(() => {
+        setCustomerPage(1);
+    }, [normalizedCustomerSearch, sortKey, sortDir]);
+
+    useEffect(() => {
+        setCustomerPage((page) => Math.min(page, customerPageCount));
+    }, [customerPageCount]);
 
     function toggleSort(key: CustomerSortKey) {
         if (sortKey === key) {
@@ -640,6 +699,38 @@ export function DevShell() {
             setSchedulingId(null);
         }
     }
+
+    const customerPaginationControls = customerResultCount > 0 ? (
+        <div className="mt-3 flex flex-col gap-2 border-t border-[#3D3C36]/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-mono text-[11px] text-[#C4C0B6]">
+                Showing {customerRangeStart.toLocaleString()}-{customerRangeEnd.toLocaleString()} of {customerResultCount.toLocaleString()}
+                {customerResultCount !== customers.length ? ` matching ${customers.length.toLocaleString()}` : ''}
+            </div>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => setCustomerPage((page) => Math.max(1, page - 1))}
+                    disabled={boundedCustomerPage <= 1}
+                    className="grid h-8 w-8 place-items-center rounded-md border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD] disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Previous customers page"
+                >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <div className="min-w-20 text-center font-mono text-[11px] text-[#C4C0B6]">
+                    {boundedCustomerPage.toLocaleString()} / {customerPageCount.toLocaleString()}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setCustomerPage((page) => Math.min(customerPageCount, page + 1))}
+                    disabled={boundedCustomerPage >= customerPageCount}
+                    className="grid h-8 w-8 place-items-center rounded-md border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD] disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Next customers page"
+                >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+            </div>
+        </div>
+    ) : null;
 
     return (
         <section className="flex min-h-0 h-full flex-col overflow-hidden">
@@ -1192,41 +1283,73 @@ export function DevShell() {
                     </div>
                 ) : (
                     <div>
-                        <h2 className="hidden text-base font-semibold text-[#E8E4DD] mb-4 sm:block sm:text-lg">
-                            Customers
-                            <span className="ml-2 font-mono text-xs text-[#C4C0B6] font-normal">{customers.length}</span>
-                        </h2>
                         <>
-                        {/* Mobile: card layout */}
-                            <div className="sm:hidden mb-3 flex items-center gap-2">
-                                <div className="min-w-0 flex-1">
-                                    <div className="text-[15px] font-semibold text-[#E8E4DD]">Customers <span className="font-mono text-xs font-normal text-[#C4C0B6]">{customers.length}</span></div>
+                            <div className="mb-3 flex flex-col gap-3 sm:mb-4">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <h2 className="text-[15px] font-semibold text-[#E8E4DD] sm:text-lg">
+                                        Customers
+                                        <span className="ml-2 font-mono text-xs font-normal text-[#C4C0B6]">
+                                            {customerResultCount === customers.length
+                                                ? customers.length.toLocaleString()
+                                                : `${customerResultCount.toLocaleString()}/${customers.length.toLocaleString()}`}
+                                        </span>
+                                    </h2>
+                                    <div className="sm:w-80">
+                                        <div className="relative min-w-0 sm:w-80">
+                                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#C4C0B6]/70" />
+                                            <input
+                                                type="search"
+                                                value={customerSearch}
+                                                onChange={(e) => setCustomerSearch(e.target.value)}
+                                                placeholder="Email, account, source"
+                                                aria-label="Search customers"
+                                                className="h-9 w-full rounded-lg border border-[#3D3C36] bg-[#24231F] pl-8 pr-8 font-mono text-[12px] text-[#E8E4DD] outline-none transition-colors placeholder:text-[#C4C0B6]/45 focus:border-[#4CAF6E]/60"
+                                            />
+                                            {customerSearch && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCustomerSearch('')}
+                                                    className="absolute right-2 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-[#C4C0B6] hover:bg-[#2E2D28] hover:text-[#E8E4DD]"
+                                                    aria-label="Clear customer search"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                                <select
-                                    aria-label="Sort customers"
-                                    value={sortKey}
-                                    onChange={(e) => setSortKey(e.target.value as CustomerSortKey)}
-                                    className="h-9 w-[154px] rounded-lg border border-[#3D3C36] bg-[#24231F] px-2 text-xs text-[#E8E4DD]"
-                                >
-                                    <option value="operations">Operations</option>
-                                    <option value="errorRate">Error Rate (30d)</option>
-                                    <option value="budget">Annual Budget (USD)</option>
-                                    <option value="accounts">Accounts</option>
-                                    <option value="lastActive">Last Active</option>
-                                    <option value="firstSeen">First Seen</option>
-                                    <option value="email">Customer</option>
-                                </select>
-                                <button
-                                    type="button"
-                                    onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
-                                    className="grid h-9 w-9 place-items-center rounded-lg border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD]"
-                                    title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
-                                >
-                                    {sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
-                                </button>
+                                <div className="flex items-center gap-2 sm:hidden">
+                                    <select
+                                        aria-label="Sort customers"
+                                        value={sortKey}
+                                        onChange={(e) => setSortKey(e.target.value as CustomerSortKey)}
+                                        className="h-9 min-w-0 flex-1 rounded-lg border border-[#3D3C36] bg-[#24231F] px-2 text-xs text-[#E8E4DD]"
+                                    >
+                                        <option value="operations">Operations</option>
+                                        <option value="errorRate">Error Rate (30d)</option>
+                                        <option value="budget">Annual Budget (USD)</option>
+                                        <option value="accounts">Accounts</option>
+                                        <option value="lastActive">Last Active</option>
+                                        <option value="firstSeen">First Seen</option>
+                                        <option value="email">Customer</option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSortDir((d) => d === 'asc' ? 'desc' : 'asc')}
+                                        className="grid h-9 w-9 place-items-center rounded-lg border border-[#3D3C36] bg-[#24231F] text-[#C4C0B6] hover:text-[#E8E4DD]"
+                                        title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+                                    >
+                                        {sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="sm:hidden space-y-3">
-                                {sortedCustomers.map((c) => {
+                                {customerResultCount === 0 ? (
+                                    <div className="rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F]/40 p-8 text-center">
+                                        <Users className="mx-auto mb-3 h-7 w-7 text-[#C4C0B6]/30" />
+                                        <p className="text-sm text-[#C4C0B6]">No customers match this search.</p>
+                                    </div>
+                                ) : paginatedCustomers.map((c) => {
                                     const { hasBudget, currency, flag, country, annualUsd, annualLocal } = deriveBudgetDisplay(c);
                                     const totalCampaigns = c.accounts.reduce((s, a) => s + (a.activeCampaigns ?? 0), 0);
                                     const attribution = c.attribution ?? {
@@ -1246,14 +1369,7 @@ export function DevShell() {
                                     return (
                                     <div
                                         key={c.userId ?? c.primaryAccountId}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => router.push(`/dev/${c.primaryAccountId}`)}
-                                        onMouseEnter={() => router.prefetch(`/dev/${c.primaryAccountId}`)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') router.push(`/dev/${c.primaryAccountId}`);
-                                        }}
-                                        className="rounded-2xl border border-[#3D3C36] bg-[#24231F]/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.16)] transition-colors active:bg-[#2E2D28]/80"
+                                        className="block rounded-2xl border border-[#3D3C36] bg-[#24231F]/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.16)] transition-colors active:bg-[#2E2D28]/80"
                                     >
                                         <div className="mb-2.5 flex items-start gap-3">
                                             <div className="min-w-0 flex-1">
@@ -1274,7 +1390,9 @@ export function DevShell() {
                                                     <div className="truncate text-[15px] font-medium leading-5 text-[#E8E4DD]">{c.userId || 'Unknown customer'}</div>
                                                 )}
                                                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                                                    <span className="font-mono text-[11px] text-[#C4C0B6]/55">{c.primaryAccountId}</span>
+                                                    <Link href={`/dev/${c.primaryAccountId}`} prefetch className="font-mono text-[11px] text-[#C4C0B6]/55 hover:text-[#E8E4DD] hover:underline">
+                                                        {c.primaryAccountId}
+                                                    </Link>
                                                     {flag && <span className="text-[13px] leading-none" title={country ?? undefined}>{flag}</span>}
                                                     {c.outreachStatus === 'drafted' && (
                                                         <span className="rounded-full border border-[#D4882A]/30 bg-[#D4882A]/10 px-2 py-0.5 text-[10px] font-semibold text-[#D4882A]">Draft</span>
@@ -1398,15 +1516,20 @@ export function DevShell() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {sortedCustomers.map((c) => {
+                                        {customerResultCount === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="px-4 py-10 text-center">
+                                                    <Users className="mx-auto mb-3 h-7 w-7 text-[#C4C0B6]/30" />
+                                                    <p className="text-sm text-[#C4C0B6]">No customers match this search.</p>
+                                                </td>
+                                            </tr>
+                                        ) : paginatedCustomers.map((c) => {
                                             const { hasBudget, currency, flag, country, annualUsd, annualLocal } = deriveBudgetDisplay(c);
                                             const totalCampaigns = c.accounts.reduce((s, a) => s + (a.activeCampaigns ?? 0), 0);
                                             return (
                                             <tr
                                                 key={c.userId ?? c.primaryAccountId}
-                                                onClick={() => router.push(`/dev/${c.primaryAccountId}`)}
-                                                onMouseEnter={() => router.prefetch(`/dev/${c.primaryAccountId}`)}
-                                                className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors cursor-pointer"
+                                                className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors"
                                             >
                                                 <td className="px-4 py-2.5">
                                                     <div className="flex items-center gap-2">
@@ -1439,7 +1562,9 @@ export function DevShell() {
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-xs text-[#C4C0B6]/60 font-mono tabular-nums">
-                                                        <span>{c.primaryAccountId}</span>
+                                                        <Link href={`/dev/${c.primaryAccountId}`} prefetch className="hover:text-[#E8E4DD] hover:underline">
+                                                            {c.primaryAccountId}
+                                                        </Link>
                                                         {flag && (
                                                             <span className="text-[13px] leading-none" title={country ?? undefined}>{flag}</span>
                                                         )}
@@ -1510,6 +1635,7 @@ export function DevShell() {
                                     </tbody>
                                 </table>
                             </div>
+                            {customerPaginationControls}
                         </>
                     </div>
                 ))}

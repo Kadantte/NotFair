@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.11.3] - 2026-05-06
+
+### Added
+- **The `/dev/customers` dashboard is easier to scan at scale.** Dev users can now search customers by email, user id, account id/name, currency, country, and attribution fields, with results paginated in fixed 50-customer pages.
+
 ## [0.3.11.2] - 2026-05-06
 
 ### Fixed
