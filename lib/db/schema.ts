@@ -384,6 +384,13 @@ export const adPlatformConnections = pgTable("ad_platform_connections", {
     currency?: string;
     timezone?: string;
     business_id?: string;
+    /**
+     * Google Ads only: manager (MCC) account id required to reach this account.
+     * `string` — routed via that manager. `null` — explicit direct-access.
+     * Field absent — legacy data; readers fall back to session-level loginCustomerId.
+     * Meta + other platforms leave this absent.
+     */
+    loginCustomerId?: string | null;
   }>>().notNull().default([]),
   /** Currently-selected ad account (sticky-with-override per design doc decision #5). */
   activeAccountId: text("active_account_id"),

@@ -6,12 +6,14 @@ const {
   mockUpdateWhere,
   mockDeleteWhere,
   mockListConnectableAccounts,
+  mockInsertValues,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectLimit: vi.fn(),
   mockUpdateWhere: vi.fn(),
   mockDeleteWhere: vi.fn(),
   mockListConnectableAccounts: vi.fn(),
+  mockInsertValues: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -52,8 +54,8 @@ vi.mock("@/lib/google-ads", () => ({
   syncAccountSnapshots: vi.fn(async () => {}),
 }));
 
-vi.mock("@/lib/db", () => ({
-  db: () => ({
+vi.mock("@/lib/db", () => {
+  const dbObj = {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
@@ -69,20 +71,41 @@ vi.mock("@/lib/db", () => ({
     delete: vi.fn(() => ({
       where: (...args: unknown[]) => mockDeleteWhere(...args),
     })),
-  }),
-  schema: {
-    mcpSessions: {
-      id: "id",
-      accessToken: "access_token",
-      refreshToken: "refresh_token",
-      userId: "user_id",
-      expiresAt: "expires_at",
-      customerId: "customer_id",
-      customerIds: "customer_ids",
-      loginCustomerId: "login_customer_id",
+    // Connection-side upsert (Phase 1 dual-write). Capture values for
+    // assertion via `mockInsertValues`; resolve no-op for both .values()
+    // (legacy direct-await path) and .onConflictDoUpdate() (helper path).
+    insert: vi.fn(() => ({
+      values: (...args: unknown[]) => {
+        mockInsertValues(...args);
+        const thenable = Promise.resolve(undefined) as Promise<undefined> & {
+          onConflictDoUpdate: (set: unknown) => Promise<undefined>;
+        };
+        thenable.onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+        return thenable;
+      },
+    })),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(dbObj),
+  };
+  return {
+    db: () => dbObj,
+    schema: {
+      mcpSessions: {
+        id: "id",
+        accessToken: "access_token",
+        refreshToken: "refresh_token",
+        userId: "user_id",
+        expiresAt: "expires_at",
+        customerId: "customer_id",
+        customerIds: "customer_ids",
+        loginCustomerId: "login_customer_id",
+      },
+      adPlatformConnections: {
+        userId: "user_id",
+        platform: "platform",
+      },
     },
-  },
-}));
+  };
+});
 
 import { POST } from "@/app/api/auth/select-account/route";
 
@@ -324,6 +347,38 @@ describe("Select account route — POST", () => {
       );
 
       expect(response.status).toBe(404);
+    });
+
+    // ─── Phase-1 dual-write ────────────────────────────────────────────
+    it("[dual-write] mirrors the curated selection onto ad_platform_connections", async () => {
+      const response = await POST(
+        makeRequest({
+          pendingToken: "pending-token-abc",
+          accounts: [
+            { id: "1111111111", name: "Client A" },
+            { id: "2222222222", name: "Client B" },
+          ],
+          next: "/connect",
+        }),
+      );
+      expect(response.status).toBe(200);
+
+      const conn = mockInsertValues.mock.calls
+        .map((call) => call[0] as Record<string, unknown>)
+        .find((row) => row?.platform === "google_ads");
+
+      expect(conn).toBeDefined();
+      expect(conn).toMatchObject({
+        userId: "user-123",
+        platform: "google_ads",
+        // First account becomes the active default; both retain
+        // their server-side loginCustomerId.
+        activeAccountId: "1111111111",
+        accountIds: [
+          { id: "1111111111", name: "Client A", loginCustomerId: "9999999999" },
+          { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+        ],
+      });
     });
   });
 });

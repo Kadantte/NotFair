@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
+import { upsertGoogleConnection } from "@/lib/connections/google";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
 import { listConnectableAccounts, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
@@ -162,25 +163,45 @@ export async function POST(request: Request) {
   // `authForAccount`) still work for the default account.
   const loginCustomerId = authorizedById.get(primaryAccount.id)?.loginCustomerId ?? null;
 
-  await db()
-    .update(schema.mcpSessions)
-    .set({
-      customerId: primaryAccount.id,
-      customerIds,
-      loginCustomerId,
-    })
-    .where(eq(schema.mcpSessions.id, session.id));
+  await db().transaction(async (tx) => {
+    await tx
+      .update(schema.mcpSessions)
+      .set({
+        customerId: primaryAccount.id,
+        customerIds,
+        loginCustomerId,
+      })
+      .where(eq(schema.mcpSessions.id, session.id));
 
-  if (session.userId) {
-    await db()
-      .delete(schema.mcpSessions)
-      .where(
-        and(
-          eq(schema.mcpSessions.userId, session.userId),
-          ne(schema.mcpSessions.id, session.id),
-        ),
+    if (session.userId) {
+      await tx
+        .delete(schema.mcpSessions)
+        .where(
+          and(
+            eq(schema.mcpSessions.userId, session.userId),
+            ne(schema.mcpSessions.id, session.id),
+          ),
+        );
+
+      // Phase-1 dual-write: mirror the curated selection onto the connection
+      // row. Note we do NOT delete the connection alongside the duplicate
+      // mcp_sessions cleanup above — there is one connection per (user,
+      // platform) and it represents the user's enduring link to Google Ads.
+      await upsertGoogleConnection(
+        {
+          userId: session.userId,
+          refreshToken: session.refreshToken,
+          activeAccountId: primaryAccount.id,
+          accountIds: validAccounts.map((a) => ({
+            id: a.id,
+            name: a.name || "",
+            loginCustomerId: authorizedById.get(a.id)?.loginCustomerId ?? null,
+          })),
+        },
+        tx,
       );
-  }
+    }
+  });
 
   // Snapshot account budget/info for dev dashboard (runs after response is sent).
   // Use the server-authorized customerIds JSON so MCC-routed accounts keep loginCustomerId.

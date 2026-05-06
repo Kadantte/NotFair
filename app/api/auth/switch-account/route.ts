@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { setGoogleConnectionActiveAccount } from "@/lib/connections/google";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { COOKIE_NAMES, setActivePlatformCookie, setSessionCookies } from "@/lib/auth-cookies";
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
       id: schema.mcpSessions.id,
       accessToken: schema.mcpSessions.accessToken,
       customerIds: schema.mcpSessions.customerIds,
+      userId: schema.mcpSessions.userId,
     })
     .from(schema.mcpSessions)
     .where(
@@ -49,10 +51,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Account not connected" }, { status: 403 });
   }
 
-  await db()
-    .update(schema.mcpSessions)
-    .set({ customerId })
-    .where(eq(schema.mcpSessions.id, session.id));
+  await db().transaction(async (tx) => {
+    await tx
+      .update(schema.mcpSessions)
+      .set({ customerId })
+      .where(eq(schema.mcpSessions.id, session.id));
+
+    if (session.userId) {
+      await setGoogleConnectionActiveAccount(
+        { userId: session.userId, activeAccountId: customerId },
+        tx,
+      );
+    }
+  });
 
   const accountNames = deriveCustomerName(session.customerIds);
   const response = NextResponse.json({ ok: true });

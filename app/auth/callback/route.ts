@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
+import { refreshGoogleConnectionCredentials, upsertGoogleConnection } from "@/lib/connections/google";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
@@ -336,14 +337,31 @@ async function mintAdsLessSession({
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-  await db().insert(schema.mcpSessions).values({
-    accessToken,
-    refreshToken,
-    customerId: "",
-    customerIds: "[]",
-    userId,
-    googleEmail,
-    expiresAt: expiresAt.toISOString(),
+  await db().transaction(async (tx) => {
+    await tx.insert(schema.mcpSessions).values({
+      accessToken,
+      refreshToken,
+      customerId: "",
+      customerIds: "[]",
+      userId,
+      googleEmail,
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    // Phase-1 dual-write. Skip when userId is null — ad_platform_connections
+    // requires it. Only the (rare) pre-supabase-attached path hits that case.
+    if (userId) {
+      await upsertGoogleConnection(
+        {
+          userId,
+          refreshToken,
+          activeAccountId: null,
+          accountIds: [],
+          googleEmail,
+        },
+        tx,
+      );
+    }
   });
 
   setSessionCookies(response, accessToken, "");
@@ -425,19 +443,35 @@ async function createOrRedirectGoogleAdsSession({
     const accessToken = randomBytes(32).toString("hex");
     // Emit loginCustomerId explicitly (string | null) so authForAccount can
     // distinguish "direct" from "legacy fallback" for this entry.
-    const customerIds = JSON.stringify([
+    const accountIds = [
       { id: account.id, name: account.name || "", loginCustomerId: account.loginCustomerId ?? null },
-    ]);
+    ];
+    const customerIds = JSON.stringify(accountIds);
 
-    await db().insert(schema.mcpSessions).values({
-      accessToken,
-      refreshToken,
-      customerId: account.id,
-      customerIds,
-      loginCustomerId: account.loginCustomerId ?? null,
-      userId,
-      googleEmail,
-      expiresAt: expiresAt.toISOString(),
+    await db().transaction(async (tx) => {
+      await tx.insert(schema.mcpSessions).values({
+        accessToken,
+        refreshToken,
+        customerId: account.id,
+        customerIds,
+        loginCustomerId: account.loginCustomerId ?? null,
+        userId,
+        googleEmail,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      if (userId) {
+        await upsertGoogleConnection(
+          {
+            userId,
+            refreshToken,
+            activeAccountId: account.id,
+            accountIds,
+            googleEmail,
+          },
+          tx,
+        );
+      }
     });
 
     // Snapshot account budget/info for dev dashboard (runs after response is sent).
@@ -494,14 +528,32 @@ async function createOrRedirectGoogleAdsSession({
     loginCustomerId: account.loginCustomerId ?? null,
   }));
 
-  await db().insert(schema.mcpSessions).values({
-    accessToken: pendingToken,
-    refreshToken,
-    customerId: "",
-    customerIds: JSON.stringify(accountsList),
-    userId,
-    googleEmail,
-    expiresAt: expiresAt.toISOString(),
+  await db().transaction(async (tx) => {
+    await tx.insert(schema.mcpSessions).values({
+      accessToken: pendingToken,
+      refreshToken,
+      customerId: "",
+      customerIds: JSON.stringify(accountsList),
+      userId,
+      googleEmail,
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    if (userId) {
+      await upsertGoogleConnection(
+        {
+          userId,
+          refreshToken,
+          // Pending — user hasn't picked yet. accountIds carries the
+          // candidate set so /api/auth/select-account can validate the
+          // pick directly off the connection row in phase 2.
+          activeAccountId: null,
+          accountIds: accountsList,
+          googleEmail,
+        },
+        tx,
+      );
+    }
   });
 
   if (popup) {
@@ -572,15 +624,25 @@ async function reuseExistingSession({
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-  await db()
-    .update(schema.mcpSessions)
-    .set({
-      refreshToken,
-      userId,
-      ...(googleEmail ? { googleEmail } : {}),
-      expiresAt: expiresAt.toISOString(),
-    })
-    .where(eq(schema.mcpSessions.id, existingSession.id));
+  await db().transaction(async (tx) => {
+    await tx
+      .update(schema.mcpSessions)
+      .set({
+        refreshToken,
+        userId,
+        ...(googleEmail ? { googleEmail } : {}),
+        expiresAt: expiresAt.toISOString(),
+      })
+      .where(eq(schema.mcpSessions.id, existingSession.id));
+
+    // Mirror the credential refresh on ad_platform_connections without
+    // disturbing the user's account curation. If no connection row exists
+    // yet (legacy session pre-dating phase 1), the backfill script seeds it.
+    await refreshGoogleConnectionCredentials(
+      { userId, refreshToken, googleEmail },
+      tx,
+    );
+  });
 
   const customerName = deriveCustomerName(existingSession.customerIds);
 

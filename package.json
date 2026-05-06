@@ -22,6 +22,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:backfill-operation-user-ids": "npx tsx scripts/backfill-operation-user-ids.ts",
+    "db:backfill-google-connections": "npx tsx scripts/backfill-google-connections.ts",
+    "db:check-google-connection-invariant": "npx tsx scripts/check-google-connection-invariant.ts",
     "db:refresh-stale-account-snapshots": "tsx scripts/refresh-stale-account-snapshots.ts",
     "eval:mcp": "npx tsx scripts/eval-mcp/eval.ts",
     "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts"

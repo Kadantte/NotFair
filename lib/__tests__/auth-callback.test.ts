@@ -71,8 +71,8 @@ vi.mock("@/lib/oauth-nonce", () => ({
   verifyOAuthNonce: (...args: unknown[]) => mockVerifyOAuthNonce(...args),
 }));
 
-vi.mock("@/lib/db", () => ({
-  db: () => ({
+vi.mock("@/lib/db", () => {
+  const dbObj = {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
@@ -84,27 +84,46 @@ vi.mock("@/lib/db", () => ({
       })),
     })),
     insert: vi.fn(() => ({
-      values: (...args: unknown[]) => mockInsertValues(...args),
+      values: (...args: unknown[]) => {
+        // Capture for assertion (mcp_sessions writes use this directly).
+        mockInsertValues(...args);
+        // Return a thenable that is ALSO chainable into onConflictDoUpdate.
+        // The connection upsert uses `.values(x).onConflictDoUpdate(y)`;
+        // mcp_sessions writes await `.values(x)` directly. Both work.
+        const thenable = Promise.resolve(undefined) as Promise<undefined> & {
+          onConflictDoUpdate: (set: unknown) => Promise<undefined>;
+        };
+        thenable.onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+        return thenable;
+      },
     })),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
         where: (...args: unknown[]) => mockUpdateWhere(...args),
       })),
     })),
-  }),
-  schema: {
-    mcpSessions: {
-      id: "id",
-      userId: "user_id",
-      googleEmail: "google_email",
-      expiresAt: "expires_at",
-      createdAt: "created_at",
-      customerId: "customer_id",
-      customerIds: "customer_ids",
-      accessToken: "access_token",
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(dbObj),
+  };
+  return {
+    db: () => dbObj,
+    schema: {
+      mcpSessions: {
+        id: "id",
+        userId: "user_id",
+        googleEmail: "google_email",
+        expiresAt: "expires_at",
+        createdAt: "created_at",
+        customerId: "customer_id",
+        customerIds: "customer_ids",
+        accessToken: "access_token",
+      },
+      adPlatformConnections: {
+        userId: "user_id",
+        platform: "platform",
+      },
     },
-  },
-}));
+  };
+});
 
 import { GET } from "@/app/auth/callback/route";
 
@@ -349,6 +368,100 @@ describe("Auth callback route — GET", () => {
     // No-accounts states route to /manage-ads-accounts (the platform picker),
     // not back to /connect (which is reserved for connection-flow errors).
     expect(location.pathname).toBe("/manage-ads-accounts");
+  });
+
+  // ─── Phase-1 dual-write: ad_platform_connections ───────────────────
+  //
+  // Every Google `mcp_sessions` write should be mirrored by a connection-row
+  // upsert keyed on (userId, "google_ads"). These assertions pin the field
+  // mapping so phase-2 readers can rely on it.
+
+  function findConnectionUpsert() {
+    return mockInsertValues.mock.calls
+      .map((call) => call[0] as Record<string, unknown>)
+      .find((row) => row?.platform === "google_ads");
+  }
+
+  it("[dual-write] mints an ad_platform_connections row for the ads-less path", async () => {
+    // signInWithIdToken returns user; listConnectableAccounts returns no
+    // usable accounts (manager-only) → mintAdsLessSession runs.
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const state = encodeState();
+    await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    const conn = findConnectionUpsert();
+    expect(conn).toBeDefined();
+    expect(conn).toMatchObject({
+      userId: "user-123",
+      platform: "google_ads",
+      refreshToken: "google-refresh-token",
+      activeAccountId: null,
+      accountIds: [],
+    });
+  });
+
+  it("[dual-write] mints an ad_platform_connections row for the single-account path", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        {
+          id: "5555555555",
+          name: "Client A",
+          loginCustomerId: "9999999999",
+          loginCustomerName: "Acme MCC",
+        },
+      ],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const state = encodeState();
+    await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    const conn = findConnectionUpsert();
+    expect(conn).toBeDefined();
+    expect(conn).toMatchObject({
+      userId: "user-123",
+      platform: "google_ads",
+      activeAccountId: "5555555555",
+      accountIds: [
+        { id: "5555555555", name: "Client A", loginCustomerId: "9999999999" },
+      ],
+    });
+  });
+
+  it("[dual-write] mints an ad_platform_connections row for the multi-account-pending path", async () => {
+    mockListConnectableAccounts.mockResolvedValue({
+      accounts: [
+        { id: "1111111111", name: "Direct Account" },
+        { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+      ],
+      managers: [{ id: "9999999999", name: "Acme MCC" }],
+    });
+
+    const state = encodeState();
+    await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    const conn = findConnectionUpsert();
+    expect(conn).toBeDefined();
+    // Pending — no chosen account yet. accountIds carries the candidate set.
+    expect(conn).toMatchObject({
+      userId: "user-123",
+      platform: "google_ads",
+      activeAccountId: null,
+      accountIds: [
+        { id: "1111111111", name: "Direct Account", loginCustomerId: null },
+        { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+      ],
+    });
   });
 
   it("reuses an existing connected session for the same user", async () => {
