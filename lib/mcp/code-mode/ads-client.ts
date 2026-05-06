@@ -143,9 +143,14 @@ export function buildAdsHost(
 
     const results = await Promise.allSettled(
       tasks.map((t) =>
-        execRead(auth, targetId, "run_script_gaql_parallel", () =>
-          runSafeGaqlReport(auth, t.query, t.limit, options),
-        ),
+        execRead(auth, targetId, "run_script_gaql_parallel", async () => {
+          try {
+            return await runSafeGaqlReport(auth, t.query, t.limit, options);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`gaqlParallel query "${t.name}" failed: ${message}`);
+          }
+        }),
       ),
     );
 

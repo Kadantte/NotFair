@@ -3,6 +3,13 @@
 All notable changes to AdsAgent will be documented in this file.
 
 
+## [0.3.6.1] - 2026-05-06
+
+### Fixed
+- **`runScript` now auto-corrects MCP-added enum label fields in GAQL.** Queries that reuse humanized result fields such as `campaign.status_name` or `ad_group_criterion.keyword.match_type_name` are rewritten to the raw Google Ads fields before execution, preventing avoidable MCP query failures while still returning the humanized companions in results.
+- **`gaqlParallel` errors now identify the failing subquery.** Per-query failures include the batch query name, making support investigations faster when one query in a wide `runScript` fan-out fails.
+
+
 ## [0.3.6.0] - 2026-05-05
 
 ### Added

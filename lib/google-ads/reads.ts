@@ -1824,6 +1824,33 @@ export function rewriteInvalidDateLiterals(query: string, today: Date = new Date
   return out;
 }
 
+function rawFieldForVirtualSibling(field: string): string | null {
+  const lower = field.toLowerCase();
+  if (lower.endsWith("_value")) {
+    // Real Google Ads fields like metrics.conversion_value are genuine GAQL
+    // fields, not MCP-added micros-to-major-unit siblings.
+    if (/conversions?_value$/.test(lower)) return null;
+    return field.replace(/_value$/i, "_micros");
+  }
+  if (!lower.endsWith("_name")) return null;
+  // Real GAQL fields with this suffix are not MCP-added humanized siblings.
+  if (/(descriptive|resource|conversion_action)_name$/.test(lower)) return null;
+  return field.replace(/_name$/i, "");
+}
+
+/**
+ * Humanized result rows add enum-name siblings like `campaign.status_name`
+ * after GAQL runs. Agents sometimes feed those row fields back into the next
+ * SELECT. Rewrite the safe enum-name form to the raw GAQL field so the query
+ * works and the response still includes the humanized sibling.
+ */
+export function rewriteVirtualNameFields(query: string): string {
+  return query.replace(
+    /\b([a-z][\w]*(?:\.[a-z][\w]*)+_name)\b/gi,
+    (match, field: string) => rawFieldForVirtualSibling(field) ?? match,
+  );
+}
+
 /**
  * Append a self-correcting hint to specific Google Ads errors so the agent's
  * next attempt has a clear path forward. Each tip names the exact next move
@@ -1853,15 +1880,8 @@ export function enrichGaqlError(message: string): string {
     const virtualMatch = message.match(/\b([\w.]+_(?:value|name))\b/);
     if (virtualMatch) {
       const field = virtualMatch[1];
-      // Exclude real Google Ads fields that end in _value (e.g. metrics.conversion_value,
-      // metrics.all_conversions_value) — those are genuine GAQL fields, not virtual siblings.
-      // Real _name fields like customer.descriptive_name are similarly excluded.
-      const isVirtualValue = field.endsWith("_value") && !/conversions?_value$/.test(field);
-      const isVirtualName = field.endsWith("_name") && !/(descriptive|resource|conversion_action)_name$/.test(field);
-      if (isVirtualValue || isVirtualName) {
-        const rawField = field.endsWith("_value")
-          ? field.replace(/_value$/, "_micros")
-          : field.replace(/_name$/, "");
+      const rawField = rawFieldForVirtualSibling(field);
+      if (rawField) {
         return `${message} Tip: \`${field}\` is a virtual field added by the MCP after the query runs — it does not exist in the GAQL schema and cannot be used in SELECT or WHERE. Instead, select the raw field (\`${rawField}\`) and the MCP will automatically attach \`${field}\` to every result row.`;
       }
     }
@@ -2161,6 +2181,7 @@ export async function runSafeGaqlReport(
   options: RunSafeGaqlOptions = {},
 ): Promise<GaqlReport> {
   let query = rewriteInvalidDateLiterals(rawQuery.trim());
+  query = rewriteVirtualNameFields(query);
   query = clampChangeEventDateWindow(query);
   let normalized = query.toUpperCase();
 

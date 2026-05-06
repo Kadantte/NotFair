@@ -24,6 +24,7 @@ import {
   buildGaqlSummary,
   buildContinuationHint,
   rewriteInvalidDateLiterals,
+  rewriteVirtualNameFields,
   enrichGaqlError,
   validateChangeEventFilter,
   validateMetricsOnConversionAction,
@@ -637,6 +638,37 @@ describe("rewriteInvalidDateLiterals", () => {
     const sentQuery = mockQuery.mock.calls[0][0] as string;
     expect(sentQuery).toContain("BETWEEN");
     expect(sentQuery).not.toContain("LAST_90_DAYS");
+  });
+});
+
+describe("rewriteVirtualNameFields", () => {
+  it("rewrites MCP-added enum name siblings to raw GAQL fields", () => {
+    const out = rewriteVirtualNameFields(
+      "SELECT campaign.status_name, ad_group.status_name, ad_group_criterion.keyword.match_type_name FROM keyword_view",
+    );
+
+    expect(out).toContain("campaign.status");
+    expect(out).toContain("ad_group.status");
+    expect(out).toContain("ad_group_criterion.keyword.match_type");
+    expect(out).not.toContain("status_name");
+    expect(out).not.toContain("match_type_name");
+  });
+
+  it("leaves real GAQL _name fields alone", () => {
+    const query =
+      "SELECT customer.descriptive_name, change_event.resource_name, segments.conversion_action_name FROM campaign";
+
+    expect(rewriteVirtualNameFields(query)).toBe(query);
+  });
+
+  it("runs through runSafeGaqlReport so virtual names do not hit Google", async () => {
+    mockQuery.mockResolvedValueOnce([{ campaign: { status: 2 } }]);
+
+    await runSafeGaqlReport(auth, "SELECT campaign.status_name FROM campaign");
+
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("campaign.status");
+    expect(sentQuery).not.toContain("campaign.status_name");
   });
 });
 

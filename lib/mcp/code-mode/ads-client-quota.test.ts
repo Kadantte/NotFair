@@ -328,6 +328,27 @@ describe("runScript op counting", () => {
       expect(out.q0).toEqual({ rows: [] });
     });
 
+    it("labels runSafeGaqlReport failures with the gaqlParallel query name", async () => {
+      mockRunSafeGaqlReport
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error("bad field"))
+        .mockResolvedValueOnce({ rows: [] });
+      const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
+
+      const out = (await host.ads.gaqlParallel([
+        { name: "campaigns", query: "SELECT campaign.id FROM campaign" },
+        { name: "conversionActions", query: "SELECT metrics.conversions FROM conversion_action" },
+        { name: "keywords", query: "SELECT ad_group_criterion.criterion_id FROM keyword_view" },
+      ])) as Record<string, unknown>;
+
+      expect(mockExecRead).toHaveBeenCalledTimes(3);
+      expect(out.conversionActions).toEqual({
+        error: 'gaqlParallel query "conversionActions" failed: bad field',
+      });
+      expect(out.campaigns).toEqual({ rows: [] });
+      expect(out.keywords).toEqual({ rows: [] });
+    });
+
     it("passes options through unchanged to each task's runSafeGaqlReport", async () => {
       const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
 
