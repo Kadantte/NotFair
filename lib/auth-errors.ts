@@ -69,7 +69,13 @@ export function isScopeError(raw: string): boolean {
   return raw.toLowerCase().includes("insufficient authentication scopes");
 }
 
+export function isInvalidGrantError(raw: string): boolean {
+  const s = raw.toLowerCase();
+  return s.includes("invalid_grant") || s.includes("token has been expired or revoked");
+}
+
 export function classifyAccountLoadError(raw: string): string {
+  if (isInvalidGrantError(raw)) return "Google access expired or was revoked. Please reconnect your Google Ads account.";
   if (isScopeError(raw)) return AUTH_ERROR_MESSAGES.SCOPE_INSUFFICIENT;
   if (isNoAdsAccountError(raw)) return AUTH_ERROR_MESSAGES.NO_ACCOUNTS;
   return AUTH_ERROR_MESSAGES.LOAD_ACCOUNTS_GENERIC;

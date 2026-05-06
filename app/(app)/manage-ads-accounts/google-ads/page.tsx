@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { ArrowRight } from "lucide-react";
 import { getCurrentRefreshToken, getSession } from "@/lib/session";
+import { isInvalidGrantError } from "@/lib/auth-errors";
 import { listConnectableAccounts } from "@/lib/google-ads";
 import { AccountSelector, type SelectableAccount } from "@/components/account-selector";
 import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
@@ -48,7 +49,11 @@ export default async function AddGoogleAdsAccountPagePath() {
         ...(a.loginCustomerName ? { loginCustomerName: a.loginCustomerName } : {}),
       }));
     } catch (e) {
-      enumerationError = e instanceof Error ? e.message : t("enumerationError");
+      const message = e instanceof Error ? e.message : t("enumerationError");
+      if (isInvalidGrantError(message)) {
+        redirect(`/api/auth/signin?prompt=select_account+consent&next=${encodeURIComponent("/manage-ads-accounts/google-ads")}`);
+      }
+      enumerationError = message;
     }
   }
 

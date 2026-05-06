@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AUTH_ERROR_MESSAGES,
   classifyAccountLoadError,
+  isInvalidGrantError,
   isNoAdsAccountError,
   isScopeError,
 } from "@/lib/auth-errors";
@@ -32,10 +33,23 @@ describe("classifyAccountLoadError", () => {
     ).toBe(AUTH_ERROR_MESSAGES.SCOPE_INSUFFICIENT);
   });
 
+  it("maps invalid_grant to a reconnect message", () => {
+    expect(
+      classifyAccountLoadError("invalid_grant: Token has been expired or revoked."),
+    ).toBe("Google access expired or was revoked. Please reconnect your Google Ads account.");
+  });
+
   it("falls back to LOAD_ACCOUNTS_GENERIC for unrecognized errors", () => {
     expect(classifyAccountLoadError("Server unavailable")).toBe(
       AUTH_ERROR_MESSAGES.LOAD_ACCOUNTS_GENERIC,
     );
+  });
+});
+
+describe("isInvalidGrantError", () => {
+  it("matches Google's revoked-token wording", () => {
+    expect(isInvalidGrantError("Token has been expired or revoked.")).toBe(true);
+    expect(isInvalidGrantError("Error: invalid_grant")).toBe(true);
   });
 });
 
