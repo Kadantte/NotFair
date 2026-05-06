@@ -62,10 +62,10 @@ const RELATED_LINKS = [
       "Full reference for the NotFair MCP server — every read and write tool exposed to Claude and other MCP clients.",
   },
   {
-    href: "/google-ads-audit",
-    title: "Free Google Ads Audit",
+    href: "/connect",
+    title: "Connect Google Ads",
     description:
-      "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues in minutes.",
+      "Connect your account and let Claude diagnose issues, recommend fixes, and draft approved campaign changes.",
   },
 ];
 

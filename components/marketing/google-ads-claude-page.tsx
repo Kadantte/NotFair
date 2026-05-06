@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ArrowRight, Terminal, Eye, Zap, MessageSquare } from "lucide-react";
+import { Terminal, Eye, Zap, MessageSquare } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
@@ -41,7 +41,6 @@ type CapabilityCopy = {
 const capabilityIcons = [MessageSquare, Zap, Eye, Terminal];
 
 const RELATED_LINKS = [
-  { href: "/google-ads-audit", key: "audit" },
   { href: "/google-ads-mcp-server", key: "mcpServer" },
   { href: "/", key: "home" },
 ];
@@ -339,47 +338,6 @@ export function GoogleAdsClaudePage() {
             </Link>
             {t("tools.referenceSuffix")}
           </motion.p>
-        </div>
-      </section>
-
-      {/* ── Free Audit CTA Band ── */}
-      <section className="border-t border-[#3D3C36] px-4 py-16">
-        <div className="mx-auto max-w-6xl">
-          <motion.div
-            variants={fadeInUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            className="flex flex-col gap-8 rounded-lg border border-[#3D3C36] bg-[#24231F] p-8 md:flex-row md:items-center md:justify-between"
-          >
-            <div className="max-w-xl">
-              <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
-                {t("auditCta.eyebrow")}
-              </p>
-              <h2 className="font-display mt-2 text-2xl font-semibold tracking-tight text-[#E8E4DD] md:text-3xl">
-                {t("auditCta.title")}
-              </h2>
-              <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
-                {t("auditCta.body")}
-              </p>
-            </div>
-            <div className="flex flex-col items-start gap-3">
-              <AuditCTA
-                session={session}
-                page="google-ads-claude"
-                size="lg"
-                disconnectedLabel={t("auditCta.disconnectedLabel")}
-                connectedLabel={t("auditCta.connectedLabel")}
-              />
-              <Link
-                href="/google-ads-audit"
-                className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
-              >
-                {t("auditCta.secondary")}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </motion.div>
         </div>
       </section>
 

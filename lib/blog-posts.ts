@@ -4322,9 +4322,9 @@ export const blogPosts: Record<string, BlogPost> = {
     ],
     relatedLinks: [
       {
-        href: "/google-ads-audit",
-        title: "Free Google Ads Audit",
-        description: "Run a free AI-powered diagnosis — find waste, missed opportunities, and structural issues in 5 minutes.",
+        href: "/connect",
+        title: "Connect Google Ads",
+        description: "Connect your account and let your AI agent diagnose issues, recommend fixes, and draft approved changes.",
       },
       {
         href: "/google-ads-claude",

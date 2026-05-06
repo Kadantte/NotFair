@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
-import { AuditCTA } from "@/components/marketing/audit-cta";
 import { SetupGuidesMenu } from "@/components/setup-guides-menu";
 import { BrandLockup } from "@/components/brand-lockup";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -66,15 +65,12 @@ export function SiteHeader({ connected = false }: { connected?: boolean } = {}) 
                     >
                         {t("bookDemo")}
                     </a>
-                    <AuditCTA
-                        session={{ connected }}
-                        page="header"
-                        size="sm"
-                        connectedLabel={t("startNow")}
-                        disconnectedLabel={t("startNow")}
-                        connectedDestination="/connect"
-                        disconnectedDestination="/connect"
-                    />
+                    <Link
+                        href={connected ? "/dashboard" : "/connect"}
+                        className="inline-flex h-9 items-center rounded-full border border-[#4CAF6E] bg-[#4CAF6E] px-4 text-[13px] font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C]"
+                    >
+                        {t("startNow")}
+                    </Link>
                 </div>
             </div>
         </header>

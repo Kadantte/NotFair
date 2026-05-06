@@ -30,8 +30,8 @@
   "CTA": {
     "connecting": "Conectando...",
     "connectGoogleAds": "Conectar Google Ads",
-    "runFreeAudit": "Ejecutar auditoria gratis",
-    "viewAudit": "Ver auditoria"
+    "runFreeAudit": "Conectar Google Ads",
+    "viewAudit": "Abrir cuenta"
   },
   "Home": {
     "githubBanner": "Diagnostica y corrige Google Ads desde Claude - escrituras con aprobacion, en GitHub",
@@ -61,7 +61,7 @@
       "demo": "demo"
     },
     "engineTitle": "Un motor de marketing completo dentro de tu agente",
-    "engineBody": "Diagnosticos, auditorias, escrituras y deshacer - todo con una conexion MCP por cuenta publicitaria.",
+    "engineBody": "Diagnósticos, correcciones recomendadas, escrituras y deshacer, todo desde una conexión MCP por cuenta publicitaria.",
     "highSpend": "Gastas mas de US$50K/mes?",
     "letsTalk": "Hablemos",
     "faqLabel": "FAQ",
@@ -369,8 +369,8 @@
         "showDiff": "Ver diff"
       },
       "audit": {
-        "user": "Audita mi cuenta de Google Ads y ordena las correcciones por impacto.",
-        "summary": "Ejecuté 20 lecturas de gasto, términos de búsqueda, quality scores y assets. Principales problemas por <value>gasto en riesgo</value>:",
+        "user": "Encuentra gasto desperdiciado y prioriza correcciones por impacto.",
+        "summary": "Revisé gasto, términos de búsqueda, quality scores y assets. Principales correcciones por <value>gasto en riesgo</value>:",
         "rows": [
           {
             "rank": "01",
@@ -446,15 +446,15 @@
         "reverse": false
       },
       {
-        "badge": "Auditar",
-        "title": "Auditorías que ya saben qué corregir.",
-        "body": "Un prompt ejecuta 20 lecturas GAQL o Graph API en una pasada, puntúa hallazgos por gasto en riesgo y devuelve una lista priorizada. La auditoría termina con un botón, no con un PDF.",
+        "badge": "Priorizar",
+        "title": "Listas de fixes, no reportes.",
+        "body": "Un prompt ejecuta las lecturas, puntúa hallazgos por gasto en riesgo y los convierte en acciones priorizadas que tu agente puede preparar para aprobación.",
         "reverse": true
       },
       {
         "badge": "Operar",
         "title": "Pausa, mueve, renombra, reescribe, desde el chat.",
-        "body": "No es una herramienta de auditoría solo lectura. Cada entidad que toca un gestor está expuesta como herramienta de escritura, con diff y aprobación antes de llegar a la plataforma.",
+        "body": "No es una herramienta pasiva de reportes. Cada entidad que toca un account manager está disponible como herramienta de escritura, con revisión y aprobación antes de llegar a la plataforma publicitaria.",
         "reverse": false
       },
       {
@@ -466,7 +466,7 @@
     ],
     "heading": {
       "title": "Un motor de marketing completo dentro de tu agente",
-      "body": "Diagnósticos, auditorías, cambios y deshacer — todo impulsado por una conexión MCP por cuenta publicitaria."
+      "body": "Diagnósticos, correcciones recomendadas, escrituras y deshacer — todo desde una conexión MCP por cuenta publicitaria."
     }
   },
   "Pricing": {
@@ -957,7 +957,7 @@
       "body": "NotFair es un servidor MCP de Google Ads para Claude. Conecta una vez y Claude obtiene acceso en vivo a tus campañas, palabras clave, gasto y anuncios — luego te ayuda a diagnosticar, optimizar y gestionar en lenguaje natural.",
       "disconnectedLabel": "Conectar Google Ads a Claude",
       "connectedLabel": "Abrir tu cuenta",
-      "note": "Auditoría gratis incluida. Sin tarjeta de crédito."
+      "note": "No requiere tarjeta. Aprobación humana en cada escritura."
     },
     "configCard": {
       "step": "Paso 1",
@@ -1069,11 +1069,11 @@
     },
     "auditCta": {
       "eyebrow": "Gratis · Sin tarjeta de crédito",
-      "title": "Auditoría gratis al conectar.",
-      "body": "Conecta tu cuenta de Google Ads y Claude ejecuta de inmediato un diagnóstico gratis — gasto desperdiciado, oportunidades perdidas y problemas estructurales con una lista priorizada.",
-      "disconnectedLabel": "Obtener auditoría gratis",
-      "connectedLabel": "Ver tu auditoría",
-      "secondary": "Conoce la auditoría"
+      "title": "Conecta una vez. Deja que Claude encuentre los fixes.",
+      "body": "Conecta tu cuenta de Google Ads y Claude puede diagnosticar gasto desperdiciado, oportunidades perdidas y problemas estructurales, y luego preparar los cambios para aprobación.",
+      "disconnectedLabel": "Conectar Google Ads",
+      "connectedLabel": "Abrir tu cuenta",
+      "secondary": "Ver cómo funciona"
     },
     "faq": {
       "title": "FAQ — Google Ads y Claude",
@@ -1114,8 +1114,8 @@
       "intro": "Explora el flujo completo de NotFair para Google Ads y Claude.",
       "links": {
         "audit": {
-          "title": "Auditoría gratuita de Google Ads",
-          "description": "Obtén un diagnóstico de IA gratis de tu cuenta de Google Ads: encuentra desperdicio, oportunidades perdidas y problemas estructurales."
+          "title": "Conectar Google Ads",
+          "description": "Conecta tu cuenta y deja que Claude diagnostique problemas, recomiende fixes y gestione cambios aprobados."
         },
         "mcpServer": {
           "title": "Servidor MCP de Google Ads",
@@ -1129,7 +1129,7 @@
     },
     "finalCta": {
       "title": "Conecta Google Ads a Claude ahora.",
-      "body": "Setup en 2 minutos. Auditoría gratis incluida. Control humano en cada cambio.",
+      "body": "Configuración en 2 minutos. Control humano en cada cambio.",
       "note": "Pega una configuración. OAuth. Listo."
     }
   },

@@ -18,10 +18,10 @@ export function AuditCTA({
   size = "default",
   variant = "primary",
   position,
-  connectedLabel = "View Your Audit",
-  disconnectedLabel = "Audit Now",
-  connectedDestination = "/audit",
-  disconnectedDestination = "/audit",
+  connectedLabel = "Open account",
+  disconnectedLabel = "Connect Google Ads",
+  connectedDestination = "/dashboard",
+  disconnectedDestination = "/connect",
 }: {
   session: { connected: boolean };
   page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server" | "header";
@@ -42,7 +42,7 @@ export function AuditCTA({
     const destination = session.connected ? connectedDestination : disconnectedDestination;
     trackEvent("cta_clicked", {
       page,
-      cta: session.connected ? "view_audit" : "audit_now",
+      cta: session.connected ? "open_account" : "connect_google_ads",
       position,
       variant,
       destination,
@@ -70,8 +70,8 @@ export function AuditCTA({
   const secondaryStyles =
     "bg-transparent text-[#E8E4DD] border border-[#4CAF6E]/50 hover:border-[#4CAF6E] hover:bg-[#4CAF6E]/10";
   const spinnerColor = variant === "secondary" ? "border-[#E8E4DD]" : "border-[#1A1917]";
-  const activeConnectedLabel = connectedLabel === "View Your Audit" ? t("viewAudit") : connectedLabel;
-  const activeDisconnectedLabel = disconnectedLabel === "Audit Now" ? t("runFreeAudit") : disconnectedLabel;
+  const activeConnectedLabel = connectedLabel === "Open account" ? t("viewAudit") : connectedLabel;
+  const activeDisconnectedLabel = disconnectedLabel === "Connect Google Ads" ? t("connectGoogleAds") : disconnectedLabel;
 
   return (
     <Button

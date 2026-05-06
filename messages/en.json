@@ -30,8 +30,8 @@
   "CTA": {
     "connecting": "Connecting...",
     "connectGoogleAds": "Connect Google Ads",
-    "runFreeAudit": "Run free audit",
-    "viewAudit": "View audit"
+    "runFreeAudit": "Connect Google Ads",
+    "viewAudit": "Open account"
   },
   "Home": {
     "githubBanner": "Diagnose and fix Google Ads from Claude - approval-gated writes, live on GitHub",
@@ -61,7 +61,7 @@
       "demo": "demo"
     },
     "engineTitle": "A Complete Marketing Engine Inside Your Agent",
-    "engineBody": "Diagnostics, audits, writes, and undo - all driven by one MCP connection per ad account.",
+    "engineBody": "Diagnostics, recommended fixes, writes, and undo - all driven by one MCP connection per ad account.",
     "highSpend": "Spending $50K+/mo?",
     "letsTalk": "Let's talk",
     "faqLabel": "FAQ",
@@ -369,8 +369,8 @@
         "showDiff": "Show diff"
       },
       "audit": {
-        "user": "Audit my Google Ads account and rank fixes by impact.",
-        "summary": "Ran 20 reads across spend, search terms, quality scores, and assets. Top issues by <value>spend at risk</value>:",
+        "user": "Find wasted spend and rank fixes by impact.",
+        "summary": "Checked spend, search terms, quality scores, and assets. Top fixes by <value>spend at risk</value>:",
         "rows": [
           {
             "rank": "01",
@@ -446,15 +446,15 @@
         "reverse": false
       },
       {
-        "badge": "Audit",
-        "title": "Audits that already know what to fix.",
-        "body": "One prompt fans out 20 GAQL or Graph API reads in a single pass, scores findings by spend at risk, and returns a prioritized fix list. The audit ends with a button, not a PDF.",
+        "badge": "Prioritize",
+        "title": "Fix lists, not reports.",
+        "body": "One prompt fans out the reads, scores findings by spend at risk, and turns the result into prioritized actions your agent can draft for approval.",
         "reverse": true
       },
       {
         "badge": "Operate",
         "title": "Pause, shift, rename, rewrite - from chat.",
-        "body": "Not a read-only audit tool. Every entity an account manager touches is exposed as a write tool, with a diff-and-approve gate before anything hits the ad platform.",
+        "body": "Not a passive reporting tool. Every entity an account manager touches is exposed as a write tool, with a diff-and-approve gate before anything hits the ad platform.",
         "reverse": false
       },
       {
@@ -466,7 +466,7 @@
     ],
     "heading": {
       "title": "A Complete Marketing Engine Inside Your Agent",
-      "body": "Diagnostics, audits, writes, and undo — all driven by one MCP connection per ad account."
+      "body": "Diagnostics, recommended fixes, writes, and undo — all driven by one MCP connection per ad account."
     }
   },
   "Pricing": {
@@ -957,7 +957,7 @@
       "body": "NotFair is a Google Ads MCP server for Claude. Connect once and Claude gets live access to your campaigns, keywords, spend, and ad copy — then helps you diagnose, optimize, and manage through natural conversation.",
       "disconnectedLabel": "Connect Google Ads to Claude",
       "connectedLabel": "Open Your Account",
-      "note": "Free audit included. No credit card required."
+      "note": "No credit card required. Human approval on every write."
     },
     "configCard": {
       "step": "Step 1",
@@ -1069,11 +1069,11 @@
     },
     "auditCta": {
       "eyebrow": "Free · No credit card",
-      "title": "Free audit when you connect.",
-      "body": "Connect your Google Ads account and Claude immediately runs a free diagnosis — surfacing wasted spend, missed opportunities, and structural issues with a prioritized fix list.",
-      "disconnectedLabel": "Get Free Audit",
-      "connectedLabel": "View Your Audit",
-      "secondary": "Learn about the audit"
+      "title": "Connect once. Let Claude find the fixes.",
+      "body": "Connect your Google Ads account and Claude can diagnose wasted spend, missed opportunities, and structural issues — then draft the changes for approval.",
+      "disconnectedLabel": "Connect Google Ads",
+      "connectedLabel": "Open Your Account",
+      "secondary": "See how it works"
     },
     "faq": {
       "title": "FAQ — Google Ads and Claude",
@@ -1114,8 +1114,8 @@
       "intro": "Explore the full NotFair workflow for Google Ads and Claude.",
       "links": {
         "audit": {
-          "title": "Free Google Ads Audit",
-          "description": "Get a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues."
+          "title": "Connect Google Ads",
+          "description": "Connect your account and let Claude diagnose issues, recommend fixes, and manage approved changes."
         },
         "mcpServer": {
           "title": "Google Ads MCP Server",
@@ -1129,7 +1129,7 @@
     },
     "finalCta": {
       "title": "Connect Google Ads to Claude — now.",
-      "body": "2-minute setup. Free audit included. Human in control of every change.",
+      "body": "2-minute setup. Human in control of every change.",
       "note": "Paste one config snippet. OAuth. Done."
     }
   },

@@ -318,13 +318,13 @@ export function PricingCards({
           <div className="mt-auto pt-8">
             {connected ? (
               <Link
-                href="/audit"
+                href="/connect"
                 onClick={() =>
                   trackEvent("pricing_cta_clicked", {
                     page,
                     plan: "free",
                     interval,
-                    action: "open_audit",
+                    action: "open_connect",
                   })
                 }
                 className="inline-flex h-11 w-full items-center justify-center rounded-full border border-[#3D3C36] bg-transparent px-5 text-sm font-medium text-[#E8E4DD] transition-colors hover:bg-[#2E2D28]"

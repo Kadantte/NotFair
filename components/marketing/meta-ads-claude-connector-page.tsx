@@ -78,10 +78,10 @@ const RELATED_LINKS = [
       "Reference for the NotFair MCP servers — Google Ads, Meta Ads, and the read/write tools each one exposes.",
   },
   {
-    href: "/google-ads-audit",
-    title: "Free Google Ads Audit",
+    href: "/connect",
+    title: "Connect an ad account",
     description:
-      "Run a free AI diagnosis of your Google Ads account — finds waste, missed opportunities, and structural issues in minutes.",
+      "Connect Google or Meta Ads and let Claude diagnose issues, recommend fixes, and draft approved campaign changes.",
   },
 ];
 

@@ -14,7 +14,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
-import { AuditCTA } from "@/components/marketing/audit-cta";
 import { McpSetupHero } from "@/components/marketing/mcp-setup-hero";
 import { MarketingEngineSection } from "@/components/marketing/marketing-engine-section";
 import { GitHubStarBadge } from "@/components/site-header";
@@ -415,7 +414,6 @@ export function HomePage({
 }) {
   const session = useSession();
   const t = useTranslations("Home");
-  const ctaT = useTranslations("CTA");
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
 
@@ -475,14 +473,6 @@ export function HomePage({
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                   <ConnectClaudeCTA session={session} position="hero" />
-                  <AuditCTA
-                    session={session}
-                    page="homepage"
-                    position="hero"
-                    variant="secondary"
-                    disconnectedLabel={ctaT("runFreeAudit")}
-                    connectedLabel={ctaT("viewAudit")}
-                  />
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-[#C4C0B6] lg:justify-start">
                   {trustItems.map((item) => (

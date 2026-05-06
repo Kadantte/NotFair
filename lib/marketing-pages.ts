@@ -82,9 +82,9 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         description: "Set up Claude with live Google Ads access in under 2 minutes via MCP.",
       },
       {
-        href: "/google-ads-audit",
-        title: "Free Google Ads Audit",
-        description: "Find waste, missed opportunities, and structural issues in 5 minutes.",
+        href: "/connect",
+        title: "Connect Google Ads",
+        description: "Connect your account and let your AI agent diagnose issues and draft fixes.",
       },
       {
         href: "/google-ads-mcp",
@@ -275,9 +275,9 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
-        href: "/google-ads-audit",
-        title: "Free Google Ads Audit",
-        description: "Start with a free account audit to find the biggest optimization wins.",
+        href: "/connect",
+        title: "Connect Google Ads",
+        description: "Connect your account and start diagnosing the highest-impact fixes.",
       },
       {
         href: "/ai-google-ads-agent",

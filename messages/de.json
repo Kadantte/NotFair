@@ -30,8 +30,8 @@
   "CTA": {
     "connecting": "Verbinde...",
     "connectGoogleAds": "Google Ads verbinden",
-    "runFreeAudit": "Kostenlosen Audit starten",
-    "viewAudit": "Audit ansehen"
+    "runFreeAudit": "Google Ads verbinden",
+    "viewAudit": "Konto öffnen"
   },
   "Home": {
     "githubBanner": "Google Ads aus Claude diagnostizieren und korrigieren - freigegebene Schreibzugriffe, live auf GitHub",
@@ -61,7 +61,7 @@
       "demo": "Demo"
     },
     "engineTitle": "Eine komplette Marketing-Engine in Ihrem Agenten",
-    "engineBody": "Diagnosen, Audits, Schreibzugriffe und Undo - alles uber eine MCP-Verbindung pro Ads-Konto.",
+    "engineBody": "Diagnosen, empfohlene Korrekturen, Schreibaktionen und Rückgängig-Funktion - alles über eine MCP-Verbindung pro Werbekonto.",
     "highSpend": "Mehr als 50.000 $/Monat Spend?",
     "letsTalk": "Sprechen wir",
     "faqLabel": "FAQ",
@@ -369,8 +369,8 @@
         "showDiff": "Diff anzeigen"
       },
       "audit": {
-        "user": "Auditiere mein Google-Ads-Konto und ordne Korrekturen nach Wirkung.",
-        "summary": "20 Lesevorgänge zu Ausgaben, Suchbegriffen, Qualitätswerten und Assets ausgeführt. Wichtigste Probleme nach <value>gefährdeten Ausgaben</value>:",
+        "user": "Verschwendete Ausgaben finden und Korrekturen nach Wirkung priorisieren.",
+        "summary": "Ausgaben, Suchbegriffe, Qualitätswerte und Assets geprüft. Top-Korrekturen nach <value>gefährdeten Ausgaben</value>:",
         "rows": [
           {
             "rank": "01",
@@ -446,15 +446,15 @@
         "reverse": false
       },
       {
-        "badge": "Auditieren",
-        "title": "Audits, die schon wissen, was zu beheben ist.",
-        "body": "Ein Prompt startet 20 GAQL- oder Graph-API-Lesevorgänge in einem Durchlauf, bewertet Befunde nach gefährdeten Ausgaben und liefert eine priorisierte Fixliste. Das Audit endet mit einem Button, nicht mit einem PDF.",
+        "badge": "Priorisieren",
+        "title": "Fixlisten, keine Reports.",
+        "body": "Ein Prompt startet die Lesevorgänge, bewertet Befunde nach gefährdeten Ausgaben und macht daraus priorisierte Aktionen, die Ihr Agent zur Freigabe vorbereiten kann.",
         "reverse": true
       },
       {
         "badge": "Operieren",
         "title": "Pausieren, verschieben, umbenennen, umschreiben, aus dem Chat.",
-        "body": "Kein schreibgeschütztes Audit-Tool. Jede Entität, die ein Account-Manager berührt, ist als Schreibtool verfügbar, mit Diff-und-Freigabe vor jeder Änderung in der Anzeigenplattform.",
+        "body": "Kein passives Reporting-Tool. Jede Entität, die ein Account-Manager berührt, ist als Schreibtool verfügbar, mit Diff-und-Freigabe vor jeder Änderung in der Anzeigenplattform.",
         "reverse": false
       },
       {
@@ -466,7 +466,7 @@
     ],
     "heading": {
       "title": "Eine komplette Marketing-Engine in Ihrem Agenten",
-      "body": "Diagnosen, Audits, Schreibaktionen und Rückgängig-Funktion — alles über eine MCP-Verbindung pro Werbekonto."
+      "body": "Diagnosen, empfohlene Korrekturen, Schreibaktionen und Rückgängig-Funktion — alles über eine MCP-Verbindung pro Werbekonto."
     }
   },
   "Pricing": {
@@ -957,7 +957,7 @@
       "body": "NotFair ist ein Google Ads MCP-Server für Claude. Einmal verbinden, und Claude erhält Live-Zugriff auf Kampagnen, Keywords, Ausgaben und Anzeigen — und hilft dann beim Diagnostizieren, Optimieren und Verwalten in natürlicher Sprache.",
       "disconnectedLabel": "Google Ads mit Claude verbinden",
       "connectedLabel": "Ihr Konto öffnen",
-      "note": "Kostenloses Audit inklusive. Keine Kreditkarte erforderlich."
+      "note": "Keine Kreditkarte erforderlich. Jede Schreibaktion braucht menschliche Freigabe."
     },
     "configCard": {
       "step": "Schritt 1",
@@ -1069,11 +1069,11 @@
     },
     "auditCta": {
       "eyebrow": "Kostenlos · Keine Kreditkarte",
-      "title": "Kostenloses Audit nach der Verbindung.",
-      "body": "Verbinden Sie Ihr Google Ads-Konto und Claude startet sofort eine kostenlose Diagnose — verschwendete Ausgaben, verpasste Chancen und strukturelle Probleme mit priorisierter Fix-Liste.",
-      "disconnectedLabel": "Kostenloses Audit erhalten",
-      "connectedLabel": "Audit ansehen",
-      "secondary": "Mehr über das Audit erfahren"
+      "title": "Einmal verbinden. Claude findet die Korrekturen.",
+      "body": "Verbinden Sie Ihr Google-Ads-Konto und Claude kann verschwendete Ausgaben, verpasste Chancen und strukturelle Probleme diagnostizieren — und die Änderungen zur Freigabe vorbereiten.",
+      "disconnectedLabel": "Google Ads verbinden",
+      "connectedLabel": "Ihr Konto öffnen",
+      "secondary": "So funktioniert es"
     },
     "faq": {
       "title": "FAQ — Google Ads und Claude",
@@ -1114,8 +1114,8 @@
       "intro": "Entdecken Sie den vollständigen NotFair-Workflow für Google Ads und Claude.",
       "links": {
         "audit": {
-          "title": "Kostenloses Google Ads Audit",
-          "description": "Erhalten Sie eine kostenlose KI-Diagnose Ihres Google Ads-Kontos; sie findet Verschwendung, verpasste Chancen und strukturelle Probleme."
+          "title": "Google Ads verbinden",
+          "description": "Verbinden Sie Ihr Konto und lassen Sie Claude Probleme diagnostizieren, Korrekturen empfehlen und freigegebene Änderungen verwalten."
         },
         "mcpServer": {
           "title": "Google Ads MCP-Server",
@@ -1129,7 +1129,7 @@
     },
     "finalCta": {
       "title": "Google Ads jetzt mit Claude verbinden.",
-      "body": "Setup in 2 Minuten. Kostenloses Audit inklusive. Jede Änderung bleibt unter menschlicher Kontrolle.",
+      "body": "Setup in 2 Minuten. Jede Änderung bleibt unter menschlicher Kontrolle.",
       "note": "Eine Konfiguration einfügen. OAuth. Fertig."
     }
   },

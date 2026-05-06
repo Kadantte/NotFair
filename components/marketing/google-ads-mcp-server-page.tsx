@@ -54,7 +54,7 @@ const clients = ["Claude Desktop", "Claude Code", "Claude Cowork", "Any MCP stdi
 
 const relatedLinks = [
   { href: "/google-ads-claude", title: "Google Ads + Claude", description: "The full guide to using Claude with your Google Ads account." },
-  { href: "/google-ads-audit", title: "Free Google Ads Audit", description: "Run a free AI-powered diagnosis — find waste, missed opportunities, and structural issues in 5 minutes." },
+  { href: "/connect", title: "Connect Google Ads", description: "Connect your account and let your AI agent find waste, recommend fixes, and draft approved changes." },
   { href: "/blog/google-ads-ai-agent", title: "What Is a Google Ads AI Agent?", description: "What AI agents can actually do for campaign management." },
 ];
 

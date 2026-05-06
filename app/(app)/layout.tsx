@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, ClipboardCheck, Rocket, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, Rocket, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
@@ -417,17 +417,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal(t('campaigns')); }}
                 />
                 <NavItem
-                    href="/audit"
-                    icon={ClipboardCheck}
-                    label={t('audit')}
-                    active={pathname === '/audit'}
-                    collapsed={isCollapsed}
-                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
-                    disabled={isMetaActive}
-                    disabledTitle={t('notAvailableForPlatform')}
-                    onDisabledClick={() => { if (isMobile) setMobileMenuOpen(false); showMetaModal(t('audit')); }}
-                />
-                <NavItem
                     href="/impact-monitor"
                     icon={Gauge}
                     label={t('impactMonitor')}
@@ -813,7 +802,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <nav className="flex md:hidden shrink-0 border-t border-[#3D3C36] bg-[#24231F]">
                 <MobileNavItem href="/dashboard" icon={Home} label={t('home')} active={pathname === '/dashboard'} />
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label={t('campaigns')} active={pathname.startsWith('/campaigns')} />
-                <MobileNavItem href="/audit" icon={ClipboardCheck} label={t('audit')} active={pathname === '/audit'} />
                 <MobileNavItem href="/impact-monitor" icon={Gauge} label={t('impact')} active={pathname.startsWith('/impact-monitor')} />
                 <MobileNavItem href="/chat" icon={MessageSquare} label={t('chat')} active={pathname.startsWith('/chat')} />
             </nav>
