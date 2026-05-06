@@ -47,25 +47,65 @@ const marketingCopyNamespaces = [
   "GoogleAdsAuditPage",
 ];
 
-const allowedIdenticalMarketingValues = new Set([
+const connectCopyNamespaces = [
+  "Connect",
+  "McpSetupTabs",
+  "ConnectorSetupSteps",
+  "ClaudeCodePluginSteps",
+  "CodexSetupSteps",
+  "AnyMcpClientSetup",
+  "ConnectMetaAdsMcpPage",
+  "ConnectSubSider",
+  "MissingPlatformWarning",
+  "ConnectedToasts",
+  "OnboardingSignOut",
+  "GoHighLevelConnect",
+  "AddMetaAdsAccount",
+  "MetaWaitlist",
+  "ConnectAdsPrompt",
+];
+
+const copyGuardNamespaces = [...marketingCopyNamespaces, ...connectCopyNamespaces];
+
+const allowedIdenticalCopyValues = new Set([
+  "API",
+  "Bearer",
   "Claude Code",
   "Claude Desktop",
+  "Claude Desktop, Web & Cowork",
   "Codex",
   "CPC",
   "CPA",
+  "CRM",
   "Google Ads",
+  "GoHighLevel",
   "Hermes",
+  "HighLevel",
   "Meta Ads",
   "MCP",
+  "MVP",
   "NotFair",
   "OAuth",
+  "OAuth 2.0",
+  "OpenAI Codex",
   "ROAS",
 ]);
 
-function isAllowedIdenticalMarketingCopy(key: string, value: string): boolean {
+function normalizeCopyValue(value: string): string {
+  return value
+    .replace(/\{[^}]+\}/gu, "{}")
+    .replace(/<[^>]+>/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function isAllowedIdenticalCopy(key: string, value: string): boolean {
   if (!/[A-Za-z]/.test(value)) return true;
-  if (allowedIdenticalMarketingValues.has(value.replace(/[.:]$/u, ""))) return true;
-  if (/\.(agentName|delta|impact|name|num|rank|roas|spend|value)$/.test(key)) return true;
+  if (allowedIdenticalCopyValues.has(value.replace(/[.:?]$/u, ""))) return true;
+  if (/\.(agentName|connectorName|delta|href|id|impact|num|path|platform|rank|roas|serverUrl|slug|spend|url|value)$/.test(key)) {
+    return true;
+  }
+  if (/^MarketingEngine\.chat\.[^.]+\.rows\.\d+\.name$/.test(key)) return true;
   if (/\.tools\.items\.\d+\.name$/.test(key)) return true;
 
   return false;
@@ -140,9 +180,9 @@ describe("i18n message bundles", () => {
     }
   });
 
-  it("does not copy visible English marketing copy into non-English locales", () => {
-    const englishMarketingEntries = new Map(
-      marketingCopyNamespaces.flatMap((namespace) => (
+  it("does not copy visible English marketing or connect copy into non-English locales", () => {
+    const englishCopyEntries = new Map(
+      copyGuardNamespaces.flatMap((namespace) => (
         flattenKeys(englishMessages[namespace] ?? {}, namespace).map((key) => [key, getAtPath(englishMessages, key)] as const)
       )),
     );
@@ -152,14 +192,14 @@ describe("i18n message bundles", () => {
 
       const localeMessages = readMessages(locale);
 
-      for (const [key, englishValue] of englishMarketingEntries) {
+      for (const [key, englishValue] of englishCopyEntries) {
         if (typeof englishValue !== "string") continue;
 
         const localeValue = getAtPath(localeMessages, key);
         if (typeof localeValue !== "string") continue;
-        if (isAllowedIdenticalMarketingCopy(key, localeValue)) continue;
+        if (isAllowedIdenticalCopy(key, localeValue)) continue;
 
-        expect(localeValue, `${locale}:${key}`).not.toBe(englishValue);
+        expect(normalizeCopyValue(localeValue), `${locale}:${key}`).not.toBe(normalizeCopyValue(englishValue));
       }
     }
   });

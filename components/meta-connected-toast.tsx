@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { appToastSuccess } from "@/lib/app-toast";
 
 /**
@@ -10,6 +11,7 @@ import { appToastSuccess } from "@/lib/app-toast";
  * <AppToaster /> in the root layout listens and renders the toast.
  */
 export function MetaConnectedToast() {
+  const t = useTranslations("ConnectedToasts.meta");
   const fired = useRef(false);
 
   useEffect(() => {
@@ -18,10 +20,10 @@ export function MetaConnectedToast() {
     if (params.get("connected") !== "1") return;
     fired.current = true;
     appToastSuccess(
-      "Meta ads accounts connected.",
-      "Let's set up the Meta Ads MCP so Claude, Codex, and other clients can use it.",
+      t("title"),
+      t("body"),
     );
-  }, []);
+  }, [t]);
 
   return null;
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { CheckCircle2, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Session } from '@/lib/session';
@@ -32,6 +34,7 @@ type Status = {
 };
 
 export function GoHighLevelConnectSurface({ session }: { session: Session }) {
+  const t = useTranslations('GoHighLevelConnect');
   const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
@@ -53,18 +56,18 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
     <div className="mx-auto flex max-w-4xl flex-col gap-8 py-8 text-left">
       <div className="space-y-4 text-center">
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-2 text-sm font-medium text-[#4CAF6E]">
-          <ShieldCheck className="h-4 w-4" /> CRM connector preview
+          <ShieldCheck className="h-4 w-4" /> {t('badge')}
         </div>
-        <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">Connect GoHighLevel</h2>
+        <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">{t('title')}</h2>
         <p className="mx-auto max-w-2xl text-lg text-[#C4C0B6]">
-          Link agency or sub-account access so NotFair can read CRM context: contacts, conversations, opportunities, and calendar events.
+          {t('body')}
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-[#3D3C36] bg-[#1A1917] p-5">
-          <h3 className="text-base font-semibold text-[#E8E4DD]">Access requested</h3>
-          <p className="mt-1 text-sm text-[#C4C0B6]">Read-only for the MVP. No contact edits, messages, or workflow changes.</p>
+          <h3 className="text-base font-semibold text-[#E8E4DD]">{t('access.title')}</h3>
+          <p className="mt-1 text-sm text-[#C4C0B6]">{t('access.body')}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {REQUESTED_SCOPES.map((scope) => (
               <span key={scope} className="rounded-full border border-[#3D3C36] bg-[#24231F] px-3 py-1 text-xs text-[#C4C0B6]">
@@ -75,11 +78,11 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
         </div>
 
         <div className="rounded-2xl border border-[#3D3C36] bg-[#1A1917] p-5">
-          <h3 className="text-base font-semibold text-[#E8E4DD]">Connection model</h3>
+          <h3 className="text-base font-semibold text-[#E8E4DD]">{t('model.title')}</h3>
           <ul className="mt-3 space-y-2 text-sm text-[#C4C0B6]">
-            <li>• Supports agencies with multiple HighLevel locations.</li>
-            <li>• Stores each connection by company/location identity.</li>
-            <li>• Refresh-token rotation is handled server-side.</li>
+            <li>• {t('model.items.0')}</li>
+            <li>• {t('model.items.1')}</li>
+            <li>• {t('model.items.2')}</li>
           </ul>
         </div>
       </div>
@@ -87,31 +90,31 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
       <div className="rounded-2xl border border-[#3D3C36] bg-[#24231F] p-6 text-center">
         {!canConnect ? (
           <div className="space-y-3">
-            <p className="font-medium text-[#E8E4DD]">Sign into NotFair first</p>
-            <p className="text-sm text-[#C4C0B6]">Use the main connect flow first so the GoHighLevel connection has a NotFair user to attach to.</p>
+            <p className="font-medium text-[#E8E4DD]">{t('signedOut.title')}</p>
+            <p className="text-sm text-[#C4C0B6]">{t('signedOut.body')}</p>
             <Button asChild className="rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]">
-              <a href="/connect">Sign in</a>
+              <Link href="/connect" prefetch>{t('signedOut.cta')}</Link>
             </Button>
           </div>
         ) : status === null ? (
           <div className="flex items-center justify-center gap-2 text-sm text-[#C4C0B6]">
-            <Loader2 className="h-4 w-4 animate-spin" /> Checking GoHighLevel status…
+            <Loader2 className="h-4 w-4 animate-spin" /> {t('checking')}
           </div>
         ) : (
           <div className="space-y-5">
             {status.connected && (
               <div className="mx-auto max-w-2xl rounded-xl border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 p-4 text-left">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[#4CAF6E]">
-                  <CheckCircle2 className="h-4 w-4" /> GoHighLevel connected
+                  <CheckCircle2 className="h-4 w-4" /> {t('connected')}
                 </div>
                 <div className="mt-3 space-y-2">
                   {status.connections.map((connection) => (
                     <div key={connection.id} className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-3 text-sm text-[#C4C0B6]">
                       <div className="font-medium text-[#E8E4DD]">
-                        {connection.locationName || connection.companyName || connection.locationId || connection.companyId || 'HighLevel connection'}
+                        {connection.locationName || connection.companyName || connection.locationId || connection.companyId || t('fallbackConnection')}
                       </div>
                       <div className="mt-1 text-xs text-[#C4C0B6]/80">
-                        {connection.userType} · company {connection.companyId ?? 'unknown'}{connection.locationId ? ` · location ${connection.locationId}` : ''}
+                        {connection.userType} · {t('company')} {connection.companyId ?? t('unknown')}{connection.locationId ? ` · ${t('location')} ${connection.locationId}` : ''}
                       </div>
                     </div>
                   ))}
@@ -119,11 +122,11 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
               </div>
             )}
             <Button asChild size="lg" className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] hover:bg-[#3D9A5C]">
-              <a href="/api/oauth/gohighlevel/start?next=/connect/gohighlevel">
-                {status.connected ? 'Connect another HighLevel account' : 'Connect GoHighLevel'} <ExternalLink className="ml-2 h-5 w-5" />
-              </a>
+              <Link href="/api/oauth/gohighlevel/start?next=/connect/gohighlevel" prefetch={false}>
+                {status.connected ? t('connectAnother') : t('connect')} <ExternalLink className="ml-2 h-5 w-5" />
+              </Link>
             </Button>
-            <p className="text-xs text-[#C4C0B6]/60">You’ll be sent to the GoHighLevel Marketplace install flow.</p>
+            <p className="text-xs text-[#C4C0B6]/60">{t('marketplaceNote')}</p>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { McpSetupTabs, parseSetupSlug } from "@/components/mcp-setup-tabs";
 import { MetaConnectedToast } from "@/components/meta-connected-toast";
 import { MissingPlatformWarning } from "@/components/missing-platform-warning";
@@ -27,6 +28,7 @@ export function ConnectMetaAdsMcpPage({
   hasMeta: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations("ConnectMetaAdsMcpPage");
   const { activeTab } = parseSetupSlug(slug);
 
   return (
@@ -37,16 +39,14 @@ export function ConnectMetaAdsMcpPage({
           {!hasMeta && <MissingPlatformWarning platform="meta_ads" />}
           <header className="space-y-2">
             <h1 className="text-3xl font-bold text-[#E8E4DD]">
-              Connect Meta Ads MCP
+              {t("title")}
             </h1>
             <p className="max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
-              Wire your Claude / Codex / MCP client up to NotFair&apos;s Meta
-              Ads resource at{" "}
+              {t("bodyBeforeCode")}{" "}
               <code className="font-mono-jb text-[13px] text-[#E8E4DD]">
                 /api/mcp/meta_ads
               </code>
-              . Same setup steps as Google — just a different URL and connector
-              name.
+              {t("bodyAfterCode")}
             </p>
           </header>
 
@@ -64,7 +64,7 @@ export function ConnectMetaAdsMcpPage({
             connectorName={META_MCP_CONNECTOR_NAME}
             platformLabel="Meta Ads"
             slashCommand="/meta-ads"
-            examplePrompt="Audit my connected Meta ad account (Facebook + Instagram) and tell me the 3 biggest optimization opportunities."
+            examplePrompt={t("examplePrompt")}
           />
         </div>
       </div>

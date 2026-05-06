@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { AlertTriangle } from "lucide-react";
 
 const PLATFORMS = {
@@ -23,18 +24,19 @@ export type WarnablePlatform = keyof typeof PLATFORMS;
  */
 export function MissingPlatformWarning({ platform }: { platform: WarnablePlatform }) {
   const { label, linkHref } = PLATFORMS[platform];
+  const t = useTranslations("MissingPlatformWarning");
   return (
     <div className="mb-6 rounded-xl border border-[#D4882A]/40 bg-[#D4882A]/[0.06] px-4 py-3">
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#D4882A]" />
         <div className="min-w-0 flex-1 text-sm">
           <p className="font-medium text-[#E8E4DD]">
-            No {label} account linked yet.
+            {t("title", { platform: label })}
           </p>
           <p className="mt-1 text-[#C4C0B6]">
-            You can read the setup steps below, but connecting an MCP client now won&apos;t do anything until at least one {label} account is linked.{" "}
+            {t("body", { platform: label })}{" "}
             <Link href={linkHref} prefetch className="font-medium text-[#D4882A] underline-offset-2 hover:underline">
-              Link a {label} account →
+              {t("link", { platform: label })}
             </Link>
           </p>
         </div>

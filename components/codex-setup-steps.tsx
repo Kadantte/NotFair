@@ -1,26 +1,26 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
-const DEFAULT_AUDIT_PROMPT =
-  "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring";
-
 export function CodexSetupSteps({
   surface,
   serverUrl = MCP_SERVER_URL,
   connectorName = MCP_CONNECTOR_NAME,
-  examplePrompt = DEFAULT_AUDIT_PROMPT,
+  examplePrompt,
 }: {
   surface: Surface;
   serverUrl?: string;
   connectorName?: string;
   examplePrompt?: string;
 }) {
+  const t = useTranslations("CodexSetupSteps");
+  const prompt = examplePrompt ?? t("defaultPrompt");
   const oneLiner = `codex mcp add ${connectorName} --url ${serverUrl}`;
   return (
     <div className="space-y-10">
@@ -29,12 +29,12 @@ export function CodexSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={1} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Install the Codex CLI
+            {t("step1.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Open a terminal and install{" "}
+            {t("step1.beforeLink")}{" "}
             <a
               href="https://github.com/openai/codex"
               target="_blank"
@@ -43,8 +43,7 @@ export function CodexSetupSteps({
             >
               OpenAI Codex
             </a>{" "}
-            if you don&apos;t have it already. Follow the official install
-            guide for your platform.
+            {t("step1.afterLink")}
           </p>
         </div>
       </div>
@@ -54,13 +53,12 @@ export function CodexSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={2} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Add the NotFair MCP
+            {t("step2.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Run this one-liner. Codex will walk you through the OAuth flow and
-            register the NotFair MCP server automatically.
+            {t("step2.body")}
           </p>
           <CommandBlock
             command={oneLiner}
@@ -75,21 +73,20 @@ export function CodexSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={3} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Ask Codex about your ads
+            {t("step3.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Try a prompt like:
+            {t("step3.beforePrompt")}
           </p>
           <div className="rounded-lg border border-[#3D3C36] bg-[#1A1917] px-4 py-3">
             <p className="text-sm italic leading-relaxed text-[#E8E4DD]">
-              &ldquo;{examplePrompt}&rdquo;
+              &ldquo;{prompt}&rdquo;
             </p>
           </div>
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Codex will call NotFair tools to read your account and respond with
-            specific, data-backed insights.
+            {t("step3.afterPrompt")}
           </p>
         </div>
       </div>
@@ -114,6 +111,7 @@ function CommandBlock({
   trackingStep: string;
   surface: Surface;
 }) {
+  const t = useTranslations("CodexSetupSteps.copy");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -138,17 +136,17 @@ function CommandBlock({
         type="button"
         onClick={handleCopy}
         className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#3D3C36] bg-[#24231F] px-3 py-2.5 text-sm text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-        aria-label={`Copy ${command}`}
+        aria-label={t("aria", { command })}
       >
         {copied ? (
           <>
             <Check className="h-4 w-4 text-[#4CAF6E]" />
-            <span className="text-[#4CAF6E]">Copied</span>
+            <span className="text-[#4CAF6E]">{t("copied")}</span>
           </>
         ) : (
           <>
             <Copy className="h-4 w-4" />
-            <span>Copy</span>
+            <span>{t("copy")}</span>
           </>
         )}
       </button>

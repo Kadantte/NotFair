@@ -3,22 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 const ITEMS: Array<{
   href: string;
-  label: string;
+  labelKey: "googleAds" | "metaAds";
   match: (pathname: string) => boolean;
   icon: "google" | "meta";
 }> = [
   {
     href: "/connect/google-ads",
-    label: "Google Ads MCP",
+    labelKey: "googleAds",
     icon: "google",
     match: (p) => p === "/connect" || p.startsWith("/connect/google-ads"),
   },
   {
     href: "/connect/meta-ads",
-    label: "Meta Ads MCP",
+    labelKey: "metaAds",
     icon: "meta",
     match: (p) => p.startsWith("/connect/meta-ads"),
   },
@@ -26,10 +27,11 @@ const ITEMS: Array<{
 
 export function ConnectSubSider() {
   const pathname = usePathname();
+  const t = useTranslations("ConnectSubSider");
   return (
     <aside className="hidden md:flex w-[200px] shrink-0 flex-col border-r border-[#3D3C36] bg-[#1A1917] p-2">
       <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#C4C0B6]/70">
-        Connect MCP
+        {t("title")}
       </div>
       <nav className="space-y-0.5">
         {ITEMS.map((item) => {
@@ -47,7 +49,7 @@ export function ConnectSubSider() {
               }`}
             >
               <Image src={iconSrc} alt="" width={16} height={16} className="shrink-0" aria-hidden="true" />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate">{t(`items.${item.labelKey}`)}</span>
             </Link>
           );
         })}

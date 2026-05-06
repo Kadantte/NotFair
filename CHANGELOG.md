@@ -2,6 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.8.1] - 2026-05-06
+
+### Fixed
+- **Connect pages now translate their full authenticated setup flow.** Google Ads, Meta Ads, GoHighLevel, MCP setup tabs, Claude Connector, Claude Code, Codex, API-key setup, waitlist, warning, toast, and sign-out copy now read from localized message bundles instead of embedded English strings.
+- **French, German, Spanish, Brazilian Portuguese, and Thai bundles now include connect-page setup translations.** The connect namespaces no longer contain copied English user-facing strings outside stable brand, product, and protocol terms.
+- **The i18n regression guard now covers connect-page namespaces.** The full string-leaf comparison prevents key-complete locale bundles from shipping visible copied English copy again.
 
 ## [0.3.8.0] - 2026-05-06
 

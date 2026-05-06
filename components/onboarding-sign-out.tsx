@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Loader2, LogOut } from "lucide-react";
 
 /**
@@ -9,6 +10,7 @@ import { Loader2, LogOut } from "lucide-react";
  * routes the user back to the home page.
  */
 export function OnboardingSignOut() {
+  const t = useTranslations("OnboardingSignOut");
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -31,7 +33,7 @@ export function OnboardingSignOut() {
       className="inline-flex items-center gap-1.5 text-sm text-[#C4C0B6] transition hover:text-[#E8E4DD] disabled:opacity-50"
     >
       {signingOut ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-      <span>Exit and sign out</span>
+      <span>{t("label")}</span>
     </button>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ClaudeCodePluginSteps } from "@/components/claude-code-plugin-steps";
 import { ConnectorSetupSteps } from "@/components/connector-setup-steps";
 import { CodexSetupSteps } from "@/components/codex-setup-steps";
@@ -62,6 +63,7 @@ export function McpSetupTabs({
   examplePrompt,
   slashCommand,
 }: McpSetupTabsProps) {
+  const t = useTranslations("McpSetupTabs");
   const tabs: Array<{
     id: SetupTab;
     href: string;
@@ -72,27 +74,27 @@ export function McpSetupTabs({
     {
       id: "connector",
       href: `${basePath}/claude-connector`,
-      title: "Claude Desktop, Web & Cowork",
-      description: "Recommended for most users",
-      badge: "Recommended",
+      title: t("tabs.connector.title"),
+      description: t("tabs.connector.description"),
+      badge: t("recommended"),
     },
     {
       id: "claude-code",
       href: `${basePath}/claude-code`,
       title: "Claude Code",
-      description: "Terminal-based coding agent",
+      description: t("tabs.claudeCode.description"),
     },
     {
       id: "codex",
       href: `${basePath}/codex`,
       title: "Codex",
-      description: "OpenAI CLI + ChatGPT connector",
+      description: t("tabs.codex.description"),
     },
     {
       id: "any-mcp",
       href: `${basePath}/any-mcp`,
-      title: "Any MCP Client",
-      description: "Cursor, Windsurf, custom apps, more",
+      title: t("tabs.anyMcp.title"),
+      description: t("tabs.anyMcp.description"),
     },
   ];
 
@@ -108,14 +110,13 @@ export function McpSetupTabs({
       <div className="w-full max-w-4xl space-y-3 text-left">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4CAF6E]">
-            Choose your client
+            {t("eyebrow")}
           </p>
           <h2 className="text-xl font-semibold text-[#E8E4DD] sm:text-2xl">
-            Where do you want to use NotFair?
+            {t("title")}
           </h2>
           <p className="text-sm text-[#C4C0B6]">
-            Pick one setup path below. The instructions underneath update for
-            that client.
+            {t("body")}
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

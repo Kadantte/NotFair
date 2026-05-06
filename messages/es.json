@@ -100,27 +100,28 @@
   },
   "Connect": {
     "headline": "Conecta tu cuenta de Google Ads",
-    "body": "Inicia sesión con Google para que NotFair encuentre tus cuentas publicitarias y prepare la configuración MCP.",
-    "signInWithGoogle": "Iniciar sesión con Google",
+    "body": "Inicia sesion con Google para que NotFair pueda encontrar tus cuentas publicitarias y preparar tu configuracion de MCP.",
+    "signInWithGoogle": "Iniciar sesion con Google",
     "oauthNote": "OAuth mantiene tus credenciales fuera del cliente de IA.",
     "or": "o",
-    "demoIntro": "¿Quieres ver el producto primero? Abre un espacio de demostración de solo lectura.",
+    "demoIntro": "Quieres ver el producto primero? Abre un espacio de demostracion de solo lectura.",
     "startingDemo": "Iniciando demo...",
     "exploreDemo": "Explorar modo demo",
-    "demoNote": "Los datos de demo son sintéticos y seguros para probar.",
-    "authFailed": "Error de autenticación. Inténtalo de nuevo.",
-    "demoFailed": "No se pudo iniciar el modo demo. Inténtalo de nuevo.",
-    "helpAria": "Reservar ayuda de configuración",
-    "needHelp": "¿Necesitas ayuda?",
+    "demoNote": "Los datos de demo son sinteticos y seguros para probar.",
+    "authFailed": "La autenticacion fallo. Intentalo de nuevo.",
+    "demoFailed": "No se pudo iniciar el modo demo. Intentalo de nuevo.",
+    "helpAria": "Reservar ayuda de configuracion",
+    "needHelp": "Necesitas ayuda?",
     "error": {
       "scopeHeadline": "Se requiere acceso a Google Ads",
-      "scopeBody": "NotFair no puede leer tus campañas ni hacer cambios sin el permiso de Google Ads. Al continuar, mantén ese permiso marcado en la pantalla de consentimiento de Google.",
-      "scopeHelper": "Busca la casilla para ver, editar, crear y eliminar tus cuentas y datos de Google Ads. Si la desmarcas, NotFair no podrá ver tus campañas.",
+      "scopeBody": "NotFair no puede leer tus campanas ni hacer cambios sin el permiso de Google Ads. Cuando continues, deja ese permiso marcado en la pantalla de consentimiento de Google.",
+      "scopeHelper": "Busca la casilla \"Ver, editar, crear y eliminar tus cuentas y datos de Google Ads\". Si la desmarcas, NotFair no podra ver tus campanas.",
       "scopeCta": "Continuar y permitir acceso a Google Ads",
       "genericHeadline": "No pudimos terminar de conectar tu cuenta",
-      "genericBody": "Algo salió mal de nuestro lado. Inténtalo de nuevo. Si sigue fallando, contáctanos.",
+      "genericBody": "Algo salio mal de nuestro lado. Intentalo de nuevo. Si sigue fallando, contactanos y te ayudamos.",
       "genericCta": "Intentar de nuevo con Google"
-    }
+    },
+    "googleAdsPrompt": "Audita mi cuenta conectada de Google Ads y prioriza los 3 cambios con mas probabilidad de mejorar el rendimiento. Para cada uno, muestra la evidencia, el beneficio esperado y el cambio exacto que recomiendas que apruebe, y crea un panel en vivo para monitoreo continuo"
   },
   "AccountSelector": {
     "headline": "Elige cuentas publicitarias",
@@ -1169,17 +1170,17 @@
       "title": "Una lista priorizada, no solo una puntuación.",
       "items": [
         {
-          "name": "Stop Wasting",
+          "name": "Detener el desperdicio",
           "tag": "Pasada 1",
           "description": "Identifica palabras clave sin conversiones, términos de búsqueda irrelevantes y desperdicio estructural, con importes exactos para saber qué recortar primero."
         },
         {
-          "name": "Capture More",
+          "name": "Capturar mas",
           "tag": "Pasada 2",
           "description": "Encuentra campañas limitadas por presupuesto que ganan subastas pero se quedan sin combustible, además de términos de búsqueda que convierten y aún no añadiste como palabras clave."
         },
         {
-          "name": "Fix Fundamentals",
+          "name": "Corregir fundamentos",
           "tag": "Pasada 3",
           "description": "Saca a la luz problemas estructurales: brechas en seguimiento de conversiones, organización de campañas, calidad de anuncios y ajuste de estrategia de puja, que se acumulan con el tiempo."
         }
@@ -1261,5 +1262,279 @@
       "title": "Obtén tu auditoría gratis ahora.",
       "body": "Toma 5 minutos. No se hacen cambios en tu cuenta. Sin tarjeta de crédito."
     }
+  },
+  "McpSetupTabs": {
+    "eyebrow": "Elige tu cliente",
+    "title": "Donde quieres usar NotFair?",
+    "body": "Elige una ruta de configuracion abajo. Las instrucciones inferiores se actualizan para ese cliente.",
+    "recommended": "Recomendado",
+    "tabs": {
+      "connector": {
+        "title": "Claude Desktop, Web & Cowork",
+        "description": "Recomendado para la mayoria de usuarios"
+      },
+      "claudeCode": {
+        "description": "Agente de codigo basado en terminal"
+      },
+      "codex": {
+        "description": "CLI de OpenAI y conector de ChatGPT"
+      },
+      "anyMcp": {
+        "title": "Cualquier cliente MCP",
+        "description": "Cursor, Windsurf, apps personalizadas y mas"
+      }
+    }
+  },
+  "ConnectorSetupSteps": {
+    "defaultPrompt": "Audita mi cuenta conectada de {platform} y prioriza los 3 cambios con mas probabilidad de mejorar el rendimiento. Para cada uno, muestra la evidencia, el beneficio esperado y el cambio exacto que recomiendas que apruebe, y crea un panel en vivo para monitoreo continuo",
+    "step1": {
+      "title": "Abrir Claude Connectors",
+      "body": "Abre la configuracion de conectores de Claude en la web; el boton de abajo va directo a <strong>Agregar conector personalizado</strong>. Los conectores configurados aqui aplican tanto a Claude Desktop como a Claude en la web.",
+      "imageAlt": "Haz clic en el icono de mas en Connectors y elige Agregar conector personalizado"
+    },
+    "step2": {
+      "title": "Configurar el conector",
+      "body": "Completa el formulario del conector:",
+      "clickAdd": "Haz clic en <strong>Agregar</strong>.",
+      "configureAlt": "Dialogo de agregar conector personalizado con Nombre y URL del servidor MCP remoto completados",
+      "verify": "Verifica que <strong>{connectorName}</strong> aparezca en tu lista de conectores con todas las herramientas disponibles.",
+      "savedAlt": "Conector de NotFair guardado y listado en Connectors con sus permisos de herramientas"
+    },
+    "step3": {
+      "title": "Preguntarle a Claude por tus anuncios",
+      "beforePrompt": "Abre un nuevo chat de Claude y prueba un prompt como",
+      "afterPrompt": "Claude usara el conector de NotFair para leer tu cuenta y responder con insights especificos basados en datos.",
+      "imageAlt": "Claude usa el conector de NotFair para auditar una cuenta de {platform} en un chat"
+    },
+    "fields": {
+      "name": "Nombre",
+      "remoteUrl": "URL del servidor MCP remoto"
+    },
+    "open": {
+      "cta": "Abrir Claude Connectors",
+      "desktop": "Prefieres la app de escritorio? Abre Claude Desktop y ve a <strong>Settings -> Connectors -> Add custom connector</strong>."
+    },
+    "copy": {
+      "aria": "Copiar {label}",
+      "copied": "Copiado",
+      "copy": "Copiar"
+    },
+    "screenshot": {
+      "expandAria": "Ampliar imagen: {alt}",
+      "close": "Cerrar"
+    }
+  },
+  "ClaudeCodePluginSteps": {
+    "defaultPrompt": "Audita mi cuenta conectada de {platform} y prioriza los 3 cambios con mas probabilidad de mejorar el rendimiento. Para cada uno, muestra la evidencia, el beneficio esperado y el cambio exacto que recomiendas que apruebe, y crea un panel en vivo para monitoreo continuo",
+    "step1": {
+      "title": "Abrir Claude Code",
+      "beforeLink": "Abre una terminal e inicia",
+      "afterLink": ". Si no lo tienes instalado, sigue primero la guia de instalacion de Anthropic."
+    },
+    "step2": {
+      "title": "Instalar el plugin de toprank",
+      "beforeLink": "En Claude Code, ejecuta estos comandos slash para registrar el",
+      "afterLink": "marketplace, instalar el plugin de NotFair y recargar plugins. Toprank incluye skills predefinidos de anuncios pagados y SEO que ensenan a Claude a auditar y optimizar tus campanas."
+    },
+    "step3": {
+      "title": "Ejecutar {slashCommand}",
+      "beforeCommand": "Ejecuta",
+      "afterCommand": "en Claude Code. Abrira tu navegador para iniciar sesion y conectar NotFair. Si el comando no aparece, reinicia Claude Code primero.",
+      "important": "<green>Importante:</green> inicia sesion con la <strong>misma cuenta de Google</strong> que usas en NotFair. De lo contrario, Claude Code se conectara a una cuenta vacia y no vera tus datos de {platform}."
+    },
+    "step4": {
+      "title": "Preguntarle a Claude por tus anuncios",
+      "beforePrompt": "Prueba un prompt como",
+      "afterPrompt": "Claude llamara herramientas de NotFair para leer tu cuenta y responder con insights especificos basados en datos."
+    },
+    "copy": {
+      "aria": "Copiar {command}",
+      "copied": "Copiado",
+      "copy": "Copiar"
+    }
+  },
+  "CodexSetupSteps": {
+    "defaultPrompt": "Audita mi cuenta conectada de Google Ads y prioriza los 3 cambios con mas probabilidad de mejorar el rendimiento. Para cada uno, muestra la evidencia, el beneficio esperado y el cambio exacto que recomiendas que apruebe, y crea un panel en vivo para monitoreo continuo",
+    "step1": {
+      "title": "Instalar la CLI de Codex",
+      "beforeLink": "Abre una terminal e instala",
+      "afterLink": "si aun no lo tienes. Sigue la guia oficial de instalacion para tu plataforma."
+    },
+    "step2": {
+      "title": "Agregar el MCP de NotFair",
+      "body": "Ejecuta este comando de una linea. Codex te guiara por el flujo de OAuth y registrara automaticamente el servidor MCP de NotFair."
+    },
+    "step3": {
+      "title": "Preguntarle a Codex por tus anuncios",
+      "beforePrompt": "Prueba un prompt como:",
+      "afterPrompt": "Codex llamara herramientas de NotFair para leer tu cuenta y responder con insights especificos basados en datos."
+    },
+    "copy": {
+      "aria": "Copiar {command}",
+      "copied": "Copiado",
+      "copy": "Copiar"
+    }
+  },
+  "AnyMcpClientSetup": {
+    "oauth": {
+      "title": "OAuth 2.0 (recomendado)",
+      "subtitle": "Pegalo en ~/.cursor/mcp.json (Cursor), en el JSON de configuracion de Cline o en cualquier cliente que acepte el esquema estandar de configuracion MCP. El cliente abre un navegador para iniciar sesion."
+    },
+    "bearer": {
+      "title": "Token Bearer (para clientes sin OAuth)",
+      "subtitle": "Pasa un encabezado Authorization en su lugar. El token de abajo es tu clave API personal.",
+      "footer": "Trata la clave API como una contrasena: no la subas al control de codigo."
+    },
+    "copy": {
+      "copied": "Copiado",
+      "copy": "Copiar"
+    },
+    "apiKey": {
+      "title": "Tu clave API personal",
+      "body": "Ya esta sustituida en la configuracion Bearer de abajo. Usa Copiar o pegala directamente.",
+      "rotateFailed": "No se pudo rotar la clave API",
+      "hideAria": "Ocultar clave API",
+      "revealAria": "Mostrar clave API",
+      "copied": "Copiado",
+      "copyKey": "Copiar clave API",
+      "rotating": "Rotando...",
+      "rotate": "Rotar",
+      "confirmTitle": "Rotar clave API?",
+      "confirmBody": "Esto invalidara tu clave API actual de inmediato. Cualquier integracion que use la clave anterior dejara de funcionar hasta que la actualices con la nueva.",
+      "cancel": "Cancelar",
+      "rotateKey": "Rotar clave API"
+    },
+    "apiKeyCta": {
+      "title": "Obtén tu clave API",
+      "body": "Inicia sesion con Google para generar tu clave API personal. La sustituiremos automaticamente en la configuracion Bearer de abajo.",
+      "button": "Iniciar sesion con Google"
+    }
+  },
+  "ConnectMetaAdsMcpPage": {
+    "title": "Conectar MCP de Meta Ads",
+    "bodyBeforeCode": "Conecta tu cliente Claude / Codex / MCP al recurso de Meta Ads de NotFair en",
+    "bodyAfterCode": ". Los pasos son los mismos que Google, solo cambia la URL y el nombre del conector.",
+    "examplePrompt": "Audita mi cuenta publicitaria conectada de Meta (Facebook + Instagram) y dime las 3 mayores oportunidades de optimizacion."
+  },
+  "ConnectSubSider": {
+    "title": "Conectar MCP",
+    "items": {
+      "googleAds": "MCP de Google Ads",
+      "metaAds": "MCP de Meta Ads"
+    }
+  },
+  "MissingPlatformWarning": {
+    "title": "Aun no hay una cuenta de {platform} vinculada.",
+    "body": "Puedes leer los pasos de configuracion abajo, pero conectar un cliente MCP ahora no hara nada hasta que haya al menos una cuenta de {platform} vinculada.",
+    "link": "Vincular una cuenta de {platform} ->"
+  },
+  "ConnectedToasts": {
+    "google": {
+      "title": "Cuentas de Google Ads conectadas.",
+      "body": "Configura el MCP de Google Ads para que Claude, Codex y otros clientes puedan usarlo."
+    },
+    "meta": {
+      "title": "Cuentas de Meta Ads conectadas.",
+      "body": "Configura el MCP de Meta Ads para que Claude, Codex y otros clientes puedan usarlo."
+    }
+  },
+  "OnboardingSignOut": {
+    "label": "Salir y cerrar sesion"
+  },
+  "GoHighLevelConnect": {
+    "badge": "Vista previa del conector CRM",
+    "title": "Conectar GoHighLevel",
+    "body": "Vincula acceso de agencia o subcuenta para que NotFair pueda leer contexto de CRM: contactos, conversaciones, oportunidades y eventos de calendario.",
+    "access": {
+      "title": "Acceso solicitado",
+      "body": "Solo lectura para el MVP. Sin ediciones de contactos, mensajes ni cambios de flujos."
+    },
+    "model": {
+      "title": "Modelo de conexion",
+      "items": [
+        "Soporta agencias con varias ubicaciones de HighLevel.",
+        "Guarda cada conexion por identidad de empresa/ubicacion.",
+        "La rotacion de refresh tokens se gestiona del lado del servidor."
+      ]
+    },
+    "signedOut": {
+      "title": "Inicia sesion en NotFair primero",
+      "body": "Usa primero el flujo principal de conexion para que la conexion de GoHighLevel tenga un usuario de NotFair al cual asociarse.",
+      "cta": "Iniciar sesion"
+    },
+    "checking": "Comprobando estado de GoHighLevel...",
+    "connected": "GoHighLevel conectado",
+    "fallbackConnection": "Conexion de HighLevel",
+    "company": "empresa",
+    "location": "ubicacion",
+    "unknown": "desconocido",
+    "connectAnother": "Conectar otra cuenta de HighLevel",
+    "connect": "Conectar GoHighLevel",
+    "marketplaceNote": "Se te enviara al flujo de instalacion de GoHighLevel Marketplace."
+  },
+  "AddMetaAdsAccount": {
+    "title": "Conectar Meta Ads",
+    "bodyBeforeCode": "Autoriza a NotFair a leer y administrar tus cuentas publicitarias de Meta (Facebook + Instagram). Una vez conectado, el MCP de Meta en",
+    "bodyAfterCode": "puede ser usado por Claude.ai, Codex y cualquier otro cliente MCP vinculado a tu cuenta de NotFair. Cambia la cuenta de trabajo desde el desplegable de la barra de navegacion.",
+    "mcp": {
+      "title": "Conectar al MCP de Meta Ads",
+      "body": "Conecta Claude, Codex o cualquier cliente MCP a tus cuentas publicitarias de Meta.",
+      "cta": "Conectar MCP"
+    },
+    "notConnected": {
+      "title": "Todavia no hay conexion de Meta",
+      "body": "Haz clic abajo para conceder a NotFair acceso a tu Meta Business Manager y tus cuentas publicitarias. Seras redirigido a Facebook para elegir que activos compartir y luego volveras aqui para elegir que cuentas publicitarias puede administrar NotFair.",
+      "cta": "Conectar Meta"
+    },
+    "connected": {
+      "title": "Elige a que cuentas publicitarias puede acceder NotFair",
+      "body": "Marca las cuentas que quieres que NotFair administre. Vuelve a autorizar Meta si tu lista de cuentas cambio o si agregaste nuevos permisos a la app.",
+      "reauthorizeTitle": "Ejecuta de nuevo el flujo OAuth de Meta para recoger nuevos permisos o actualizar la lista de cuentas.",
+      "reauthorize": "Volver a autorizar",
+      "emptyBeforeLink": "No encontramos ninguna cuenta publicitaria de Meta que puedas administrar. Asegurate de que la cuenta de Meta con la que iniciaste sesion tenga acceso a un Business Manager o a una cuenta publicitaria directa, luego",
+      "emptyLink": "intenta conectar de nuevo",
+      "emptyAfterLink": ".",
+      "selectAll": "Seleccionar todas",
+      "selectNone": "No seleccionar ninguna",
+      "selectedCount": "{selected} de {total} seleccionadas",
+      "fallbackAdAccount": "Cuenta publicitaria {id}",
+      "unsavedChanges": "Cambios sin guardar",
+      "reset": "Restablecer",
+      "saveSelection": "Guardar seleccion",
+      "saveFailed": "Error al guardar",
+      "networkError": "Error de red; intentalo de nuevo."
+    },
+    "disconnect": {
+      "title": "Desconectar Meta Ads",
+      "body": "Elimina la autorizacion guardada, revoca el token de acceso en Meta e invalida cualquier token MCP emitido para esta conexion. Tus datos historicos de NotFair se conservan; puedes volver a conectar cuando quieras.",
+      "button": "Desconectar",
+      "confirm": "Confirmar desconexion",
+      "cancel": "Cancelar",
+      "failed": "No se pudo desconectar",
+      "networkError": "Error de red; intentalo de nuevo."
+    }
+  },
+  "MetaWaitlist": {
+    "card": {
+      "comingSoon": "Proximamente",
+      "body": "La revision de la app de Meta esta pendiente. Unete a la lista de espera y te enviaremos un correo cuando este disponible.",
+      "joinFailed": "No se pudo unir a la lista de espera"
+    },
+    "wall": {
+      "comingSoon": "Proximamente",
+      "title": "Meta Ads esta en camino",
+      "body": "Estamos terminando la revision de la app de Meta. Unete a la lista de espera y te enviaremos un correo en cuanto NotFair pueda conectarse a tus cuentas publicitarias de Facebook e Instagram.",
+      "note": "Mientras tanto, NotFair ofrece soporte completo para Google Ads.",
+      "joinFailed": "No se pudo unir a la lista de espera"
+    },
+    "button": {
+      "joined": "Ya estas en la lista",
+      "join": "Unirse a la lista de espera"
+    }
+  },
+  "ConnectAdsPrompt": {
+    "title": "Conecta tu cuenta de Google Ads",
+    "body": "Vincula tu cuenta de Google Ads para empezar a administrar tus campanas con IA. Autorizaras acceso de lectura y escritura a tus datos publicitarios.",
+    "cta": "Conectar Google Ads"
   }
 }

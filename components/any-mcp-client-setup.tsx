@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ArrowRight, Check, Copy, Eye, EyeOff, Key, Lock, RotateCw } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
@@ -47,12 +48,13 @@ export function AnyMcpClientSetup({
   serverUrl?: string;
   connectorName?: string;
 }) {
+  const t = useTranslations("AnyMcpClientSetup");
   return (
     <div className="space-y-10">
       <ConfigBlock
         id="oauth"
-        title="OAuth 2.0 (recommended)"
-        subtitle="Drop into ~/.cursor/mcp.json (Cursor), the Cline settings JSON, or any client that takes the standard MCP config schema. The client opens a browser for sign-in."
+        title={t("oauth.title")}
+        subtitle={t("oauth.subtitle")}
       >
         <CodeBlock
           code={oauthConfigFor(connectorName, serverUrl)}
@@ -64,12 +66,12 @@ export function AnyMcpClientSetup({
 
       <ConfigBlock
         id="bearer"
-        title="Bearer token (for clients without OAuth)"
-        subtitle="Pass an Authorization header instead. The token below is your personal API key."
+        title={t("bearer.title")}
+        subtitle={t("bearer.subtitle")}
         footer={
           <span className="inline-flex items-center gap-1.5">
             <Lock className="h-3.5 w-3.5 text-[#C4C0B6]" />
-            Treat the API key like a password — don&apos;t commit it to source control.
+            {t("bearer.footer")}
           </span>
         }
       >
@@ -135,6 +137,7 @@ function CodeBlock({
   trackingStep: string;
   surface: Surface;
 }) {
+  const t = useTranslations("AnyMcpClientSetup.copy");
   const [copied, setCopied] = useState(false);
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code);
@@ -161,12 +164,12 @@ function CodeBlock({
           {copied ? (
             <>
               <Check className="h-3.5 w-3.5 text-[#4CAF6E]" />
-              <span className="text-[#4CAF6E]">Copied</span>
+              <span className="text-[#4CAF6E]">{t("copied")}</span>
             </>
           ) : (
             <>
               <Copy className="h-3.5 w-3.5" />
-              <span>Copy</span>
+              <span>{t("copy")}</span>
             </>
           )}
         </button>
@@ -187,6 +190,7 @@ function ApiKeyDisplay({
   onRotated?: () => Promise<void> | void;
   surface: Surface;
 }) {
+  const t = useTranslations("AnyMcpClientSetup.apiKey");
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [rotating, setRotating] = useState(false);
@@ -207,13 +211,13 @@ function ApiKeyDisplay({
       const res = await fetch("/api/auth/rotate-token", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setError(data.error || "Failed to rotate API key");
+        setError(data.error || t("rotateFailed"));
         return;
       }
       trackEvent("api_key_rotated", { surface });
       await onRotated?.();
     } catch {
-      setError("Failed to rotate API key");
+      setError(t("rotateFailed"));
     } finally {
       setRotating(false);
       setShowConfirm(false);
@@ -229,9 +233,9 @@ function ApiKeyDisplay({
           <Key className="h-4 w-4 text-[#4CAF6E]" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-[#E8E4DD]">Your personal API key</p>
+          <p className="text-sm font-semibold text-[#E8E4DD]">{t("title")}</p>
           <p className="mt-1 text-xs text-[#C4C0B6]">
-            Already substituted into the Bearer config below. Use Copy or paste this directly.
+            {t("body")}
           </p>
 
           <div className="mt-3 flex items-center gap-2">
@@ -248,7 +252,7 @@ function ApiKeyDisplay({
                 });
               }}
               className="shrink-0 rounded-md border border-[#3D3C36] bg-[#24231F] p-2 text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-              aria-label={revealed ? "Hide API key" : "Reveal API key"}
+              aria-label={revealed ? t("hideAria") : t("revealAria")}
             >
               {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -261,7 +265,7 @@ function ApiKeyDisplay({
               className="inline-flex items-center gap-1.5 rounded-md bg-[#4CAF6E] px-3 py-1.5 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
             >
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copied" : "Copy API Key"}
+              {copied ? t("copied") : t("copyKey")}
             </button>
             <button
               type="button"
@@ -273,7 +277,7 @@ function ApiKeyDisplay({
               className="inline-flex items-center gap-1.5 rounded-md border border-[#3D3C36] bg-[#24231F] px-3 py-1.5 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-50"
             >
               <RotateCw className={`h-4 w-4 ${rotating ? "animate-spin" : ""}`} />
-              {rotating ? "Rotating..." : "Rotate"}
+              {rotating ? t("rotating") : t("rotate")}
             </button>
           </div>
 
@@ -292,10 +296,9 @@ function ApiKeyDisplay({
             className="mx-4 w-full max-w-md rounded-xl border border-[#3D3C36] bg-[#24231F] p-6 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[#E8E4DD]">Rotate API key?</h3>
+            <h3 className="text-lg font-semibold text-[#E8E4DD]">{t("confirmTitle")}</h3>
             <p className="mt-2 text-sm text-[#C4C0B6]">
-              This will invalidate your current API key immediately. Any integrations using
-              the old key will stop working until you update them with the new one.
+              {t("confirmBody")}
             </p>
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
@@ -303,7 +306,7 @@ function ApiKeyDisplay({
                 disabled={rotating}
                 className="rounded-lg border border-[#3D3C36] px-4 py-2 text-sm text-[#C4C0B6] transition hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD] disabled:opacity-50"
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 onClick={rotate}
@@ -311,7 +314,7 @@ function ApiKeyDisplay({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[#C45D4A] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#B04E3D] disabled:opacity-50"
               >
                 <RotateCw className={`h-4 w-4 ${rotating ? "animate-spin" : ""}`} />
-                {rotating ? "Rotating..." : "Rotate API Key"}
+                {rotating ? t("rotating") : t("rotateKey")}
               </button>
             </div>
           </div>
@@ -328,6 +331,7 @@ function ApiKeyCta({
   onSignIn?: () => void;
   surface: Surface;
 }) {
+  const t = useTranslations("AnyMcpClientSetup.apiKeyCta");
   const handleClick = useCallback(() => {
     trackEvent("api_key_cta_clicked", { surface });
     onSignIn?.();
@@ -340,17 +344,16 @@ function ApiKeyCta({
           <Key className="h-4 w-4 text-[#4CAF6E]" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-[#E8E4DD]">Get your API key</p>
+          <p className="text-sm font-semibold text-[#E8E4DD]">{t("title")}</p>
           <p className="mt-1 text-sm leading-relaxed text-[#C4C0B6]">
-            Sign in with Google to generate your personal API key. We&apos;ll
-            substitute it into the Bearer config below automatically.
+            {t("body")}
           </p>
           <button
             type="button"
             onClick={handleClick}
             className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-lg bg-[#4CAF6E] px-4 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
           >
-            Sign in with Google
+            {t("button")}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

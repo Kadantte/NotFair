@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 
@@ -8,22 +9,22 @@ const MARKETPLACE_CMD = "/plugin marketplace add nowork-studio/toprank";
 const INSTALL_CMD = "/plugin install toprank@nowork-studio";
 const RELOAD_CMD = "/reload-plugins";
 const DEFAULT_ADS_CMD = "/google-ads";
-const DEFAULT_AUDIT_PROMPT =
-  "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring";
-
 type Surface = "marketing" | "in_app";
 
 export function ClaudeCodePluginSteps({
   surface,
   slashCommand = DEFAULT_ADS_CMD,
   platformLabel = "Google Ads",
-  examplePrompt = DEFAULT_AUDIT_PROMPT,
+  examplePrompt,
 }: {
   surface: Surface;
   slashCommand?: string;
   platformLabel?: string;
   examplePrompt?: string;
 }) {
+  const t = useTranslations("ClaudeCodePluginSteps");
+  const prompt = examplePrompt ?? t("defaultPrompt", { platform: platformLabel });
+
   return (
     <div className="space-y-10">
       {/* Step 1 */}
@@ -31,12 +32,12 @@ export function ClaudeCodePluginSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={1} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Open Claude Code
+            {t("step1.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Open a terminal and start{" "}
+            {t("step1.beforeLink")}{" "}
             <a
               href="https://docs.claude.com/en/docs/claude-code"
               target="_blank"
@@ -45,8 +46,7 @@ export function ClaudeCodePluginSteps({
             >
               Claude Code
             </a>
-            . If you don&apos;t have it installed, follow Anthropic&apos;s
-            install guide first.
+            {t("step1.afterLink")}
           </p>
         </div>
       </div>
@@ -56,12 +56,12 @@ export function ClaudeCodePluginSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={2} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Install the toprank plugin
+            {t("step2.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            In Claude Code, run these slash commands to register the{" "}
+            {t("step2.beforeLink")}{" "}
             <a
               href="https://github.com/nowork-studio/toprank"
               target="_blank"
@@ -70,9 +70,7 @@ export function ClaudeCodePluginSteps({
             >
               toprank
             </a>{" "}
-            marketplace, install the NotFair plugin, and reload plugins.
-            Toprank ships with pre-made paid-ads and SEO skills that
-            teach Claude how to audit and optimize your campaigns.
+            {t("step2.afterLink")}
           </p>
           <CommandBlock
             command={MARKETPLACE_CMD}
@@ -96,17 +94,15 @@ export function ClaudeCodePluginSteps({
       <div id="step-3" className="space-y-3 scroll-mt-24">
         <div className="flex items-baseline gap-3">
           <StepNumber n={3} />
-          <h3 className="text-lg font-semibold text-[#E8E4DD]">Run {slashCommand}</h3>
+          <h3 className="text-lg font-semibold text-[#E8E4DD]">{t("step3.title", { slashCommand })}</h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Run{" "}
+            {t("step3.beforeCommand")}{" "}
             <code className="rounded bg-[#2E2D28] px-1.5 py-0.5 font-mono text-sm text-[#4CAF6E]">
               {slashCommand}
             </code>{" "}
-            in Claude Code. It will open your browser to sign in and connect
-            NotFair. If the command doesn&apos;t appear, restart Claude Code
-            first.
+            {t("step3.afterCommand")}
           </p>
           <CommandBlock
             command={slashCommand}
@@ -115,11 +111,11 @@ export function ClaudeCodePluginSteps({
           />
           <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/8 px-4 py-3">
             <p className="text-sm leading-relaxed text-[#E8E4DD]">
-              <strong className="text-[#4CAF6E]">Important:</strong> sign in
-              with the{" "}
-              <strong className="text-[#E8E4DD]">same Google account</strong>{" "}
-              you use on NotFair. Otherwise Claude Code will connect to an
-              empty account and won&apos;t see your {platformLabel} data.
+              {t.rich("step3.important", {
+                platform: platformLabel,
+                green: (chunks) => <strong className="text-[#4CAF6E]">{chunks}</strong>,
+                strong: (chunks) => <strong className="text-[#E8E4DD]">{chunks}</strong>,
+              })}
             </p>
           </div>
         </div>
@@ -130,17 +126,16 @@ export function ClaudeCodePluginSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={4} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Ask Claude about your ads
+            {t("step4.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Try a prompt like{" "}
+            {t("step4.beforePrompt")}{" "}
             <em className="text-[#E8E4DD]">
-              &ldquo;{examplePrompt}&rdquo;
+              &ldquo;{prompt}&rdquo;
             </em>{" "}
-            Claude will call NotFair tools to read your account and respond
-            with specific, data-backed insights.
+            {t("step4.afterPrompt")}
           </p>
         </div>
       </div>
@@ -165,6 +160,7 @@ function CommandBlock({
   trackingStep: string;
   surface: Surface;
 }) {
+  const t = useTranslations("ClaudeCodePluginSteps.copy");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -189,17 +185,17 @@ function CommandBlock({
         type="button"
         onClick={handleCopy}
         className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#3D3C36] bg-[#24231F] px-3 py-2.5 text-sm text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-        aria-label={`Copy ${command}`}
+        aria-label={t("aria", { command })}
       >
         {copied ? (
           <>
             <Check className="h-4 w-4 text-[#4CAF6E]" />
-            <span className="text-[#4CAF6E]">Copied</span>
+            <span className="text-[#4CAF6E]">{t("copied")}</span>
           </>
         ) : (
           <>
             <Copy className="h-4 w-4" />
-            <span>Copy</span>
+            <span>{t("copy")}</span>
           </>
         )}
       </button>

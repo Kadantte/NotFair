@@ -281,6 +281,9 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                             basePath="/connect/google-ads"
                             serverUrl={MCP_SERVER_URL}
                             connectorName={MCP_CONNECTOR_NAME}
+                            platformLabel="Google Ads"
+                            slashCommand="/google-ads"
+                            examplePrompt={t('googleAdsPrompt')}
                         />
                     )}
                 </div>

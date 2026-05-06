@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
@@ -10,15 +11,12 @@ type Surface = "marketing" | "in_app";
 
 const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/settings/connectors?modal=add-custom-connector";
 
-const DEFAULT_AUDIT_PROMPT =
-  "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring";
-
 export function ConnectorSetupSteps({
   surface,
   serverUrl = MCP_SERVER_URL,
   connectorName = MCP_CONNECTOR_NAME,
   platformLabel = "Google Ads",
-  examplePrompt = DEFAULT_AUDIT_PROMPT,
+  examplePrompt,
 }: {
   surface: Surface;
   serverUrl?: string;
@@ -26,6 +24,9 @@ export function ConnectorSetupSteps({
   platformLabel?: string;
   examplePrompt?: string;
 }) {
+  const t = useTranslations("ConnectorSetupSteps");
+  const prompt = examplePrompt ?? t("defaultPrompt", { platform: platformLabel });
+
   return (
     <div className="space-y-10">
       {/* Step 1 */}
@@ -33,20 +34,19 @@ export function ConnectorSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={1} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Open Claude Connectors
+            {t("step1.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Open Claude&apos;s connector settings on the web — the button below
-            lands directly on{" "}
-            <strong className="text-[#E8E4DD]">Add custom connector</strong>.
-            Connectors set up here apply to both Claude Desktop and Claude on the web.
+            {t.rich("step1.body", {
+              strong: (chunks) => <strong className="text-[#E8E4DD]">{chunks}</strong>,
+            })}
           </p>
           <OpenClaudeConnectorsCtas />
           <SetupScreenshot
             src="/connector-setup/01-add.png"
-            alt="Click the plus icon in Connectors and choose Add custom connector"
+            alt={t("step1.imageAlt")}
             surface={surface}
           />
         </div>
@@ -57,43 +57,47 @@ export function ConnectorSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={2} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Configure the connector
+            {t("step2.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-4">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Fill in the connector form:
+            {t("step2.body")}
           </p>
           <CopyableField
-            label="Name"
+            label={t("fields.name")}
             value={connectorName}
             trackingField="name"
             surface={surface}
           />
           <CopyableField
-            label="Remote MCP Server URL"
+            label={t("fields.remoteUrl")}
             value={serverUrl}
             trackingField="server_url"
             surface={surface}
           />
 
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Click <strong className="text-[#E8E4DD]">Add</strong>.
+            {t.rich("step2.clickAdd", {
+              strong: (chunks) => <strong className="text-[#E8E4DD]">{chunks}</strong>,
+            })}
           </p>
 
           <SetupScreenshot
             src="/connector-setup/02-configure.png"
-            alt="Add custom connector dialog with Name and Remote MCP Server URL filled in"
+            alt={t("step2.configureAlt")}
             surface={surface}
           />
 
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Verify <strong className="text-[#E8E4DD]">{connectorName}</strong> appears
-            in your Connectors list with all available tools.
+            {t.rich("step2.verify", {
+              connectorName,
+              strong: (chunks) => <strong className="text-[#E8E4DD]">{chunks}</strong>,
+            })}
           </p>
           <SetupScreenshot
             src="/connector-setup/03-saved.png"
-            alt="NotFair connector saved and listed under Connectors with its tool permissions"
+            alt={t("step2.savedAlt")}
             surface={surface}
           />
         </div>
@@ -104,21 +108,20 @@ export function ConnectorSetupSteps({
         <div className="flex items-baseline gap-3">
           <StepNumber n={3} />
           <h3 className="text-lg font-semibold text-[#E8E4DD]">
-            Ask Claude about your ads
+            {t("step3.title")}
           </h3>
         </div>
         <div className="ml-11 space-y-3">
           <p className="text-base leading-relaxed text-[#C4C0B6]">
-            Open a new Claude chat and try a prompt like{" "}
+            {t("step3.beforePrompt")}{" "}
             <em className="text-[#E8E4DD]">
-              &ldquo;{examplePrompt}&rdquo;
+              &ldquo;{prompt}&rdquo;
             </em>{" "}
-            Claude will use the NotFair connector to read your account and respond
-            with specific, data-backed insights.
+            {t("step3.afterPrompt")}
           </p>
           <SetupScreenshot
             src="/connector-setup/05-use-in-chat.png"
-            alt={`Claude using the NotFair connector to audit a ${platformLabel} account in a chat`}
+            alt={t("step3.imageAlt", { platform: platformLabel })}
             surface={surface}
           />
         </div>
@@ -128,6 +131,8 @@ export function ConnectorSetupSteps({
 }
 
 function OpenClaudeConnectorsCtas() {
+  const t = useTranslations("ConnectorSetupSteps.open");
+
   return (
     <div className="space-y-2">
       <a
@@ -136,11 +141,12 @@ function OpenClaudeConnectorsCtas() {
         rel="noopener noreferrer"
         className="inline-flex items-center justify-center rounded-lg bg-[#4CAF6E] px-4 py-2.5 text-sm font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
       >
-        Open Claude Connectors
+        {t("cta")}
       </a>
       <p className="text-xs text-[#C4C0B6]/70">
-        Prefer the desktop app? Open Claude Desktop and go to{" "}
-        <strong className="text-[#C4C0B6]">Settings → Connectors → Add custom connector</strong>.
+        {t.rich("desktop", {
+          strong: (chunks) => <strong className="text-[#C4C0B6]">{chunks}</strong>,
+        })}
       </p>
     </div>
   );
@@ -165,6 +171,7 @@ function CopyableField({
   trackingField: string;
   surface: Surface;
 }) {
+  const t = useTranslations("ConnectorSetupSteps.copy");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -190,17 +197,17 @@ function CopyableField({
           type="button"
           onClick={handleCopy}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#3D3C36] bg-[#24231F] px-3 py-2.5 text-sm text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
-          aria-label={`Copy ${label}`}
+          aria-label={t("aria", { label })}
         >
           {copied ? (
             <>
               <Check className="h-4 w-4 text-[#4CAF6E]" />
-              <span className="text-[#4CAF6E]">Copied</span>
+              <span className="text-[#4CAF6E]">{t("copied")}</span>
             </>
           ) : (
             <>
               <Copy className="h-4 w-4" />
-              <span>Copy</span>
+              <span>{t("copy")}</span>
             </>
           )}
         </button>
@@ -223,6 +230,7 @@ function SetupScreenshot({
   alt: string;
   surface: Surface;
 }) {
+  const t = useTranslations("ConnectorSetupSteps.screenshot");
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -253,7 +261,7 @@ function SetupScreenshot({
         type="button"
         onClick={handleExpand}
         className="group block w-full overflow-hidden rounded-lg border border-[#3D3C36] bg-[#1A1917] transition hover:border-[#4CAF6E]/60"
-        aria-label={`Expand image: ${alt}`}
+        aria-label={t("expandAria", { alt })}
       >
         <Image
           src={src}
@@ -277,7 +285,7 @@ function SetupScreenshot({
             onClick={() => setExpanded(false)}
             className="absolute right-4 top-4 rounded-full bg-[#24231F] px-3 py-1.5 text-sm text-[#E8E4DD] shadow-md hover:bg-[#2E2D28]"
           >
-            Close
+            {t("close")}
           </button>
           <Image
             src={src}

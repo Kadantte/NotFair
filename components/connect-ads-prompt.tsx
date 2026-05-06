@@ -1,9 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ExternalLink } from "lucide-react";
 
 export function ConnectAdsPrompt() {
+  const t = useTranslations("ConnectAdsPrompt");
   return (
     <div className="flex flex-col items-center justify-center text-center py-24 px-4">
       <div className="w-16 h-16 rounded-2xl bg-indigo-950/50 border border-indigo-900/50 flex items-center justify-center mb-6">
@@ -22,20 +25,19 @@ export function ConnectAdsPrompt() {
         </svg>
       </div>
       <h2 className="text-2xl font-bold text-white mb-2">
-        Connect your Google Ads account
+        {t("title")}
       </h2>
       <p className="text-zinc-400 text-sm max-w-md mb-8">
-        Link your Google Ads account to start managing your campaigns with AI.
-        You'll authorize read and write access to your ad data.
+        {t("body")}
       </p>
       <Button
         asChild
         size="lg"
         className="h-12 px-8 bg-white text-black hover:bg-zinc-200 font-semibold rounded-full transition-all hover:scale-105"
       >
-        <a href="/connect">
-          Connect Google Ads <ExternalLink className="w-4 h-4 ml-2" />
-        </a>
+        <Link href="/connect" prefetch>
+          {t("cta")} <ExternalLink className="w-4 h-4 ml-2" />
+        </Link>
       </Button>
     </div>
   );

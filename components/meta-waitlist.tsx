@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { Check, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
@@ -40,6 +41,7 @@ export function MetaWaitlistCard({
   initialJoined: boolean;
   source: string;
 }) {
+  const t = useTranslations("MetaWaitlist.card");
   const [state, setState] = useState<JoinState>(initialJoined ? "joined" : "idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +55,7 @@ export function MetaWaitlistCard({
       }
       setState("joined");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join waitlist");
+      setError(err instanceof Error ? err.message : t("joinFailed"));
       setState("error");
     }
   };
@@ -68,11 +70,11 @@ export function MetaWaitlistCard({
           <p className="text-base font-medium text-[#E8E4DD]">Meta Ads</p>
           <span className="inline-flex items-center gap-1 rounded-md border border-[#D4882A]/40 bg-[#D4882A]/[0.08] px-2 py-0.5 text-[11px] font-medium text-[#D4882A]">
             <Clock className="h-3 w-3" />
-            Coming soon
+            {t("comingSoon")}
           </span>
         </div>
         <p className="mt-0.5 text-sm text-[#C4C0B6]">
-          Pending Meta App Review. Join the waitlist and we&apos;ll email when it&apos;s live.
+          {t("body")}
         </p>
         {state === "error" && error && (
           <p className="mt-2 text-xs text-[#C45D4A]">{error}</p>
@@ -95,6 +97,7 @@ export function MetaWaitlistWall({
   initialJoined: boolean;
   source: string;
 }) {
+  const t = useTranslations("MetaWaitlist.wall");
   const [state, setState] = useState<JoinState>(initialJoined ? "joined" : "idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +111,7 @@ export function MetaWaitlistWall({
       }
       setState("joined");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join waitlist");
+      setError(err instanceof Error ? err.message : t("joinFailed"));
       setState("error");
     }
   };
@@ -122,18 +125,17 @@ export function MetaWaitlistWall({
           </div>
           <span className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-[#D4882A]/40 bg-[#D4882A]/[0.08] px-3 py-1 text-xs font-medium text-[#D4882A]">
             <Clock className="h-3.5 w-3.5" />
-            Coming soon
+            {t("comingSoon")}
           </span>
-          <h1 className="mt-4 text-3xl font-bold text-[#E8E4DD]">Meta Ads is on the way</h1>
+          <h1 className="mt-4 text-3xl font-bold text-[#E8E4DD]">{t("title")}</h1>
           <p className="mt-3 max-w-lg text-sm leading-relaxed text-[#C4C0B6]">
-            We&apos;re finishing up Meta App Review. Join the waitlist and we&apos;ll send you
-            an email the moment NotFair can connect to your Facebook + Instagram ad accounts.
+            {t("body")}
           </p>
           <div className="mt-6">
             <JoinButton state={state} onClick={handleJoin} />
           </div>
           <p className="mt-4 text-xs text-[#C4C0B6]/70">
-            In the meantime, NotFair fully supports Google Ads.
+            {t("note")}
           </p>
         </div>
       </div>
@@ -150,6 +152,7 @@ function JoinButton({
   onClick: () => void;
   compact?: boolean;
 }) {
+  const t = useTranslations("MetaWaitlist.button");
   if (state === "joined") {
     return (
       <span
@@ -158,7 +161,7 @@ function JoinButton({
         } text-sm font-semibold text-[#4CAF6E]`}
       >
         <Check className="h-4 w-4" />
-        You&apos;re on the list
+        {t("joined")}
       </span>
     );
   }
@@ -171,7 +174,7 @@ function JoinButton({
         compact ? "h-10" : "h-11"
       } text-sm font-semibold text-[#1A1917] hover:bg-[#3D9A5C] disabled:opacity-60`}
     >
-      {state === "joining" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Join waitlist"}
+      {state === "joining" ? <Loader2 className="h-4 w-4 animate-spin" /> : t("join")}
     </Button>
   );
 }
