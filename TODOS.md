@@ -38,3 +38,23 @@ Living list of deferred work. Each item names why it was deferred and what unblo
 **What:** `package.json.scripts.typecheck = "tsc --noEmit"`.
 **Why:** Developers (and agents) keep running `npx tsc --noEmit` manually. One-line fix, significant muscle-memory improvement.
 **Effort:** XS (2 min).
+
+## Marketing pages — codex landing follow-ups (v0.3.10.0)
+
+### P2 — MCP tools table on `/google-ads-codex` and `/google-ads-claude` lists tool names that don't exist
+**What:** The `tools.items` arrays in `messages/*.json` for both `GoogleAdsCodexPage` and `GoogleAdsClaudePage` advertise `listCampaigns`, `getKeywords`, `getSearchTermReport`, `getCampaignPerformance`, etc. The actual MCP surface is `runScript`/`listKeywords`/`summarizeAccountSetup`/`pauseCampaign`/`updateBid`/`addNegativeKeyword`/`createAd`.
+**Why:** A developer who reads either page, tries those tool names in Claude/Codex, and gets "method not found" loses trust at the highest-intent point of the funnel. Pre-existing on `/google-ads-claude`; carried over verbatim into `/google-ads-codex` by design (same backend = same table).
+**Fix:** Replace the rows with real tool names sourced from the MCP server, OR reframe the table as capability rows and drop the function-name column.
+**Effort:** S (CC: ~30 min — touches 6 locale files).
+
+### P3 — Dead `GoogleAdsCodexPage.auditCta.*` i18n keys
+**What:** The `auditCta` subblock (eyebrow, title, body, disconnectedLabel, connectedLabel, secondary) was added to all 6 locales speculatively but is never rendered by `components/marketing/google-ads-codex-page.tsx`. 36 dead strings.
+**Why:** Translation work that doesn't ship to users; bloats the i18n bundle.
+**Fix:** Remove the `auditCta` subkey from `GoogleAdsCodexPage` in all 6 message files.
+**Effort:** XS (5 min).
+
+### P3 — `navigator.clipboard.writeText` has no error handling on the codex setup-guide page
+**What:** `CommandCard` in `components/marketing/google-ads-codex-mcp-setup-page.tsx` calls `navigator.clipboard.writeText(...)` without a `.catch()`. Same pattern as `components/codex-setup-steps.tsx` `CommandBlock`.
+**Why:** Silent failure in non-secure contexts or when permission is denied — copy button appears to do nothing.
+**Fix:** Wrap in try/catch with a user-visible error state, OR fall back to `document.execCommand('copy')`.
+**Effort:** S (15 min, refactor both call sites).

@@ -1137,6 +1137,173 @@
       "note": "Eine Konfiguration einfügen. OAuth. Fertig."
     }
   },
+  "GoogleAdsCodexPage": {
+    "hero": {
+      "eyebrow": "OpenAI Codex CLI · MCP-Server",
+      "title": {
+        "line1": "OpenAI Codex für",
+        "line2": "Google Ads nutzen —",
+        "highlight": "Live-Daten, Setup in 1 Minute."
+      },
+      "body": "NotFair ist ein Google Ads MCP-Server für OpenAI's Codex CLI. Ein Terminal-Befehl genügt — Codex erhält dann Live-Zugriff auf Kampagnen, Keywords, Ausgaben und Anzeigen — Diagnose, Optimierung und Verwaltung direkt im Terminal.",
+      "disconnectedLabel": "Google Ads mit Codex verbinden",
+      "connectedLabel": "Ihr Konto öffnen",
+      "note": "Keine Kreditkarte erforderlich. Jede Schreibaktion braucht menschliche Freigabe.",
+      "setupGuideLink": "Zur 1-Minuten-Setup-Anleitung"
+    },
+    "heroPreview": {
+      "eyebrow": "Was Codex kann",
+      "title": "Fragen Sie Ihr Terminal zu Ihren Anzeigen",
+      "bullets": [
+        "Kampagnen auditieren und verschwendete Ausgaben aufdecken",
+        "Fehlende Negatives und schwache Keywords finden",
+        "Gebotsanpassungen mit Belegen vorschlagen",
+        "Neue Anzeigentexte entwerfen — vor Ausführung freigeben"
+      ]
+    },
+    "capabilities": {
+      "eyebrow": "Was Sie bekommen",
+      "title": "Codex AI für Google Ads — was es wirklich tut.",
+      "body": "Nach der Verbindung hat Codex Live-Zugriff auf Ihr Konto vom Terminal aus. Keine CSV-Exporte, kein Kopieren in den Chat. Stellen Sie eine Frage, erhalten Sie eine konkrete Antwort auf Basis echter Daten.",
+      "items": [
+        {
+          "title": "Audit direkt aus dem Terminal",
+          "body": "Fragen Sie Codex, was nicht stimmt. Es prüft Kampagnenstruktur, Keyword-Zustand, Suchbegriffqualität und Anzeigentexte — und liefert eine priorisierte Fix-Liste direkt in Ihrer Shell."
+        },
+        {
+          "title": "In Ihren Entwickler-Workflow integrieren",
+          "body": "Codex ist terminal-nativ. Kombinieren Sie Google-Ads-Diagnosen mit Ihren Skripten, CI-Checks oder Deploy-Hooks. Dieselben MCP-Tools funktionieren im interaktiven und headless Modus."
+        },
+        {
+          "title": "Jede Schreibaktion freigeben",
+          "body": "NotFair übernimmt nie eine Änderung ohne Ihre ausdrückliche Freigabe. Codex zeigt genau, was es tun möchte — Kampagne pausieren, Gebot anpassen, Negative hinzufügen — Sie sagen Ja oder Nein."
+        },
+        {
+          "title": "Funktioniert auf macOS, Linux, WSL",
+          "body": "Die Codex CLI läuft überall, wo Ihr Terminal läuft. macOS, Linux und Windows via WSL werden alle out-of-the-box mit demselben Einzeiler-Install unterstützt."
+        }
+      ]
+    },
+    "tools": {
+      "eyebrow": "MCP-Tools",
+      "title": "Was Codex lesen und ändern kann.",
+      "body": "NotFair stellt fokussierte MCP-Tools bereit. Lesetools geben Codex Live-Kontext. Schreibtools lassen Codex Änderungen vorschlagen — jede erfordert Ihre explizite Freigabe vor der Ausführung.",
+      "columns": {
+        "tool": "Werkzeug",
+        "type": "Typ",
+        "description": "Funktion"
+      },
+      "categories": {
+        "read": "Lesen",
+        "write": "Schreiben"
+      },
+      "referencePrefix": "Vollständige Tool-Referenz unter",
+      "referenceSuffix": ".",
+      "items": [
+        {
+          "name": "listCampaigns",
+          "category": "read",
+          "description": "Ruft Live-Kampagnenleistung, Ausgaben und Status ab"
+        },
+        {
+          "name": "getKeywords",
+          "category": "read",
+          "description": "Prüft Keyword-Gebote, Quality Scores und Impressionen"
+        },
+        {
+          "name": "getSearchTermReport",
+          "category": "read",
+          "description": "Findet irrelevante Suchanfragen, schwache Match Types und Budgetlecks"
+        },
+        {
+          "name": "getCampaignPerformance",
+          "category": "read",
+          "description": "Analysiert Kampagnenmetriken über jeden Zeitraum im Detail"
+        },
+        {
+          "name": "updateBid",
+          "category": "write",
+          "description": "Passt ein Keyword-Gebot an, vor Anwendung prüfbar"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "Pausiert eine leistungsschwache Kampagne über Codex"
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "write",
+          "description": "Blockiert einen verschwendeten Suchbegriff auf Kampagnen- oder Kontoebene"
+        },
+        {
+          "name": "createAd",
+          "category": "write",
+          "description": "Schreibt und startet neue Anzeigentexte in natürlicher Unterhaltung"
+        }
+      ]
+    },
+    "auditCta": {
+      "eyebrow": "Kostenlos · Keine Kreditkarte",
+      "title": "Einmal verbinden. Codex findet die Korrekturen.",
+      "body": "Verbinden Sie Ihr Google-Ads-Konto und Codex kann verschwendete Ausgaben, verpasste Chancen und strukturelle Probleme diagnostizieren — und die Änderungen zur Freigabe vorbereiten.",
+      "disconnectedLabel": "Google Ads verbinden",
+      "connectedLabel": "Ihr Konto öffnen",
+      "secondary": "So funktioniert es"
+    },
+    "faq": {
+      "title": "FAQ — Google Ads und OpenAI Codex",
+      "intro": "Häufige Fragen von Entwicklern und Marketern, die den Codex-CLI-Google-Ads-Workflow einrichten.",
+      "items": [
+        {
+          "question": "Was ist die NotFair-Codex-Integration?",
+          "answer": "Es handelt sich um einen MCP-Server (Model Context Protocol), der OpenAI's Codex CLI Live-Zugriff auf Ihr Google-Ads-Konto gibt. Ein Terminal-Befehl genügt zur Einrichtung — Codex kann dann Probleme diagnostizieren, Korrekturen empfehlen und Änderungen vorschlagen, die Sie im Chat genehmigen."
+        },
+        {
+          "question": "Worin unterscheidet sich das von der Claude-Integration?",
+          "answer": "Dasselbe Backend, ein anderer Client. Die Codex CLI ruft den NotFair MCP-Server über OpenAIs MCP-Unterstützung auf. Das Claude-Connector- und Claude-Code-Plugin nutzen denselben Server über Anthropics Clients. Die Funktionen sind identisch — nur der Client unterscheidet sich."
+        },
+        {
+          "question": "Welche Google-Ads-Aufgaben kann Codex übernehmen?",
+          "answer": "Codex kann Kampagnen auditieren, verschwendete Ausgaben aufdecken, fehlende Negatives finden, Gebotsanpassungen vorschlagen und neue Anzeigentexte entwerfen. Es bezieht Live-Daten aus Ihrem Konto über NotFairs MCP-Tools, sodass Antworten auf Ihren echten Zahlen basieren — nicht auf generischen Best Practices. Alles, was Ihr Konto berührt, wird Ihnen zur Genehmigung angezeigt, bevor es ausgeführt wird."
+        },
+        {
+          "question": "Für wen ist OpenAI Codex für Google Ads gedacht?",
+          "answer": "Entwickler und technisch versierte Marketer, die bereits im Terminal arbeiten. Wenn Sie Codex CLI für Code nutzen, ermöglicht NotFair, Ihr Google-Ads-Konto genauso zu behandeln — beschreiben Sie, was Sie wollen, sehen Sie Live-Daten, genehmigen Sie Änderungen. Keine CSV-Exporte, kein Dashboard-Wechsel."
+        },
+        {
+          "question": "Ist das kostenlos?",
+          "answer": "Ja. NotFair zu Codex hinzuzufügen und einen Google-Ads-Audit durchzuführen ist kostenlos und ohne Kreditkarte. Bezahlpläne schalten höhere Nutzungslimits und Team-Funktionen frei."
+        },
+        {
+          "question": "Kann Codex mein Google-Ads-Konto wirklich ändern?",
+          "answer": "Nur mit Ihrer ausdrücklichen Genehmigung. Codex kann das Pausieren von Kampagnen, das Anpassen von Geboten, das Hinzufügen von Negatives oder das Schreiben neuer Anzeigen vorschlagen — aber jede Schreibaktion wird Ihnen zuerst angezeigt und erfordert Ihre Bestätigung. Lesezugriff ist uneingeschränkt; Schreibzugriff ist gesperrt."
+        }
+      ]
+    },
+    "related": {
+      "title": "Verwandte Seiten",
+      "intro": "Entdecken Sie den vollständigen NotFair-Workflow für Google Ads und OpenAI Codex.",
+      "links": {
+        "setupGuide": {
+          "title": "Codex-Setup-Anleitung",
+          "description": "Schritt-für-Schritt-Anleitung zum Hinzufügen von NotFair zur Codex CLI — umfasst Installation, MCP-Registrierung und Ihre erste Abfrage."
+        },
+        "claude": {
+          "title": "Google Ads + Claude",
+          "description": "Nutzen Sie NotFair mit Claude Desktop, Claude Code oder Claude Cowork statt der Codex CLI."
+        },
+        "mcpServer": {
+          "title": "Google Ads MCP-Server",
+          "description": "Erfahren Sie, wie NotFairs MCP-Server Ihre Google-Ads-Daten und -Aktionen für jeden MCP-kompatiblen KI-Client bereitstellt."
+        }
+      }
+    },
+    "finalCta": {
+      "title": "Google Ads jetzt mit Codex verbinden.",
+      "body": "Setup in 1 Minute. Mensch behält die Kontrolle über jede Änderung.",
+      "note": "Ein Terminal-Befehl. OAuth. Fertig."
+    }
+  },
   "GoogleAdsAuditPage": {
     "hero": {
       "eyebrow": "Kostenlos · Keine Kreditkarte · 5 Minuten",

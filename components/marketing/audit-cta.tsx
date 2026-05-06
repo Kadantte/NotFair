@@ -24,7 +24,7 @@ export function AuditCTA({
   disconnectedDestination = "/connect",
 }: {
   session: { connected: boolean };
-  page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-mcp-server" | "header";
+  page: "homepage" | "google-ads-audit" | "google-ads-claude" | "google-ads-codex" | "google-ads-mcp-server" | "header";
   size?: "sm" | "default" | "lg";
   variant?: "primary" | "secondary";
   position?: string;

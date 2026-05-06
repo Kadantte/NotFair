@@ -3,31 +3,26 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 export const metadata = buildMetadata({
-  title: "Google Ads Codex MCP — Setup Guide for NotFair in OpenAI Codex",
+  title: "Codex MCP Setup Guide for Google Ads | NotFair",
   description:
-    "Step-by-step guide to add NotFair to OpenAI's Codex CLI as an MCP server. One terminal command wires up Google Ads access in under a minute — diagnose issues and manage approved changes through Codex chat.",
+    "Add NotFair to OpenAI's Codex CLI in under a minute. One terminal command wires up Google Ads access — no JSON config, no scripts to run.",
   path: "/google-ads-codex-mcp-setup-guide",
   keywords: [
     "google ads codex mcp",
-    "openai codex google ads",
-    "codex cli google ads",
     "codex mcp setup",
     "adsagent codex",
     "openai codex mcp server",
     "google ads codex integration",
+    "install codex mcp",
+    "codex mcp install guide",
   ],
 });
 
 const faqItems = [
   {
-    question: "What is the NotFair Codex MCP integration?",
+    question: "What does the NotFair Codex MCP do once installed?",
     answer:
-      "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
-  },
-  {
-    question: "How is this different from the Claude setup guides?",
-    answer:
-      "Same backend, different client. The Codex CLI calls the NotFair MCP server using OpenAI's MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic's clients. Capabilities are identical.",
+      "It exposes a set of MCP tools to Codex that let it read your Google Ads campaigns, search terms, and spend, and propose write actions you approve in chat. For the full capability overview see the Google Ads × Codex landing page at /google-ads-codex.",
   },
   {
     question: "How long does setup take?",
@@ -40,14 +35,19 @@ const faqItems = [
       "No. One terminal command sets everything up. There are no JSON config edits, no environment variables, and no scripts to run.",
   },
   {
-    question: "Is the integration free?",
+    question: "Which terminals and shells does it work in?",
     answer:
-      "Yes. Adding NotFair to Codex and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
+      "Any shell that can run Node.js — bash, zsh, fish, PowerShell, and others. The Codex CLI itself is a Node.js process, so the NotFair MCP inherits full shell compatibility. If Codex runs, NotFair runs.",
   },
   {
-    question: "Can Codex actually change my Google Ads account?",
+    question: "Does it work with WSL on Windows?",
     answer:
-      "Only with your explicit approval. Codex can propose pausing campaigns, adjusting bids, adding negative keywords, or writing new ads — but every write action is shown to you first and requires confirmation. Read access is unrestricted; write access is gated.",
+      "Yes. Install the Codex CLI inside your WSL environment and run the same one-liner. The MCP server and OAuth flow work identically on WSL 1 and WSL 2. Native Windows (outside WSL) depends on Codex CLI's Windows support status.",
+  },
+  {
+    question: "Can I use it inside an IDE like VS Code?",
+    answer:
+      "Codex is a terminal-first tool, but you can run it in any integrated terminal — VS Code's built-in terminal, JetBrains terminals, or any other IDE that embeds a shell. The NotFair MCP works wherever the Codex CLI runs.",
   },
 ];
 
@@ -82,29 +82,6 @@ const jsonLd = [
         text: "Try a prompt like 'Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.' Codex calls NotFair tools and answers with live data.",
         url: new URL("/google-ads-codex-mcp-setup-guide#step-3", SITE_URL).toString(),
       },
-    ],
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "NotFair — Google Ads Codex MCP",
-    applicationCategory: "BusinessApplication",
-    applicationSubCategory: "Google Ads Management Software",
-    operatingSystem: "macOS, Linux, Windows",
-    description:
-      "MCP server that gives OpenAI's Codex CLI live access to diagnose and manage your Google Ads account through NotFair.",
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
-    url: new URL("/google-ads-codex-mcp-setup-guide", SITE_URL).toString(),
-    featureList: [
-      "MCP integration for OpenAI Codex CLI",
-      "One-line terminal install",
-      "Live Google Ads account access",
-      "Diagnose, optimize, and manage approved campaign changes through chat",
-      "Read-only by default; writes require human approval",
     ],
   },
 ];

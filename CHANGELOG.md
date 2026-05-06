@@ -2,6 +2,15 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.10.0] - 2026-05-06
+
+### Added
+- **New `/google-ads-codex` landing page.** Top-funnel overview of the Google Ads × OpenAI Codex CLI integration — capabilities, MCP tools, FAQs, and a clear "View setup guide" path into the install flow. Localized across all six locales (en, de, es, fr, pt-BR, th).
+
+### Changed
+- **`/google-ads-codex-mcp-setup-guide` is now install-focused.** Removed the marketing-style capability grid and MCP tools table, trimmed the FAQ to terminal/shell/WSL/IDE questions, dropped the duplicate `SoftwareApplication` JSON-LD, and updated the title and description to fit under SERP truncation limits.
+- **De-duplicated SEO between the two codex pages.** The landing page owns capability-marketing keywords and the `SoftwareApplication` schema; the setup guide owns install-intent keywords and the `HowTo` schema. Page titles, meta descriptions, FAQs, and JSON-LD entities no longer collide.
+
 ## [0.3.9.2] - 2026-05-06
 
 ### Changed

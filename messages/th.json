@@ -1137,6 +1137,173 @@
       "note": "วางการตั้งค่า OAuth แล้วพร้อมใช้"
     }
   },
+  "GoogleAdsCodexPage": {
+    "hero": {
+      "eyebrow": "OpenAI Codex CLI · เซิร์ฟเวอร์ MCP",
+      "title": {
+        "line1": "ใช้ OpenAI Codex กับ",
+        "line2": "Google Ads —",
+        "highlight": "ข้อมูลสด ตั้งค่าใน 1 นาที"
+      },
+      "body": "NotFair คือเซิร์ฟเวอร์ Google Ads MCP สำหรับ OpenAI's Codex CLI คำสั่งเดียวในเทอร์มินัล และ Codex จะเข้าถึงแคมเปญ คีย์เวิร์ด ค่าใช้จ่าย และโฆษณาของคุณแบบสด — วินิจฉัย เพิ่มประสิทธิภาพ และจัดการจากเทอร์มินัล",
+      "disconnectedLabel": "เชื่อมต่อ Google Ads กับ Codex",
+      "connectedLabel": "เปิดบัญชีของคุณ",
+      "note": "ไม่ต้องใช้บัตรเครดิต ทุกการเขียนต้องมีมนุษย์อนุมัติ",
+      "setupGuideLink": "ดูคู่มือตั้งค่าใน 1 นาที"
+    },
+    "heroPreview": {
+      "eyebrow": "สิ่งที่ Codex ทำได้",
+      "title": "ถามเทอร์มินัลของคุณเกี่ยวกับโฆษณา",
+      "bullets": [
+        "ตรวจสอบแคมเปญและค้นหางบที่สูญเปล่า",
+        "ค้นหา negative keyword ที่ขาดหายและคีย์เวิร์ดที่อ่อนแอ",
+        "เสนอการปรับ bid พร้อมหลักฐาน",
+        "ร่างข้อความโฆษณาใหม่ — อนุมัติก่อนเผยแพร่"
+      ]
+    },
+    "capabilities": {
+      "eyebrow": "สิ่งที่คุณได้รับ",
+      "title": "Codex AI สำหรับ Google Ads — สิ่งที่ทำได้จริง",
+      "body": "เมื่อเชื่อมต่อแล้ว Codex จะเข้าถึงบัญชีของคุณแบบสดจากเทอร์มินัล ไม่ต้อง export CSV หรือคัดลอกวางเข้าแชทอีกต่อไป ถามคำถามแล้วรับคำตอบเฉพาะเจาะจงที่อ้างอิงจากข้อมูลจริง",
+      "items": [
+        {
+          "title": "ตรวจสอบจากเทอร์มินัลของคุณ",
+          "body": "ถาม Codex ว่ามีอะไรผิดปกติ ระบบจะตรวจโครงสร้างแคมเปญ สุขภาพคีย์เวิร์ด คุณภาพคำค้นหา และข้อความโฆษณา — แล้วให้รายการแก้ไขที่จัดลำดับแล้ว ตรงใน shell ของคุณ"
+        },
+        {
+          "title": "รวมเข้ากับ workflow การพัฒนาของคุณ",
+          "body": "Codex เป็น terminal-native เชื่อมการวินิจฉัย Google Ads กับสคริปต์ CI checks หรือ deploy hooks ของคุณ เครื่องมือ MCP เดียวกันทำงานได้ทั้งในโหมด interactive และ headless"
+        },
+        {
+          "title": "อนุมัติทุกการเขียน",
+          "body": "NotFair จะไม่บันทึกการเปลี่ยนแปลงโดยไม่มีการอนุมัติชัดเจนจากคุณ Codex แสดงสิ่งที่ต้องการทำ — หยุดแคมเปญ ปรับ bid เพิ่ม negative — แล้วคุณตอบ yes หรือ no มนุษย์ควบคุมเสมอ"
+        },
+        {
+          "title": "ทำงานได้บน macOS, Linux, WSL",
+          "body": "Codex CLI รันได้ทุกที่ที่เทอร์มินัลของคุณรัน macOS, Linux และ Windows via WSL รองรับทั้งหมด out of the box ด้วยคำสั่งติดตั้งเดียวกัน"
+        }
+      ]
+    },
+    "tools": {
+      "eyebrow": "เครื่องมือ MCP ที่เปิดให้ใช้",
+      "title": "สิ่งที่ Codex อ่านและเปลี่ยนแปลงได้",
+      "body": "NotFair เปิดชุดเครื่องมือ MCP ที่โฟกัสชัดเจน เครื่องมืออ่านให้บริบทแบบสด เครื่องมือเขียนให้ Codex เสนอการเปลี่ยนแปลง — แต่ละรายการต้องได้รับอนุมัติจากคุณอย่างชัดเจนก่อนดำเนินการ",
+      "columns": {
+        "tool": "เครื่องมือ",
+        "type": "ประเภท",
+        "description": "หน้าที่"
+      },
+      "categories": {
+        "read": "อ่าน",
+        "write": "เขียน"
+      },
+      "referencePrefix": "ดูรายการเครื่องมือทั้งหมดได้ที่",
+      "referenceSuffix": ".",
+      "items": [
+        {
+          "name": "listCampaigns",
+          "category": "read",
+          "description": "ดึงผลงาน ค่าใช้จ่าย และสถานะแคมเปญแบบสด"
+        },
+        {
+          "name": "getKeywords",
+          "category": "read",
+          "description": "ตรวจ bid คีย์เวิร์ด Quality Scores และ impressions"
+        },
+        {
+          "name": "getSearchTermReport",
+          "category": "read",
+          "description": "ค้นหา query ที่ไม่เกี่ยวข้อง match type ที่อ่อน และงบที่รั่ว"
+        },
+        {
+          "name": "getCampaignPerformance",
+          "category": "read",
+          "description": "เจาะลึก metrics ของแคมเปญในช่วงวันที่ใดก็ได้"
+        },
+        {
+          "name": "updateBid",
+          "category": "write",
+          "description": "ปรับ bid คีย์เวิร์ด และตรวจสอบได้ก่อนใช้จริง"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "หยุดแคมเปญผลงานต่ำผ่าน Codex"
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "write",
+          "description": "บล็อกคำค้นที่เปลืองงบในระดับแคมเปญหรือบัญชี"
+        },
+        {
+          "name": "createAd",
+          "category": "write",
+          "description": "เขียนและเปิดใช้ข้อความโฆษณาใหม่ผ่านบทสนทนาธรรมชาติ"
+        }
+      ]
+    },
+    "auditCta": {
+      "eyebrow": "ฟรี · ไม่ต้องใช้บัตรเครดิต",
+      "title": "เชื่อมต่อครั้งเดียว ให้ Codex หาแนวทางแก้ไข",
+      "body": "เชื่อมต่อบัญชี Google Ads แล้ว Codex จะช่วยวินิจฉัยงบที่สูญเปล่า โอกาสที่พลาด และปัญหาโครงสร้าง จากนั้นเตรียมการเปลี่ยนแปลงให้อนุมัติ",
+      "disconnectedLabel": "เชื่อมต่อ Google Ads",
+      "connectedLabel": "เปิดบัญชีของคุณ",
+      "secondary": "ดูวิธีทำงาน"
+    },
+    "faq": {
+      "title": "คำถามที่พบบ่อย — Google Ads และ OpenAI Codex",
+      "intro": "คำถามทั่วไปจากนักพัฒนาและนักการตลาดที่ตั้งค่า workflow Codex CLI สำหรับ Google Ads",
+      "items": [
+        {
+          "question": "การรวม NotFair Codex คืออะไร?",
+          "answer": "เป็นเซิร์ฟเวอร์ MCP (Model Context Protocol) ที่ให้ OpenAI's Codex CLI เข้าถึงบัญชี Google Ads ของคุณแบบสด คำสั่งเดียวในเทอร์มินัลก็ตั้งค่าได้ — Codex จะวินิจฉัยปัญหา แนะนำการแก้ไข และเสนอการเปลี่ยนแปลงที่คุณอนุมัติในแชท"
+        },
+        {
+          "question": "แตกต่างจากการรวมกับ Claude อย่างไร?",
+          "answer": "backend เดียวกัน แต่ client ต่างกัน Codex CLI เรียกเซิร์ฟเวอร์ MCP ของ NotFair ผ่านการรองรับ MCP ของ OpenAI Claude connector และ plugin Claude Code เรียกเซิร์ฟเวอร์เดียวกันจาก client ของ Anthropic ความสามารถเหมือนกันทุกประการ — ต่างแค่ client"
+        },
+        {
+          "question": "Codex จัดการงาน Google Ads ประเภทใดได้บ้าง?",
+          "answer": "Codex ตรวจสอบแคมเปญ ค้นหางบที่สูญเปล่า หา negative keyword ที่ขาด เสนอการปรับ bid และร่างข้อความโฆษณาใหม่ได้ โดยดึงข้อมูลสดจากบัญชีของคุณผ่านเครื่องมือ MCP ของ NotFair คำตอบจึงอ้างอิงจากตัวเลขจริงของคุณ ไม่ใช่แนวปฏิบัติทั่วไป ทุกสิ่งที่กระทบบัญชีจะแสดงให้คุณอนุมัติก่อนดำเนินการ"
+        },
+        {
+          "question": "OpenAI Codex สำหรับ Google Ads เหมาะกับใคร?",
+          "answer": "นักพัฒนาและนักการตลาดเชิงเทคนิคที่ทำงานในเทอร์มินัลอยู่แล้ว ถ้าคุณใช้ Codex CLI กับโค้ด การเพิ่ม NotFair ทำให้คุณจัดการบัญชี Google Ads ได้ในแบบเดียวกัน — อธิบายสิ่งที่ต้องการ ดูข้อมูลสด อนุมัติการเปลี่ยนแปลง ไม่ต้อง export CSV หรือสลับ dashboard"
+        },
+        {
+          "question": "ฟรีไหม?",
+          "answer": "ใช่ การเพิ่ม NotFair ใน Codex และรันการตรวจสอบ Google Ads ฟรีโดยไม่ต้องใช้บัตรเครดิต แผนชำระเงินปลดล็อกขีดจำกัดการใช้งานที่สูงขึ้นและฟีเจอร์ทีม"
+        },
+        {
+          "question": "Codex เปลี่ยนแปลงบัญชี Google Ads ของฉันได้จริงไหม?",
+          "answer": "ได้ แต่เฉพาะเมื่อคุณอนุมัติอย่างชัดเจนเท่านั้น Codex เสนอการหยุดแคมเปญ ปรับ bid เพิ่ม negative keyword หรือเขียนโฆษณาใหม่ได้ — แต่ทุก action จะแสดงให้คุณเห็นก่อนและต้องได้รับการยืนยันจากคุณ การอ่านข้อมูลไม่มีข้อจำกัด การเขียนต้องผ่านการควบคุม"
+        }
+      ]
+    },
+    "related": {
+      "title": "หน้าที่เกี่ยวข้อง",
+      "intro": "สำรวจ workflow ครบวงจรของ NotFair สำหรับ Google Ads และ OpenAI Codex",
+      "links": {
+        "setupGuide": {
+          "title": "คู่มือตั้งค่า Codex",
+          "description": "คำแนะนำทีละขั้นตอนสำหรับเพิ่ม NotFair ใน Codex CLI — ครอบคลุมการติดตั้ง การลงทะเบียน MCP และ query แรกของคุณ"
+        },
+        "claude": {
+          "title": "Google Ads + Claude",
+          "description": "ใช้ NotFair กับ Claude Desktop, Claude Code หรือ Claude Cowork แทน Codex CLI"
+        },
+        "mcpServer": {
+          "title": "เซิร์ฟเวอร์ MCP ของ Google Ads",
+          "description": "เรียนรู้ว่าเซิร์ฟเวอร์ MCP ของ NotFair เปิดข้อมูลและ action ของ Google Ads ให้กับ AI client ที่รองรับ MCP ใดก็ได้อย่างไร"
+        }
+      }
+    },
+    "finalCta": {
+      "title": "เชื่อมต่อ Google Ads กับ Codex — เดี๋ยวนี้",
+      "body": "ตั้งค่าใน 1 นาที มนุษย์ควบคุมทุกการเปลี่ยนแปลง",
+      "note": "คำสั่งเดียวในเทอร์มินัล OAuth เสร็จแล้ว"
+    }
+  },
   "GoogleAdsAuditPage": {
     "hero": {
       "eyebrow": "ฟรี · ไม่ต้องใช้บัตรเครดิต · 5 นาที",

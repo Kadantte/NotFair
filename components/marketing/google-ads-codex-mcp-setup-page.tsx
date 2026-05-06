@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink, Terminal, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session-provider";
 import { startGoogleConnect } from "@/lib/google-oauth";
@@ -15,16 +15,13 @@ import { CodexSetupSteps } from "@/components/codex-setup-steps";
 import type { FaqItem } from "@/lib/seo";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
+const oneLiner = `codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}`;
+
 const FAQ_ITEMS: FaqItem[] = [
   {
-    question: "What is the NotFair Codex MCP integration?",
+    question: "What does the NotFair Codex MCP do once installed?",
     answer:
-      "It's an MCP (Model Context Protocol) integration for OpenAI's Codex CLI. Once added, Codex can read your Google Ads campaigns, keywords, search terms, spend, and ad copy in real time — then diagnose issues, recommend fixes, and propose changes you approve in chat.",
-  },
-  {
-    question: "How is this different from the Claude setup guides?",
-    answer:
-      "Same backend, different client. The Codex CLI calls the NotFair MCP server using OpenAI's MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic's clients. Capabilities are identical.",
+      "It exposes a set of MCP tools to Codex that let it read your Google Ads campaigns, search terms, and spend, and propose write actions you approve in chat. For the full capability overview see the Google Ads × Codex landing page at /google-ads-codex.",
   },
   {
     question: "How long does setup take?",
@@ -37,18 +34,29 @@ const FAQ_ITEMS: FaqItem[] = [
       "No. One terminal command sets everything up. There are no JSON config edits, no environment variables, and no scripts to run.",
   },
   {
-    question: "Is the integration free?",
+    question: "Which terminals and shells does it work in?",
     answer:
-      "Yes. Adding NotFair to Codex and running a free Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features.",
+      "Any shell that can run Node.js — bash, zsh, fish, PowerShell, and others. The Codex CLI itself is a Node.js process, so the NotFair MCP inherits full shell compatibility. If Codex runs, NotFair runs.",
   },
   {
-    question: "Can Codex actually change my Google Ads account?",
+    question: "Does it work with WSL on Windows?",
     answer:
-      "Only with your explicit approval. Codex can propose pausing campaigns, adjusting bids, adding negative keywords, or writing new ads — but every write action is shown to you first and requires confirmation. Read access is unrestricted; write access is gated.",
+      "Yes. Install the Codex CLI inside your WSL environment and run the same one-liner. The MCP server and OAuth flow work identically on WSL 1 and WSL 2. Native Windows (outside WSL) depends on Codex CLI's Windows support status.",
+  },
+  {
+    question: "Can I use it inside an IDE like VS Code?",
+    answer:
+      "Codex is a terminal-first tool, but you can run it in any integrated terminal — VS Code's built-in terminal, JetBrains terminals, or any other IDE that embeds a shell. The NotFair MCP works wherever the Codex CLI runs.",
   },
 ];
 
 const RELATED_LINKS = [
+  {
+    href: "/google-ads-codex",
+    title: "Google Ads + OpenAI Codex",
+    description:
+      "Full overview of the Codex × Google Ads integration — capabilities, tools, and use cases.",
+  },
   {
     href: "/google-ads-claude-connector-setup-guide",
     title: "Google Ads Claude Connector",
@@ -68,6 +76,7 @@ const RELATED_LINKS = [
       "Connect your account and let Codex diagnose issues, recommend fixes, and draft approved campaign changes.",
   },
 ];
+
 
 export function GoogleAdsCodexMcpSetupPage() {
   const session = useSession();
@@ -96,6 +105,16 @@ export function GoogleAdsCodexMcpSetupPage() {
             <p className="mt-6 text-sm text-[#C4C0B6]">
               Free · No credit card · 1-minute setup
             </p>
+          </motion.div>
+
+          {/* ── Inline one-liner command card ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+            className="mx-auto mt-8 max-w-2xl"
+          >
+            <CommandCard command={oneLiner} />
           </motion.div>
         </div>
       </section>
@@ -143,6 +162,7 @@ export function GoogleAdsCodexMcpSetupPage() {
               <ConnectButton connected={session.connected} large />
               <Link
                 href="/google-ads-claude-code-plugin-setup-guide"
+                prefetch
                 className="flex items-center gap-1 text-sm text-[#C4C0B6] underline underline-offset-2 hover:text-[#E8E4DD]"
               >
                 Or use Claude Code instead
@@ -170,7 +190,54 @@ export function GoogleAdsCodexMcpSetupPage() {
   );
 }
 
-/* ─────────────────────────────────────────────────── helpers ────────────── */
+/* ─────────────────────────────────────── helpers ────────────── */
+
+function CommandCard({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    trackEvent("install_command_copied", {
+      setup_tab: "codex",
+      surface: "marketing",
+      step: "codex_oneliner_hero",
+    });
+    setTimeout(() => setCopied(false), 2000);
+  }, [command]);
+
+  return (
+    <div className="rounded-lg border border-[#3D3C36] bg-[#24231F]">
+      <div className="flex items-center gap-2 border-b border-[#3D3C36] px-4 py-2.5">
+        <Terminal className="h-3.5 w-3.5 text-[#4CAF6E]" />
+        <span className="font-mono text-xs text-[#C4C0B6]">Terminal</span>
+      </div>
+      <div className="flex items-center gap-2 px-4 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <code className="truncate font-mono text-sm text-[#E8E4DD]">{command}</code>
+        </div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded border border-[#3D3C36] bg-[#2E2D28] px-3 py-1.5 text-sm text-[#C4C0B6] transition-colors hover:border-[#C4C0B6]/40 hover:text-[#E8E4DD]"
+          aria-label={copied ? "Copied!" : "Copy command"}
+        >
+          {copied ? (
+            <>
+              <Check className="h-4 w-4 text-[#4CAF6E]" />
+              <span className="text-[#4CAF6E]">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ConnectButton({
   connected,

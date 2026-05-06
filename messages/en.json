@@ -1137,6 +1137,173 @@
       "note": "Paste one config snippet. OAuth. Done."
     }
   },
+  "GoogleAdsCodexPage": {
+    "hero": {
+      "eyebrow": "OpenAI Codex CLI · MCP Server",
+      "title": {
+        "line1": "Use OpenAI Codex",
+        "line2": "for Google Ads —",
+        "highlight": "live data, 1-minute setup."
+      },
+      "body": "NotFair is a Google Ads MCP server for OpenAI's Codex CLI. One terminal command and Codex gets live access to your campaigns, keywords, spend, and ad copy — diagnose, optimize, and manage from the terminal.",
+      "disconnectedLabel": "Connect Google Ads to Codex",
+      "connectedLabel": "Open Your Account",
+      "note": "No credit card required. Human approval on every write.",
+      "setupGuideLink": "View the 1-minute setup guide"
+    },
+    "capabilities": {
+      "eyebrow": "What you get",
+      "title": "Codex AI for Google Ads — what it actually does.",
+      "body": "Once connected, Codex has live access to your account from the terminal. No more exporting CSVs, no copy-pasting into chat. Ask a question, get a specific answer backed by real data.",
+      "items": [
+        {
+          "title": "Audit from your terminal",
+          "body": "Ask Codex what is wrong. It checks campaign structure, keyword health, search term quality, and ad copy — then gives you a prioritized fix list, right in your shell."
+        },
+        {
+          "title": "Pipe into your dev workflow",
+          "body": "Codex is terminal-native. Chain Google Ads diagnostics with your scripts, CI checks, or deploy hooks. The same MCP tools work in interactive and headless modes."
+        },
+        {
+          "title": "Approve every write",
+          "body": "NotFair never commits a change without your explicit approval. Codex shows you exactly what it wants to do — pause a campaign, adjust a bid, add a negative — you say yes or no."
+        },
+        {
+          "title": "Works on macOS, Linux, WSL",
+          "body": "The Codex CLI runs wherever your terminal runs. macOS, Linux, and Windows via WSL are all supported out of the box with the same one-liner install."
+        }
+      ]
+    },
+    "tools": {
+      "eyebrow": "MCP tools exposed",
+      "title": "What Codex can read and change.",
+      "body": "NotFair exposes a focused set of MCP tools. Read tools give Codex live account context. Write tools let Codex propose changes — each requiring your explicit approval before execution.",
+      "columns": {
+        "tool": "Tool",
+        "type": "Type",
+        "description": "What it does"
+      },
+      "categories": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "referencePrefix": "Full tool reference at",
+      "referenceSuffix": ".",
+      "items": [
+        {
+          "name": "listCampaigns",
+          "category": "read",
+          "description": "Pull live campaign performance, spend, and status"
+        },
+        {
+          "name": "getKeywords",
+          "category": "read",
+          "description": "Inspect keyword bids, Quality Scores, and impressions"
+        },
+        {
+          "name": "getSearchTermReport",
+          "category": "read",
+          "description": "Find irrelevant queries, weak match types, and budget leaks"
+        },
+        {
+          "name": "getCampaignPerformance",
+          "category": "read",
+          "description": "Deep-dive into campaign metrics over any date range"
+        },
+        {
+          "name": "updateBid",
+          "category": "write",
+          "description": "Adjust a keyword bid — reviewable before it applies"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "Pause an underperforming campaign through Codex"
+        },
+        {
+          "name": "addNegativeKeyword",
+          "category": "write",
+          "description": "Block a wasted search term at the campaign or account level"
+        },
+        {
+          "name": "createAd",
+          "category": "write",
+          "description": "Write and launch new ad copy through natural conversation"
+        }
+      ]
+    },
+    "auditCta": {
+      "eyebrow": "Free · No credit card",
+      "title": "Connect once. Let Codex find the fixes.",
+      "body": "Connect your Google Ads account and Codex can diagnose wasted spend, missed opportunities, and structural issues — then draft the changes for your approval.",
+      "disconnectedLabel": "Connect Google Ads",
+      "connectedLabel": "Open Your Account",
+      "secondary": "See how it works"
+    },
+    "faq": {
+      "title": "FAQ — Google Ads and OpenAI Codex",
+      "intro": "Common questions from developers and marketers setting up the Codex CLI Google Ads workflow.",
+      "items": [
+        {
+          "question": "What is the NotFair Codex integration?",
+          "answer": "It's an MCP (Model Context Protocol) server that gives OpenAI's Codex CLI live access to your Google Ads account. One terminal command wires it up — Codex can then diagnose issues, recommend fixes, and propose changes you approve in chat."
+        },
+        {
+          "question": "How is this different from the Claude integration?",
+          "answer": "Same backend, different client. The Codex CLI calls the NotFair MCP server using OpenAI’s MCP support. The Claude Connector and Claude Code plugin call the same server from Anthropic’s clients. Capabilities are identical — only the client differs."
+        },
+        {
+          "question": "What kinds of Google Ads tasks can Codex handle?",
+          "answer": "Codex can audit campaigns, surface wasted spend, find missing negatives, propose bid adjustments, and draft new ad copy. It pulls live data from your account through NotFair’s MCP tools, so answers are grounded in your real numbers — not generic best practices. Anything that touches your account is shown to you for approval before it runs."
+        },
+        {
+          "question": "Who is OpenAI Codex for Google Ads built for?",
+          "answer": "Developers and technical marketers who already live in the terminal. If you run Codex CLI for code, adding NotFair lets you treat your Google Ads account the same way — describe what you want, see live data, approve changes. No CSV exports, no dashboard hopping."
+        },
+        {
+          "question": "Is this free?",
+          "answer": "Yes. Adding NotFair to Codex and running a Google Ads audit is free with no credit card. Paid plans unlock higher usage limits and team features."
+        },
+        {
+          "question": "Can Codex actually change my Google Ads account?",
+          "answer": "Only with your explicit approval. Codex can propose pausing campaigns, adjusting bids, adding negative keywords, or writing new ads — but every write action is shown to you first and requires your confirmation. Read access is unrestricted; write access is gated."
+        }
+      ]
+    },
+    "related": {
+      "title": "Related pages",
+      "intro": "Explore the full NotFair workflow for Google Ads and OpenAI Codex.",
+      "links": {
+        "setupGuide": {
+          "title": "Codex Setup Guide",
+          "description": "Step-by-step instructions to add NotFair to the Codex CLI — covers install, MCP registration, and your first query."
+        },
+        "claude": {
+          "title": "Google Ads + Claude",
+          "description": "Use NotFair with Claude Desktop, Claude Code, or Claude Cowork instead of the Codex CLI."
+        },
+        "mcpServer": {
+          "title": "Google Ads MCP Server",
+          "description": "Learn how NotFair's MCP server exposes your Google Ads data and actions to any MCP-compatible AI client."
+        }
+      }
+    },
+    "finalCta": {
+      "title": "Connect Google Ads to Codex — now.",
+      "body": "1-minute setup. Human in control of every change.",
+      "note": "One terminal command. OAuth. Done."
+    },
+    "heroPreview": {
+      "eyebrow": "What Codex can do",
+      "title": "Ask your terminal about your ads",
+      "bullets": [
+        "Audit campaigns and surface wasted spend",
+        "Find missing negatives and weak keywords",
+        "Propose bid adjustments with evidence",
+        "Draft new ad copy — approve before it runs"
+      ]
+    }
+  },
   "GoogleAdsAuditPage": {
     "hero": {
       "eyebrow": "Free · No credit card · 5 minutes",
