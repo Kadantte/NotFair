@@ -13,67 +13,13 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { useSession } from "@/components/session-provider";
 import { McpSetupHero } from "@/components/marketing/mcp-setup-hero";
 import { MarketingEngineSection } from "@/components/marketing/marketing-engine-section";
 import { GitHubStarBadge } from "@/components/site-header";
-import { Button } from "@/components/ui/button";
-import { startGoogleConnect } from "@/lib/google-oauth";
+import { ConnectClaudeCTA } from "@/components/connect-claude-cta";
 import { CONTACT_EMAIL } from "@/lib/brand";
 import { trackEvent } from "@/lib/analytics";
 import { PricingSection, type PricingSectionProps } from "./pricing-cards";
-
-function ConnectClaudeCTA({
-  session,
-  label,
-  returnTo = "/connect",
-  position,
-}: {
-  session: { connected: boolean };
-  label?: string;
-  returnTo?: string;
-  position: "hero" | "final";
-}) {
-  const [loading, setLoading] = useState(false);
-  const t = useTranslations("CTA");
-
-  function handleClick() {
-    if (loading) return;
-    setLoading(true);
-    trackEvent("cta_clicked", {
-      page: "homepage",
-      cta: "connect_claude",
-      position,
-      destination: returnTo,
-      requires_auth: !session.connected,
-    });
-    if (session.connected) {
-      window.location.assign(returnTo);
-    } else {
-      startGoogleConnect(returnTo);
-    }
-  }
-
-  return (
-    <Button
-      onClick={handleClick}
-      disabled={loading}
-      className="h-12 rounded-full bg-[#4CAF6E] px-7 text-base font-semibold text-black transition-all hover:scale-[1.02] hover:bg-[#3D9A5C] disabled:opacity-70 sm:px-8"
-    >
-      {loading ? (
-        <span className="inline-flex items-center gap-2">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-black border-t-transparent" />
-          {t("connecting")}
-        </span>
-      ) : (
-        <>
-          {label ?? t("connectGoogleAds")}
-          {!label && <ArrowRight className="ml-1 h-5 w-5" />}
-        </>
-      )}
-    </Button>
-  );
-}
 
 function AccordionFaqItem({ q, a, defaultOpen }: { q: string; a: string; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(!!defaultOpen);
@@ -412,7 +358,6 @@ export function HomePage({
   githubStars?: number | null;
   pricing: Omit<PricingSectionProps, "page">;
 }) {
-  const session = useSession();
   const t = useTranslations("Home");
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
@@ -472,7 +417,7 @@ export function HomePage({
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-                  <ConnectClaudeCTA session={session} position="hero" />
+                  <ConnectClaudeCTA tracking={{ page: "homepage", position: "hero" }} />
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-[#C4C0B6] lg:justify-start">
                   {trustItems.map((item) => (
@@ -590,7 +535,7 @@ export function HomePage({
               {t("closingHeadline")}
             </h2>
             <div className="mt-10 flex justify-center">
-              <ConnectClaudeCTA session={session} position="final" />
+              <ConnectClaudeCTA tracking={{ page: "homepage", position: "final" }} />
             </div>
             <p className="mx-auto mt-6 max-w-md text-[11px] leading-relaxed text-[#C4C0B6]">
               {t("legalPrefix")}{" "}

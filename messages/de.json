@@ -108,13 +108,7 @@
     "body": "Melde dich mit Google an, damit NotFair deine Werbekonten finden und dein MCP-Setup vorbereiten kann.",
     "signInWithGoogle": "Mit Google anmelden",
     "oauthNote": "OAuth verhindert, dass deine Zugangsdaten im KI-Client landen.",
-    "or": "oder",
-    "demoIntro": "Mochtest du das Produkt zuerst ansehen? Offne einen schreibgeschutzten Demo-Arbeitsbereich.",
-    "startingDemo": "Demo wird gestartet...",
-    "exploreDemo": "Demo-Modus ansehen",
-    "demoNote": "Die Demo-Daten sind synthetisch und sicher zum Durchklicken.",
     "authFailed": "Authentifizierung fehlgeschlagen. Bitte versuche es erneut.",
-    "demoFailed": "Der Demo-Modus konnte nicht gestartet werden. Bitte versuche es erneut.",
     "helpAria": "Setup-Hilfe buchen",
     "needHelp": "Brauchst du Hilfe?",
     "error": {

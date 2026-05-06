@@ -108,13 +108,7 @@
     "body": "Sign in with Google so NotFair can find your ad accounts and prepare your MCP setup.",
     "signInWithGoogle": "Sign in with Google",
     "oauthNote": "OAuth keeps your credentials out of the AI client.",
-    "or": "or",
-    "demoIntro": "Want to see the product first? Open a read-only demo workspace.",
-    "startingDemo": "Starting demo...",
-    "exploreDemo": "Explore demo mode",
-    "demoNote": "Demo data is synthetic and safe to click through.",
     "authFailed": "Authentication failed. Please try again.",
-    "demoFailed": "Could not start demo mode. Please try again.",
     "helpAria": "Book setup help",
     "needHelp": "Need help?",
     "error": {

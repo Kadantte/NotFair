@@ -463,56 +463,6 @@ export function demoGetAccountBudgetSummary() {
   };
 }
 
-// ─── Dashboard helpers (bypass DB) ──────────────────────────────────
-//
-// The dashboard queries `performance_snapshots` directly for sparklines + WoW.
-// These helpers produce the same shape as those DB queries would.
-
-/** 7-day daily aggregates across all campaigns (matches fetchSparklineData). */
-export function demoSparklineData(daysBack = 7) {
-  const byDate = new Map<string, { cost: number; clicks: number; impressions: number; conversions: number }>();
-  for (const campaign of DEMO_CAMPAIGNS) {
-    const dailies = generateDemoDailyMetrics(campaign, DEMO_HISTORY_DAYS);
-    for (const d of dailies.slice(-daysBack)) {
-      const existing = byDate.get(d.date) ?? { cost: 0, clicks: 0, impressions: 0, conversions: 0 };
-      existing.cost += d.cost;
-      existing.clicks += d.clicks;
-      existing.impressions += d.impressions;
-      existing.conversions += d.conversions;
-      byDate.set(d.date, existing);
-    }
-  }
-  const sorted = [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  return {
-    cost: sorted.map(([, d]) => d.cost),
-    clicks: sorted.map(([, d]) => d.clicks),
-    impressions: sorted.map(([, d]) => d.impressions),
-    cpa: sorted.map(([, d]) => (d.conversions > 0 ? d.cost / d.conversions : 0)),
-  };
-}
-
-/** Week-over-week per-campaign CPA comparison. */
-export function demoWoWPerformance() {
-  return DEMO_CAMPAIGNS.map((c) => {
-    const dailies = generateDemoDailyMetrics(c, DEMO_HISTORY_DAYS);
-    const thisWeek = dailies.slice(-7);
-    const lastWeek = dailies.slice(-14, -7);
-    const sum = (arr: typeof dailies) => ({
-      cost: arr.reduce((s, d) => s + d.cost, 0),
-      conversions: arr.reduce((s, d) => s + d.conversions, 0),
-    });
-    const tw = sum(thisWeek);
-    const lw = sum(lastWeek);
-    return {
-      campaignId: c.id,
-      campaignName: c.name,
-      currentWeekCpa: tw.conversions > 0 ? tw.cost / tw.conversions : null,
-      previousWeekCpa: lw.conversions > 0 ? lw.cost / lw.conversions : null,
-      currentWeekCost: tw.cost,
-    };
-  });
-}
-
 // ─── Exported campaign list for account switcher / sync ─────────────
 
 export function demoConnectedAccounts() {

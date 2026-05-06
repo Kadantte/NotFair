@@ -59,7 +59,6 @@ function subscribeHydration() {
  * /manage-ads-accounts where they can pick a platform.
  */
 const PROTECTED_FEATURE_PREFIXES = [
-    '/dashboard',
     '/campaigns',
     '/audit',
     '/impact-monitor',
@@ -800,7 +799,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile bottom navigation */}
             <nav className="flex md:hidden shrink-0 border-t border-[#3D3C36] bg-[#24231F]">
-                <MobileNavItem href="/dashboard" icon={Home} label={t('home')} active={pathname === '/dashboard'} />
+                <MobileNavItem href="/connect" icon={Home} label={t('home')} active={pathname === '/connect'} />
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label={t('campaigns')} active={pathname.startsWith('/campaigns')} />
                 <MobileNavItem href="/impact-monitor" icon={Gauge} label={t('impact')} active={pathname.startsWith('/impact-monitor')} />
                 <MobileNavItem href="/chat" icon={MessageSquare} label={t('chat')} active={pathname.startsWith('/chat')} />

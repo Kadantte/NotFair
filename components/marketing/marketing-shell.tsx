@@ -8,7 +8,7 @@ export async function MarketingShell({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#1A1917] text-[#E8E4DD] selection:bg-[#4CAF6E]/30 font-sans">
-      <SiteHeader connected={session.connected} />
+      <SiteHeader />
       <SessionProvider session={session}>
         <main className="flex-1 flex flex-col">{children}</main>
       </SessionProvider>

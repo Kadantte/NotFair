@@ -23,7 +23,7 @@ export default async function ContactProfilePage({
 
   const session = await getSession();
   if (!session.connected) redirect("/connect");
-  if (!session.isDev) redirect("/dashboard");
+  if (!session.isDev) redirect("/connect");
 
   const [initial] = await db()
     .select()

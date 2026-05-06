@@ -2,6 +2,14 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.12.0] - 2026-05-06
+
+### Changed
+- **"Start Now" in the header now behaves the same as "Connect Google Ads" everywhere else.** Both CTAs share one component, so logged-in users always land on `/connect` instead of being routed to a separate dashboard, and disconnected users get the same Google OAuth flow regardless of which button they click.
+
+### Removed
+- **Retired the standalone `/dashboard` route.** The post-login dashboard, its health-score / issues / opportunities sections, and the read-only "Explore demo" button on `/connect` have been removed. Mobile bottom-nav "Home" and the post-OAuth landing now go to `/connect`. Saves ~3,000 lines of code that were duplicating views available elsewhere.
+
 ## [0.3.11.3] - 2026-05-06
 
 ### Added
