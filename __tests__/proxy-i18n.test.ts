@@ -31,6 +31,10 @@ describe("proxy i18n routing", () => {
     ["th-TH,th;q=0.9", "th"],
     ["pt-BR,pt;q=0.9", "pt-BR"],
     ["pt-PT,pt;q=0.9", "pt-BR"],
+    ["ru-RU,ru;q=0.9", "ru"],
+    ["be-BY,be;q=0.9", "ru"],
+    ["pl-PL,pl;q=0.9", "ru"],
+    ["kk-KZ,kk;q=0.9", "ru"],
     ["en-US,en;q=0.9", "en"],
   ])("detects %s for canonical public routes", async (acceptLanguage, expectedLocale) => {
     const response = await proxy(makeRequest("/mcp", { "accept-language": acceptLanguage }));
@@ -104,6 +108,14 @@ describe("proxy i18n routing", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/fr");
+  });
+
+  it("routes Russian-related browser regions to the Russian home page", async () => {
+    const response = await proxy(makeRequest("/", { "accept-language": "pl-PL,pl;q=0.9" }));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:3000/ru");
+    expect(response.cookies.get("NEXT_LOCALE")?.value).toBe("ru");
   });
 
   it("keeps English home visits on the canonical root route", async () => {

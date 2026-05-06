@@ -2,6 +2,19 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.11.0] - 2026-05-06
+
+### Added
+- **Russian is now available as a supported product language.** Users can choose Russian from the language switcher, visit the localized `/ru` home page, and receive Russian copy across the same marketing, onboarding, account-management, and setup flows covered by the existing i18n bundles.
+
+### Changed
+- **Russian-region browser detection now routes to Russian.** Browser language tags for Russian and related regional languages, including Belarusian, Polish, Ukrainian, Kazakh, and nearby post-Soviet region tags, now default users to the Russian experience unless a saved language preference is already present.
+
+### Fixed
+- **Manual language choice now persists beyond browser auto-detection.** The language switcher stores the selected locale in both `localStorage` and the `NEXT_LOCALE` cookie, and a before-hydration bootstrap restores the cookie from the saved preference before automated language detection can override it.
+- **Language preference recovery avoids reload loops.** When cookies are blocked or rejected, the bootstrap no longer repeatedly reloads canonical app routes.
+- **In-place language switching preserves anchor links.** Query strings and hash fragments now survive language changes on canonical routes.
+
 ## [0.3.10.1] - 2026-05-06
 
 ### Added

@@ -2,11 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
 import { defaultLocale, locales, type AppLocale } from "@/i18n/locales";
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, LOCALE_HEADER } from "@/i18n/locale-preference";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const intlMiddleware = createMiddleware(routing);
-const LOCALE_COOKIE = "NEXT_LOCALE";
-const LOCALE_HEADER = "X-NEXT-INTL-LOCALE";
 
 const APP_PATH_PREFIXES = [
   "/connect",
@@ -24,6 +23,40 @@ const APP_PATH_PREFIXES = [
   "/dev",
   "/outreach",
 ] as const;
+
+const RUSSIAN_RELATED_LANGUAGE_CODES = new Set([
+  "ru",
+  "be",
+  "uk",
+  "pl",
+  "kk",
+  "ky",
+  "uz",
+  "tg",
+  "tk",
+  "hy",
+  "az",
+  "ka",
+]);
+
+const RUSSIAN_RELATED_REGION_CODES = new Set([
+  "ru",
+  "by",
+  "pl",
+  "ua",
+  "kz",
+  "kg",
+  "uz",
+  "tj",
+  "tm",
+  "am",
+  "az",
+  "ge",
+  "md",
+  "ee",
+  "lv",
+  "lt",
+]);
 
 function isAppPath(pathname: string): boolean {
   return APP_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -61,12 +94,15 @@ function detectLocale(request: NextRequest): AppLocale {
 
   for (const candidate of candidates) {
     if (candidate === "pt-br" || candidate.startsWith("pt-br-")) return "pt-BR";
-    const primary = candidate.split("-")[0];
+    const [primary, region] = candidate.split("-");
     if (primary === "fr") return "fr";
     if (primary === "de") return "de";
     if (primary === "th") return "th";
     if (primary === "pt") return "pt-BR";
     if (primary === "es") return "es";
+    if (RUSSIAN_RELATED_LANGUAGE_CODES.has(primary) || (region && RUSSIAN_RELATED_REGION_CODES.has(region))) {
+      return "ru";
+    }
     if (primary === "en") return "en";
   }
 
@@ -76,7 +112,7 @@ function detectLocale(request: NextRequest): AppLocale {
 function setLocaleCookie(response: NextResponse, locale: AppLocale) {
   response.cookies.set(LOCALE_COOKIE, locale, {
     path: "/",
-    maxAge: 60 * 60 * 24 * 365,
+    maxAge: LOCALE_COOKIE_MAX_AGE,
     sameSite: "lax",
   });
 }

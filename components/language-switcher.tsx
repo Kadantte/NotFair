@@ -5,15 +5,12 @@ import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Languages } from "lucide-react";
 import { localeLabels, locales, type AppLocale } from "@/i18n/locales";
+import { persistLocalePreference } from "@/i18n/locale-preference";
 
 type LanguageSwitcherProps = {
   className?: string;
   mode?: "links" | "cookie";
 };
-
-function setLocaleCookie(locale: AppLocale) {
-  document.cookie = `NEXT_LOCALE=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
-}
 
 function getPathLocale(pathname: string): AppLocale | null {
   return locales.find((entry) => pathname === `/${entry}` || pathname.startsWith(`/${entry}/`)) ?? null;
@@ -43,8 +40,8 @@ export function LanguageSwitcher({ className = "", mode = "links" }: LanguageSwi
   const canUseLocaleLinks = canonicalPathname === "/";
 
   function switchInPlace(nextLocale: AppLocale) {
-    setLocaleCookie(nextLocale);
-    window.location.assign(`${canonicalPathname}${window.location.search}`);
+    persistLocalePreference(nextLocale);
+    window.location.assign(`${canonicalPathname}${window.location.search}${window.location.hash}`);
   }
 
   return (
@@ -84,7 +81,7 @@ export function LanguageSwitcher({ className = "", mode = "links" }: LanguageSwi
               href={getLocalizedHomeHref(entry)}
               prefetch
               aria-current={active ? "page" : undefined}
-              onClick={() => setLocaleCookie(entry)}
+              onClick={() => persistLocalePreference(entry)}
               className={className}
             >
               {localeLabels[entry]}

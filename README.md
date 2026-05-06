@@ -33,10 +33,11 @@ The app uses `next-intl` with these locales:
 - `th` - Thai
 - `pt-BR` - Brazilian Portuguese
 - `es` - Spanish
+- `ru` - Russian
 
 Translation messages live in `messages/*.json`. Locale configuration lives in `i18n/locales.ts`, `i18n/routing.ts`, and `i18n/request.ts`.
 
-Localized home pages are available at `/fr`, `/de`, `/th`, `/pt-BR`, and `/es`. Non-home public pages and app routes stay on canonical paths while the proxy preserves the user's locale preference in the `NEXT_LOCALE` cookie.
+Localized home pages are available at `/fr`, `/de`, `/th`, `/pt-BR`, `/es`, and `/ru`. Non-home public pages and app routes stay on canonical paths while the proxy preserves the user's locale preference in the `NEXT_LOCALE` cookie.
 
 ## Documentation
 

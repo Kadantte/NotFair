@@ -2,6 +2,7 @@ import { getRequestConfig } from "next-intl/server";
 import { hasLocale } from "next-intl";
 import { cookies } from "next/headers";
 import { routing } from "./routing";
+import { LOCALE_COOKIE } from "./locale-preference";
 
 type Messages = Record<string, unknown>;
 
@@ -27,7 +28,7 @@ function mergeMessages(base: Messages, override: Messages): Messages {
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
-  const cookieLocale = (await cookies()).get("NEXT_LOCALE")?.value;
+  const cookieLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = hasLocale(routing.locales, requested)
     ? requested
     : hasLocale(routing.locales, cookieLocale)
