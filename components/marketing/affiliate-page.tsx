@@ -36,12 +36,6 @@ const examples = [
     yourCut: "$475 upfront",
     annual: "$475",
   },
-  {
-    plan: "Managed",
-    price: "From $499 / mo",
-    yourCut: "$249.50+ / mo",
-    annual: "$2,994+",
-  },
 ];
 
 const rules = [

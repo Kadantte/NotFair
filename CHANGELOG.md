@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.9.1] - 2026-05-06
+
+### Fixed
+- **Removed Managed from the affiliate earnings table.** Managed is not part of the affiliate program; the earnings table on /affiliate now only shows Growth monthly and Growth yearly.
+
 ## [0.3.9.0] - 2026-05-06
 
 ### Added
