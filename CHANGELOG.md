@@ -3,6 +3,12 @@
 All notable changes to NotFair will be documented in this file.
 
 
+## [0.3.7.1] - 2026-05-06
+
+### Fixed
+- **The canonical English homepage now renders at `/` after the i18n rollout.** Default-English visitors stay on the root route instead of being passed through localized-home middleware that could miss the marketing home page in production.
+
+
 ## [0.3.7.0] - 2026-05-06
 
 ### Added

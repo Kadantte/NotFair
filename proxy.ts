@@ -42,6 +42,10 @@ function isLocalizedHomePath(pathname: string): boolean {
   return normalizedPathname === "/" || locales.some((locale) => normalizedPathname === `/${locale}`);
 }
 
+function isRootPath(pathname: string): boolean {
+  return normalizePathname(pathname) === "/";
+}
+
 function detectLocale(request: NextRequest): AppLocale {
   const pathLocale = getPathLocale(request.nextUrl.pathname);
   if (pathLocale) return pathLocale;
@@ -108,6 +112,20 @@ export async function proxy(request: NextRequest) {
     if (!request.cookies.has(LOCALE_COOKIE)) {
       setLocaleCookie(response, detectLocale(request));
     }
+    return response;
+  }
+
+  if (isRootPath(pathname)) {
+    const locale = detectLocale(request);
+    if (locale === defaultLocale) {
+      return nextWithLocale(request, locale);
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}`;
+
+    const response = NextResponse.redirect(url);
+    setLocaleCookie(response, locale);
     return response;
   }
 

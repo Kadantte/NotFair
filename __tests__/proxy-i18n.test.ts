@@ -106,6 +106,14 @@ describe("proxy i18n routing", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/fr");
   });
 
+  it("keeps English home visits on the canonical root route", async () => {
+    const response = await proxy(makeRequest("/", { "accept-language": "en-US,en;q=0.9" }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.cookies.get("NEXT_LOCALE")?.value).toBe("en");
+  });
+
   it("treats trailing-slash locale home paths as localized home pages", async () => {
     const response = await proxy(makeRequest("/fr/"));
 
