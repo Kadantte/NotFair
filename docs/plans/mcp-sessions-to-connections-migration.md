@@ -178,14 +178,15 @@ What shipped:
 - `lib/session.ts` — split into `loadDeviceSession` (mcp_sessions, cookie + impersonation) and `mergeWithConnection` (ad_platform_connections). Always shadow-reads on every session-load surface (`getSession`, `getSessionAuth`, `getAuthContext`, `getCurrentRefreshToken`); flag-on swaps source of truth, flag-off keeps mcp_sessions reads but still emits mismatches.
 - `app/api/auth/select-account/route.ts`, `app/api/auth/switch-account/route.ts` — flag-on reads candidate accountIds from the connection row; flag-off keeps reading from mcp_sessions. Both routes now shadow-read the full session/connection diff (extended SELECTs to pull `loginCustomerId` + `googleEmail` for parity comparison).
 - `app/api/oauth/token/route.ts` — flag-on translates Google sessionId-bound auth codes to connectionId-bound tokens at exchange time. The auth code itself is left alone (10-min TTL); the issued `oauth_access_tokens` row gets `connectionId` set / `sessionId = NULL`. `oauth_clients.session_id` UPDATE is skipped on translated rows so we don't write a connection id into an mcp_sessions FK. Falls back to sessionId binding when no connection row exists for the user (logs gap, doesn't block exchange). Token-prefix selection unchanged.
-- `lib/mcp/handler-factory.ts` — Google branch now resolves bindings dual-aware. SELECT-then-branch on the token row: `connectionId !== null` → JOIN `ad_platform_connections` and build `AuthContext` directly (mirrors Meta path); `sessionId !== null` → existing mcp_sessions JOIN + expiry check. Audience check (Google vs Meta platform) runs before either branch. Time-based expiry on the connectionId path is intentionally not enforced — needs the token-level `expires_at` follow-up (see cross-cutting fix below).
+- `lib/mcp/handler-factory.ts` — Google branch now resolves bindings dual-aware. SELECT-then-branch on the token row: `connectionId !== null` → JOIN `ad_platform_connections` and build `AuthContext` directly (mirrors Meta path); `sessionId !== null` → existing mcp_sessions JOIN + expiry check. Audience check (Google vs Meta platform) runs before either branch. Time-based expiry on the connectionId path is intentionally not enforced — connection-bound Google tokens are revocable via row deletion only, matching Meta's behavior (see "expiresAt semantics" below).
 - Tests: 15 new `google-read.test.ts` (projection, derivation, shadow-read), 4 new `oauth-token-route.test.ts` cases for translation (flag-on success, missing-connection fallback, null-userId no-translate, flag-off legacy). Full suite: 1308 passing.
 
 What's still pending in phase 2:
 
-- **Supabase session bridge** (`@supabase/ssr`, root `middleware.ts`, persisted `sb-*` cookie). Separate workstream — independent of the connections-read flip.
-- **Token-level `expires_at` column** on `oauth_access_tokens`. Without it, connectionId-bound Google tokens have no time-based expiry (matches Meta's current behavior). Drizzle migration + back-stamp on existing rows + handler-factory check.
+- **Supabase session bridge** (`@supabase/ssr`, root `middleware.ts`, persisted `sb-*` cookie). Separate workstream — independent of the connections-read flip. Required for phase 4.
 - **Flag rollout**: flip on staging post-bake, monitor `google_connection_mismatch` event count for ≥1 week, then flip in prod. Any non-zero `field_diff` count is a dual-write gap that must be fixed before proceeding.
+
+Explicitly **not** in scope for phase 2 (or this migration at all): a token-level `expires_at` on `oauth_access_tokens`. The earlier plan flagged this as a phase-2 follow-up; on closer reading of phase 5 it isn't a blocker (the cleanup script force-deletes orphaned sessionId-only tokens directly). Connection-bound Google tokens become revocation-only, same as Meta. If hard TTLs are wanted later, do them platform-wide as a standalone change.
 
 
 
@@ -414,9 +415,13 @@ This is a UX change worth flagging. If per-device active account is a real requi
 
 Supabase JWTs are ~1–2KB; with both access + refresh cookies + display state you can flirt with the 4KB header limit on Vercel. Audit cookie size after phase 2 ships.
 
-### `expiresAt` semantics
+### `expiresAt` semantics — accepted state, not a phase blocker
 
-Today the MCP OAuth path checks `mcp_sessions.expiresAt`, not `oauth_access_tokens.expiresAt` (handler-factory.ts:250–287). Fix this in phase 2: token expiry is the token's own field. Without this fix, phase 5 (which removes `mcp_sessions`) breaks expiry enforcement for tokens that were issued without proper `oauth_access_tokens.expiresAt` set.
+Pre-migration, Google MCP tokens implicitly expired by JOINing to `mcp_sessions.expiresAt` (sliding 1yr). Meta tokens have never had a time-based expiry — the resolver does no expiry check on `oauth_access_tokens` for Meta. Phase 2 lands connectionId-bound Google tokens in the same shape as Meta: revocable via row deletion, no time-based ceiling.
+
+This is a mild security drift on Google (loss of implicit 1yr ceiling) in exchange for parity with Meta. Phase 5 does NOT depend on a token-level `expiresAt` column — its cleanup script `DELETE FROM oauth_access_tokens WHERE session_id IS NOT NULL AND connection_id IS NULL` removes orphaned legacy tokens directly, so there's nothing left to enforce expiry against once `mcp_sessions` is dropped.
+
+If we later want hard TTLs on MCP tokens, do it as a standalone change covering **both** Google and Meta in one go — not as part of this migration. Adding `expires_at` to only Google would re-introduce the cross-platform inconsistency we just removed.
 
 ### Operations table
 

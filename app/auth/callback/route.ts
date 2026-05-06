@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
+import { supabaseSessionBridge } from "@/lib/connections/feature-flags";
 import { refreshGoogleConnectionCredentials, upsertGoogleConnection } from "@/lib/connections/google";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
@@ -23,8 +24,14 @@ import { evaluateScopeGrant } from "@/lib/oauth-scope-retry";
  * `adsagent_token` cookie handles session management.  Leaving the sb-*
  * cookies around pushes total header size past the 8 KB limit, causing
  * HTTP 431 errors.
+ *
+ * Phase-2 Supabase bridge: when `SUPABASE_SESSION_BRIDGE=true`, persist sb-*
+ * instead so phase 4 can read userId from Supabase Auth directly. The size
+ * audit lives on that flag — flipping it without confirming aggregate cookie
+ * size stays under 4KB risks reproducing the 431 incident.
  */
 function clearSupabaseCookies(response: NextResponse, requestCookies: { name: string }[]) {
+  if (supabaseSessionBridge()) return;
   for (const { name } of requestCookies) {
     if (name.startsWith("sb-")) {
       response.cookies.set(name, "", { maxAge: 0, path: "/" });
@@ -802,10 +809,12 @@ export async function GET(request: Request) {
       : redirectWithError(origin, AUTH_ERROR_REASON.SCOPE_DENIED);
     // Clean up cookies even on scope failure to avoid 431 errors
     scopeResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
-    const requestCookiesForCleanup = (await cookies()).getAll();
-    for (const { name } of requestCookiesForCleanup) {
-      if (name.startsWith("sb-")) {
-        scopeResponse.cookies.set(name, "", { maxAge: 0, path: "/" });
+    if (!supabaseSessionBridge()) {
+      const requestCookiesForCleanup = (await cookies()).getAll();
+      for (const { name } of requestCookiesForCleanup) {
+        if (name.startsWith("sb-")) {
+          scopeResponse.cookies.set(name, "", { maxAge: 0, path: "/" });
+        }
       }
     }
     return scopeResponse;
