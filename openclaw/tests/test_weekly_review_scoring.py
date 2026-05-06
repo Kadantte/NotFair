@@ -138,6 +138,25 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertEqual(issue["score_components"]["goal_alignment_score"], 1.0)
         self.assertTrue(any("service page" in note for note in issue["operator_judgment_notes"]))
 
+    def test_generic_branded_gap_on_service_page_is_not_approval_ready(self) -> None:
+        issue = weekly_review.ctr_gap_issue(
+            {
+                "query": "example",
+                "page": "https://www.example.com/dog-boarding",
+                "clicks": 17,
+                "impressions": 941,
+                "ctr": 1.81,
+                "position": 1.2,
+            },
+            ["example"],
+        )
+        readiness = weekly_review.approval_readiness_for_issue(issue)
+
+        self.assertLess(issue["score_components"]["goal_alignment_score"], 1.0)
+        self.assertLess(issue["score_components"]["actionability_score"], 0.5)
+        self.assertFalse(readiness["approval_ready"])
+        self.assertTrue(any("generic branded" in note for note in issue["operator_judgment_notes"]))
+
     def test_branded_gap_on_blog_stays_lower_priority(self) -> None:
         issue = weekly_review.ctr_gap_issue(
             {
@@ -511,6 +530,115 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertTrue(any(gap["field"] == "service_value_weights" for gap in context_request["business_context_gaps"]))
         self.assertTrue(context_request["business_context_questions"])
 
+    def test_seed_stage_generates_demand_seed_action_instead_of_manual_review(self) -> None:
+        analysis = {
+            "site": "sc-domain:newco.com",
+            "period": {"start": "2026-04-01", "end": "2026-04-28", "days": 28},
+            "summary": {"clicks": 9, "impressions": 44, "ctr": 20.45, "position": 4.1},
+            "branded_split": {},
+            "comparison": {"declining_pages": [], "declining_queries": []},
+            "ctr_gaps_by_page": [],
+            "ctr_opportunities": [],
+            "cannibalization": [],
+            "top_pages": [{"page": "https://newco.com/setup-guide", "clicks": 0, "impressions": 6}],
+            "top_queries": [{"query": "newco setup", "clicks": 0, "impressions": 1}],
+        }
+
+        payload = weekly_review.build_payload("newco.com", analysis, {"priors": {}}, None, site_profile={"canonical_url": "https://newco.com"})
+        top_action = payload["action_plan"]["actions"][0]
+        proposal = next(item for item in payload["queue_items"] if item["type"] == "action_proposal")
+        stage_check = next(item for item in payload["verification"]["checks"] if item["name"] == "site stage playbook")
+
+        self.assertEqual(payload["action_plan"]["site_stage"]["stage"], "seed")
+        self.assertEqual(top_action["type"], "demand_seed_content")
+        self.assertNotEqual(top_action["type"], "manual_review")
+        self.assertEqual(top_action["approval_artifact_type"], "seed_content_portfolio_brief")
+        self.assertIn("Google Ads/search-term data", top_action["recommended_deliverable"]["demand_sources"])
+        self.assertEqual(proposal["action_type"], "demand_seed_content")
+        self.assertEqual(stage_check["site_stage"]["stage"], "seed")
+
+    def test_seed_stage_prioritizes_seed_portfolio_over_sparse_ctr_noise(self) -> None:
+        analysis = {
+            "site": "sc-domain:newco.com",
+            "period": {"start": "2026-04-01", "end": "2026-04-28", "days": 28},
+            "summary": {"clicks": 20, "impressions": 900, "ctr": 2.2, "position": 4.0},
+            "branded_split": {},
+            "comparison": {"declining_pages": [], "declining_queries": []},
+            "ctr_gaps_by_page": [
+                {
+                    "query": "emergency roof repair near me",
+                    "page": "https://newco.com/roof-repair",
+                    "clicks": 1,
+                    "impressions": 900,
+                    "ctr": 0.11,
+                    "position": 3.0,
+                }
+            ],
+            "ctr_opportunities": [],
+            "cannibalization": [],
+            "top_pages": [],
+            "top_queries": [],
+        }
+
+        payload = weekly_review.build_payload("newco.com", analysis, {"priors": {}}, None, site_profile={"canonical_url": "https://newco.com"})
+        top_action = payload["action_plan"]["actions"][0]
+        proposal = next(item for item in payload["queue_items"] if item["type"] == "action_proposal")
+
+        self.assertEqual(payload["action_plan"]["site_stage"]["stage"], "seed")
+        self.assertEqual(top_action["type"], "demand_seed_content")
+        self.assertEqual(proposal["action_type"], "demand_seed_content")
+        self.assertTrue(any(action["type"] == "meta_tags" for action in payload["action_plan"]["actions"][1:]))
+
+    def test_declining_click_loss_uses_max_slice_not_page_plus_query_sum(self) -> None:
+        analysis = {
+            "comparison": {
+                "declining_pages": [{"clicks_prev": 100, "clicks_now": 80}],
+                "declining_queries": [{"clicks_prev": 95, "clicks_now": 75}],
+            }
+        }
+
+        self.assertEqual(weekly_review.total_declining_click_loss(analysis), 20.0)
+
+    def test_conversion_weighting_promotes_transactional_high_value_candidate(self) -> None:
+        analysis = self.base_analysis()
+        analysis["ctr_gaps_by_page"] = [
+            {
+                "query": "roof repair cost",
+                "page": "https://www.example.com/blog/roof-repair-cost",
+                "clicks": 2,
+                "impressions": 5000,
+                "ctr": 0.1,
+                "position": 3.0,
+            },
+            {
+                "query": "emergency roof repair near me",
+                "page": "https://www.example.com/roof-repair",
+                "clicks": 8,
+                "impressions": 900,
+                "ctr": 0.89,
+                "position": 8.0,
+            },
+        ]
+        business_context = {
+            "site_stage": "harvest",
+            "service_value_weights": {"emergency roof repair": 1.8, "roof repair cost": 0.6},
+            "conversion_events": [
+                {"name": "quote_request", "weight": 1.5, "paths": ["/roof-repair"], "intent_terms": ["near me", "emergency"]}
+            ],
+            "page_role_map": {
+                "/roof-repair": "transactional quote landing page",
+                "/blog/roof-repair-cost": "supporting informational page",
+            },
+        }
+
+        payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None, business_context)
+        top_action = payload["action_plan"]["actions"][0]
+
+        self.assertEqual(top_action["target"], "https://www.example.com/roof-repair")
+        self.assertEqual(top_action["conversion_opportunity"]["matched_service"], "emergency roof repair")
+        self.assertEqual(top_action["conversion_opportunity"]["matched_conversion_event"], "quote_request")
+        self.assertGreater(top_action["priority_score"], top_action["raw_priority_score"])
+
     def test_action_proposal_includes_best_practice_alignment(self) -> None:
         analysis = self.base_analysis()
         analysis["ctr_gaps_by_page"] = [
@@ -537,6 +665,7 @@ class WeeklyReviewScoringTest(unittest.TestCase):
     def test_all_current_action_types_have_best_practice_mapping(self) -> None:
         expected_action_types = {
             "canonical_or_tracking_investigation",
+            "demand_seed_content",
             "query_intent_mapping",
             "local_intent_ownership",
             "content_refresh",
@@ -710,10 +839,50 @@ class WeeklyReviewScoringTest(unittest.TestCase):
             ],
         }
         issue = weekly_review.decline_issue(page)
-        # primary_query should be set (it's still the top query) but action_type stays page_improvement
-        # because share_of_loss = 5/20 = 25% < 30%
+        # share_of_loss = 5/20 = 25% < 30%, so the query is only a diagnostic fallback.
         self.assertNotIn("primary_query", issue)
+        self.assertEqual(issue["diagnostic_query"], "dog sitting seattle")
         self.assertEqual(issue["recommended_action_type"], "page_improvement")
+        self.assertLess(issue["score_components"]["actionability_score"], 0.5)
+        self.assertFalse(weekly_review.approval_readiness_for_issue(issue)["approval_ready"])
+
+    def test_non_actionable_top_issues_do_not_queue_approval_proposal(self) -> None:
+        analysis = self.base_analysis()
+        analysis["_brand_terms"] = ["example"]
+        analysis["comparison"]["declining_pages"] = [
+            {
+                "page": "https://www.example.com/blog/dog-boarding-cost",
+                "clicks_now": 173,
+                "clicks_prev": 247,
+                "change_pct": -30.0,
+            }
+        ]
+        analysis["comparison"]["page_query_decompositions"] = [
+            {
+                "page": "https://www.example.com/blog/dog-boarding-cost",
+                "top_losing_queries": [
+                    {"query": "average cost to board a dog", "absolute_click_loss": 1, "clicks_now": 2, "clicks_prev": 3}
+                ],
+            }
+        ]
+        analysis["ctr_gaps_by_page"] = [
+            {
+                "query": "example",
+                "page": "https://www.example.com/dog-boarding",
+                "clicks": 17,
+                "impressions": 941,
+                "ctr": 1.81,
+                "position": 1.2,
+            }
+        ]
+
+        payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None)
+        proposals = [item for item in payload["queue_items"] if item["type"] == "action_proposal"]
+
+        self.assertEqual(proposals, [])
+        self.assertFalse(payload["action_plan"]["actions"][0]["approval_ready"])
+        quality_gate = next(item for item in payload["verification"]["checks"] if item["name"] == "recommendation quality gate")
+        self.assertEqual(quality_gate["status"], "warning")
 
     def test_unknown_action_type_warns_as_unmapped(self) -> None:
         alignment = weekly_review.best_practice_alignment_for_issue({"recommended_action_type": "core_web_vitals"})

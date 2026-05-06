@@ -105,6 +105,7 @@ SEO_BEST_PRACTICE_AREAS: dict[str, dict[str, Any]] = {
 
 ACTION_BEST_PRACTICE_AREAS = {
     "canonical_or_tracking_investigation": "search_eligibility_indexability",
+    "demand_seed_content": "demand_intent_targeting",
     "query_intent_mapping": "demand_intent_targeting",
     "local_intent_ownership": "demand_intent_targeting",
     "content_refresh": "content_usefulness_trust",
@@ -247,6 +248,61 @@ def severity_from_score(score: float) -> str:
     if score >= 0.65:
         return "warning"
     return "info"
+
+
+def total_declining_click_loss(analysis: dict[str, Any]) -> float:
+    comparison = analysis.get("comparison") or {}
+    page_loss = 0.0
+    query_loss = 0.0
+    for page in comparison.get("declining_pages") or []:
+        page_loss += max(float(page.get("clicks_prev") or 0) - float(page.get("clicks_now") or 0), 0.0)
+    for query in comparison.get("declining_queries") or []:
+        query_loss += max(float(query.get("clicks_prev") or 0) - float(query.get("clicks_now") or 0), 0.0)
+    # Page and query declines are different slices of the same GSC clicks. Summing
+    # them double-counts the same traffic loss and can falsely trigger recovery mode.
+    return round(max(page_loss, query_loss), 1)
+
+
+def infer_site_stage(analysis: dict[str, Any], metrics: dict[str, float], business_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Classify the SEO operating mode so the weekly review picks the right playbook.
+
+    Seed-stage sites should not be told "manual review only" just because GSC is
+    sparse. Harvest/recover/defend sites have enough signal for GSC-led actions.
+    """
+    configured = (business_context or {}).get("site_stage") or (business_context or {}).get("seo_stage")
+    valid = {"seed", "harvest", "defend", "recover"}
+    if isinstance(configured, str) and configured.lower() in valid:
+        return {
+            "stage": configured.lower(),
+            "source": "business_context",
+            "reason": f"Business context explicitly sets SEO stage to {configured.lower()}.",
+        }
+
+    period_days = int((analysis.get("period") or {}).get("days") or 28)
+    suffix = f"_{period_days}d"
+    organic_clicks = float(metrics.get(f"organic_clicks{suffix}", 0.0))
+    organic_impressions = float(metrics.get(f"organic_impressions{suffix}", 0.0))
+    non_brand_clicks = float(metrics.get(f"non_brand_clicks{suffix}", 0.0))
+    non_brand_impressions = float(metrics.get(f"non_brand_impressions{suffix}", 0.0))
+    branded_clicks = float(metrics.get(f"branded_clicks{suffix}", 0.0))
+    lost_clicks = total_declining_click_loss(analysis)
+
+    signals = {
+        "organic_clicks": organic_clicks,
+        "organic_impressions": organic_impressions,
+        "non_brand_clicks": non_brand_clicks,
+        "non_brand_impressions": non_brand_impressions,
+        "branded_clicks": branded_clicks,
+        "declining_click_loss": lost_clicks,
+        "period_days": period_days,
+    }
+    if lost_clicks >= 25:
+        return {"stage": "recover", "source": "heuristic", "reason": f"Meaningful recent organic loss detected (~{lost_clicks:g} lost clicks).", "signals": signals}
+    if organic_impressions < 1000 or organic_clicks < 50:
+        return {"stage": "seed", "source": "heuristic", "reason": "GSC volume is too sparse for harvest-mode optimization; create demand-capture assets first.", "signals": signals}
+    if non_brand_impressions >= 1000 or organic_impressions >= 5000:
+        return {"stage": "harvest", "source": "heuristic", "reason": "Enough impression volume exists to harvest CTR/ranking/internal-link opportunities.", "signals": signals}
+    return {"stage": "defend", "source": "heuristic", "reason": "Moderate organic presence; protect brand/service coverage while looking for qualified expansion bets.", "signals": signals}
 
 
 def make_issue(
@@ -412,6 +468,32 @@ def is_branded_query(query: str | None, brand_terms: list[str] | None) -> bool:
     return any(term and term.lower() in q for term in brand_terms)
 
 
+GENERIC_BRAND_STOPWORDS = {"the", "a", "an", "inc", "llc", "ltd", "co", "company", "official", "website"}
+GENERIC_BRAND_SERVICE_TERMS = {"boarding", "board", "daycare", "grooming", "groom", "training", "sitting", "sitter", "pet", "dog", "cat"}
+
+
+def is_generic_branded_query(query: str | None, brand_terms: list[str] | None) -> bool:
+    """True for pure navigational brand searches like "paws vip".
+
+    Branded service searches ("paws vip dog boarding", "example grooming seattle")
+    can still be business-relevant for service pages, but pure brand navigational
+    searches usually belong to the homepage / GBP / directory SERP, so low CTR on
+    a secondary service page is not an actionable snippet opportunity.
+    """
+    if not is_branded_query(query, brand_terms):
+        return False
+    normalized = re.sub(r"[^a-z0-9]+", " ", (query or "").lower()).strip()
+    for term in sorted((brand_terms or []), key=len, reverse=True):
+        term_norm = re.sub(r"[^a-z0-9]+", " ", term.lower()).strip()
+        if term_norm:
+            normalized = re.sub(rf"\b{re.escape(term_norm)}\b", " ", normalized)
+    residual = " ".join(token for token in normalized.split() if token not in GENERIC_BRAND_STOPWORDS)
+    if not residual:
+        return True
+    action_terms = LOCAL_INTENT_TERMS | COMMERCIAL_SERVICE_TERMS | INFORMATIONAL_SERP_TERMS | GENERIC_BRAND_SERVICE_TERMS
+    return not any(term in residual for term in action_terms)
+
+
 SERVICE_PAGE_PATTERNS = re.compile(r"/(?:locations?|services?|pricing|booking|book|reserve|contact|about|faq|gallery|rates?|review|team|careers?|apply|shop|products?|dogs?-(?:boarding?|daycare|sitting?|grooming|training)|pet-(?:boarding?|daycare|sitting?|grooming|training))")
 
 
@@ -509,11 +591,23 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
         top_losing_queries = [q for q in top_losing_queries if q.get("absolute_click_loss", 0) > 0]
 
     primary_query: str | None = None
+    diagnostic_query: str | None = None
+    query_decomposition: dict[str, Any] | None = None
+    approval_blockers: list[str] = []
     if top_losing_queries:
         top = top_losing_queries[0]
         total_lost = top.get("absolute_click_loss", 0)
         share_of_loss = total_lost / max(lost_clicks, 1)
         top_name = top.get("query", "")
+        diagnostic_query = top_name or None
+        explained_loss = sum(float(q.get("absolute_click_loss") or 0) for q in top_losing_queries[:5])
+        explained_loss_share = explained_loss / max(lost_clicks, 1)
+        query_decomposition = {
+            "top_query_loss_share": round(share_of_loss, 3),
+            "top_5_explained_loss_share": round(explained_loss_share, 3),
+            "top_5_explained_lost_clicks": round(explained_loss, 1),
+            "is_distributed": share_of_loss < 0.3,
+        }
 
         if share_of_loss >= 0.3:
             # Dominant losing query — reclassify action type based on regression pattern
@@ -526,6 +620,9 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
             # Distributed across queries — keep page_improvement but attach context
             notes.append(f"Top query '{top_name}' drives {share_of_loss:.0%} of lost clicks; decline is distributed")
             notes.append("Distributed decline; diagnose SERP changes and content freshness across multiple queries")
+            actionability_score = 0.35 if explained_loss_share >= 0.5 else 0.2
+            notes.append("No dominant losing query; this is a diagnostic signal, not an approval-ready edit")
+            approval_blockers.append("distributed regression has no dominant primary query")
 
     if context["has_tracking_params"]:
         action_type = "canonical_or_tracking_investigation"
@@ -555,6 +652,12 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
     }
     if primary_query:
         extra_kwargs["primary_query"] = primary_query
+    if diagnostic_query and diagnostic_query != primary_query:
+        extra_kwargs["diagnostic_query"] = diagnostic_query
+    if query_decomposition:
+        extra_kwargs["query_decomposition"] = query_decomposition
+    if approval_blockers:
+        extra_kwargs["approval_blockers"] = approval_blockers
 
     return make_issue(
         f"Traffic dropped on {title_target}",
@@ -593,9 +696,19 @@ def ctr_gap_issue(gap: dict[str, Any], brand_terms: list[str] | None = None) -> 
         ]
     url_quality = float(url_context(raw_target)["url_quality_score"])
     # For service pages, goal_alignment considers the page's role, not just the top
-    # underperforming query. A boarding page at position 1.2 with 943 impressions is
-    # inherently valuable — the branded query is just what's currently underperforming.
-    if is_service_page(raw_target) and is_branded_query(query, brand_terms):
+    # underperforming query. Branded service searches ("example boarding") can be
+    # valuable; pure brand navigational searches ("example") should not become
+    # secondary-page CTR edit proposals.
+    generic_branded_service_gap = is_service_page(raw_target) and is_generic_branded_query(query, brand_terms)
+    approval_blockers: list[str] = []
+    if generic_branded_service_gap:
+        goal_alignment_score = 0.35
+        actionability_score = min(actionability_score, 0.35)
+        goal_notes = [
+            "generic branded query; low CTR on a secondary service page is usually navigational SERP behavior, not a snippet/content fix",
+        ]
+        approval_blockers.append("generic branded query needs SERP ownership diagnosis, not a page edit")
+    elif is_service_page(raw_target) and is_branded_query(query, brand_terms):
         goal_alignment_score = 1.0
         goal_notes = ["service page; goal alignment based on page role, not gap query"]
     else:
@@ -627,9 +740,26 @@ def ctr_gap_issue(gap: dict[str, Any], brand_terms: list[str] | None = None) -> 
             "business_intent_score": business_intent_score,
             "actionability_score": actionability_score,
             "url_quality_score": url_quality,
+            **({"generic_brand_discount": 0.35} if generic_branded_service_gap else {}),
         },
         operator_judgment_notes=[*action_notes, *intent_notes, *goal_notes],
+        approval_blockers=approval_blockers,
     )
+
+
+def approval_readiness_for_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    blockers = [str(blocker) for blocker in issue.get("approval_blockers", []) if blocker]
+    if issue.get("recommended_action_type") == "manual_review":
+        blockers.append("manual review only")
+    actionability = (issue.get("score_components") or {}).get("actionability_score")
+    if isinstance(actionability, (int, float)) and actionability < 0.5:
+        blockers.append("actionability below approval threshold")
+    if issue.get("recommended_action_type") == "page_improvement" and issue.get("diagnostic_query") and not issue.get("primary_query"):
+        blocker = "diagnostic query is only a fallback; no primary query owns the loss"
+        if blocker not in blockers:
+            blockers.append(blocker)
+    deduped = list(dict.fromkeys(blockers))
+    return {"approval_ready": not deduped, "approval_blockers": deduped}
 
 
 def cannibalization_issue(cannibal: dict[str, Any], brand_terms: list[str] | None = None) -> dict[str, Any]:
@@ -1095,7 +1225,8 @@ def matching_serp_result(serp: dict[str, Any], target: str | None) -> dict[str, 
 
 
 def deep_dive_diagnostic(issue: dict[str, Any], site_id: str, site_profile: dict[str, Any] | None = None, live: bool = False) -> dict[str, Any]:
-    query = issue.get("primary_query")
+    query = issue.get("primary_query") or issue.get("diagnostic_query")
+    query_source = "primary_query" if issue.get("primary_query") else ("diagnostic_query" if issue.get("diagnostic_query") else None)
     intent_class = issue.get("intent_class")
     target = issue.get("target") or issue.get("canonical_target") or issue.get("raw_target")
     if isinstance(target, str) and target.startswith("/"):
@@ -1123,6 +1254,7 @@ def deep_dive_diagnostic(issue: dict[str, Any], site_id: str, site_profile: dict
     return {
         "status": "completed" if all(checks.values()) else "partial",
         "query": query,
+        "query_source": query_source,
         "target": target,
         "checks": checks,
         "serp": serp,
@@ -1271,6 +1403,238 @@ def booking_intent_terms(hierarchy: Any) -> tuple[list[Any], list[Any]]:
         if any(marker in str(term).lower() for marker in informational_markers) and term not in supporting:
             supporting.append(term)
     return high_priority, supporting
+
+
+def weighted_terms_match_score(text: str, weighted_terms: Any, default: float = 1.0) -> tuple[float, str | None]:
+    """Return the strongest business value weight whose term appears in text.
+
+    Supports either {"term": 1.4} or [{"term": "x", "weight": 1.4}].
+    """
+    haystack = (text or "").lower()
+    best = (default, None)
+    if isinstance(weighted_terms, dict):
+        iterable = weighted_terms.items()
+    elif isinstance(weighted_terms, list):
+        iterable = []
+        for item in weighted_terms:
+            if isinstance(item, dict):
+                term = item.get("term") or item.get("service") or item.get("product") or item.get("query")
+                weight = item.get("weight") or item.get("value") or item.get("score")
+                iterable.append((term, weight))
+            else:
+                iterable.append((item, default))
+    else:
+        iterable = []
+    for term, raw_weight in iterable:
+        if not term:
+            continue
+        try:
+            weight = float(raw_weight)
+        except (TypeError, ValueError):
+            weight = default
+        if str(term).lower() in haystack and weight > best[0]:
+            best = (weight, str(term))
+    return best
+
+
+def conversion_event_weight_for_issue(issue: dict[str, Any], business_context: dict[str, Any] | None) -> tuple[float, str | None]:
+    events = (business_context or {}).get("conversion_events") or []
+    target = str(issue.get("target") or issue.get("canonical_target") or issue.get("raw_target") or "").lower()
+    query = str(issue.get("primary_query") or issue.get("diagnostic_query") or "").lower()
+    title = str(issue.get("title") or "").lower()
+    text = " ".join([target, query, title])
+    best_weight = 1.0
+    best_event = None
+    iterable = events.values() if isinstance(events, dict) else events
+    for event in iterable:
+        if isinstance(event, str):
+            event = {"name": event}
+        if not isinstance(event, dict):
+            continue
+        name = str(event.get("name") or event.get("event") or event.get("id") or "conversion")
+        paths = context_values(event.get("paths") or event.get("page_paths") or event.get("landing_pages") or event.get("targets") or [])
+        terms = context_values(event.get("queries") or event.get("intent_terms") or event.get("terms") or [])
+        target_path = urlparse(target).path.rstrip("/") or "/"
+        path_match = False
+        for path in paths:
+            if not path:
+                continue
+            raw_path = str(path).lower().rstrip("/") or "/"
+            parsed_path = urlparse(raw_path).path.rstrip("/") or raw_path
+            if target_path == parsed_path or target.endswith(raw_path):
+                path_match = True
+                break
+        match = path_match or any(str(term).lower() in text for term in terms if term)
+        if not match and not paths and not terms:
+            match = any(token in text for token in ["book", "quote", "contact", "signup", "connect", "demo"])
+        if not match:
+            continue
+        try:
+            weight = float(event.get("weight") or event.get("value_weight") or event.get("business_value") or 1.15)
+        except (TypeError, ValueError):
+            weight = 1.15
+        if weight > best_weight:
+            best_weight = weight
+            best_event = name
+    return best_weight, best_event
+
+
+def page_role_conversion_weight(issue: dict[str, Any], business_context: dict[str, Any] | None) -> tuple[float, str]:
+    target = issue.get("target") or issue.get("canonical_target") or issue.get("raw_target")
+    role = matching_page_role(target, (business_context or {}).get("page_role_map") or {})
+    target_path = urlparse(target or "").path.rstrip("/") or "/"
+    if not role and target_path != "/" and is_service_page(target):
+        role = "service/transactional page inferred from URL"
+    role_text = role.lower()
+    if any(token in role_text for token in ["transactional", "booking", "signup", "quote", "lead", "conversion"]):
+        return 1.35, role or "transactional page"
+    if any(token in role_text for token in ["local", "commercial", "service", "pricing"]):
+        return 1.15, role or "commercial page"
+    if any(token in role_text for token in ["support", "informational", "blog", "guide", "docs"]):
+        return 0.7, role or "supporting informational page"
+    return 1.0, role or "unknown"
+
+
+def stage_conversion_multiplier(site_stage: dict[str, Any], issue: dict[str, Any]) -> tuple[float, list[str]]:
+    stage = (site_stage or {}).get("stage")
+    action_type = issue.get("recommended_action_type")
+    notes: list[str] = []
+    if stage == "seed":
+        if action_type == "demand_seed_content":
+            notes.append("seed-stage site: prioritize creating qualified demand-capture assets before optimizing sparse GSC noise")
+            return 1.25, notes
+        notes.append("seed-stage site: GSC evidence is sparse, so require external demand validation")
+        return 0.85, notes
+    if stage == "recover" and action_type in {"content_refresh", "page_improvement", "snippet_content_packaging"}:
+        notes.append("recover-stage site: recent losses get extra priority")
+        return 1.15, notes
+    if stage == "harvest" and action_type in {"meta_tags", "snippet_content_packaging", "internal_links", "local_intent_ownership"}:
+        notes.append("harvest-stage site: enough impressions exist to optimize existing qualified demand")
+        return 1.1, notes
+    return 1.0, notes
+
+
+def conversion_opportunity_for_issue(issue: dict[str, Any], business_context: dict[str, Any] | None, site_stage: dict[str, Any]) -> dict[str, Any]:
+    query = str(issue.get("primary_query") or issue.get("diagnostic_query") or "")
+    target = str(issue.get("target") or issue.get("canonical_target") or issue.get("raw_target") or "")
+    title = str(issue.get("title") or "")
+    combined = " ".join([query, target, title])
+    service_weight, matched_service = weighted_terms_match_score(combined, (business_context or {}).get("service_value_weights"), default=1.0)
+    role_weight, role = page_role_conversion_weight(issue, business_context)
+    event_weight, matched_event = conversion_event_weight_for_issue(issue, business_context)
+    intent_weight = float((issue.get("score_components") or {}).get("business_intent_score") or 1.0)
+    if is_branded_query(query, (business_context or {}).get("brand_terms") or []):
+        intent_weight = min(intent_weight, 0.85)
+    stage_weight, stage_notes = stage_conversion_multiplier(site_stage, issue)
+    has_context = bool(business_context)
+    context_weight = 1.0 if has_context else 0.95
+    multiplier = clamp(service_weight * role_weight * event_weight * intent_weight * stage_weight * context_weight, 0.35, 2.25)
+    notes = []
+    if matched_service:
+        notes.append(f"matched high-value service/product: {matched_service}")
+    if matched_event:
+        notes.append(f"maps to conversion event: {matched_event}")
+    if role != "unknown":
+        notes.append(f"page role: {role}")
+    if not has_context:
+        notes.append("business context missing; conversion weighting is conservative")
+    notes.extend(stage_notes)
+    return {
+        "multiplier": round(multiplier, 3),
+        "service_value_weight": round(service_weight, 3),
+        "matched_service": matched_service,
+        "page_role_weight": round(role_weight, 3),
+        "page_role": role,
+        "conversion_event_weight": round(event_weight, 3),
+        "matched_conversion_event": matched_event,
+        "intent_weight": round(intent_weight, 3),
+        "stage_weight": round(stage_weight, 3),
+        "stage": (site_stage or {}).get("stage"),
+        "notes": notes,
+    }
+
+
+def apply_conversion_weighting(candidates: list[dict[str, Any]], business_context: dict[str, Any] | None, site_stage: dict[str, Any]) -> list[dict[str, Any]]:
+    weighted = []
+    for candidate in candidates:
+        updated = dict(candidate)
+        opportunity = conversion_opportunity_for_issue(updated, business_context, site_stage)
+        raw_priority = float(updated.get("priority_score", updated.get("base_priority", 0.5)))
+        updated["raw_priority_score"] = round(raw_priority, 3)
+        updated["conversion_opportunity"] = opportunity
+        updated["priority_score"] = round(raw_priority * float(opportunity["multiplier"]), 3)
+        score_components = dict(updated.get("score_components") or {})
+        score_components["conversion_multiplier"] = opportunity["multiplier"]
+        score_components["conversion_weighted_priority_score"] = updated["priority_score"]
+        updated["score_components"] = score_components
+        notes = list(updated.get("operator_judgment_notes") or [])
+        notes.extend(opportunity.get("notes") or [])
+        updated["operator_judgment_notes"] = list(dict.fromkeys(notes))
+        weighted.append(updated)
+    return weighted
+
+
+def seed_demand_issue(site_id: str, analysis: dict[str, Any], site_profile: dict[str, Any] | None, business_context: dict[str, Any] | None, site_stage: dict[str, Any]) -> dict[str, Any]:
+    summary = analysis.get("summary") or {}
+    top_pages = analysis.get("top_pages") or []
+    top_queries = analysis.get("top_queries") or []
+    canonical = (site_profile or {}).get("canonical_url") or f"https://{site_id}"
+    visible_pages = [str(page.get("page")) for page in top_pages[:5] if page.get("page")]
+    visible_queries = [str(query.get("query")) for query in top_queries[:8] if query.get("query")]
+    context = business_context or {}
+    conversion_events = context_values(context.get("conversion_events"))[:5]
+    recommended_deliverable = {
+        "artifact_type": "seed_content_portfolio_brief",
+        "goal": "Create qualified organic demand where GSC does not yet have enough data to optimize.",
+        "minimum_bets": 3,
+        "demand_sources": [
+            "Google Ads/search-term data",
+            "Keyword Planner",
+            "competitor SERPs",
+            "customer/sales language",
+            "existing product/integration docs",
+        ],
+        "page_bet_types": [
+            "high-intent integration/setup page",
+            "comparison or alternative page",
+            "use-case landing page",
+            "problem/solution page with conversion CTA",
+        ],
+        "required_fields_per_bet": ["slug", "target_query_cluster", "intent", "conversion_event", "title", "h1", "CTA", "measurement_plan"],
+        "known_gsc_pages": visible_pages,
+        "visible_gsc_queries": visible_queries,
+        "known_conversion_events": conversion_events,
+        "success_metric": "qualified organic impressions/clicks plus mapped conversion events by landing page",
+    }
+    return make_issue(
+        f"Seed qualified organic demand for {site_id}",
+        "warning",
+        0.62,
+        [
+            f"Only {summary.get('clicks', 0):g} clicks and {summary.get('impressions', 0):g} impressions in the current GSC window.",
+            "Sparse GSC means the operator should generate validated demand-capture bets instead of reporting no issue.",
+        ],
+        "demand_seed_content",
+        target=canonical,
+        base_priority=0.55,
+        priority_score=0.55,
+        expected_click_delta=None,
+        expected_impact="Prepare an approval-ready portfolio of 3–5 high-intent organic landing/content bets, then measure first impressions/clicks/conversions.",
+        approval_artifact_type="seed_content_portfolio_brief",
+        recommended_deliverable=recommended_deliverable,
+        site_stage=site_stage,
+        score_components={
+            "expected_impact": 0.55,
+            "confidence_score": 0.62,
+            "goal_alignment_score": 1.0,
+            "actionability_score": 0.85,
+            "url_quality_score": 1.0,
+        },
+        operator_judgment_notes=[
+            "seed mode: use external demand sources because GSC has too little volume",
+            "human approval is still required before publishing new pages or content",
+        ],
+    )
 
 def apply_business_context_to_issue(issue: dict[str, Any], business_context: dict[str, Any] | None, site_id: str | None = None) -> dict[str, Any]:
     if not business_context:
@@ -1432,18 +1796,30 @@ def build_payload(
         primary_metric = DEFAULT_PRIMARY_METRIC if DEFAULT_PRIMARY_METRIC in metrics else next(iter(metrics.keys()), DEFAULT_PRIMARY_METRIC)
 
     context_check = context_quality_check(business_context)
+    site_stage = infer_site_stage(analysis, metrics, business_context)
     candidates = dedupe_candidates(apply_business_context(derive_candidate_issues(analysis), business_context, site_id=site_id))
+    candidates = apply_conversion_weighting(candidates, business_context, site_stage)
     ranked = apply_prioritization(candidates, learned, primary_metric)
-    top_issues = ranked[:3] if ranked else [
-        make_issue(
-            "No major issue surfaced from the automated weekly review.",
-            "info",
-            0.5,
-            ["Use the canonical seo-analysis skill for deeper manual diagnosis if needed."],
-            "manual_review",
-            base_priority=0.3,
-        )
-    ]
+    if site_stage.get("stage") == "seed":
+        # Sparse-GSC sites need demand creation first. Keep noisy GSC-derived items as
+        # supporting diagnostics, but do not let a single low-volume CTR gap become
+        # the approval proposal ahead of the seed content portfolio.
+        seed_issue = seed_demand_issue(site_id, analysis, site_profile, business_context, site_stage)
+        seed_ranked = apply_prioritization(apply_conversion_weighting([seed_issue], business_context, site_stage), learned, primary_metric)
+        top_issues = [*seed_ranked, *ranked[:2]]
+    elif ranked:
+        top_issues = ranked[:3]
+    else:
+        top_issues = [
+            make_issue(
+                "No major issue surfaced from the automated weekly review.",
+                "info",
+                0.5,
+                ["Use the canonical seo-analysis skill for deeper manual diagnosis if needed."],
+                "manual_review",
+                base_priority=0.3,
+            )
+        ]
     top_issues = [
         {
             **issue,
@@ -1462,9 +1838,13 @@ def build_payload(
     context_request = build_business_context_request(site_id, context_check)
     if context_request:
         queue_items.append(context_request)
+    proposal_written = False
     for idx, issue in enumerate(top_issues, start=1):
         action_id = f"weekly_action_{idx:02d}"
         action_type = issue["recommended_action_type"]
+        readiness = approval_readiness_for_issue(issue)
+        issue["approval_ready"] = readiness["approval_ready"]
+        issue["approval_blockers"] = readiness["approval_blockers"]
         expected_delta = issue.get("expected_click_delta")
         expected_impact = issue.get("expected_impact") or f"Address {action_type.replace('_', ' ')} opportunity surfaced in the weekly review."
         if isinstance(expected_delta, (int, float)) and expected_delta > 0:
@@ -1488,16 +1868,26 @@ def build_payload(
                 "operator_judgment_notes": issue.get("operator_judgment_notes", []),
                 "deep_dive": issue.get("deep_dive"),
                 "business_context_adjustment": issue.get("business_context_adjustment"),
+                "conversion_opportunity": issue.get("conversion_opportunity"),
+                "raw_priority_score": issue.get("raw_priority_score"),
+                "site_stage": site_stage,
                 "best_practice_alignment": issue.get("best_practice_alignment"),
                 "primary_query": issue.get("primary_query"),
+                "diagnostic_query": issue.get("diagnostic_query"),
+                "query_decomposition": issue.get("query_decomposition"),
                 "top_losing_queries": issue.get("top_losing_queries", []),
+                "approval_ready": issue.get("approval_ready", False),
+                "approval_blockers": issue.get("approval_blockers", []),
                 "consolidation_targets": issue.get("consolidation_targets"),
                 "source_target": issue.get("source_target"),
+                "approval_artifact_type": issue.get("approval_artifact_type"),
+                "recommended_deliverable": issue.get("recommended_deliverable"),
                 "needs_business_context": context_check["score"] < 0.75,
                 "learned_multiplier": issue.get("learned_multiplier", 1.0),
             }
         )
-        if idx == 1 and action_type != "manual_review":
+        if not proposal_written and issue.get("approval_ready") and action_type != "manual_review":
+            proposal_written = True
             queue_items.append(
                 {
                     "item_id": f"proposal_{site_id}_{action_type}_{analysis['period']['days']}d",
@@ -1520,11 +1910,20 @@ def build_payload(
                     "operator_judgment_notes": issue.get("operator_judgment_notes", []),
                     "deep_dive": issue.get("deep_dive"),
                     "business_context_adjustment": issue.get("business_context_adjustment"),
+                    "conversion_opportunity": issue.get("conversion_opportunity"),
+                    "raw_priority_score": issue.get("raw_priority_score"),
+                    "site_stage": site_stage,
                     "best_practice_alignment": issue.get("best_practice_alignment"),
                     "primary_query": issue.get("primary_query"),
+                    "diagnostic_query": issue.get("diagnostic_query"),
+                    "query_decomposition": issue.get("query_decomposition"),
                     "top_losing_queries": issue.get("top_losing_queries", []),
+                    "approval_ready": issue.get("approval_ready", False),
+                    "approval_blockers": issue.get("approval_blockers", []),
                     "consolidation_targets": issue.get("consolidation_targets"),
                     "source_target": issue.get("source_target"),
+                    "approval_artifact_type": issue.get("approval_artifact_type"),
+                    "recommended_deliverable": issue.get("recommended_deliverable"),
                     "business_context_score": context_check["score"],
                     "business_context_gaps": context_check["missing_fields"],
                     "business_context_questions": context_check["questions"],
@@ -1550,16 +1949,19 @@ def build_payload(
             ],
             "recent_actions": [],
             "metrics": metrics,
+            "site_stage": site_stage,
         },
         "audit": {
             "site_id": site_id,
             "summary": f"Automated weekly review surfaced {len(top_issues)} prioritized issue(s).",
             "issues": top_issues,
             "metrics": metrics,
+            "site_stage": site_stage,
         },
         "action_plan": {
             "site_id": site_id,
             "goal_id": goal.get("goal_id") if goal else None,
+            "site_stage": site_stage,
             "actions": action_entries,
         },
         "verification": {
@@ -1567,10 +1969,11 @@ def build_payload(
             "checks": [
                 {"name": "gsc analysis available", "status": "pass", "notes": "Weekly review generated from Search Console data."},
                 {"name": "action plan generated", "status": "pass", "notes": f"Primary metric for follow-up scoring: {primary_metric}."},
+                {"name": "site stage playbook", "status": "pass", "notes": site_stage.get("reason", "Site stage inferred."), "site_stage": site_stage},
                 {
                     "name": "recommendation quality gate",
-                    "status": "pass" if top_issues[0].get("priority_score", 0) >= 0.35 else "warning",
-                    "notes": "; ".join(top_issues[0].get("operator_judgment_notes", [])) or "Top action has explicit score components for operator review.",
+                    "status": "pass" if top_issues[0].get("approval_ready") else "warning",
+                    "notes": "; ".join(top_issues[0].get("approval_blockers") or top_issues[0].get("operator_judgment_notes", [])) or "Top action has explicit score components for operator review.",
                 },
                 {
                     "name": "deep dive diagnostics",
@@ -1619,12 +2022,15 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
     top_action = actions[0] if actions else {}
     queue_items = result.get("queue_items_written") or []
     proposal_path = next((path for path in queue_items if "/proposal_" in path), None)
+    site_stage = (payload.get("action_plan") or {}).get("site_stage") or {}
     lines = [
         f"Weekly SEO review complete for `{site_id}`.",
         "",
         f"Run: `{result.get('run_dir')}`",
         f"Summary: {summary}",
     ]
+    if site_stage:
+        lines.append(f"Stage: `{site_stage.get('stage')}` — {site_stage.get('reason')}")
     if top_action:
         lines.extend([
             "",
@@ -1635,6 +2041,14 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
             f"- Best-practice lane: `{(top_action.get('best_practice_alignment') or {}).get('primary_area_label', 'not mapped')}`",
             f"- Requires approval: {'yes' if top_action.get('requires_approval') else 'no'}",
         ])
+        conversion = top_action.get("conversion_opportunity") or {}
+        if conversion:
+            lines.append(f"- Conversion weighting: {conversion.get('multiplier')}× ({'; '.join(conversion.get('notes') or []) or 'no notes'})")
+        if top_action.get("approval_artifact_type"):
+            lines.append(f"- Approval artifact: `{top_action.get('approval_artifact_type')}`")
+        if top_action.get("approval_ready") is False:
+            blockers = top_action.get("approval_blockers") or []
+            lines.append(f"- Approval-ready: no{'; ' + '; '.join(blockers) if blockers else ''}")
         deep_dive = top_action.get("deep_dive") or {}
         checks = deep_dive.get("checks") or {}
         if deep_dive:
@@ -1656,6 +2070,8 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
             )
     if proposal_path:
         lines.extend(["", f"Proposal file: `{proposal_path}`"])
+    elif top_action:
+        lines.extend(["", "No approval proposal was queued; the review surfaced diagnostics only."])
     if context_request:
         questions = context_request.get("business_context_questions") or []
         score = context_request.get("business_context_score")
