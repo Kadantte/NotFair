@@ -15,6 +15,7 @@ import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
 import { flushServerEvents } from "@/lib/analytics-server";
 import { DEFAULT_RESOURCE_PATH, findResource, type Platform } from "@/lib/mcp/resources";
+import { activeLoginCustomerIdFor } from "@/lib/connections/google-read";
 
 /**
  * Per-request auth context shape, common across every platform MCP. Platform-
@@ -246,22 +247,23 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
         }
         // Token not found → fall through to the "session not found" throw below.
       } else {
-        // Google path (existing).
-        const [row] = await db()
+        // Google path. Phase-2 dual-aware: token may bind to either
+        // mcp_sessions (legacy, sessionId column) OR ad_platform_connections
+        // (new, connectionId column). Look up the token row first, then JOIN
+        // to whichever target it points at. This keeps existing tokens working
+        // while new tokens issued by the connection-bound flow resolve
+        // directly against ad_platform_connections.
+        const [tokenRow] = await db()
           .select({
-            session: schema.mcpSessions,
-            tokenResourceUrl: schema.oauthAccessTokens.resourceUrl,
+            sessionId: schema.oauthAccessTokens.sessionId,
+            connectionId: schema.oauthAccessTokens.connectionId,
+            resourceUrl: schema.oauthAccessTokens.resourceUrl,
           })
           .from(schema.oauthAccessTokens)
-          .innerJoin(schema.mcpSessions, eq(schema.oauthAccessTokens.sessionId, schema.mcpSessions.id))
-          .where(
-            and(
-              eq(schema.oauthAccessTokens.token, bearerToken),
-              gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-            ),
-          )
+          .where(eq(schema.oauthAccessTokens.token, bearerToken))
           .limit(1);
-        if (row) {
+
+        if (tokenRow) {
           // Platform-scoped audience check. A token issued for any URL on this
           // platform is accepted at any other URL on the same platform — both
           // /api/mcp (legacy default) and /api/mcp/google_ads route to the same
@@ -276,14 +278,76 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
           // /authorize and the issued token defaults to /api/mcp. Without this
           // relaxation, those tokens would 401 at any platform-explicit URL
           // even though the user is authentic and the session is platform-bound.
-          const tokenResource = row.tokenResourceUrl ?? DEFAULT_RESOURCE_PATH;
+          const tokenResource = tokenRow.resourceUrl ?? DEFAULT_RESOURCE_PATH;
           const tokenPlatform = findResource(tokenResource)?.platform;
           if (tokenPlatform !== config.platform) {
             throw new Error(
               `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${config.platform}.`,
             );
           }
-          session = row.session;
+
+          if (tokenRow.connectionId !== null) {
+            // Phase-2 connection-bound Google token. Build the AuthContext
+            // directly off ad_platform_connections — same shape we return for
+            // mcp_sessions-bound tokens, just sourced from the connection row.
+            //
+            // Time-based expiry is intentionally not enforced here: there is
+            // no mcp_sessions.expires_at equivalent on the connection row, and
+            // the cleanest fix (a token-level expires_at column on
+            // oauth_access_tokens) is its own follow-up. Tokens remain
+            // revocable via row deletion. Mirrors Meta's behavior today.
+            const [conn] = await db()
+              .select({
+                refreshToken: schema.adPlatformConnections.refreshToken,
+                activeAccountId: schema.adPlatformConnections.activeAccountId,
+                accountIds: schema.adPlatformConnections.accountIds,
+                userId: schema.adPlatformConnections.userId,
+              })
+              .from(schema.adPlatformConnections)
+              .where(eq(schema.adPlatformConnections.id, tokenRow.connectionId))
+              .limit(1);
+
+            if (conn) {
+              if (!conn.activeAccountId) {
+                throw new Error("Account selection pending. Complete setup at /connect.");
+              }
+              const accounts = (conn.accountIds ?? []).map((a) => ({
+                id: a.id,
+                name: a.name ?? "",
+                ...("loginCustomerId" in a ? { loginCustomerId: a.loginCustomerId } : {}),
+              }));
+              return {
+                refreshToken: conn.refreshToken,
+                customerId: conn.activeAccountId,
+                customerIds: accounts.length > 0
+                  ? accounts
+                  : [{ id: conn.activeAccountId, name: "" }],
+                loginCustomerId: activeLoginCustomerIdFor(conn.activeAccountId, accounts),
+                userId: conn.userId,
+                clientName: null,
+                clientVersion: null,
+                authMethod,
+                userAgent,
+                sessionToken: bearerToken,
+                sessionId: null,
+              };
+            }
+            // connectionId set but row missing → fall through to "session not
+            // found" throw. Connection was deleted out from under the token.
+          } else if (tokenRow.sessionId !== null) {
+            const [row] = await db()
+              .select({ session: schema.mcpSessions })
+              .from(schema.mcpSessions)
+              .where(
+                and(
+                  eq(schema.mcpSessions.id, tokenRow.sessionId),
+                  gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+                ),
+              )
+              .limit(1);
+            if (row) session = row.session;
+          }
+          // Both null is impossible per the XOR CHECK on oauth_access_tokens.
         }
       }
     } else if (config.acceptDirectBearer) {

@@ -14,3 +14,7 @@ export function getRequiredEnv(name: string): string {
 
   return value;
 }
+
+export function getEnvBool(name: string): boolean {
+  return getEnv(name) === "true";
+}

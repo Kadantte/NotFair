@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { redirectUriEquivalent } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, findResource } from "@/lib/mcp/resources";
+import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 
 /**
  * OAuth 2.0 Token Endpoint for Claude Connector.
@@ -184,10 +185,21 @@ export async function POST(request: Request) {
   // Polymorphic dispatch: the auth code carries either session_id (Google,
   // → mcp_sessions) or connection_id (Meta+, → ad_platform_connections).
   // Exactly one is non-null per the XOR CHECK constraint.
+  //
+  // Phase-2 dual-aware token binding for Google: when the auth code carries
+  // session_id AND READ_GOOGLE_FROM_CONNECTIONS is on, translate the binding
+  // to the user's ad_platform_connections row at exchange time. The auth code
+  // itself is left alone (short-lived, expires in 10 min). The token row gets
+  // connectionId set / sessionId NULL — same shape Meta tokens use today.
   let expiresInSeconds: number;
+  // Set to a non-null value when phase-2 translation produces a connection
+  // binding for a sessionId-bound code; the INSERT below uses these instead
+  // of authCode.sessionId / authCode.connectionId.
+  let translatedSessionId: number | null = authCode.sessionId;
+  let translatedConnectionId: number | null = authCode.connectionId;
   if (authCode.sessionId !== null) {
     const [session] = await db()
-      .select({ expiresAt: schema.mcpSessions.expiresAt })
+      .select({ expiresAt: schema.mcpSessions.expiresAt, userId: schema.mcpSessions.userId })
       .from(schema.mcpSessions)
       .where(
         and(
@@ -210,6 +222,28 @@ export async function POST(request: Request) {
       0,
       Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000),
     );
+
+    if (readGoogleFromConnections() && session.userId) {
+      const [conn] = await db()
+        .select({ id: schema.adPlatformConnections.id })
+        .from(schema.adPlatformConnections)
+        .where(
+          and(
+            eq(schema.adPlatformConnections.userId, session.userId),
+            eq(schema.adPlatformConnections.platform, "google_ads"),
+          ),
+        )
+        .limit(1);
+      if (conn) {
+        // Successful translation: bind the new token to the connection row,
+        // not the session row. Defer-fall-through if the connection lookup
+        // fails (phase-1 dual-write should have populated one for every live
+        // mcp_sessions user; the missing row is a backfill gap, not a reason
+        // to block token exchange).
+        translatedSessionId = null;
+        translatedConnectionId = conn.id;
+      }
+    }
   } else if (authCode.connectionId !== null) {
     const [conn] = await db()
       .select({ expiresAt: schema.adPlatformConnections.accessTokenExpiresAt })
@@ -268,9 +302,10 @@ export async function POST(request: Request) {
     token: oauthAccessToken,
     clientId,
     // Polymorphic FK: exactly one of these is non-null per the XOR CHECK.
-    // Carry over from the auth code so the token points at the same target.
-    sessionId: authCode.sessionId,
-    connectionId: authCode.connectionId,
+    // For Google sessionId-bound codes, phase-2 may have translated to a
+    // connection binding above; otherwise these match the auth code 1:1.
+    sessionId: translatedSessionId,
+    connectionId: translatedConnectionId,
     resourceUrl: resourceUrlPath,
   });
 
@@ -279,15 +314,19 @@ export async function POST(request: Request) {
   // pre-bound path instead of re-prompting for sign-in. Pre-bound clients
   // already have session_id set; this UPDATE is a no-op for them.
   //
-  // SKIPPED for Meta tokens: `oauth_clients.session_id` is FK-pointing at
-  // mcp_sessions only. Writing a Meta `ad_platform_connections.id` here
-  // would corrupt the table. Meta DCR clients always re-resolve the user's
-  // Meta connection via cookie at /authorize time anyway, so the
-  // short-circuit isn't needed.
-  if (authCode.sessionId !== null) {
+  // SKIPPED when:
+  // - Meta tokens (authCode.connectionId set): oauth_clients.session_id is
+  //   FK-pointing at mcp_sessions only; writing an ad_platform_connections.id
+  //   would corrupt the table.
+  // - Phase-2 translated Google tokens (translatedSessionId === null but
+  //   authCode.sessionId !== null): same reason — the column is mcp_sessions-
+  //   only. The pre-bound short-circuit retires alongside mcp_sessions in
+  //   phase 5; until then, leaving the client row untouched is safe (the
+  //   /authorize DCR path will re-resolve via cookie next time).
+  if (translatedSessionId !== null) {
     await db()
       .update(schema.oauthClients)
-      .set({ sessionId: authCode.sessionId })
+      .set({ sessionId: translatedSessionId })
       .where(eq(schema.oauthClients.clientId, clientId));
   }
 

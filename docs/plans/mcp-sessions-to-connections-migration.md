@@ -5,7 +5,7 @@
 | Phase | Status |
 |---|---|
 | 1 — Dual-write Google connection state | **Shipped 2026-05-05, in bake** |
-| 2 — Reads + OAuth tokens move to connections | Not started |
+| 2 — Reads + OAuth tokens move to connections | **Code in place behind `READ_GOOGLE_FROM_CONNECTIONS` flag (2026-05-06); flag still off in prod** |
 | 3 — Direct-bearer MCP cutoff | Not started |
 | 4 — Switch web cookie to Supabase Auth | Not started |
 | 5 — Drop `mcp_sessions` | Not started |
@@ -167,6 +167,28 @@ Add an integration test that runs the full callback flow and asserts both rows e
 
 **Goal:** `lib/session.ts` reads Google connection state from `ad_platform_connections`. New OAuth tokens for Google use `connectionId` (not `sessionId`). Supabase session bridge starts running alongside `adsagent_token`.
 
+#### Phase 2 progress (as of 2026-05-06)
+
+Connection-read + token-binding work landed behind `READ_GOOGLE_FROM_CONNECTIONS` (default off). Flag flip is gated on phase-1 bake completion (≥2026-05-12) plus a clean shadow-read week.
+
+What shipped:
+
+- `lib/connections/feature-flags.ts` — `readGoogleFromConnections()` predicate sourcing from `READ_GOOGLE_FROM_CONNECTIONS` env var.
+- `lib/connections/google-read.ts` — `loadGoogleConnection(userId)` projects `ad_platform_connections` into the legacy SessionRow shape; `activeLoginCustomerIdFor` derives session-level loginCustomerId; `compareForShadowRead` emits PostHog `google_connection_mismatch` (kind: `missing_connection_row` or `field_diff`) with fingerprinted refresh tokens and per-field diffs.
+- `lib/session.ts` — split into `loadDeviceSession` (mcp_sessions, cookie + impersonation) and `mergeWithConnection` (ad_platform_connections). Always shadow-reads on every session-load surface (`getSession`, `getSessionAuth`, `getAuthContext`, `getCurrentRefreshToken`); flag-on swaps source of truth, flag-off keeps mcp_sessions reads but still emits mismatches.
+- `app/api/auth/select-account/route.ts`, `app/api/auth/switch-account/route.ts` — flag-on reads candidate accountIds from the connection row; flag-off keeps reading from mcp_sessions. Both routes now shadow-read the full session/connection diff (extended SELECTs to pull `loginCustomerId` + `googleEmail` for parity comparison).
+- `app/api/oauth/token/route.ts` — flag-on translates Google sessionId-bound auth codes to connectionId-bound tokens at exchange time. The auth code itself is left alone (10-min TTL); the issued `oauth_access_tokens` row gets `connectionId` set / `sessionId = NULL`. `oauth_clients.session_id` UPDATE is skipped on translated rows so we don't write a connection id into an mcp_sessions FK. Falls back to sessionId binding when no connection row exists for the user (logs gap, doesn't block exchange). Token-prefix selection unchanged.
+- `lib/mcp/handler-factory.ts` — Google branch now resolves bindings dual-aware. SELECT-then-branch on the token row: `connectionId !== null` → JOIN `ad_platform_connections` and build `AuthContext` directly (mirrors Meta path); `sessionId !== null` → existing mcp_sessions JOIN + expiry check. Audience check (Google vs Meta platform) runs before either branch. Time-based expiry on the connectionId path is intentionally not enforced — needs the token-level `expires_at` follow-up (see cross-cutting fix below).
+- Tests: 15 new `google-read.test.ts` (projection, derivation, shadow-read), 4 new `oauth-token-route.test.ts` cases for translation (flag-on success, missing-connection fallback, null-userId no-translate, flag-off legacy). Full suite: 1308 passing.
+
+What's still pending in phase 2:
+
+- **Supabase session bridge** (`@supabase/ssr`, root `middleware.ts`, persisted `sb-*` cookie). Separate workstream — independent of the connections-read flip.
+- **Token-level `expires_at` column** on `oauth_access_tokens`. Without it, connectionId-bound Google tokens have no time-based expiry (matches Meta's current behavior). Drizzle migration + back-stamp on existing rows + handler-factory check.
+- **Flag rollout**: flip on staging post-bake, monitor `google_connection_mismatch` event count for ≥1 week, then flip in prod. Any non-zero `field_diff` count is a dual-write gap that must be fixed before proceeding.
+
+
+
 #### `lib/session.ts` refactor
 
 Today: `loadSessionRow()` (line 63) loads everything from `mcp_sessions` by cookie token.
@@ -200,11 +222,20 @@ function activeLoginCustomerId(conn: AdPlatformConnection): string | null {
 
 Migration 0032 already supports `connectionId` (XOR with `sessionId`). Today Meta uses `connectionId`, Google uses `sessionId`.
 
+Note on Google token prefixes: Google has **two** live prefixes, both bound to `mcp_sessions` today. Phase 2 flips both to `connectionId`-binding; prefix-selection logic is untouched.
+
+| Prefix | Resource path | Origin |
+|---|---|---|
+| `oat_` (legacy) | `/api/mcp` | Pre-multi-platform Claude clients that registered before platform-explicit paths existed. Kept forever for back-compat. |
+| `oat_google_ads_` | `/api/mcp/google_ads` | New platform-explicit path; stamped when the auth code carries `resource=/api/mcp/google_ads`. |
+
+The prefix is derived from the auth code's `resource_url` in `app/api/oauth/token/route.ts:255–264` — independent of which table the token binds to.
+
 Phase 2 changes:
 
-- `app/api/oauth/token/route.ts` — when issuing a Google `oat_*` token, set `connectionId` (looked up from `ad_platform_connections` by `userId + platform="google_ads"`), leave `sessionId = NULL`.
-- `lib/mcp/handler-factory.ts:250–287` — change the Google JOIN from `oauth_access_tokens.sessionId → mcp_sessions` to `oauth_access_tokens.connectionId → ad_platform_connections`. Returns the same `AuthContext` shape (refreshToken, customerId, customerIds, loginCustomerId, userId).
-- Existing tokens with `sessionId` set keep working — make the JOIN dual-aware: if `connectionId` is set use it, else fall back to `sessionId`. Existing tokens roll over via natural expiry (1 year) or get force-revoked at the start of phase 5.
+- `app/api/oauth/token/route.ts` — when issuing a Google token (either prefix), set `connectionId` (looked up from `ad_platform_connections` by `userId + platform="google_ads"`), leave `sessionId = NULL`. Token-prefix selection is unchanged.
+- `lib/mcp/handler-factory.ts:250–287` — change the Google JOIN from `oauth_access_tokens.sessionId → mcp_sessions` to `oauth_access_tokens.connectionId → ad_platform_connections`. Applies to both Google resource entries in `MCP_RESOURCES` (`/api/mcp` and `/api/mcp/google_ads`). Returns the same `AuthContext` shape (refreshToken, customerId, customerIds, loginCustomerId, userId).
+- Existing tokens with `sessionId` set — both flavors — keep working: make the JOIN dual-aware. If `connectionId` is set use it, else fall back to `sessionId`. Existing tokens roll over via natural expiry (1 year) or get force-revoked at the start of phase 5.
 
 #### Supabase session bridge
 

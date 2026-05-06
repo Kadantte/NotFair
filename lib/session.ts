@@ -7,6 +7,12 @@ import { COOKIE_NAMES, type ActivePlatform } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 import { DEV_EMAILS } from "@/lib/dev-access";
 import { resolveActivePlatform } from "@/lib/active-platform";
+import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
+import {
+  compareForShadowRead,
+  loadGoogleConnection,
+  type GoogleConnectionView,
+} from "@/lib/connections/google-read";
 
 export type Session = {
   connected: true;
@@ -58,7 +64,18 @@ type LoadSessionResult = {
   impersonating?: { sessionId: number; realEmail: string };
 };
 
-async function loadSessionRow(): Promise<LoadSessionResult | null> {
+/**
+ * Stage 1: identify the user and load device-level fields from `mcp_sessions`
+ * (cookie binding, dev impersonation). Returns the legacy SessionRow shape so
+ * stage-2 code can layer connection-row data on top without rewriting callers.
+ *
+ * Phase-2 note: this still reads Google connection state (refreshToken,
+ * customerId, customerIds, loginCustomerId, googleEmail) from mcp_sessions for
+ * back-compat with rows that haven't been dual-written yet. The
+ * `mergeWithConnection` step below replaces those fields with values from
+ * `ad_platform_connections` when `READ_GOOGLE_FROM_CONNECTIONS=true`.
+ */
+async function loadDeviceSession(): Promise<LoadSessionResult | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAMES.token)?.value;
 
@@ -130,6 +147,79 @@ async function loadSessionRow(): Promise<LoadSessionResult | null> {
 }
 
 /**
+ * Stage 2: layer Google `ad_platform_connections` fields on top of the
+ * mcp_sessions row when `READ_GOOGLE_FROM_CONNECTIONS=true`. Always shadow-
+ * reads (and emits `google_connection_mismatch` on diff) so we can validate
+ * parity in both flag states.
+ *
+ * Returns the same `SessionRow` shape so all downstream getters
+ * (getSession/getSessionAuth/getAuthContext) stay unchanged.
+ */
+async function mergeWithConnection(args: {
+  result: LoadSessionResult;
+  source: string;
+}): Promise<LoadSessionResult> {
+  const { result, source } = args;
+  const userId = result.row.userId;
+  if (!userId) return result;
+
+  const conn = await loadGoogleConnection(userId);
+
+  compareForShadowRead({
+    userId,
+    fromSession: {
+      refreshToken: result.row.refreshToken,
+      customerId: result.row.customerId,
+      customerIds: result.row.customerIds,
+      loginCustomerId: result.row.loginCustomerId,
+      googleEmail: result.row.googleEmail,
+    },
+    fromConnection: conn,
+    source,
+  });
+
+  if (!readGoogleFromConnections() || !conn) return result;
+
+  return {
+    ...result,
+    row: projectConnectionOntoSessionRow(result.row, conn),
+  };
+}
+
+function projectConnectionOntoSessionRow(
+  base: SessionRow,
+  conn: GoogleConnectionView,
+): SessionRow {
+  return {
+    ...base,
+    refreshToken: conn.refreshToken,
+    customerId: conn.customerId,
+    customerIds: stringifyCustomerIds(conn.customerIds),
+    loginCustomerId: conn.loginCustomerId,
+    // googleEmail keeps falling back to the session row when the connection
+    // row doesn't carry it — phase 4 finishes the move once Supabase Auth
+    // owns the identity record.
+    googleEmail: conn.googleEmail ?? base.googleEmail,
+  };
+}
+
+function stringifyCustomerIds(accounts: ConnectedAccount[]): string {
+  return JSON.stringify(
+    accounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      ...("loginCustomerId" in a ? { loginCustomerId: a.loginCustomerId } : {}),
+    })),
+  );
+}
+
+async function loadSessionRow(source: string): Promise<LoadSessionResult | null> {
+  const result = await loadDeviceSession();
+  if (!result) return null;
+  return mergeWithConnection({ result, source });
+}
+
+/**
  * Read display name + avatar from the dedicated profile cookie set by
  * /auth/callback. We can't query Supabase live here because the auth callback
  * deletes all sb-* cookies after a successful sign-in (header-size mitigation),
@@ -151,7 +241,7 @@ async function readProfileCookie(): Promise<{ displayName: string | null; pictur
 }
 
 export async function getSession(): Promise<Session> {
-  const result = await loadSessionRow();
+  const result = await loadSessionRow("getSession");
   if (!result) return { connected: false };
 
   // isDev is always based on the real user's email, not the impersonated one
@@ -238,12 +328,12 @@ export async function getSession(): Promise<Session> {
  * the picker. Returns null when there's no session at all.
  */
 export async function getCurrentRefreshToken(): Promise<string | null> {
-  const result = await loadSessionRow();
+  const result = await loadSessionRow("getCurrentRefreshToken");
   return result?.row.refreshToken ?? null;
 }
 
 export async function getSessionAuth(): Promise<SessionRow> {
-  const result = await loadSessionRow();
+  const result = await loadSessionRow("getSessionAuth");
   // Reject ads-less sessions: callers of getSessionAuth do Google Ads work
   // that requires a real customerId. The user-facing route handlers catch
   // this and bounce the user back to /connect, which is the right behavior
@@ -253,7 +343,7 @@ export async function getSessionAuth(): Promise<SessionRow> {
 }
 
 export async function getAuthContext(): Promise<{ auth: AuthContext; session: SessionRow }> {
-  const result = await loadSessionRow();
+  const result = await loadSessionRow("getAuthContext");
   if (!result || !result.row.customerId) throw new Error("Not authenticated");
   return {
     auth: {

@@ -3,6 +3,8 @@ import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { upsertGoogleConnection } from "@/lib/connections/google";
+import { compareForShadowRead, loadGoogleConnection } from "@/lib/connections/google-read";
+import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
 import { listConnectableAccounts, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
@@ -81,6 +83,8 @@ export async function POST(request: Request) {
       refreshToken: schema.mcpSessions.refreshToken,
       customerId: schema.mcpSessions.customerId,
       customerIds: schema.mcpSessions.customerIds,
+      loginCustomerId: schema.mcpSessions.loginCustomerId,
+      googleEmail: schema.mcpSessions.googleEmail,
       userId: schema.mcpSessions.userId,
     })
     .from(schema.mcpSessions)
@@ -103,18 +107,44 @@ export async function POST(request: Request) {
   // For existing sessions (account switcher / add-account flow): re-query
   // the user's connectable accounts (which expands managers into their
   // clients) so we can validate manager-routed picks too.
-  const storedAccounts = parseCustomerIds(session.customerIds ?? "[]");
+  //
+  // Phase-2 read split: the pre-validated candidate set lives in *both*
+  // mcp_sessions.customerIds and ad_platform_connections.accountIds (phase-1
+  // dual-write). Behind READ_GOOGLE_FROM_CONNECTIONS we source it from the
+  // connection row; otherwise fall back to mcp_sessions and shadow-read for
+  // parity. Either way, the shape (id, name, loginCustomerId?) is identical.
+  const conn = session.userId ? await loadGoogleConnection(session.userId) : null;
+  if (session.userId) {
+    compareForShadowRead({
+      userId: session.userId,
+      fromSession: {
+        refreshToken: session.refreshToken,
+        customerId: session.customerId,
+        customerIds: session.customerIds ?? "[]",
+        loginCustomerId: session.loginCustomerId ?? null,
+        googleEmail: session.googleEmail ?? null,
+      },
+      fromConnection: conn,
+      source: "select-account",
+    });
+  }
+
+  const storedAccountsFromSession = parseCustomerIds(session.customerIds ?? "[]");
+  const storedAccounts = readGoogleFromConnections() && conn
+    ? conn.customerIds
+    : storedAccountsFromSession;
   const isPreValidated = pendingToken && storedAccounts.length > 0;
 
   type AuthorizedAccount = { id: string; name: string; loginCustomerId?: string };
   let authorized: AuthorizedAccount[];
 
   if (isPreValidated) {
-    try {
-      authorized = JSON.parse(session.customerIds!) as AuthorizedAccount[];
-    } catch {
-      authorized = [];
-    }
+    authorized = storedAccounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      // Strip nulls so the AuthorizedAccount shape stays loginCustomerId?: string.
+      ...(typeof a.loginCustomerId === "string" ? { loginCustomerId: a.loginCustomerId } : {}),
+    }));
   } else {
     const { accounts } = await listConnectableAccounts(session.refreshToken);
     authorized = accounts.map((a) => ({
