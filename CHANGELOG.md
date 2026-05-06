@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.8.2] - 2026-05-06
+
+### Fixed
+- **Meta Ads waitlist failures now use localized fallback copy.** Failed waitlist API responses no longer surface an English client-side fallback in non-English locales.
+
 ## [0.3.8.1] - 2026-05-06
 
 ### Fixed

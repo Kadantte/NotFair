@@ -12,7 +12,11 @@ const WAITLIST_KEY = "meta_ads";
 
 type JoinState = "idle" | "joining" | "joined" | "error";
 
-async function postJoin(source: string): Promise<{ alreadyOnList: boolean }> {
+type JoinResult =
+  | { ok: true; alreadyOnList: boolean }
+  | { ok: false };
+
+async function postJoin(source: string): Promise<JoinResult> {
   const res = await fetch("/api/waitlist", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -23,10 +27,10 @@ async function postJoin(source: string): Promise<{ alreadyOnList: boolean }> {
     }),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? "Failed to join waitlist");
+    return { ok: false };
   }
-  return (await res.json()) as { joined: boolean; alreadyOnList: boolean };
+  const body = (await res.json()) as { joined: boolean; alreadyOnList: boolean };
+  return { ok: true, alreadyOnList: body.alreadyOnList };
 }
 
 /**
@@ -49,13 +53,18 @@ export function MetaWaitlistCard({
     setState("joining");
     setError(null);
     try {
-      const { alreadyOnList } = await postJoin(source);
-      if (!alreadyOnList) {
+      const result = await postJoin(source);
+      if (!result.ok) {
+        setError(t("joinFailed"));
+        setState("error");
+        return;
+      }
+      if (!result.alreadyOnList) {
         trackEvent("waitlist_joined", { key: WAITLIST_KEY, source });
       }
       setState("joined");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("joinFailed"));
+    } catch {
+      setError(t("joinFailed"));
       setState("error");
     }
   };
@@ -105,13 +114,18 @@ export function MetaWaitlistWall({
     setState("joining");
     setError(null);
     try {
-      const { alreadyOnList } = await postJoin(source);
-      if (!alreadyOnList) {
+      const result = await postJoin(source);
+      if (!result.ok) {
+        setError(t("joinFailed"));
+        setState("error");
+        return;
+      }
+      if (!result.alreadyOnList) {
         trackEvent("waitlist_joined", { key: WAITLIST_KEY, source });
       }
       setState("joined");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("joinFailed"));
+    } catch {
+      setError(t("joinFailed"));
       setState("error");
     }
   };
