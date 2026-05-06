@@ -13,7 +13,7 @@ import { db, schema } from "@/lib/db";
 import { eq, and, gte, desc } from "drizzle-orm";
 import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
-import { flushServerEvents } from "@/lib/analytics-server";
+import { flushServerEvents, trackServerEvent } from "@/lib/analytics-server";
 import { DEFAULT_RESOURCE_PATH, findResource, type Platform } from "@/lib/mcp/resources";
 import { activeLoginCustomerIdFor } from "@/lib/connections/google-read";
 
@@ -365,6 +365,25 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
         )
         .limit(1);
       session = s;
+
+      // Phase-3 prep telemetry. Counts authenticated direct-bearer hits so we
+      // can identify which users + MCP clients still rely on the legacy auth
+      // path before we cut it off (plan §"Phase 3 — Direct-bearer MCP cutoff",
+      // step 1: "Run for ≥1 week to find affected users."). No behavior
+      // change. Failed lookups (s undefined) don't fire — there's no
+      // userId/clientName to capture, and they're already 401-ing.
+      if (s) {
+        trackServerEvent(s.userId ?? null, "mcp_direct_bearer_used", {
+          // Raw clientName (not normalized) so dashboards can group by
+          // exact identity — "claude-code" vs "claude-code (oauth)" matter
+          // for outreach decisions.
+          client_name: s.clientName ?? null,
+          client_version: s.clientVersion ?? null,
+          resource_url: config.resourceUrlPath,
+          platform: config.platform,
+          user_agent: userAgent,
+        });
+      }
     } else {
       throw new Error("Token does not match any accepted prefix for this MCP resource.");
     }

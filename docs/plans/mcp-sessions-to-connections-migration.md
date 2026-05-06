@@ -294,9 +294,13 @@ Behind env flag `READ_GOOGLE_FROM_CONNECTIONS=true`:
 
 This is the riskiest phase because it can break working Claude Code installs that have the cookie value baked into `~/.mcp-settings.json`.
 
+#### Phase 3 progress (as of 2026-05-06)
+
+- **Step 1 (telemetry) shipped early** to run during phase-1/2 bake. `mcp_direct_bearer_used` event fires on every successful direct-bearer auth in `lib/mcp/handler-factory.ts`'s `acceptDirectBearer` branch. Properties: `client_name` (raw, unnormalized), `client_version`, `resource_url`, `platform`, `user_agent`. Distinct id = `userId` (or anonymous for null-userId rows). No behavior change. Build a PostHog dashboard grouping by `client_name` to size the migration cohort before step 2.
+
 #### Steps
 
-1. **Telemetry first.** Add a PostHog event `mcp_direct_bearer_used` in `lib/mcp/handler-factory.ts:289–302` capturing `userId`, `clientName`, request path. Run for ≥1 week to find affected users.
+1. **Telemetry first.** Add a PostHog event `mcp_direct_bearer_used` in `lib/mcp/handler-factory.ts:289–302` capturing `userId`, `clientName`, request path. Run for ≥1 week to find affected users. ✅ Shipped 2026-05-06.
 2. **Build a one-click migration endpoint.** `POST /api/migrate-mcp-token`:
    - Authenticated via existing `adsagent_token` cookie or direct bearer.
    - Looks up the user's `ad_platform_connections.id` (Google).
