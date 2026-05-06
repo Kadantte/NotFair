@@ -5,7 +5,7 @@
 | Phase | Status |
 |---|---|
 | 1 — Dual-write Google connection state | **Shipped 2026-05-05, in bake** |
-| 2 — Reads + OAuth tokens move to connections | **Code in place behind `READ_GOOGLE_FROM_CONNECTIONS` flag (2026-05-06); flag still off in prod** |
+| 2 — Reads + OAuth tokens move to connections | **Code in place behind `READ_GOOGLE_FROM_CONNECTIONS` + `SUPABASE_SESSION_BRIDGE` flags (2026-05-06); both flags off in prod** |
 | 3 — Direct-bearer MCP cutoff | Not started |
 | 4 — Switch web cookie to Supabase Auth | Not started |
 | 5 — Drop `mcp_sessions` | Not started |
@@ -180,10 +180,19 @@ What shipped:
 - `app/api/oauth/token/route.ts` — flag-on translates Google sessionId-bound auth codes to connectionId-bound tokens at exchange time. The auth code itself is left alone (10-min TTL); the issued `oauth_access_tokens` row gets `connectionId` set / `sessionId = NULL`. `oauth_clients.session_id` UPDATE is skipped on translated rows so we don't write a connection id into an mcp_sessions FK. Falls back to sessionId binding when no connection row exists for the user (logs gap, doesn't block exchange). Token-prefix selection unchanged.
 - `lib/mcp/handler-factory.ts` — Google branch now resolves bindings dual-aware. SELECT-then-branch on the token row: `connectionId !== null` → JOIN `ad_platform_connections` and build `AuthContext` directly (mirrors Meta path); `sessionId !== null` → existing mcp_sessions JOIN + expiry check. Audience check (Google vs Meta platform) runs before either branch. Time-based expiry on the connectionId path is intentionally not enforced — connection-bound Google tokens are revocable via row deletion only, matching Meta's behavior (see "expiresAt semantics" below).
 - Tests: 15 new `google-read.test.ts` (projection, derivation, shadow-read), 4 new `oauth-token-route.test.ts` cases for translation (flag-on success, missing-connection fallback, null-userId no-translate, flag-off legacy). Full suite: 1308 passing.
+- **Verified locally** with a 16-cell matrix (4 token variants × 2 routes × 2 flag states): both Google prefixes (`oat_*`, `oat_google_ads_*`) × both bindings (sessionId, connectionId) × both routes (`/api/mcp`, `/api/mcp/google_ads`) × flag on/off — all 16 return 200 against a real prod connection.
+
+Supabase bridge scaffolding (commit `db3ef7c`):
+
+- `lib/supabase/refresh-session.ts` — request-scoped helper; calls `supabase.auth.getUser()` to rotate `sb-*` cookies before the access token expires. No-op when no `sb-*` cookies present (the default state today).
+- `lib/supabase/middleware.ts` (existing `updateSession`) — invokes the refresh helper on protected paths when `SUPABASE_SESSION_BRIDGE=true`. Flag-off path keeps the current behavior (one fewer Supabase round-trip per request).
+- `app/auth/callback/route.ts` — gates the `clearSupabaseCookies` calls (success path + scope-failure path) behind the flag. When on, `sb-*` cookies survive the callback; when off, the 8KB-header-mitigation deletion that prevented HTTP 431 errors stays in place.
+- Boot-tested under both flag states; `/api/health` returns 200 in both.
 
 What's still pending in phase 2:
 
-- **Supabase session bridge** (`@supabase/ssr`, root `middleware.ts`, persisted `sb-*` cookie). Separate workstream — independent of the connections-read flip. Required for phase 4.
+- **`lib/session.ts` dual-read** — prefer Supabase user_id from the refreshed `sb-*` session, fall back to `adsagent_token` → `mcp_sessions.userId`. Deferred from the scaffolding PR because it's inert until the bridge flag is actually live; landing it now would just add dead code paths. Will land alongside the prod flag flip.
+- **Header-size audit** — measure aggregate cookie size on a real session before flipping `SUPABASE_SESSION_BRIDGE` in prod. Adding `sb-*` (~1–2KB) on top of `adsagent_*` cookies could re-trigger the original HTTP 431 incident.
 - **Flag rollout**: flip on staging post-bake, monitor `google_connection_mismatch` event count for ≥1 week, then flip in prod. Any non-zero `field_diff` count is a dual-write gap that must be fixed before proceeding.
 
 Explicitly **not** in scope for phase 2 (or this migration at all): a token-level `expires_at` on `oauth_access_tokens`. The earlier plan flagged this as a phase-2 follow-up; on closer reading of phase 5 it isn't a blocker (the cleanup script force-deletes orphaned sessionId-only tokens directly). Connection-bound Google tokens become revocation-only, same as Meta. If hard TTLs are wanted later, do them platform-wide as a standalone change.
