@@ -2,7 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
-## [0.3.8.2] - 2026-05-06
+## [0.3.9.0] - 2026-05-06
+
+### Added
+- **New affiliate program page at /affiliate.** Explains the 50% revenue share for the first 12 months, walks through the four-step join flow, shows concrete per-plan earnings (Growth and Managed), lists program rules in plain language, and points interested partners to Discord onboarding.
+- **Affiliate entry point on the landing page.** A green-bordered banner between the marketing-engine and pricing sections surfaces the program with a "See how it works" CTA into /affiliate, with click tracking via the existing `cta_clicked` analytics event.
+- **Affiliate copy localized across all six locales.** English, German, Spanish, French, Brazilian Portuguese, and Thai bundles now include the home-page affiliate eyebrow, title, body, and CTA strings.
 
 ### Fixed
 - **Meta Ads waitlist failures now use localized fallback copy.** Failed waitlist API responses no longer surface an English client-side fallback in non-English locales.

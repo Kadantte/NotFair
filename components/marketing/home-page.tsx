@@ -493,6 +493,41 @@ export function HomePage({
 
       <section className="border-t border-[#3D3C36] px-4 py-16 sm:py-20">
         <div className="container mx-auto max-w-6xl">
+          <div className="rounded-3xl border border-[#4CAF6E]/30 bg-[#4CAF6E]/[0.04] p-8 md:p-10">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+                  {t("affiliateEyebrow")}
+                </p>
+                <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+                  {t("affiliateTitle")}
+                </h2>
+                <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
+                  {t("affiliateBody")}
+                </p>
+              </div>
+              <Link
+                href="/affiliate"
+                onClick={() =>
+                  trackEvent("cta_clicked", {
+                    page: "homepage",
+                    cta: "affiliate_program",
+                    destination: "/affiliate",
+                    requires_auth: false,
+                  })
+                }
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-[#4CAF6E] bg-[#4CAF6E] px-6 text-sm font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C]"
+              >
+                {t("affiliateCta")}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[#3D3C36] px-4 py-16 sm:py-20">
+        <div className="container mx-auto max-w-6xl">
           <PricingSection {...pricing} page="homepage" />
           <p className="mt-6 text-sm text-[#C4C0B6]">
             {t("highSpend")}{" "}
