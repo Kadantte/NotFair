@@ -7,12 +7,12 @@ export async function MarketingShell({ children }: { children: React.ReactNode }
   const session = await getSession();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#1A1917] text-[#E8E4DD] selection:bg-[#4CAF6E]/30 font-sans">
-      <SiteHeader />
-      <SessionProvider session={session}>
+    <SessionProvider session={session}>
+      <div className="flex min-h-screen flex-col bg-[#1A1917] text-[#E8E4DD] selection:bg-[#4CAF6E]/30 font-sans">
+        <SiteHeader />
         <main className="flex-1 flex flex-col">{children}</main>
-      </SessionProvider>
-      <SiteFooter />
-    </div>
+        <SiteFooter />
+      </div>
+    </SessionProvider>
   );
 }
