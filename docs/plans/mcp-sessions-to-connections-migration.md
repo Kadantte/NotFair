@@ -6,7 +6,7 @@
 |---|---|
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
 | 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). Phase-4 lib/session.ts dual-read still pending (deferred). |
-| 3 — Direct-bearer MCP cutoff | Telemetry-only prep shipped 2026-05-06 (`mcp_direct_bearer_used`); cutoff steps not started |
+| 3 — Direct-bearer MCP cutoff | Telemetry shipped 2026-05-06 (`mcp_direct_bearer_used`) + symmetric OAuth telemetry 2026-05-07 (`mcp_oauth_used`). Initial cohort sized at **38 active direct-bearer users** (31 on claude-code). Cutoff steps not started. |
 | 4 — Switch web cookie to Supabase Auth | Not started |
 | 5 — Drop `mcp_sessions` | Not started |
 
@@ -337,13 +337,23 @@ Behind env flag `READ_GOOGLE_FROM_CONNECTIONS=true`:
 
 This is the riskiest phase because it can break working Claude Code installs that have the cookie value baked into `~/.mcp-settings.json`.
 
-#### Phase 3 progress (as of 2026-05-06)
+#### Phase 3 progress (as of 2026-05-07)
 
-- **Step 1 (telemetry) shipped early** to run during phase-1/2 bake. `mcp_direct_bearer_used` event fires on every successful direct-bearer auth in `lib/mcp/handler-factory.ts`'s `acceptDirectBearer` branch. Properties: `client_name` (raw, unnormalized), `client_version`, `resource_url`, `platform`, `user_agent`. Distinct id = `userId` (or anonymous for null-userId rows). No behavior change. Build a PostHog dashboard grouping by `client_name` to size the migration cohort before step 2.
+- **Step 1 (telemetry) shipped 2026-05-06** (commit `98b0f6b`). `mcp_direct_bearer_used` event fires on every successful direct-bearer auth in `lib/mcp/handler-factory.ts`'s `acceptDirectBearer` branch.
+- **Symmetric OAuth telemetry shipped 2026-05-07** (commit `40a9e0f`). `mcp_oauth_used` event fires on every successful OAuth resolution across all three paths (Meta connection, Google connection, Google session-fallback). Property `binding: "connection" | "session"` tracks phase-2 mix; `client_name` is captured raw (may be null on connection-bound paths). With both events live, we get a clean side-by-side: active OAuth users vs active direct-bearer users.
+
+##### Initial 12-hour read (2026-05-06 14:54 → 2026-05-07 02:09 PT)
+
+| Cohort | Hits | Unique users | Notes |
+|---|---|---|---|
+| Direct-bearer | 6,815 | 38 | Bulk on `claude-code` (31 users / 6,630 hits); rest split across craft-agent, Trae, openclaw-bundle-mcp, Anthropic/Toolbox |
+| OAuth (issuance proxy) | n/a | 143 (all-time) | True active-now count not available until `mcp_oauth_used` accumulates a day of data |
+
+**Implication:** the cutoff cohort is small enough (~38 users, dominated by 31 claude-code users) that phase 3's "2–4 week notice" estimate is the upper bound — banner + email outreach should converge faster.
 
 #### Steps
 
-1. **Telemetry first.** Add a PostHog event `mcp_direct_bearer_used` in `lib/mcp/handler-factory.ts:289–302` capturing `userId`, `clientName`, request path. Run for ≥1 week to find affected users. ✅ Shipped 2026-05-06.
+1. **Telemetry first.** Add PostHog events `mcp_direct_bearer_used` (and symmetric `mcp_oauth_used`) capturing `userId`, `clientName`, request path. Run for ≥1 week to find affected users. ✅ Shipped 2026-05-06 + 2026-05-07.
 2. **Build a one-click migration endpoint.** `POST /api/migrate-mcp-token`:
    - Authenticated via existing `adsagent_token` cookie or direct bearer.
    - Looks up the user's `ad_platform_connections.id` (Google).
