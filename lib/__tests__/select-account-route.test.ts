@@ -7,6 +7,8 @@ const {
   mockDeleteWhere,
   mockListConnectableAccounts,
   mockInsertValues,
+  mockIdentifyUser,
+  mockLoadGoogleConnection,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectLimit: vi.fn(),
@@ -14,6 +16,23 @@ const {
   mockDeleteWhere: vi.fn(),
   mockListConnectableAccounts: vi.fn(),
   mockInsertValues: vi.fn(),
+  mockIdentifyUser: vi.fn(),
+  mockLoadGoogleConnection: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/identify-user", () => ({
+  identifyUser: () => mockIdentifyUser(),
+}));
+
+vi.mock("@/lib/connections/google-read", () => ({
+  loadGoogleConnection: () => mockLoadGoogleConnection(),
+  compareForShadowRead: vi.fn(),
+}));
+
+vi.mock("@/lib/connections/feature-flags", () => ({
+  readGoogleFromConnections: () => false,
+  readUserIdFromSupabase: () => false,
+  supabaseSessionBridge: () => false,
 }));
 
 vi.mock("next/headers", () => ({
@@ -141,17 +160,24 @@ describe("Select account route — POST", () => {
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
 
     mockCookieGet.mockReturnValue({ value: "existing-token" });
-    mockSelectLimit.mockResolvedValue([
-      {
-        id: 7,
-        accessToken: "existing-token",
-        refreshToken: "refresh-token",
-        customerId: "1234567890",
-        customerIds: JSON.stringify([{ id: "1234567890", name: "Existing Account" }]),
-        loginCustomerId: null,
-        userId: "user-123",
-      },
-    ]);
+    // Default identity: cookie-resolved user with a live mcp_sessions row.
+    // Tests override via mockIdentifyUser.mockResolvedValueOnce(null) etc.
+    mockIdentifyUser.mockResolvedValue({
+      userId: "user-123",
+      googleEmail: "test@example.com",
+      legacySessionId: 7,
+      via: "cookie_fallback",
+    });
+    // Default connection: existing connected account.
+    mockLoadGoogleConnection.mockResolvedValue({
+      refreshToken: "refresh-token",
+      customerId: "1234567890",
+      customerIds: [{ id: "1234567890", name: "Existing Account" }],
+      loginCustomerId: null,
+      googleEmail: "test@example.com",
+    });
+    // mcp_sessions accessToken lookup at the bottom (for setSessionCookies).
+    mockSelectLimit.mockResolvedValue([{ accessToken: "existing-token" }]);
     mockUpdateWhere.mockResolvedValue(undefined);
     mockDeleteWhere.mockResolvedValue(undefined);
     mockListConnectableAccounts.mockResolvedValue({
@@ -182,8 +208,9 @@ describe("Select account route — POST", () => {
     expect(response.cookies.get("adsagent_token")?.value).toBe("existing-token");
   });
 
-  it("returns 401 when no active cookie-backed session exists for in-place updates", async () => {
+  it("returns 401 when identifyUser returns null (no Supabase user, no cookie)", async () => {
     mockCookieGet.mockReturnValue(undefined);
+    mockIdentifyUser.mockResolvedValue(null);
 
     const response = await POST(
       makeRequest({
@@ -217,6 +244,19 @@ describe("Select account route — POST", () => {
     beforeEach(() => {
       mockCookieGet.mockReturnValue(undefined); // no cookie for pending flow
       mockSelectLimit.mockResolvedValue([makePendingSession()]);
+      // Pending connection: customerId is "" (no active account yet) and
+      // candidates are the pre-validated MCC accounts. Phase-4 step 2 reads
+      // candidates from the connection, not from mcp_sessions.customerIds.
+      mockLoadGoogleConnection.mockResolvedValue({
+        refreshToken: "refresh-token",
+        customerId: "",
+        customerIds: [
+          { id: "1111111111", name: "Client A", loginCustomerId: "9999999999" },
+          { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+        ],
+        loginCustomerId: null,
+        googleEmail: "test@example.com",
+      });
     });
 
     it("accepts a single valid account and stores loginCustomerId from server-side data", async () => {
@@ -280,6 +320,18 @@ describe("Select account route — POST", () => {
       mockSelectLimit.mockResolvedValue([
         makePendingSession({ customerIds: mixedSourceAccounts }),
       ]);
+      // Override the connection's candidate set to match.
+      mockLoadGoogleConnection.mockResolvedValue({
+        refreshToken: "refresh-token",
+        customerId: "",
+        customerIds: [
+          { id: "1111111111", name: "Direct" },
+          { id: "2222222222", name: "Client A", loginCustomerId: "9999999999" },
+          { id: "3333333333", name: "Client B", loginCustomerId: "8888888888" },
+        ],
+        loginCustomerId: null,
+        googleEmail: "test@example.com",
+      });
 
       const response = await POST(
         makeRequest({
@@ -336,12 +388,15 @@ describe("Select account route — POST", () => {
       expect(response.cookies.get("gads_new_signup")?.value).toBe("1");
     });
 
-    it("returns 404 when pendingToken does not match any session", async () => {
-      mockSelectLimit.mockResolvedValue([]); // no matching session
+    it("returns 404 when no Google connection exists for the user", async () => {
+      // Phase-4 step 2: pendingToken is no longer load-bearing for identity.
+      // The 404 surfaces when the user has no ad_platform_connections row
+      // (e.g. callback's connection upsert never ran).
+      mockLoadGoogleConnection.mockResolvedValue(null);
 
       const response = await POST(
         makeRequest({
-          pendingToken: "nonexistent-token",
+          pendingToken: "ignored-now",
           accounts: [{ id: "1111111111", name: "Client A" }],
         }),
       );
@@ -379,6 +434,62 @@ describe("Select account route — POST", () => {
           { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
         ],
       });
+    });
+  });
+
+  // ─── Phase-4 step 2: Supabase-only identity (no legacy mcp_sessions) ──
+
+  describe("Supabase-only identity path", () => {
+    beforeEach(() => {
+      // No mcp_sessions row; identity comes purely from Supabase.
+      mockIdentifyUser.mockResolvedValue({
+        userId: "user-123",
+        googleEmail: "supabase@example.com",
+        legacySessionId: null,
+        via: "supabase",
+      });
+      mockLoadGoogleConnection.mockResolvedValue({
+        refreshToken: "refresh-token",
+        customerId: "",
+        customerIds: [
+          { id: "1111111111", name: "Client A", loginCustomerId: "9999999999" },
+        ],
+        loginCustomerId: null,
+        googleEmail: "supabase@example.com",
+      });
+    });
+
+    it("succeeds without UPDATEing mcp_sessions when legacySessionId is null", async () => {
+      const response = await POST(
+        makeRequest({
+          pendingToken: "pt",
+          accounts: [{ id: "1111111111", name: "Client A" }],
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      // Connection upsert ran (always)
+      const connInsert = mockInsertValues.mock.calls
+        .map((call) => call[0] as Record<string, unknown>)
+        .find((row) => row?.platform === "google_ads");
+      expect(connInsert).toBeDefined();
+      // mcp_sessions UPDATE/DELETE both skipped (no legacy row)
+      expect(mockUpdateWhere).not.toHaveBeenCalled();
+      expect(mockDeleteWhere).not.toHaveBeenCalled();
+    });
+
+    it("does NOT re-set the adsagent_token cookie for Supabase-only users", async () => {
+      const response = await POST(
+        makeRequest({
+          pendingToken: "pt",
+          accounts: [{ id: "1111111111", name: "Client A" }],
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      // setSessionCookies skipped — Supabase users have sb-* cookies; the
+      // legacy adsagent_token cookie is not re-issued.
+      expect(response.cookies.get("adsagent_token")).toBeUndefined();
     });
   });
 });

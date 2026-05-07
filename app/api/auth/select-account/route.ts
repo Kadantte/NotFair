@@ -1,14 +1,11 @@
 import { randomUUID } from "crypto";
 import { NextResponse, after } from "next/server";
-import { cookies } from "next/headers";
 import { getAppOrigin } from "@/lib/app-url";
 import { upsertGoogleConnection } from "@/lib/connections/google";
-import { compareForShadowRead, loadGoogleConnection } from "@/lib/connections/google-read";
-import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
 import { listConnectableAccounts, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
-import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
+import { setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import {
@@ -17,6 +14,8 @@ import {
   type RedditConversionInput,
 } from "@/lib/reddit-capi";
 import { getClientIp } from "@/lib/request-ip";
+import { identifyUser } from "@/lib/auth/identify-user";
+import { loadGoogleConnection } from "@/lib/connections/google-read";
 
 export async function POST(request: Request) {
   after(flushServerEvents);
@@ -53,47 +52,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const cookieStore = await cookies();
-  const currentToken = cookieStore.get(COOKIE_NAMES.token)?.value ?? null;
-
-  const sessionWhere = pendingToken
-    ? and(
-        eq(schema.mcpSessions.accessToken, pendingToken),
-        eq(schema.mcpSessions.customerId, ""),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      )
-    : currentToken
-      ? and(
-          eq(schema.mcpSessions.accessToken, currentToken),
-          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        )
-      : null;
-
-  if (!sessionWhere) {
+  // Phase-4 step 2: identity comes from Supabase (with adsagent_token cookie
+  // fallback). Connection is the source of truth for refreshToken + candidate
+  // accounts; mcp_sessions UPDATE only fires for legacy cookie-resolved users
+  // (back-compat) and is skipped entirely for Supabase-only users.
+  const identity = await identifyUser({ source: "select-account" });
+  if (!identity) {
     return NextResponse.json(
       { error: "No active session found" },
       { status: 401 },
     );
   }
 
-  const [session] = await db()
-    .select({
-      id: schema.mcpSessions.id,
-      accessToken: schema.mcpSessions.accessToken,
-      refreshToken: schema.mcpSessions.refreshToken,
-      customerId: schema.mcpSessions.customerId,
-      customerIds: schema.mcpSessions.customerIds,
-      loginCustomerId: schema.mcpSessions.loginCustomerId,
-      googleEmail: schema.mcpSessions.googleEmail,
-      userId: schema.mcpSessions.userId,
-    })
-    .from(schema.mcpSessions)
-    .where(sessionWhere)
-    .limit(1);
-
-  if (!session) {
+  const conn = await loadGoogleConnection(identity.userId);
+  if (!conn) {
+    // Phase-1 backfill should ensure every live user has a connection row.
+    // A missing row here means either a backfill gap or a brand-new user
+    // who somehow reached this route before the callback's connection
+    // upsert ran. Either way: cannot proceed without a refresh token.
     return NextResponse.json(
-      { error: pendingToken ? "Pending session not found" : "Session not found" },
+      { error: "No Google Ads connection found. Reconnect at /connect." },
       { status: 404 },
     );
   }
@@ -101,52 +79,32 @@ export async function POST(request: Request) {
   // Verify all selected account IDs are accessible AND resolve loginCustomerId
   // for any manager-routed selections.
   //
-  // For pending sessions: the OAuth callback stored a pre-validated list
-  // (with loginCustomerId per account) in customerIds — trust that.
+  // For pending signups (multi-account picker): the OAuth callback stored a
+  // pre-validated list (with loginCustomerId per account) in
+  // ad_platform_connections.account_ids — trust that.
   //
   // For existing sessions (account switcher / add-account flow): re-query
   // the user's connectable accounts (which expands managers into their
   // clients) so we can validate manager-routed picks too.
   //
-  // Phase-2 read split: the pre-validated candidate set lives in *both*
-  // mcp_sessions.customerIds and ad_platform_connections.accountIds (phase-1
-  // dual-write). Behind READ_GOOGLE_FROM_CONNECTIONS we source it from the
-  // connection row; otherwise fall back to mcp_sessions and shadow-read for
-  // parity. Either way, the shape (id, name, loginCustomerId?) is identical.
-  const conn = session.userId ? await loadGoogleConnection(session.userId) : null;
-  if (session.userId) {
-    compareForShadowRead({
-      userId: session.userId,
-      fromSession: {
-        refreshToken: session.refreshToken,
-        customerId: session.customerId,
-        customerIds: session.customerIds ?? "[]",
-        loginCustomerId: session.loginCustomerId ?? null,
-        googleEmail: session.googleEmail ?? null,
-      },
-      fromConnection: conn,
-      source: "select-account",
-    });
-  }
-
-  const storedAccountsFromSession = parseCustomerIds(session.customerIds ?? "[]");
-  const storedAccounts = readGoogleFromConnections() && conn
-    ? conn.customerIds
-    : storedAccountsFromSession;
-  const isPreValidated = pendingToken && storedAccounts.length > 0;
+  // `pendingToken` is now an OPTIONAL signal (post-step-2) that this is a
+  // fresh-signup multi-account flow. The legacy path verified it as an
+  // mcp_sessions.access_token; we now infer "pending" from the connection's
+  // missing `activeAccountId`.
+  const isPending = !!pendingToken || !conn.customerId;
 
   type AuthorizedAccount = { id: string; name: string; loginCustomerId?: string };
   let authorized: AuthorizedAccount[];
 
-  if (isPreValidated) {
-    authorized = storedAccounts.map((a) => ({
+  if (isPending && conn.customerIds.length > 0) {
+    authorized = conn.customerIds.map((a) => ({
       id: a.id,
       name: a.name,
       // Strip nulls so the AuthorizedAccount shape stays loginCustomerId?: string.
       ...(typeof a.loginCustomerId === "string" ? { loginCustomerId: a.loginCustomerId } : {}),
     }));
   } else {
-    const { accounts } = await listConnectableAccounts(session.refreshToken);
+    const { accounts } = await listConnectableAccounts(conn.refreshToken);
     authorized = accounts.map((a) => ({
       id: a.id,
       name: a.name,
@@ -159,7 +117,7 @@ export async function POST(request: Request) {
   if (inaccessible.length > 0) {
     return NextResponse.json(
       {
-        error: isPreValidated
+        error: isPending
           ? `Account(s) not in authorized set: ${inaccessible.map((a) => a.id).join(", ")}`
           : `Account(s) not accessible: ${inaccessible.map((a) => a.id).join(", ")}`,
       },
@@ -169,7 +127,7 @@ export async function POST(request: Request) {
 
   // Keep the current primary account if it remains selected; otherwise use the first selected account.
   const primaryAccount =
-    validAccounts.find((account) => account.id === session.customerId) ??
+    validAccounts.find((account) => account.id === conn.customerId) ??
     validAccounts[0];
 
   // Per-account loginCustomerId — always read from server-side authorized data,
@@ -194,42 +152,42 @@ export async function POST(request: Request) {
   const loginCustomerId = authorizedById.get(primaryAccount.id)?.loginCustomerId ?? null;
 
   await db().transaction(async (tx) => {
-    await tx
-      .update(schema.mcpSessions)
-      .set({
-        customerId: primaryAccount.id,
-        customerIds,
-        loginCustomerId,
-      })
-      .where(eq(schema.mcpSessions.id, session.id));
+    // Connection upsert — source of truth for ad state. Always runs.
+    await upsertGoogleConnection(
+      {
+        userId: identity.userId,
+        refreshToken: conn.refreshToken,
+        activeAccountId: primaryAccount.id,
+        accountIds: validAccounts.map((a) => ({
+          id: a.id,
+          name: a.name || "",
+          loginCustomerId: authorizedById.get(a.id)?.loginCustomerId ?? null,
+        })),
+      },
+      tx,
+    );
 
-    if (session.userId) {
+    // Legacy mcp_sessions UPDATE/DELETE — only when resolved via the cookie
+    // path (we have the session id to target). Supabase-only users skip
+    // this entirely; their identity isn't backed by an mcp_sessions row.
+    if (identity.legacySessionId !== null) {
+      await tx
+        .update(schema.mcpSessions)
+        .set({
+          customerId: primaryAccount.id,
+          customerIds,
+          loginCustomerId,
+        })
+        .where(eq(schema.mcpSessions.id, identity.legacySessionId));
+
       await tx
         .delete(schema.mcpSessions)
         .where(
           and(
-            eq(schema.mcpSessions.userId, session.userId),
-            ne(schema.mcpSessions.id, session.id),
+            eq(schema.mcpSessions.userId, identity.userId),
+            ne(schema.mcpSessions.id, identity.legacySessionId),
           ),
         );
-
-      // Phase-1 dual-write: mirror the curated selection onto the connection
-      // row. Note we do NOT delete the connection alongside the duplicate
-      // mcp_sessions cleanup above — there is one connection per (user,
-      // platform) and it represents the user's enduring link to Google Ads.
-      await upsertGoogleConnection(
-        {
-          userId: session.userId,
-          refreshToken: session.refreshToken,
-          activeAccountId: primaryAccount.id,
-          accountIds: validAccounts.map((a) => ({
-            id: a.id,
-            name: a.name || "",
-            loginCustomerId: authorizedById.get(a.id)?.loginCustomerId ?? null,
-          })),
-        },
-        tx,
-      );
     }
   });
 
@@ -237,12 +195,16 @@ export async function POST(request: Request) {
   // Use the server-authorized customerIds JSON so MCC-routed accounts keep loginCustomerId.
   const selectedAccounts = parseCustomerIds(customerIds);
   after(async () => {
-    syncAccountSnapshots(session.refreshToken, selectedAccounts).catch((err) => {
+    syncAccountSnapshots(conn.refreshToken, selectedAccounts).catch((err) => {
       console.error("[sync-account] Failed to snapshot on select:", err);
     });
   });
 
-  const isNewSignup = pendingToken && !session.customerId;
+  // First-signup detection: pre-step-2 we used `pendingToken && !session.customerId`.
+  // Post-step-2 we use the connection's prior `activeAccountId`. New signups have
+  // no active account yet (callback writes the candidate set with activeAccountId=null
+  // for multi-account flows; single-account flows pre-set it).
+  const isNewSignup = !conn.customerId;
 
   // Multi-account signups go through this route rather than the auth callback's
   // single-account path, so fire user_signed_up here — otherwise PostHog misses
@@ -251,20 +213,20 @@ export async function POST(request: Request) {
   // callback before branching; read them back so attribution is preserved.
   let redditConversionPayload: RedditConversionInput | null = null;
 
-  if (isNewSignup && session.userId) {
+  if (isNewSignup) {
     try {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>;
       const clientIp = getClientIp(request);
-      trackServerEvent(session.userId, "user_signed_up", {
+      trackServerEvent(identity.userId, "user_signed_up", {
         utm_source: meta.utm_source,
         utm_medium: meta.utm_medium,
         utm_campaign: meta.utm_campaign,
         utm_term: meta.utm_term,
         utm_content: meta.utm_content,
         signup_referrer: meta.signup_referrer,
-        google_email: user?.email,
+        google_email: user?.email ?? identity.googleEmail,
         signup_method: "google_oauth",
         ...(clientIp ? { $ip: clientIp } : {}),
       });
@@ -272,8 +234,8 @@ export async function POST(request: Request) {
       redditConversionPayload = {
         trackingType: "SignUp",
         conversionId: randomUUID(),
-        email: user?.email ?? null,
-        externalId: session.userId,
+        email: user?.email ?? identity.googleEmail,
+        externalId: identity.userId,
         ipAddress: clientIp ?? null,
         userAgent: request.headers.get("user-agent"),
         valueDecimal: 1.0,
@@ -290,7 +252,17 @@ export async function POST(request: Request) {
   const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect/google-ads?connected=1'}`,
   });
-  setSessionCookies(response, session.accessToken);
+  // Re-issue the legacy adsagent_token cookie only if the user came in via
+  // that path (preserves max-age refresh). Supabase-resolved users have
+  // sb-* cookies which the middleware already keeps fresh — no action needed.
+  if (identity.legacySessionId !== null) {
+    const [legacyRow] = await db()
+      .select({ accessToken: schema.mcpSessions.accessToken })
+      .from(schema.mcpSessions)
+      .where(eq(schema.mcpSessions.id, identity.legacySessionId))
+      .limit(1);
+    if (legacyRow) setSessionCookies(response, legacyRow.accessToken);
+  }
   if (isNewSignup) {
     response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
   }
