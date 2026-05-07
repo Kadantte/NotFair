@@ -7,7 +7,7 @@
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
 | 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). Phase-4 lib/session.ts dual-read still pending (deferred). |
 | 3 — Direct-bearer MCP cutoff | Telemetry shipped 2026-05-06 (`mcp_direct_bearer_used`) + symmetric OAuth telemetry 2026-05-07 (`mcp_oauth_used`). Initial cohort sized at **38 active direct-bearer users** (31 on claude-code). Cutoff steps not started. |
-| 4 — Switch web cookie to Supabase Auth | **Step 1 live in prod 2026-05-07** (`READ_USERID_FROM_SUPABASE=true` flipped after the cleaner connection-anchored loader landed). Steps 2–4 not started. |
+| 4 — Switch web cookie to Supabase Auth | **Step 1 + 2 read-side live in prod 2026-05-07.** `READ_USERID_FROM_SUPABASE=true` flipped; every code path that previously needed an `mcp_sessions` row to function now tolerates its absence. Step 2 INSERT flag-gating, plus steps 3–4, not started. |
 | 5 — Drop `mcp_sessions` | Not started |
 
 ### Phase 1 — closed out 2026-05-07
@@ -393,24 +393,59 @@ Phase 2 already set up the bridge. This phase finishes the move.
 
 **Rollback for step 1:** `vercel env rm READ_USERID_FROM_SUPABASE production` + redeploy. Cookie fallback path is unchanged, so reverting the flag restores pre-step-1 behavior.
 
-**Open metrics:**
-- `web_session_resolved` daily breakdown by `via` — track Supabase migration rate.
-- `cookie_fallback` count → must hit 0 before step 3 can ship without forced re-auth.
+**Step 2 read-side migration shipped in prod (2026-05-07):**
+
+Every code path that previously required an `mcp_sessions` row to identify the user has been migrated to a shared Supabase-first / cookie-fallback helper. With this in place, the auth callback's `mcp_sessions` INSERT can be safely flag-gated off without breaking new-user signup, account switching, OAuth, or conversion attribution.
+
+- **`lib/auth/identify-user.ts` (new, commit `a4d1aca`)** — `identifyUser({ source })` returns `{ userId, googleEmail, legacySessionId, via }`. Tries `supabase.auth.getUser()` first when `READ_USERID_FROM_SUPABASE=true`, falls back to `adsagent_token` → `mcp_sessions` cookie path. Always emits `auth_identity_resolved` PostHog event with `via` + `source` so we can measure when each call site stops needing the fallback.
+- **`lib/auth/get-user-email.ts` (new, commit `11fbb6d`)** — queries `auth.users.email` directly via raw SQL. Replaces the prior pattern of looking up `mcp_sessions.googleEmail` by userId, which silently returned null for Supabase-only users.
+- **Routes migrated to `identifyUser`** (commits `343705a`, `d33c3fc`, `d5e9795`, `11fbb6d`):
+  - `/api/oauth/authorize` — Google DCR codes now bind to `connectionId` directly when Supabase resolves the user.
+  - `/api/auth/select-account` — connection-as-source-of-truth for refresh token + candidate accounts. mcp_sessions UPDATE/DELETE only fires for legacy cookie users.
+  - `/api/auth/switch-account` — same pattern.
+  - `/api/oauth/meta/start`, `/api/oauth/meta/callback` — Meta OAuth flow Supabase-aware end-to-end.
+  - `/api/oauth/gohighlevel/start`, `/api/oauth/gohighlevel/callback`, `/api/integrations/gohighlevel/status` — GHL flow + status check.
+  - `app/(app)/manage-ads-accounts/page.tsx` — pending Google candidate accounts come from `ad_platform_connections.account_ids` (populated by phase-1 dual-write) instead of `mcp_sessions.customerIds`.
+- **Email lookups migrated to `getUserEmail`**:
+  - `lib/x-first-write.ts`, `lib/reddit-first-write.ts` — conversion-event email attribution now sources from `auth.users` (was silently null for Supabase-only users).
+  - `lib/subscription.ts` — dev-email override.
+  - `lib/mcp/agent-feedback.ts` — Slack/PostHog enrichment.
+
+**Open metrics (added 2026-05-07):**
+
+- `web_session_resolved` (`lib/session.ts`) — daily breakdown by `via`. Tracks rate of users naturally migrating from cookies to Supabase as they re-engage.
+- `auth_identity_resolved` (`identifyUser`) — per-route breakdown by `via`. Tracks whether each migrated route's traffic is on Supabase or still leaning on the cookie fallback.
+
+**Initial readout (~3h post-bridge-flip):** 1 user resolved via Supabase / 3 still on cookie fallback / 17%/83% hit ratio. Expected this early — `sb-*` cookies are only set on fresh signins. Step 3 readiness gate is `cookie_fallback` count <5% sustained for ≥3 days.
+
+**What's still pending in step 2:**
+
+- **`app/auth/callback/route.ts` flag-gated `mcp_sessions` INSERT skip** — the actual "stop creating new rows for new web logins" change. All read paths now tolerate a missing row, so the INSERT can be skipped behind a `STOP_CREATING_MCP_SESSIONS` flag. Small (~30 LOC) but ships separately so the read-side migration can bake first.
 
 #### Code changes
 
 | File | Change | Step | Status |
 |---|---|---|---|
 | `lib/session.ts` | Add Supabase-anchored loader; `loadSessionRow` prefers it when flag on. | 1 | ✅ shipped 2026-05-07 |
+| `lib/auth/identify-user.ts` (new) | Shared `identifyUser` helper (Supabase first / cookie fallback) + `auth_identity_resolved` telemetry. | 2 | ✅ shipped 2026-05-07 (`a4d1aca`) |
+| `lib/auth/get-user-email.ts` (new) | Email-by-userId helper, queries `auth.users` directly. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
+| `app/api/oauth/authorize/route.ts` | Identify user via Supabase first; bind Google DCR codes to `connectionId` when connection has active account. | 2 | ✅ shipped 2026-05-07 (`343705a`, `d5e9795`) |
+| `app/api/auth/select-account/route.ts` | Connection is source of truth for refresh token + candidate accounts; mcp_sessions UPDATE/DELETE only for legacy users. | 2 | ✅ shipped 2026-05-07 (`d33c3fc`) |
+| `app/api/auth/switch-account/route.ts` | Same pattern. | 2 | ✅ shipped 2026-05-07 (`d5e9795`) |
+| `app/api/oauth/meta/start/route.ts` + `callback` | Supabase-first identity; userId verification via identifyUser. | 2 | ✅ shipped 2026-05-07 (`d5e9795`, `11fbb6d`) |
+| `app/api/oauth/gohighlevel/start/route.ts` + `callback` + `status` | Same pattern. | 2 | ✅ shipped 2026-05-07 (`d5e9795`, `11fbb6d`) |
+| `app/(app)/manage-ads-accounts/page.tsx` | Pending Google candidate accounts come from `ad_platform_connections.account_ids` instead of `mcp_sessions.customerIds`. | 2 | ✅ shipped 2026-05-07 (`d5e9795`) |
+| `lib/x-first-write.ts`, `lib/reddit-first-write.ts` | Email attribution sources from `auth.users` via `getUserEmail`. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
+| `lib/subscription.ts` | Dev-email override sources from `auth.users`. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
+| `lib/mcp/agent-feedback.ts` | Slack/PostHog enrichment prefers `auth.users` via userId; mcp_sessions kept as fallback for sessionId-bound legacy paths. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
+| `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending — `STOP_CREATING_MCP_SESSIONS` flag |
 | `lib/session.ts` | Drop the cookie fallback path (no more `adsagent_token` reads). | 3 | pending |
 | `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. | 3 | pending |
-| `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending |
-| `app/api/oauth/authorize/route.ts` | Identify user via Supabase first (cookie fallback for legacy users). Bind new Google DCR codes to `connectionId` directly. | 2 | ✅ shipped 2026-05-07 (commit `343705a`) |
 | `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates refresh tokens natively. | 3 | pending |
 | `app/api/auth/signout/route.ts` | Replace cookie-clearing with `supabase.auth.signOut()`. | 3 | pending |
-| `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata` (Google identity provider populates these). | 4 | pending |
-| `lib/session.ts` (impersonation) | `adsagent_impersonate` cookie value changes from `mcp_sessions.id` (int) to `userId` (uuid). Update dev impersonation lookup accordingly. | 4 | pending |
-| `lib/auth-cookies.ts` | Drop `adsagent_customer` cookie — derive customer name from connection on render. | (phase 2 prep) | ✅ shipped 2026-05-07 (commit `97b4ca7`) |
+| `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata`. | 4 | pending |
+| `lib/session.ts` (impersonation) | `adsagent_impersonate` cookie value changes from `mcp_sessions.id` (int) to `userId` (uuid). | 4 | pending |
+| `lib/auth-cookies.ts` | Drop `adsagent_customer` cookie — derive customer name from connection on render. | (phase 2 prep) | ✅ shipped 2026-05-07 (`97b4ca7`) |
 
 #### Forced re-auth
 
