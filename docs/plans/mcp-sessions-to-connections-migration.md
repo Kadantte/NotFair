@@ -9,7 +9,7 @@
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
 | 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). |
 | 3 — Direct-bearer MCP cutoff | 🛑 **Halted 2026-05-07.** Telemetry stays live (`mcp_direct_bearer_used` + `mcp_oauth_used`) for visibility. Cutoff steps will not ship. Direct-bearer remains a supported auth path. |
-| 4 — Switch web cookie to Supabase Auth | **Step 1 + 2 read-side live in prod 2026-05-07.** `READ_USERID_FROM_SUPABASE=true` flipped; every code path that previously needed an `mcp_sessions` row to function now tolerates its absence. Step 2 INSERT flag-gating, plus steps 3–4, still pending. End state changes: callback stops creating new `mcp_sessions` rows for new users, but existing rows stay alive forever to keep the direct-bearer cohort working. |
+| 4 — Switch web cookie to Supabase Auth | **Step 2 INSERT skip live in prod 2026-05-07** (`STOP_CREATING_MCP_SESSIONS=true` flipped, deploy `9b9fa57`). New web logins no longer create `mcp_sessions` rows or set `adsagent_token`; identity carried entirely by Supabase `sb-*` cookies + `ad_platform_connections`. Bearer-block UI removed (`568e76a`). `/api/auth/rotate-token` deleted + direct-bearer `expiresAt` check dropped (option B, `79a7c64`). Steps 3–4 (drop `adsagent_token` reads from `lib/session.ts`, drop `adsagent_profile`, migrate impersonation cookie to userId) still pending; gate on `web_session_resolved.via=cookie_fallback` <5% for ≥3 days. |
 | 5 — Drop `mcp_sessions` | 🛑 **Cancelled 2026-05-07.** Table stays. `oauth_access_tokens.session_id`, `authorization_codes.session_id`, `oauth_clients.session_id`, `operations.session_id` all stay. No schema cleanup. |
 
 ### Phase 1 — closed out 2026-05-07
@@ -455,9 +455,16 @@ Every code path that previously required an `mcp_sessions` row to identify the u
 
 **Initial readout (~3h post-bridge-flip):** 1 user resolved via Supabase / 3 still on cookie fallback / 17%/83% hit ratio. Expected this early — `sb-*` cookies are only set on fresh signins. Step 3 readiness gate is `cookie_fallback` count <5% sustained for ≥3 days.
 
-**What's still pending in step 2:**
+**Step 2 INSERT skip shipped + flipped 2026-05-07:**
 
-- **`app/auth/callback/route.ts` flag-gated `mcp_sessions` INSERT skip** — the actual "stop creating new rows for new web logins" change. All read paths now tolerate a missing row, so the INSERT can be skipped behind a `STOP_CREATING_MCP_SESSIONS` flag. Small (~30 LOC) but ships separately so the read-side migration can bake first.
+- **Code (`5bdfe70`):** `STOP_CREATING_MCP_SESSIONS` predicate in `lib/connections/feature-flags.ts`. Auth callbacks (Google OAuth + Supabase magic-link) skip both the `mcp_sessions` INSERT and the `adsagent_token` cookie set when flag on AND a Supabase userId is present. Connection upsert still fires unconditionally. Defensive fallback when `userId === null` (rare pre-Supabase-attached path) keeps the legacy INSERT to avoid stranding the user. Magic-link callback also skips `clearSupabaseCookies` under the flag (sb-* cookies ARE the session, can't be cleared). +6 tests.
+- **Audit before flip (in chat, 2026-05-07):** walked the full new-user journey end-to-end under flag-on — signin → callback → /manage-ads-accounts → picker → /api/auth/select-account → /connect/google-ads → DCR /api/oauth/register → /api/oauth/authorize (connectionId-bound) → /api/oauth/token → /api/mcp/google_ads tool call. 15 of 16 read paths green; 1 UX break found and fixed.
+- **UX fix (`5bdfe70`):** `components/connect-page.tsx` was hiding the entire MCP setup UI behind `!token`, which conflated "has a Supabase session" with "has an `mcp_sessions.access_token`." Connected Supabase-only users would have seen a "Sign in with Google" CTA for an account they were already signed into. Gate switched to `session.connected && !session.pendingSetup`.
+- **Bearer-block removal (`568e76a`):** `/connect/*-ads/any-mcp` no longer renders the bearer-token ConfigBlock — under STOP_CREATING_MCP_SESSIONS the "sign in to get a key" CTA was misleading (signing in won't produce a key), and the rotate button would 404 once `/api/auth/rotate-token` was deleted. Component slimmed to OAuth-only across in-app + marketing surfaces.
+- **Rotate-token retirement + option B (`79a7c64`):** deleted `/api/auth/rotate-token` route + test, dropped `expiresAt` check from `lib/mcp/handler-factory.ts`'s direct-bearer branch (locked option B). Direct-bearer tokens are now long-lived credentials revocable via row deletion only — mirrors connection-bound Google + Meta behavior. Translation cleanup across all 7 locales (`AnyMcpClientSetup.{bearer,apiKey,apiKeyCta}.*` keys removed) + 5 dead `api_key_*` event-registry entries removed.
+- **Production flip (`9b9fa57`):** `vercel env add STOP_CREATING_MCP_SESSIONS production` → `true`, empty-commit redeploy. Same flip pattern used for `READ_GOOGLE_FROM_CONNECTIONS` (`e5b2dcd`) and `SUPABASE_SESSION_BRIDGE` (`e6d11fe`).
+
+**Rollback for step 2 INSERT skip:** `vercel env rm STOP_CREATING_MCP_SESSIONS production` + redeploy. Users who signed up during the on-window keep working post-rollback (sb-* cookies + `READ_USERID_FROM_SUPABASE=true` carry identity, `READ_GOOGLE_FROM_CONNECTIONS=true` carries Google state). They just lack a `mcp_sessions` row, which nothing on the UI consumes anymore (bearer block is gone, `session.token` no longer gates anything).
 
 #### Code changes
 
@@ -475,7 +482,8 @@ Every code path that previously required an `mcp_sessions` row to identify the u
 | `lib/x-first-write.ts`, `lib/reddit-first-write.ts` | Email attribution sources from `auth.users` via `getUserEmail`. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
 | `lib/subscription.ts` | Dev-email override sources from `auth.users`. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
 | `lib/mcp/agent-feedback.ts` | Slack/PostHog enrichment prefers `auth.users` via userId; mcp_sessions kept as fallback for sessionId-bound legacy paths. | 2 | ✅ shipped 2026-05-07 (`11fbb6d`) |
-| `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending — `STOP_CREATING_MCP_SESSIONS` flag |
+| `app/auth/callback/route.ts` + `app/auth/supabase/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. Magic-link callback also preserves `sb-*` cookies under the flag. (Connection upsert still fires unconditionally.) | 2 | ✅ shipped + flipped 2026-05-07 (`5bdfe70`, `9b9fa57`) |
+| `components/any-mcp-client-setup.tsx` + `mcp-setup-tabs.tsx` + `connect-page.tsx` + `connect-meta-ads-mcp-page.tsx` + marketing pages | Drop bearer-token ConfigBlock + `apiKey`/`onSignIn`/`onTokenRotated` prop chain. Connect-page setup-tabs gate switches from `!token` to `session.connected && !session.pendingSetup`. | 2 | ✅ shipped 2026-05-07 (`568e76a`) |
 | `lib/session.ts` | Drop the cookie fallback path (no more `adsagent_token` reads). | 3 | pending |
 | `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. | 3 | pending |
 | `app/api/auth/rotate-token/route.ts` | **Deleted 2026-05-07.** Supabase rotates web refresh tokens natively. Direct-bearer no longer depends on `expiresAt` being extended. | 3 | ✅ shipped |
@@ -600,7 +608,7 @@ If we later want hard TTLs on MCP tokens, do it as a standalone change covering 
 | 1 | Revert dual-write code. Orphan `ad_platform_connections` rows are harmless. |
 | 2 | Flip `READ_GOOGLE_FROM_CONNECTIONS=false`. Dual-write still running, reads fall back to `mcp_sessions`. |
 | 3 | 🛑 Halted — no rollback needed. Direct-bearer never cut off. |
-| 4 | Restore `adsagent_token` minting in callback + restore `lib/session.ts` cookie fallback. Risk: users who re-auth during phase 4 will not have `mcp_sessions` rows; they'll need to log in again on rollback. (Direct-bearer users untouched — their `mcp_sessions` rows are pre-existing, not phase-4 creations.) |
+| 4 | **Step 2 INSERT skip:** `vercel env rm STOP_CREATING_MCP_SESSIONS production` + redeploy. Users who signed up during the on-window keep working post-rollback (sb-* + Supabase-anchored loader carries identity, `ad_platform_connections` carries Google state). Nothing on the UI consumes `session.token` anymore (bearer block gone). **Step 3+4 (when shipped):** restore `adsagent_token` minting + `lib/session.ts` cookie fallback. Risk: users who re-auth during the phase-4 window won't have `mcp_sessions` rows; identity still works via Supabase. |
 | 5 | 🛑 Cancelled — no destructive action to roll back. |
 
 ## Risks summary
@@ -619,9 +627,36 @@ If we later want hard TTLs on MCP tokens, do it as a standalone change covering 
 | 1 | ~600 | 2–3 | 1 week | ✅ shipped |
 | 2 | ~800 | 2–3 | 1 week | ✅ shipped |
 | 3 | ~300 | 2 | 2–4 weeks (user notice) | 🛑 halted |
-| 4 | ~400 | 1–2 | 1 week | step 1 + 2 read-side shipped; INSERT skip + cookie cutover pending |
+| 4 | ~400 | 1–2 | 1 week | step 1 + 2 (read-side + INSERT skip) live in prod; option B locked + rotate-token retired; steps 3–4 cookie cutover pending |
 | 5 | ~200 | 1 | — | 🛑 cancelled |
 | **Total (revised)** | **~1,800** | **6–8** | **~3–4 weeks remaining** | |
+
+## What shipped 2026-05-07 (phase 4 step 2 finalization)
+
+Five commits, ~700 LOC removed net.
+
+- **`5bdfe70` — `feat(auth): STOP_CREATING_MCP_SESSIONS flag + scope migration to phase 4`**
+  - `lib/connections/feature-flags.ts` — `stopCreatingMcpSessions()` predicate
+  - `app/auth/callback/route.ts` — flag-gated INSERT skip in all 3 paths (`mintAdsLessSession`, single-account, multi-account-pending) + `setSessionCookies` skip
+  - `app/auth/supabase/callback/route.ts` — flag-gated `mintEmailOnlySession` skip + `clearSupabaseCookies` skip (sb-* MUST persist under flag)
+  - `components/connect-page.tsx` — UX fix: setup-tabs gate switched from `!token` to `session.connected && !session.pendingSetup`
+  - `docs/plans/mcp-sessions-to-connections-migration.md` — phase 3 + 5 marked halted/cancelled
+  - +6 tests
+- **`568e76a` — `refactor(connect): drop bearer-token block from any-mcp setup`**
+  - `components/any-mcp-client-setup.tsx` — bearer ConfigBlock + `ApiKeyDisplay` + `ApiKeyCta` + `bearerConfigFor` removed; OAuth-only
+  - `components/mcp-setup-tabs.tsx` — `apiKey`/`onSignIn`/`onTokenRotated` props dropped
+  - `components/connect-page.tsx`, `components/connect-meta-ads-mcp-page.tsx`, `components/marketing/{google,meta}-ads-mcp-page.tsx`, `app/(app)/connect/meta-ads/[[...slug]]/page.tsx` — apiKey prop chain unwound
+  - Net -288 LOC
+- **`79a7c64` — `refactor(auth): retire rotate-token + lock direct-bearer option B`**
+  - `lib/mcp/handler-factory.ts` — direct-bearer branch no longer enforces `mcp_sessions.expiresAt` (option B locked)
+  - `app/api/auth/rotate-token/route.ts` + `lib/__tests__/rotate-token-route.test.ts` — deleted
+  - `messages/{de,en,es,fr,pt-BR,ru,th}.json` — orphan `AnyMcpClientSetup.{bearer,apiKey,apiKeyCta}.*` keys removed
+  - `docs/event-registry.md` — 5 dead `api_key_*` events removed
+  - Net -405 LOC
+- **`9b9fa57` — `chore(deploy): flip STOP_CREATING_MCP_SESSIONS=true in production`**
+  - `vercel env add STOP_CREATING_MCP_SESSIONS production` → `true`, empty-commit redeploy
+
+Pre-flip end-to-end audit (in chat): walked the full new-user journey under flag-on through 16 read-path stops. All green after the connect-page UX fix.
 
 ## What shipped in phase 1 (`c74e4da`)
 
@@ -638,9 +673,8 @@ If we later want hard TTLs on MCP tokens, do it as a standalone change covering 
 
 ## Next action
 
-With phase 3 + 5 off the table, the remaining work is finishing phase 4:
+Phase 4 step 1 + 2 are live in prod. Three of the eight items in the step 3+4 code-changes table also already shipped (rotate-token deletion, option B `expiresAt` drop, bearer-block UI removal). Remaining work:
 
-1. **Bake the read-side migration** — ≥3–7 days of clean `google_connection_mismatch` (currently 1 self-healed event in 24h) and at least one day where `auth_identity_resolved.source=oauth-authorize` shows non-zero Supabase resolution.
-2. **Ship `STOP_CREATING_MCP_SESSIONS` flag (off-by-default)** — auth callback skips the `mcp_sessions` INSERT for new users. Code can land now; flip after step 1's bake clears.
-3. **Phase 4 step 3 + 4** — remove `adsagent_token` reads from `lib/session.ts`, drop `adsagent_profile`, migrate impersonation cookie to userId, delete `/api/auth/rotate-token`, **drop the `expiresAt` check from `handler-factory.ts`'s direct-bearer branch (locked option B)**. Gate on `web_session_resolved.via=cookie_fallback` <5% sustained ≥3 days.
-4. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort serves itself off the existing rows indefinitely.
+1. **Watch the post-flip dashboard for ~7 days** — `auth_error` events, `web_session_resolved.via` distribution, Vercel function logs, user reports. Rollback path is `vercel env rm STOP_CREATING_MCP_SESSIONS production` + redeploy.
+2. **Phase 4 step 3 + 4 (cookie cutover)** — remove `adsagent_token` reads from `lib/session.ts`, drop `adsagent_profile` (read `displayName`/`picture` from `auth.users.user_metadata`), migrate `adsagent_impersonate` cookie value from `mcp_sessions.id` (int) to `userId` (uuid), replace cookie-clearing in `/api/auth/signout` with `supabase.auth.signOut()`. Gate on `web_session_resolved.via=cookie_fallback` <5% sustained ≥3 days.
+3. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort serves itself off the existing rows indefinitely.
