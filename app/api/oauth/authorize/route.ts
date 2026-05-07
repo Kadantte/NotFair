@@ -8,6 +8,7 @@ import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
 import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -154,55 +155,61 @@ export async function GET(request: Request) {
     }
     resolvedSessionId = session.id;
   } else {
-    // 2 + 3. DCR flow — identify the user from the cookie. Both Google and
-    // Meta resources need a NotFair session (the user identity); they
-    // diverge on which downstream connection table to bind to.
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
+    // 2 + 3. DCR flow — identify the user. Phase-4 step 2: prefer Supabase
+    // Auth (post-bridge cookies persisted server-side) and fall back to the
+    // legacy `adsagent_token` → mcp_sessions cookie path for users who
+    // haven't re-signed-in since the bridge flipped.
+    const supabase = await createSupabaseServerClient();
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-    if (!sessionToken) {
-      // Send the user through Google sign-in, then back to this exact URL.
-      const signinUrl = new URL("/api/auth/signin", requestUrl);
-      signinUrl.searchParams.set(
-        "next",
-        `${requestUrl.pathname}${requestUrl.search}`,
-      );
-      return NextResponse.redirect(signinUrl.toString());
-    }
+    let userId: string | null = supabaseUser?.id ?? null;
+    let legacyMcpSessionId: number | null = null;
 
-    const [session] = await db()
-      .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
-      .from(schema.mcpSessions)
-      .where(
-        and(
-          eq(schema.mcpSessions.accessToken, sessionToken),
-          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-          sql`${schema.mcpSessions.customerId} <> ''`,
-        ),
-      )
-      .limit(1);
+    if (!userId) {
+      const cookieStore = await cookies();
+      const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "access_denied", error_description: "No active session. Sign in and try again." },
-        { status: 403 },
-      );
-    }
+      if (!sessionToken) {
+        // No identity at all — send through Google sign-in, then back here.
+        const signinUrl = new URL("/api/auth/signin", requestUrl);
+        signinUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
+        );
+        return NextResponse.redirect(signinUrl.toString());
+      }
 
-    if (isMetaResource) {
-      // 3. Meta DCR: bind to ad_platform_connections row, not mcp_sessions.
-      if (!session.userId) {
+      const [session] = await db()
+        .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
+        .from(schema.mcpSessions)
+        .where(
+          and(
+            eq(schema.mcpSessions.accessToken, sessionToken),
+            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+            sql`${schema.mcpSessions.customerId} <> ''`,
+          ),
+        )
+        .limit(1);
+
+      if (!session?.userId) {
         return NextResponse.json(
-          { error: "access_denied", error_description: "Session has no user_id; sign in again." },
+          { error: "access_denied", error_description: "No active session. Sign in and try again." },
           { status: 403 },
         );
       }
+
+      userId = session.userId;
+      legacyMcpSessionId = session.id;
+    }
+
+    if (isMetaResource) {
+      // 3. Meta DCR: bind to ad_platform_connections row.
       const [conn] = await db()
         .select({ id: schema.adPlatformConnections.id, activeAccountId: schema.adPlatformConnections.activeAccountId })
         .from(schema.adPlatformConnections)
         .where(
           and(
-            eq(schema.adPlatformConnections.userId, session.userId),
+            eq(schema.adPlatformConnections.userId, userId),
             eq(schema.adPlatformConnections.platform, "meta_ads"),
           ),
         )
@@ -232,8 +239,41 @@ export async function GET(request: Request) {
       }
       resolvedConnectionId = conn.id;
     } else {
-      // 2. Google DCR: bind to mcp_sessions (existing behavior).
-      resolvedSessionId = session.id;
+      // 2. Google DCR: prefer connection-bound auth codes when the user has
+      // a Google connection (post-phase-1 backfill, this is every live
+      // user). Falls back to mcp_sessions binding only for the unusual case
+      // where we resolved via cookie but the connection is absent — keeps
+      // mid-onboarding flows working until phase-1 dual-write covers them.
+      const [googleConn] = await db()
+        .select({ id: schema.adPlatformConnections.id, activeAccountId: schema.adPlatformConnections.activeAccountId })
+        .from(schema.adPlatformConnections)
+        .where(
+          and(
+            eq(schema.adPlatformConnections.userId, userId),
+            eq(schema.adPlatformConnections.platform, "google_ads"),
+          ),
+        )
+        .limit(1);
+
+      if (googleConn?.activeAccountId) {
+        resolvedConnectionId = googleConn.id;
+      } else if (legacyMcpSessionId !== null) {
+        // Cookie path + no usable connection. Auth code carries sessionId;
+        // /token's phase-2 translator promotes it to connectionId at
+        // exchange time.
+        resolvedSessionId = legacyMcpSessionId;
+      } else {
+        // Supabase-resolved + no Google connection (or no active account).
+        // No legitimate way to mint a Google MCP token — bounce to setup.
+        return NextResponse.json(
+          {
+            error: "access_denied",
+            error_description:
+              "No Google Ads account connected. Visit notfair.co/connect to finish setup and try again.",
+          },
+          { status: 403 },
+        );
+      }
     }
   }
 
