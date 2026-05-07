@@ -5,7 +5,7 @@
 | Phase | Status |
 |---|---|
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
-| 2 — Reads + OAuth tokens move to connections | **`READ_GOOGLE_FROM_CONNECTIONS=true` live in prod 2026-05-07 (commit `e5b2dcd`)**; `SUPABASE_SESSION_BRIDGE` still off (header audit complete, recommends slimming `adsagent_customer` first) |
+| 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). Phase-4 lib/session.ts dual-read still pending (deferred). |
 | 3 — Direct-bearer MCP cutoff | Telemetry-only prep shipped 2026-05-06 (`mcp_direct_bearer_used`); cutoff steps not started |
 | 4 — Switch web cookie to Supabase Auth | Not started |
 | 5 — Drop `mcp_sessions` | Not started |
@@ -203,11 +203,25 @@ Phase-2 connection-read flag flipped (2026-05-07):
 - **End-to-end translation proof:** seeded a sessionId-bound auth code, exchanged it via real `POST /api/oauth/token` against prod, observed the issued `oauth_access_tokens` row carry `connection_id` and `session_id = NULL` — translation is live. Used the issued token to call `summarizeAccountSetup` → returned real Google Ads data. All test artifacts cleaned up.
 - **Rollback:** `vercel env rm READ_GOOGLE_FROM_CONNECTIONS production` + redeploy. Dual-write keeps mcp_sessions in sync, so falling back is consistent.
 
+`adsagent_customer` slim (commit `97b4ca7`, 2026-05-07):
+
+- Dropped the redundant `adsagent_customer` cookie (up to ~1KB) — set on every signin/select/switch/rotate, read by nothing. `customerName` is already derived fresh in `getSession()` from the connection row's `accountIds`.
+- `setSessionCookies(response, token, customerName)` → `setSessionCookies(response, token)`. Six call sites updated.
+- Both `setSessionCookies` and `clearSessionCookies` now actively delete `adsagent_customer` (Max-Age=0) so existing browsers shed the cookie on their next signin/switch/rotate/signout.
+- Header projection drops worst-case post-bridge-flip from ~7KB → **~6KB**.
+
+`SUPABASE_SESSION_BRIDGE=true` flip (commit `e6d11fe`, 2026-05-07):
+
+- Auth callback no longer deletes `sb-*` cookies. Supabase session cookies persist on the browser after `signInWithIdToken`.
+- `lib/supabase/middleware.ts` (`updateSession`) now calls `refreshSupabaseSession(request)` on protected paths to rotate `sb-*` tokens before they expire.
+- Verified: `/api/health` 200, smoke probes clean, real connectionId-bound MCP token resolves end-to-end against prod.
+- **Rollback**: `vercel env rm SUPABASE_SESSION_BRIDGE production` + redeploy. Existing `sb-*` cookies on browsers stay until expiry but become inert (nothing reads them yet — phase 4 ships the consumer).
+
 What's still pending in phase 2:
 
-- **`SUPABASE_SESSION_BRIDGE` flip** — held. Header audit (2026-05-07) showed worst-case request headers project to ~7KB after flipping (close to the 8KB ceiling that originally triggered the HTTP 431 incident). Recommended path: drop the redundant `adsagent_customer` cookie first (~1KB worst-case savings; phase-4 plan already targets this) and then flip with comfortable margin.
-- **`lib/session.ts` dual-read** — prefer Supabase user_id from the refreshed `sb-*` session, fall back to `adsagent_token` → `mcp_sessions.userId`. Inert until `SUPABASE_SESSION_BRIDGE=true` lands, so deferred until then.
-- **Real-traffic monitoring of `google_connection_mismatch`** — the shadow-read fires on every session-load surface; with the flag on, drift between dual-write and connection reads now surfaces directly. Watch for ≥1 week to validate the dual-write is leak-free for all real flows.
+- **`lib/session.ts` dual-read** — prefer Supabase user_id from the refreshed `sb-*` session, fall back to `adsagent_token` → `mcp_sessions.userId`. Was deferred from the bridge-scaffolding PR; can land now that the bridge is live. This is the actual phase-4 trigger — ships it and we're ready to start cutting `adsagent_token` over.
+- **Real-traffic monitoring of `google_connection_mismatch`** — the shadow-read fires on every session-load surface; with the read flag on, any drift between dual-write and connection reads now surfaces directly. Watch for ≥1 week to validate the dual-write is leak-free for all real flows.
+- **Header-size monitoring** — first ~24h with `SUPABASE_SESSION_BRIDGE` on. If we see HTTP 431 spikes in Vercel logs, the audit's worst-case projection was off and we'll need to roll back + rethink (most likely path: also drop `adsagent_profile`).
 
 #### Header-size audit (2026-05-07)
 
