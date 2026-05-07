@@ -1489,7 +1489,7 @@
     },
     "open": {
       "cta": "Claude Connectors offnen",
-      "desktop": "Lieber die Desktop-App? Offne Claude Desktop und gehe zu <strong>Einstellungen -> Connectors -> Benutzerdefinierten Connector hinzufugen</strong>."
+      "desktop": "Lieber die Desktop-App? Offne Claude Desktop und gehe zu <strong>Anpassen -> Connectors -> Benutzerdefinierten Connector hinzufugen</strong>."
     },
     "copy": {
       "aria": "{label} kopieren",

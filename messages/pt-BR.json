@@ -1489,7 +1489,7 @@
     },
     "open": {
       "cta": "Abrir Claude Connectors",
-      "desktop": "Prefere o app desktop? Abra o Claude Desktop e va para <strong>Settings -> Connectors -> Add custom connector</strong>."
+      "desktop": "Prefere o app desktop? Abra o Claude Desktop e va para <strong>Customize -> Connectors -> Add custom connector</strong>."
     },
     "copy": {
       "aria": "Copiar {label}",
