@@ -1,5 +1,5 @@
 import { getCustomer } from "./client";
-import { extractErrorMessage, normalizeCustomerId, safeEntityId, validateRsaAssets } from "./helpers";
+import { extractErrorMessage, getDateRange, micros, normalizeCustomerId, safeEntityId, validateRsaAssets } from "./helpers";
 import { updateAdAssets, updateAdFinalUrl, type AdAsset } from "./campaign-ops";
 import type { AuthContext, WriteResult } from "./types";
 
@@ -37,6 +37,11 @@ export type SupportedExperimentType = (typeof SUPPORTED_EXPERIMENT_TYPES)[number
 const EXPERIMENT_TYPE_CODE: Record<SupportedExperimentType, number> = {
   SEARCH_CUSTOM: 7,
   SEARCH_AUTOMATED_BIDDING_STRATEGY: 9,
+};
+
+const EXPERIMENT_TYPE_NAME: Record<number, SupportedExperimentType> = {
+  7: "SEARCH_CUSTOM",
+  9: "SEARCH_AUTOMATED_BIDDING_STRATEGY",
 };
 
 const EXPERIMENT_STATUS_CODE = {
@@ -150,6 +155,66 @@ export type ListExperimentAsyncErrorsResult = {
   nextPageToken: string | null;
 };
 
+export type ActiveExperimentCampaign = {
+  campaignId: string;
+  campaignResourceName: string;
+  campaignName: string | null;
+};
+
+export type ActiveExperimentArm = {
+  resourceName: string;
+  name: string;
+  control: boolean;
+  trafficSplit: number;
+  campaigns: ActiveExperimentCampaign[];
+  inDesignCampaigns: ActiveExperimentCampaign[];
+};
+
+export type ActiveExperimentCampaignMetrics = {
+  campaignId: string;
+  campaignResourceName: string;
+  campaignName: string | null;
+  impressions: number;
+  clicks: number;
+  costMicros: number;
+  cost: number;
+  conversions: number;
+  conversionValue: number;
+};
+
+export type ActiveExperimentSummary = {
+  experimentResourceName: string;
+  experimentId: string;
+  name: string;
+  status: "ENABLED";
+  type: string;
+  startDate: string | null;
+  endDate: string | null;
+  suffix: string | null;
+  arms: ActiveExperimentArm[];
+  metricsWindow: { start: string; end: string; days: number };
+  metrics: ActiveExperimentCampaignMetrics[];
+};
+
+export type ActiveExperimentImpact = {
+  campaignId: string;
+  campaignResourceName: string;
+  experimentResourceName: string;
+  experimentId: string;
+  experimentName: string;
+  armName: string;
+  armRole: "CONTROL" | "TREATMENT";
+  trafficSplit: number;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export type ActiveExperimentImpactCheck = {
+  ok: boolean;
+  impacts: ActiveExperimentImpact[];
+  error?: string;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -220,6 +285,123 @@ function rewriteExperimentError(msg: string): string {
   return msg;
 }
 
+function experimentStatusName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const code = Number(raw ?? 0);
+  return EXPERIMENT_STATUS_NAME[code] ?? `UNKNOWN(${code})`;
+}
+
+function campaignIdFromResourceName(resourceName: string | null | undefined): string | null {
+  const match = String(resourceName ?? "").match(/^customers\/\d+\/campaigns\/(\d+)$/);
+  return match ? match[1] : null;
+}
+
+function campaignResourceName(customerId: string, campaignId: string): string {
+  return `customers/${normalizeCustomerId(customerId)}/campaigns/${safeEntityId(campaignId)}`;
+}
+
+function quoteGaqlString(value: string): string {
+  return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+}
+
+function enumName(raw: unknown, fallback = "UNKNOWN"): string {
+  if (typeof raw === "string") return raw;
+  if (raw == null) return fallback;
+  return String(raw);
+}
+
+function experimentTypeName(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  const code = Number(raw ?? 0);
+  return EXPERIMENT_TYPE_NAME[code] ?? enumName(raw);
+}
+
+function boolValue(raw: unknown): boolean {
+  return raw === true || raw === 1 || raw === "true" || raw === "TRUE";
+}
+
+async function fetchCampaignNames(
+  customer: ReturnType<typeof getCustomer>,
+  resourceNames: string[],
+): Promise<Map<string, { id: string; name: string | null }>> {
+  const unique = [...new Set(resourceNames)].filter(Boolean);
+  const out = new Map<string, { id: string; name: string | null }>();
+  if (unique.length === 0) return out;
+
+  const rows = await customer.query(`
+    SELECT campaign.resource_name, campaign.id, campaign.name
+    FROM campaign
+    WHERE campaign.resource_name IN (${unique.map(quoteGaqlString).join(", ")})
+  `);
+  type CampaignRow = {
+    campaign?: { resource_name?: string; id?: string | number; name?: string };
+  };
+  for (const row of rows as CampaignRow[]) {
+    const rn = row.campaign?.resource_name ?? "";
+    const id = String(row.campaign?.id ?? campaignIdFromResourceName(rn) ?? "");
+    out.set(rn, { id, name: row.campaign?.name ?? null });
+  }
+  for (const rn of unique) {
+    if (!out.has(rn)) {
+      out.set(rn, { id: campaignIdFromResourceName(rn) ?? "", name: null });
+    }
+  }
+  return out;
+}
+
+async function fetchCampaignMetrics(
+  customer: ReturnType<typeof getCustomer>,
+  resourceNames: string[],
+  days: number,
+): Promise<{ window: { start: string; end: string; days: number }; metrics: ActiveExperimentCampaignMetrics[] }> {
+  const unique = [...new Set(resourceNames)].filter(Boolean);
+  const window = { ...getDateRange(days), days };
+  if (unique.length === 0) return { window, metrics: [] };
+
+  const rows = await customer.query(`
+    SELECT campaign.resource_name,
+           campaign.id,
+           campaign.name,
+           metrics.impressions,
+           metrics.clicks,
+           metrics.cost_micros,
+           metrics.conversions,
+           metrics.conversions_value
+    FROM campaign
+    WHERE campaign.resource_name IN (${unique.map(quoteGaqlString).join(", ")})
+      AND segments.date BETWEEN '${window.start}' AND '${window.end}'
+  `);
+  type MetricsRow = {
+    campaign?: { resource_name?: string; id?: string | number; name?: string };
+    metrics?: {
+      impressions?: string | number;
+      clicks?: string | number;
+      cost_micros?: string | number;
+      conversions?: string | number;
+      conversions_value?: string | number;
+    };
+  };
+
+  return {
+    window,
+    metrics: (rows as MetricsRow[]).map((row) => {
+      const costMicros = Number(row.metrics?.cost_micros ?? 0);
+      const rn = row.campaign?.resource_name ?? "";
+      return {
+        campaignId: String(row.campaign?.id ?? campaignIdFromResourceName(rn) ?? ""),
+        campaignResourceName: rn,
+        campaignName: row.campaign?.name ?? null,
+        impressions: Number(row.metrics?.impressions ?? 0),
+        clicks: Number(row.metrics?.clicks ?? 0),
+        costMicros,
+        cost: micros(costMicros),
+        conversions: Number(row.metrics?.conversions ?? 0),
+        conversionValue: Number(row.metrics?.conversions_value ?? 0),
+      };
+    }),
+  };
+}
+
 /** Read the current experiment status (numeric) so we can pre-empt invalid lifecycle transitions. */
 async function fetchExperimentStatus(
   customer: ReturnType<typeof getCustomer>,
@@ -277,6 +459,241 @@ async function fetchTreatmentTrialCampaign(
     return trial[0] ?? null;
   } catch {
     return null;
+  }
+}
+
+// ─── listActiveExperiments ──────────────────────────────────────────
+
+/**
+ * Denormalized, safety-oriented view of currently running experiments.
+ * Raw `experiment_arm` rows can outlive removed parent experiments; this
+ * helper starts from `experiment.status = ENABLED` and only then attaches
+ * arms, campaign names, and recent metrics.
+ */
+export async function listActiveExperiments(
+  auth: AuthContext,
+  days = 14,
+): Promise<{ activeExperiments: ActiveExperimentSummary[]; count: number }> {
+  const customer = getCustomer(auth);
+  const metricDays = Math.max(1, Math.min(90, Math.floor(days)));
+
+  type ExperimentRow = {
+    experiment?: {
+      resource_name?: string;
+      id?: string | number;
+      name?: string;
+      status?: string | number;
+      type?: string | number;
+      start_date?: string;
+      end_date?: string;
+      suffix?: string;
+    };
+  };
+  const experimentRows = await customer.query(`
+    SELECT experiment.resource_name,
+           experiment.id,
+           experiment.name,
+           experiment.type,
+           experiment.status,
+           experiment.start_date,
+           experiment.end_date,
+           experiment.suffix
+    FROM experiment
+    WHERE experiment.status = 'ENABLED'
+    ORDER BY experiment.start_date DESC
+    LIMIT 100
+  `) as ExperimentRow[];
+
+  const experiments = experimentRows
+    .map((row) => row.experiment)
+    .filter((experiment): experiment is NonNullable<ExperimentRow["experiment"]> =>
+      Boolean(experiment?.resource_name) && experimentStatusName(experiment?.status) === "ENABLED",
+    );
+  if (experiments.length === 0) {
+    return { activeExperiments: [], count: 0 };
+  }
+
+  const experimentResourceNames = experiments.map((e) => e.resource_name!);
+  type ArmRow = {
+    experiment_arm?: {
+      resource_name?: string;
+      experiment?: string;
+      name?: string;
+      control?: boolean | number | string;
+      traffic_split?: string | number;
+      campaigns?: string[];
+      in_design_campaigns?: string[];
+    };
+  };
+  const armRows = await customer.query(`
+    SELECT experiment_arm.resource_name,
+           experiment_arm.experiment,
+           experiment_arm.name,
+           experiment_arm.control,
+           experiment_arm.traffic_split,
+           experiment_arm.campaigns,
+           experiment_arm.in_design_campaigns
+    FROM experiment_arm
+    WHERE experiment_arm.experiment IN (${experimentResourceNames.map(quoteGaqlString).join(", ")})
+  `) as ArmRow[];
+
+  const campaignResourceNames = armRows.flatMap((row) => [
+    ...(row.experiment_arm?.campaigns ?? []),
+    ...(row.experiment_arm?.in_design_campaigns ?? []),
+  ]);
+  const [campaignNames, metricsResult] = await Promise.all([
+    fetchCampaignNames(customer, campaignResourceNames),
+    fetchCampaignMetrics(customer, campaignResourceNames, metricDays),
+  ]);
+
+  const campaignInfo = (rn: string): ActiveExperimentCampaign => {
+    const known = campaignNames.get(rn);
+    return {
+      campaignId: known?.id || campaignIdFromResourceName(rn) || "",
+      campaignResourceName: rn,
+      campaignName: known?.name ?? null,
+    };
+  };
+
+  const armsByExperiment = new Map<string, ActiveExperimentArm[]>();
+  for (const row of armRows) {
+    const arm = row.experiment_arm;
+    if (!arm?.experiment || !experimentResourceNames.includes(arm.experiment)) continue;
+    const denormalized: ActiveExperimentArm = {
+      resourceName: arm.resource_name ?? "",
+      name: arm.name ?? "",
+      control: boolValue(arm.control),
+      trafficSplit: Number(arm.traffic_split ?? 0),
+      campaigns: (arm.campaigns ?? []).map(campaignInfo),
+      inDesignCampaigns: (arm.in_design_campaigns ?? []).map(campaignInfo),
+    };
+    armsByExperiment.set(arm.experiment, [
+      ...(armsByExperiment.get(arm.experiment) ?? []),
+      denormalized,
+    ]);
+  }
+
+  const activeExperiments = experiments.map((experiment): ActiveExperimentSummary => {
+    const rn = experiment.resource_name!;
+    const arms = armsByExperiment.get(rn) ?? [];
+    const experimentCampaignResourceNames = new Set(
+      arms.flatMap((arm) => [
+        ...arm.campaigns.map((campaign) => campaign.campaignResourceName),
+        ...arm.inDesignCampaigns.map((campaign) => campaign.campaignResourceName),
+      ]),
+    );
+    return {
+      experimentResourceName: rn,
+      experimentId: String(experiment.id ?? experimentIdFromResourceName(rn) ?? ""),
+      name: experiment.name ?? "",
+      status: "ENABLED",
+      type: experimentTypeName(experiment.type),
+      startDate: experiment.start_date ?? null,
+      endDate: experiment.end_date ?? null,
+      suffix: experiment.suffix ?? null,
+      arms,
+      metricsWindow: metricsResult.window,
+      metrics: metricsResult.metrics.filter((metric) => experimentCampaignResourceNames.has(metric.campaignResourceName)),
+    };
+  });
+
+  return { activeExperiments, count: activeExperiments.length };
+}
+
+export async function checkActiveExperimentImpact(
+  auth: AuthContext,
+  campaignIds: string[],
+): Promise<ActiveExperimentImpactCheck> {
+  const uniqueCampaignIds = [...new Set(campaignIds.filter(Boolean).map(String))];
+  if (uniqueCampaignIds.length === 0) return { ok: true, impacts: [] };
+
+  try {
+    const customer = getCustomer(auth);
+    type ExperimentRow = {
+      experiment?: {
+        resource_name?: string;
+        id?: string | number;
+        name?: string;
+        status?: string | number;
+        start_date?: string;
+        end_date?: string;
+      };
+    };
+    const experimentRows = await customer.query(`
+      SELECT experiment.resource_name,
+             experiment.id,
+             experiment.name,
+             experiment.status,
+             experiment.start_date,
+             experiment.end_date
+      FROM experiment
+      WHERE experiment.status = 'ENABLED'
+      LIMIT 100
+    `) as ExperimentRow[];
+    const activeExperiments = experimentRows
+      .map((row) => row.experiment)
+      .filter((experiment): experiment is NonNullable<ExperimentRow["experiment"]> =>
+        Boolean(experiment?.resource_name) && experimentStatusName(experiment?.status) === "ENABLED",
+      );
+    if (activeExperiments.length === 0) return { ok: true, impacts: [] };
+
+    const experimentByResourceName = new Map(
+      activeExperiments.map((experiment) => [experiment.resource_name!, experiment]),
+    );
+    type ArmRow = {
+      experiment_arm?: {
+        experiment?: string;
+        name?: string;
+        control?: boolean | number | string;
+        traffic_split?: string | number;
+        campaigns?: string[];
+        in_design_campaigns?: string[];
+      };
+    };
+    const armRows = await customer.query(`
+      SELECT experiment_arm.experiment,
+             experiment_arm.name,
+             experiment_arm.control,
+             experiment_arm.traffic_split,
+             experiment_arm.campaigns,
+             experiment_arm.in_design_campaigns
+      FROM experiment_arm
+      WHERE experiment_arm.experiment IN (${activeExperiments.map((e) => quoteGaqlString(e.resource_name!)).join(", ")})
+    `) as ArmRow[];
+
+    const targetResourceNames = new Set(uniqueCampaignIds.map((id) => campaignResourceName(auth.customerId, id)));
+    const impacts: ActiveExperimentImpact[] = [];
+
+    for (const row of armRows) {
+      const arm = row.experiment_arm;
+      const experiment = arm?.experiment ? experimentByResourceName.get(arm.experiment) : undefined;
+      if (!arm || !experiment?.resource_name) continue;
+      const role = boolValue(arm.control) ? "CONTROL" : "TREATMENT";
+      const campaignResourceNames = [...(arm.campaigns ?? []), ...(arm.in_design_campaigns ?? [])];
+      for (const rn of campaignResourceNames) {
+        if (!targetResourceNames.has(rn)) continue;
+        impacts.push({
+          campaignId: campaignIdFromResourceName(rn) ?? "",
+          campaignResourceName: rn,
+          experimentResourceName: experiment.resource_name,
+          experimentId: String(experiment.id ?? experimentIdFromResourceName(experiment.resource_name) ?? ""),
+          experimentName: experiment.name ?? "",
+          armName: arm.name ?? "",
+          armRole: role,
+          trafficSplit: Number(arm.traffic_split ?? 0),
+          startDate: experiment.start_date ?? null,
+          endDate: experiment.end_date ?? null,
+        });
+      }
+    }
+
+    return { ok: impacts.length === 0, impacts };
+  } catch (error) {
+    return {
+      ok: false,
+      impacts: [],
+      error: `Could not verify active experiment impact before mutation: ${extractErrorMessage(error, { log: false })}`,
+    };
   }
 }
 

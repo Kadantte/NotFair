@@ -88,6 +88,7 @@ describe("MCP read tools — registration", () => {
     expect(names).toContain("listQueryableResources");
     expect(names).toContain("getKeywordIdeas");
     expect(names).toContain("listKeywords");
+    expect(names).toContain("listActiveExperiments");
   });
 
   it("every registered read tool declares readOnlyHint = true", () => {
@@ -400,6 +401,51 @@ describe("MCP write tools — smoke", () => {
     });
   });
 
+  it("addSitelinkAsset blocks when any campaign target is in an active experiment before mutating", async () => {
+    mockQuery
+      .mockResolvedValueOnce([
+        {
+          experiment: {
+            resource_name: "customers/1234567890/experiments/555",
+            id: "555",
+            name: "LP test",
+            status: "ENABLED",
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          experiment_arm: {
+            experiment: "customers/1234567890/experiments/555",
+            name: "treatment",
+            control: false,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/200"],
+            in_design_campaigns: [],
+          },
+        },
+      ]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("addSitelinkAsset", {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+      targets: [
+        { level: "campaign", campaignId: "100" },
+        { level: "campaign", campaignId: "200" },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: false,
+      executed: false,
+      reason: "CAMPAIGN_IN_ACTIVE_EXPERIMENT",
+    });
+    expect(JSON.stringify(structured.impacts)).toContain("LP test");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
   it("createSitelinkAsset defaults to creating without account-level link", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
@@ -587,6 +633,7 @@ describe("MCP write tools — smoke", () => {
         { ad_group_criterion: { criterion_id: "333" } },
         { ad_group_criterion: { criterion_id: "444" } },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         { ad_group_criterion: { criterion_id: "333" } },
         { ad_group_criterion: { criterion_id: "444" } },
@@ -701,7 +748,10 @@ describe("MCP write tools — smoke", () => {
         keyword: { match_type: "PHRASE" },
       },
     };
-    mockQuery.mockResolvedValueOnce([keywordRow]).mockResolvedValueOnce([keywordRow]);
+    mockQuery
+      .mockResolvedValueOnce([keywordRow])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([keywordRow]);
 
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
     const result = await harness.callTool("bulkUpdateBids", {
@@ -715,11 +765,66 @@ describe("MCP write tools — smoke", () => {
       executed: true,
       summary: { total: 1, succeeded: 1, failed: 0 },
     });
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    for (const call of mockQuery.mock.calls) {
-      expect(call[0]).toContain("FROM ad_group_criterion");
-      expect(call[0]).not.toContain("FROM keyword_view");
-    }
+    expect(mockQuery).toHaveBeenCalledTimes(3);
+    expect(mockQuery.mock.calls[0][0]).toContain("FROM ad_group_criterion");
+    expect(mockQuery.mock.calls[0][0]).not.toContain("FROM keyword_view");
+    expect(mockQuery.mock.calls[1][0]).toContain("FROM experiment");
+    expect(mockQuery.mock.calls[2][0]).toContain("FROM ad_group_criterion");
+    expect(mockQuery.mock.calls[2][0]).not.toContain("FROM keyword_view");
     expect(mockMutateResources).toHaveBeenCalledTimes(1);
+  });
+
+  it("bulkUpdateBids blocks active experiment campaigns before mutating", async () => {
+    const keywordRow = {
+      campaign: { id: "100", status: "ENABLED", bidding_strategy_type: "MANUAL_CPC" },
+      ad_group: { id: "111", status: "ENABLED" },
+      ad_group_criterion: {
+        criterion_id: "222",
+        status: "ENABLED",
+        negative: false,
+        cpc_bid_micros: 1_000_000,
+        keyword: { match_type: "PHRASE" },
+      },
+    };
+    mockQuery
+      .mockResolvedValueOnce([keywordRow])
+      .mockResolvedValueOnce([
+        {
+          experiment: {
+            resource_name: "customers/1234567890/experiments/555",
+            id: "555",
+            name: "LP test",
+            status: "ENABLED",
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          experiment_arm: {
+            experiment: "customers/1234567890/experiments/555",
+            name: "control",
+            control: true,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/100"],
+            in_design_campaigns: [],
+          },
+        },
+      ]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("bulkUpdateBids", {
+      updates: [
+        { campaignId: "100", adGroupId: "111", criterionId: "222", newBidDollars: 1.1 },
+      ],
+    });
+
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({
+      success: false,
+      executed: false,
+      reason: "CAMPAIGN_IN_ACTIVE_EXPERIMENT",
+    });
+    expect(JSON.stringify(structured.impacts)).toContain("LP test");
+    expect(mockMutateResources).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ const {
   mockLogChange,
   mockLogRead,
   mockInvalidateCache,
+  mockCheckActiveExperimentImpact,
   mockTrackServerEvent,
   mockSyncAccountSnapshot,
   mockAutoTrackChangeIntervention,
@@ -17,6 +18,7 @@ const {
   mockLogChange: vi.fn(),
   mockLogRead: vi.fn(),
   mockInvalidateCache: vi.fn(),
+  mockCheckActiveExperimentImpact: vi.fn(),
   mockTrackServerEvent: vi.fn(),
   mockSyncAccountSnapshot: vi.fn(),
   mockAutoTrackChangeIntervention: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock("@/lib/db/tracking", () => ({
 
 vi.mock("@/lib/google-ads", () => ({
   authForAccount: (auth: ToolAuth, accountId?: string) => ({ ...auth, customerId: accountId ?? auth.customerId }),
+  checkActiveExperimentImpact: mockCheckActiveExperimentImpact,
   invalidateCache: mockInvalidateCache,
   extractErrorMessage: (error: unknown) => {
     if (error instanceof Error) return error.message;
@@ -80,6 +83,7 @@ describe("execWrite", () => {
     vi.clearAllMocks();
     mockEnforceRateLimit.mockResolvedValue(undefined);
     mockLogChange.mockResolvedValue({ id: 42 });
+    mockCheckActiveExperimentImpact.mockResolvedValue({ ok: true, impacts: [] });
     mockSyncAccountSnapshot.mockResolvedValue(undefined);
     mockAutoTrackChangeIntervention.mockResolvedValue(9);
   });
@@ -177,6 +181,75 @@ describe("execWrite", () => {
 
     expect(result.success).toBe(false);
     expect(result.changeId).toBe(42);
+  });
+
+  it("blocks campaign writes when the campaign is in an active experiment", async () => {
+    mockCheckActiveExperimentImpact.mockResolvedValue({
+      ok: false,
+      impacts: [
+        {
+          campaignId: "23360675423",
+          campaignResourceName: "customers/acct-1/campaigns/23360675423",
+          experimentResourceName: "customers/acct-1/experiments/555",
+          experimentId: "555",
+          experimentName: "LP test",
+          armName: "control",
+          armRole: "CONTROL",
+          trafficSplit: 50,
+          startDate: "2026-05-01",
+          endDate: "2026-06-12",
+        },
+      ],
+    });
+    const fn = vi.fn().mockResolvedValue({
+      success: true,
+      action: "link_sitelink_asset",
+      entityId: "asset-1",
+      beforeValue: "",
+      afterValue: "linked",
+    } satisfies WriteResult);
+
+    const result = await execWrite(auth, "acct-1", "23360675423", fn);
+
+    expect(fn).not.toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("CAMPAIGN_IN_ACTIVE_EXPERIMENT");
+    expect(result.error).toContain("LP test");
+    expect(mockInvalidateCache).not.toHaveBeenCalled();
+    expect(mockLogChange).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: "acct-1",
+      campaignId: "23360675423",
+      writeResult: expect.objectContaining({
+        success: false,
+        beforeValue: "ACTIVE_EXPERIMENT_GUARD",
+        afterValue: "BLOCKED",
+      }),
+      telemetry: expect.objectContaining({ errorClass: "WRITE_REJECTED" }),
+    }));
+  });
+
+  it("allows active-experiment campaign writes when explicitly acknowledged", async () => {
+    const writeResult: WriteResult = {
+      success: true,
+      action: "link_sitelink_asset",
+      entityId: "asset-1",
+      beforeValue: "",
+      afterValue: "linked",
+    };
+    const fn = vi.fn().mockResolvedValue(writeResult);
+
+    const result = await execWrite(
+      auth,
+      "acct-1",
+      "23360675423",
+      fn,
+      undefined,
+      { acknowledgeExperimentImpact: true },
+    );
+
+    expect(mockCheckActiveExperimentImpact).not.toHaveBeenCalled();
+    expect(fn).toHaveBeenCalled();
+    expect(result.success).toBe(true);
   });
 
   it("options.overrideLatencyMs wins over measured fn() latency (bulk fan-out path)", async () => {

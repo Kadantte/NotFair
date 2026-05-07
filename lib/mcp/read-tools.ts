@@ -7,6 +7,7 @@ import {
   getKeywordIdeas,
   listKeywords,
   getAccountSummary,
+  listActiveExperiments,
   type AuthContext,
 } from "@/lib/google-ads";
 import { getChanges, reviewChangeImpact } from "@/lib/db/tracking";
@@ -227,6 +228,28 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execRead(auth, targetId, "summarize_account_setup", () =>
       getAccountSummary(targetAuth),
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("listActiveExperiments", {
+    description:
+      "One-call, safety-oriented view of currently running Google Ads experiments. Returns ENABLED experiments only, with control/treatment campaign IDs and names, traffic split, dates, and recent campaign metrics for both arms. Use this before experiment analysis or before planning campaign mutations; do not stitch raw experiment + experiment_arm GAQL unless you need historical/removed experiments.",
+    inputSchema: {
+      accountId: accountIdParam,
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .default(14)
+        .describe("Recent metrics window in days. Default 14, max 90."),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, days }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execRead(auth, targetId, "list_active_experiments", () =>
+      listActiveExperiments(targetAuth, days),
     );
     return typedResult(result);
   }));

@@ -43,6 +43,8 @@ import {
   endExperiment,
   promoteExperiment,
   graduateExperiment,
+  listActiveExperiments,
+  checkActiveExperimentImpact,
   listExperimentAsyncErrors,
   createAdVariationExperiment,
   __testInternals,
@@ -59,6 +61,255 @@ const EXP_RN = "customers/1234567890/experiments/555";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("listActiveExperiments", () => {
+  it("returns only ENABLED experiments with denormalized arms and metrics", async () => {
+    queryFn
+      .mockResolvedValueOnce([
+        {
+          experiment: {
+            resource_name: EXP_RN,
+            id: "555",
+            name: "LP test",
+            type: "SEARCH_CUSTOM",
+            status: 2,
+            start_date: "2026-05-01",
+            end_date: "2026-06-12",
+            suffix: "[lp]",
+          },
+        },
+        {
+          experiment: {
+            resource_name: "customers/1234567890/experiments/444",
+            id: "444",
+            name: "Removed stale test",
+            type: "SEARCH_CUSTOM",
+            status: 3,
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          experiment_arm: {
+            resource_name: "customers/1234567890/experimentArms/555~1",
+            experiment: EXP_RN,
+            name: "control",
+            control: true,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/23360675423"],
+            in_design_campaigns: [],
+          },
+        },
+        {
+          experiment_arm: {
+            resource_name: "customers/1234567890/experimentArms/555~2",
+            experiment: EXP_RN,
+            name: "treatment",
+            control: false,
+            traffic_split: 50,
+            campaigns: [],
+            in_design_campaigns: ["customers/1234567890/campaigns/9876543210"],
+          },
+        },
+        {
+          experiment_arm: {
+            resource_name: "customers/1234567890/experimentArms/444~1",
+            experiment: "customers/1234567890/experiments/444",
+            name: "stale",
+            control: true,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/111"],
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/23360675423",
+            id: "23360675423",
+            name: "Ballard-Search",
+          },
+        },
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/9876543210",
+            id: "9876543210",
+            name: "Ballard-Search [lp]",
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/23360675423",
+            id: "23360675423",
+            name: "Ballard-Search",
+          },
+          metrics: { impressions: 1000, clicks: 100, cost_micros: 25000000, conversions: 10, conversions_value: 1000 },
+        },
+      ]);
+
+    const result = await listActiveExperiments(auth, 14);
+
+    expect(result.count).toBe(1);
+    expect(result.activeExperiments[0]).toMatchObject({
+      experimentResourceName: EXP_RN,
+      name: "LP test",
+      status: "ENABLED",
+      arms: [
+        {
+          name: "control",
+          control: true,
+          trafficSplit: 50,
+          campaigns: [{ campaignId: "23360675423", campaignName: "Ballard-Search" }],
+        },
+        {
+          name: "treatment",
+          control: false,
+          trafficSplit: 50,
+          inDesignCampaigns: [{ campaignId: "9876543210", campaignName: "Ballard-Search [lp]" }],
+        },
+      ],
+      metrics: [
+        expect.objectContaining({
+          campaignId: "23360675423",
+          costMicros: 25000000,
+          cost: 25,
+          conversions: 10,
+        }),
+      ],
+    });
+    expect(queryFn.mock.calls[1][0]).toContain("experiment_arm.experiment IN");
+    expect(queryFn.mock.calls[1][0]).not.toContain("444");
+  });
+
+  it("scopes campaign metrics to each active experiment", async () => {
+    const secondExpRn = "customers/1234567890/experiments/777";
+    queryFn
+      .mockResolvedValueOnce([
+        {
+          experiment: {
+            resource_name: EXP_RN,
+            id: "555",
+            name: "LP test",
+            type: "SEARCH_CUSTOM",
+            status: "ENABLED",
+          },
+        },
+        {
+          experiment: {
+            resource_name: secondExpRn,
+            id: "777",
+            name: "Bid test",
+            type: "SEARCH_CUSTOM",
+            status: "ENABLED",
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          experiment_arm: {
+            resource_name: "customers/1234567890/experimentArms/555~1",
+            experiment: EXP_RN,
+            name: "lp-control",
+            control: true,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/100"],
+            in_design_campaigns: [],
+          },
+        },
+        {
+          experiment_arm: {
+            resource_name: "customers/1234567890/experimentArms/777~1",
+            experiment: secondExpRn,
+            name: "bid-control",
+            control: true,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/200"],
+            in_design_campaigns: [],
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/100",
+            id: "100",
+            name: "LP Campaign",
+          },
+        },
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/200",
+            id: "200",
+            name: "Bid Campaign",
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/100",
+            id: "100",
+            name: "LP Campaign",
+          },
+          metrics: { impressions: 100, clicks: 10, cost_micros: 1_000_000, conversions: 1, conversions_value: 10 },
+        },
+        {
+          campaign: {
+            resource_name: "customers/1234567890/campaigns/200",
+            id: "200",
+            name: "Bid Campaign",
+          },
+          metrics: { impressions: 200, clicks: 20, cost_micros: 2_000_000, conversions: 2, conversions_value: 20 },
+        },
+      ]);
+
+    const result = await listActiveExperiments(auth, 14);
+
+    expect(result.count).toBe(2);
+    expect(result.activeExperiments.find((experiment) => experiment.experimentId === "555")?.metrics.map((metric) => metric.campaignId)).toEqual(["100"]);
+    expect(result.activeExperiments.find((experiment) => experiment.experimentId === "777")?.metrics.map((metric) => metric.campaignId)).toEqual(["200"]);
+  });
+
+  it("reports active experiment impact for a campaign and ignores removed parents", async () => {
+    queryFn
+      .mockResolvedValueOnce([
+        {
+          experiment: {
+            resource_name: EXP_RN,
+            id: "555",
+            name: "LP test",
+            status: "ENABLED",
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          experiment_arm: {
+            resource_name: "customers/1234567890/experimentArms/555~1",
+            experiment: EXP_RN,
+            name: "control",
+            control: true,
+            traffic_split: 50,
+            campaigns: ["customers/1234567890/campaigns/23360675423"],
+            in_design_campaigns: [],
+          },
+        },
+      ]);
+
+    const result = await checkActiveExperimentImpact(auth, ["23360675423"]);
+
+    expect(result.ok).toBe(false);
+    expect(result.impacts).toEqual([
+      expect.objectContaining({
+        campaignId: "23360675423",
+        experimentName: "LP test",
+        armRole: "CONTROL",
+      }),
+    ]);
+  });
 });
 
 describe("createExperiment", () => {

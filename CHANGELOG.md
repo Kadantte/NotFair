@@ -8,6 +8,19 @@ All notable changes to NotFair will be documented in this file.
 - **Google Ads MCP tool guidance is more explicit for agent callers.** `runScript` now includes a copy-pasteable `ads.gaqlParallel([{ name, query, limit }])` example, documents `{ partial: true }` for intentional partial success, and clarifies Local Services / `local_services_*` conversion actions as Google-managed/read-only when they appear only through conversion-action segments. Keyword write tools now describe `addKeyword` / `bulkAddKeywords` as creating new positive keywords so agents do not invent duplicate `createKeyword` tools.
 - **GAQL schema errors now point agents at the exact metadata workflow.** Invalid-field and enum-code tips tell agents to call `getResourceMetadata` with the query's `FROM` resource instead of guessing at Google Ads field names.
 
+## [0.3.15.0] - 2026-05-07
+
+### Added
+- **Google Ads MCP can now list active experiments in one call.** `listActiveExperiments` returns ENABLED experiments only, with control and treatment campaign ids/names, traffic split, dates, and recent arm metrics so agents can answer "what is being tested?" without stitching fragile GAQL across `experiment` and `experiment_arm`.
+
+### Changed
+- **Campaign writes now preflight active experiment impact before mutating Google Ads.** Shared `execWrite` and pre-mutating bulk handlers block writes to campaigns that are BASE or TREATMENT arms of active experiments unless `acknowledgeExperimentImpact` is explicitly set.
+- **Bulk and extension write logging avoids redundant experiment checks after preflight.** Multi-row bid, keyword, settings, language, and asset-extension workflows preflight the intended campaign set once before mutation, then mark per-campaign change logging as already checked.
+
+### Fixed
+- **Multi-campaign asset extension workflows no longer contaminate experiments through later targets.** `addSitelinkAsset`, `addCalloutAsset`, and `addStructuredSnippetAsset` now preflight every campaign target before creating/linking assets, instead of guarding only the first campaign and discovering later experiment arms after mutation.
+- **Active experiment metrics stay scoped to their own experiment.** `listActiveExperiments` filters campaign metrics per experiment arm set so agents do not compare campaigns from unrelated live tests.
+
 ## [0.3.14.1] - 2026-05-07
 
 ### Added

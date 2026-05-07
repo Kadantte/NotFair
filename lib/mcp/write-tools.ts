@@ -13,6 +13,7 @@ import {
   removeCampaign,
   createCampaign,
   setTrackingTemplate,
+  getTrackingTemplate,
   decodeTrackingEntityId,
   getCustomer,
   safeEntityId,
@@ -80,8 +81,9 @@ import {
   listExperimentAsyncErrors,
   createAdVariationExperiment,
   SUPPORTED_EXPERIMENT_TYPES,
+  checkActiveExperimentImpact,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, LinkImageAssetLevel, AssetExtensionMutationResult, CreateCampaignParams } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, LinkImageAssetLevel, AssetExtensionMutationResult, CreateCampaignParams, ActiveExperimentImpact } from "@/lib/google-ads";
 import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite, execRead } from "@/lib/tools/execute";
@@ -212,10 +214,58 @@ const assetExtensionTargetSchema = z.discriminatedUnion("level", [
   }),
 ]);
 
-type AssetExtensionToolTarget = z.infer<typeof assetExtensionTargetSchema>;
+const experimentImpactAcknowledgementSchema = {
+  acknowledgeExperimentImpact: z
+    .boolean()
+    .default(false)
+    .describe("Danger override. Set true only after the user explicitly accepts that this mutation touches a campaign in an active experiment, or after applying the same intended change to both arms."),
+};
 
-function firstCampaignTargetId(targets: AssetExtensionToolTarget[] | undefined): string | null {
-  return targets?.find((target) => target.level === "campaign")?.campaignId ?? null;
+type AssetExtensionToolTarget = z.infer<typeof assetExtensionTargetSchema>;
+type ExperimentPreflightBlock = {
+  success: false;
+  executed: false;
+  reason: "CAMPAIGN_IN_ACTIVE_EXPERIMENT";
+  error: string;
+  impacts: ActiveExperimentImpact[];
+};
+
+function buildExperimentPreflightBlock(error: string, impacts: ActiveExperimentImpact[] = []): ExperimentPreflightBlock {
+  const first = impacts[0];
+  return {
+    success: false,
+    executed: false,
+    reason: "CAMPAIGN_IN_ACTIVE_EXPERIMENT",
+    error: first
+      ? `CAMPAIGN_IN_ACTIVE_EXPERIMENT: campaign ${first.campaignId} is the ${first.armRole} arm of active experiment "${first.experimentName}" (${first.experimentResourceName}). Pass acknowledgeExperimentImpact: true only after explicit user approval, or apply the same intended change to both arms.`
+      : error,
+    impacts,
+  };
+}
+
+async function preflightActiveExperimentMutation(
+  auth: AuthContext,
+  accountId: string | undefined,
+  campaignIds: Array<string | null | undefined>,
+  acknowledgeExperimentImpact = false,
+): Promise<ExperimentPreflightBlock | null> {
+  if (acknowledgeExperimentImpact) return null;
+  const uniqueCampaignIds = [...new Set(campaignIds.filter((id): id is string => Boolean(id)).map(String))];
+  if (uniqueCampaignIds.length === 0) return null;
+
+  const impact = await checkActiveExperimentImpact(authForAccount(auth, accountId), uniqueCampaignIds);
+  if (impact.ok) return null;
+  return buildExperimentPreflightBlock(
+    impact.error ?? "CAMPAIGN_IN_ACTIVE_EXPERIMENT: at least one target campaign is in an active experiment.",
+    impact.impacts,
+  );
+}
+
+function campaignTargetIds(targets: AssetExtensionToolTarget[] | undefined): string[] {
+  const ids = targets
+    ?.filter((target) => target.level === "campaign")
+    .map((target) => target.campaignId) ?? [];
+  return [...new Set(ids)];
 }
 
 function linkedCampaignIds(result: AssetExtensionMutationResult): string[] {
@@ -229,11 +279,20 @@ function linkedCampaignIds(result: AssetExtensionMutationResult): string[] {
 async function execAssetExtensionWrite(
   auth: AuthContext,
   targetId: string,
-  initialCampaignId: string | null,
+  campaignIds: string[],
   fn: () => Promise<AssetExtensionMutationResult>,
+  acknowledgeExperimentImpact = false,
 ) {
+  const intendedCampaignIds = [...new Set(campaignIds.filter(Boolean))];
+  const block = await preflightActiveExperimentMutation(auth, targetId, intendedCampaignIds, acknowledgeExperimentImpact);
+  if (block) return block;
+
+  const initialCampaignId = intendedCampaignIds[0] ?? null;
   const t0 = performance.now();
-  const first = await execWrite(auth, targetId, initialCampaignId, fn);
+  const first = await execWrite(auth, targetId, initialCampaignId, fn, undefined, {
+    acknowledgeExperimentImpact,
+    experimentGuardAlreadyChecked: intendedCampaignIds.length > 0,
+  });
   if (!first.success) return first;
 
   const overrideLatencyMs = Math.round(performance.now() - t0);
@@ -248,7 +307,7 @@ async function execAssetExtensionWrite(
         campaignId,
         async () => ({ ...first, campaignId }),
         undefined,
-        { overrideLatencyMs },
+        { overrideLatencyMs, acknowledgeExperimentImpact, experimentGuardAlreadyChecked: true },
       ),
     ),
   );
@@ -854,21 +913,39 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       trackingTemplate: z
         .string()
         .describe("Tracking URL template (e.g. '{lpurl}?utm_source=google&utm_medium=cpc'). Empty string to remove."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, level, campaignId, adGroupId, adId, trackingTemplate }) => {
+  }, safeHandler(async ({ accountId, level, campaignId, adGroupId, adId, trackingTemplate, acknowledgeExperimentImpact }) => {
     const entityId = level === "campaign" ? campaignId
       : level === "ad_group" ? adGroupId
       : level === "ad" ? adId
       : undefined;
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const targetAuth = authForAccount(auth, accountId);
     await enforceRateLimit(auth.userId); // Check before API call (not deferred to execWrite)
+
+    let resolvedCampaignId = level === "campaign" ? (entityId ?? null) : null;
+    if ((level === "ad_group" || level === "ad") && entityId) {
+      try {
+        const current = await getTrackingTemplate(targetAuth, level, entityId);
+        resolvedCampaignId = current.campaignId ?? null;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return typedResult(buildExperimentPreflightBlock(`Could not resolve owning campaign before mutation: ${message}`));
+      }
+      if (!resolvedCampaignId) {
+        return typedResult(buildExperimentPreflightBlock("Could not resolve owning campaign before mutation."));
+      }
+    }
+    const block = await preflightActiveExperimentMutation(auth, accountId, [resolvedCampaignId], acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
+
     const t0 = performance.now();
-    const writeResult = await setTrackingTemplate(authForAccount(auth, accountId), level, trackingTemplate, entityId);
+    const writeResult = await setTrackingTemplate(targetAuth, level, trackingTemplate, entityId);
     const overrideLatencyMs = Math.round(performance.now() - t0);
-    const resolvedCampaignId = level === "campaign" ? (entityId ?? null) : (writeResult.campaignId ?? null);
-    const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult, undefined, { overrideLatencyMs });
+    const result = await execWrite(auth, targetId, resolvedCampaignId, async () => writeResult, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact });
     return typedResult(result);
   }));
 
@@ -1036,9 +1113,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .boolean()
         .default(false)
         .describe("If true, run pre-validation but do not execute. Returns wouldSucceedIds and structured errors/warnings."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, updates, continueOnError, dryRun }) => {
+  }, safeHandler(async ({ accountId, updates, continueOnError, dryRun, acknowledgeExperimentImpact }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
@@ -1053,12 +1131,15 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       return typedResult(buildBulkValidationResponse("PRE_VALIDATION_FAILED", updates.length, validation.valid.map((item) => item.id), validation.invalid));
     }
 
+    const block = await preflightActiveExperimentMutation(auth, accountId, validUpdates.map((update) => update.campaignId), acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
+
     const results = validUpdates.length > 0 ? await bulkUpdateBids(targetAuth, validUpdates) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        execWrite(auth, targetId, input.campaignId, async () => result, undefined, { overrideLatencyMs })
+        execWrite(auth, targetId, input.campaignId, async () => result, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact })
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -1102,9 +1183,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .boolean()
         .default(false)
         .describe("If true, skip invalid items and execute the valid subset. If false, fail the whole batch before writing when any item fails pre-validation."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, keywords, dryRun, continueOnError }) => {
+  }, safeHandler(async ({ accountId, keywords, dryRun, continueOnError, acknowledgeExperimentImpact }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
@@ -1119,12 +1201,15 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       return typedResult(buildBulkValidationResponse("PRE_VALIDATION_FAILED", keywords.length, validation.valid.map((item) => item.id), validation.invalid));
     }
 
+    const block = await preflightActiveExperimentMutation(auth, accountId, validKeywords.map((keyword) => keyword.campaignId), acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
+
     const results = validKeywords.length > 0 ? await bulkPauseKeywords(targetAuth, validKeywords) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        execWrite(auth, targetId, input.campaignId, async () => result, undefined, { overrideLatencyMs })
+        execWrite(auth, targetId, input.campaignId, async () => result, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact })
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -1166,9 +1251,10 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .boolean()
         .default(false)
         .describe("If true, run pre-validation but do not execute. Returns wouldSucceedIds and structured errors/warnings."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, adGroupId, keywords, continueOnError, dryRun }) => {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, keywords, continueOnError, dryRun, acknowledgeExperimentImpact }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
@@ -1187,12 +1273,15 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       return typedResult(buildBulkValidationResponse("PRE_VALIDATION_FAILED", keywords.length, validation.valid.map((item) => item.id), validation.invalid));
     }
 
+    const block = await preflightActiveExperimentMutation(auth, accountId, [campaignId], acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
+
     const results = validKeywords.length > 0 ? await bulkAddKeywords(targetAuth, adGroupId, validKeywords) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
       results.map(({ input, ...result }) =>
-        execWrite(auth, targetId, campaignId, async () => result, undefined, { overrideLatencyMs })
+        execWrite(auth, targetId, campaignId, async () => result, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact })
           .then((r) => ({ ...r, input })),
       ),
     );
@@ -1225,25 +1314,29 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .enum(["BROAD", "PHRASE", "EXACT"])
         .optional()
         .describe("Override match type in destination — omit to inherit from source"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType }) => {
+  }, safeHandler(async ({ accountId, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType, acknowledgeExperimentImpact }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const targetAuth = authForAccount(auth, accountId);
+    const block = await preflightActiveExperimentMutation(auth, accountId, [campaignId], acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
     const t0 = performance.now();
-    const result = await moveKeywords(authForAccount(auth, accountId), campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
+    const result = await moveKeywords(targetAuth, campaignId, fromAdGroupId, toAdGroupId, criterionIds, matchType);
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     // Route every result (success or failure) through execWrite so failures count toward the daily
     // limit — same overcount-preferred policy as every other write path.
     const addChangeIds = await Promise.all(
       result.added.map((r) =>
-        execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs }),
+        execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact }),
       ),
     );
     const pauseChangeIds = await Promise.all(
       result.paused.map((r) =>
-        execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs }),
+        execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact }),
       ),
     );
 
@@ -1433,11 +1526,13 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         })
         .optional()
         .describe("Radius-based proximity targeting — target people within N miles/km of a lat/lng point."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting, adSchedule, positiveGeoTargetType, negativeGeoTargetType, proximityTargeting }) => {
+  }, safeHandler(async ({ accountId, campaignId, networks, locationTargeting, negativeLocationTargeting, adSchedule, positiveGeoTargetType, negativeGeoTargetType, proximityTargeting, acknowledgeExperimentImpact }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const targetAuth = authForAccount(auth, accountId);
 
     const params: UpdateCampaignSettingsParams = {};
     if (networks) params.networks = networks;
@@ -1448,12 +1543,15 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     if (negativeGeoTargetType) params.negativeGeoTargetType = negativeGeoTargetType;
     if (proximityTargeting) params.proximityTargeting = proximityTargeting;
 
+    const block = await preflightActiveExperimentMutation(auth, accountId, [campaignId], acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
+
     const t0 = performance.now();
-    const result = await updateCampaignSettings(authForAccount(auth, accountId), campaignId, params);
+    const result = await updateCampaignSettings(targetAuth, campaignId, params);
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(
-      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs })),
+      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact })),
     );
 
     return typedResult({
@@ -1691,16 +1789,20 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       add: z.array(z.string()).optional().describe("Language constant IDs to add (e.g. ['1000'] for English)"),
       remove: z.array(z.string()).optional().describe("Language constant IDs to remove"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, add, remove }) => {
+  }, safeHandler(async ({ accountId, campaignId, add, remove, acknowledgeExperimentImpact }) => {
     const auth = currentAuth();
     const targetId = resolveAccountId(auth, accountId);
+    const targetAuth = authForAccount(auth, accountId);
+    const block = await preflightActiveExperimentMutation(auth, accountId, [campaignId], acknowledgeExperimentImpact);
+    if (block) return typedResult(block);
     const t0 = performance.now();
-    const result = await updateCampaignLanguages(authForAccount(auth, accountId), campaignId, { add, remove });
+    const result = await updateCampaignLanguages(targetAuth, campaignId, { add, remove });
     const overrideLatencyMs = Math.round(performance.now() - t0);
     const logged = await Promise.all(
-      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs })),
+      result.results.map((r) => execWrite(auth, targetId, campaignId, async () => r, undefined, { overrideLatencyMs, experimentGuardAlreadyChecked: true, acknowledgeExperimentImpact })),
     );
     return typedResult({ success: result.success, error: result.error, results: logged });
   }));
@@ -1713,15 +1815,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
       targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific extensions."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, text, targets }) => {
+  }, safeHandler(async ({ accountId, text, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execAssetExtensionWrite(
       auth,
       targetId,
-      firstCampaignTargetId(targets),
+      campaignTargetIds(targets),
       () => addCalloutAsset(targetAuth, { text, targets }),
+      acknowledgeExperimentImpact,
     );
     return typedResult(result);
   }));
@@ -1803,15 +1907,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       header: z.string().describe(`Structured snippet header. Must be one of: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. "Service catalog" is accepted and normalized to "Services".`),
       values: z.array(z.string().min(1).max(25)).min(3).max(10).describe("Snippet values, 3-10 items, each ≤25 chars"),
       targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific snippets."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, header, values, targets }) => {
+  }, safeHandler(async ({ accountId, header, values, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execAssetExtensionWrite(
       auth,
       targetId,
-      firstCampaignTargetId(targets),
+      campaignTargetIds(targets),
       () => addStructuredSnippetAsset(targetAuth, { header, values, targets }),
+      acknowledgeExperimentImpact,
     );
     return typedResult(result);
   }));
@@ -1870,15 +1976,17 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       description1: z.string().max(35).optional().describe("Optional sitelink description line 1 (≤35 chars). If provided, description2 is also required."),
       description2: z.string().max(35).optional().describe("Optional sitelink description line 2 (≤35 chars). If provided, description1 is also required."),
       targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific sitelinks."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, targets }) => {
+  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
     const result = await execAssetExtensionWrite(
       auth,
       targetId,
-      firstCampaignTargetId(targets),
+      campaignTargetIds(targets),
       () => addSitelinkAsset(targetAuth, { linkText, finalUrl, description1, description2, targets }),
+      acknowledgeExperimentImpact,
     );
     return typedResult(result);
   }));
@@ -1906,11 +2014,19 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
       target: assetExtensionTargetSchema,
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target }) => {
+  }, safeHandler(async ({ accountId, assetId, target, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => linkSitelinkAsset(targetAuth, { assetId, target }));
+    const result = await execWrite(
+      auth,
+      targetId,
+      target.level === "campaign" ? target.campaignId : null,
+      () => linkSitelinkAsset(targetAuth, { assetId, target }),
+      undefined,
+      { acknowledgeExperimentImpact },
+    );
     return typedResult(result);
   }));
 
@@ -1920,11 +2036,19 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
       target: assetExtensionTargetSchema,
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target }) => {
+  }, safeHandler(async ({ accountId, assetId, target, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkSitelinkAsset(targetAuth, { assetId, target }));
+    const result = await execWrite(
+      auth,
+      targetId,
+      target.level === "campaign" ? target.campaignId : null,
+      () => unlinkSitelinkAsset(targetAuth, { assetId, target }),
+      undefined,
+      { acknowledgeExperimentImpact },
+    );
     return typedResult(result);
   }));
 

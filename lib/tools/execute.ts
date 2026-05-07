@@ -1,6 +1,6 @@
 import { logChange, logRead, ERROR_CLASS, type CallTelemetry, type ErrorClass } from "@/lib/db/tracking";
 import { autoTrackChangeIntervention } from "@/lib/db/interventions";
-import { authForAccount, extractErrorMessage, invalidateCache } from "@/lib/google-ads";
+import { authForAccount, checkActiveExperimentImpact, extractErrorMessage, invalidateCache } from "@/lib/google-ads";
 import type { ConnectedAccount, WriteResult } from "@/lib/google-ads";
 import { enforceRateLimit, recordOperation, RateLimitError } from "@/lib/mcp/rate-limit";
 import { trackServerEvent } from "@/lib/analytics-server";
@@ -54,6 +54,12 @@ const SNAPSHOT_REFRESH_ACTIONS = new Set([
   "update_budget",
   "updateCampaignBudget",
 ]);
+
+type ExecWriteOptions = {
+  overrideLatencyMs?: number;
+  acknowledgeExperimentImpact?: boolean;
+  experimentGuardAlreadyChecked?: boolean;
+};
 
 async function refreshAccountSnapshotIfNeeded(auth: ToolAuth, accountId: string, result: WriteResult) {
   if (!result.success || !SNAPSHOT_REFRESH_ACTIONS.has(result.action)) return;
@@ -115,14 +121,38 @@ export async function execWrite<R extends WriteResult = WriteResult>(
   // /dev usage tab p50/p95 for every bulk write. The caller measures the real
   // API latency and threads it in here so every fan-out row carries the same
   // honest invocation latency.
-  options?: { overrideLatencyMs?: number },
+  options?: ExecWriteOptions,
 ): Promise<R & { changeId: number | null }> {
   await enforceRateLimit(auth.userId);
   const ctx = getTelemetry();
   const t0 = performance.now();
   let result: R;
   try {
-    result = await fn();
+    const acknowledgedByToolArgs =
+      typeof ctx?.args === "object" &&
+      ctx.args !== null &&
+      (ctx.args as Record<string, unknown>).acknowledgeExperimentImpact === true;
+    if (campaignId && !options?.acknowledgeExperimentImpact && !options?.experimentGuardAlreadyChecked && !acknowledgedByToolArgs) {
+      const impact = await checkActiveExperimentImpact(authForAccount(auth, accountId), [campaignId]);
+      if (!impact.ok) {
+        const first = impact.impacts[0];
+        const error = first
+          ? `CAMPAIGN_IN_ACTIVE_EXPERIMENT: campaign ${campaignId} is the ${first.armRole} arm of active experiment "${first.experimentName}" (${first.experimentResourceName}). Pass acknowledgeExperimentImpact: true only if the user explicitly accepts contaminating this experiment, or run the intended change against both arms intentionally.`
+          : `${impact.error ?? "Could not verify whether the campaign is part of an active experiment."} Pass acknowledgeExperimentImpact: true only if the user explicitly accepts this risk.`;
+        result = {
+          success: false,
+          action: ctx?.toolName ?? "write_blocked_by_active_experiment",
+          entityId: campaignId,
+          beforeValue: "ACTIVE_EXPERIMENT_GUARD",
+          afterValue: "BLOCKED",
+          error,
+        } as R;
+      } else {
+        result = await fn();
+      }
+    } else {
+      result = await fn();
+    }
   } catch (error) {
     // Network/runtime throws propagate uncounted — the user's quota shouldn't
     // charge for infra failures — but we still log a telemetry row so the
