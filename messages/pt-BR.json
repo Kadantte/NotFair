@@ -1473,7 +1473,9 @@
       "clickAdd": "Clique em <strong>Adicionar</strong>.",
       "configureAlt": "Dialogo de adicionar conector personalizado com Nome e URL do servidor MCP remoto preenchidos",
       "verify": "Verifique se <strong>{connectorName}</strong> aparece na sua lista de conectores com todas as ferramentas disponiveis.",
-      "savedAlt": "Conector do NotFair salvo e listado em Connectors com suas permissoes de ferramentas"
+      "savedAlt": "Conector do NotFair salvo e listado em Connectors com suas permissoes de ferramentas",
+      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
+      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
     },
     "step3": {
       "title": "Perguntar ao Claude sobre seus anuncios",

@@ -90,6 +90,17 @@ export function ConnectorSetupSteps({
           />
 
           <p className="text-base leading-relaxed text-[#C4C0B6]">
+            {t.rich("step2.refreshTools", {
+              strong: (chunks) => <strong className="text-[#E8E4DD]">{chunks}</strong>,
+            })}
+          </p>
+          <SetupScreenshot
+            src="/connector-setup/03a-refresh-tools.png"
+            alt={t("step2.refreshAlt")}
+            surface={surface}
+          />
+
+          <p className="text-base leading-relaxed text-[#C4C0B6]">
             {t.rich("step2.verify", {
               connectorName,
               strong: (chunks) => <strong className="text-[#E8E4DD]">{chunks}</strong>,

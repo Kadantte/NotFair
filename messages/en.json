@@ -1473,7 +1473,9 @@
       "clickAdd": "Click <strong>Add</strong>.",
       "configureAlt": "Add custom connector dialog with Name and Remote MCP Server URL filled in",
       "verify": "Verify <strong>{connectorName}</strong> appears in your Connectors list with all available tools.",
-      "savedAlt": "NotFair connector saved and listed under Connectors with its tool permissions"
+      "savedAlt": "NotFair connector saved and listed under Connectors with its tool permissions",
+      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
+      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
     },
     "step3": {
       "title": "Ask Claude about your ads",

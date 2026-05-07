@@ -1473,7 +1473,9 @@
       "clickAdd": "Klicke auf <strong>Hinzufugen</strong>.",
       "configureAlt": "Dialog Benutzerdefinierten Connector hinzufugen mit ausgefulltem Namen und Remote-MCP-Server-URL",
       "verify": "Prufe, dass <strong>{connectorName}</strong> mit allen verfugbaren Tools in deiner Connector-Liste erscheint.",
-      "savedAlt": "NotFair-Connector gespeichert und unter Connectors mit seinen Tool-Berechtigungen gelistet"
+      "savedAlt": "NotFair-Connector gespeichert und unter Connectors mit seinen Tool-Berechtigungen gelistet",
+      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
+      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
     },
     "step3": {
       "title": "Claude zu deinen Anzeigen befragen",

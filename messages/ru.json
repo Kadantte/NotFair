@@ -1473,7 +1473,9 @@
       "clickAdd": "Нажмите <strong>Добавить</strong>.",
       "configureAlt": "Добавление диалогового окна настраиваемого соединителя с заполненными именем и удаленным сервером MCP URL.",
       "verify": "Убедитесь, что <strong>{connectorName}</strong> отображается в вашем списке соединителей с помощью всех доступных инструментов.",
-      "savedAlt": "NotFair соединитель сохранен и указан в разделе «Соединители» с разрешениями для инструментов."
+      "savedAlt": "NotFair соединитель сохранен и указан в разделе «Соединители» с разрешениями для инструментов.",
+      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
+      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
     },
     "step3": {
       "title": "Спросите Claude о вашей рекламе",

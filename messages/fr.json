@@ -1473,7 +1473,9 @@
       "clickAdd": "Cliquez sur <strong>Ajouter</strong>.",
       "configureAlt": "Fenêtre Ajouter un connecteur personnalisé avec le nom et l’URL du serveur MCP distant remplis",
       "verify": "Vérifiez que <strong>{connectorName}</strong> apparaît dans votre liste de connecteurs avec tous les outils disponibles.",
-      "savedAlt": "Connecteur NotFair enregistré et listé dans Connecteurs avec ses permissions d’outils"
+      "savedAlt": "Connecteur NotFair enregistré et listé dans Connecteurs avec ses permissions d’outils",
+      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
+      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
     },
     "step3": {
       "title": "Demander à Claude d’analyser vos pubs",
