@@ -1,11 +1,8 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { and, eq, gte, sql } from "drizzle-orm";
-import { db, schema } from "@/lib/db";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 import { getGoHighLevelInstallUrl } from "@/lib/gohighlevel/oauth";
+import { identifyUser } from "@/lib/auth/identify-user";
 
 const STATE_COOKIE = "nf_ghl_oauth_state";
 
@@ -17,28 +14,13 @@ function getSafeNext(next: string | null): string {
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const next = getSafeNext(requestUrl.searchParams.get("next"));
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
 
-  if (!sessionToken) {
-    const signinUrl = new URL("/api/auth/signin", requestUrl);
-    signinUrl.searchParams.set("next", `${requestUrl.pathname}${requestUrl.search}`);
-    return NextResponse.redirect(signinUrl.toString());
-  }
-
-  const [session] = await db()
-    .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.accessToken, sessionToken),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        sql`${schema.mcpSessions.customerId} <> ''`,
-      ),
-    )
-    .limit(1);
-
-  if (!session?.userId) {
+  // Phase-4 step 2: Supabase-first identity, cookie fallback. We previously
+  // also gated on `mcp_sessions.customerId <> ''` (i.e. user must have a
+  // Google connection); the connection-check moves to /connect UI surfaces
+  // since GHL is platform-agnostic and doesn't strictly require Google Ads.
+  const identity = await identifyUser({ source: "gohighlevel-oauth-start" });
+  if (!identity) {
     const signinUrl = new URL("/api/auth/signin", requestUrl);
     signinUrl.searchParams.set("next", `${requestUrl.pathname}${requestUrl.search}`);
     return NextResponse.redirect(signinUrl.toString());
@@ -47,7 +29,7 @@ export async function GET(request: Request) {
   const nonce = randomBytes(16).toString("hex");
   await storeOAuthNonce(nonce);
 
-  const state = Buffer.from(JSON.stringify({ nonce, userId: session.userId, next })).toString("base64url");
+  const state = Buffer.from(JSON.stringify({ nonce, userId: identity.userId, next })).toString("base64url");
   const installUrl = new URL(getGoHighLevelInstallUrl());
   // HighLevel's Marketplace install link is generated in their UI. If it
   // preserves unknown query params, this gives us normal OAuth CSRF `state`.

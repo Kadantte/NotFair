@@ -1,11 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { eq } from "drizzle-orm";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { hasJoinedWaitlist, isWaitlistApproved } from "@/lib/waitlist";
+import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { BrandLockup } from "@/components/brand-lockup";
 import { OnboardingSignOut } from "@/components/onboarding-sign-out";
 import { MetaWaitlistCard } from "@/components/meta-waitlist";
@@ -45,23 +44,26 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
   const session = await getSession();
 
   // Pull the candidate accounts list when this is a pending Google session.
+  // Phase-4 step 2: source candidates from ad_platform_connections.account_ids
+  // (populated by phase-1 dual-write) instead of mcp_sessions.customerIds.
+  // pendingToken is now an optional signal — kept non-null for back-compat
+  // with the legacy session.token consumer in /api/auth/select-account, which
+  // still tolerates it as informational.
   let pendingGoogleAccounts: CandidateAccount[] = [];
   let pendingToken: string | null = null;
-  if (session.connected && session.pendingSetup) {
-    const [row] = await db()
-      .select({ customerIds: schema.mcpSessions.customerIds })
-      .from(schema.mcpSessions)
-      .where(eq(schema.mcpSessions.accessToken, session.token))
-      .limit(1);
-    if (row) {
-      try {
-        const parsed = JSON.parse(row.customerIds) as CandidateAccount[];
-        if (Array.isArray(parsed)) pendingGoogleAccounts = parsed;
-      } catch {
-        // Malformed candidate list — fall through to the empty-state link.
-      }
-      pendingToken = session.token;
+  if (session.connected && session.pendingSetup && session.userId) {
+    const conn = await loadGoogleConnection(session.userId);
+    if (conn && conn.customerIds.length > 0) {
+      pendingGoogleAccounts = conn.customerIds.map((a) => ({
+        id: a.id,
+        name: a.name,
+        ...("loginCustomerId" in a ? { loginCustomerId: a.loginCustomerId } : {}),
+      }));
     }
+    // Surface session.token (may be empty for Supabase-only users) so the
+    // picker page passes it through to /api/auth/select-account; the route
+    // treats it as informational, not load-bearing.
+    pendingToken = session.token || null;
   }
 
   const googleEmail = session.connected ? session.googleEmail : null;

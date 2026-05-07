@@ -1,26 +1,11 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
+import { identifyUser } from "@/lib/auth/identify-user";
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
-  if (!sessionToken) return NextResponse.json({ connected: false, connections: [] });
-
-  const [session] = await db()
-    .select({ userId: schema.mcpSessions.userId })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.accessToken, sessionToken),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .limit(1);
-
-  if (!session?.userId) return NextResponse.json({ connected: false, connections: [] });
+  const identity = await identifyUser({ source: "gohighlevel-status" });
+  if (!identity) return NextResponse.json({ connected: false, connections: [] });
 
   const rows = await db()
     .select({
@@ -34,7 +19,7 @@ export async function GET() {
       updatedAt: schema.goHighLevelConnections.updatedAt,
     })
     .from(schema.goHighLevelConnections)
-    .where(eq(schema.goHighLevelConnections.userId, session.userId))
+    .where(eq(schema.goHighLevelConnections.userId, identity.userId))
     .orderBy(desc(schema.goHighLevelConnections.updatedAt));
 
   return NextResponse.json({ connected: rows.length > 0, connections: rows });

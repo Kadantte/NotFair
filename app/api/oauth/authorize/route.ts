@@ -1,14 +1,12 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
 import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { identifyUser } from "@/lib/auth/identify-user";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -155,52 +153,22 @@ export async function GET(request: Request) {
     }
     resolvedSessionId = session.id;
   } else {
-    // 2 + 3. DCR flow — identify the user. Phase-4 step 2: prefer Supabase
-    // Auth (post-bridge cookies persisted server-side) and fall back to the
-    // legacy `adsagent_token` → mcp_sessions cookie path for users who
-    // haven't re-signed-in since the bridge flipped.
-    const supabase = await createSupabaseServerClient();
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+    // 2 + 3. DCR flow — identify the user. Phase-4 step 2: shared identifyUser
+    // helper handles Supabase-first / cookie-fallback dispatch + telemetry.
+    const identity = await identifyUser({ source: "oauth-authorize" });
 
-    let userId: string | null = supabaseUser?.id ?? null;
-    let legacyMcpSessionId: number | null = null;
-
-    if (!userId) {
-      const cookieStore = await cookies();
-      const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
-
-      if (!sessionToken) {
-        // No identity at all — send through Google sign-in, then back here.
-        const signinUrl = new URL("/api/auth/signin", requestUrl);
-        signinUrl.searchParams.set(
-          "next",
-          `${requestUrl.pathname}${requestUrl.search}`,
-        );
-        return NextResponse.redirect(signinUrl.toString());
-      }
-
-      const [session] = await db()
-        .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
-        .from(schema.mcpSessions)
-        .where(
-          and(
-            eq(schema.mcpSessions.accessToken, sessionToken),
-            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-            sql`${schema.mcpSessions.customerId} <> ''`,
-          ),
-        )
-        .limit(1);
-
-      if (!session?.userId) {
-        return NextResponse.json(
-          { error: "access_denied", error_description: "No active session. Sign in and try again." },
-          { status: 403 },
-        );
-      }
-
-      userId = session.userId;
-      legacyMcpSessionId = session.id;
+    if (!identity) {
+      // No identity at all — send through Google sign-in, then back here.
+      const signinUrl = new URL("/api/auth/signin", requestUrl);
+      signinUrl.searchParams.set(
+        "next",
+        `${requestUrl.pathname}${requestUrl.search}`,
+      );
+      return NextResponse.redirect(signinUrl.toString());
     }
+
+    const userId = identity.userId;
+    const legacyMcpSessionId = identity.legacySessionId;
 
     if (isMetaResource) {
       // 3. Meta DCR: bind to ad_platform_connections row.

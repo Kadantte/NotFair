@@ -16,14 +16,13 @@
 
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
 import { buildMetaAuthorizeUrl } from "@/lib/meta-ads/oauth";
 import { isWaitlistApproved } from "@/lib/waitlist";
+import { identifyUser } from "@/lib/auth/identify-user";
 
 function getSafeNext(next: string | null): string {
   if (!next || !next.startsWith("/")) return "/connect?platform=meta_ads&status=connected";
@@ -34,39 +33,13 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const next = getSafeNext(requestUrl.searchParams.get("next"));
 
-  // Resolve the NotFair user from the session cookie. Meta connections are
-  // keyed on user_id, so the user has to be signed into NotFair first.
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(COOKIE_NAMES.token)?.value;
-
-  if (!sessionToken) {
+  // Resolve the NotFair user (Supabase first, adsagent_token cookie fallback).
+  // Meta connections are keyed on user_id; ads-less Supabase users still need
+  // to be able to start Meta OAuth (Meta is one of the explicit "set up later"
+  // paths for users with no Google Ads account).
+  const identity = await identifyUser({ source: "meta-oauth-start" });
+  if (!identity) {
     // Send through Google sign-in, then bounce back here.
-    const signinUrl = new URL("/api/auth/signin", requestUrl);
-    signinUrl.searchParams.set(
-      "next",
-      `${requestUrl.pathname}${requestUrl.search}`,
-    );
-    return NextResponse.redirect(signinUrl.toString());
-  }
-
-  // Don't filter on `customerId <> ''` here: ads-less sessions (user signed
-  // in via Google but has no Google Ads account yet) need to be able to
-  // start Meta OAuth — connecting Meta is one of the explicit "set up
-  // later" paths offered to those users.
-  const [session] = await db()
-    .select({ id: schema.mcpSessions.id, userId: schema.mcpSessions.userId })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.accessToken, sessionToken),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .limit(1);
-
-  if (!session || !session.userId) {
-    // Session row gone or doesn't have a user_id (shouldn't happen for any
-    // post-2026 sign-in, but guard anyway). Fall back to sign-in.
     const signinUrl = new URL("/api/auth/signin", requestUrl);
     signinUrl.searchParams.set(
       "next",
@@ -80,7 +53,7 @@ export async function GET(request: Request) {
     .from(schema.adPlatformConnections)
     .where(
       and(
-        eq(schema.adPlatformConnections.userId, session.userId),
+        eq(schema.adPlatformConnections.userId, identity.userId),
         eq(schema.adPlatformConnections.platform, "meta_ads"),
       ),
     )
@@ -102,7 +75,7 @@ export async function GET(request: Request) {
   const state = Buffer.from(
     JSON.stringify({
       nonce,
-      userId: session.userId,
+      userId: identity.userId,
       next,
     }),
   ).toString("base64url");
