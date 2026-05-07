@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ExternalLink, AlertCircle, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -124,8 +124,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     const { activeTab: baseTab } = isGhl ? { activeTab: 'connector' as const } : parseSetupSlug(slug);
     const activeTab: SetupTab = isGhl ? 'gohighlevel' : baseTab;
     const searchParams = useSearchParams();
-    const router = useRouter();
-    const urlToken = searchParams.get('token');
     const urlError = searchParams.get('error');
     const urlErrorReason = searchParams.get('reason');
     const currentConnectPath = connectPathForTab(activeTab);
@@ -134,25 +132,9 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     const [error, setError] = useState<string | null>(urlError);
     const [errorReason, setErrorReason] = useState<string | null>(urlErrorReason);
 
-    const token = urlToken || (session.connected ? session.token : null);
-    // Setup-tabs visibility tracks connectivity, NOT token presence. Pre-phase-4
-    // these were equivalent (every connected user had an `mcp_sessions.access_token`
-    // surfaced as `session.token`), but Supabase-only users (post-STOP_CREATING_MCP_SESSIONS)
-    // are connected with `session.token === ""` — gating on `!token` would
-    // hide the setup UI from a fully-connected user and show a sign-in prompt
-    // for an account they're already signed into. McpSetupTabs already
-    // handles a null/empty apiKey: OAuth tabs (Connector/Claude Code/Codex)
-    // don't need it, and the Any-MCP tab swaps the bearer block for a CTA.
     const showSetup = session.connected && !session.pendingSetup;
 
     useEffect(() => {
-        if (urlToken) {
-            // account_connected is now fired centrally from PostHogProvider
-            // via the gads_connect_event cookie set by the auth callback.
-            window.history.replaceState({}, '', currentConnectPath);
-            return;
-        }
-
         let cancelled = false;
         readServerSession().then(nextSession => {
             if (!cancelled) setSession(nextSession);
@@ -163,7 +145,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
         return () => {
             cancelled = true;
         };
-    }, [currentConnectPath, urlToken]);
+    }, [currentConnectPath]);
 
     async function beginGoogleSignIn(prompt?: 'consent' | 'select_account' | 'select_account consent') {
         setError(null);
@@ -231,13 +213,6 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                     ) : (
                         <McpSetupTabs
                             activeTab={activeTab as Exclude<SetupTab, 'gohighlevel'>}
-                            apiKey={token}
-                            onSignIn={beginGoogleSignIn}
-                            onTokenRotated={async () => {
-                                const next = await readServerSession();
-                                setSession(next);
-                                router.refresh();
-                            }}
                             basePath="/connect/google-ads"
                             serverUrl={MCP_SERVER_URL}
                             connectorName={MCP_CONNECTOR_NAME}

@@ -116,7 +116,6 @@ export function MetaAdsMcpPage() {
                     </motion.div>
 
                     <AnyMcpClientSetup
-                        apiKey={null}
                         surface="marketing"
                         serverUrl={META_MCP_SERVER_URL}
                         connectorName={META_MCP_CONNECTOR_NAME}

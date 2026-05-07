@@ -35,7 +35,6 @@ export default async function ConnectMetaAdsMcpPagePath({ params }: Props) {
   return (
     <ConnectMetaAdsMcpPage
       slug={slug}
-      apiKey={session.token}
       hasMeta={session.metaAccounts.length > 0}
     />
   );

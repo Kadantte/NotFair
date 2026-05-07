@@ -116,11 +116,7 @@ export function GoogleAdsMcpPage() {
                         </p>
                     </motion.div>
 
-                    <AnyMcpClientSetup
-                        apiKey={null}
-                        onSignIn={() => startGoogleConnect("/connect/any-mcp")}
-                        surface="marketing"
-                    />
+                    <AnyMcpClientSetup surface="marketing" />
                 </div>
             </section>
 

@@ -11,9 +11,6 @@ export type SetupTab = "claude-code" | "connector" | "codex" | "any-mcp";
 
 export type McpSetupTabsProps = {
   activeTab: SetupTab;
-  apiKey: string | null;
-  onSignIn: () => void;
-  onTokenRotated: () => Promise<void>;
   /** Base path for tab hrefs (e.g. "/connect" or "/connect/meta-ads"). */
   basePath: string;
   /** Server URL to surface in copy-paste fields and snippets. */
@@ -53,9 +50,6 @@ export function parseSetupSlug(slug?: string[]): { activeTab: SetupTab } {
 
 export function McpSetupTabs({
   activeTab,
-  apiKey,
-  onSignIn,
-  onTokenRotated,
   basePath,
   serverUrl,
   connectorName,
@@ -192,9 +186,6 @@ export function McpSetupTabs({
       ) : (
         <div className="w-full max-w-4xl text-left">
           <AnyMcpClientSetup
-            apiKey={apiKey}
-            onSignIn={onSignIn}
-            onRotated={onTokenRotated}
             surface="in_app"
             serverUrl={serverUrl}
             connectorName={connectorName}

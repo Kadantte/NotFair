@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { McpSetupTabs, parseSetupSlug } from "@/components/mcp-setup-tabs";
 import { MetaConnectedToast } from "@/components/meta-connected-toast";
@@ -10,24 +9,16 @@ import { META_MCP_CONNECTOR_NAME, META_MCP_SERVER_URL } from "@/lib/brand";
 /**
  * Mirror of /connect for the Meta Ads MCP. Renders the same SetupTabs
  * (Claude Connector / Claude Code / Codex / Any-MCP) but with URLs and
- * connector name pointed at /api/mcp/meta_ads.
- *
- * Bearer-token auth is not yet wired for the Meta resource — Google session
- * tokens (`oat_*`) are platform-scoped and the meta_ads handler refuses them.
- * The OAuth path works end-to-end. We pass `apiKey` so the Bearer block
- * displays a real-looking config; once Meta-bound API keys exist, swap to a
- * Meta-scoped token here.
+ * connector name pointed at /api/mcp/meta_ads. OAuth-only — direct-bearer
+ * was never wired for Meta.
  */
 export function ConnectMetaAdsMcpPage({
   slug,
-  apiKey,
   hasMeta,
 }: {
   slug?: string[];
-  apiKey: string | null;
   hasMeta: boolean;
 }) {
-  const router = useRouter();
   const t = useTranslations("ConnectMetaAdsMcpPage");
   const { activeTab } = parseSetupSlug(slug);
 
@@ -52,13 +43,6 @@ export function ConnectMetaAdsMcpPage({
 
           <McpSetupTabs
             activeTab={activeTab}
-            apiKey={apiKey}
-            onSignIn={() => {
-              router.refresh();
-            }}
-            onTokenRotated={async () => {
-              router.refresh();
-            }}
             basePath="/connect/meta-ads"
             serverUrl={META_MCP_SERVER_URL}
             connectorName={META_MCP_CONNECTOR_NAME}
