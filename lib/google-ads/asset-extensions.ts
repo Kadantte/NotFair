@@ -1,4 +1,5 @@
 import { getCustomer } from "./client";
+import { isDemoAuth } from "@/lib/demo/constants";
 import { extractErrorMessage, normalizeCustomerId, safeEntityId } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
 
@@ -38,6 +39,11 @@ export type AssetExtensionMutationResult = WriteResult & {
 type MutateResultRecord = { resource_name?: string };
 type MutateResourcesResponse = {
   mutate_operation_responses?: Array<Record<string, MutateResultRecord | undefined>>;
+};
+type AssetSourceRow = {
+  asset?: {
+    source?: string | number;
+  };
 };
 type AssetExtensionLinkRow = Partial<Record<LinkTargetMeta["entity"], { resource_name?: string }>>;
 
@@ -121,6 +127,53 @@ export function assetResourceName(auth: AuthContext, assetId: string): string {
   return `customers/${customerId}/assets/${safeAssetId}`;
 }
 
+export function normalizeAssetSource(source: string | number | null | undefined): string | null {
+  if (source == null) return null;
+  const normalized = String(source);
+  if (normalized === "3") return "AUTOMATICALLY_CREATED";
+  if (normalized === "2") return "ADVERTISER";
+  return normalized;
+}
+
+export function isAutomaticallyCreatedAssetSource(source: string | number | null | undefined): boolean {
+  return normalizeAssetSource(source) === "AUTOMATICALLY_CREATED";
+}
+
+async function rejectUnlinkableAutomaticAsset(
+  auth: AuthContext,
+  assetResource: string,
+  assetType: AssetExtensionType,
+): Promise<string | null> {
+  if (isDemoAuth(auth)) return null;
+
+  const customer = getCustomer(auth);
+
+  try {
+    const result = await customer.query(`
+      SELECT
+        asset.source
+      FROM asset
+      WHERE asset.resource_name = '${assetResource}'
+        AND asset.type = ${assetType}
+      LIMIT 1
+    `);
+    const source = normalizeAssetSource((result as AssetSourceRow[])[0]?.asset?.source);
+
+    if (!source || source === "UNSPECIFIED" || source === "UNKNOWN") {
+      return `Could not verify whether ${assetType} asset ${assetResource.split("/").pop()} is advertiser-linkable. Query asset.source first or create a new advertiser-provided asset.`;
+    }
+    if (source === "AUTOMATICALLY_CREATED") {
+      return `${assetType} asset ${assetResource.split("/").pop()} was automatically created by Google and cannot be linked by advertisers. Create a new advertiser-provided asset instead of reusing this asset ID.`;
+    }
+    if (source !== "ADVERTISER") {
+      return `${assetType} asset ${assetResource.split("/").pop()} has source ${source} and cannot be linked by advertisers. Create a new advertiser-provided asset instead of reusing this asset ID.`;
+    }
+    return null;
+  } catch (error) {
+    return `Could not verify whether ${assetType} asset ${assetResource.split("/").pop()} is advertiser-linkable: ${extractErrorMessage(error)}`;
+  }
+}
+
 export function buildAssetExtensionLinkOperation(
   auth: AuthContext,
   assetResource: string,
@@ -173,6 +226,22 @@ export async function linkAssetExtension(
   const assetResource = assetResourceName(auth, params.assetId);
   const target = normalizeAssetExtensionTarget(params.target);
   const meta = LINK_TARGET[target.level];
+  const automaticAssetError = await rejectUnlinkableAutomaticAsset(auth, assetResource, params.assetType);
+
+  if (automaticAssetError) {
+    return {
+      success: false,
+      action: params.action,
+      entityId: params.assetId,
+      beforeValue: "",
+      afterValue: "",
+      error: automaticAssetError,
+      assetType: params.assetType,
+      assetId: params.assetId,
+      assetResourceName: assetResource,
+      campaignId: target.campaignId ?? null,
+    };
+  }
 
   try {
     const response = await customer.mutateResources([

@@ -820,6 +820,7 @@ describe("protobuf validation: asset extensions", () => {
   });
 
   it("linkCalloutAsset creates an ad_group_asset link", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
     await linkCalloutAsset(AUTH, {
       assetId: "999",
       target: { level: "ad_group", adGroupId: "111" },
@@ -892,6 +893,7 @@ describe("protobuf validation: asset extensions", () => {
   });
 
   it("linkSitelinkAsset creates an account-level customer_asset link", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
     await linkSitelinkAsset(AUTH, {
       assetId: "999",
       target: { level: "account" },

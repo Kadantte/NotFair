@@ -1419,7 +1419,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("linkCalloutAsset", {
-    description: "Link an existing callout asset to an account, campaign, or ad group target. Prefer addCalloutAsset when creating a new callout. Returns changeId and link resource names.",
+    description: "Link an existing callout asset to an account, campaign, or ad group target. Prefer addCalloutAsset when creating a new callout. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId and link resource names.",
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
@@ -1433,7 +1433,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("linkCalloutToAccount", {
-    description: "Compatibility tool: link an existing callout asset to the customer/account level so it can serve across all campaigns. Prefer linkCalloutAsset for campaign/ad group targeting. Returns changeId.",
+    description: "Compatibility tool: link an existing callout asset to the customer/account level so it can serve across all campaigns. Prefer linkCalloutAsset for campaign/ad group targeting. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
@@ -1510,7 +1510,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("linkStructuredSnippetAsset", {
-    description: "Link an existing structured snippet asset to an account, campaign, or ad group target. Prefer addStructuredSnippetAsset when creating a new snippet. Returns changeId and link resource names.",
+    description: "Link an existing structured snippet asset to an account, campaign, or ad group target. Prefer addStructuredSnippetAsset when creating a new snippet. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId and link resource names.",
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Structured snippet asset ID (query asset WHERE asset.type = STRUCTURED_SNIPPET via runScript)"),
@@ -1579,7 +1579,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("linkSitelinkAsset", {
-    description: "Link an existing sitelink asset to an account, campaign, or ad group target. Prefer addSitelinkAsset when creating a new sitelink. Returns changeId and link resource names.",
+    description: "Link an existing sitelink asset to an account, campaign, or ad group target. Prefer addSitelinkAsset when creating a new sitelink. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId and link resource names.",
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
