@@ -1474,8 +1474,8 @@
       "configureAlt": "Dialogo de agregar conector personalizado con Nombre y URL del servidor MCP remoto completados",
       "verify": "Verifica que <strong>{connectorName}</strong> aparezca en tu lista de conectores con todas las herramientas disponibles.",
       "savedAlt": "Conector de NotFair guardado y listado en Connectors con sus permisos de herramientas",
-      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
-      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
+      "refreshTools": "Haga clic en <strong>···</strong> → <strong>Actualizar lista de herramientas</strong>.",
+      "refreshAlt": "Menú del conector con la opción «Actualizar lista de herramientas» resaltada"
     },
     "step3": {
       "title": "Preguntarle a Claude por tus anuncios",

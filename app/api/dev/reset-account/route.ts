@@ -4,28 +4,39 @@
  *   GET  → preview (counts per table, no writes)
  *   POST → delete everything for this user (requires { confirm: true })
  *
+ * Identity is resolved via `identifyUser` (Supabase first, cookie fallback)
+ * so this works for users with no `mcp_sessions` row (post-phase-4
+ * STOP_CREATING_MCP_SESSIONS). Account IDs are sourced from
+ * `ad_platform_connections.account_ids` for the same reason.
+ *
  * Scope:
  *   - userId-linked rows: subscriptions, chat threads/messages, tool
  *     permissions, ad-platform connections, GoHighLevel connections, shared
  *     audits, audit snapshots/applies, operations, mcp_sessions, oauth
  *     access tokens / authorization codes that hang off those sessions or
  *     ad-platform connections.
- *   - accountId-linked rows for every customer in the caller's
- *     mcp_sessions.customer_ids: goals, performance_snapshots,
- *     change_interventions (+ children), accounts (snapshot table), plus
- *     any operations / audit rows whose userId was null at write time.
+ *   - accountId-linked rows for every customer in the caller's connection:
+ *     goals, performance_snapshots, change_interventions (+ children),
+ *     accounts (snapshot table), plus any operations / audit rows whose
+ *     userId was null at write time.
+ *   - Session cookies: legacy app cookies (adsagent_*) AND Supabase sb-*
+ *     cookies, so the next request is a true signed-out state.
+ *
+ * Does NOT delete the `auth.users` row. Devs re-sign-in with the same
+ * Google identity to recreate state from scratch.
  *
  * Refuses to run while impersonating another account — devs reset their
  * own data, not someone else's.
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { eq, inArray, or, sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { db, schema } from "@/lib/db";
 import { COOKIE_NAMES, clearSessionCookies } from "@/lib/auth-cookies";
 import { requireDevEmail } from "@/lib/dev-access";
-import { parseCustomerIds } from "@/lib/google-ads";
+import { identifyUser } from "@/lib/auth/identify-user";
+import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { getEnv } from "@/lib/env";
 
 type StripeMode = "test" | "live";
@@ -80,37 +91,36 @@ async function deleteStripeCustomers(refs: StripeCustomerRef[]): Promise<StripeD
 }
 
 type RealSession = {
-  userId: string | null;
+  userId: string;
   googleEmail: string | null;
   customerIds: string[];
 };
 
+/**
+ * Resolves the dev's identity for reset. Phase-4 step-2-aware: prefers
+ * Supabase via `identifyUser`, falls back to the legacy `adsagent_token`
+ * cookie for users who haven't re-signed-in. Sources `accountIds` from
+ * `ad_platform_connections` (post-STOP_CREATING_MCP_SESSIONS users have
+ * no `mcp_sessions` row, so the legacy `mcp_sessions.customer_ids`
+ * lookup would silently return empty and account-scoped deletes would
+ * skip).
+ *
+ * Refuses to run while impersonating — devs reset their own data, not
+ * someone else's.
+ */
 async function loadRealSession(): Promise<RealSession | null> {
   const store = await cookies();
   if (store.get(COOKIE_NAMES.impersonate)?.value) return null;
-  const token = store.get(COOKIE_NAMES.token)?.value;
-  if (!token) return null;
 
-  const [row] = await db()
-    .select({
-      userId: schema.mcpSessions.userId,
-      googleEmail: schema.mcpSessions.googleEmail,
-      customerIds: schema.mcpSessions.customerIds,
-    })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.accessToken, token),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .limit(1);
+  const identity = await identifyUser({ source: "dev-reset-account" });
+  if (!identity) return null;
 
-  if (!row) return null;
+  const conn = await loadGoogleConnection(identity.userId);
+
   return {
-    userId: row.userId ?? null,
-    googleEmail: row.googleEmail ?? null,
-    customerIds: parseCustomerIds(row.customerIds).map((a) => a.id),
+    userId: identity.userId,
+    googleEmail: conn?.googleEmail ?? identity.googleEmail,
+    customerIds: (conn?.customerIds ?? []).map((a) => a.id),
   };
 }
 
@@ -240,12 +250,9 @@ export async function GET() {
   const real = await loadRealSession();
   if (!real) {
     return NextResponse.json(
-      { error: "No real (non-impersonated) session — stop impersonating before reset." },
+      { error: "No real (non-impersonated) session — sign in or stop impersonating before reset." },
       { status: 400 },
     );
-  }
-  if (!real.userId) {
-    return NextResponse.json({ error: "Session has no userId" }, { status: 400 });
   }
 
   const [counts, stripeCustomers] = await Promise.all([
@@ -281,14 +288,11 @@ export async function POST(request: Request) {
   const real = await loadRealSession();
   if (!real) {
     return NextResponse.json(
-      { error: "No real (non-impersonated) session — stop impersonating before reset." },
+      { error: "No real (non-impersonated) session — sign in or stop impersonating before reset." },
       { status: 400 },
     );
   }
   const userId = real.userId;
-  if (!userId) {
-    return NextResponse.json({ error: "Session has no userId" }, { status: 400 });
-  }
   const accountIds = real.customerIds;
 
   const { sessionIds, connectionIds } = await fetchUserScopeIds(userId);
@@ -423,5 +427,15 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ ok: true, userId, accountIds, deleted, stripe: stripeResults });
   clearSessionCookies(response);
+  // Also expire Supabase sb-* cookies so the next request starts from a true
+  // signed-out state. Without this, Supabase still resolves the dev's identity
+  // post-reset (auth.users isn't deleted), and the re-OAuth flow may skip parts
+  // of the new-user codepath we usually want to exercise.
+  const cookieStore = await cookies();
+  for (const { name } of cookieStore.getAll()) {
+    if (name.startsWith("sb-")) {
+      response.cookies.set(name, "", { maxAge: 0, path: "/" });
+    }
+  }
   return response;
 }

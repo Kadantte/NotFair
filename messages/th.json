@@ -1474,8 +1474,8 @@
       "configureAlt": "กล่องเพิ่มตัวเชื่อมต่อแบบกำหนดเองที่กรอกชื่อและ URL เซิร์ฟเวอร์ MCP ระยะไกลแล้ว",
       "verify": "ตรวจสอบว่า <strong>{connectorName}</strong> ปรากฏในรายการ Connectors ของคุณพร้อมเครื่องมือทั้งหมดที่มี",
       "savedAlt": "บันทึกตัวเชื่อมต่อ NotFair แล้วและแสดงอยู่ใต้ Connectors พร้อมสิทธิ์เครื่องมือ",
-      "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
-      "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
+      "refreshTools": "คลิก <strong>···</strong> → <strong>รีเฟรชรายการเครื่องมือ</strong>",
+      "refreshAlt": "เมนูเชื่อมต่อพร้อมไฮไลต์ตัวเลือกรีเฟรชรายการเครื่องมือ"
     },
     "step3": {
       "title": "ถาม Claude เกี่ยวกับโฆษณาของคุณ",
