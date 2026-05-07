@@ -14,6 +14,7 @@ import {
   type GoogleConnectionView,
 } from "@/lib/connections/google-read";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { trackServerEvent } from "@/lib/analytics-server";
 
 export type Session = {
   connected: true;
@@ -335,12 +336,34 @@ async function loadSessionRow(source: string): Promise<LoadSessionResult | null>
   // the legacy cookie path when no Supabase session is present.
   if (readUserIdFromSupabase()) {
     const supaResult = await loadSessionViaSupabase();
-    if (supaResult) return supaResult;
+    if (supaResult) {
+      trackResolutionPath(supaResult.row.userId, "supabase", source);
+      return supaResult;
+    }
   }
 
   const result = await loadDeviceSession();
   if (!result) return null;
-  return mergeWithConnection({ result, source });
+  const merged = await mergeWithConnection({ result, source });
+  trackResolutionPath(merged.row.userId, "cookie_fallback", source);
+  return merged;
+}
+
+/**
+ * Phase-4 step 3 readiness signal: emit a PostHog event each time
+ * loadSessionRow resolves a session, tagged with how it resolved. Drives
+ * a dashboard that shows what % of authenticated traffic is on the
+ * Supabase path vs still on the legacy `adsagent_token` cookie fallback.
+ *
+ * Drop the cookie path (step 3) only when `cookie_fallback` daily count
+ * is at zero for ≥1 week.
+ */
+function trackResolutionPath(
+  userId: string | null,
+  via: "supabase" | "cookie_fallback",
+  source: string,
+): void {
+  trackServerEvent(userId ?? null, "web_session_resolved", { via, source });
 }
 
 /**
