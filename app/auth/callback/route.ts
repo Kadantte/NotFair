@@ -6,6 +6,7 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { stopCreatingMcpSessions, supabaseSessionBridge } from "@/lib/connections/feature-flags";
 import { refreshGoogleConnectionCredentials, upsertGoogleConnection } from "@/lib/connections/google";
+import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
@@ -463,13 +464,25 @@ async function createOrRedirectGoogleAdsSession({
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-  // Check if this is a first-time user (no prior sessions) for conversion tracking
+  // Check if this is a first-time user (no prior sessions) for conversion tracking.
+  // Connection-first: post phase-4 step 2 new users have no mcp_sessions row, so
+  // checking only that table would falsely flag every re-login as a new signup.
+  // Treat the user as new only when neither table has a row.
   const isFirstSignup = userId
-    ? (await db()
-        .select({ id: schema.mcpSessions.id })
-        .from(schema.mcpSessions)
-        .where(eq(schema.mcpSessions.userId, userId))
-        .limit(1)).length === 0
+    ? (
+        await Promise.all([
+          db()
+            .select({ id: schema.mcpSessions.id })
+            .from(schema.mcpSessions)
+            .where(eq(schema.mcpSessions.userId, userId))
+            .limit(1),
+          db()
+            .select({ id: schema.adPlatformConnections.id })
+            .from(schema.adPlatformConnections)
+            .where(eq(schema.adPlatformConnections.userId, userId))
+            .limit(1),
+        ])
+      ).every((rows) => rows.length === 0)
     : false;
 
   if (usableAccounts.length === 1) {
@@ -652,6 +665,48 @@ async function reuseExistingSession({
     return null;
   }
 
+  // Connection-first reuse. ad_platform_connections is the source of truth
+  // post phase-4 step 2; mcp_sessions is deprecated for new users and only
+  // checked as a fallback for legacy users who don't have a connection row.
+  const conn = await loadGoogleConnection(userId);
+  if (conn && conn.customerId) {
+    await refreshGoogleConnectionCredentials({
+      userId,
+      refreshToken,
+      googleEmail,
+    });
+
+    if (conn.customerIds.length > 0) {
+      after(async () => {
+        syncAccountSnapshots(
+          refreshToken,
+          conn.customerIds.map((a) => ({
+            id: a.id,
+            loginCustomerId: a.loginCustomerId ?? null,
+          })),
+        ).catch((err) => {
+          console.error("[sync-account] Failed to snapshot on reuse:", err);
+        });
+      });
+    }
+
+    const activeAccount = conn.customerIds.find((a) => a.id === conn.customerId);
+    const customerName = activeAccount?.name || "Google Ads Account";
+
+    if (popup) {
+      return popupPostMessage(origin, {
+        type: "GOOGLE_ADS_AUTH_SUCCESS",
+        customerId: conn.customerId,
+        customerName,
+      });
+    }
+
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+
+  // Legacy fallback: pre-phase-1 users with an mcp_sessions row but no
+  // connection row yet (rare post-backfill). Reissues the legacy
+  // adsagent_token cookie so cookie-anchored consumers keep working.
   const [existingSession] = await db()
     .select({
       id: schema.mcpSessions.id,
@@ -689,8 +744,8 @@ async function reuseExistingSession({
       .where(eq(schema.mcpSessions.id, existingSession.id));
 
     // Mirror the credential refresh on ad_platform_connections without
-    // disturbing the user's account curation. If no connection row exists
-    // yet (legacy session pre-dating phase 1), the backfill script seeds it.
+    // disturbing the user's account curation. No-op when the connection row
+    // is missing (the backfill script seeds those).
     await refreshGoogleConnectionCredentials(
       { userId, refreshToken, googleEmail },
       tx,
@@ -699,7 +754,6 @@ async function reuseExistingSession({
 
   const customerName = deriveCustomerName(existingSession.customerIds);
 
-  // Re-sync account snapshots on returning login (runs after response is sent)
   const reusedAccounts = parseCustomerIds(existingSession.customerIds);
   if (reusedAccounts.length > 0) {
     after(async () => {

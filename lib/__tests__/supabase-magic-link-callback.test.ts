@@ -6,12 +6,14 @@ const {
   mockInsertValues,
   mockSelectRows,
   mockCookieGetAll,
+  mockLoadGoogleConnection,
 } = vi.hoisted(() => ({
   mockExchangeCodeForSession: vi.fn(),
   mockGetUser: vi.fn(),
   mockInsertValues: vi.fn(),
   mockSelectRows: vi.fn(),
   mockCookieGetAll: vi.fn(),
+  mockLoadGoogleConnection: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -65,6 +67,7 @@ vi.mock("@/lib/db", () => {
     db: () => dbObj,
     schema: {
       mcpSessions: {
+        id: "id",
         accessToken: "access_token",
         refreshToken: "refresh_token",
         customerId: "customer_id",
@@ -73,6 +76,13 @@ vi.mock("@/lib/db", () => {
         googleEmail: "google_email",
         expiresAt: "expires_at",
         createdAt: "created_at",
+      },
+      adPlatformConnections: {
+        id: "id",
+        userId: "user_id",
+        platform: "platform",
+        activeAccountId: "active_account_id",
+        accountIds: "account_ids",
       },
       userAttribution: {
         userId: "user_id",
@@ -108,6 +118,10 @@ vi.mock("@/lib/google-ads", () => ({
   }),
 }));
 
+vi.mock("@/lib/connections/google-read", () => ({
+  loadGoogleConnection: mockLoadGoogleConnection,
+}));
+
 import { GET } from "@/app/auth/supabase/callback/route";
 
 function makeRequest(url: string): Request {
@@ -137,6 +151,7 @@ describe("Supabase magic-link callback route - GET", () => {
     mockSelectRows.mockResolvedValue([]);
     mockInsertValues.mockResolvedValue(undefined);
     mockCookieGetAll.mockReturnValue([]);
+    mockLoadGoogleConnection.mockResolvedValue(null);
   });
 
   it("exchanges the Supabase code and mints an email-only app session", async () => {

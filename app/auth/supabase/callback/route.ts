@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { stopCreatingMcpSessions } from "@/lib/connections/feature-flags";
+import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
@@ -40,11 +41,32 @@ type SupabaseUser = {
   } | null;
 };
 
-async function findExistingConnectedSession(userId: string) {
-  const [existingSession] = await db()
+/**
+ * Decide how to handle an email-magic-link sign-in for a returning user.
+ *
+ * Connection-first: ad_platform_connections is the source of truth post
+ * phase-4 step 2. When it carries a non-empty `activeAccountId`, the user
+ * already has a Google connection — we don't need to mint or reissue any
+ * mcp_sessions cookie; identity is carried by Supabase sb-* cookies.
+ *
+ * Falls back to a legacy mcp_sessions lookup so older users on the
+ * adsagent_token cookie path still get their cookie reissued.
+ *
+ * Return shape:
+ *   - { hasGoogleConnection: true, legacyAccessToken? } — returning Google-
+ *     connected user. legacyAccessToken set only when an mcp_sessions row
+ *     exists (cookie reissue path).
+ *   - null — no prior Google connection on either table.
+ */
+async function findExistingConnectedSession(
+  userId: string,
+): Promise<{ hasGoogleConnection: true; legacyAccessToken?: string } | null> {
+  const conn = await loadGoogleConnection(userId);
+  const hasGoogleConnection = !!conn?.customerId;
+
+  const [legacyRow] = await db()
     .select({
       accessToken: schema.mcpSessions.accessToken,
-      customerIds: schema.mcpSessions.customerIds,
     })
     .from(schema.mcpSessions)
     .where(
@@ -57,17 +79,34 @@ async function findExistingConnectedSession(userId: string) {
     .orderBy(desc(schema.mcpSessions.createdAt))
     .limit(1);
 
-  return existingSession ?? null;
+  if (!hasGoogleConnection && !legacyRow) return null;
+
+  return {
+    hasGoogleConnection: true,
+    ...(legacyRow ? { legacyAccessToken: legacyRow.accessToken } : {}),
+  };
 }
 
+/**
+ * Has this user signed in before? Connection-first; mcp_sessions kept for
+ * legacy users. Drives the `user_signed_up` event so we don't double-fire
+ * for returning users whose signup pre-dated phase-4 step 2.
+ */
 async function hasAnySession(userId: string) {
-  const [existingSession] = await db()
-    .select({ id: schema.mcpSessions.id })
-    .from(schema.mcpSessions)
-    .where(eq(schema.mcpSessions.userId, userId))
-    .limit(1);
+  const [mcpRow, connRow] = await Promise.all([
+    db()
+      .select({ id: schema.mcpSessions.id })
+      .from(schema.mcpSessions)
+      .where(eq(schema.mcpSessions.userId, userId))
+      .limit(1),
+    db()
+      .select({ id: schema.adPlatformConnections.id })
+      .from(schema.adPlatformConnections)
+      .where(eq(schema.adPlatformConnections.userId, userId))
+      .limit(1),
+  ]);
 
-  return !!existingSession;
+  return mcpRow.length > 0 || connRow.length > 0;
 }
 
 async function mintEmailOnlySession(user: SupabaseUser): Promise<string> {
@@ -161,20 +200,20 @@ export async function GET(request: Request) {
   const response = NextResponse.redirect(`${origin}${next}`);
   const existingSession = await findExistingConnectedSession(user.id);
 
-  if (existingSession) {
+  if (existingSession?.legacyAccessToken) {
     // Returning user with a legacy mcp_sessions row. Reissue the cookie even
     // when STOP_CREATING_MCP_SESSIONS is on — this path doesn't create new
     // state, just rebinds the browser to the row that's already there.
-    setSessionCookies(response, existingSession.accessToken);
-  } else if (!stopCreatingMcpSessions()) {
+    setSessionCookies(response, existingSession.legacyAccessToken);
+  } else if (!existingSession && !stopCreatingMcpSessions()) {
     const accessToken = await mintEmailOnlySession(user);
     setSessionCookies(response, accessToken);
   }
-  // else: STOP_CREATING_MCP_SESSIONS on, no existing row → identity carried
-  // entirely by Supabase sb-* cookies (preserved below). No mcp_sessions row,
-  // no adsagent_token cookie, no Google connection upsert (this is the
-  // email-only path; Google connection is upserted later by the Google OAuth
-  // callback when the user actually links Ads).
+  // else: returning user with a connection row but no mcp_sessions row, OR
+  // STOP_CREATING_MCP_SESSIONS on with no existing row → identity carried
+  // entirely by Supabase sb-* cookies (preserved below). No mcp_sessions
+  // row, no adsagent_token cookie. Google connection (if any) lives on
+  // ad_platform_connections; the Google OAuth callback writes/refreshes it.
 
   setProfileFromSupabaseUser(response, user);
   // Header-size mitigation pre-bridge. Once STOP_CREATING_MCP_SESSIONS is on,
