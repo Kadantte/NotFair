@@ -1555,34 +1555,9 @@
       "title": "OAuth 2.0 (empfohlen)",
       "subtitle": "In ~/.cursor/mcp.json (Cursor), die Cline-Einstellungs-JSON oder jeden Client einfugen, der das Standard-MCP-Konfigurationsschema akzeptiert. Der Client offnet einen Browser fur die Anmeldung."
     },
-    "bearer": {
-      "title": "Bearer-Token (fur Clients ohne OAuth)",
-      "subtitle": "Verwende stattdessen einen Authorization-Header. Der Token unten ist dein personlicher API-Schlussel.",
-      "footer": "Behandle den API-Schlussel wie ein Passwort - committe ihn nicht ins Quellcode-Repository."
-    },
     "copy": {
       "copied": "Kopiert",
       "copy": "Kopieren"
-    },
-    "apiKey": {
-      "title": "Dein personlicher API-Schlussel",
-      "body": "Er ist bereits in die Bearer-Konfiguration unten eingesetzt. Nutze Kopieren oder fuge ihn direkt ein.",
-      "rotateFailed": "API-Schlussel konnte nicht rotiert werden",
-      "hideAria": "API-Schlussel ausblenden",
-      "revealAria": "API-Schlussel anzeigen",
-      "copied": "Kopiert",
-      "copyKey": "API-Schlussel kopieren",
-      "rotating": "Wird rotiert...",
-      "rotate": "Rotieren",
-      "confirmTitle": "API-Schlussel rotieren?",
-      "confirmBody": "Dadurch wird dein aktueller API-Schlussel sofort ungultig. Integrationen mit dem alten Schlussel funktionieren erst wieder, wenn du sie mit dem neuen aktualisierst.",
-      "cancel": "Abbrechen",
-      "rotateKey": "API-Schlussel rotieren"
-    },
-    "apiKeyCta": {
-      "title": "API-Schlussel erhalten",
-      "body": "Melde dich mit Google an, um deinen personlichen API-Schlussel zu generieren. Wir setzen ihn automatisch in die Bearer-Konfiguration unten ein.",
-      "button": "Mit Google anmelden"
     }
   },
   "ConnectMetaAdsMcpPage": {

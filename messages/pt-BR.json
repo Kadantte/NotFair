@@ -1555,34 +1555,9 @@
       "title": "OAuth 2.0 (recomendado)",
       "subtitle": "Cole em ~/.cursor/mcp.json (Cursor), no JSON de configuracoes do Cline ou em qualquer cliente que aceite o schema padrao de configuracao MCP. O cliente abre um navegador para login."
     },
-    "bearer": {
-      "title": "Token Bearer (para clientes sem OAuth)",
-      "subtitle": "Passe um cabecalho Authorization em vez disso. O token abaixo e sua chave API pessoal.",
-      "footer": "Trate a chave API como uma senha: nao a envie para o controle de codigo-fonte."
-    },
     "copy": {
       "copied": "Copiado",
       "copy": "Copiar"
-    },
-    "apiKey": {
-      "title": "Sua chave API pessoal",
-      "body": "Ja substituida na configuracao Bearer abaixo. Use Copiar ou cole diretamente.",
-      "rotateFailed": "Falha ao rotacionar a chave API",
-      "hideAria": "Ocultar chave API",
-      "revealAria": "Revelar chave API",
-      "copied": "Copiado",
-      "copyKey": "Copiar chave API",
-      "rotating": "Rotacionando...",
-      "rotate": "Rotacionar",
-      "confirmTitle": "Rotacionar chave API?",
-      "confirmBody": "Isso invalidara sua chave API atual imediatamente. Qualquer integracao usando a chave antiga deixara de funcionar ate voce atualiza-la com a nova.",
-      "cancel": "Cancelar",
-      "rotateKey": "Rotacionar chave API"
-    },
-    "apiKeyCta": {
-      "title": "Obter sua chave API",
-      "body": "Entre com o Google para gerar sua chave API pessoal. Vamos inseri-la automaticamente na configuracao Bearer abaixo.",
-      "button": "Entrar com o Google"
     }
   },
   "ConnectMetaAdsMcpPage": {

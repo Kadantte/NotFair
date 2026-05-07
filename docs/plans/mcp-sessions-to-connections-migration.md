@@ -478,8 +478,8 @@ Every code path that previously required an `mcp_sessions` row to identify the u
 | `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending — `STOP_CREATING_MCP_SESSIONS` flag |
 | `lib/session.ts` | Drop the cookie fallback path (no more `adsagent_token` reads). | 3 | pending |
 | `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. | 3 | pending |
-| `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates web refresh tokens natively. Direct-bearer no longer depends on `expiresAt` being extended (see next row). | 3 | pending |
-| `lib/mcp/handler-factory.ts` (direct-bearer branch) | **Drop the `expiresAt` check.** Direct-bearer tokens valid until row is manually deleted. Locked 2026-05-07 (option B). | 3 | pending |
+| `app/api/auth/rotate-token/route.ts` | **Deleted 2026-05-07.** Supabase rotates web refresh tokens natively. Direct-bearer no longer depends on `expiresAt` being extended. | 3 | ✅ shipped |
+| `lib/mcp/handler-factory.ts` (direct-bearer branch) | **Dropped the `expiresAt` check 2026-05-07.** Direct-bearer tokens valid until row is manually deleted. Option B locked. | 3 | ✅ shipped |
 | `app/api/auth/signout/route.ts` | Replace cookie-clearing with `supabase.auth.signOut()`. | 3 | pending |
 | `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata`. | 4 | pending |
 | `lib/session.ts` (impersonation) | `adsagent_impersonate` cookie value changes from `mcp_sessions.id` (int) to `userId` (uuid). | 4 | pending |

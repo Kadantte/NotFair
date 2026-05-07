@@ -380,15 +380,14 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
       // Direct MCP session token (pre-multi-platform flat bearer). Only the
       // legacy `/api/mcp` resource accepts these — platform-explicit paths
       // require an `oat_*` token whose `resource_url` matches.
+      //
+      // Option B (locked 2026-05-07): no time-based expiry check. Direct-bearer
+      // tokens are long-lived credentials, revocable only by deleting the row.
+      // Mirrors how Meta + connection-bound Google OAuth tokens already work.
       const [s] = await db()
         .select()
         .from(schema.mcpSessions)
-        .where(
-          and(
-            eq(schema.mcpSessions.accessToken, bearerToken),
-            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-          ),
-        )
+        .where(eq(schema.mcpSessions.accessToken, bearerToken))
         .limit(1);
       session = s;
 
