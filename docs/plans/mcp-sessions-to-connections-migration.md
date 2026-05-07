@@ -4,29 +4,35 @@
 
 | Phase | Status |
 |---|---|
-| 1 — Dual-write Google connection state | **Shipped 2026-05-05, in bake** |
+| 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
 | 2 — Reads + OAuth tokens move to connections | **Code in place behind `READ_GOOGLE_FROM_CONNECTIONS` + `SUPABASE_SESSION_BRIDGE` flags (2026-05-06); both flags off in prod** |
-| 3 — Direct-bearer MCP cutoff | Not started |
+| 3 — Direct-bearer MCP cutoff | Telemetry-only prep shipped 2026-05-06 (`mcp_direct_bearer_used`); cutoff steps not started |
 | 4 — Switch web cookie to Supabase Auth | Not started |
 | 5 — Drop `mcp_sessions` | Not started |
 
-### Phase 1 progress (as of 2026-05-05)
+### Phase 1 — closed out 2026-05-07
 
 - **Deploy commit:** `c74e4da` (`feat(connections): phase-1 dual-write google ads to ad_platform_connections`).
-- **Backfill applied:** 437 `ad_platform_connections` rows seeded (484 live `mcp_sessions` rows → 437 distinct users; 52 ads-less / pending; 47 multi-device duplicates collapsed).
-- **Invariant check:** OK at deploy time — every live `mcp_sessions` user has a matching `google_ads` connection row.
+- **Backfill applied:** 437 `ad_platform_connections` rows seeded on deploy (484 live `mcp_sessions` rows → 437 distinct users; 52 ads-less / pending; 47 multi-device duplicates collapsed).
+- **Final sweep before phase-2 work:** `pnpm db:backfill-google-connections --apply` on 2026-05-07 — **0 creates**, 474 idempotent updates. Zero drift confirmed independently of the live invariant.
 - **Tests:** 1,286 passing (4 new dual-write assertions).
-- **Bake started:** 2026-05-05.
-- **Earliest phase-2 start:** 2026-05-12 (≥1 week of clean dual-write traffic).
+- **Bake outcome:** plan called for ≥7 days; closed early at day 2 on owner judgment after live gates returned clean numbers two days running.
 
-### Phase 1 bake-time checklist (must all be green before phase 2)
+#### Final gate readout (2026-05-07)
 
-- [ ] `pnpm db:check-google-connection-invariant` returns OK every day for 7 consecutive days.
-- [ ] Spot-check fresh signups: `SELECT count(*) FROM ad_platform_connections WHERE platform = 'google_ads' AND created_at > '2026-05-05'` is non-zero and grows daily — proves dual-write is firing for new users, not just the backfill.
-- [ ] Spot-check account-switch consistency: for users who switched accounts via the navbar post-deploy, `mcp_sessions.customer_id` and `ad_platform_connections.active_account_id` must match.
-- [ ] Re-run `pnpm db:backfill-google-connections --apply` immediately before kicking off phase 2 as a final sweep.
+| Gate | Result |
+|---|---|
+| `pnpm db:check-google-connection-invariant` (every live mcp_sessions user has a google_ads connection row) | **0 missing** |
+| Active-account consistency (`mcp_sessions.customer_id` vs `ad_platform_connections.active_account_id`) | **0 mismatches** across 543 live sessions |
+| Dual-write firing for fresh signups | **20 fresh users on 2026-05-06**, **17 more on 2026-05-07** (each with distinct user_id, no upserts) — proves dual-write is alive for new users at expected volume |
+| Final backfill sweep | **0 new rows** to create, 474 no-op refreshes — independent confirmation of gate 1 |
 
-If any check fails: identify the missing write site, fix it, re-run the backfill, and reset the bake clock.
+#### Bake-time checklist (closed)
+
+- [x] `pnpm db:check-google-connection-invariant` returns OK — passed days 1 + 2; bake closed early.
+- [x] Fresh-signup dual-write firing — 20 + 17 fresh users on days 1 + 2.
+- [x] Account-switch consistency — 0 mismatches.
+- [x] Final `pnpm db:backfill-google-connections --apply` sweep — 0 creates, 474 no-op upserts (2026-05-07).
 
 ## Goal
 
