@@ -50,3 +50,31 @@ export function readGoogleFromConnections(): boolean {
 export function supabaseSessionBridge(): boolean {
   return getEnvBool("SUPABASE_SESSION_BRIDGE");
 }
+
+/**
+ * Phase-4 step 1 flag: source `userId` from Supabase Auth.
+ *
+ * When `true`:
+ * - `lib/session.ts` calls `supabase.auth.getUser()` first; if a Supabase user
+ *   exists, looks up the user's mcp_sessions row by `user_id` (not by
+ *   `access_token`). This severs the dependency on the `adsagent_token`
+ *   cookie for identity resolution — the cookie can be deleted entirely
+ *   in step 3.
+ * - Falls back to the existing `adsagent_token` cookie path when no Supabase
+ *   user is present (covers users who haven't re-signed-in since
+ *   `SUPABASE_SESSION_BRIDGE` flipped).
+ *
+ * When `false` (default):
+ * - `lib/session.ts` reads identity exclusively from `adsagent_token` →
+ *   `mcp_sessions.access_token` (current behavior).
+ *
+ * Pre-requisite: `SUPABASE_SESSION_BRIDGE=true` must be live and have baked
+ * long enough for active users to carry `sb-*` cookies. Otherwise the
+ * Supabase getUser() call is a no-op for everyone and the flag has no
+ * effect (besides one extra round-trip per session load).
+ *
+ * See docs/plans/mcp-sessions-to-connections-migration.md, phase 4.
+ */
+export function readUserIdFromSupabase(): boolean {
+  return getEnvBool("READ_USERID_FROM_SUPABASE");
+}

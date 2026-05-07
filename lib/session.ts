@@ -2,17 +2,18 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
-import { eq, gte, and } from "drizzle-orm";
+import { eq, gte, and, desc } from "drizzle-orm";
 import { COOKIE_NAMES, type ActivePlatform } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 import { DEV_EMAILS } from "@/lib/dev-access";
 import { resolveActivePlatform } from "@/lib/active-platform";
-import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
+import { readGoogleFromConnections, readUserIdFromSupabase } from "@/lib/connections/feature-flags";
 import {
   compareForShadowRead,
   loadGoogleConnection,
   type GoogleConnectionView,
 } from "@/lib/connections/google-read";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type Session = {
   connected: true;
@@ -74,9 +75,25 @@ type LoadSessionResult = {
  * back-compat with rows that haven't been dual-written yet. The
  * `mergeWithConnection` step below replaces those fields with values from
  * `ad_platform_connections` when `READ_GOOGLE_FROM_CONNECTIONS=true`.
+ *
+ * Phase-4 step 1 note: when `READ_USERID_FROM_SUPABASE=true`, identity comes
+ * from the Supabase session cookie (refreshed by middleware) and we look up
+ * the user's mcp_sessions row by `user_id` rather than by `access_token`.
+ * This severs identity resolution from the `adsagent_token` cookie so
+ * step 3 can drop it entirely. Falls back to the cookie path when no
+ * Supabase user is present.
  */
 async function loadDeviceSession(): Promise<LoadSessionResult | null> {
   const cookieStore = await cookies();
+
+  // Phase-4 step 1: try Supabase Auth first.
+  if (readUserIdFromSupabase()) {
+    const supabaseResult = await loadDeviceSessionViaSupabase();
+    if (supabaseResult) return supabaseResult;
+    // No Supabase user → fall through to cookie path so existing users who
+    // haven't re-signed-in since the bridge flipped keep working.
+  }
+
   const token = cookieStore.get(COOKIE_NAMES.token)?.value;
 
   if (!token) return null;
@@ -144,6 +161,115 @@ async function loadDeviceSession(): Promise<LoadSessionResult | null> {
   }
 
   return { token, row };
+}
+
+/**
+ * Phase-4 step 1: Supabase-anchored device-session loader.
+ *
+ * Resolves identity from the Supabase Auth cookies (refreshed per request by
+ * the proxy middleware), then looks up the user's mcp_sessions row by
+ * `user_id`. Returns null when:
+ *   - No Supabase user (caller falls through to the legacy cookie path).
+ *   - Supabase user present but no live mcp_sessions row (caller falls
+ *     through; this can happen for users mid-onboarding or with corrupted
+ *     state — step 2 will make this state expected for new signups, at
+ *     which point we'll synthesize a SessionRow from ad_platform_connections
+ *     instead).
+ *
+ * Dev impersonation: the impersonation cookie still uses `mcp_sessions.id`
+ * (int) values in step 1. We honor it the same way as the cookie path —
+ * read the impersonate cookie, look up by id, swap target. Step 4 migrates
+ * the cookie value to userId (uuid).
+ */
+async function loadDeviceSessionViaSupabase(): Promise<LoadSessionResult | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+  if (!supabaseUser) return null;
+
+  const cookieStore = await cookies();
+
+  const [realRow] = await db()
+    .select({
+      accessToken: schema.mcpSessions.accessToken,
+      refreshToken: schema.mcpSessions.refreshToken,
+      customerId: schema.mcpSessions.customerId,
+      customerIds: schema.mcpSessions.customerIds,
+      loginCustomerId: schema.mcpSessions.loginCustomerId,
+      userId: schema.mcpSessions.userId,
+      googleEmail: schema.mcpSessions.googleEmail,
+    })
+    .from(schema.mcpSessions)
+    .where(
+      and(
+        eq(schema.mcpSessions.userId, supabaseUser.id),
+        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+      ),
+    )
+    .orderBy(desc(schema.mcpSessions.createdAt))
+    .limit(1);
+
+  if (!realRow) return null;
+
+  // Email source-of-truth swap: trust Supabase's email over mcp_sessions.
+  // Supabase Auth keeps it current via OIDC; mcp_sessions.googleEmail is
+  // a one-time copy that can drift if a user ever reconnects with a
+  // different Google identity.
+  const googleEmail = supabaseUser.email ?? realRow.googleEmail;
+
+  const row: SessionRow = {
+    refreshToken: realRow.refreshToken,
+    customerId: realRow.customerId,
+    customerIds: realRow.customerIds,
+    loginCustomerId: realRow.loginCustomerId ?? null,
+    userId: realRow.userId ?? supabaseUser.id,
+    googleEmail,
+  };
+
+  // Dev impersonation — same int-id semantics as the cookie path. Step 4
+  // migrates this cookie value to userId (uuid).
+  const impersonateId = cookieStore.get(COOKIE_NAMES.impersonate)?.value;
+  if (impersonateId && googleEmail && DEV_EMAILS.includes(googleEmail)) {
+    if (!/^\d+$/.test(impersonateId)) {
+      return { token: realRow.accessToken, row };
+    }
+    const sessionId = parseInt(impersonateId, 10);
+
+    const [targetRow] = await db()
+      .select({
+        accessToken: schema.mcpSessions.accessToken,
+        refreshToken: schema.mcpSessions.refreshToken,
+        customerId: schema.mcpSessions.customerId,
+        customerIds: schema.mcpSessions.customerIds,
+        loginCustomerId: schema.mcpSessions.loginCustomerId,
+        userId: schema.mcpSessions.userId,
+        googleEmail: schema.mcpSessions.googleEmail,
+      })
+      .from(schema.mcpSessions)
+      .where(
+        and(
+          eq(schema.mcpSessions.id, sessionId),
+          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+        ),
+      )
+      .limit(1);
+
+    if (!targetRow || !targetRow.customerId) return null;
+
+    return {
+      token: targetRow.accessToken,
+      row: {
+        refreshToken: targetRow.refreshToken,
+        customerId: targetRow.customerId,
+        customerIds: targetRow.customerIds,
+        loginCustomerId: targetRow.loginCustomerId ?? null,
+        userId: targetRow.userId ?? null,
+        googleEmail: targetRow.googleEmail,
+      },
+      impersonating: { sessionId, realEmail: googleEmail },
+    };
+  }
+
+  return { token: realRow.accessToken, row };
 }
 
 /**
