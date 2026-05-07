@@ -2,6 +2,18 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.14.0] - 2026-05-07
+
+### Added
+- **Six new MCP campaign creation tools across every modern Google Ads channel.** Agents can now create Standard Shopping, Performance Max, Demand Gen, Display, Video (YouTube TrueView), and App campaigns through dedicated tools — `createShoppingCampaign`, `createPerformanceMaxCampaign`, `createDemandGenCampaign`, `createDisplayCampaign`, `createVideoCampaign`, `createAppCampaign`. Each tool has a focused, flat schema with type-specific required fields (e.g., `merchantId`/`salesCountry` for Shopping; `headlines`/`longHeadlines`/`businessName` for PMax; `youtubeVideoId` for Video; `appId`/`appStore` for App). All campaigns start PAUSED. Closes the gap reported by aitorgaisan82@gmail.com (claude-code session 631) where Shopping campaigns weren't supported.
+- **Inventory filtering for Shopping campaigns.** `createShoppingCampaign` accepts an `inventoryFilter` array that scopes a campaign to specific products via `productType` (levels 1–5) or `customLabel` (indexes 0–4) dimensions. Lets advertisers segment a single Merchant Center feed across multiple campaigns by category.
+- **Eval prompts for every new campaign type.** `prompts-chat.json` adds chat-followup evals for Shopping (3-campaign category split), PMax retail, Demand Gen awareness, Display retargeting, Video TrueView, and App install — each with `writes:true` criteria that gate on tool selection accuracy and arg shape correctness.
+- **Proto-validation tests for all 7 campaign types.** `__tests__/all-tools-proto-validation.test.ts` adds 14 cases covering MANUAL_CPC + inventory filter, TARGET_ROAS, MAXIMIZE_CLICKS, asset-group builds, video ads, and app campaigns. Every operation array is encoded against the real `google-ads-node` v22 protos before any code ships.
+
+### Changed
+- **Unified `createCampaign` lib entry point with shared scaffolding.** A single `createCampaign(auth, params)` in `lib/google-ads/create-campaign.ts` dispatches to 7 private per-type builders. Common scaffolding (campaign budget op, geo/language criteria, network settings, ID extraction, error mapping) lives once. Each MCP tool's handler is a thin wrapper that hardcodes `campaignType` and the action string before calling the shared lib — DRY internals, focused tool surfaces.
+- **Undo and snapshot-refresh wiring covers every campaign type.** `lib/db/tracking.ts` registers `create_shopping_campaign`, `create_pmax_campaign`, `create_demand_gen_campaign`, `create_display_campaign`, `create_video_campaign`, and `create_app_campaign` as reversible actions. `lib/tools/execute.ts` and `lib/google-ads/account-snapshot-refresh.ts` recognize all 12 tool/action variants for snapshot invalidation. Closes a latent bug where non-Search campaign undo would have silently failed.
+
 ## [0.3.13.1] - 2026-05-07
 
 ### Fixed

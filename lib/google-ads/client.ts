@@ -14,6 +14,7 @@ export const STATUS = {
 
 export const AD_GROUP_TYPE = {
   SEARCH_STANDARD: 2,
+  SHOPPING_PRODUCT_ADS: 4,
 } as const;
 
 export const MATCH_TYPE = { EXACT: 2, PHRASE: 3, BROAD: 4 } as const;

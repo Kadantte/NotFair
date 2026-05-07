@@ -55,7 +55,7 @@ import {
   // Budget
   updateCampaignBudget,
   // Campaign management
-  createSearchCampaign,
+  createCampaign,
   pauseCampaign,
   enableCampaign,
   removeCampaign,
@@ -261,7 +261,7 @@ describe("protobuf validation: budget management", () => {
 describe("protobuf validation: campaign management", () => {
   beforeEach(resetMocks);
 
-  it("createSearchCampaign", async () => {
+  it("createCampaign (SEARCH)", async () => {
     mockMutateResources.mockImplementationOnce((ops: Array<{ entity: string; operation: string; resource: unknown }>) => {
       capturedOps.push(ops);
       return Promise.resolve(
@@ -280,7 +280,8 @@ describe("protobuf validation: campaign management", () => {
         }),
       );
     });
-    await createSearchCampaign(AUTH, {
+    await createCampaign(AUTH, {
+      campaignType: "SEARCH",
       campaignName: "Test Campaign",
       dailyBudgetDollars: 10,
       keywords: ["keyword one", "keyword two"],
@@ -289,6 +290,193 @@ describe("protobuf validation: campaign management", () => {
       finalUrl: "https://example.com",
     });
     assertAllCapturedOpsEncode();
+  });
+
+  it("createCampaign (SHOPPING, manual CPC + inventory filter + geo/language)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: Array<{ entity: string; operation: string; resource: unknown }>) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            {
+              campaign_result: {
+                resource_name: "customers/1234567890/campaigns/77777",
+              },
+            },
+            {
+              ad_group_result: {
+                resource_name: "customers/1234567890/adGroups/88888",
+              },
+            },
+            // root listing group criterion
+            {},
+            // shopping product ad
+            {},
+            // inventory filter criterion 1 (productType)
+            {},
+            // inventory filter criterion 2 (customLabel)
+            {},
+            // geo criterion
+            {},
+            // language criterion
+            {},
+          ],
+        }),
+      );
+    });
+    const result = await createCampaign(AUTH, {
+      campaignType: "SHOPPING",
+      campaignName: "Test Shopping Campaign",
+      dailyBudgetDollars: 20,
+      merchantId: 123456789,
+      salesCountry: "US",
+      campaignPriority: 1,
+      enableLocal: false,
+      bidding: { strategy: "MANUAL_CPC", defaultCpcDollars: 0.50 },
+      searchPartners: true,
+      geoTargetIds: ["2840"],
+      languageIds: ["1000"],
+      inventoryFilter: [
+        { productType: { level: 1, value: "Electronics" } },
+        { customLabel: { index: 0, value: "sale" } },
+      ],
+    });
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    // Verify ad_group and root listing_group criterion both have cpc_bid_micros=500000
+    const ops = capturedOps.flat();
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect((adGroupOp?.resource as Record<string, unknown>).cpc_bid_micros).toBe(500_000);
+
+    const listingGroupOp = ops.find(
+      (op) => op.entity === "ad_group_criterion" && op.operation === "create" &&
+        (op.resource as Record<string, unknown>).listing_group !== undefined,
+    );
+    expect((listingGroupOp?.resource as Record<string, unknown>).cpc_bid_micros).toBe(500_000);
+
+    // Verify network_settings on campaign
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    const networkSettings = (campaignOp?.resource as Record<string, unknown>).network_settings as Record<string, unknown>;
+    expect(networkSettings.target_google_search).toBe(true);
+    expect(networkSettings.target_search_network).toBe(true);
+
+    // Verify geo and language criteria exist
+    const geoCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" &&
+        (op.resource as Record<string, unknown>).location !== undefined,
+    );
+    expect(geoCriterion).toBeDefined();
+    const langCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" &&
+        (op.resource as Record<string, unknown>).language !== undefined,
+    );
+    expect(langCriterion).toBeDefined();
+  });
+
+  it("createCampaign (SHOPPING, target ROAS, no filter + geo)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: Array<{ entity: string; operation: string; resource: unknown }>) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            {
+              campaign_result: {
+                resource_name: "customers/1234567890/campaigns/99999",
+              },
+            },
+            {
+              ad_group_result: {
+                resource_name: "customers/1234567890/adGroups/11111",
+              },
+            },
+            // root listing group criterion
+            {},
+            // shopping product ad
+            {},
+            // geo criterion
+            {},
+          ],
+        }),
+      );
+    });
+    const result = await createCampaign(AUTH, {
+      campaignType: "SHOPPING",
+      campaignName: "Test Shopping ROAS Campaign",
+      dailyBudgetDollars: 50,
+      merchantId: 987654321,
+      salesCountry: "GB",
+      bidding: { strategy: "TARGET_ROAS", targetRoas: 3.5 },
+      geoTargetIds: ["2840"],
+    });
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    // TARGET_ROAS — no cpc_bid_micros on ad_group
+    const ops = capturedOps.flat();
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect((adGroupOp?.resource as Record<string, unknown>).cpc_bid_micros).toBeUndefined();
+
+    // Geo criterion should encode
+    const geoCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" &&
+        (op.resource as Record<string, unknown>).location !== undefined,
+    );
+    expect(geoCriterion).toBeDefined();
+  });
+
+  it("createCampaign (SHOPPING, MAXIMIZE_CLICKS)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: Array<{ entity: string; operation: string; resource: unknown }>) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            {
+              campaign_result: {
+                resource_name: "customers/1234567890/campaigns/55555",
+              },
+            },
+            {
+              ad_group_result: {
+                resource_name: "customers/1234567890/adGroups/66666",
+              },
+            },
+            // root listing group criterion
+            {},
+            // shopping product ad
+            {},
+          ],
+        }),
+      );
+    });
+    const result = await createCampaign(AUTH, {
+      campaignType: "SHOPPING",
+      campaignName: "Test Shopping MaxClicks Campaign",
+      dailyBudgetDollars: 30,
+      merchantId: 667676442,
+      salesCountry: "US",
+      bidding: { strategy: "MAXIMIZE_CLICKS" },
+    });
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    // MAXIMIZE_CLICKS — no cpc_bid_micros on ad_group or listing group
+    const ops = capturedOps.flat();
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect((adGroupOp?.resource as Record<string, unknown>).cpc_bid_micros).toBeUndefined();
+
+    const listingGroupOp = ops.find(
+      (op) => op.entity === "ad_group_criterion" && op.operation === "create" &&
+        (op.resource as Record<string, unknown>).listing_group !== undefined,
+    );
+    expect((listingGroupOp?.resource as Record<string, unknown>).cpc_bid_micros).toBeUndefined();
+
+    // Campaign should have target_spend bidding
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).target_spend).toBeDefined();
   });
 
   it("pauseCampaign", async () => {
@@ -312,6 +500,532 @@ describe("protobuf validation: campaign management", () => {
     ]);
     await renameCampaign(AUTH, "100", "New Name");
     assertAllCapturedOpsEncode();
+  });
+});
+
+// ─── Performance Max ─────────────────────────────────────────────────
+
+describe("protobuf validation: createCampaign (PERFORMANCE_MAX)", () => {
+  beforeEach(resetMocks);
+
+  it("createCampaign (PERFORMANCE_MAX, MAXIMIZE_CONVERSIONS + text assets + geo/language)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            { campaign_result: { resource_name: "customers/1234567890/campaigns/10001" } },
+            { asset_group_result: { resource_name: "customers/1234567890/assetGroups/20001" } },
+            // text asset ops (asset + asset_group_asset for each) — 5 headlines x2 + 1 long x2 + 2 desc x2 + 1 biz x2 = 18 ops
+            ...Array(18).fill({}),
+            // geo criterion
+            {},
+            // language criterion
+            {},
+          ],
+        }),
+      );
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "PERFORMANCE_MAX",
+      campaignName: "Test PMax Campaign",
+      dailyBudgetDollars: 50,
+      finalUrl: "https://example.com/shop",
+      headlines: ["Buy Now", "Great Deals", "Shop Today", "Save Big", "Best Prices"],
+      longHeadlines: ["Shop our entire collection of products online today"],
+      descriptions: ["We have what you need at great prices.", "Fast shipping on all orders over $50."],
+      businessName: "Example Store",
+      bidding: { strategy: "MAXIMIZE_CONVERSIONS", targetCpaDollars: 25 },
+      geoTargetIds: ["2840"],
+      languageIds: ["1000"],
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+
+    // Campaign should have PERFORMANCE_MAX channel type (10) and PAUSED status
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).advertising_channel_type).toBe(10);
+    expect((campaignOp?.resource as Record<string, unknown>).status).toBe(3); // PAUSED
+
+    // Asset group should reference campaign temp
+    const assetGroupOp = ops.find((op) => op.entity === "asset_group" && op.operation === "create");
+    expect(assetGroupOp).toBeDefined();
+
+    // Text asset ops should exist
+    const assetOps = ops.filter((op) => op.entity === "asset" && op.operation === "create");
+    expect(assetOps.length).toBeGreaterThan(0);
+
+    // AssetGroupAsset ops should link assets to asset group
+    const agaOps = ops.filter((op) => op.entity === "asset_group_asset" && op.operation === "create");
+    expect(agaOps.length).toBeGreaterThan(0);
+
+    // Geo/language criteria
+    const geoCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" && (op.resource as Record<string, unknown>).location !== undefined,
+    );
+    expect(geoCriterion).toBeDefined();
+
+    const langCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" && (op.resource as Record<string, unknown>).language !== undefined,
+    );
+    expect(langCriterion).toBeDefined();
+  });
+
+  it("createCampaign (PERFORMANCE_MAX, MAXIMIZE_CONVERSION_VALUE + retail PMax with merchantId)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          {},
+          { campaign_result: { resource_name: "customers/1234567890/campaigns/10002" } },
+          { asset_group_result: { resource_name: "customers/1234567890/assetGroups/20002" } },
+          ...Array(14).fill({}), // 3 headlines + 2 long + 2 desc + 1 biz = 8 assets x2 ops = 16, but we have 3+1+2+1=7 → 14 ops
+        ],
+      }));
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "PERFORMANCE_MAX",
+      campaignName: "Test Retail PMax",
+      dailyBudgetDollars: 100,
+      finalUrl: "https://shop.example.com",
+      headlines: ["Shop Electronics", "New Arrivals Daily", "Free Shipping"],
+      longHeadlines: ["The best electronics store online"],
+      descriptions: ["Shop thousands of electronics.", "Returns accepted within 30 days."],
+      businessName: "Electronics Shop",
+      bidding: { strategy: "MAXIMIZE_CONVERSION_VALUE", targetRoas: 4.0 },
+      merchantId: 123456789,
+      salesCountry: "US",
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    // Should have shopping_setting for retail PMax
+    expect((campaignOp?.resource as Record<string, unknown>).shopping_setting).toBeDefined();
+    // Should have maximize_conversion_value bidding
+    expect((campaignOp?.resource as Record<string, unknown>).maximize_conversion_value).toBeDefined();
+  });
+});
+
+// ─── Demand Gen ──────────────────────────────────────────────────────
+
+describe("protobuf validation: createCampaign (DEMAND_GEN)", () => {
+  beforeEach(resetMocks);
+
+  it("createCampaign (DEMAND_GEN, MAXIMIZE_CONVERSIONS + geo/language)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            { campaign_result: { resource_name: "customers/1234567890/campaigns/10010" } },
+            { ad_group_result: { resource_name: "customers/1234567890/adGroups/20010" } },
+            {}, // ad_group_ad
+            {}, // geo criterion
+            {}, // language criterion
+          ],
+        }),
+      );
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "DEMAND_GEN",
+      campaignName: "Test Demand Gen Campaign",
+      dailyBudgetDollars: 30,
+      finalUrl: "https://example.com/discover",
+      headlines: ["Discover Our Products", "New This Season", "Shop Now"],
+      longHeadlines: ["Explore our full collection of quality products today"],
+      descriptions: ["Find exactly what you're looking for.", "Fast shipping and easy returns."],
+      businessName: "Example Store",
+      bidding: { strategy: "MAXIMIZE_CONVERSIONS", targetCpaDollars: 15 },
+      geoTargetIds: ["2840"],
+      languageIds: ["1000"],
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+
+    // Campaign should have DEMAND_GEN channel type (14)
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).advertising_channel_type).toBe(14);
+    expect((campaignOp?.resource as Record<string, unknown>).status).toBe(3); // PAUSED
+
+    // Ad group op
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect(adGroupOp).toBeDefined();
+
+    // Ad group ad with demand_gen_multi_asset_ad
+    const adGroupAdOp = ops.find((op) => op.entity === "ad_group_ad" && op.operation === "create");
+    expect(adGroupAdOp).toBeDefined();
+    const ad = ((adGroupAdOp?.resource as Record<string, unknown>).ad as Record<string, unknown>);
+    expect(ad.demand_gen_multi_asset_ad).toBeDefined();
+  });
+
+  it("createCampaign (DEMAND_GEN, MAXIMIZE_CONVERSION_VALUE, no geo)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          {},
+          { campaign_result: { resource_name: "customers/1234567890/campaigns/10011" } },
+          { ad_group_result: { resource_name: "customers/1234567890/adGroups/20011" } },
+          {},
+        ],
+      }));
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "DEMAND_GEN",
+      campaignName: "Test DG Value Campaign",
+      dailyBudgetDollars: 50,
+      finalUrl: "https://store.example.com",
+      headlines: ["Top Quality Products", "Shop the Best Deals", "Limited Time Offer"],
+      longHeadlines: ["Browse our curated selection of top-rated products"],
+      descriptions: ["Quality you can trust.", "Join millions of happy customers."],
+      businessName: "Great Store",
+      bidding: { strategy: "MAXIMIZE_CONVERSION_VALUE", targetRoas: 3.0 },
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).maximize_conversion_value).toBeDefined();
+  });
+});
+
+// ─── Display ─────────────────────────────────────────────────────────
+
+describe("protobuf validation: createCampaign (DISPLAY)", () => {
+  beforeEach(resetMocks);
+
+  it("createCampaign (DISPLAY, MAXIMIZE_CONVERSIONS + image asset IDs + geo/language)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            { campaign_result: { resource_name: "customers/1234567890/campaigns/10020" } },
+            { ad_group_result: { resource_name: "customers/1234567890/adGroups/20020" } },
+            {}, // ad_group_ad
+            {}, // geo
+            {}, // language
+          ],
+        }),
+      );
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "DISPLAY",
+      campaignName: "Test Display Campaign",
+      dailyBudgetDollars: 25,
+      finalUrl: "https://example.com",
+      headlines: ["Amazing Deals", "Shop Now"],
+      longHeadline: "Discover the best deals on quality products today",
+      descriptions: ["Top products at great prices.", "Fast and free shipping available."],
+      businessName: "Example Co",
+      marketingImageAssetId: "customers/1234567890/assets/9001",
+      squareMarketingImageAssetId: "customers/1234567890/assets/9002",
+      bidding: { strategy: "MAXIMIZE_CONVERSIONS", targetCpaDollars: 20 },
+      geoTargetIds: ["2840"],
+      languageIds: ["1000"],
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+
+    // Campaign should have DISPLAY channel type (3) and target_content_network=true
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).advertising_channel_type).toBe(3);
+    const netSettings = (campaignOp?.resource as Record<string, unknown>).network_settings as Record<string, unknown>;
+    expect(netSettings.target_content_network).toBe(true);
+    expect(netSettings.target_google_search).toBe(false);
+
+    // Ad group should have DISPLAY_STANDARD type (3)
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect((adGroupOp?.resource as Record<string, unknown>).type).toBe(3);
+
+    // Ad should have responsive_display_ad
+    const adGroupAdOp = ops.find((op) => op.entity === "ad_group_ad" && op.operation === "create");
+    const adData = ((adGroupAdOp?.resource as Record<string, unknown>).ad as Record<string, unknown>);
+    expect(adData.responsive_display_ad).toBeDefined();
+    const rda = adData.responsive_display_ad as Record<string, unknown>;
+    expect(Array.isArray(rda.marketing_images)).toBe(true);
+    expect(Array.isArray(rda.square_marketing_images)).toBe(true);
+  });
+
+  it("createCampaign (DISPLAY, MANUAL_CPC with bid + logo image)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          {},
+          { campaign_result: { resource_name: "customers/1234567890/campaigns/10021" } },
+          { ad_group_result: { resource_name: "customers/1234567890/adGroups/20021" } },
+          {},
+        ],
+      }));
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "DISPLAY",
+      campaignName: "Test Display Manual",
+      dailyBudgetDollars: 15,
+      finalUrl: "https://example.com/sale",
+      headlines: ["Shop the Sale"],
+      longHeadline: "Big savings on all items this weekend only",
+      descriptions: ["Shop now and save up to 40%."],
+      businessName: "Sale Store",
+      marketingImageAssetId: "9001",
+      squareMarketingImageAssetId: "9002",
+      logoImageAssetId: "9003",
+      bidding: { strategy: "MANUAL_CPC", defaultCpcDollars: 0.75 },
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).manual_cpc).toBeDefined();
+
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect((adGroupOp?.resource as Record<string, unknown>).cpc_bid_micros).toBe(750_000);
+
+    // Logo image should be included
+    const adGroupAdOp = ops.find((op) => op.entity === "ad_group_ad" && op.operation === "create");
+    const rda = ((adGroupAdOp?.resource as Record<string, unknown>).ad as Record<string, unknown>)
+      .responsive_display_ad as Record<string, unknown>;
+    expect(rda.logo_images).toBeDefined();
+  });
+});
+
+// ─── Video ───────────────────────────────────────────────────────────
+
+describe("protobuf validation: createCampaign (VIDEO)", () => {
+  beforeEach(resetMocks);
+
+  it("createCampaign (VIDEO, TARGET_CPV + geo/language)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            { campaign_result: { resource_name: "customers/1234567890/campaigns/10030" } },
+            { ad_group_result: { resource_name: "customers/1234567890/adGroups/20030" } },
+            {}, // video asset
+            {}, // ad_group_ad
+            {}, // geo
+            {}, // language
+          ],
+        }),
+      );
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "VIDEO",
+      campaignName: "Test YouTube Campaign",
+      dailyBudgetDollars: 40,
+      youtubeVideoId: "abc123XYZ99",
+      finalUrl: "https://example.com/video",
+      headline: "Watch Our Story",
+      longHeadline: "See what makes us the best choice for your needs",
+      description: "Quality products and excellent service.",
+      callToAction: "LEARN_MORE",
+      bidding: { strategy: "TARGET_CPV", targetCpvDollars: 0.05 },
+      geoTargetIds: ["2840"],
+      languageIds: ["1000"],
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+
+    // Campaign should have VIDEO channel type (6)
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).advertising_channel_type).toBe(6);
+    expect((campaignOp?.resource as Record<string, unknown>).target_cpv).toBeDefined();
+
+    // Ad group type should be VIDEO_TRUE_VIEW_IN_STREAM (9)
+    const adGroupOp = ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+    expect((adGroupOp?.resource as Record<string, unknown>).type).toBe(9);
+
+    // YouTube video asset
+    const assetOp = ops.find((op) => op.entity === "asset" && op.operation === "create");
+    expect(assetOp).toBeDefined();
+    expect((assetOp?.resource as Record<string, unknown>).youtube_video_asset).toBeDefined();
+
+    // video_responsive_ad
+    const adGroupAdOp = ops.find((op) => op.entity === "ad_group_ad" && op.operation === "create");
+    const adData = ((adGroupAdOp?.resource as Record<string, unknown>).ad as Record<string, unknown>);
+    expect(adData.video_responsive_ad).toBeDefined();
+
+    // Geo/language criteria
+    const geoCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" && (op.resource as Record<string, unknown>).location !== undefined,
+    );
+    expect(geoCriterion).toBeDefined();
+  });
+
+  it("createCampaign (VIDEO, MAXIMIZE_CONVERSIONS, no optional fields)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          {},
+          { campaign_result: { resource_name: "customers/1234567890/campaigns/10031" } },
+          { ad_group_result: { resource_name: "customers/1234567890/adGroups/20031" } },
+          {},
+          {},
+        ],
+      }));
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "VIDEO",
+      campaignName: "Test Video Max Conv",
+      dailyBudgetDollars: 20,
+      youtubeVideoId: "dEfGhIjKlMn",
+      finalUrl: "https://example.com",
+      headline: "Buy Our Product",
+      bidding: { strategy: "MAXIMIZE_CONVERSIONS", targetCpaDollars: 50 },
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).maximize_conversions).toBeDefined();
+    expect((campaignOp?.resource as Record<string, unknown>).target_cpv).toBeUndefined();
+  });
+});
+
+// ─── App Campaign ─────────────────────────────────────────────────────
+
+describe("protobuf validation: createCampaign (APP)", () => {
+  beforeEach(resetMocks);
+
+  it("createCampaign (APP, iOS, TARGET_CPA + geo/language)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            {},
+            { campaign_result: { resource_name: "customers/1234567890/campaigns/10040" } },
+            { asset_group_result: { resource_name: "customers/1234567890/assetGroups/20040" } },
+            // 2 headlines x2 + 2 desc x2 + 1 biz x2 = 10 asset ops
+            ...Array(10).fill({}),
+            {}, // geo
+            {}, // language
+          ],
+        }),
+      );
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "APP",
+      campaignName: "Test iOS App Install",
+      dailyBudgetDollars: 30,
+      finalUrl: "https://apps.apple.com/app/id123456789",
+      appId: "123456789",
+      appStore: "APPLE_APP_STORE",
+      headlines: ["Download Free Today", "Top-Rated App"],
+      descriptions: ["Join millions of happy users.", "Free download, no ads."],
+      businessName: "My App Inc",
+      bidding: { strategy: "TARGET_CPA", targetCpaDollars: 5 },
+      geoTargetIds: ["2840"],
+      languageIds: ["1000"],
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+
+    // Campaign should have MULTI_CHANNEL (7) + APP_CAMPAIGN sub_type (12)
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    expect((campaignOp?.resource as Record<string, unknown>).advertising_channel_type).toBe(7);
+    expect((campaignOp?.resource as Record<string, unknown>).advertising_channel_sub_type).toBe(12);
+
+    const appSetting = (campaignOp?.resource as Record<string, unknown>).app_campaign_setting as Record<string, unknown>;
+    expect(appSetting).toBeDefined();
+    expect(appSetting.app_id).toBe("123456789");
+    expect(appSetting.app_store).toBe(2); // APPLE_APP_STORE
+    expect(appSetting.bidding_strategy_goal_type).toBe(2); // OPTIMIZE_INSTALLS_TARGET_INSTALL_COST
+
+    // target_cpa bidding
+    expect((campaignOp?.resource as Record<string, unknown>).target_cpa).toBeDefined();
+
+    // Asset group
+    const assetGroupOp = ops.find((op) => op.entity === "asset_group" && op.operation === "create");
+    expect(assetGroupOp).toBeDefined();
+
+    // Text asset ops
+    const assetOps = ops.filter((op) => op.entity === "asset" && op.operation === "create");
+    expect(assetOps.length).toBeGreaterThan(0);
+
+    // Geo/language
+    const geoCriterion = ops.find(
+      (op) => op.entity === "campaign_criterion" && (op.resource as Record<string, unknown>).location !== undefined,
+    );
+    expect(geoCriterion).toBeDefined();
+  });
+
+  it("createCampaign (APP, Android, MAXIMIZE_CONVERSIONS, no businessName)", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          {},
+          { campaign_result: { resource_name: "customers/1234567890/campaigns/10041" } },
+          { asset_group_result: { resource_name: "customers/1234567890/assetGroups/20041" } },
+          // 2 headlines x2 + 1 desc x2 = 6 asset ops
+          ...Array(6).fill({}),
+        ],
+      }));
+    });
+
+    const result = await createCampaign(AUTH, {
+      campaignType: "APP",
+      campaignName: "Test Android App",
+      dailyBudgetDollars: 50,
+      finalUrl: "https://play.google.com/store/apps/details?id=com.example.app",
+      appId: "com.example.app",
+      appStore: "GOOGLE_APP_STORE",
+      headlines: ["Install Now", "Best Productivity App"],
+      descriptions: ["Get organized with our app."],
+      bidding: { strategy: "MAXIMIZE_CONVERSIONS" },
+    });
+
+    expect(result.success).toBe(true);
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps.flat();
+    const campaignOp = ops.find((op) => op.entity === "campaign" && op.operation === "create");
+    const appSetting = (campaignOp?.resource as Record<string, unknown>).app_campaign_setting as Record<string, unknown>;
+    expect(appSetting.app_store).toBe(3); // GOOGLE_APP_STORE
+    expect(appSetting.bidding_strategy_goal_type).toBe(7); // OPTIMIZE_INSTALLS_WITHOUT_TARGET_INSTALL_COST
+
+    expect((campaignOp?.resource as Record<string, unknown>).maximize_conversions).toBeDefined();
   });
 });
 

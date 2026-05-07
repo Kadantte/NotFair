@@ -1006,7 +1006,7 @@ function trialCampaignIdFromResourceName(resourceName: string): string | null {
  *
  * Bundled-write semantics. This helper makes 4+ Google Ads API mutations
  * but only one operations-log row and one rate-limit charge get recorded
- * (via execWrite at the MCP boundary). That matches `createSearchCampaign`'s
+ * (via execWrite at the MCP boundary). That matches `createCampaign`'s
  * pattern — we treat the bundled call as one logical change. The granular
  * undo path is `endExperiment`, not per-step rollback (see
  * executeUndoForChange).

@@ -17,7 +17,7 @@ vi.mock("google-ads-api", () => ({
   },
 }));
 
-import { createSearchCampaign, updateCampaignLanguages } from "@/lib/google-ads";
+import { createCampaign, updateCampaignLanguages } from "@/lib/google-ads";
 
 const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
 
@@ -30,7 +30,7 @@ describe("language targeting (RMF C.30 / M.10)", () => {
     });
   });
 
-  describe("createSearchCampaign with languageIds + geoTargetIds", () => {
+  describe("createCampaign (SEARCH) with languageIds + geoTargetIds", () => {
     it("adds campaign_criterion.language and campaign_criterion.location rows to the batch", async () => {
       mockMutateResources.mockResolvedValueOnce({
         mutate_operation_responses: [
@@ -44,7 +44,8 @@ describe("language targeting (RMF C.30 / M.10)", () => {
         ],
       });
 
-      const result = await createSearchCampaign(auth, {
+      const result = await createCampaign(auth, {
+        campaignType: "SEARCH",
         campaignName: "Test",
         dailyBudgetDollars: 10,
         keywords: ["buy widgets"],
@@ -79,7 +80,8 @@ describe("language targeting (RMF C.30 / M.10)", () => {
           {}, {}, {},
         ],
       });
-      await createSearchCampaign(auth, {
+      await createCampaign(auth, {
+        campaignType: "SEARCH",
         campaignName: "Test",
         dailyBudgetDollars: 5,
         keywords: ["x"],
@@ -102,7 +104,8 @@ describe("language targeting (RMF C.30 / M.10)", () => {
           {}, {},
         ],
       });
-      const result = await createSearchCampaign(auth, {
+      const result = await createCampaign(auth, {
+        campaignType: "SEARCH",
         campaignName: "Test",
         dailyBudgetDollars: 5,
         keywords: ["x"],

@@ -71,7 +71,7 @@ vi.mock("@/lib/google-ads", () => ({
   updateCampaignSettings: mockUpdateCampaignSettings,
   // Stubs for other imports the module needs
   addKeyword: vi.fn(),
-  createSearchCampaign: vi.fn(),
+  createCampaign: vi.fn(),
   toMicros: vi.fn(),
   authForAccount: vi.fn(),
   resolveAccountId: vi.fn(),
