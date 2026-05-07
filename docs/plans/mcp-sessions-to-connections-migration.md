@@ -5,7 +5,7 @@
 | Phase | Status |
 |---|---|
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
-| 2 — Reads + OAuth tokens move to connections | **Code in place behind `READ_GOOGLE_FROM_CONNECTIONS` + `SUPABASE_SESSION_BRIDGE` flags (2026-05-06); both flags off in prod** |
+| 2 — Reads + OAuth tokens move to connections | **`READ_GOOGLE_FROM_CONNECTIONS=true` live in prod 2026-05-07 (commit `e5b2dcd`)**; `SUPABASE_SESSION_BRIDGE` still off (header audit complete, recommends slimming `adsagent_customer` first) |
 | 3 — Direct-bearer MCP cutoff | Telemetry-only prep shipped 2026-05-06 (`mcp_direct_bearer_used`); cutoff steps not started |
 | 4 — Switch web cookie to Supabase Auth | Not started |
 | 5 — Drop `mcp_sessions` | Not started |
@@ -195,11 +195,34 @@ Supabase bridge scaffolding (commit `db3ef7c`):
 - `app/auth/callback/route.ts` — gates the `clearSupabaseCookies` calls (success path + scope-failure path) behind the flag. When on, `sb-*` cookies survive the callback; when off, the 8KB-header-mitigation deletion that prevented HTTP 431 errors stays in place.
 - Boot-tested under both flag states; `/api/health` returns 200 in both.
 
+Phase-2 connection-read flag flipped (2026-05-07):
+
+- **Set `READ_GOOGLE_FROM_CONNECTIONS=true` on Vercel production** + empty-commit redeploy (`e5b2dcd`).
+- **Smoke probes:** `/api/health` 200, `/` 200, `/campaigns` 307 (protected redirect), `/api/mcp` no-auth 401. All clean.
+- **Token-binding matrix in prod (8 cells, all 200):** `oat_*` and `oat_google_ads_` × `sessionId` and `connectionId` × `/api/mcp` and `/api/mcp/google_ads`. Both binding columns resolve correctly via the dual-aware JOIN.
+- **End-to-end translation proof:** seeded a sessionId-bound auth code, exchanged it via real `POST /api/oauth/token` against prod, observed the issued `oauth_access_tokens` row carry `connection_id` and `session_id = NULL` — translation is live. Used the issued token to call `summarizeAccountSetup` → returned real Google Ads data. All test artifacts cleaned up.
+- **Rollback:** `vercel env rm READ_GOOGLE_FROM_CONNECTIONS production` + redeploy. Dual-write keeps mcp_sessions in sync, so falling back is consistent.
+
 What's still pending in phase 2:
 
-- **`lib/session.ts` dual-read** — prefer Supabase user_id from the refreshed `sb-*` session, fall back to `adsagent_token` → `mcp_sessions.userId`. Deferred from the scaffolding PR because it's inert until the bridge flag is actually live; landing it now would just add dead code paths. Will land alongside the prod flag flip.
-- **Header-size audit** — measure aggregate cookie size on a real session before flipping `SUPABASE_SESSION_BRIDGE` in prod. Adding `sb-*` (~1–2KB) on top of `adsagent_*` cookies could re-trigger the original HTTP 431 incident.
-- **Flag rollout**: flip on staging post-bake, monitor `google_connection_mismatch` event count for ≥1 week, then flip in prod. Any non-zero `field_diff` count is a dual-write gap that must be fixed before proceeding.
+- **`SUPABASE_SESSION_BRIDGE` flip** — held. Header audit (2026-05-07) showed worst-case request headers project to ~7KB after flipping (close to the 8KB ceiling that originally triggered the HTTP 431 incident). Recommended path: drop the redundant `adsagent_customer` cookie first (~1KB worst-case savings; phase-4 plan already targets this) and then flip with comfortable margin.
+- **`lib/session.ts` dual-read** — prefer Supabase user_id from the refreshed `sb-*` session, fall back to `adsagent_token` → `mcp_sessions.userId`. Inert until `SUPABASE_SESSION_BRIDGE=true` lands, so deferred until then.
+- **Real-traffic monitoring of `google_connection_mismatch`** — the shadow-read fires on every session-load surface; with the flag on, drift between dual-write and connection reads now surfaces directly. Watch for ≥1 week to validate the dual-write is leak-free for all real flows.
+
+#### Header-size audit (2026-05-07)
+
+Computed against 409 active users using real `auth.users` + `mcp_sessions` data:
+
+| Tier | Total request header (post-flip) | Status |
+|---|---|---|
+| p50 | ~5KB | ✅ Safe |
+| p95 | ~6KB | ✅ Safe |
+| p99 | ~6.5KB | ⚠️ Tight |
+| Worst case (max user_metadata + 1KB+ `adsagent_customer`) | ~7KB | ⚠️ Tight |
+
+28% of users would have an `sb-*` cookie value over Supabase SSR's 3,500-byte chunking threshold, getting split into `.0` / `.1` cookies. Largest single load: ~3,500 + ~759 bytes = ~4,259 bytes for the heaviest user.
+
+Pre-flip recommendation: drop the redundant `adsagent_customer` cookie (max ~1KB) — `customerName` is derivable from `ad_platform_connections.accountIds` on render. Doing so brings worst-case to ~6KB, p99 to ~5.5KB.
 
 Explicitly **not** in scope for phase 2 (or this migration at all): a token-level `expires_at` on `oauth_access_tokens`. The earlier plan flagged this as a phase-2 follow-up; on closer reading of phase 5 it isn't a blocker (the cleanup script force-deletes orphaned sessionId-only tokens directly). Connection-bound Google tokens become revocation-only, same as Meta. If hard TTLs are wanted later, do them platform-wide as a standalone change.
 
