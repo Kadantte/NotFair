@@ -4,7 +4,6 @@ import { randomBytes } from "crypto";
 import { db, schema } from "@/lib/db";
 import { eq, gte, and } from "drizzle-orm";
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
-import { deriveCustomerName } from "@/lib/google-ads";
 
 export async function POST() {
   const cookieStore = await cookies();
@@ -32,13 +31,13 @@ export async function POST() {
         gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
       ),
     )
-    .returning({ customerIds: schema.mcpSessions.customerIds });
+    .returning({ id: schema.mcpSessions.id });
 
   if (!updated) {
     return NextResponse.json({ error: "Session not found or expired" }, { status: 404 });
   }
 
   const response = NextResponse.json({ token: newToken });
-  setSessionCookies(response, newToken, deriveCustomerName(updated.customerIds));
+  setSessionCookies(response, newToken);
   return response;
 }

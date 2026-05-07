@@ -7,7 +7,7 @@ import { compareForShadowRead, loadGoogleConnection } from "@/lib/connections/go
 import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte, ne } from "drizzle-orm";
-import { listConnectableAccounts, deriveCustomerName, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
+import { listConnectableAccounts, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { COOKIE_NAMES, setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
@@ -242,8 +242,6 @@ export async function POST(request: Request) {
     });
   });
 
-  const accountNames = deriveCustomerName(customerIds);
-
   const isNewSignup = pendingToken && !session.customerId;
 
   // Multi-account signups go through this route rather than the auth callback's
@@ -292,7 +290,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect/google-ads?connected=1'}`,
   });
-  setSessionCookies(response, session.accessToken, accountNames);
+  setSessionCookies(response, session.accessToken);
   if (isNewSignup) {
     response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
   }

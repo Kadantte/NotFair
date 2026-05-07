@@ -371,7 +371,7 @@ async function mintAdsLessSession({
     }
   });
 
-  setSessionCookies(response, accessToken, "");
+  setSessionCookies(response, accessToken);
 }
 
 async function createOrRedirectGoogleAdsSession({
@@ -498,7 +498,7 @@ async function createOrRedirectGoogleAdsSession({
         customerName: account.name || "Google Ads Account",
         ...(googleEmail ? { googleEmail } : {}),
       });
-      setSessionCookies(response, accessToken, account.name || "Google Ads Account");
+      setSessionCookies(response, accessToken);
       if (isFirstSignup) {
         response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
       }
@@ -511,7 +511,7 @@ async function createOrRedirectGoogleAdsSession({
     }
 
     const response = NextResponse.redirect(`${origin}${next}`);
-    setSessionCookies(response, accessToken, account.name || "Google Ads Account");
+    setSessionCookies(response, accessToken);
     if (isFirstSignup) {
       response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
     }
@@ -581,9 +581,8 @@ async function createOrRedirectGoogleAdsSession({
   // Surface the user's identity to the navbar while they're picking which
   // accounts to connect — without this they'd appear signed-out on the
   // selection screen because loadSessionRow is keyed on adsagent_token.
-  // /api/auth/select-account replaces this row's customerId on submission;
-  // setSessionCookies just renames customerName once accounts are picked.
-  setSessionCookies(pendingResponse, pendingToken, "");
+  // /api/auth/select-account replaces this row's customerId on submission.
+  setSessionCookies(pendingResponse, pendingToken);
   return pendingResponse;
 }
 
@@ -669,12 +668,12 @@ async function reuseExistingSession({
       customerId: existingSession.customerId,
       customerName,
     });
-    setSessionCookies(response, existingSession.accessToken, customerName);
+    setSessionCookies(response, existingSession.accessToken);
     return response;
   }
 
   const response = NextResponse.redirect(`${origin}${next}`);
-  setSessionCookies(response, existingSession.accessToken, customerName);
+  setSessionCookies(response, existingSession.accessToken);
   return response;
 }
 

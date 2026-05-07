@@ -85,7 +85,6 @@ vi.mock("@/lib/dev-access", () => ({
 vi.mock("@/lib/auth-cookies", () => ({
   COOKIE_NAMES: {
     token: "adsagent_token",
-    customer: "adsagent_customer",
     impersonate: "adsagent_impersonate",
   },
 }));

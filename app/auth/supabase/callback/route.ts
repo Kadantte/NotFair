@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { db, schema } from "@/lib/db";
-import { deriveCustomerName } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 
 function getSafeNext(next: string | null): string {
@@ -112,14 +111,10 @@ export async function GET(request: Request) {
   const existingSession = await findExistingConnectedSession(user.id);
 
   if (existingSession) {
-    setSessionCookies(
-      response,
-      existingSession.accessToken,
-      deriveCustomerName(existingSession.customerIds),
-    );
+    setSessionCookies(response, existingSession.accessToken);
   } else {
     const accessToken = await mintEmailOnlySession(user);
-    setSessionCookies(response, accessToken, "");
+    setSessionCookies(response, accessToken);
   }
 
   setProfileFromSupabaseUser(response, user);

@@ -149,7 +149,11 @@ describe("Supabase magic-link callback route - GET", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/campaigns");
     expect(mockInsertValues).not.toHaveBeenCalled();
     expect(response.cookies.get("adsagent_token")?.value).toBe("existing-connected-token");
-    expect(response.cookies.get("adsagent_customer")?.value).toBe("Existing%20Account");
+    // Phase-2 header reclaim: setSessionCookies actively deletes the legacy
+    // adsagent_customer cookie so existing browsers shed it. Verify the
+    // delete fires (Max-Age=0).
+    const customerDelete = response.cookies.get("adsagent_customer");
+    expect(customerDelete?.maxAge).toBe(0);
   });
 
   it("redirects back to login when Supabase rejects the code", async () => {

@@ -32,7 +32,9 @@ describe("Sign-out route — POST", () => {
     expect(response.status).toBe(200);
     expect(mockSignOut).toHaveBeenCalled();
     expect(setCookie).toContain(`${COOKIE_NAMES.token}=;`);
-    expect(setCookie).toContain(`${COOKIE_NAMES.customer}=;`);
+    // Legacy adsagent_customer cookie still actively cleared on sign-out so
+    // browsers carrying it from older sessions shed it.
+    expect(setCookie).toContain("adsagent_customer=;");
   });
 
   it("also clears the impersonate cookie on sign-out", async () => {

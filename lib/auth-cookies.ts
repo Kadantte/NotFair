@@ -10,7 +10,6 @@ const COOKIE_OPTIONS = {
 
 export const COOKIE_NAMES = {
   token: "adsagent_token",
-  customer: "adsagent_customer",
   impersonate: "adsagent_impersonate",
   /**
    * Compact { name, picture } captured from Supabase user_metadata at callback
@@ -82,13 +81,15 @@ const IMPERSONATE_COOKIE_OPTIONS = {
   maxAge: 60 * 60 * 8, // 8 hours — safety limit for dev impersonation
 };
 
-export function setSessionCookies(
-  response: NextResponse,
-  token: string,
-  customerName: string,
-) {
+export function setSessionCookies(response: NextResponse, token: string) {
   response.cookies.set(COOKIE_NAMES.token, token, COOKIE_OPTIONS);
-  response.cookies.set(COOKIE_NAMES.customer, encodeURIComponent(customerName), COOKIE_OPTIONS);
+  // Phase-2 header reclaim: `adsagent_customer` was up to ~1KB of customer-
+  // name list. Nothing reads it — getSession derives `customerName` fresh
+  // from `customerIds` on every render. Force-delete on every session set
+  // so existing browsers shed it on their next signin/account-switch/
+  // token-rotation. Drop this line once we've confirmed no live cookies
+  // remain in the wild (e.g. via shadow logging in middleware).
+  response.cookies.set("adsagent_customer", "", { maxAge: 0, path: "/" });
 }
 
 export function setImpersonateCookie(response: NextResponse, sessionId: string) {
@@ -101,8 +102,9 @@ export function clearImpersonateCookie(response: NextResponse) {
 
 export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(COOKIE_NAMES.token);
-  response.cookies.delete(COOKIE_NAMES.customer);
   response.cookies.delete(COOKIE_NAMES.impersonate);
   response.cookies.delete(COOKIE_NAMES.profile);
   response.cookies.delete(COOKIE_NAMES.activePlatform);
+  // Legacy cookie cleanup — see setSessionCookies for context.
+  response.cookies.delete("adsagent_customer");
 }

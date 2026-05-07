@@ -6,7 +6,7 @@ import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { COOKIE_NAMES, setActivePlatformCookie, setSessionCookies } from "@/lib/auth-cookies";
-import { deriveCustomerName, parseCustomerIds } from "@/lib/google-ads";
+import { parseCustomerIds } from "@/lib/google-ads";
 
 export async function POST(request: Request) {
   let body;
@@ -94,9 +94,8 @@ export async function POST(request: Request) {
     }
   });
 
-  const accountNames = deriveCustomerName(session.customerIds);
   const response = NextResponse.json({ ok: true });
-  setSessionCookies(response, session.accessToken, accountNames);
+  setSessionCookies(response, session.accessToken);
   setActivePlatformCookie(response, "google_ads");
   return response;
 }
