@@ -7,7 +7,7 @@
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
 | 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). Phase-4 lib/session.ts dual-read still pending (deferred). |
 | 3 — Direct-bearer MCP cutoff | Telemetry shipped 2026-05-06 (`mcp_direct_bearer_used`) + symmetric OAuth telemetry 2026-05-07 (`mcp_oauth_used`). Initial cohort sized at **38 active direct-bearer users** (31 on claude-code). Cutoff steps not started. |
-| 4 — Switch web cookie to Supabase Auth | Not started |
+| 4 — Switch web cookie to Supabase Auth | **Step 1 live in prod 2026-05-07** (`READ_USERID_FROM_SUPABASE=true` flipped after the cleaner connection-anchored loader landed). Steps 2–4 not started. |
 | 5 — Drop `mcp_sessions` | Not started |
 
 ### Phase 1 — closed out 2026-05-07
@@ -380,18 +380,36 @@ PostHog dashboard: `mcp_direct_bearer_used` daily count → must trend to 0 befo
 
 Phase 2 already set up the bridge. This phase finishes the move.
 
+#### Phase 4 progress (as of 2026-05-07)
+
+**Step 1 (Supabase-anchored session loader) shipped + flipped in prod:**
+
+- `lib/session.ts` — new `loadSessionViaSupabase()` helper. Identity comes from `supabase.auth.getUser()` (cookies refreshed per-request by middleware after the phase-2 bridge flip). Ads state comes directly from `ad_platform_connections` via `loadGoogleConnection`. **Skips `mcp_sessions` entirely** except for an optional legacy lookup for `Session.token` (back-compat with the direct-bearer Bearer-display on /connect; phase 3 retires this consumer).
+- `loadSessionRow` dispatches: when `READ_USERID_FROM_SUPABASE=true`, prefer Supabase loader; on null result (no `sb-*` cookies), fall through to the legacy cookie path. Cookie path runs through `mergeWithConnection` as before; Supabase path skips it (the row is already connection-sourced).
+- Dev impersonation still uses `mcp_sessions.id` (int) cookie values — step 4 migrates the cookie to userId (uuid). Existing impersonation flows unchanged.
+- `web_session_resolved` PostHog event fires on every successful `loadSessionRow` with `via: "supabase" | "cookie_fallback"`. **This is the readiness signal for step 3** — drop the cookie path only when `cookie_fallback` daily count hits zero for ≥1 week.
+- 7 unit tests covering both flag states, fallback paths, ads-less behavior, Supabase email override, and Meta accounts loading via the same userId.
+- Verified: 4/4 post-flip smoke probes clean against prod (`/api/health`, `/`, `/campaigns` 307, `/api/mcp` schema-introspection 200).
+
+**Rollback for step 1:** `vercel env rm READ_USERID_FROM_SUPABASE production` + redeploy. Cookie fallback path is unchanged, so reverting the flag restores pre-step-1 behavior.
+
+**Open metrics:**
+- `web_session_resolved` daily breakdown by `via` — track Supabase migration rate.
+- `cookie_fallback` count → must hit 0 before step 3 can ship without forced re-auth.
+
 #### Code changes
 
-| File | Change |
-|---|---|
-| `lib/session.ts` | Drop `loadSessionRow()` cookie path; userId comes only from Supabase session. |
-| `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. |
-| `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) |
-| `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates refresh tokens natively. |
-| `app/api/auth/signout/route.ts` | Replace cookie-clearing with `supabase.auth.signOut()`. |
-| `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata` (Google identity provider populates these). |
-| `lib/session.ts` (impersonation) | `adsagent_impersonate` cookie value changes from `mcp_sessions.id` (int) to `userId` (uuid). Update dev impersonation lookup accordingly. |
-| `lib/auth-cookies.ts` | Drop `adsagent_customer` cookie — derive customer name from connection on render. |
+| File | Change | Step | Status |
+|---|---|---|---|
+| `lib/session.ts` | Add Supabase-anchored loader; `loadSessionRow` prefers it when flag on. | 1 | ✅ shipped 2026-05-07 |
+| `lib/session.ts` | Drop the cookie fallback path (no more `adsagent_token` reads). | 3 | pending |
+| `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. | 3 | pending |
+| `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending |
+| `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates refresh tokens natively. | 3 | pending |
+| `app/api/auth/signout/route.ts` | Replace cookie-clearing with `supabase.auth.signOut()`. | 3 | pending |
+| `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata` (Google identity provider populates these). | 4 | pending |
+| `lib/session.ts` (impersonation) | `adsagent_impersonate` cookie value changes from `mcp_sessions.id` (int) to `userId` (uuid). Update dev impersonation lookup accordingly. | 4 | pending |
+| `lib/auth-cookies.ts` | Drop `adsagent_customer` cookie — derive customer name from connection on render. | (phase 2 prep) | ✅ shipped 2026-05-07 (commit `97b4ca7`) |
 
 #### Forced re-auth
 
