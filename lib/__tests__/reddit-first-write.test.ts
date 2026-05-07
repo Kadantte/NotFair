@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { selectLimitMock } = vi.hoisted(() => ({
+const { selectLimitMock, getUserEmailMock } = vi.hoisted(() => ({
   selectLimitMock: vi.fn(),
+  getUserEmailMock: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/get-user-email", () => ({
+  getUserEmail: getUserEmailMock,
 }));
 
 vi.mock("@/lib/db", () => {
@@ -48,11 +53,13 @@ describe("maybeFireRedditFirstWrite", () => {
   beforeEach(() => {
     selectLimitMock.mockReset();
     sendMock.mockReset();
+    getUserEmailMock.mockReset();
     _resetFirstWriteCacheForTests();
   });
 
   it("skips when user has prior successful writes", async () => {
     selectLimitMock.mockResolvedValueOnce([{ id: 42 }]); // prior write exists
+    getUserEmailMock.mockResolvedValue("a@b.com");
 
     await maybeFireRedditFirstWrite({ userId: "user-1", justInsertedId: 100 });
 
@@ -60,9 +67,8 @@ describe("maybeFireRedditFirstWrite", () => {
   });
 
   it("fires Lead with stable conversionId on first write", async () => {
-    selectLimitMock
-      .mockResolvedValueOnce([]) // no prior writes
-      .mockResolvedValueOnce([{ googleEmail: "a@b.com" }]); // session lookup
+    selectLimitMock.mockResolvedValueOnce([]); // no prior writes
+    getUserEmailMock.mockResolvedValueOnce("a@b.com");
 
     await maybeFireRedditFirstWrite({ userId: "user-1", justInsertedId: 100 });
 
@@ -77,10 +83,9 @@ describe("maybeFireRedditFirstWrite", () => {
     });
   });
 
-  it("fires even when session email is unavailable", async () => {
-    selectLimitMock
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]); // no matching session
+  it("fires even when email is unavailable", async () => {
+    selectLimitMock.mockResolvedValueOnce([]);
+    getUserEmailMock.mockResolvedValueOnce(null);
 
     await maybeFireRedditFirstWrite({ userId: "user-2", justInsertedId: 50 });
 
@@ -95,16 +100,15 @@ describe("maybeFireRedditFirstWrite", () => {
   });
 
   it("short-circuits subsequent calls for the same user (no DB queries)", async () => {
-    selectLimitMock
-      .mockResolvedValueOnce([{ id: 42 }]) // first call: prior write exists
-      .mockResolvedValueOnce([]); // session (same Promise.all batch)
+    selectLimitMock.mockResolvedValueOnce([{ id: 42 }]); // first call: prior write exists
+    getUserEmailMock.mockResolvedValue("a@b.com");
 
     await maybeFireRedditFirstWrite({ userId: "user-cache", justInsertedId: 1 });
-    expect(selectLimitMock).toHaveBeenCalledTimes(2);
+    expect(selectLimitMock).toHaveBeenCalledTimes(1);
 
     await maybeFireRedditFirstWrite({ userId: "user-cache", justInsertedId: 2 });
     await maybeFireRedditFirstWrite({ userId: "user-cache", justInsertedId: 3 });
-    expect(selectLimitMock).toHaveBeenCalledTimes(2); // still 2 — cache hit
+    expect(selectLimitMock).toHaveBeenCalledTimes(1); // still 1 — cache hit
     expect(sendMock).not.toHaveBeenCalled();
   });
 

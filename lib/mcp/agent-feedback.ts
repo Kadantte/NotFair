@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { postToSlack } from "@/lib/slack";
+import { getUserEmail } from "@/lib/auth/get-user-email";
 import { typedResult } from "./types";
 import type { ToolRegistrar } from "./types";
 
@@ -131,19 +132,25 @@ async function resolveUserEmail(
   userId: string | null | undefined,
 ): Promise<string | null> {
   try {
+    // Phase-4 step 2: prefer auth.users via userId — that's the canonical
+    // identity for every active user. The legacy mcp_sessions lookup by
+    // sessionId is kept as a fallback for OAuth tokens still bound via
+    // sessionId; once those age out (phase 5), this can drop the branch.
+    if (userId) {
+      const email = await getUserEmail(userId);
+      if (email) return email;
+      const [row] = await db()
+        .select({ email: schema.subscriptions.email })
+        .from(schema.subscriptions)
+        .where(and(eq(schema.subscriptions.userId, userId), eq(schema.subscriptions.env, "live")))
+        .limit(1);
+      if (row?.email) return row.email;
+    }
     if (sessionId != null) {
       const [row] = await db()
         .select({ email: schema.mcpSessions.googleEmail })
         .from(schema.mcpSessions)
         .where(eq(schema.mcpSessions.id, sessionId))
-        .limit(1);
-      if (row?.email) return row.email;
-    }
-    if (userId) {
-      const [row] = await db()
-        .select({ email: schema.subscriptions.email })
-        .from(schema.subscriptions)
-        .where(and(eq(schema.subscriptions.userId, userId), eq(schema.subscriptions.env, "live")))
         .limit(1);
       if (row?.email) return row.email;
     }

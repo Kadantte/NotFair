@@ -20,6 +20,7 @@ import { db, schema } from "@/lib/db";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
 import { setActivePlatformCookie } from "@/lib/auth-cookies";
+import { identifyUser } from "@/lib/auth/identify-user";
 import {
   exchangeCodeForShortLivedToken,
   exchangeForLongLivedToken,
@@ -110,17 +111,13 @@ export async function GET(request: Request) {
     return redirectToConnect({ status: "error", reason: "nonce_expired", next });
   }
 
-  // Verify the user_id from state still matches an active session — defends
-  // against stale state from a logged-out tab. We don't require customerId
-  // here because ads-less sessions (user has no Google Ads account yet) are
-  // a supported entry point for Meta connection.
-  const [session] = await db()
-    .select({ userId: schema.mcpSessions.userId })
-    .from(schema.mcpSessions)
-    .where(eq(schema.mcpSessions.userId, state.userId))
-    .limit(1);
-
-  if (!session) {
+  // Verify the user_id from state still matches the current authenticated
+  // user — defends against stale state from a logged-out tab. We use
+  // identifyUser (Supabase first, cookie fallback) instead of looking up an
+  // mcp_sessions row directly so post-step-2 Supabase-only users (who have
+  // no mcp_sessions row) still pass.
+  const identity = await identifyUser({ source: "meta-oauth-callback" });
+  if (!identity || identity.userId !== state.userId) {
     return redirectToConnect({ status: "error", reason: "no_session", next });
   }
 

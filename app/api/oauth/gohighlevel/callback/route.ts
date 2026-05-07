@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
+import { identifyUser } from "@/lib/auth/identify-user";
 import {
   exchangeCodeForToken,
   getGoHighLevelRedirectUri,
@@ -83,18 +83,14 @@ export async function GET(request: Request) {
   const nonceOk = await verifyOAuthNonce(state.nonce);
   if (!nonceOk) return redirectToSurface({ status: "error", reason: "nonce_expired", next });
 
-  const [session] = await db()
-    .select({ userId: schema.mcpSessions.userId })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.userId, state.userId),
-        sql`${schema.mcpSessions.customerId} <> ''`,
-      ),
-    )
-    .limit(1);
-
-  if (!session) return redirectToSurface({ status: "error", reason: "no_session", next });
+  // Phase-4 step 2: verify state.userId matches current session via
+  // identifyUser (Supabase first, cookie fallback). Drops the legacy
+  // `customerId <> ''` gate; GHL connections don't strictly require Google
+  // Ads to be connected first, and the UI surfaces enforce prerequisites.
+  const identity = await identifyUser({ source: "gohighlevel-oauth-callback" });
+  if (!identity || identity.userId !== state.userId) {
+    return redirectToSurface({ status: "error", reason: "no_session", next });
+  }
 
   let token: GoHighLevelTokenResponse;
   try {

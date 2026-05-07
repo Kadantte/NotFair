@@ -1,7 +1,8 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { OP_TYPE } from "@/lib/db/tracking";
 import { sendRedditConversion } from "@/lib/reddit-capi";
+import { getUserEmail } from "@/lib/auth/get-user-email";
 
 // Process-local cache of users we've already observed writing. Once a user
 // has any prior successful write, they'll have one forever — so a single
@@ -28,7 +29,7 @@ export async function maybeFireRedditFirstWrite(params: {
   if (firstWriteChecked.has(userId)) return;
 
   try {
-    const [priorWrite, session] = await Promise.all([
+    const [priorWrite, email] = await Promise.all([
       db()
         .select({ id: schema.operations.id })
         .from(schema.operations)
@@ -41,12 +42,9 @@ export async function maybeFireRedditFirstWrite(params: {
           ),
         )
         .limit(1),
-      db()
-        .select({ googleEmail: schema.mcpSessions.googleEmail })
-        .from(schema.mcpSessions)
-        .where(eq(schema.mcpSessions.userId, userId))
-        .orderBy(desc(schema.mcpSessions.createdAt))
-        .limit(1),
+      // Phase-4 step 2: pull email from auth.users (Supabase) rather than
+      // mcp_sessions, which is empty for Supabase-only users.
+      getUserEmail(userId),
     ]);
 
     firstWriteChecked.add(userId);
@@ -56,7 +54,7 @@ export async function maybeFireRedditFirstWrite(params: {
     await sendRedditConversion({
       trackingType: "Lead",
       conversionId: `first-write-${userId}`,
-      email: session[0]?.googleEmail ?? null,
+      email,
       externalId: userId,
       valueDecimal: 1.0,
       currency: "USD",

@@ -1,7 +1,8 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { OP_TYPE } from "@/lib/db/tracking";
 import { sendXConversion } from "@/lib/x-capi";
+import { getUserEmail } from "@/lib/auth/get-user-email";
 
 // Process-local cache of users we've already checked. The database remains the
 // source of truth; this just avoids repeated first-write lookups in bulk writes.
@@ -25,7 +26,7 @@ export async function maybeFireXFirstWrite(params: {
   if (firstWriteChecked.has(userId)) return;
 
   try {
-    const [priorWrite, session] = await Promise.all([
+    const [priorWrite, email] = await Promise.all([
       db()
         .select({ id: schema.operations.id })
         .from(schema.operations)
@@ -38,12 +39,9 @@ export async function maybeFireXFirstWrite(params: {
           ),
         )
         .limit(1),
-      db()
-        .select({ googleEmail: schema.mcpSessions.googleEmail })
-        .from(schema.mcpSessions)
-        .where(eq(schema.mcpSessions.userId, userId))
-        .orderBy(desc(schema.mcpSessions.createdAt))
-        .limit(1),
+      // Phase-4 step 2: pull email from auth.users instead of mcp_sessions
+      // (which is empty for Supabase-only users).
+      getUserEmail(userId),
     ]);
 
     firstWriteChecked.add(userId);
@@ -52,7 +50,7 @@ export async function maybeFireXFirstWrite(params: {
 
     await sendXConversion({
       conversionId: `first-write-${userId}`,
-      email: session[0]?.googleEmail ?? null,
+      email,
       valueDecimal: 1.0,
       currency: "USD",
     });

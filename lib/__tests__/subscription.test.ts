@@ -27,43 +27,32 @@ let mockRow: Record<string, unknown> | undefined = undefined;
 let mockMcpSessionEmail: string | null = null;
 
 vi.mock("@/lib/db", () => {
-  // The resolver makes at most two queries: (1) subscriptions, (2) mcp_sessions
-  // for the dev-email override lookup. We route by the first `from()` target.
-  const fromTable = { current: "subscriptions" as "subscriptions" | "mcpSessions" };
   return {
     db: () => ({
       select: () => ({
-        from: (table: { __name: string }) => {
-          fromTable.current = table.__name === "mcpSessions" ? "mcpSessions" : "subscriptions";
-          return {
-            where: () => ({
-              limit: () => {
-                if (fromTable.current === "mcpSessions") {
-                  return mockMcpSessionEmail === null ? [] : [{ email: mockMcpSessionEmail }];
-                }
-                return mockRow ? [mockRow] : [];
-              },
-            }),
-          };
-        },
+        from: () => ({
+          where: () => ({
+            limit: () => (mockRow ? [mockRow] : []),
+          }),
+        }),
       }),
     }),
     schema: {
       subscriptions: {
-        __name: "subscriptions",
         userId: "userId",
         env: "env",
         stripeCustomerId: "stripeCustomerId",
         email: "email",
       },
-      mcpSessions: {
-        __name: "mcpSessions",
-        userId: "userId",
-        googleEmail: "googleEmail",
-      },
     },
   };
 });
+
+// Phase-4 step 2: subscription resolver looks up dev email via getUserEmail
+// (auth.users) instead of mcp_sessions. Mock returns whatever the test sets.
+vi.mock("@/lib/auth/get-user-email", () => ({
+  getUserEmail: vi.fn(async () => mockMcpSessionEmail),
+}));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ["eq", ...args]),

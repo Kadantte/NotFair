@@ -23,10 +23,10 @@ vi.mock("@/lib/slack", () => ({
   postToSlack: (...args: unknown[]) => postToSlack(...args),
 }));
 
-// `resolveUserEmail` issues a `db().select().from().where().limit()` chain.
-// We don't need to differentiate `mcpSessions` vs `subscriptions` here — the
-// resolver short-circuits as soon as the first non-null email arrives, so a
-// single chainable stub returning `dbEmailResult` is enough.
+// `resolveUserEmail` calls `getUserEmail` (auth.users) first, then the
+// `db().select().from(subscriptions).where().limit()` chain, then mcp_sessions.
+// Stub both layers; tests configure dbEmailResult for the subscriptions branch
+// and getUserEmailMock for the auth.users branch.
 vi.mock("@/lib/db", () => {
   const chainable = {
     select: () => chainable,
@@ -42,6 +42,13 @@ vi.mock("@/lib/db", () => {
     },
   };
 });
+
+const { getUserEmailMock } = vi.hoisted(() => ({
+  getUserEmailMock: vi.fn(async () => null as string | null),
+}));
+vi.mock("@/lib/auth/get-user-email", () => ({
+  getUserEmail: getUserEmailMock,
+}));
 
 vi.mock("drizzle-orm", () => ({
   eq: () => ({ __eq: true }),

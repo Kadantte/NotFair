@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { selectLimitMock } = vi.hoisted(() => ({
+const { selectLimitMock, getUserEmailMock } = vi.hoisted(() => ({
   selectLimitMock: vi.fn(),
+  getUserEmailMock: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/get-user-email", () => ({
+  getUserEmail: getUserEmailMock,
 }));
 
 vi.mock("@/lib/db", () => {
@@ -48,11 +53,13 @@ describe("maybeFireXFirstWrite", () => {
   beforeEach(() => {
     selectLimitMock.mockReset();
     sendMock.mockReset();
+    getUserEmailMock.mockReset();
     _resetXFirstWriteCacheForTests();
   });
 
   it("skips when user has prior successful writes", async () => {
     selectLimitMock.mockResolvedValueOnce([{ id: 42 }]);
+    getUserEmailMock.mockResolvedValue("a@b.com");
 
     await maybeFireXFirstWrite({ userId: "user-1", justInsertedId: 100 });
 
@@ -60,9 +67,8 @@ describe("maybeFireXFirstWrite", () => {
   });
 
   it("fires the first-write conversion with stable conversionId", async () => {
-    selectLimitMock
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ googleEmail: "a@b.com" }]);
+    selectLimitMock.mockResolvedValueOnce([]);
+    getUserEmailMock.mockResolvedValueOnce("a@b.com");
 
     await maybeFireXFirstWrite({ userId: "user-1", justInsertedId: 100 });
 
@@ -75,10 +81,9 @@ describe("maybeFireXFirstWrite", () => {
     });
   });
 
-  it("delegates even when session email is unavailable", async () => {
-    selectLimitMock
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+  it("delegates even when email is unavailable", async () => {
+    selectLimitMock.mockResolvedValueOnce([]);
+    getUserEmailMock.mockResolvedValueOnce(null);
 
     await maybeFireXFirstWrite({ userId: "user-2", justInsertedId: 50 });
 
@@ -91,16 +96,15 @@ describe("maybeFireXFirstWrite", () => {
   });
 
   it("short-circuits subsequent calls for the same user", async () => {
-    selectLimitMock
-      .mockResolvedValueOnce([{ id: 42 }])
-      .mockResolvedValueOnce([]);
+    selectLimitMock.mockResolvedValueOnce([{ id: 42 }]);
+    getUserEmailMock.mockResolvedValue("a@b.com");
 
     await maybeFireXFirstWrite({ userId: "user-cache", justInsertedId: 1 });
-    expect(selectLimitMock).toHaveBeenCalledTimes(2);
+    expect(selectLimitMock).toHaveBeenCalledTimes(1);
 
     await maybeFireXFirstWrite({ userId: "user-cache", justInsertedId: 2 });
     await maybeFireXFirstWrite({ userId: "user-cache", justInsertedId: 3 });
-    expect(selectLimitMock).toHaveBeenCalledTimes(2);
+    expect(selectLimitMock).toHaveBeenCalledTimes(1);
     expect(sendMock).not.toHaveBeenCalled();
   });
 

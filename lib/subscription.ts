@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
 import { resolvePrice, stripeMode } from "@/lib/stripe/config";
 import { DEV_EMAILS } from "@/lib/dev-emails";
+import { getUserEmail } from "@/lib/auth/get-user-email";
 
 const DEV_GROWTH_OVERRIDE_COOKIE = "dev_growth_override";
 
@@ -231,12 +232,9 @@ async function maybeDevOverride(
 async function isDevUser(userId: string): Promise<boolean> {
   const cached = devUserCache.get(userId);
   if (cached !== undefined) return cached;
-  const [row] = await db()
-    .select({ email: schema.mcpSessions.googleEmail })
-    .from(schema.mcpSessions)
-    .where(eq(schema.mcpSessions.userId, userId))
-    .limit(1);
-  const isDev = !!row?.email && DEV_EMAILS.includes(row.email);
+  // Phase-4 step 2: source email from auth.users instead of mcp_sessions.
+  const email = await getUserEmail(userId);
+  const isDev = !!email && DEV_EMAILS.includes(email);
   devUserCache.set(userId, isDev);
   return isDev;
 }
