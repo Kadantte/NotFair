@@ -120,7 +120,7 @@
       "genericBody": "Something went wrong on our end. Please try again. If it keeps failing, reach out and we can help.",
       "genericCta": "Try again with Google"
     },
-    "googleAdsPrompt": "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring"
+    "googleAdsPrompt": "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For every recommendation, you must pull actual data to prove or disprove your hypothesis before suggesting it. Then, show the hard evidence, expected upside, and the exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring"
   },
   "AccountSelector": {
     "headline": "Choose ad accounts",
@@ -1461,7 +1461,7 @@
     }
   },
   "ConnectorSetupSteps": {
-    "defaultPrompt": "Audit my connected {platform} account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring",
+    "defaultPrompt": "Audit my connected {platform} account and prioritize the 3 changes most likely to improve performance. For every recommendation, you must pull actual data to prove or disprove your hypothesis before suggesting it. Then, show the hard evidence, expected upside, and the exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring",
     "step1": {
       "title": "Open Claude Connectors",
       "body": "Open Claude's connector settings on the web - the button below lands directly on <strong>Add custom connector</strong>. Connectors set up here apply to both Claude Desktop and Claude on the web.",
@@ -1500,7 +1500,7 @@
     }
   },
   "ClaudeCodePluginSteps": {
-    "defaultPrompt": "Audit my connected {platform} account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring",
+    "defaultPrompt": "Audit my connected {platform} account and prioritize the 3 changes most likely to improve performance. For every recommendation, you must pull actual data to prove or disprove your hypothesis before suggesting it. Then, show the hard evidence, expected upside, and the exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring",
     "step1": {
       "title": "Open Claude Code",
       "beforeLink": "Open a terminal and start",
@@ -1529,7 +1529,7 @@
     }
   },
   "CodexSetupSteps": {
-    "defaultPrompt": "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring",
+    "defaultPrompt": "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For every recommendation, you must pull actual data to prove or disprove your hypothesis before suggesting it. Then, show the hard evidence, expected upside, and the exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring",
     "step1": {
       "title": "Install the Codex CLI",
       "beforeLink": "Open a terminal and install",

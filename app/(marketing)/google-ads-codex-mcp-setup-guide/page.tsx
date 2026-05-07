@@ -1,6 +1,7 @@
 import { GoogleAdsCodexMcpSetupPage } from "@/components/marketing/google-ads-codex-mcp-setup-page";
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
+import { GOOGLE_ADS_AUDIT_PROMPT } from "@/lib/prompts";
 
 export const metadata = buildMetadata({
   title: "Codex MCP Setup Guide for Google Ads | NotFair",
@@ -79,7 +80,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 3,
         name: "Ask Codex about your ads",
-        text: "Try a prompt like 'Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.' Codex calls NotFair tools and answers with live data.",
+        text: `Try a prompt like '${GOOGLE_ADS_AUDIT_PROMPT}' Codex calls NotFair tools and answers with live data.`,
         url: new URL("/google-ads-codex-mcp-setup-guide#step-3", SITE_URL).toString(),
       },
     ],

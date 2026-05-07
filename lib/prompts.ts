@@ -1,0 +1,2 @@
+export const GOOGLE_ADS_AUDIT_PROMPT =
+  "Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For every recommendation, you must pull actual data to prove or disprove your hypothesis before suggesting it. Then, show the hard evidence, expected upside, and the exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.";

@@ -20,6 +20,14 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: vi.fn(() => {}),
+  };
+});
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
@@ -34,6 +42,7 @@ vi.mock("@/lib/db", () => {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
+          limit: vi.fn(async () => mockSelectRows()),
           orderBy: vi.fn(() => ({
             limit: vi.fn(async () => mockSelectRows()),
           })),
@@ -43,7 +52,11 @@ vi.mock("@/lib/db", () => {
     insert: vi.fn(() => ({
       values: (...args: unknown[]) => {
         mockInsertValues(...args);
-        return Promise.resolve(undefined);
+        const thenable = Promise.resolve(undefined) as Promise<undefined> & {
+          onConflictDoUpdate: (set: unknown) => Promise<undefined>;
+        };
+        thenable.onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+        return thenable;
       },
     })),
   };
@@ -61,6 +74,28 @@ vi.mock("@/lib/db", () => {
         expiresAt: "expires_at",
         createdAt: "created_at",
       },
+      userAttribution: {
+        userId: "user_id",
+        email: "email",
+        signupMethod: "signup_method",
+        source: "source",
+        medium: "medium",
+        campaign: "campaign",
+        term: "term",
+        content: "content",
+        gclid: "gclid",
+        fbclid: "fbclid",
+        rdtCid: "rdt_cid",
+        firstLandingUrl: "first_landing_url",
+        firstLandingPath: "first_landing_path",
+        signupReferrer: "signup_referrer",
+        signupReferrerDomain: "signup_referrer_domain",
+        attributionCapturedAt: "attribution_captured_at",
+        attributionSource: "attribution_source",
+        attributionVersion: "attribution_version",
+        rawAttribution: "raw_attribution",
+        updatedAt: "updated_at",
+      },
     },
   };
 });
@@ -77,6 +112,12 @@ import { GET } from "@/app/auth/supabase/callback/route";
 
 function makeRequest(url: string): Request {
   return new Request(url);
+}
+
+function findSessionInsert() {
+  return mockInsertValues.mock.calls
+    .map((call) => call[0] as Record<string, unknown>)
+    .find((row) => Object.prototype.hasOwnProperty.call(row, "accessToken"));
 }
 
 describe("Supabase magic-link callback route - GET", () => {
@@ -106,9 +147,9 @@ describe("Supabase magic-link callback route - GET", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/connect/meta-ads");
     expect(mockExchangeCodeForSession).toHaveBeenCalledWith("supabase-code");
-    expect(mockInsertValues).toHaveBeenCalledOnce();
+    expect(findSessionInsert()).toBeDefined();
 
-    const insertedRow = mockInsertValues.mock.calls[0][0] as Record<string, unknown>;
+    const insertedRow = findSessionInsert() as Record<string, unknown>;
     expect(insertedRow).toMatchObject({
       refreshToken: "",
       customerId: "",
@@ -147,7 +188,7 @@ describe("Supabase magic-link callback route - GET", () => {
     );
 
     expect(response.headers.get("location")).toBe("http://localhost:3000/campaigns");
-    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(findSessionInsert()).toBeUndefined();
     expect(response.cookies.get("adsagent_token")?.value).toBe("existing-connected-token");
     // Phase-2 header reclaim: setSessionCookies actively deletes the legacy
     // adsagent_customer cookie so existing browsers shed it. Verify the
@@ -169,6 +210,6 @@ describe("Supabase magic-link callback route - GET", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/login?error=auth_failed&reason=supabase_auth",
     );
-    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(findSessionInsert()).toBeUndefined();
   });
 });

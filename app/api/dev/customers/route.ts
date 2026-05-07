@@ -33,20 +33,36 @@ function formatReferrer(referrer: string | null): string | null {
 }
 
 function deriveAttribution(meta: Record<string, unknown> | null | undefined): Attribution {
-  const source = safeString(meta?.utm_source);
-  const medium = safeString(meta?.utm_medium);
-  const campaign = safeString(meta?.utm_campaign);
-  const term = safeString(meta?.utm_term);
-  const content = safeString(meta?.utm_content);
-  const referrer = safeString(meta?.signup_referrer);
+  return deriveAttributionFromFields({
+    source: safeString(meta?.utm_source),
+    medium: safeString(meta?.utm_medium),
+    campaign: safeString(meta?.utm_campaign),
+    term: safeString(meta?.utm_term),
+    content: safeString(meta?.utm_content),
+    referrer: safeString(meta?.signup_referrer),
+    referrerDomain: safeString(meta?.signup_referrer_domain),
+  });
+}
+
+function deriveAttributionFromFields(fields: {
+  source: string | null;
+  medium: string | null;
+  campaign: string | null;
+  term: string | null;
+  content: string | null;
+  referrer: string | null;
+  referrerDomain?: string | null;
+}): Attribution {
+  const { source, medium, campaign, term, content, referrer } = fields;
   const referrerHost = formatReferrer(referrer);
+  const referrerDomain = safeString(fields.referrerDomain) ?? referrerHost;
 
   const label = source && medium
     ? `${source} / ${medium}`
     : source
       ? source
-      : referrerHost
-        ? referrerHost
+      : referrerDomain
+        ? referrerDomain
         : "Unknown source";
 
   const detail = campaign
@@ -54,8 +70,8 @@ function deriveAttribution(meta: Record<string, unknown> | null | undefined): At
     : term
       ? `term: ${term}`
       : content
-        ? `content: ${content}`
-        : referrerHost && referrer
+      ? `content: ${content}`
+        : referrerDomain && referrer
           ? referrer
           : null;
 
@@ -244,23 +260,30 @@ export async function GET(request: Request) {
       }
       return map;
     })(),
-    // Supabase Auth stores first-touch UTM/referrer on user metadata during the
-    // OAuth callback. Querying auth.users here keeps attribution visible without
-    // adding a new app-table migration.
+    // Canonical first-touch attribution. This table is backfilled from
+    // auth.users and then written directly by the auth callbacks.
     (async () => {
       const map = new Map<string, Attribution>();
       if (userIds.length === 0) return map;
       try {
-        const rows = await db().execute(sql<{ id: string; raw_user_meta_data: Record<string, unknown> | null }>`
-          select id::text as id, raw_user_meta_data
-          from auth.users
-          where id::text in (${sql.join(userIds.map((id) => sql`${id}`), sql`,`)})
-        `);
-        for (const r of rows as unknown as Array<{ id: string; raw_user_meta_data: Record<string, unknown> | null }>) {
-          map.set(r.id, deriveAttribution(r.raw_user_meta_data));
+        const rows = await db()
+          .select({
+            userId: schema.userAttribution.userId,
+            source: schema.userAttribution.source,
+            medium: schema.userAttribution.medium,
+            campaign: schema.userAttribution.campaign,
+            term: schema.userAttribution.term,
+            content: schema.userAttribution.content,
+            referrer: schema.userAttribution.signupReferrer,
+            referrerDomain: schema.userAttribution.signupReferrerDomain,
+          })
+          .from(schema.userAttribution)
+          .where(inArray(schema.userAttribution.userId, userIds));
+        for (const r of rows) {
+          map.set(r.userId, deriveAttributionFromFields(r));
         }
       } catch (err) {
-        console.warn("[dev/customers] Failed to read auth.users attribution:", err);
+        console.warn("[dev/customers] Failed to read user attribution:", err);
       }
       return map;
     })(),

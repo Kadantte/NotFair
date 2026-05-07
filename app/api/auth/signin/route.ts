@@ -1,7 +1,14 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
-import { UTM_KEYS } from "@/lib/utm";
+import {
+  ATTRIBUTION_PARAM_KEYS,
+  type FirstTouchAttribution,
+  UTM_KEYS,
+  isInternalAttributionReferrer,
+  parseAttributionCookie,
+  sanitizeAttribution,
+} from "@/lib/utm";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 
 function getSafeNext(next: string | null) {
@@ -26,6 +33,34 @@ function getSafePrompt(prompt: string | null): string {
   return ALLOWED_PROMPTS.has(normalized) ? normalized : "consent";
 }
 
+function attributionFromRequest(
+  request: Request,
+  searchParams: URLSearchParams,
+): FirstTouchAttribution | null {
+  const requestUrl = new URL(request.url);
+  const raw: Record<string, unknown> = {
+    ...(parseAttributionCookie(request.headers.get("cookie")) ?? {}),
+  };
+
+  for (const key of ATTRIBUTION_PARAM_KEYS) {
+    const val = searchParams.get(key);
+    if (val) raw[key] = val;
+  }
+
+  const signupReferrer = searchParams.get("signup_referrer") ?? raw.signup_referrer;
+  if (
+    typeof signupReferrer === "string" &&
+    !isInternalAttributionReferrer(signupReferrer, requestUrl.hostname)
+  ) {
+    raw.signup_referrer = signupReferrer;
+  } else {
+    delete raw.signup_referrer;
+    delete raw.signup_referrer_domain;
+  }
+
+  return sanitizeAttribution(raw);
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const popup = searchParams.get("popup") === "1";
@@ -42,17 +77,19 @@ export async function GET(request: Request) {
     );
   }
 
+  const attribution = attributionFromRequest(request, searchParams);
+
   // Capture UTM params to thread through the OAuth round-trip
   const utm: Record<string, string> = {};
   for (const key of UTM_KEYS) {
-    const val = searchParams.get(key);
+    const val = attribution?.[key] ?? searchParams.get(key);
     if (val) utm[key] = val;
   }
 
   // The caller passes the original marketing referrer (e.g. github.com) so we
   // can attribute it on user_signed_up — the HTTP Referer header on the
   // callback is always accounts.google.com, which is useless for attribution.
-  const signupReferrer = searchParams.get("signup_referrer");
+  const signupReferrer = attribution?.signup_referrer;
 
   // Generate a random nonce for CSRF protection.
   // The nonce goes into both the OAuth state param and a short-lived cookie.
@@ -68,6 +105,7 @@ export async function GET(request: Request) {
     ...(scopeRetry ? { scope_retry: true } : {}),
     ...(Object.keys(utm).length > 0 ? { utm } : {}),
     ...(signupReferrer ? { signup_referrer: signupReferrer } : {}),
+    ...(attribution ? { attribution } : {}),
   })).toString("base64url");
 
   const prompt = getSafePrompt(searchParams.get("prompt"));

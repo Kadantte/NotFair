@@ -652,3 +652,48 @@ export const waitlistSignups = pgTable("waitlist_signups", {
    * and the user bypasses the waitlist wall for `key`. */
   approvedAt: timestamp("approved_at"),
 });
+
+// ─── User Attribution ───────────────────────────────────────────────
+//
+// Canonical first-touch acquisition record. PostHog remains the event stream
+// for pageview/CTA/funnel analysis; this table gives SQL-native joins from
+// users → accounts → operations → subscriptions without scraping auth metadata.
+
+export const userAttribution = pgTable("user_attribution", {
+  /** NotFair user id (matches auth.users.id and mcp_sessions.user_id). */
+  userId: text("user_id").primaryKey(),
+  /** Email at signup/first capture time. Kept flat for admin/reconcile queries. */
+  email: text("email"),
+  /** google_oauth, email_magic_link, or inferred/backfill values. */
+  signupMethod: text("signup_method"),
+  /** Normalized first-touch source fields. `source` is utm_source or referrer domain fallback. */
+  source: text("source"),
+  medium: text("medium"),
+  campaign: text("campaign"),
+  term: text("term"),
+  content: text("content"),
+  /** Paid/social click ids captured before OAuth bounces. */
+  gclid: text("gclid"),
+  fbclid: text("fbclid"),
+  rdtCid: text("rdt_cid"),
+  /** First page we saw in this browser before signup/auth. */
+  firstLandingUrl: text("first_landing_url"),
+  firstLandingPath: text("first_landing_path"),
+  /** External pre-signup referrer, excluding OAuth/payment/same-site noise. */
+  signupReferrer: text("signup_referrer"),
+  signupReferrerDomain: text("signup_referrer_domain"),
+  /** Client-side first-touch capture timestamp, if available. */
+  attributionCapturedAt: timestamp("attribution_captured_at"),
+  /** cookie, oauth_state, supabase_magic_link, backfill_auth_metadata, etc. */
+  attributionSource: text("attribution_source").notNull().default("unknown"),
+  attributionVersion: integer("attribution_version").notNull().default(1),
+  /** Attribution-only raw payload; do not dump full auth.user metadata here. */
+  rawAttribution: jsonb("raw_attribution").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("user_attribution_source_idx").on(table.source, table.medium),
+  index("user_attribution_referrer_idx").on(table.signupReferrerDomain),
+  index("user_attribution_captured_idx").on(table.attributionCapturedAt),
+  index("user_attribution_created_idx").on(table.createdAt),
+]);

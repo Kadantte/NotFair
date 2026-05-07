@@ -2,8 +2,9 @@ import { randomUUID } from "crypto";
 import { NextResponse, after } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { upsertGoogleConnection } from "@/lib/connections/google";
+import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
-import { eq, and, gte, ne } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { listConnectableAccounts, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
 import { setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,7 @@ import {
   type RedditConversionInput,
 } from "@/lib/reddit-capi";
 import { getClientIp } from "@/lib/request-ip";
+import { sanitizeAttribution } from "@/lib/utm";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { loadGoogleConnection } from "@/lib/connections/google-read";
 
@@ -218,6 +220,14 @@ export async function POST(request: Request) {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>;
+      const attribution = sanitizeAttribution(meta);
+      await recordUserAttribution({
+        userId: identity.userId,
+        email: user?.email ?? null,
+        signupMethod: "google_oauth",
+        attribution,
+        attributionSource: attribution ? "select_account_metadata" : "select_account_missing",
+      });
       const clientIp = getClientIp(request);
       trackServerEvent(identity.userId, "user_signed_up", {
         utm_source: meta.utm_source,
@@ -225,7 +235,15 @@ export async function POST(request: Request) {
         utm_campaign: meta.utm_campaign,
         utm_term: meta.utm_term,
         utm_content: meta.utm_content,
+        gclid: meta.gclid,
+        fbclid: meta.fbclid,
+        rdt_cid: meta.rdt_cid,
         signup_referrer: meta.signup_referrer,
+        signup_referrer_domain: meta.signup_referrer_domain,
+        first_landing_url: meta.first_landing_url,
+        first_landing_path: meta.first_landing_path,
+        attribution_captured_at: meta.attribution_captured_at,
+        attribution_version: meta.attribution_version,
         google_email: user?.email ?? identity.googleEmail,
         signup_method: "google_oauth",
         ...(clientIp ? { $ip: clientIp } : {}),

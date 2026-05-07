@@ -10,7 +10,7 @@ export type BootstrapUser = {
   properties?: Record<string, unknown>;
 } | null;
 
-export function initPostHog(bootstrapUser?: BootstrapUser) {
+export function initPostHog() {
   if (initialized || !POSTHOG_KEY || typeof window === "undefined") return;
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
@@ -28,13 +28,7 @@ export function initPostHog(bootstrapUser?: BootstrapUser) {
         return text;
       },
     },
-    bootstrap: bootstrapUser
-      ? { distinctID: bootstrapUser.distinctId, isIdentifiedID: true }
-      : undefined,
   });
-  if (bootstrapUser?.properties) {
-    posthog.setPersonProperties(bootstrapUser.properties);
-  }
   initialized = true;
 }
 

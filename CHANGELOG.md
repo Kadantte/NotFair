@@ -2,6 +2,21 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.3.14.1] - 2026-05-07
+
+### Added
+- **Canonical first-touch attribution table for acquisition analysis.** New signups now write one `user_attribution` row keyed by NotFair user id, with UTM fields, paid click ids, first landing page, external referrer, signup method, raw attribution payload, and backfilled unknown rows for existing users. The table is RLS-protected and designed for SQL joins against sessions, operations, Stripe, and activation data without scraping Supabase Auth metadata.
+- **First-touch attribution capture before auth redirects.** The app now stores a durable `nf_first_touch` cookie before Google OAuth or Supabase magic-link flows can overwrite referrer context, preserving UTMs, `gclid`, `fbclid`, `rdt_cid`, first landing URL/path, capture time, and non-internal referrer domain.
+
+### Changed
+- **PostHog identity stitching now preserves anonymous pre-signup activity.** The browser provider initializes PostHog anonymously, then aliases the anonymous id to the app user id and identifies the user after login so pageviews and signup events stay connected.
+- **Dev customer attribution now reads from `user_attribution`.** `/api/dev/customers` uses the canonical acquisition table instead of querying `auth.users.raw_user_meta_data`, keeping attribution reporting in app-owned schema.
+- **Google Ads setup prompt copy is centralized.** Marketing setup guide JSON-LD and English onboarding copy now share the same stronger Google Ads audit prompt that requires agents to prove or disprove recommendations with real account data.
+
+### Fixed
+- **OAuth signup referrer filtering no longer falls back to polluted query params.** Google signin now threads only sanitized attribution through OAuth state, preventing `accounts.google.com`, Stripe, or same-site URLs from reappearing as acquisition referrers after filtering.
+- **Auth callback tests distinguish attribution writes from session writes.** Existing tests now assert on the actual session insert shape while allowing the new attribution upsert side effect.
+
 ## [0.3.14.0] - 2026-05-07
 
 ### Added

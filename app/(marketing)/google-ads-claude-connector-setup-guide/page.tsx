@@ -1,5 +1,6 @@
 import { GoogleAdsClaudeConnectorPage } from "@/components/marketing/google-ads-claude-connector-page";
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
+import { GOOGLE_ADS_AUDIT_PROMPT } from "@/lib/prompts";
 
 export const metadata = buildMetadata({
   title: "Google Ads Claude Connector — Use NotFair in Claude Desktop, Web & Cowork",
@@ -85,7 +86,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 3,
         name: "Ask Claude about your Google Ads",
-        text: "Open a new Claude chat and try a prompt like 'Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.' Claude calls NotFair tools and answers with live data.",
+        text: `Open a new Claude chat and try a prompt like '${GOOGLE_ADS_AUDIT_PROMPT}' Claude calls NotFair tools and answers with live data.`,
         url: new URL("/google-ads-claude-connector-setup-guide#step-3", SITE_URL).toString(),
       },
     ],

@@ -1,6 +1,6 @@
 "use client";
 
-import { UTM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
+import { ATTRIBUTION_PARAM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
 
 export type GoogleConnectOptions = {
   /**
@@ -21,9 +21,10 @@ function buildAuthUrl(next: string, popup: boolean, options?: GoogleConnectOptio
   if (options?.prompt) {
     url.searchParams.set("prompt", options.prompt);
   }
-  // Forward UTM params — prefer current URL, fall back to sessionStorage
+  // Forward first-touch params when present — /api/auth/signin also reads the
+  // durable cookie, but explicit query params keep popup flows self-contained.
   const currentParams = new URLSearchParams(window.location.search);
-  for (const key of UTM_KEYS) {
+  for (const key of ATTRIBUTION_PARAM_KEYS) {
     const val = currentParams.get(key)
       ?? sessionStorage.getItem(`${UTM_STORAGE_PREFIX}${key}`);
     if (val) url.searchParams.set(key, val);

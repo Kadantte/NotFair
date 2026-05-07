@@ -1,10 +1,19 @@
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
+import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
+import { flushServerEvents, trackServerEvent } from "@/lib/analytics-server";
+import { getClientIp } from "@/lib/request-ip";
+import {
+  attributionToUserMetadata,
+  isInternalAttributionReferrer,
+  parseAttributionCookie,
+} from "@/lib/utm";
 
 function getSafeNext(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) {
@@ -21,7 +30,8 @@ function redirectToLogin(origin: string, reason: string) {
 type SupabaseUser = {
   id: string;
   email?: string | null;
-  user_metadata?: {
+  created_at?: string | null;
+  user_metadata?: Record<string, unknown> & {
     full_name?: string | null;
     name?: string | null;
     avatar_url?: string | null;
@@ -47,6 +57,16 @@ async function findExistingConnectedSession(userId: string) {
     .limit(1);
 
   return existingSession ?? null;
+}
+
+async function hasAnySession(userId: string) {
+  const [existingSession] = await db()
+    .select({ id: schema.mcpSessions.id })
+    .from(schema.mcpSessions)
+    .where(eq(schema.mcpSessions.userId, userId))
+    .limit(1);
+
+  return !!existingSession;
 }
 
 async function mintEmailOnlySession(user: SupabaseUser): Promise<string> {
@@ -88,6 +108,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = getSafeNext(searchParams.get("next"));
+  after(flushServerEvents);
 
   if (!code) {
     return redirectToLogin(origin, "missing_code");
@@ -107,6 +128,35 @@ export async function GET(request: Request) {
     return redirectToLogin(origin, "supabase_auth");
   }
 
+  const hadPriorSession = await hasAnySession(user.id);
+  const attribution = parseAttributionCookie(request.headers.get("cookie"));
+  if (
+    attribution?.signup_referrer &&
+    isInternalAttributionReferrer(attribution.signup_referrer, new URL(request.url).hostname)
+  ) {
+    delete attribution.signup_referrer;
+    delete attribution.signup_referrer_domain;
+  }
+  const attributionMetadata = attributionToUserMetadata(attribution);
+  if (Object.keys(attributionMetadata).length > 0) {
+    const existingMeta = user.user_metadata ?? {};
+    if (!existingMeta.attribution_captured_at && !existingMeta.utm_source && !existingMeta.signup_referrer) {
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: attributionMetadata,
+      });
+      if (updateError) {
+        console.warn("[supabase/callback] Attribution metadata update failed:", updateError);
+      }
+    }
+  }
+  await recordUserAttribution({
+    userId: user.id,
+    email: user.email ?? null,
+    signupMethod: "email_magic_link",
+    attribution,
+    attributionSource: attribution ? "supabase_magic_link_cookie" : "supabase_magic_link_missing",
+  });
+
   const response = NextResponse.redirect(`${origin}${next}`);
   const existingSession = await findExistingConnectedSession(user.id);
 
@@ -119,5 +169,16 @@ export async function GET(request: Request) {
 
   setProfileFromSupabaseUser(response, user);
   await clearSupabaseCookies(response);
+
+  if (!hadPriorSession) {
+    const clientIp = getClientIp(request);
+    trackServerEvent(user.id, "user_signed_up", {
+      ...attributionMetadata,
+      google_email: user.email,
+      signup_method: "email_magic_link",
+      ...(clientIp ? { $ip: clientIp } : {}),
+    });
+  }
+
   return response;
 }

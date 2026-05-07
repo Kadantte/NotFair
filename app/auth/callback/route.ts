@@ -6,6 +6,7 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
 import { supabaseSessionBridge } from "@/lib/connections/feature-flags";
 import { refreshGoogleConnectionCredentials, upsertGoogleConnection } from "@/lib/connections/google";
+import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
 import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +14,13 @@ import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi";
 import { getClientIp } from "@/lib/request-ip";
-import { UTM_KEYS, type UtmParams } from "@/lib/utm";
+import {
+  UTM_KEYS,
+  attributionToUserMetadata,
+  sanitizeAttribution,
+  type FirstTouchAttribution,
+  type UtmParams,
+} from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyAccountLoadError, classifyGoogleError } from "@/lib/auth-errors";
 import { evaluateScopeGrant } from "@/lib/oauth-scope-retry";
@@ -45,6 +52,7 @@ type AuthState = {
   utm?: UtmParams;
   scope_retry?: boolean;
   signup_referrer?: string;
+  attribution?: FirstTouchAttribution;
 };
 
 function getSafeNext(next: string | null | undefined) {
@@ -101,6 +109,10 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
       scope_retry: parsed.scope_retry === true ? true : undefined,
       signup_referrer: typeof parsed.signup_referrer === "string" ? parsed.signup_referrer : undefined,
       utm,
+      attribution:
+        parsed.attribution && typeof parsed.attribution === "object"
+          ? sanitizeAttribution(parsed.attribution as Record<string, unknown>) ?? undefined
+          : undefined,
     };
   } catch {
     return null;
@@ -836,18 +848,29 @@ export async function GET(request: Request) {
 
   const user = authData.user ?? authData.session?.user ?? null;
 
-  // Save UTM attribution data to user metadata on first sign-up
-  if (user && (state.utm || state.signup_referrer)) {
+  // Save first-touch attribution data to user metadata on first sign-up.
+  // Keep this first-write only: later re-auth should not rewrite acquisition.
+  const attributionMetadata = {
+    ...attributionToUserMetadata(state.attribution),
+    ...(state.utm ?? {}),
+    ...(state.signup_referrer ? { signup_referrer: state.signup_referrer } : {}),
+  };
+  if (user && Object.keys(attributionMetadata).length > 0) {
     const existingMeta = user.user_metadata ?? {};
-    // Only write UTMs if not already set (don't overwrite on re-auth)
-    if (!existingMeta.utm_source) {
+    if (!existingMeta.attribution_captured_at && !existingMeta.utm_source && !existingMeta.signup_referrer) {
       await supabase.auth.updateUser({
-        data: {
-          ...(state.utm ?? {}),
-          signup_referrer: state.signup_referrer ?? undefined,
-        },
+        data: attributionMetadata,
       });
     }
+  }
+  if (user?.id) {
+    await recordUserAttribution({
+      userId: user.id,
+      email: user.email ?? null,
+      signupMethod: "google_oauth",
+      attribution: state.attribution ?? null,
+      attributionSource: state.attribution ? "oauth_state" : "oauth_state_missing",
+    });
   }
 
   // Reuse cookieStore from nonce check above to identify sb-* cookies to clear
@@ -888,8 +911,7 @@ export async function GET(request: Request) {
     // real marketing referrer captured before the OAuth bounce.
     const clientIp = getClientIp(request);
     trackServerEvent(user.id, "user_signed_up", {
-      ...(state.utm ?? {}),
-      signup_referrer: state.signup_referrer ?? undefined,
+      ...attributionMetadata,
       google_email: user.email,
       signup_method: "google_oauth",
       ...(clientIp ? { $ip: clientIp } : {}),

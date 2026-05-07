@@ -8,7 +8,13 @@ import "./sonner.css";
 import "./globals.css";
 
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
-import { UTM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
+import {
+  ATTRIBUTION_COOKIE_NAME,
+  ATTRIBUTION_PARAM_KEYS,
+  ATTRIBUTION_VERSION,
+  UTM_KEYS,
+  UTM_STORAGE_PREFIX,
+} from "@/lib/utm";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { GadsConversionTracker } from "@/components/gads-conversion-tracker";
 import { getSession } from "@/lib/session";
@@ -118,7 +124,15 @@ export default async function RootLayout({
           {getLocalePreferenceBootstrapScript()}
         </Script>
         <Script id="utm-persist" strategy="beforeInteractive">
-          {`(function(){try{var u=new URLSearchParams(location.search),k=${JSON.stringify(UTM_KEYS)},s=sessionStorage,p="${UTM_STORAGE_PREFIX}";if(k.some(function(x){return u.has(x)})){k.forEach(function(x){var v=u.get(x);if(v)s.setItem(p+x,v);else s.removeItem(p+x)})}if(document.referrer&&!s.getItem(p+"referrer")){try{var r=new URL(document.referrer);if(r.hostname!==location.hostname)s.setItem(p+"referrer",document.referrer)}catch(e){}}}catch(e){}})()`}
+          {`(function(){try{var u=new URLSearchParams(location.search),utm=${JSON.stringify(UTM_KEYS)},all=${JSON.stringify(ATTRIBUTION_PARAM_KEYS)},s=sessionStorage,p="${UTM_STORAGE_PREFIX}",cookie="${ATTRIBUTION_COOKIE_NAME}",internal=${JSON.stringify(["accounts.google.com","checkout.stripe.com","billing.stripe.com"])};
+function clean(v){return typeof v==="string"&&v.trim()?v.trim().slice(0,512):null}
+function domain(v){try{return new URL(v).hostname.replace(/^www\\./,"")}catch(e){return String(v||"").replace(/^https?:\\/\\//,"").replace(/^www\\./,"").split("/")[0]||null}}
+function isInternalRef(v){var d=domain(v),h=location.hostname.replace(/^www\\./,"");return !!d&&(d===h||internal.indexOf(d)>=0)}
+function getCookie(name){return document.cookie.split(";").map(function(x){return x.trim()}).find(function(x){return x.indexOf(name+"=")===0})}
+if(utm.some(function(x){return u.has(x)})){utm.forEach(function(x){var v=clean(u.get(x));if(v)s.setItem(p+x,v);else s.removeItem(p+x)})}
+if(document.referrer&&!s.getItem(p+"referrer")&&!isInternalRef(document.referrer)){s.setItem(p+"referrer",document.referrer)}
+if(!getCookie(cookie)){var a={version:${ATTRIBUTION_VERSION},first_landing_url:location.href.slice(0,512),first_landing_path:(location.pathname+location.search).slice(0,512),attribution_captured_at:new Date().toISOString()};all.forEach(function(x){var v=clean(u.get(x))||clean(s.getItem(p+x));if(v)a[x]=v});var r=s.getItem(p+"referrer");if(r&&!isInternalRef(r)){a.signup_referrer=r;a.signup_referrer_domain=domain(r)}document.cookie=cookie+"="+encodeURIComponent(JSON.stringify(a))+"; path=/; max-age=15552000; SameSite=Lax"}
+}catch(e){}})()`}
         </Script>
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GADS_CONVERSION_ID}`}

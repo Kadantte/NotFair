@@ -117,6 +117,28 @@ vi.mock("@/lib/db", () => {
         customerIds: "customer_ids",
         accessToken: "access_token",
       },
+      userAttribution: {
+        userId: "user_id",
+        email: "email",
+        signupMethod: "signup_method",
+        source: "source",
+        medium: "medium",
+        campaign: "campaign",
+        term: "term",
+        content: "content",
+        gclid: "gclid",
+        fbclid: "fbclid",
+        rdtCid: "rdt_cid",
+        firstLandingUrl: "first_landing_url",
+        firstLandingPath: "first_landing_path",
+        signupReferrer: "signup_referrer",
+        signupReferrerDomain: "signup_referrer_domain",
+        attributionCapturedAt: "attribution_captured_at",
+        attributionSource: "attribution_source",
+        attributionVersion: "attribution_version",
+        rawAttribution: "raw_attribution",
+        updatedAt: "updated_at",
+      },
       adPlatformConnections: {
         userId: "user_id",
         platform: "platform",
@@ -135,6 +157,12 @@ function encodeState(overrides: Record<string, unknown> = {}) {
 
 function makeRequest(url: string): Request {
   return new Request(url);
+}
+
+function findSessionInsert() {
+  return mockInsertValues.mock.calls
+    .map((call) => call[0] as Record<string, unknown>)
+    .find((row) => Object.prototype.hasOwnProperty.call(row, "accessToken"));
 }
 
 describe("Auth callback route — GET", () => {
@@ -324,9 +352,10 @@ describe("Auth callback route — GET", () => {
     );
 
     expect(mockInsertValues).toHaveBeenCalled();
-    const insertedRow = mockInsertValues.mock.calls[0][0];
-    expect(insertedRow.customerId).toBe("5555555555");
-    expect(insertedRow.loginCustomerId).toBe("9999999999");
+    const insertedRow = findSessionInsert();
+    expect(insertedRow).toBeDefined();
+    expect(insertedRow?.customerId).toBe("5555555555");
+    expect(insertedRow?.loginCustomerId).toBe("9999999999");
   });
 
   it("stores pre-validated accounts (with loginCustomerId) on the pending session for multi-account flow", async () => {
@@ -352,10 +381,11 @@ describe("Auth callback route — GET", () => {
     // accounts live on the pending mcp_sessions row, not the URL.
     expect(response.headers.get("location")).toContain("/manage-ads-accounts");
     expect(mockInsertValues).toHaveBeenCalled();
-    const insertedRow = mockInsertValues.mock.calls[0][0];
-    expect(insertedRow.customerId).toBe("");
-    expect(insertedRow.customerIds).toBeTruthy();
-    const stored = JSON.parse(insertedRow.customerIds);
+    const insertedRow = findSessionInsert();
+    expect(insertedRow).toBeDefined();
+    expect(insertedRow?.customerId).toBe("");
+    expect(insertedRow?.customerIds).toBeTruthy();
+    const stored = JSON.parse(insertedRow?.customerIds as string);
     // Both entries carry an explicit loginCustomerId — null for direct, manager
     // id for manager-routed. authForAccount relies on the field being present
     // (not just truthy) to distinguish direct from legacy fallback.
@@ -495,7 +525,7 @@ describe("Auth callback route — GET", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/tools");
     expect(mockUpdateWhere).toHaveBeenCalled();
-    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(findSessionInsert()).toBeUndefined();
     expect(mockListConnectableAccounts).not.toHaveBeenCalled();
     expect(response.cookies.get("adsagent_token")?.value).toBe("existing-token");
   });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { initPostHog, trackPageView, trackEvent, type BootstrapUser } from '@/lib/analytics';
+import { identifyUser, initPostHog, trackPageView, trackEvent, type BootstrapUser } from '@/lib/analytics';
 import posthog from 'posthog-js';
 import { UTM_KEYS, UTM_STORAGE_PREFIX } from '@/lib/utm';
 
@@ -41,8 +41,26 @@ export function PostHogProvider({
     const prevPathRef = useRef<string | null>(null);
 
     useEffect(() => {
-        initPostHog(bootstrapUser);
+        initPostHog();
         consumeConnectEventCookie();
+
+        if (bootstrapUser?.distinctId) {
+            try {
+                const currentDistinctId = posthog.get_distinct_id?.();
+                const aliasKey = `nf_ph_alias_${bootstrapUser.distinctId}`;
+                if (
+                    currentDistinctId &&
+                    currentDistinctId !== bootstrapUser.distinctId &&
+                    !localStorage.getItem(aliasKey)
+                ) {
+                    posthog.alias(bootstrapUser.distinctId, currentDistinctId);
+                    localStorage.setItem(aliasKey, '1');
+                }
+                identifyUser(bootstrapUser.distinctId, bootstrapUser.properties);
+            } catch {
+                identifyUser(bootstrapUser.distinctId, bootstrapUser.properties);
+            }
+        }
 
         // Set UTM attribution as person properties from sessionStorage
         try {

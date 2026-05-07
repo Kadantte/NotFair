@@ -1,5 +1,6 @@
 import { GoogleAdsClaudeCodePluginSetupPage } from "@/components/marketing/google-ads-claude-code-plugin-setup-page";
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
+import { GOOGLE_ADS_AUDIT_PROMPT } from "@/lib/prompts";
 
 export const metadata = buildMetadata({
   title: "Google Ads Claude Code Plugin — Setup Guide for NotFair",
@@ -91,7 +92,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 4,
         name: "Ask Claude about your Google Ads",
-        text: "Try a prompt like 'Audit my connected Google Ads account and prioritize the 3 changes most likely to improve performance. For each one, show the evidence, expected upside, and exact change you recommend I approve, and create a live dashboard for me for ongoing monitoring.' Claude calls NotFair tools and answers with live data.",
+        text: `Try a prompt like '${GOOGLE_ADS_AUDIT_PROMPT}' Claude calls NotFair tools and answers with live data.`,
         url: new URL("/google-ads-claude-code-plugin-setup-guide#step-4", SITE_URL).toString(),
       },
     ],
