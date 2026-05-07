@@ -22,8 +22,8 @@ const {
     mockSelectChain: vi.fn(),
     mockGetUser: vi.fn(),
     mockReadUserIdFromSupabase: vi.fn(() => false),
-    mockReadGoogleFromConnections: vi.fn(() => false),
-    mockLoadGoogleConnection: vi.fn(async () => null),
+    mockReadGoogleFromConnections: vi.fn(() => true),
+    mockLoadGoogleConnection: vi.fn(async () => null as unknown),
   };
 });
 
@@ -114,7 +114,7 @@ vi.mock("@/lib/connections/feature-flags", () => ({
 }));
 
 vi.mock("@/lib/connections/google-read", () => ({
-  loadGoogleConnection: (...args: unknown[]) => mockLoadGoogleConnection(...args),
+  loadGoogleConnection: () => mockLoadGoogleConnection(),
   compareForShadowRead: vi.fn(),
 }));
 
@@ -128,31 +128,42 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { getSession } from "@/lib/session";
 
-// ─── Tests ──────────────────────────────────────────────────────────
+// ─── Test data ──────────────────────────────────────────────────────
 
 const SUPABASE_USER = {
   id: "supabase-user-uuid-1234",
   email: "user@example.com",
 };
 
-const MCP_ROW = {
-  accessToken: "session-cookie-token",
-  refreshToken: "rt",
+const CONNECTION_VIEW = {
+  refreshToken: "rt-from-connection",
   customerId: "111",
-  customerIds: '[{"id":"111","name":"Acct"}]',
+  customerIds: [{ id: "111", name: "Acct" }],
+  loginCustomerId: null,
+  googleEmail: null,
+};
+
+const LEGACY_TOKEN_ROW = { accessToken: "legacy-bearer-token" };
+
+const COOKIE_PATH_MCP_ROW = {
+  refreshToken: "rt-from-mcp",
+  customerId: "999",
+  customerIds: '[{"id":"999","name":"Cookie Acct"}]',
   loginCustomerId: null,
   userId: SUPABASE_USER.id,
   googleEmail: SUPABASE_USER.email,
 };
 
-describe("Phase-4 step 1 — Supabase-first userId resolution", () => {
+// ─── Tests ──────────────────────────────────────────────────────────
+
+describe("Phase-4 step 1 — Supabase-anchored session loader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCookies._clear();
     mockReadUserIdFromSupabase.mockReturnValue(false);
-    mockReadGoogleFromConnections.mockReturnValue(false);
+    mockReadGoogleFromConnections.mockReturnValue(true);
     mockGetUser.mockReturnValue(null);
-    // Default: empty for any DB select. Tests override with mockResolvedValueOnce.
+    mockLoadGoogleConnection.mockResolvedValue(null);
     mockSelectChain.mockResolvedValue([]);
   });
 
@@ -160,7 +171,9 @@ describe("Phase-4 step 1 — Supabase-first userId resolution", () => {
     mockReadUserIdFromSupabase.mockReturnValue(false);
     mockCookies._set("adsagent_token", "session-cookie-token");
     // 1: cookie-keyed mcp_sessions row.  2: meta connection (none).
-    mockSelectChain.mockResolvedValueOnce([MCP_ROW]).mockResolvedValueOnce([]);
+    mockSelectChain
+      .mockResolvedValueOnce([COOKIE_PATH_MCP_ROW])
+      .mockResolvedValueOnce([]);
 
     const session = await getSession();
 
@@ -168,75 +181,85 @@ describe("Phase-4 step 1 — Supabase-first userId resolution", () => {
     expect(mockGetUser).not.toHaveBeenCalled();
   });
 
-  it("flag on + supabase user present — looks up mcp_sessions by user_id", async () => {
+  it("flag on + supabase user + connection — row sourced from connection, NOT from mcp_sessions", async () => {
     mockReadUserIdFromSupabase.mockReturnValue(true);
     mockGetUser.mockReturnValue(SUPABASE_USER);
-    // 1: user_id-keyed mcp_sessions row.  2: meta connection (none).
-    mockSelectChain.mockResolvedValueOnce([MCP_ROW]).mockResolvedValueOnce([]);
+    mockLoadGoogleConnection.mockResolvedValueOnce(CONNECTION_VIEW);
+    // 1: legacy mcp_sessions for Session.token. 2: meta connection (none).
+    mockSelectChain
+      .mockResolvedValueOnce([LEGACY_TOKEN_ROW])
+      .mockResolvedValueOnce([]);
 
     const session = await getSession();
 
     expect(session.connected).toBe(true);
     if (session.connected) {
       expect(session.userId).toBe(SUPABASE_USER.id);
+      // customerId comes from the CONNECTION view, not from mcp_sessions
+      expect(session.customerId).toBe(CONNECTION_VIEW.customerId);
       expect(session.googleEmail).toBe(SUPABASE_USER.email);
+      // Legacy token still surfaced (until phase 3 retires direct-bearer)
+      expect(session.token).toBe(LEGACY_TOKEN_ROW.accessToken);
     }
-    expect(mockGetUser).toHaveBeenCalled();
+    expect(mockLoadGoogleConnection).toHaveBeenCalled();
   });
 
-  it("flag on + no supabase user — falls through to adsagent_token cookie path", async () => {
-    mockReadUserIdFromSupabase.mockReturnValue(true);
-    mockGetUser.mockReturnValue(null); // no Supabase session
-    mockCookies._set("adsagent_token", "session-cookie-token");
-    // 1: cookie-keyed mcp_sessions row.  2: meta connection (none).
-    mockSelectChain.mockResolvedValueOnce([MCP_ROW]).mockResolvedValueOnce([]);
-
-    const session = await getSession();
-
-    expect(session.connected).toBe(true);
-    expect(mockGetUser).toHaveBeenCalled();
-  });
-
-  it("flag on + supabase user but no live mcp_sessions row — falls through to cookie path", async () => {
+  it("flag on + supabase user + NO connection — ads-less but connected", async () => {
     mockReadUserIdFromSupabase.mockReturnValue(true);
     mockGetUser.mockReturnValue(SUPABASE_USER);
-    mockCookies._set("adsagent_token", "session-cookie-token");
-    // 1: user_id-keyed (empty).  2: cookie-keyed (row).  3: meta (none).
+    mockLoadGoogleConnection.mockResolvedValueOnce(null);
+    // 1: legacy mcp_sessions for Session.token (also empty).  2: meta (none).
     mockSelectChain
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([MCP_ROW])
-      .mockResolvedValueOnce([]);
-
-    const session = await getSession();
-
-    expect(session.connected).toBe(true);
-  });
-
-  it("flag on + no supabase user + no cookie — returns disconnected", async () => {
-    mockReadUserIdFromSupabase.mockReturnValue(true);
-    mockGetUser.mockReturnValue(null);
-    // No cookies, no DB rows.
-
-    const session = await getSession();
-
-    expect(session.connected).toBe(false);
-  });
-
-  it("flag on — Supabase email overrides stale mcp_sessions.googleEmail", async () => {
-    mockReadUserIdFromSupabase.mockReturnValue(true);
-    mockGetUser.mockReturnValue({
-      id: SUPABASE_USER.id,
-      email: "current@example.com",
-    });
-    mockSelectChain
-      .mockResolvedValueOnce([{ ...MCP_ROW, googleEmail: "stale@example.com" }])
       .mockResolvedValueOnce([]);
 
     const session = await getSession();
 
     expect(session.connected).toBe(true);
     if (session.connected) {
-      // Supabase is the source of truth post-bridge.
+      expect(session.pendingSetup).toBe(true);
+      expect(session.userId).toBe(SUPABASE_USER.id);
+      expect(session.token).toBe(""); // no legacy row → empty token
+    }
+  });
+
+  it("flag on + no supabase user — falls through to legacy cookie path", async () => {
+    mockReadUserIdFromSupabase.mockReturnValue(true);
+    mockGetUser.mockReturnValue(null);
+    mockCookies._set("adsagent_token", "session-cookie-token");
+    // Cookie path: 1: mcp_sessions by accessToken. 2: meta.
+    mockSelectChain
+      .mockResolvedValueOnce([COOKIE_PATH_MCP_ROW])
+      .mockResolvedValueOnce([]);
+
+    const session = await getSession();
+
+    expect(session.connected).toBe(true);
+    expect(mockGetUser).toHaveBeenCalled();
+  });
+
+  it("flag on + no supabase user + no cookie — disconnected", async () => {
+    mockReadUserIdFromSupabase.mockReturnValue(true);
+    mockGetUser.mockReturnValue(null);
+
+    const session = await getSession();
+
+    expect(session.connected).toBe(false);
+  });
+
+  it("Supabase email beats stale connection.googleEmail", async () => {
+    mockReadUserIdFromSupabase.mockReturnValue(true);
+    mockGetUser.mockReturnValue({ id: SUPABASE_USER.id, email: "current@example.com" });
+    mockLoadGoogleConnection.mockResolvedValueOnce({
+      ...CONNECTION_VIEW,
+      googleEmail: "stale-from-connection-metadata@example.com",
+    });
+    mockSelectChain.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const session = await getSession();
+
+    expect(session.connected).toBe(true);
+    if (session.connected) {
       expect(session.googleEmail).toBe("current@example.com");
     }
   });

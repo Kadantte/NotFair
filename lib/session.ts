@@ -75,24 +75,9 @@ type LoadSessionResult = {
  * back-compat with rows that haven't been dual-written yet. The
  * `mergeWithConnection` step below replaces those fields with values from
  * `ad_platform_connections` when `READ_GOOGLE_FROM_CONNECTIONS=true`.
- *
- * Phase-4 step 1 note: when `READ_USERID_FROM_SUPABASE=true`, identity comes
- * from the Supabase session cookie (refreshed by middleware) and we look up
- * the user's mcp_sessions row by `user_id` rather than by `access_token`.
- * This severs identity resolution from the `adsagent_token` cookie so
- * step 3 can drop it entirely. Falls back to the cookie path when no
- * Supabase user is present.
  */
 async function loadDeviceSession(): Promise<LoadSessionResult | null> {
   const cookieStore = await cookies();
-
-  // Phase-4 step 1: try Supabase Auth first.
-  if (readUserIdFromSupabase()) {
-    const supabaseResult = await loadDeviceSessionViaSupabase();
-    if (supabaseResult) return supabaseResult;
-    // No Supabase user → fall through to cookie path so existing users who
-    // haven't re-signed-in since the bridge flipped keep working.
-  }
 
   const token = cookieStore.get(COOKIE_NAMES.token)?.value;
 
@@ -164,85 +149,52 @@ async function loadDeviceSession(): Promise<LoadSessionResult | null> {
 }
 
 /**
- * Phase-4 step 1: Supabase-anchored device-session loader.
+ * Phase-4 step 1: Supabase-anchored session loader.
  *
- * Resolves identity from the Supabase Auth cookies (refreshed per request by
- * the proxy middleware), then looks up the user's mcp_sessions row by
- * `user_id`. Returns null when:
- *   - No Supabase user (caller falls through to the legacy cookie path).
- *   - Supabase user present but no live mcp_sessions row (caller falls
- *     through; this can happen for users mid-onboarding or with corrupted
- *     state — step 2 will make this state expected for new signups, at
- *     which point we'll synthesize a SessionRow from ad_platform_connections
- *     instead).
+ * Identifies the user via Supabase Auth cookies (refreshed per protected
+ * request by `lib/supabase/middleware.ts` after the phase-2
+ * `SUPABASE_SESSION_BRIDGE` flip), then loads connection state directly from
+ * `ad_platform_connections`. Skips `mcp_sessions` for everything except:
+ *   - The optional legacy `Session.token` (still surfaced on /connect for
+ *     direct-bearer setup display; phase 3 retires this).
+ *   - Dev impersonation, which still uses `mcp_sessions.id` cookie values
+ *     (step 4 migrates the cookie to userId uuid).
  *
- * Dev impersonation: the impersonation cookie still uses `mcp_sessions.id`
- * (int) values in step 1. We honor it the same way as the cookie path —
- * read the impersonate cookie, look up by id, swap target. Step 4 migrates
- * the cookie value to userId (uuid).
+ * Returns null when no Supabase user is present — caller falls through to
+ * the legacy cookie path so users who haven't re-signed-in since the bridge
+ * flipped keep working.
+ *
+ * Implication: post-step-1, callers should NOT run `mergeWithConnection`
+ * over the result — the row is already connection-sourced. The dispatcher
+ * (`loadSessionRow`) takes care of skipping it.
  */
-async function loadDeviceSessionViaSupabase(): Promise<LoadSessionResult | null> {
+async function loadSessionViaSupabase(): Promise<LoadSessionResult | null> {
   const supabase = await createSupabaseServerClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
   if (!supabaseUser) return null;
 
+  let userId = supabaseUser.id;
+  let googleEmail: string | null = supabaseUser.email ?? null;
+  let impersonating: LoadSessionResult["impersonating"] | undefined;
+
+  // Dev impersonation — still uses `mcp_sessions.id` (int) cookie values.
+  // Resolve the target's userId + email from mcp_sessions, then proceed
+  // with the connection lookup against the *target* user. Step 4 migrates
+  // the impersonate cookie to userId (uuid) which removes this lookup.
   const cookieStore = await cookies();
-
-  const [realRow] = await db()
-    .select({
-      accessToken: schema.mcpSessions.accessToken,
-      refreshToken: schema.mcpSessions.refreshToken,
-      customerId: schema.mcpSessions.customerId,
-      customerIds: schema.mcpSessions.customerIds,
-      loginCustomerId: schema.mcpSessions.loginCustomerId,
-      userId: schema.mcpSessions.userId,
-      googleEmail: schema.mcpSessions.googleEmail,
-    })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.userId, supabaseUser.id),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .orderBy(desc(schema.mcpSessions.createdAt))
-    .limit(1);
-
-  if (!realRow) return null;
-
-  // Email source-of-truth swap: trust Supabase's email over mcp_sessions.
-  // Supabase Auth keeps it current via OIDC; mcp_sessions.googleEmail is
-  // a one-time copy that can drift if a user ever reconnects with a
-  // different Google identity.
-  const googleEmail = supabaseUser.email ?? realRow.googleEmail;
-
-  const row: SessionRow = {
-    refreshToken: realRow.refreshToken,
-    customerId: realRow.customerId,
-    customerIds: realRow.customerIds,
-    loginCustomerId: realRow.loginCustomerId ?? null,
-    userId: realRow.userId ?? supabaseUser.id,
-    googleEmail,
-  };
-
-  // Dev impersonation — same int-id semantics as the cookie path. Step 4
-  // migrates this cookie value to userId (uuid).
   const impersonateId = cookieStore.get(COOKIE_NAMES.impersonate)?.value;
-  if (impersonateId && googleEmail && DEV_EMAILS.includes(googleEmail)) {
-    if (!/^\d+$/.test(impersonateId)) {
-      return { token: realRow.accessToken, row };
-    }
+  if (
+    impersonateId
+    && googleEmail
+    && DEV_EMAILS.includes(googleEmail)
+    && /^\d+$/.test(impersonateId)
+  ) {
     const sessionId = parseInt(impersonateId, 10);
-
     const [targetRow] = await db()
       .select({
-        accessToken: schema.mcpSessions.accessToken,
-        refreshToken: schema.mcpSessions.refreshToken,
-        customerId: schema.mcpSessions.customerId,
-        customerIds: schema.mcpSessions.customerIds,
-        loginCustomerId: schema.mcpSessions.loginCustomerId,
         userId: schema.mcpSessions.userId,
         googleEmail: schema.mcpSessions.googleEmail,
+        customerId: schema.mcpSessions.customerId,
       })
       .from(schema.mcpSessions)
       .where(
@@ -253,23 +205,61 @@ async function loadDeviceSessionViaSupabase(): Promise<LoadSessionResult | null>
       )
       .limit(1);
 
-    if (!targetRow || !targetRow.customerId) return null;
+    if (!targetRow || !targetRow.userId || !targetRow.customerId) {
+      // Target session missing or ads-less — never let a dev impersonate a
+      // placeholder session, the whole point is to read real ads data.
+      return null;
+    }
 
-    return {
-      token: targetRow.accessToken,
-      row: {
-        refreshToken: targetRow.refreshToken,
-        customerId: targetRow.customerId,
-        customerIds: targetRow.customerIds,
-        loginCustomerId: targetRow.loginCustomerId ?? null,
-        userId: targetRow.userId ?? null,
-        googleEmail: targetRow.googleEmail,
-      },
-      impersonating: { sessionId, realEmail: googleEmail },
-    };
+    impersonating = { sessionId, realEmail: googleEmail };
+    userId = targetRow.userId;
+    googleEmail = targetRow.googleEmail;
   }
 
-  return { token: realRow.accessToken, row };
+  // Connection is the source of truth for Google ads state. With
+  // READ_USERID_FROM_SUPABASE=true we skip `mergeWithConnection` entirely;
+  // the row is built here.
+  const conn = await loadGoogleConnection(userId);
+
+  // Optional legacy lookup for `Session.token` — surfaced on /connect for
+  // direct-bearer Bearer-token setup. Phase 3 retires this consumer; until
+  // then a missing row degrades cleanly (UI hides the direct-bearer block).
+  const [legacyTokenRow] = await db()
+    .select({ accessToken: schema.mcpSessions.accessToken })
+    .from(schema.mcpSessions)
+    .where(
+      and(
+        eq(schema.mcpSessions.userId, userId),
+        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+      ),
+    )
+    .orderBy(desc(schema.mcpSessions.createdAt))
+    .limit(1);
+
+  const row: SessionRow = conn
+    ? {
+        refreshToken: conn.refreshToken,
+        customerId: conn.customerId,
+        customerIds: stringifyCustomerIds(conn.customerIds),
+        loginCustomerId: conn.loginCustomerId,
+        userId,
+        // Supabase email beats connection metadata (current via OIDC).
+        googleEmail: googleEmail ?? conn.googleEmail,
+      }
+    : {
+        refreshToken: "",
+        customerId: "",
+        customerIds: "[]",
+        loginCustomerId: null,
+        userId,
+        googleEmail,
+      };
+
+  return {
+    token: legacyTokenRow?.accessToken ?? "",
+    row,
+    ...(impersonating ? { impersonating } : {}),
+  };
 }
 
 /**
@@ -340,6 +330,14 @@ function stringifyCustomerIds(accounts: ConnectedAccount[]): string {
 }
 
 async function loadSessionRow(source: string): Promise<LoadSessionResult | null> {
+  // Phase-4 step 1: when on, prefer the Supabase-anchored loader. Its result
+  // is already connection-sourced — skip `mergeWithConnection`. Falls back to
+  // the legacy cookie path when no Supabase session is present.
+  if (readUserIdFromSupabase()) {
+    const supaResult = await loadSessionViaSupabase();
+    if (supaResult) return supaResult;
+  }
+
   const result = await loadDeviceSession();
   if (!result) return null;
   return mergeWithConnection({ result, source });
