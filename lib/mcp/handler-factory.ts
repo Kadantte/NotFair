@@ -228,6 +228,14 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
             name: a.name ?? "",
           }));
           const userAgent = request.headers.get("user-agent") ?? null;
+          trackServerEvent(conn.userId ?? null, "mcp_oauth_used", {
+            client_name: null,
+            client_version: null,
+            resource_url: config.resourceUrlPath,
+            platform: config.platform,
+            binding: "connection",
+            user_agent: userAgent,
+          });
           return {
             refreshToken: conn.refreshToken,
             customerId: conn.activeAccountId ?? "",
@@ -316,6 +324,14 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
                 name: a.name ?? "",
                 ...("loginCustomerId" in a ? { loginCustomerId: a.loginCustomerId } : {}),
               }));
+              trackServerEvent(conn.userId ?? null, "mcp_oauth_used", {
+                client_name: null,
+                client_version: null,
+                resource_url: config.resourceUrlPath,
+                platform: config.platform,
+                binding: "connection",
+                user_agent: userAgent,
+              });
               return {
                 refreshToken: conn.refreshToken,
                 customerId: conn.activeAccountId,
@@ -345,7 +361,17 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
                 ),
               )
               .limit(1);
-            if (row) session = row.session;
+            if (row) {
+              session = row.session;
+              trackServerEvent(row.session.userId ?? null, "mcp_oauth_used", {
+                client_name: row.session.clientName ?? null,
+                client_version: row.session.clientVersion ?? null,
+                resource_url: config.resourceUrlPath,
+                platform: config.platform,
+                binding: "session",
+                user_agent: userAgent,
+              });
+            }
           }
           // Both null is impossible per the XOR CHECK on oauth_access_tokens.
         }
