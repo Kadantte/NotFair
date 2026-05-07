@@ -42,7 +42,9 @@ Use this when the user asks anything like "audit my account", "how is my Google 
 ## The one-call pattern
 
 \`ads.gaqlParallel\` takes \`[{name, query, limit?}, ...]\` and returns
-\`{ [name]: GaqlReport | { error } }\`. Destructure by name, read \`.rows\`.
+\`{ [name]: GaqlReport }\`. It fails the whole call if any subquery errors.
+Only pass \`{ partial: true }\` when you explicitly want \`{ error }\` entries
+mixed with successful reports. Destructure by name, read \`.rows\`.
 
 \`\`\`js
 const r = await ads.gaqlParallel([
@@ -139,7 +141,9 @@ Use this when the user asks "why did my CPA go up", "what happened to conversion
 ## The one-call pattern
 
 \`ads.gaqlParallel\` takes \`[{name, query, limit?}, ...]\` and returns
-\`{ [name]: GaqlReport | { error } }\`. Destructure by name, read \`.rows\`.
+\`{ [name]: GaqlReport }\`. It fails the whole call if any subquery errors.
+Only pass \`{ partial: true }\` when you explicitly want \`{ error }\` entries
+mixed with successful reports. Destructure by name, read \`.rows\`.
 
 \`\`\`js
 const r = await ads.gaqlParallel([

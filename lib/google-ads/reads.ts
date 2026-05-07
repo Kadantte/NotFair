@@ -1899,7 +1899,7 @@ export function enrichGaqlError(message: string): string {
         return `${message} Tip: \`${field}\` is a virtual field added by the MCP after the query runs — it does not exist in the GAQL schema and cannot be used in SELECT or WHERE. Instead, select the raw field (\`${rawField}\`) and the MCP will automatically attach \`${field}\` to every result row.`;
       }
     }
-    return `${message} Tip: call getResourceMetadata('<resource>') to discover valid fields before retrying.`;
+    return `${message} Tip: discover valid fields with the getResourceMetadata tool before retrying. Use the resource in your FROM clause — for example, if the query says \`FROM campaign\`, call \`getResourceMetadata('campaign')\`; if it says \`FROM search_term_view\`, call \`getResourceMetadata('search_term_view')\`.`;
   }
   if (/incompatible with the resource in the FROM clause/i.test(message)) {
     return `${message} Tip: this metric is not selectable on that resource. Try a different FROM (e.g. metrics.cost_micros lives on campaign/ad_group/keyword_view, not on conversion_action). To break down metrics by conversion action, query FROM campaign (or ad_group) and SELECT segments.conversion_action_name.`;
@@ -1915,7 +1915,7 @@ export function enrichGaqlError(message: string): string {
     return `${message} Tip: add \`${field}\` to the SELECT clause (Google requires that any field used in WHERE/ORDER BY also be selected), or drop it from WHERE if you don't need to filter on it.`;
   }
   if (/Invalid enum value cannot be included in WHERE clause/i.test(message)) {
-    return `${message} Tip: enum fields take STRING names, not numeric codes — write \`campaign.status = 'PAUSED'\`, not \`campaign.status = 3\`. Common enum names: status (ENABLED, PAUSED, REMOVED), advertising_channel_type (SEARCH, DISPLAY, SHOPPING, PERFORMANCE_MAX, VIDEO). Call getResourceMetadata('<resource>') for the full set.`;
+    return `${message} Tip: enum fields take STRING names, not numeric codes — write \`campaign.status = 'PAUSED'\`, not \`campaign.status = 3\`. Common enum names: status (ENABLED, PAUSED, REMOVED), advertising_channel_type (SEARCH, DISPLAY, SHOPPING, PERFORMANCE_MAX, VIDEO). For the full set, call getResourceMetadata with the FROM resource, e.g. \`getResourceMetadata('campaign')\`.`;
   }
   if (
     /unsupported metric is found in SELECT or WHERE clause/i.test(message) ||
@@ -2030,7 +2030,7 @@ export function validateEnumLiteralsInWhere(query: string) {
   throw new Error(
     "GAQL pre-flight: enum fields take STRING names in WHERE, not numeric codes.\n" +
       lines.join("\n") +
-      "\nExample fix: `WHERE campaign.status = 'PAUSED'` (not `= 3`). Call getResourceMetadata('<resource>') if you need the full enum.",
+      "\nExample fix: `WHERE campaign.status = 'PAUSED'` (not `= 3`). If you need the full enum, call getResourceMetadata with the FROM resource, e.g. `getResourceMetadata('campaign')`.",
   );
 }
 

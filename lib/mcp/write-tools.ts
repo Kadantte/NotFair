@@ -292,7 +292,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("addKeyword", {
-    description: "Add a keyword to an ad group (starts enabled). Returns changeId.",
+    description: "Create/add a new positive keyword in an ad group (starts enabled). Use this for a single new keyword; use bulkAddKeywords to create many positive keywords at once. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -1144,7 +1144,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("bulkAddKeywords", {
-    description: "Add up to 100 keywords to an ad group in one call. Atomic by default: the server pre-validates every item and executes nothing if any keyword fails static checks such as duplicates, invalid syntax, removed parents, or negative-keyword conflicts. Set continueOnError=true to skip invalid items and add the valid subset. Set dryRun=true to validate only. Returns per-keyword results with individual changeIds when executed.",
+    description: "Bulk-create/add up to 100 new positive keywords to an ad group in one call. This is the bulk variant of addKeyword/create keyword. Atomic by default: the server pre-validates every item and executes nothing if any keyword fails static checks such as duplicates, invalid syntax, removed parents, or negative-keyword conflicts. Set continueOnError=true to skip invalid items and add the valid subset. Set dryRun=true to validate only. Returns per-keyword results with individual changeIds when executed.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string().describe("Campaign ID (for logging)"),
@@ -1507,7 +1507,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
   }));
 
   server.registerTool("updateConversionAction", {
-    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename. Call getConversionActions first and only pass IDs where `mutable: true`; conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, and manager-inherited actions are read-only via the API. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
+    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename. Call getConversionActions first and only pass IDs where `mutable: true`; conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, local_services_* / Local Services Ads actions, and manager-inherited actions are read-only or Google-managed via the API. LSA conversion names may appear in segments.conversion_action_name without appearing as mutable FROM conversion_action rows. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       conversionActionId: z.string().describe("Conversion action ID (query conversion_action via runScript)"),

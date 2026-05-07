@@ -37,6 +37,19 @@ Async RPCs:
 - ads.gaqlParallel([{name, query, limit?}, ...], options?) -> { [name]: GaqlReport } — max 20 per call. USE THIS for multi-surface analysis. Fails the whole call if any subquery errors; pass \`{ partial: true }\` only when you explicitly want \`{ error }\` entries mixed with successful reports.
 - options.excludeRemovedParents defaults to true. Rows under REMOVED campaigns/ad groups are filtered out server-side because most audits need current serving state. Pass \`{ excludeRemovedParents: false }\` only for historical analysis.
 
+Canonical gaqlParallel shape:
+
+  const r = await ads.gaqlParallel([
+    { name: "campaigns", query: \`SELECT campaign.id, campaign.name, metrics.cost_micros FROM campaign WHERE segments.date DURING LAST_30_DAYS\`, limit: 50 },
+    { name: "searchTerms", query: \`SELECT search_term_view.search_term, metrics.clicks, metrics.conversions FROM search_term_view WHERE segments.date DURING LAST_30_DAYS\`, limit: 100 },
+  ]);
+  const campaigns = r.campaigns.rows ?? [];
+
+For intentional partial success:
+
+  const r = await ads.gaqlParallel([...], { partial: true });
+  const rows = "error" in r.searchTerms ? [] : r.searchTerms.rows;
+
 Pre-built GAQL strings (sync, no RPC cost):
 - Parameterless: ads.queries.accountInfo | geoTargeting | qualityScores | adGroups | conversionActions | audienceSegmentCheck | negativeKeywords | campaignAssets | adGroupAssets | sharedNegativeKeywordLists | sharedNegativeKeywordMembers | pausedCampaigns | customerManagerLinks
 - Date-windowed builders (call with YYYY-MM-DD): ads.queries.campaigns(start,end) | keywords | searchTerms | convertingSearchTerms | zeroConversionKeywords | ads | devicePerformance | networkSegmentation | landingPages | changeEvents | dailyCampaignMetrics
@@ -68,8 +81,9 @@ Note: \`change_event\` only supports the last 30 days regardless of how you expr
 ── COMMON GOTCHAS (the validator will reject these before they reach Google) ──
 
 - **change_event REQUIRES \`change_event.change_date_time\` in WHERE.** \`segments.date DURING ...\` does NOT work for this resource (Google rejects with change_event_error=3). Window cap is 30 rolling days. Easiest: \`ads.queries.changeEvents(start, end)\` builds the right shape.
-- **Enums in WHERE are STRING names, not numbers.** Write \`WHERE campaign.status = 'PAUSED'\`, never \`= 3\`. Same for \`ad_group.status\`, \`ad_group_ad.status\`, \`ad_group_criterion.status\`, \`conversion_action.status\`, \`asset_group.status\`. Valid status values: ENABLED, PAUSED, REMOVED. Call \`getResourceMetadata('<resource>')\` for other enums (advertising_channel_type, bidding_strategy_type, etc.).
+- **Enums in WHERE are STRING names, not numbers.** Write \`WHERE campaign.status = 'PAUSED'\`, never \`= 3\`. Same for \`ad_group.status\`, \`ad_group_ad.status\`, \`ad_group_criterion.status\`, \`conversion_action.status\`, \`asset_group.status\`. Valid status values: ENABLED, PAUSED, REMOVED. For other enums (advertising_channel_type, bidding_strategy_type, etc.), call \`getResourceMetadata\` with the query's FROM resource, e.g. \`getResourceMetadata('campaign')\`.
 - **\`metrics.*\` is NOT selectable from \`FROM conversion_action\`.** That resource carries dimensional fields only (name, type, status, counting). To break down metric counts by conversion action: query \`FROM campaign\` (or \`ad_group\`) and SELECT \`segments.conversion_action_name\`. To list configured actions: drop the metrics and keep only \`conversion_action.*\` fields.
+- **Local Services conversion actions are often segment-only.** LSA / \`local_services_*\` conversion names can appear in \`segments.conversion_action_name\` but not as mutable rows in \`FROM conversion_action\`. If they are absent from \`getConversionActions\` or show \`mutable: false\`, treat them as Google-managed/read-only and do not call \`updateConversionAction\`.
 - **\`segments.conversion_action_name\` and friends don't pair with \`metrics.cost_micros\`.** Google reports cost at the campaign/ad_group level, not per conversion action — pick one or the other (query_error=53). For per-action cost-per-conversion, divide \`cost_micros\` (campaign-total) by per-action \`metrics.conversions\` in-script.
 - **Fields used in WHERE must also be in SELECT** (query_error=16). The server auto-injects \`campaign.status\`/\`ad_group.status\` for REMOVED-parent filters and promotes non-date \`segments.*\` predicate fields into SELECT automatically. Date segments are left unselected to avoid changing row granularity.
 

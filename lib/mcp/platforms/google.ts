@@ -44,7 +44,9 @@ Tool-selection heuristic — pick ONE path per user question:
    \`\`\`
 
    Example — parallel fan-out for an audit (gaqlParallel takes
-   [{name, query, limit?}, ...] and returns { [name]: GaqlReport }):
+   [{name, query, limit?}, ...] and returns { [name]: GaqlReport }.
+   It fails the whole call if any subquery errors; pass { partial: true }
+   only when you intentionally want mixed successes and { error } entries):
    \`\`\`js
    const r = await ads.gaqlParallel([
      { name: "campaigns", query: \`

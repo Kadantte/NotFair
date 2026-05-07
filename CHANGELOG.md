@@ -2,6 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## Unreleased
+
+### Changed
+- **Google Ads MCP tool guidance is more explicit for agent callers.** `runScript` now includes a copy-pasteable `ads.gaqlParallel([{ name, query, limit }])` example, documents `{ partial: true }` for intentional partial success, and clarifies Local Services / `local_services_*` conversion actions as Google-managed/read-only when they appear only through conversion-action segments. Keyword write tools now describe `addKeyword` / `bulkAddKeywords` as creating new positive keywords so agents do not invent duplicate `createKeyword` tools.
+- **GAQL schema errors now point agents at the exact metadata workflow.** Invalid-field and enum-code tips tell agents to call `getResourceMetadata` with the query's `FROM` resource instead of guessing at Google Ads field names.
+
 ## [0.3.14.1] - 2026-05-07
 
 ### Added
