@@ -94,7 +94,7 @@ export function GoogleAdsClaudeConnectorPage() {
             </p>
             <div className="mt-8 flex flex-col items-center gap-3">
               <a
-                href="https://claude.ai/settings/connectors?modal=add-custom-connector"
+                href="https://claude.ai/customize/connectors?modal=add-custom-connector"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-[#4CAF6E] px-6 py-3 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"
@@ -153,14 +153,14 @@ export function GoogleAdsClaudeConnectorPage() {
             </p>
             <div className="mt-6 flex flex-col items-center gap-3">
               <a
-                href="https://claude.ai/settings/connectors?modal=add-custom-connector"
+                href="https://claude.ai/customize/connectors?modal=add-custom-connector"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() =>
                   trackEvent("cta_clicked", {
                     page: "google-ads-claude-connector-setup-guide",
                     cta: "open_claude_connectors",
-                    destination: "https://claude.ai/settings/connectors?modal=add-custom-connector",
+                    destination: "https://claude.ai/customize/connectors?modal=add-custom-connector",
                   })
                 }
                 className="inline-flex items-center gap-2 rounded-lg bg-[#4CAF6E] px-6 py-3 text-base font-semibold text-[#1A1917] transition hover:bg-[#3D9A5C]"

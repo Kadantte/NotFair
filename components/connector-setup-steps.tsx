@@ -9,7 +9,7 @@ import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 
 type Surface = "marketing" | "in_app";
 
-const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/settings/connectors?modal=add-custom-connector";
+const CLAUDE_CONNECTORS_WEB_URL = "https://claude.ai/customize/connectors?modal=add-custom-connector";
 
 export function ConnectorSetupSteps({
   surface,
