@@ -405,6 +405,7 @@ Phase 2 already set up the bridge. This phase finishes the move.
 | `lib/session.ts` | Drop the cookie fallback path (no more `adsagent_token` reads). | 3 | pending |
 | `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. | 3 | pending |
 | `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending |
+| `app/api/oauth/authorize/route.ts` | Identify user via Supabase first (cookie fallback for legacy users). Bind new Google DCR codes to `connectionId` directly. | 2 | ✅ shipped 2026-05-07 (commit `343705a`) |
 | `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates refresh tokens natively. | 3 | pending |
 | `app/api/auth/signout/route.ts` | Replace cookie-clearing with `supabase.auth.signOut()`. | 3 | pending |
 | `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata` (Google identity provider populates these). | 4 | pending |
@@ -423,6 +424,8 @@ Users whose Supabase session expired during the phase 2 → 4 window get redirec
 #### OAuth `/authorize` flow
 
 Today `/api/oauth/authorize` reads `adsagent_token` to identify who's authorizing. After phase 4 it reads the Supabase session. Make sure the Supabase cookie is set before this phase ships — phase 2's bridge handles that.
+
+**Status (2026-05-07, commit `343705a`):** the Supabase-first identification path is live in production as an additive change — no flag. DCR Google branch tries `supabase.auth.getUser()` first; falls back to the existing `adsagent_token` cookie path when no Supabase user is present. Supabase-resolved Google flows now bind the auth code to `connectionId` directly (skipping the `/token`-time translation that the cookie path still relies on). This pre-emptively covers step 2 — without it, callback's mcp_sessions write removal would loop new users back through signin indefinitely.
 
 #### Estimated scope
 
