@@ -247,6 +247,39 @@ describe("Phase-4 step 1 — Supabase-anchored session loader", () => {
     expect(session.connected).toBe(false);
   });
 
+  it("Supabase path loads Meta accounts via the same user_id", async () => {
+    mockReadUserIdFromSupabase.mockReturnValue(true);
+    mockGetUser.mockReturnValue(SUPABASE_USER);
+    mockLoadGoogleConnection.mockResolvedValueOnce(CONNECTION_VIEW);
+    // 1: legacy mcp_sessions for Session.token (none).
+    // 2: meta connection — populated for this user.
+    mockSelectChain
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          accountIds: [
+            { id: "act_meta_1", name: "Meta Acct 1" },
+            { id: "act_meta_2", name: "Meta Acct 2" },
+          ],
+          activeAccountId: "act_meta_1",
+        },
+      ]);
+
+    const session = await getSession();
+
+    expect(session.connected).toBe(true);
+    if (session.connected) {
+      // Google still resolves (from connection)
+      expect(session.customerId).toBe(CONNECTION_VIEW.customerId);
+      // Meta loaded via the same userId pulled from Supabase
+      expect(session.metaAccounts).toEqual([
+        { id: "act_meta_1", name: "Meta Acct 1" },
+        { id: "act_meta_2", name: "Meta Acct 2" },
+      ]);
+      expect(session.activeMetaAccountId).toBe("act_meta_1");
+    }
+  });
+
   it("Supabase email beats stale connection.googleEmail", async () => {
     mockReadUserIdFromSupabase.mockReturnValue(true);
     mockGetUser.mockReturnValue({ id: SUPABASE_USER.id, email: "current@example.com" });
