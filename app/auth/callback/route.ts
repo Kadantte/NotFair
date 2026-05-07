@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
-import { supabaseSessionBridge } from "@/lib/connections/feature-flags";
+import { stopCreatingMcpSessions, supabaseSessionBridge } from "@/lib/connections/feature-flags";
 import { refreshGoogleConnectionCredentials, upsertGoogleConnection } from "@/lib/connections/google";
 import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
@@ -352,6 +352,21 @@ async function mintAdsLessSession({
   userId: string | null;
   googleEmail: string | null;
 }) {
+  // Phase-4 step 2: when STOP_CREATING_MCP_SESSIONS is on AND we have a
+  // Supabase userId to anchor identity, skip the mcp_sessions row and the
+  // adsagent_token cookie. The connection row alone carries Google state;
+  // sb-* cookies carry web identity.
+  if (stopCreatingMcpSessions() && userId) {
+    await upsertGoogleConnection({
+      userId,
+      refreshToken,
+      activeAccountId: null,
+      accountIds: [],
+      googleEmail,
+    });
+    return;
+  }
+
   const accessToken = randomBytes(32).toString("hex");
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -459,39 +474,50 @@ async function createOrRedirectGoogleAdsSession({
 
   if (usableAccounts.length === 1) {
     const account = usableAccounts[0];
-    const accessToken = randomBytes(32).toString("hex");
     // Emit loginCustomerId explicitly (string | null) so authForAccount can
     // distinguish "direct" from "legacy fallback" for this entry.
     const accountIds = [
       { id: account.id, name: account.name || "", loginCustomerId: account.loginCustomerId ?? null },
     ];
-    const customerIds = JSON.stringify(accountIds);
+    const skipMcpSession = stopCreatingMcpSessions() && !!userId;
+    const accessToken = skipMcpSession ? null : randomBytes(32).toString("hex");
 
-    await db().transaction(async (tx) => {
-      await tx.insert(schema.mcpSessions).values({
-        accessToken,
+    if (skipMcpSession) {
+      await upsertGoogleConnection({
+        userId: userId as string,
         refreshToken,
-        customerId: account.id,
-        customerIds,
-        loginCustomerId: account.loginCustomerId ?? null,
-        userId,
+        activeAccountId: account.id,
+        accountIds,
         googleEmail,
-        expiresAt: expiresAt.toISOString(),
       });
+    } else {
+      const customerIds = JSON.stringify(accountIds);
+      await db().transaction(async (tx) => {
+        await tx.insert(schema.mcpSessions).values({
+          accessToken: accessToken as string,
+          refreshToken,
+          customerId: account.id,
+          customerIds,
+          loginCustomerId: account.loginCustomerId ?? null,
+          userId,
+          googleEmail,
+          expiresAt: expiresAt.toISOString(),
+        });
 
-      if (userId) {
-        await upsertGoogleConnection(
-          {
-            userId,
-            refreshToken,
-            activeAccountId: account.id,
-            accountIds,
-            googleEmail,
-          },
-          tx,
-        );
-      }
-    });
+        if (userId) {
+          await upsertGoogleConnection(
+            {
+              userId,
+              refreshToken,
+              activeAccountId: account.id,
+              accountIds,
+              googleEmail,
+            },
+            tx,
+          );
+        }
+      });
+    }
 
     // Snapshot account budget/info for dev dashboard (runs after response is sent).
     // Preserve per-account loginCustomerId so MCC-routed client accounts can be queried.
@@ -510,7 +536,7 @@ async function createOrRedirectGoogleAdsSession({
         customerName: account.name || "Google Ads Account",
         ...(googleEmail ? { googleEmail } : {}),
       });
-      setSessionCookies(response, accessToken);
+      if (accessToken) setSessionCookies(response, accessToken);
       if (isFirstSignup) {
         response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
       }
@@ -523,7 +549,7 @@ async function createOrRedirectGoogleAdsSession({
     }
 
     const response = NextResponse.redirect(`${origin}${next}`);
-    setSessionCookies(response, accessToken);
+    if (accessToken) setSessionCookies(response, accessToken);
     if (isFirstSignup) {
       response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
     }
@@ -535,8 +561,6 @@ async function createOrRedirectGoogleAdsSession({
     return response;
   }
 
-  const pendingToken = randomBytes(32).toString("hex");
-
   // Pre-validated accounts stored on the pending session so /api/auth/select-account
   // can verify the user's pick without a second round-trip to Google. Always emit
   // loginCustomerId explicitly (string | null) so authForAccount has a clean signal
@@ -547,54 +571,65 @@ async function createOrRedirectGoogleAdsSession({
     loginCustomerId: account.loginCustomerId ?? null,
   }));
 
-  await db().transaction(async (tx) => {
-    await tx.insert(schema.mcpSessions).values({
-      accessToken: pendingToken,
-      refreshToken,
-      customerId: "",
-      customerIds: JSON.stringify(accountsList),
-      userId,
-      googleEmail,
-      expiresAt: expiresAt.toISOString(),
-    });
+  const skipMcpSession = stopCreatingMcpSessions() && !!userId;
+  const pendingToken = skipMcpSession ? null : randomBytes(32).toString("hex");
 
-    if (userId) {
-      await upsertGoogleConnection(
-        {
-          userId,
-          refreshToken,
-          // Pending — user hasn't picked yet. accountIds carries the
-          // candidate set so /api/auth/select-account can validate the
-          // pick directly off the connection row in phase 2.
-          activeAccountId: null,
-          accountIds: accountsList,
-          googleEmail,
-        },
-        tx,
-      );
-    }
-  });
+  if (skipMcpSession) {
+    await upsertGoogleConnection({
+      userId: userId as string,
+      refreshToken,
+      // Pending — user hasn't picked yet. accountIds carries the candidate
+      // set so /api/auth/select-account can validate the pick off the
+      // connection row directly.
+      activeAccountId: null,
+      accountIds: accountsList,
+      googleEmail,
+    });
+  } else {
+    await db().transaction(async (tx) => {
+      await tx.insert(schema.mcpSessions).values({
+        accessToken: pendingToken as string,
+        refreshToken,
+        customerId: "",
+        customerIds: JSON.stringify(accountsList),
+        userId,
+        googleEmail,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      if (userId) {
+        await upsertGoogleConnection(
+          {
+            userId,
+            refreshToken,
+            activeAccountId: null,
+            accountIds: accountsList,
+            googleEmail,
+          },
+          tx,
+        );
+      }
+    });
+  }
 
   if (popup) {
-    return popupAccountSelectionResponse(usableAccounts, pendingToken, origin);
+    // popupAccountSelectionResponse drops a pending-token cookie so the
+    // selection page can identify the in-flight flow. Under
+    // STOP_CREATING_MCP_SESSIONS, no token exists; the page identifies the
+    // user via Supabase + reads candidates off ad_platform_connections.
+    return popupAccountSelectionResponse(usableAccounts, pendingToken ?? "", origin);
   }
 
   // Land new users on /manage-ads-accounts so they can pick a platform
-  // (Google or Meta) before being routed to the Google picker. The pending
-  // mcp_sessions row + cookie carry the auth state; /manage-ads-accounts
-  // detects pending Google state and forwards to /manage-ads-accounts/google-ads/select
-  // with the candidate accounts when the user clicks the Google card.
-  // `next` is preserved as a query param so the eventual save lands the
-  // user where they originally intended.
+  // (Google or Meta) before being routed to the Google picker. With
+  // STOP_CREATING_MCP_SESSIONS off, the pending mcp_sessions row + cookie
+  // carry auth state; with it on, Supabase carries identity and the
+  // candidate accounts come from ad_platform_connections.accountIds.
   const nextParam = next !== "/connect" ? `?next=${encodeURIComponent(next)}` : "";
   const pendingResponse = NextResponse.redirect(
     `${origin}/manage-ads-accounts${nextParam}`,
   );
-  // Surface the user's identity to the navbar while they're picking which
-  // accounts to connect — without this they'd appear signed-out on the
-  // selection screen because loadSessionRow is keyed on adsagent_token.
-  // /api/auth/select-account replaces this row's customerId on submission.
-  setSessionCookies(pendingResponse, pendingToken);
+  if (pendingToken) setSessionCookies(pendingResponse, pendingToken);
   return pendingResponse;
 }
 

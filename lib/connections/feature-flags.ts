@@ -78,3 +78,34 @@ export function supabaseSessionBridge(): boolean {
 export function readUserIdFromSupabase(): boolean {
   return getEnvBool("READ_USERID_FROM_SUPABASE");
 }
+
+/**
+ * Phase-4 step 2 finalization flag: stop minting new `mcp_sessions` rows on
+ * web sign-in. Once on, the auth callbacks skip the `mcp_sessions` INSERT and
+ * the `adsagent_token` cookie set; identity is carried by Supabase `sb-*`
+ * cookies and Google connection state lives in `ad_platform_connections`.
+ *
+ * Pre-requisites — must all be true in the same environment before flipping:
+ * - `SUPABASE_SESSION_BRIDGE=true`: callback persists `sb-*` cookies and the
+ *   middleware refreshes them on every request.
+ * - `READ_USERID_FROM_SUPABASE=true`: `lib/session.ts` resolves identity from
+ *   the Supabase session.
+ * - `READ_GOOGLE_FROM_CONNECTIONS=true`: connection state read from
+ *   `ad_platform_connections`, not `mcp_sessions`.
+ *
+ * One-way door: once flipped, no new direct-bearer MCP tokens can be issued
+ * because direct-bearer is sourced from `mcp_sessions.accessToken`. New users
+ * use OAuth only. Legacy direct-bearer rows continue to authenticate per
+ * `lib/mcp/handler-factory.ts`'s direct-bearer branch (with the `expiresAt`
+ * check removed — option B locked 2026-05-07; tokens valid until row deletion).
+ *
+ * When `userId` is `null` (rare pre-Supabase-attached path), the flag is
+ * defensively ignored and the legacy INSERT runs. Without a userId we have no
+ * Supabase identity to fall back to, so the cookie-bound row is the only way
+ * to keep the user logged in.
+ *
+ * See docs/plans/mcp-sessions-to-connections-migration.md, phase 4 step 2.
+ */
+export function stopCreatingMcpSessions(): boolean {
+  return getEnvBool("STOP_CREATING_MCP_SESSIONS");
+}

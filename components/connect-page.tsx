@@ -135,6 +135,15 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
     const [errorReason, setErrorReason] = useState<string | null>(urlErrorReason);
 
     const token = urlToken || (session.connected ? session.token : null);
+    // Setup-tabs visibility tracks connectivity, NOT token presence. Pre-phase-4
+    // these were equivalent (every connected user had an `mcp_sessions.access_token`
+    // surfaced as `session.token`), but Supabase-only users (post-STOP_CREATING_MCP_SESSIONS)
+    // are connected with `session.token === ""` — gating on `!token` would
+    // hide the setup UI from a fully-connected user and show a sign-in prompt
+    // for an account they're already signed into. McpSetupTabs already
+    // handles a null/empty apiKey: OAuth tabs (Connector/Claude Code/Codex)
+    // don't need it, and the Any-MCP tab swaps the bearer block for a CTA.
+    const showSetup = session.connected && !session.pendingSetup;
 
     useEffect(() => {
         if (urlToken) {
@@ -204,7 +213,7 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
 
                     {activeTab === 'gohighlevel' ? (
                         <GoHighLevelConnectSurface session={session} />
-                    ) : !token ? (
+                    ) : !showSetup ? (
                         <div className="flex flex-col items-center space-y-6 pt-12 text-center">
                             <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">{t('headline')}</h2>
                             <p className="max-w-md text-lg text-[#C4C0B6]">
@@ -245,15 +254,18 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 rel="noopener noreferrer"
                 onClick={() => {
                     const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
+                    // Use session connectivity (not token presence) so post-STOP_CREATING_MCP_SESSIONS
+                    // users still report as connected — their session.token is "".
+                    const isConnected = showSetup;
                     trackEvent('setup_help_requested', {
-                        connected: Boolean(token),
+                        connected: isConnected,
                         pathname,
                         active_tab: activeTab,
                     });
                     void notifyHelpClicked({
                         activeTab: activeTab === 'gohighlevel' ? undefined : activeTab,
                         pathname,
-                        connected: Boolean(token),
+                        connected: isConnected,
                         source: 'connect_floating',
                     }).catch(() => {});
                 }}

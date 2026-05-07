@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockExchangeCodeForSession,
@@ -211,5 +211,45 @@ describe("Supabase magic-link callback route - GET", () => {
       "http://localhost:3000/login?error=auth_failed&reason=supabase_auth",
     );
     expect(findSessionInsert()).toBeUndefined();
+  });
+
+  describe("STOP_CREATING_MCP_SESSIONS flag", () => {
+    beforeEach(() => {
+      process.env.STOP_CREATING_MCP_SESSIONS = "true";
+    });
+
+    afterEach(() => {
+      delete process.env.STOP_CREATING_MCP_SESSIONS;
+    });
+
+    it("skips the mcp_sessions INSERT, the adsagent_token cookie, and the sb-* clear for new users", async () => {
+      mockCookieGetAll.mockReturnValue([{ name: "sb-project-auth-token" }]);
+
+      const response = await GET(
+        makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code"),
+      );
+
+      expect(findSessionInsert()).toBeUndefined();
+      expect(response.cookies.get("adsagent_token")?.value).toBeUndefined();
+      // sb-* cookies must persist — they're now the session.
+      expect(response.cookies.get("sb-project-auth-token")).toBeUndefined();
+    });
+
+    it("still reissues the legacy cookie for users with an existing mcp_sessions row", async () => {
+      mockSelectRows.mockResolvedValue([
+        {
+          accessToken: "existing-connected-token",
+          customerIds: '[{"id":"1234567890","name":"Existing Account"}]',
+        },
+      ]);
+
+      const response = await GET(
+        makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code"),
+      );
+
+      expect(findSessionInsert()).toBeUndefined();
+      // Legacy users keep their adsagent_token rebound — this isn't new state.
+      expect(response.cookies.get("adsagent_token")?.value).toBe("existing-connected-token");
+    });
   });
 });

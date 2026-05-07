@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
+import { stopCreatingMcpSessions } from "@/lib/connections/feature-flags";
 import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
@@ -161,14 +162,27 @@ export async function GET(request: Request) {
   const existingSession = await findExistingConnectedSession(user.id);
 
   if (existingSession) {
+    // Returning user with a legacy mcp_sessions row. Reissue the cookie even
+    // when STOP_CREATING_MCP_SESSIONS is on — this path doesn't create new
+    // state, just rebinds the browser to the row that's already there.
     setSessionCookies(response, existingSession.accessToken);
-  } else {
+  } else if (!stopCreatingMcpSessions()) {
     const accessToken = await mintEmailOnlySession(user);
     setSessionCookies(response, accessToken);
   }
+  // else: STOP_CREATING_MCP_SESSIONS on, no existing row → identity carried
+  // entirely by Supabase sb-* cookies (preserved below). No mcp_sessions row,
+  // no adsagent_token cookie, no Google connection upsert (this is the
+  // email-only path; Google connection is upserted later by the Google OAuth
+  // callback when the user actually links Ads).
 
   setProfileFromSupabaseUser(response, user);
-  await clearSupabaseCookies(response);
+  // Header-size mitigation pre-bridge. Once STOP_CREATING_MCP_SESSIONS is on,
+  // sb-* cookies ARE the session, so they must be preserved here regardless
+  // of the bridge flag — clearing them would log the user straight back out.
+  if (!stopCreatingMcpSessions()) {
+    await clearSupabaseCookies(response);
+  }
 
   if (!hadPriorSession) {
     const clientIp = getClientIp(request);

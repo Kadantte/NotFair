@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockSignInWithIdToken,
@@ -528,5 +528,115 @@ describe("Auth callback route — GET", () => {
     expect(findSessionInsert()).toBeUndefined();
     expect(mockListConnectableAccounts).not.toHaveBeenCalled();
     expect(response.cookies.get("adsagent_token")?.value).toBe("existing-token");
+  });
+
+  // ─── Phase-4 step 2: STOP_CREATING_MCP_SESSIONS flag ─────────────────
+  //
+  // When the flag is on AND the Supabase userId is known, the callback skips
+  // the mcp_sessions INSERT and the adsagent_token cookie. The connection
+  // upsert still fires (it carries Google state). When the flag is off, or
+  // the userId is null (rare pre-Supabase-attached path), the legacy INSERT
+  // path runs unchanged.
+
+  describe("STOP_CREATING_MCP_SESSIONS flag", () => {
+    beforeEach(() => {
+      process.env.STOP_CREATING_MCP_SESSIONS = "true";
+    });
+
+    afterEach(() => {
+      delete process.env.STOP_CREATING_MCP_SESSIONS;
+    });
+
+    it("skips the mcp_sessions INSERT and adsagent_token cookie on the ads-less path", async () => {
+      mockListConnectableAccounts.mockResolvedValue({
+        accounts: [],
+        managers: [{ id: "9999999999", name: "Acme MCC" }],
+      });
+
+      const state = encodeState();
+      const response = await GET(
+        makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+      );
+
+      expect(findSessionInsert()).toBeUndefined();
+      expect(response.cookies.get("adsagent_token")?.value).toBeUndefined();
+      // Connection upsert still fires.
+      const conn = findConnectionUpsert();
+      expect(conn).toBeDefined();
+      expect(conn).toMatchObject({ userId: "user-123", platform: "google_ads", activeAccountId: null });
+    });
+
+    it("skips the mcp_sessions INSERT and adsagent_token cookie on the single-account path", async () => {
+      mockListConnectableAccounts.mockResolvedValue({
+        accounts: [{ id: "5555555555", name: "Client A" }],
+        managers: [],
+      });
+
+      const state = encodeState();
+      const response = await GET(
+        makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+      );
+
+      expect(findSessionInsert()).toBeUndefined();
+      expect(response.cookies.get("adsagent_token")?.value).toBeUndefined();
+      const conn = findConnectionUpsert();
+      expect(conn).toMatchObject({
+        userId: "user-123",
+        platform: "google_ads",
+        activeAccountId: "5555555555",
+      });
+    });
+
+    it("skips the mcp_sessions INSERT and adsagent_token cookie on the multi-account-pending path", async () => {
+      mockListConnectableAccounts.mockResolvedValue({
+        accounts: [
+          { id: "1111111111", name: "Direct Account" },
+          { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+        ],
+        managers: [{ id: "9999999999", name: "Acme MCC" }],
+      });
+
+      const state = encodeState();
+      const response = await GET(
+        makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+      );
+
+      expect(findSessionInsert()).toBeUndefined();
+      expect(response.cookies.get("adsagent_token")?.value).toBeUndefined();
+      // Pending users land on /manage-ads-accounts; identity comes from Supabase
+      // and candidates from the connection row's accountIds.
+      expect(response.headers.get("location")).toContain("/manage-ads-accounts");
+      const conn = findConnectionUpsert();
+      expect(conn).toMatchObject({
+        userId: "user-123",
+        platform: "google_ads",
+        activeAccountId: null,
+        accountIds: [
+          { id: "1111111111", name: "Direct Account", loginCustomerId: null },
+          { id: "2222222222", name: "Client B", loginCustomerId: "9999999999" },
+        ],
+      });
+    });
+
+    it("falls back to the legacy INSERT path when userId is null (pre-Supabase-attached)", async () => {
+      // Supabase signin yields no user id — the rare legacy/error path.
+      mockSignInWithIdToken.mockResolvedValue({
+        data: { user: null, session: null },
+        error: null,
+      });
+      mockListConnectableAccounts.mockResolvedValue({
+        accounts: [{ id: "5555555555", name: "Client A" }],
+        managers: [],
+      });
+
+      const state = encodeState();
+      const response = await GET(
+        makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+      );
+
+      // Legacy INSERT runs (no Supabase identity to fall back to).
+      expect(findSessionInsert()).toBeDefined();
+      expect(response.cookies.get("adsagent_token")?.value).toBeTruthy();
+    });
   });
 });

@@ -1,14 +1,16 @@
 # Migration: `mcp_sessions` → `ad_platform_connections` + Supabase Auth
 
+> **Scope change 2026-05-07**: phases 3 + 5 halted. We are no longer retiring `mcp_sessions`. With 32 active direct-bearer users still on `claude-code` and other clients, the migration cost (banner + email + 2–4 week notice + breakage tail) outweighs the value of dropping the table. Goal narrows to: **move web sessions to Supabase Auth and Google connection state to `ad_platform_connections`, but leave the `mcp_sessions` table standing as a frozen legacy footprint serving the direct-bearer cohort.** See [§ Scope change 2026-05-07](#scope-change-2026-05-07) below.
+
 ## Status
 
 | Phase | Status |
 |---|---|
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
-| 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). Phase-4 lib/session.ts dual-read still pending (deferred). |
-| 3 — Direct-bearer MCP cutoff | Telemetry shipped 2026-05-06 (`mcp_direct_bearer_used`) + symmetric OAuth telemetry 2026-05-07 (`mcp_oauth_used`). Initial cohort sized at **38 active direct-bearer users** (31 on claude-code). Cutoff steps not started. |
-| 4 — Switch web cookie to Supabase Auth | **Step 1 + 2 read-side live in prod 2026-05-07.** `READ_USERID_FROM_SUPABASE=true` flipped; every code path that previously needed an `mcp_sessions` row to function now tolerates its absence. Step 2 INSERT flag-gating, plus steps 3–4, not started. |
-| 5 — Drop `mcp_sessions` | Not started |
+| 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). |
+| 3 — Direct-bearer MCP cutoff | 🛑 **Halted 2026-05-07.** Telemetry stays live (`mcp_direct_bearer_used` + `mcp_oauth_used`) for visibility. Cutoff steps will not ship. Direct-bearer remains a supported auth path. |
+| 4 — Switch web cookie to Supabase Auth | **Step 1 + 2 read-side live in prod 2026-05-07.** `READ_USERID_FROM_SUPABASE=true` flipped; every code path that previously needed an `mcp_sessions` row to function now tolerates its absence. Step 2 INSERT flag-gating, plus steps 3–4, still pending. End state changes: callback stops creating new `mcp_sessions` rows for new users, but existing rows stay alive forever to keep the direct-bearer cohort working. |
+| 5 — Drop `mcp_sessions` | 🛑 **Cancelled 2026-05-07.** Table stays. `oauth_access_tokens.session_id`, `authorization_codes.session_id`, `oauth_clients.session_id`, `operations.session_id` all stay. No schema cleanup. |
 
 ### Phase 1 — closed out 2026-05-07
 
@@ -34,11 +36,31 @@
 - [x] Account-switch consistency — 0 mismatches.
 - [x] Final `pnpm db:backfill-google-connections --apply` sweep — 0 creates, 474 no-op upserts (2026-05-07).
 
+## Scope change 2026-05-07
+
+The original plan retired `mcp_sessions` entirely by phase 5. After phase-2 telemetry landed, the direct-bearer cohort came in at **32 active users / day** (down from 38, but holding steady) — dominated by `claude-code` installs that have a long-lived bearer baked into `~/.mcp-settings.json`. Phase 3's premise was "force everyone onto OAuth via banner + email + hard cutoff." On 2026-05-07 we decided that cost (user friction, support churn, breakage tail on installs we can't notify) is not worth the schema cleanup.
+
+**New end state:**
+
+- ✅ Phase 1 + 2 complete (Google connection state in `ad_platform_connections`, OAuth tokens dual-bind, Supabase bridge live).
+- ✅ Phase 4 still proceeds: web cookie moves to Supabase Auth, `adsagent_token` / `adsagent_profile` retired, callback stops minting new `mcp_sessions` rows.
+- 🛑 Phase 3 halted: direct-bearer MCP path stays. `acceptDirectBearer: true` on `/api/mcp` indefinitely.
+- 🛑 Phase 5 cancelled: `mcp_sessions` table stays. Existing direct-bearer rows live forever. Schema (sessionId columns on `oauth_access_tokens`, `authorization_codes`, `oauth_clients`, `operations`) stays.
+
+**What `mcp_sessions` becomes:** a frozen legacy footprint. After phase 4 finishes, no new rows get written; existing rows serve only the direct-bearer cohort's `accessToken` lookups in `lib/mcp/handler-factory.ts`. The cohort can only shrink (via row expiry or user churn), never grow.
+
+**Decisions locked 2026-05-07:**
+
+1. **Direct-bearer tokens last forever (option B).** Drop the `expiresAt` check from `lib/mcp/handler-factory.ts`'s direct-bearer branch when phase 4 step 3 ships. Existing `mcp_sessions` rows stay valid until the row is manually deleted. Rationale: predictable behavior, no surprise expirations a year out, no need to keep a rotate-token route alive just to extend timestamps. `/api/auth/rotate-token` gets deleted as originally planned.
+2. **New direct-bearer issuance:** today the only way to obtain a direct-bearer is to have a `mcp_sessions` row. Once callback stops minting rows (`STOP_CREATING_MCP_SESSIONS`), no new direct-bearer tokens can be issued. New users must use OAuth. This is intentional and aligns with "freeze the cohort."
+
 ## Goal
 
-Retire the `mcp_sessions` table entirely. Move Google Ads connection state to `ad_platform_connections` (where Meta already lives), let Supabase Auth own web sessions, and let `oauth_access_tokens` (RFC 6749) + `oauth_clients` (RFC 7591 DCR) own MCP authentication.
+**Original goal (superseded 2026-05-07):** retire the `mcp_sessions` table entirely. Move Google Ads connection state to `ad_platform_connections` (where Meta already lives), let Supabase Auth own web sessions, and let `oauth_access_tokens` (RFC 6749) + `oauth_clients` (RFC 7591 DCR) own MCP authentication.
 
-## End state
+**Revised goal:** move web sessions to Supabase Auth and Google connection state to `ad_platform_connections`. Stop writing to `mcp_sessions` for new users. Leave the table and the direct-bearer auth path standing for the existing cohort.
+
+## End state (revised 2026-05-07)
 
 ```
 auth.users                  ← Supabase-owned: identity (email, name, picture)
@@ -46,11 +68,15 @@ auth.sessions               ← Supabase-owned: web session JWTs (replaces adsag
 
 ad_platform_connections     ← canonical connection state for both Google + Meta
 oauth_clients               ← DCR client metadata (incl. client_name, client_version)
-oauth_access_tokens         ← issued MCP tokens, FK → ad_platform_connections.id
-authorization_codes         ← DCR auth codes, FK → ad_platform_connections.id
+oauth_access_tokens         ← issued MCP tokens. Polymorphic: connectionId for OAuth, sessionId for legacy direct-bearer
+authorization_codes         ← DCR auth codes. Polymorphic: same as oauth_access_tokens
+
+mcp_sessions                ← FROZEN LEGACY. No new rows after phase 4. Read only by:
+                              - lib/mcp/handler-factory.ts direct-bearer branch
+                              - oauth_access_tokens session-bound JOIN (legacy tokens issued pre-phase-2)
 ```
 
-No `mcp_sessions`. No `adsagent_token` cookie. Direct-bearer MCP path removed.
+`adsagent_token` cookie removed. Direct-bearer MCP path remains supported indefinitely.
 
 ## Why this shape
 
@@ -331,9 +357,15 @@ Behind env flag `READ_GOOGLE_FROM_CONNECTIONS=true`:
 
 ---
 
-### Phase 3 — Direct-bearer MCP cutoff
+### Phase 3 — Direct-bearer MCP cutoff 🛑 HALTED 2026-05-07
 
-**Goal:** stop accepting `Authorization: Bearer <hex>` (the `mcp_sessions.accessToken` cookie value as MCP bearer). Force all MCP traffic onto OAuth 2.0.
+**Status:** halted. We are no longer cutting off direct-bearer auth. The 32-user cohort (mostly `claude-code` installs with bearers baked into `~/.mcp-settings.json`) stays supported indefinitely. Telemetry events `mcp_direct_bearer_used` and `mcp_oauth_used` stay live for visibility but no cutoff actions ship.
+
+The text below preserves the original plan as a reference in case we ever revisit. It is **not the active plan.**
+
+---
+
+**Original goal:** stop accepting `Authorization: Bearer <hex>` (the `mcp_sessions.accessToken` cookie value as MCP bearer). Force all MCP traffic onto OAuth 2.0.
 
 This is the riskiest phase because it can break working Claude Code installs that have the cookie value baked into `~/.mcp-settings.json`.
 
@@ -374,11 +406,16 @@ PostHog dashboard: `mcp_direct_bearer_used` daily count → must trend to 0 befo
 
 ---
 
-### Phase 4 — Switch web cookie to Supabase Auth
+### Phase 4 — Switch web cookie to Supabase Auth (now the final phase)
 
-**Goal:** `lib/session.ts` no longer reads `adsagent_token`. Every server-side caller of `getSession()` reads userId from the Supabase session cookie.
+**Goal:** `lib/session.ts` no longer reads `adsagent_token`. Every server-side caller of `getSession()` reads userId from the Supabase session cookie. Callback stops minting `mcp_sessions` rows for new users.
 
 Phase 2 already set up the bridge. This phase finishes the move.
+
+**Scope adjustment 2026-05-07** (phases 3 + 5 halted): the original phase-4 endpoint assumed `mcp_sessions` would be dropped one phase later, so it removed `adsagent_token` plumbing aggressively. With the table staying, two adjustments apply:
+
+- **Direct-bearer tokens become indefinite.** Step 3 drops the `expiresAt` check from `lib/mcp/handler-factory.ts`'s direct-bearer branch. `/api/auth/rotate-token` is still deleted (Supabase rotates web sessions natively), and the `mcp_sessions.expiresAt` column becomes vestigial — kept for forensic data but no longer enforced. Decision: option B in the original tradeoff (locked 2026-05-07).
+- **`STOP_CREATING_MCP_SESSIONS` is a one-way door.** Once flipped on, no new direct-bearer tokens can be issued. New users must use OAuth. This is the desired end state, but flag the user-visible implication if anyone ever asks "how do I get a direct bearer for my new account."
 
 #### Phase 4 progress (as of 2026-05-07)
 
@@ -441,7 +478,8 @@ Every code path that previously required an `mcp_sessions` row to identify the u
 | `app/auth/callback/route.ts` | Stop creating `mcp_sessions` rows for new web logins. Stop setting `adsagent_token`. (Still upserts `ad_platform_connections`.) | 2 | pending — `STOP_CREATING_MCP_SESSIONS` flag |
 | `lib/session.ts` | Drop the cookie fallback path (no more `adsagent_token` reads). | 3 | pending |
 | `lib/auth-cookies.ts` | Remove `adsagent_token` constant + helpers. | 3 | pending |
-| `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates refresh tokens natively. | 3 | pending |
+| `app/api/auth/rotate-token/route.ts` | **Delete the route** — Supabase rotates web refresh tokens natively. Direct-bearer no longer depends on `expiresAt` being extended (see next row). | 3 | pending |
+| `lib/mcp/handler-factory.ts` (direct-bearer branch) | **Drop the `expiresAt` check.** Direct-bearer tokens valid until row is manually deleted. Locked 2026-05-07 (option B). | 3 | pending |
 | `app/api/auth/signout/route.ts` | Replace cookie-clearing with `supabase.auth.signOut()`. | 3 | pending |
 | `lib/session.ts` (profile cookie) | Drop `adsagent_profile`. Read `displayName`/`picture` from `auth.users.user_metadata`. | 4 | pending |
 | `lib/session.ts` (impersonation) | `adsagent_impersonate` cookie value changes from `mcp_sessions.id` (int) to `userId` (uuid). | 4 | pending |
@@ -468,9 +506,15 @@ Today `/api/oauth/authorize` reads `adsagent_token` to identify who's authorizin
 
 ---
 
-### Phase 5 — Drop `mcp_sessions`
+### Phase 5 — Drop `mcp_sessions` 🛑 CANCELLED 2026-05-07
 
-**Goal:** delete the table and all dead code referencing it.
+**Status:** cancelled. The table stays. With phase 3 halted, direct-bearer auth still reads `mcp_sessions.accessToken` and the polymorphic `sessionId` columns on `oauth_access_tokens` / `authorization_codes` / `oauth_clients` / `operations` still resolve to live rows for the legacy cohort.
+
+The text below is preserved as a reference. **Not the active plan.**
+
+---
+
+**Original goal:** delete the table and all dead code referencing it.
 
 By phase 5 nothing reads or writes `mcp_sessions`. `oauth_access_tokens` may still have legacy rows with `sessionId` set (from phase 2 fallback) — clean those up first.
 
@@ -555,28 +599,29 @@ If we later want hard TTLs on MCP tokens, do it as a standalone change covering 
 |---|---|
 | 1 | Revert dual-write code. Orphan `ad_platform_connections` rows are harmless. |
 | 2 | Flip `READ_GOOGLE_FROM_CONNECTIONS=false`. Dual-write still running, reads fall back to `mcp_sessions`. |
-| 3 | Re-enable `acceptDirectBearer: true`. Existing `mcp_sessions.accessToken` values still valid. |
-| 4 | Restore `adsagent_token` minting in callback + restore `lib/session.ts` cookie fallback. Risk: users who re-auth during phase 4 will not have `mcp_sessions` rows; they'll need to log in again on rollback. |
-| 5 | **Irreversible without a restore.** Take a logical backup of `mcp_sessions`, `oauth_access_tokens.session_id`, `authorization_codes.session_id`, `oauth_clients.session_id`, `operations.session_id` immediately before the drop. Plan: 7-day point-in-time recovery window in Supabase. |
+| 3 | 🛑 Halted — no rollback needed. Direct-bearer never cut off. |
+| 4 | Restore `adsagent_token` minting in callback + restore `lib/session.ts` cookie fallback. Risk: users who re-auth during phase 4 will not have `mcp_sessions` rows; they'll need to log in again on rollback. (Direct-bearer users untouched — their `mcp_sessions` rows are pre-existing, not phase-4 creations.) |
+| 5 | 🛑 Cancelled — no destructive action to roll back. |
 
 ## Risks summary
 
-1. **Direct-bearer holdouts** (phase 3) — non-zero users will ignore migration banners. Hard cutoff date + clear error message + email needed.
+1. ~~**Direct-bearer holdouts** (phase 3)~~ — no longer a risk. Phase 3 halted; direct-bearer stays.
 2. **Supabase middleware refresh** (phase 2) — adds latency to every request. Benchmark before/after on a representative route.
-3. **Cookie size** (phase 2) — Vercel 4KB header limit. Audit.
+3. **Cookie size** (phase 2) — Vercel 4KB header limit. Audit. ✅ Audited 2026-05-07; worst case ~6KB after `adsagent_customer` slim.
 4. **Dev impersonation** keys off `mcp_sessions.id` — repointable to `userId`, but easy to miss. Catch in phase 4 review.
 5. **Per-device active account regression** — flag during phase 2 review; decide whether to add overrides.
+6. **`mcp_sessions.expiresAt` becomes vestigial after phase 4** — locked 2026-05-07 (option B): direct-bearer branch in `handler-factory.ts` stops checking `expiresAt`. Tokens last until row deletion. Column is preserved for forensic data only.
 
 ## Estimated total scope
 
-| Phase | LOC | PRs | Bake time |
-|---|---|---|---|
-| 1 | ~600 | 2–3 | 1 week |
-| 2 | ~800 | 2–3 | 1 week |
-| 3 | ~300 | 2 | 2–4 weeks (user notice) |
-| 4 | ~400 | 1–2 | 1 week |
-| 5 | ~200 | 1 | — |
-| **Total** | **~2,300** | **8–11** | **~6–8 weeks** |
+| Phase | LOC | PRs | Bake time | Status |
+|---|---|---|---|---|
+| 1 | ~600 | 2–3 | 1 week | ✅ shipped |
+| 2 | ~800 | 2–3 | 1 week | ✅ shipped |
+| 3 | ~300 | 2 | 2–4 weeks (user notice) | 🛑 halted |
+| 4 | ~400 | 1–2 | 1 week | step 1 + 2 read-side shipped; INSERT skip + cookie cutover pending |
+| 5 | ~200 | 1 | — | 🛑 cancelled |
+| **Total (revised)** | **~1,800** | **6–8** | **~3–4 weeks remaining** | |
 
 ## What shipped in phase 1 (`c74e4da`)
 
@@ -593,4 +638,9 @@ If we later want hard TTLs on MCP tokens, do it as a standalone change covering 
 
 ## Next action
 
-Run the bake-time checklist (top of doc) for ≥7 days. When all gates are green, kick off [Phase 2](#phase-2--reads--oauth-tokens-move-to-ad_platform_connections).
+With phase 3 + 5 off the table, the remaining work is finishing phase 4:
+
+1. **Bake the read-side migration** — ≥3–7 days of clean `google_connection_mismatch` (currently 1 self-healed event in 24h) and at least one day where `auth_identity_resolved.source=oauth-authorize` shows non-zero Supabase resolution.
+2. **Ship `STOP_CREATING_MCP_SESSIONS` flag (off-by-default)** — auth callback skips the `mcp_sessions` INSERT for new users. Code can land now; flip after step 1's bake clears.
+3. **Phase 4 step 3 + 4** — remove `adsagent_token` reads from `lib/session.ts`, drop `adsagent_profile`, migrate impersonation cookie to userId, delete `/api/auth/rotate-token`, **drop the `expiresAt` check from `handler-factory.ts`'s direct-bearer branch (locked option B)**. Gate on `web_session_resolved.via=cookie_fallback` <5% sustained ≥3 days.
+4. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort serves itself off the existing rows indefinitely.
