@@ -328,6 +328,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       adGroupId: z.string(),
       criterionId: z.string().describe("Keyword criterion ID (query keyword_view via runScript)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId }) => {
@@ -358,6 +359,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       adGroupId: z.string(),
       keyword: z.string().min(1),
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("BROAD"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, keyword, matchType }) => {
@@ -376,6 +378,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       adGroupId: z.string(),
       criterionId: z.string().describe("Keyword criterion ID (query keyword_view via runScript)"),
       newBidDollars: z.number().positive().describe("New bid in dollars (e.g. 1.50)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
@@ -395,6 +398,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       keyword: z.string().min(1).describe("Keyword text to block"),
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).default("PHRASE").describe("Match type for the negative keyword (default: PHRASE)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, keyword, matchType }) => {
@@ -410,6 +414,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       keyword: z.string().min(1).describe("Exact negative keyword text to remove"),
       matchType: z.enum(["BROAD", "PHRASE", "EXACT"]).optional().describe("Match type to disambiguate if the same text exists under multiple match types"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: {
       readOnlyHint: false,
@@ -431,6 +436,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       newDailyBudgetDollars: z.number().positive().describe("New daily budget in dollars (e.g. 25.00)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, newDailyBudgetDollars }) => {
@@ -847,6 +853,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: {
       readOnlyHint: false,
@@ -865,6 +872,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId }) => {
@@ -878,6 +886,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: {
       readOnlyHint: false,
@@ -957,6 +966,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       adGroupName: z.string().min(1),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupName }) => {
@@ -984,6 +994,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .max(4)
         .describe("2-4 descriptions, max 90 chars each"),
       finalUrl: z.string().url(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, headlines, descriptions, finalUrl }) => {
@@ -999,6 +1010,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string().describe("Campaign ID (for logging)"),
       adGroupId: z.string(),
       adId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
@@ -1014,6 +1026,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string().describe("Campaign ID (for logging)"),
       adGroupId: z.string(),
       adId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
@@ -1029,6 +1042,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string().describe("Campaign ID (for logging)"),
       adGroupId: z.string(),
       adId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId }) => {
@@ -1045,6 +1059,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       adGroupId: z.string(),
       adId: z.string(),
       finalUrl: z.string().url(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, finalUrl }) => {
@@ -1080,6 +1095,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .min(2)
         .max(4)
         .describe("Complete replacement descriptions (2-4, max 90 chars each)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, adId, headlines, descriptions }) => {
@@ -1362,6 +1378,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       newName: z.string().min(1),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, newName }) => {
@@ -1377,6 +1394,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       adGroupId: z.string(),
       newName: z.string().min(1),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, adGroupId, newName }) => {
@@ -1404,6 +1422,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
         .describe("TARGET_IMPRESSION_SHARE only: the IS target as a fraction from 0.01 to 1.00 (e.g. 0.95 = 95%). Typical brand target is 0.90–0.95."),
       cpcBidCeiling: z.number().positive().optional()
         .describe("TARGET_IMPRESSION_SHARE only: max CPC bid cap in dollars (e.g. 2.00 = $2.00). Required — without a ceiling Google can bid unbounded to hit the IS target."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, async ({ accountId, campaignId, biddingStrategy, targetCpa, targetRoas, impressionShareLocation, locationFraction, cpcBidCeiling }) => {
@@ -1433,6 +1452,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string(),
       goalConfigLevel: z.enum(["CUSTOMER", "CAMPAIGN"])
         .describe("CUSTOMER = use account-level conversion goals. CAMPAIGN = use campaign-specific conversion goals."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, goalConfigLevel }) => {
@@ -1758,6 +1778,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string().describe("Performance Max campaign ID"),
       assetGroupId: z.string().describe("Asset group ID to pause (query asset_group WHERE type = PERFORMANCE_MAX via runScript)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
@@ -1772,6 +1793,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string().describe("Performance Max campaign ID"),
       assetGroupId: z.string().describe("Asset group ID to enable (query asset_group WHERE type = PERFORMANCE_MAX via runScript)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, assetGroupId }) => {
@@ -2087,6 +2109,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string().optional().describe("Required when level=campaign. Optional for logging when linking to an ad group or asset group."),
       adGroupId: z.string().optional().describe("Required when level=ad_group."),
       assetGroupId: z.string().optional().describe("Required when level=asset_group (Performance Max)."),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, assetId, fieldType, level, campaignId, adGroupId, assetGroupId }) => {
@@ -2165,6 +2188,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       biddingStrategyId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, biddingStrategyId }) => {
@@ -2237,6 +2261,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {
@@ -2251,6 +2276,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
       campaignId: z.string(),
       sharedSetId: z.string().describe("Shared set ID (query shared_set WHERE type = NEGATIVE_KEYWORDS via runScript)"),
+      ...experimentImpactAcknowledgementSchema,
     },
     annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, campaignId, sharedSetId }) => {

@@ -51,7 +51,7 @@ vi.mock("@/lib/tools/execute", () => ({
 
 import { registerReadTools } from "../read-tools";
 import { registerWriteTools } from "../write-tools";
-import { clearCache } from "@/lib/google-ads";
+import { clearCache, __resetActiveExperimentProbeCacheForTests } from "@/lib/google-ads";
 import { execWrite } from "@/lib/tools/execute";
 import { buildHarness, TEST_AUTH, expectOk, expectError } from "./harness";
 
@@ -65,8 +65,11 @@ function resetMocks() {
   mockMutateResources.mockResolvedValue({ mutate_operation_responses: [] });
   // `getCachedCustomer` memoises GAQL responses by (userId, customerId, query).
   // Tests reuse TEST_AUTH so every call collides on the same cache key — clear
-  // between tests so `mockQuery` is actually reached each time.
+  // between tests so `mockQuery` is actually reached each time. The
+  // active-experiment probe cache lives separately and also leaks across
+  // tests (a "no experiments" hit silently skips the FROM experiment probe).
   clearCache();
+  __resetActiveExperimentProbeCacheForTests();
 }
 
 describe("MCP read tools — registration", () => {
@@ -826,5 +829,70 @@ describe("MCP write tools — smoke", () => {
     });
     expect(JSON.stringify(structured.impacts)).toContain("LP test");
     expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("active-experiment probe does not select experiment.id (UNRECOGNIZED_FIELD regression)", async () => {
+    // Some accounts/API versions reject experiment.id with query_error=32
+    // (UNRECOGNIZED_FIELD), which used to block 100% of guarded writes (e.g.
+    // updateBid, bulkUpdateBids) even on accounts with zero experiments.
+    // The probe must derive experimentId from experiment.resource_name instead.
+    const keywordRow = {
+      campaign: { id: "100", status: "ENABLED", bidding_strategy_type: "MANUAL_CPC" },
+      ad_group: { id: "111", status: "ENABLED" },
+      ad_group_criterion: {
+        criterion_id: "222",
+        status: "ENABLED",
+        negative: false,
+        cpc_bid_micros: 1_000_000,
+        keyword: { match_type: "PHRASE" },
+      },
+    };
+    mockQuery
+      .mockResolvedValueOnce([keywordRow])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([keywordRow]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    await harness.callTool("bulkUpdateBids", {
+      updates: [
+        { campaignId: "100", adGroupId: "111", criterionId: "222", newBidDollars: 1.1 },
+      ],
+    });
+
+    const probeQuery = mockQuery.mock.calls.find((call) => /FROM experiment\b/.test(String(call[0])));
+    expect(probeQuery, "expected the experiment guard probe to run").toBeDefined();
+    expect(String(probeQuery![0])).not.toMatch(/\bexperiment\.id\b/);
+  });
+
+  it("simple-write tools targeting a campaign expose acknowledgeExperimentImpact", () => {
+    // execWrite reads ctx.args.acknowledgeExperimentImpact via AsyncLocalStorage
+    // (lib/tools/execute.ts), so any tool that passes a non-null campaignId to
+    // execWrite must declare the override field in its schema — otherwise Zod
+    // strips it before the handler runs and typed-tool-call hosts (Claude Code)
+    // can't pass the override the error message tells them to pass. This test
+    // pins the contract for the simple-write surface; bulk tools have their own
+    // explicit-options path covered separately.
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const simpleWriteTargetingCampaign = [
+      "pauseKeyword", "addKeyword", "updateBid",
+      "addNegativeKeyword", "removeNegativeKeyword", "updateCampaignBudget",
+      "pauseCampaign", "enableCampaign", "removeCampaign",
+      "createAdGroup", "createAd", "pauseAd", "enableAd", "removeAd",
+      "updateAdFinalUrl", "updateAdAssets",
+      "renameCampaign", "renameAdGroup",
+      "updateCampaignBidding", "updateCampaignGoals",
+      "pausePmaxAssetGroup", "enablePmaxAssetGroup",
+      "linkCampaignToBiddingStrategy",
+      "linkNegativeListToCampaign", "unlinkNegativeListFromCampaign",
+      "linkImageAsset",
+    ];
+    for (const name of simpleWriteTargetingCampaign) {
+      const tool = harness.getTool(name);
+      expect(tool.inputSchema, `${name} has no inputSchema`).toBeDefined();
+      expect(
+        Object.keys(tool.inputSchema!),
+        `${name} schema is missing acknowledgeExperimentImpact`,
+      ).toContain("acknowledgeExperimentImpact");
+    }
   });
 });

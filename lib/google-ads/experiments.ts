@@ -462,6 +462,52 @@ async function fetchTreatmentTrialCampaign(
   }
 }
 
+// ─── Active-experiment probe cache ──────────────────────────────────
+//
+// `checkActiveExperimentImpact` runs as a pre-check on every guarded write
+// (updateBid, bulkUpdateBids, etc.). Most accounts have zero experiments,
+// so without caching this is a per-write GAQL roundtrip on the hot path.
+//
+// We cache only the negative result ("no active experiments") with a short
+// TTL. The positive case is never cached: experiment lifecycles change
+// frequently and a stale hit would silently bypass the guard. Cache is
+// invalidated by every experiment-mutation function in this file so a
+// freshly-created experiment is visible to the very next probe.
+
+const NO_EXPERIMENTS_CACHE_TTL_MS = 60_000;
+const noActiveExperimentsCache = new Map<string, number>();
+
+function probeCacheKey(customerId: string, loginCustomerId: string | null | undefined): string {
+  const cid = normalizeCustomerId(customerId);
+  return loginCustomerId ? `${normalizeCustomerId(loginCustomerId)}/${cid}` : cid;
+}
+
+function probeCacheHasFresh(auth: AuthContext): boolean {
+  const expiresAt = noActiveExperimentsCache.get(probeCacheKey(auth.customerId, auth.loginCustomerId));
+  return expiresAt !== undefined && expiresAt > Date.now();
+}
+
+function setProbeCacheNoExperiments(auth: AuthContext): void {
+  noActiveExperimentsCache.set(
+    probeCacheKey(auth.customerId, auth.loginCustomerId),
+    Date.now() + NO_EXPERIMENTS_CACHE_TTL_MS,
+  );
+}
+
+/**
+ * Drop the cached "no active experiments" entry for this account. Called by
+ * every experiment-mutation function below so the next guarded write re-probes
+ * with fresh state.
+ */
+export function invalidateActiveExperimentProbeCache(auth: AuthContext): void {
+  noActiveExperimentsCache.delete(probeCacheKey(auth.customerId, auth.loginCustomerId));
+}
+
+/** Test-only helper. Drop every cached entry. */
+export function __resetActiveExperimentProbeCacheForTests(): void {
+  noActiveExperimentsCache.clear();
+}
+
 // ─── listActiveExperiments ──────────────────────────────────────────
 
 /**
@@ -480,7 +526,6 @@ export async function listActiveExperiments(
   type ExperimentRow = {
     experiment?: {
       resource_name?: string;
-      id?: string | number;
       name?: string;
       status?: string | number;
       type?: string | number;
@@ -489,9 +534,13 @@ export async function listActiveExperiments(
       suffix?: string;
     };
   };
+  // experiment.id is intentionally NOT selected — it's derivable from
+  // resource_name and selecting it has historically tripped UNRECOGNIZED_FIELD
+  // (query_error=32) on accounts/API versions where the field was rejected,
+  // breaking this read for users with zero experiments. Stick to fields the
+  // experiment resource is guaranteed to expose across versions.
   const experimentRows = await customer.query(`
     SELECT experiment.resource_name,
-           experiment.id,
            experiment.name,
            experiment.type,
            experiment.status,
@@ -584,7 +633,7 @@ export async function listActiveExperiments(
     );
     return {
       experimentResourceName: rn,
-      experimentId: String(experiment.id ?? experimentIdFromResourceName(rn) ?? ""),
+      experimentId: experimentIdFromResourceName(rn) ?? "",
       name: experiment.name ?? "",
       status: "ENABLED",
       type: experimentTypeName(experiment.type),
@@ -607,21 +656,24 @@ export async function checkActiveExperimentImpact(
   const uniqueCampaignIds = [...new Set(campaignIds.filter(Boolean).map(String))];
   if (uniqueCampaignIds.length === 0) return { ok: true, impacts: [] };
 
+  if (probeCacheHasFresh(auth)) return { ok: true, impacts: [] };
+
   try {
     const customer = getCustomer(auth);
     type ExperimentRow = {
       experiment?: {
         resource_name?: string;
-        id?: string | number;
         name?: string;
         status?: string | number;
         start_date?: string;
         end_date?: string;
       };
     };
+    // experiment.id intentionally omitted — same UNRECOGNIZED_FIELD risk as
+    // listActiveExperiments, and a failure here would block 100% of guarded
+    // writes (this probe runs as a pre-check on every campaign mutation).
     const experimentRows = await customer.query(`
       SELECT experiment.resource_name,
-             experiment.id,
              experiment.name,
              experiment.status,
              experiment.start_date,
@@ -635,7 +687,10 @@ export async function checkActiveExperimentImpact(
       .filter((experiment): experiment is NonNullable<ExperimentRow["experiment"]> =>
         Boolean(experiment?.resource_name) && experimentStatusName(experiment?.status) === "ENABLED",
       );
-    if (activeExperiments.length === 0) return { ok: true, impacts: [] };
+    if (activeExperiments.length === 0) {
+      setProbeCacheNoExperiments(auth);
+      return { ok: true, impacts: [] };
+    }
 
     const experimentByResourceName = new Map(
       activeExperiments.map((experiment) => [experiment.resource_name!, experiment]),
@@ -676,7 +731,7 @@ export async function checkActiveExperimentImpact(
           campaignId: campaignIdFromResourceName(rn) ?? "",
           campaignResourceName: rn,
           experimentResourceName: experiment.resource_name,
-          experimentId: String(experiment.id ?? experimentIdFromResourceName(experiment.resource_name) ?? ""),
+          experimentId: experimentIdFromResourceName(experiment.resource_name) ?? "",
           experimentName: experiment.name ?? "",
           armName: arm.name ?? "",
           armRole: role,
@@ -707,6 +762,7 @@ export async function createExperiment(
   auth: AuthContext,
   params: CreateExperimentParams,
 ): Promise<CreateExperimentResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
 
   const name = params.name.trim();
@@ -820,6 +876,7 @@ export async function addExperimentArms(
   experimentResourceName: string,
   arms: ExperimentArmInput[],
 ): Promise<AddExperimentArmsResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
 
@@ -946,6 +1003,7 @@ export async function scheduleExperiment(
   auth: AuthContext,
   experimentResourceName: string,
 ): Promise<ScheduleExperimentResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
 
   const status = await fetchExperimentStatus(customer, experimentResourceName);
@@ -1004,6 +1062,7 @@ export async function endExperiment(
   auth: AuthContext,
   experimentResourceName: string,
 ): Promise<EndExperimentResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
 
   const status = await fetchExperimentStatus(customer, experimentResourceName);
@@ -1063,6 +1122,7 @@ export async function promoteExperiment(
   auth: AuthContext,
   experimentResourceName: string,
 ): Promise<PromoteExperimentResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
 
   const status = await fetchExperimentStatus(customer, experimentResourceName);
@@ -1123,6 +1183,7 @@ export async function graduateExperiment(
   experimentResourceName: string,
   campaignBudgetResourceName: string,
 ): Promise<GraduateExperimentResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
 
   const status = await fetchExperimentStatus(customer, experimentResourceName);
@@ -1437,6 +1498,7 @@ export async function createAdVariationExperiment(
   auth: AuthContext,
   params: CreateAdVariationExperimentParams,
 ): Promise<CreateAdVariationExperimentResult> {
+  invalidateActiveExperimentProbeCache(auth);
   const customer = getCustomer(auth);
   const split = params.treatmentTrafficSplit ?? 50;
   const patches = { headlines: false, descriptions: false, finalUrl: false };

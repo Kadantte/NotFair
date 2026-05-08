@@ -47,6 +47,8 @@ import {
   checkActiveExperimentImpact,
   listExperimentAsyncErrors,
   createAdVariationExperiment,
+  invalidateActiveExperimentProbeCache,
+  __resetActiveExperimentProbeCacheForTests,
   __testInternals,
 } from "./experiments";
 import type { AuthContext } from "./types";
@@ -61,6 +63,7 @@ const EXP_RN = "customers/1234567890/experiments/555";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetActiveExperimentProbeCacheForTests();
 });
 
 describe("listActiveExperiments", () => {
@@ -309,6 +312,78 @@ describe("listActiveExperiments", () => {
         armRole: "CONTROL",
       }),
     ]);
+  });
+});
+
+describe("active-experiment probe cache", () => {
+  it("caches a 'no experiments' probe and skips GAQL on the next call", async () => {
+    queryFn.mockResolvedValueOnce([]);
+
+    const first = await checkActiveExperimentImpact(auth, ["100"]);
+    expect(first.ok).toBe(true);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    const second = await checkActiveExperimentImpact(auth, ["100"]);
+    expect(second.ok).toBe(true);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache when active experiments exist (positive case)", async () => {
+    const experimentRow = {
+      experiment: {
+        resource_name: EXP_RN,
+        name: "LP test",
+        status: "ENABLED",
+      },
+    };
+    const armRows = [
+      {
+        experiment_arm: {
+          experiment: EXP_RN,
+          name: "control",
+          control: true,
+          traffic_split: 50,
+          campaigns: ["customers/1234567890/campaigns/200"],
+          in_design_campaigns: [],
+        },
+      },
+    ];
+    queryFn
+      .mockResolvedValueOnce([experimentRow])
+      .mockResolvedValueOnce(armRows)
+      .mockResolvedValueOnce([experimentRow])
+      .mockResolvedValueOnce(armRows);
+
+    await checkActiveExperimentImpact(auth, ["100"]);
+    await checkActiveExperimentImpact(auth, ["100"]);
+
+    // Both calls fully run the probe; no cache short-circuit.
+    expect(queryFn).toHaveBeenCalledTimes(4);
+  });
+
+  it("invalidates the cache when an experiment is mutated", async () => {
+    queryFn.mockResolvedValueOnce([]);
+    await checkActiveExperimentImpact(auth, ["100"]);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    invalidateActiveExperimentProbeCache(auth);
+
+    queryFn.mockResolvedValueOnce([]);
+    await checkActiveExperimentImpact(auth, ["100"]);
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("createExperiment invalidates the probe cache", async () => {
+    queryFn.mockResolvedValueOnce([]);
+    await checkActiveExperimentImpact(auth, ["100"]);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    experimentsCreate.mockResolvedValueOnce({ results: [{ resource_name: EXP_RN }] });
+    await createExperiment(auth, { name: "new exp", type: "SEARCH_CUSTOM" });
+
+    queryFn.mockResolvedValueOnce([]);
+    await checkActiveExperimentImpact(auth, ["100"]);
+    expect(queryFn).toHaveBeenCalledTimes(2);
   });
 });
 
