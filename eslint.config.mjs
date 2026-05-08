@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "packages/notfair-design-mcp/**",
     "next-env.d.ts",
   ]),
 ]);

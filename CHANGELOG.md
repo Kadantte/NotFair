@@ -4,12 +4,22 @@ All notable changes to NotFair will be documented in this file.
 
 ## Unreleased
 
+## [0.4.0.0] - 2026-05-08
+
+### Added
+- **Hosted Design MCP at `/api/mcp/design`.** Any signed-in NotFair user can connect Claude.ai, Claude Code, Codex, Cursor, or any MCP-compatible client and generate images from a prompt — no API keys, no local install. Two tools: `generate_image` (Gemini 3 Pro Image Preview server-side, returns a public URL) and `get_usage` (monthly quota snapshot). Quota: free=3 images/month, growth=100 images/month, atomically tracked in a new `design_usage_monthly` table with reserve-and-release semantics so failed generations don't burn quota.
+- **AWS S3 image storage with least-privilege IAM.** Generated images upload to a public-read prefix (`design/<userId>/`) on a dedicated S3 bucket; signing IAM user has PutObject only. Local dev falls back to `public/design-dev/` so the full pipeline works without provisioning S3.
+- **Design MCP entry in the Connect MCP sub-sider** with a setup page at `/connect/design` mirroring the Google Ads / Meta Ads MCP setup tabs (Claude Connector, Claude Code, Codex, Any MCP). OAuth flow reuses the existing NotFair authorize/token endpoints with a new `oat_design_*` token prefix bound to the user's session.
+- **Eval prompts for Design MCP** at `scripts/eval-mcp/prompts-design.json` covering image generation across aspect ratios and quota inspection paths.
+
 ### Changed
 - **Google Ads MCP tool guidance is more explicit for agent callers.** `runScript` now includes a copy-pasteable `ads.gaqlParallel([{ name, query, limit }])` example, documents `{ partial: true }` for intentional partial success, and clarifies Local Services / `local_services_*` conversion actions as Google-managed/read-only when they appear only through conversion-action segments. Keyword write tools now describe `addKeyword` / `bulkAddKeywords` as creating new positive keywords so agents do not invent duplicate `createKeyword` tools.
 - **GAQL schema errors now point agents at the exact metadata workflow.** Invalid-field and enum-code tips tell agents to call `getResourceMetadata` with the query's `FROM` resource instead of guessing at Google Ads field names.
+- **Connector setup steps no longer show outdated Claude.ai screenshots.** Removed two stale screenshots (`02-configure.png`, `03-saved.png`) that no longer match the current Claude.ai UI; instructions now lead users by text only.
 
 ### Fixed
 - **GAQL preflight now auto-selects non-date fields used in predicates or ordering.** `runScript` queries that filter on fields like `campaign.id` or `campaign.status` no longer fail Google Ads `query_error=16` solely because the agent forgot to include those fields in `SELECT`.
+- **OAuth token issuance correctly stamps audience for non-Google-Ads platforms.** The Google-Ads-specific phase-2 translator that promotes `sessionId` bindings to `connectionId` now gates on `platform === "google_ads"` so design tokens (and future non-ads platforms) keep their session binding instead of being silently corrupted at exchange time for users who also have Google Ads connected.
 
 ## [0.3.15.0] - 2026-05-07
 

@@ -1,0 +1,29 @@
+{
+  "name": "notfair-design-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP server for NotFair design image generation.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "notfair-design-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.36.0",
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

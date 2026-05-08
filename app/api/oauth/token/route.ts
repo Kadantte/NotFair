@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { redirectUriEquivalent } from "@/lib/oauth/redirect-uri";
-import { DEFAULT_RESOURCE_PATH, findResource } from "@/lib/mcp/resources";
+import { DEFAULT_RESOURCE_PATH, findResource, resolveResourceFromUrl } from "@/lib/mcp/resources";
 import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 
 /**
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
         {
           error: "invalid_grant",
           error_description:
-            "The Google Ads session bound to this authorization code has expired. Reconnect at notfair.co/connect to mint a new session.",
+            "The session bound to this authorization code has expired. Sign in again at notfair.co/connect to mint a new session.",
         },
         { status: 400 },
       );
@@ -223,7 +223,13 @@ export async function POST(request: Request) {
       Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000),
     );
 
-    if (readGoogleFromConnections() && session.userId) {
+    // Phase-2 Google translator: only run when the auth code's resource is
+    // google_ads. Design tokens also carry sessionId (they bind to
+    // mcp_sessions, not ad_platform_connections), so we must NOT translate
+    // them — a design user who also has Google Ads would otherwise have their
+    // design token silently rewritten to a Google connection binding.
+    const codeResource = resolveResourceFromUrl(authCode.resourceUrl ?? DEFAULT_RESOURCE_PATH);
+    if (readGoogleFromConnections() && session.userId && codeResource?.platform === "google_ads") {
       const [conn] = await db()
         .select({ id: schema.adPlatformConnections.id })
         .from(schema.adPlatformConnections)

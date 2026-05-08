@@ -1471,9 +1471,7 @@
       "title": "Connector konfigurieren",
       "body": "Fulle das Connector-Formular aus:",
       "clickAdd": "Klicke auf <strong>Hinzufugen</strong>.",
-      "configureAlt": "Dialog Benutzerdefinierten Connector hinzufugen mit ausgefulltem Namen und Remote-MCP-Server-URL",
       "verify": "Prufe, dass <strong>{connectorName}</strong> mit allen verfugbaren Tools in deiner Connector-Liste erscheint.",
-      "savedAlt": "NotFair-Connector gespeichert und unter Connectors mit seinen Tool-Berechtigungen gelistet",
       "refreshTools": "Klicken Sie auf <strong>···</strong> → <strong>Tools-Liste aktualisieren</strong>.",
       "refreshAlt": "Connector-Menü mit hervorgehobener Option „Tools-Liste aktualisieren\""
     },
@@ -1572,7 +1570,8 @@
     "title": "MCP verbinden",
     "items": {
       "googleAds": "Google Ads-MCP",
-      "metaAds": "Meta Ads-MCP"
+      "metaAds": "Meta Ads-MCP",
+      "design": "Design-MCP"
     }
   },
   "MissingPlatformWarning": {
@@ -1688,5 +1687,11 @@
     "title": "Verbinde dein Google Ads-Konto",
     "body": "Verknupfe dein Google Ads-Konto, um deine Kampagnen mit KI zu verwalten. Du autorisierst Lese- und Schreibzugriff auf deine Anzeigendaten.",
     "cta": "Google Ads verbinden"
+  },
+  "ConnectDesignMcpPage": {
+    "title": "Design-MCP verbinden",
+    "bodyBeforeCode": "Verbinde deinen Claude- / Codex- / Cursor- / MCP-Client mit der gehosteten Bildgenerierungs-Ressource von NotFair unter",
+    "bodyAfterCode": ". Einmal authentifizieren und serverseitig Bilder generieren — keine API-Schlüssel erforderlich.",
+    "examplePrompt": "Generiere ein hochwertiges Heldenbild für eine SaaS-Landingpage zum Thema KI-gestütztes Ad-Management. Redaktionelle Beleuchtung, dunkler Hintergrund, kein Text, 16:9."
   }
 }

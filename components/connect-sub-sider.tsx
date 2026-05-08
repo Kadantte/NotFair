@@ -4,12 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Sparkles } from "lucide-react";
+
+type IconKind = "google" | "meta" | "design";
 
 const ITEMS: Array<{
   href: string;
-  labelKey: "googleAds" | "metaAds";
+  labelKey: "googleAds" | "metaAds" | "design";
   match: (pathname: string) => boolean;
-  icon: "google" | "meta";
+  icon: IconKind;
 }> = [
   {
     href: "/connect/google-ads",
@@ -23,7 +26,25 @@ const ITEMS: Array<{
     icon: "meta",
     match: (p) => p.startsWith("/connect/meta-ads"),
   },
+  {
+    href: "/connect/design",
+    labelKey: "design",
+    icon: "design",
+    match: (p) => p.startsWith("/connect/design"),
+  },
 ];
+
+function ItemIcon({ icon }: { icon: IconKind }) {
+  if (icon === "design") {
+    return (
+      <Sparkles className="h-4 w-4 shrink-0 text-current" aria-hidden="true" />
+    );
+  }
+  const src = icon === "google" ? "/google-ads-icon.svg" : "/meta-icon.svg";
+  return (
+    <Image src={src} alt="" width={16} height={16} className="shrink-0" aria-hidden="true" />
+  );
+}
 
 export function ConnectSubSider() {
   const pathname = usePathname();
@@ -36,7 +57,6 @@ export function ConnectSubSider() {
       <nav className="space-y-0.5">
         {ITEMS.map((item) => {
           const active = item.match(pathname);
-          const iconSrc = item.icon === "google" ? "/google-ads-icon.svg" : "/meta-icon.svg";
           return (
             <Link
               key={item.href}
@@ -48,7 +68,7 @@ export function ConnectSubSider() {
                   : "text-[#C4C0B6] hover:bg-[#E8E4DD]/6 hover:text-[#E8E4DD]"
               }`}
             >
-              <Image src={iconSrc} alt="" width={16} height={16} className="shrink-0" aria-hidden="true" />
+              <ItemIcon icon={item.icon} />
               <span className="truncate">{t(`items.${item.labelKey}`)}</span>
             </Link>
           );

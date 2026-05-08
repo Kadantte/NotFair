@@ -1471,9 +1471,7 @@
       "title": "Configurar el conector",
       "body": "Completa el formulario del conector:",
       "clickAdd": "Haz clic en <strong>Agregar</strong>.",
-      "configureAlt": "Dialogo de agregar conector personalizado con Nombre y URL del servidor MCP remoto completados",
       "verify": "Verifica que <strong>{connectorName}</strong> aparezca en tu lista de conectores con todas las herramientas disponibles.",
-      "savedAlt": "Conector de NotFair guardado y listado en Connectors con sus permisos de herramientas",
       "refreshTools": "Haga clic en <strong>···</strong> → <strong>Actualizar lista de herramientas</strong>.",
       "refreshAlt": "Menú del conector con la opción «Actualizar lista de herramientas» resaltada"
     },
@@ -1572,7 +1570,8 @@
     "title": "Conectar MCP",
     "items": {
       "googleAds": "MCP de Google Ads",
-      "metaAds": "MCP de Meta Ads"
+      "metaAds": "MCP de Meta Ads",
+      "design": "MCP de Diseño"
     }
   },
   "MissingPlatformWarning": {
@@ -1688,5 +1687,11 @@
     "title": "Conecta tu cuenta de Google Ads",
     "body": "Vincula tu cuenta de Google Ads para empezar a administrar tus campanas con IA. Autorizaras acceso de lectura y escritura a tus datos publicitarios.",
     "cta": "Conectar Google Ads"
+  },
+  "ConnectDesignMcpPage": {
+    "title": "Conectar MCP de Diseño",
+    "bodyBeforeCode": "Conecta tu cliente Claude / Codex / Cursor / MCP al recurso de generación de imágenes alojado de NotFair en",
+    "bodyAfterCode": ". Autentícate una vez y genera imágenes en el servidor — sin necesidad de claves API.",
+    "examplePrompt": "Genera una imagen hero pulida para una landing page de SaaS sobre gestión publicitaria con IA. Iluminación editorial, fondo oscuro, sin texto, 16:9."
   }
 }

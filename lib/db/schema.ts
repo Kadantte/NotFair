@@ -11,6 +11,7 @@ import {
   index,
   timestamp,
   jsonb,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // ─── Goals & Guardrails ──────────────────────────────────────────────
@@ -765,3 +766,19 @@ export const emailPreferences = pgTable("email_preferences", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ─── Design MCP Usage Quota ──────────────────────────────────────────
+//
+// One row per (user_id, year_month). Count is the number of successfully
+// generated images for that calendar month. Used by lib/design/quota.ts
+// to enforce per-plan monthly limits without an external rate-limiting
+// service. See drizzle/0039_design_usage.sql.
+
+export const designUsageMonthly = pgTable("design_usage_monthly", {
+  userId: text("user_id").notNull(),
+  yearMonth: text("year_month").notNull(), // 'YYYY-MM'
+  count: integer("count").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.yearMonth] }),
+]);

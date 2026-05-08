@@ -54,3 +54,4 @@ toprank/
 # analysis reports
 docs/analysis/
 .env*.local
+public/design-dev/

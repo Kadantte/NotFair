@@ -16,6 +16,7 @@ import { withMcpTelemetry } from "@/lib/mcp/telemetry";
 import { flushServerEvents, trackServerEvent } from "@/lib/analytics-server";
 import { DEFAULT_RESOURCE_PATH, findResource, type Platform } from "@/lib/mcp/resources";
 import { activeLoginCustomerIdFor } from "@/lib/connections/google-read";
+import type { DesignAuthContext } from "@/lib/mcp/platforms/design";
 
 /**
  * Per-request auth context shape, common across every platform MCP. Platform-
@@ -61,6 +62,53 @@ export type PlatformMcpConfig = {
 };
 
 const SCHEMA_METHODS = new Set(["initialize", "tools/list", "notifications/initialized"]);
+
+/**
+ * RFC 8707 audience check. Throws when the token was issued for a different
+ * platform than the resource it's being presented at. Cross-URL within the
+ * same platform is allowed (legacy `/api/mcp` and `/api/mcp/google_ads` both
+ * map to `google_ads`).
+ */
+function assertTokenAudience(
+  tokenResourceUrl: string | null | undefined,
+  expectedPlatform: Platform,
+): void {
+  const tokenResource = tokenResourceUrl ?? DEFAULT_RESOURCE_PATH;
+  const tokenPlatform = findResource(tokenResource)?.platform;
+  if (tokenPlatform !== expectedPlatform) {
+    throw new Error(
+      `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${expectedPlatform}.`,
+    );
+  }
+}
+
+/**
+ * Build a 401 response with the RFC 6750 + MCP-spec `WWW-Authenticate` header
+ * pointing at the path-aware protected-resource document. Shared by every
+ * MCP route handler so a single change here updates the discovery URL for
+ * all platforms.
+ */
+function buildUnauthorizedResponse(
+  request: Request,
+  resourceUrlPath: string,
+  message: string,
+): Response {
+  const url = new URL(request.url);
+  const host = request.headers.get("host") ?? url.host;
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  const resourceMetadata =
+    `${proto}://${host}/.well-known/oauth-protected-resource${resourceUrlPath}`;
+  return new Response(
+    JSON.stringify({ error: message || "Authentication required" }),
+    {
+      status: 401,
+      headers: {
+        "Content-Type": "application/json",
+        "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadata}"`,
+      },
+    },
+  );
+}
 
 /**
  * Build a Next.js App Router request handler that serves the MCP protocol
@@ -207,14 +255,7 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
           .limit(1);
 
         if (row) {
-          // Audience check (platform-scoped, same as Google branch).
-          const tokenResource = row.tokenResourceUrl ?? DEFAULT_RESOURCE_PATH;
-          const tokenPlatform = findResource(tokenResource)?.platform;
-          if (tokenPlatform !== config.platform) {
-            throw new Error(
-              `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${config.platform}.`,
-            );
-          }
+          assertTokenAudience(row.tokenResourceUrl, config.platform);
 
           // Build a Google-shaped AuthContext from the Meta connection. The
           // tool surface is currently Google-only; when Stage 4 introduces
@@ -283,16 +324,11 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
           // Strict per-URL audience proved too rigid for real-world clients:
           // rmcp (Codex's MCP client) implements RFC 8414 but skips RFC 9728
           // protected-resource discovery, so it never sends `resource=` on
-          // /authorize and the issued token defaults to /api/mcp. Without this
-          // relaxation, those tokens would 401 at any platform-explicit URL
-          // even though the user is authentic and the session is platform-bound.
-          const tokenResource = tokenRow.resourceUrl ?? DEFAULT_RESOURCE_PATH;
-          const tokenPlatform = findResource(tokenResource)?.platform;
-          if (tokenPlatform !== config.platform) {
-            throw new Error(
-              `Token audience mismatch — issued for ${tokenPlatform ?? "unknown"} platform, this resource is ${config.platform}.`,
-            );
-          }
+          // /authorize and the issued token defaults to /api/mcp. The
+          // platform-scoped check (assertTokenAudience) lets a default-resource
+          // token authenticate at any same-platform URL while still blocking
+          // cross-platform impersonation.
+          assertTokenAudience(tokenRow.resourceUrl, config.platform);
 
           if (tokenRow.connectionId !== null) {
             // Phase-2 connection-bound Google token. Build the AuthContext
@@ -451,30 +487,8 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
       // Allow schema introspection without auth so MCP clients can probe
       // capabilities before completing the OAuth dance.
       const { schemaOnly, cloned } = await isSchemaRequest(request);
-      if (schemaOnly) {
-        return mcpHandler(cloned);
-      }
-      // RFC 6750 §3 + MCP spec: 401 responses from protected resources MUST
-      // include WWW-Authenticate so clients can discover the auth server and
-      // kick off an OAuth flow. resource_metadata points at the path-aware
-      // protected-resource document for *this* resource — pointing at the
-      // root document would mis-direct clients of platform-explicit paths
-      // back at the legacy `/api/mcp` resource.
-      const url = new URL(request.url);
-      const host = request.headers.get("host") ?? url.host;
-      const proto = request.headers.get("x-forwarded-proto") ?? "https";
-      const resourceMetadata =
-        `${proto}://${host}/.well-known/oauth-protected-resource${config.resourceUrlPath}`;
-      return new Response(
-        JSON.stringify({ error: (e as Error).message || "Authentication required" }),
-        {
-          status: 401,
-          headers: {
-            "Content-Type": "application/json",
-            "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadata}"`,
-          },
-        },
-      );
+      if (schemaOnly) return mcpHandler(cloned);
+      return buildUnauthorizedResponse(request, config.resourceUrlPath, (e as Error).message);
     }
 
     if (request.method === "POST" && auth.sessionId != null && !auth.clientName) {
@@ -483,6 +497,166 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
 
     after(flushServerEvents);
 
+    return authStore.run(auth, () => mcpHandler(request));
+  }
+
+  return handler;
+}
+
+// ─── Simple MCP handler (no customerId / platform connection required) ───────
+//
+// Used by resource types that authenticate via any valid NotFair session
+// (currently: Design). Unlike createPlatformMcpHandler, the auth context
+// carries only `userId` — there is no Google / Meta ad-platform binding.
+
+export type SimpleMcpConfig = {
+  platform: Platform;
+  resourceUrlPath: string;
+  tokenPrefix: string;
+  legacyTokenPrefixes: readonly string[];
+  instructions: string;
+  registerTools: (server: McpServer, currentAuth: () => DesignAuthContext) => void;
+};
+
+/**
+ * Build a Next.js App Router request handler for a "user-only" MCP resource.
+ * Auth resolves to `{ userId: string }` via an `oat_design_*`-prefixed bearer
+ * token that binds to an `mcp_sessions` row (via sessionId). No customerId,
+ * no ad-platform connection required.
+ */
+export function createSimpleMcpHandler(config: SimpleMcpConfig) {
+  const authStore = new AsyncLocalStorage<DesignAuthContext>();
+
+  function currentAuth(): DesignAuthContext {
+    const auth = authStore.getStore();
+    if (!auth) throw new Error("No auth context — request not authenticated.");
+    return auth;
+  }
+
+  const mcpHandler = createMcpHandler(
+    (server) => {
+      withMcpTelemetry(server);
+      config.registerTools(server, currentAuth);
+    },
+    {
+      instructions: config.instructions,
+      serverInfo: {
+        name: `notfair-${config.platform.replace("_", "-")}-mcp`,
+        version: "1.0.0",
+      },
+    },
+    mcpHandlerEndpointConfig(config.resourceUrlPath),
+  );
+
+  async function resolveSimpleAuth(request: Request): Promise<DesignAuthContext> {
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    // Dev-only bypass mirroring createPlatformMcpHandler. Lets eval-mcp drive
+    // /api/mcp/design via raw HTTP without running the OAuth dance. Triple
+    // gated: NODE_ENV=development, DEV_LOCAL_EMAIL set, no Authorization
+    // header (real Bearer flows still work in dev).
+    if (
+      !bearerToken
+      && process.env.NODE_ENV === "development"
+      && process.env.DEV_LOCAL_EMAIL
+    ) {
+      const devEmail = process.env.DEV_LOCAL_EMAIL;
+      const [s] = await db()
+        .select({ userId: schema.mcpSessions.userId })
+        .from(schema.mcpSessions)
+        .where(
+          and(
+            eq(schema.mcpSessions.googleEmail, devEmail),
+            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+          ),
+        )
+        .orderBy(desc(schema.mcpSessions.createdAt))
+        .limit(1);
+      if (!s) {
+        throw new Error(
+          `DEV_LOCAL_EMAIL bypass active but no valid mcpSession found for ${devEmail}. ` +
+          `Sign in at http://localhost:3000/connect first.`,
+        );
+      }
+      if (!s.userId) {
+        throw new Error("Dev session has no userId. Sign in at /connect first.");
+      }
+      return { userId: s.userId };
+    }
+
+    if (!bearerToken) {
+      throw new Error("No valid authentication. Sign in at /connect/design to get your MCP token.");
+    }
+
+    const isKnownPrefix =
+      bearerToken.startsWith(config.tokenPrefix)
+      || config.legacyTokenPrefixes.some((p) => bearerToken.startsWith(p));
+
+    if (!isKnownPrefix) {
+      throw new Error("Token does not match any accepted prefix for this MCP resource.");
+    }
+
+    // Design tokens bind to sessionId (mcp_sessions), never connectionId.
+    // One JOIN-ed read instead of two serial roundtrips.
+    const [row] = await db()
+      .select({
+        userId: schema.mcpSessions.userId,
+        sessionId: schema.oauthAccessTokens.sessionId,
+        resourceUrl: schema.oauthAccessTokens.resourceUrl,
+        sessionExpiresAt: schema.mcpSessions.expiresAt,
+      })
+      .from(schema.oauthAccessTokens)
+      .leftJoin(
+        schema.mcpSessions,
+        eq(schema.mcpSessions.id, schema.oauthAccessTokens.sessionId),
+      )
+      .where(eq(schema.oauthAccessTokens.token, bearerToken))
+      .limit(1);
+
+    if (!row) {
+      throw new Error("Token not found or revoked. Sign in again at /connect/design.");
+    }
+
+    assertTokenAudience(row.resourceUrl, config.platform);
+
+    if (row.sessionId === null) {
+      throw new Error("Design token has no session binding. Re-register via /connect/design.");
+    }
+
+    if (!row.sessionExpiresAt || row.sessionExpiresAt < new Date().toISOString()) {
+      throw new Error("Session expired. Sign in again at /connect/design to get a new token.");
+    }
+
+    if (!row.userId) {
+      throw new Error("Session has no user ID. Sign in again at /connect/design.");
+    }
+
+    trackServerEvent(row.userId, "mcp_oauth_used", {
+      client_name: null,
+      client_version: null,
+      resource_url: config.resourceUrlPath,
+      platform: config.platform,
+      binding: "session",
+      user_agent: request.headers.get("user-agent") ?? null,
+    });
+
+    return { userId: row.userId };
+  }
+
+  async function handler(request: Request): Promise<Response> {
+    let auth: DesignAuthContext | null = null;
+    try {
+      auth = await resolveSimpleAuth(request);
+    } catch (e) {
+      const { schemaOnly, cloned } = await isSchemaRequest(request);
+      if (schemaOnly) return mcpHandler(cloned);
+      return buildUnauthorizedResponse(request, config.resourceUrlPath, (e as Error).message);
+    }
+
+    after(flushServerEvents);
     return authStore.run(auth, () => mcpHandler(request));
   }
 

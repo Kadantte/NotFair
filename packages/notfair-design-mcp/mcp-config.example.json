@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "notfair-design": {
+      "command": "node",
+      "args": ["/Users/tongchen/Documents/Projects/notfair/packages/notfair-design-mcp/dist/index.js"],
+      "env": {
+        "OPENAI_API_KEY": "YOUR_OPENAI_API_KEY",
+        "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY",
+        "NOTFAIR_DESIGN_PROVIDER": "nano_banana",
+        "NOTFAIR_DESIGN_USER_STATUS": "free",
+        "NOTFAIR_DESIGN_USER_ID": "local",
+        "NOTFAIR_DESIGN_OUTPUT_DIR": "./out"
+      }
+    }
+  }
+}

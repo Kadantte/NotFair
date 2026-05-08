@@ -60,6 +60,7 @@ export async function GET(request: Request) {
   }
   const resourceUrlPath = resolvedResource?.path ?? DEFAULT_RESOURCE_PATH;
   const isMetaResource = resolvedResource?.platform === "meta_ads";
+  const isDesignResource = resolvedResource?.platform === "design";
 
   if (responseType !== "code") {
     return NextResponse.json(
@@ -111,15 +112,15 @@ export async function GET(request: Request) {
   }
 
   // Pre-bound clients are Google-only — `oauth_clients.session_id` points
-  // at an `mcp_sessions` row. Refusing them at the Meta resource avoids
-  // mismatched-target tokens (a Google session_id getting stamped onto a
-  // Meta-audience auth code, which would then violate the XOR CHECK).
-  if (client.sessionId !== null && isMetaResource) {
+  // at an `mcp_sessions` row. Refusing them at the Meta and Design resources
+  // avoids mismatched-target tokens (a Google session_id getting stamped onto
+  // a Meta- or Design-audience auth code, which would then violate the XOR CHECK).
+  if (client.sessionId !== null && (isMetaResource || isDesignResource)) {
     return NextResponse.json(
       {
         error: "invalid_target",
         error_description:
-          "Pre-bound OAuth clients are Google-only. Re-register via /api/oauth/register to use the Meta resource.",
+          "Pre-bound OAuth clients are Google-only. Re-register via /api/oauth/register to use this resource.",
       },
       { status: 400 },
     );
@@ -170,7 +171,34 @@ export async function GET(request: Request) {
     const userId = identity.userId;
     const legacyMcpSessionId = identity.legacySessionId;
 
-    if (isMetaResource) {
+    if (isDesignResource) {
+      // 4. Design DCR: any authenticated NotFair user can connect. Bind the
+      // auth code to the user's most-recent non-expired mcp_sessions row via
+      // sessionId (no customerId requirement). The design MCP does not need
+      // Google Ads credentials — it uses the user's server-side Gemini quota.
+      const [designSession] = await db()
+        .select({ id: schema.mcpSessions.id })
+        .from(schema.mcpSessions)
+        .where(
+          and(
+            eq(schema.mcpSessions.userId, userId),
+            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
+          ),
+        )
+        .orderBy(sql`${schema.mcpSessions.createdAt} DESC`)
+        .limit(1);
+
+      if (!designSession) {
+        // User has no session yet — bounce to sign-in, then back here.
+        const signinUrl = new URL("/api/auth/signin", requestUrl);
+        signinUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
+        );
+        return NextResponse.redirect(signinUrl.toString());
+      }
+      resolvedSessionId = designSession.id;
+    } else if (isMetaResource) {
       // 3. Meta DCR: bind to ad_platform_connections row.
       const [conn] = await db()
         .select({ id: schema.adPlatformConnections.id, activeAccountId: schema.adPlatformConnections.activeAccountId })

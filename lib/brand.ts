@@ -34,6 +34,15 @@ export const MCP_CONNECTOR_NAME = "NotFair-GoogleAds";
 export const META_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/meta_ads`;
 export const META_MCP_CONNECTOR_NAME = "NotFair-MetaAds";
 
+/**
+ * Design MCP — hosted HTTP MCP authenticated via OAuth Bearer token.
+ * Unlike the local stdio Design MCP (npx @notfair/design-mcp), this server
+ * runs server-side and uses the user's NotFair account for API keys and quota.
+ * Surfaced on /connect/design for Claude.ai, Codex, Cursor, and any MCP client.
+ */
+export const DESIGN_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/design`;
+export const DESIGN_MCP_CONNECTOR_NAME = "NotFair-Design";
+
 const EMAIL_DOMAIN = "notfair.co";
 export const SUPPORT_EMAIL = `tong@${EMAIL_DOMAIN}`;
 export const OUTREACH_EMAIL = `tong@${EMAIL_DOMAIN}`;

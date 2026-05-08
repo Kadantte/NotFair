@@ -1,0 +1,32 @@
+[
+  {
+    "id": "hero-image-16x9",
+    "prompt": "Generate a hero image for a SaaS landing page about AI-managed ad operations. 16:9, editorial lighting, no text.",
+    "expected": "generate_image",
+    "reason": "Direct image generation with explicit aspect ratio and 'no text' constraint — should call generate_image with aspectRatio='16:9'."
+  },
+  {
+    "id": "social-story-9x16",
+    "prompt": "Make me a vertical Instagram story image: abstract gradient background, 9:16, no text.",
+    "expected": "generate_image",
+    "reason": "Vertical/story format request — should call generate_image with aspectRatio='9:16'."
+  },
+  {
+    "id": "square-product-mockup",
+    "prompt": "Create a clean product mockup of a smartphone showing a finance dashboard, square format.",
+    "expected": "generate_image",
+    "reason": "Product mockup request with square format — should call generate_image with aspectRatio='1:1'."
+  },
+  {
+    "id": "check-quota",
+    "prompt": "How many image generations do I have left this month?",
+    "expected": "get_usage",
+    "reason": "Quota inspection — should call get_usage and report used / limit / plan."
+  },
+  {
+    "id": "before-generating",
+    "prompt": "What's my current image generation quota? I want to budget how many I can make this month.",
+    "expected": "get_usage",
+    "reason": "User explicitly asks to budget — should fetch usage first via get_usage, NOT call generate_image."
+  }
+]

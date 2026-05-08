@@ -1471,9 +1471,7 @@
       "title": "Configure the connector",
       "body": "Fill in the connector form:",
       "clickAdd": "Click <strong>Add</strong>.",
-      "configureAlt": "Add custom connector dialog with Name and Remote MCP Server URL filled in",
       "verify": "Verify <strong>{connectorName}</strong> appears in your Connectors list with all available tools.",
-      "savedAlt": "NotFair connector saved and listed under Connectors with its tool permissions",
       "refreshTools": "Click <strong>···</strong> → <strong>Refresh tools list</strong>.",
       "refreshAlt": "Connector menu with the Refresh tools list option highlighted"
     },
@@ -1568,11 +1566,18 @@
     "bodyAfterCode": ". Same setup steps as Google - just a different URL and connector name.",
     "examplePrompt": "Audit my connected Meta ad account (Facebook + Instagram) and tell me the 3 biggest optimization opportunities."
   },
+  "ConnectDesignMcpPage": {
+    "title": "Connect Design MCP",
+    "bodyBeforeCode": "Wire your Claude / Codex / Cursor / MCP client up to NotFair's hosted image generation resource at",
+    "bodyAfterCode": ". Authenticate once and generate images server-side — no API keys required.",
+    "examplePrompt": "Generate a polished hero image for a SaaS landing page about AI-powered ad management. Editorial lighting, dark background, no text, 16:9."
+  },
   "ConnectSubSider": {
     "title": "Connect MCP",
     "items": {
       "googleAds": "Google Ads MCP",
-      "metaAds": "Meta Ads MCP"
+      "metaAds": "Meta Ads MCP",
+      "design": "Design MCP"
     }
   },
   "MissingPlatformWarning": {
