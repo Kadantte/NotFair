@@ -671,6 +671,45 @@ Pre-flip end-to-end audit (in chat): walked the full new-user journey under flag
 - npm scripts: `db:backfill-google-connections`, `db:check-google-connection-invariant`.
 - Tests: extended `auth-callback.test.ts` and `select-account-route.test.ts` with dual-write assertions.
 
+## Day-1 post-flip metrics (2026-05-08, ~24h after `STOP_CREATING_MCP_SESSIONS` flip)
+
+Dev-excluded, last 24h, PostHog project 368485.
+
+| Event | Hits | Users | Notes |
+|---|---|---|---|
+| `mcp_direct_bearer_used` | 14,331 | 47 | Frozen cohort, +2 users vs pre-flip 12h read. New minting blocked; can only shrink. |
+| `mcp_oauth_used` | 6,275 | 104 | binding mix: session 87 users (85%), connection 13 users (15%). Long tail of pre-phase-2 sessionId-bound Google tokens — phase 5 cancelled, these stay forever. |
+| `web_session_resolved` | 2,809 | 49 | via mix: supabase 29 users (71%), cookie_fallback 25 users (29%). Step-3 gate is <5% sustained ≥3 days; expect 5–7 day decay. |
+| `auth_identity_resolved` | 189 | 35 | `oauth-authorize` is biggest, ~80% cookie_fallback (DCR flow needs live `sb-*` at `/authorize`); `select-account` 100% supabase. |
+| `google_connection_mismatch` | 245 | **3** | All `refreshToken`-only field diffs, **same 3 users, population stable**. Connection-bound MCP refresh updates `ad_platform_connections` only — `mcp_sessions.refreshToken` is no longer the read source on either path, so the divergence is cosmetic. Quiets when these users pick up `sb-*` cookies. |
+| `auth_error` | 14 | 1 | All `scope_denied_retry` (user denying Google OAuth scopes). Unrelated to migration. |
+
+### Read-side regressions
+
+None observed. The one spike (`google_connection_mismatch` jumping from 1 → 245) is benign — refresh-token rotation on the connection row not mirrored to the legacy `mcp_sessions` row. Worth tracking only if affected-user count climbs above 3.
+
+### Direction
+
+- `cookie_fallback` share: 34% (initial 3h read) → 29% (24h). Slow decay, hour-by-hour bounces with active-user mix. On track but won't hit <5% for several days.
+- Step 3 + 4 cookie cutover stays gated.
+
+### Afternoon re-check (2026-05-08, ~6h after the morning readout)
+
+| Event | Hits | Users | Δ vs morning |
+|---|---|---|---|
+| `mcp_direct_bearer_used` | 13,305 | 44 | -3 users (older calls aged out of 24h window) |
+| `mcp_oauth_used` | 6,415 | 106 | +2 users |
+| `web_session_resolved` | 2,773 | 49 | flat |
+| `google_connection_mismatch` | 245 | **3** | **population still 3; last event 07:22 PT — ~6h dry** |
+| `auth_identity_resolved` | 177 | 35 | flat |
+| `auth_error` | 13 | 1 | flat (still `scope_denied_retry`, unrelated) |
+
+`web_session_resolved.via` mix: **supabase 69% / cookie_fallback 31%** (29 vs 26 users). Essentially unchanged vs morning (71/29) — same active pool, no meaningful intra-day decay.
+
+Mismatch alarm is contained — all 245 hits are residual from the morning burst, no new ones in 6h. Refresh-token drift is on the legacy `mcp_sessions.refreshToken` field which nothing on the live path reads; self-quieting as those 3 users pick up `sb-*` cookies on next signin. Worth tracking only if affected-user count breaches 3.
+
+Day 1 verdict: clean. Continue the ≥7-day watch; nothing actionable today.
+
 ## Next action
 
 Phase 4 step 1 + 2 are live in prod. Three of the eight items in the step 3+4 code-changes table also already shipped (rotate-token deletion, option B `expiresAt` drop, bearer-block UI removal). Remaining work:
