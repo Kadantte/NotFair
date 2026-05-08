@@ -337,6 +337,41 @@ describe("runSafeGaqlReport validation", () => {
     expect(selectClause).toMatch(/\bsegments\.conversion_action_category\b/);
   });
 
+  it("auto-adds resource fields used in WHERE", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT ad_group.name, metrics.clicks FROM ad_group WHERE campaign.id = 123 AND segments.date DURING YESTERDAY",
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    expect(selectClause).toMatch(/\bcampaign\.id\b/);
+    expect(selectClause).not.toMatch(/\bsegments\.date\b/);
+  });
+
+  it("auto-adds resource fields used in ORDER BY", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.name FROM campaign ORDER BY campaign.id DESC",
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    expect(selectClause).toMatch(/\bcampaign\.id\b/);
+  });
+
+  it("auto-adds explicit status filters even when removed-parent filters are skipped", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.name, campaign.id FROM campaign_asset WHERE campaign.status = 'ENABLED' AND campaign_asset.status != 'REMOVED'",
+    );
+    const query = mockQuery.mock.calls[0][0] as string;
+    const selectClause = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i)?.[1] ?? "";
+    expect(selectClause).toMatch(/\bcampaign\.status\b/);
+    expect(selectClause).toMatch(/\bcampaign_asset\.status\b/);
+  });
+
   it("allows date filters without selecting segments.date", async () => {
     mockQuery.mockResolvedValueOnce([]);
     await runSafeGaqlReport(

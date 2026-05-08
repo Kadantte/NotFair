@@ -2218,7 +2218,7 @@ export async function runSafeGaqlReport(
     throw new Error("The query contains forbidden keywords.");
   }
 
-  query = promoteSegmentsInFiltersToSelect(query);
+  query = promotePredicateFieldsToSelect(query);
   validateChangeEventFilter(query);
   validateMetricsOnConversionAction(query);
   validateEnumLiteralsInWhere(query);
@@ -2338,16 +2338,16 @@ function addFieldsToSelect(query: string, fieldsToAdd: string[]): string {
 }
 
 /**
- * Google Ads requires most `segments.*` fields used in predicates to also be
- * present in SELECT (query_error=16). That is a GAQL footgun, not a useful
- * caller contract, so promote those segment fields automatically instead of
- * forcing agents to retry.
+ * Google Ads requires fields used in WHERE/HAVING/ORDER BY to also be present
+ * in SELECT (query_error=16). That is a GAQL footgun, not a useful caller
+ * contract, so promote safe fields automatically instead of forcing agents to
+ * retry.
  *
  * Date/time period segments are intentionally exempt: Google allows them as
  * filters without selecting them, and selecting them would change metric
  * granularity by splitting rows by date/week/month.
  */
-export function promoteSegmentsInFiltersToSelect(query: string): string {
+export function promotePredicateFieldsToSelect(query: string): string {
   const selectMatch = query.match(/^\s*SELECT\s+([\s\S]+?)\s+FROM\s+/i);
   if (!selectMatch) return query;
 
@@ -2358,22 +2358,32 @@ export function promoteSegmentsInFiltersToSelect(query: string): string {
       .filter(Boolean),
   );
   const missing = new Set<string>();
-  const segmentRegex = /\bsegments\.[a-z_]+\b/gi;
+  const fieldRegex = /\b[a-z][a-z_]*(?:\.[a-z_][a-z0-9_]*)+\b/gi;
 
   const predicateClauses = [
     query.match(/\sWHERE\s+([\s\S]*?)(?:\sHAVING\s|\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i)?.[1],
     query.match(/\sHAVING\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i)?.[1],
+    query.match(/\sORDER\s+BY\s+([\s\S]*?)(?:\sLIMIT\s|\sPARAMETERS\s|$)/i)?.[1],
   ].filter((clause): clause is string => typeof clause === "string");
 
   for (const clause of predicateClauses) {
-    for (const match of clause.matchAll(segmentRegex)) {
+    for (const match of stripQuotedGaqlLiterals(clause).matchAll(fieldRegex)) {
       const field = match[0].toLowerCase();
+      if (field.startsWith("metrics.")) continue;
       if (SEGMENT_WHERE_SELECT_EXEMPTIONS.has(field)) continue;
+      if (rawFieldForVirtualSibling(field)) continue;
       if (!selected.has(field)) missing.add(field);
     }
   }
 
   return addFieldsToSelect(query, [...missing].sort());
+}
+
+// Keep old export name for tests/imports outside this module.
+export const promoteSegmentsInFiltersToSelect = promotePredicateFieldsToSelect;
+
+function stripQuotedGaqlLiterals(clause: string): string {
+  return clause.replace(/'[^']*'|"[^"]*"/g, "");
 }
 
 function applyRemovedParentFilters(query: string): string {
