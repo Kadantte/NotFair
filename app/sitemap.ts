@@ -9,7 +9,9 @@ const publicMarketingRoutes = [
   "/google-ads-claude",
   "/google-ads-claude-connector-setup-guide",
   "/google-ads-claude-code-plugin-setup-guide",
+  "/google-ads-codex",
   "/google-ads-codex-mcp-setup-guide",
+  "/google-ads-mcp",
   "/google-ads-mcp-server",
   "/meta-ads-claude-connector-setup-guide",
   "/meta-ads-claude-code-plugin-setup-guide",
@@ -28,7 +30,9 @@ const highPriorityRoutes = new Set([
   "/google-ads-claude",
   "/google-ads-claude-connector-setup-guide",
   "/google-ads-claude-code-plugin-setup-guide",
+  "/google-ads-codex",
   "/google-ads-codex-mcp-setup-guide",
+  "/google-ads-mcp",
   "/google-ads-mcp-server",
   "/meta-ads-claude-connector-setup-guide",
   "/meta-ads-claude-code-plugin-setup-guide",
@@ -42,7 +46,7 @@ const seoLandingRoutes = new Set([
   "/connect-google-ads-to-chatgpt",
   "/ai-google-ads-optimization",
 ]);
-const marketingPagesLastModified = new Date("2026-04-07");
+const marketingPagesLastModified = new Date("2026-05-08");
 const homepageLastModified = new Date("2026-04-07");
 
 export default function sitemap(): MetadataRoute.Sitemap {

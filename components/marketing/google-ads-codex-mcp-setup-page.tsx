@@ -102,6 +102,17 @@ export function GoogleAdsCodexMcpSetupPage() {
               terminal command wires up the MCP server and walks you through
               OAuth — Codex then has live access to diagnose and operate your Google Ads account.
             </p>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-[#C4C0B6]">
+              Looking for the full product overview? Start with{" "}
+              <Link
+                href="/google-ads-codex"
+                prefetch
+                className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
+              >
+                Codex Google Ads agent
+              </Link>
+              , then come back here for the install command.
+            </p>
             <p className="mt-6 text-sm text-[#C4C0B6]">
               Free · No credit card · 1-minute setup
             </p>
@@ -138,6 +149,47 @@ export function GoogleAdsCodexMcpSetupPage() {
           </motion.div>
 
           <CodexSetupSteps surface="marketing" />
+        </div>
+      </section>
+
+      {/* ── First Prompts ── */}
+      <section className="border-t border-[#3D3C36] px-4 py-16">
+        <div className="mx-auto max-w-3xl">
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-60px" }}
+            className="mb-8"
+          >
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+              First prompts
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+              Move from setup to approved writes
+            </h2>
+            <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
+              After the MCP is connected, start with a read-only diagnosis, then ask
+              Codex to draft a specific change and show the diff before writing.
+            </p>
+          </motion.div>
+          <div className="grid gap-3">
+            {[
+              "Audit my Google Ads account and rank fixes by impact.",
+              "Find search terms I should add as negatives, but show me the diff before writing.",
+              "Draft a new RSA for this ad group and wait for approval.",
+              "Explain what changed before CPA spiked this week.",
+            ].map((prompt) => (
+              <div
+                key={prompt}
+                className="rounded-lg border border-[#3D3C36] bg-[#24231F] px-4 py-3"
+              >
+                <code className="text-sm leading-relaxed text-[#E8E4DD]">
+                  {prompt}
+                </code>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

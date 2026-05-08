@@ -4,9 +4,9 @@ import { MCP_CONNECTOR_NAME, MCP_SERVER_URL } from "@/lib/brand";
 import { GOOGLE_ADS_AUDIT_PROMPT } from "@/lib/prompts";
 
 export const metadata = buildMetadata({
-  title: "Codex MCP Setup Guide for Google Ads | NotFair",
+  title: "Google Ads Codex MCP Setup Guide | NotFair",
   description:
-    "Add NotFair to OpenAI's Codex CLI in under a minute. One terminal command wires up Google Ads access — no JSON config, no scripts to run.",
+    "Set up the Google Ads Codex MCP with NotFair in under a minute. One terminal command gives Codex live Google Ads access for diagnosis, approved edits, and search-term cleanup.",
   path: "/google-ads-codex-mcp-setup-guide",
   keywords: [
     "google ads codex mcp",
@@ -23,12 +23,17 @@ const faqItems = [
   {
     question: "What does the NotFair Codex MCP do once installed?",
     answer:
-      "It exposes a set of MCP tools to Codex that let it read your Google Ads campaigns, search terms, and spend, and propose write actions you approve in chat. For the full capability overview see the Google Ads × Codex landing page at /google-ads-codex.",
+      "It exposes a set of MCP tools to Codex that let it read your Google Ads campaigns, search terms, and spend, then propose write actions you approve in chat. For the full commercial overview, see /google-ads-codex.",
   },
   {
     question: "How long does setup take?",
     answer:
       `Under a minute. Run a single \`codex mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}\` command in your terminal — Codex walks you through the OAuth flow and registers the MCP automatically.`,
+  },
+  {
+    question: "What should I ask Codex first after setup?",
+    answer:
+      "Start with a data-grounded audit, then move to a reviewable write: ask Codex to rank fixes by impact, find search terms to add as negatives while showing the diff first, or draft a new RSA for an ad group and wait for approval.",
   },
   {
     question: "Do I need to write any code?",
@@ -59,7 +64,7 @@ const jsonLd = [
     "@type": "HowTo",
     name: "How to add the NotFair MCP to OpenAI Codex CLI",
     description:
-      "Add NotFair to OpenAI's Codex CLI as an MCP server with a single terminal command — Codex walks you through OAuth and registers the integration automatically.",
+      "Add the NotFair Google Ads MCP to OpenAI's Codex CLI with a single terminal command — Codex walks you through OAuth and registers the integration automatically.",
     totalTime: "PT1M",
     step: [
       {
@@ -80,7 +85,7 @@ const jsonLd = [
         "@type": "HowToStep",
         position: 3,
         name: "Ask Codex about your ads",
-        text: `Try a prompt like '${GOOGLE_ADS_AUDIT_PROMPT}' Codex calls NotFair tools and answers with live data.`,
+        text: `Try a prompt like '${GOOGLE_ADS_AUDIT_PROMPT}' Codex calls NotFair tools and answers with live data. For an action-oriented first write, ask Codex to find search terms worth adding as negatives and show the diff before writing.`,
         url: new URL("/google-ads-codex-mcp-setup-guide#step-3", SITE_URL).toString(),
       },
     ],

@@ -2,9 +2,9 @@ import { GoogleAdsCodexPage } from "@/components/marketing/google-ads-codex-page
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "OpenAI Codex for Google Ads — AI Agent | NotFair",
+  title: "Codex Google Ads Agent — Manage Google Ads from OpenAI Codex | NotFair",
   description:
-    "Connect OpenAI Codex to Google Ads with NotFair. Live campaign access from your terminal — diagnose issues, recommend fixes, and approve every change.",
+    "Connect Codex to Google Ads through NotFair. Diagnose campaigns, review search terms, draft fixes, and approve every Google Ads change from your terminal.",
   path: "/google-ads-codex",
   keywords: [
     "codex google ads",
@@ -20,7 +20,7 @@ const faqItems = [
   {
     question: "What is the NotFair Codex integration?",
     answer:
-      "It's an MCP (Model Context Protocol) server that gives OpenAI's Codex CLI live access to your Google Ads account. One terminal command wires it up — Codex can then diagnose issues, recommend fixes, and propose changes you approve in chat.",
+      "It's an MCP (Model Context Protocol) server that gives OpenAI's Codex CLI live access to your Google Ads account. One terminal command wires it up — Codex can then diagnose campaigns, review search terms, draft fixes, and propose changes you approve in chat.",
   },
   {
     question: "How is this different from the Claude integration?",
@@ -30,7 +30,7 @@ const faqItems = [
   {
     question: "What kinds of Google Ads tasks can Codex handle?",
     answer:
-      "Codex can audit campaigns, surface wasted spend, find missing negatives, propose bid adjustments, and draft new ad copy. It pulls live data from your account through NotFair's MCP tools, so answers are grounded in your real numbers — not generic best practices. Anything that touches your account is shown to you for approval before it runs.",
+      "Codex can audit campaigns, review search terms, draft negative keywords, pause wasteful entities, propose bid changes, create campaign/ad group plans, and write new ad copy. It pulls live data through NotFair's MCP tools, so answers are grounded in your account — not generic best practices. Anything that touches your account is shown to you for approval before it runs.",
   },
   {
     question: "Who is OpenAI Codex for Google Ads built for?",
@@ -59,7 +59,7 @@ const jsonLd = [
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "macOS, Linux, Windows",
     description:
-      "NotFair is a Google Ads MCP server for OpenAI's Codex CLI. Connect your Google Ads account to Codex so it can diagnose issues, recommend fixes, and manage approved campaign changes from your terminal.",
+      "NotFair is a Google Ads MCP server for OpenAI's Codex CLI. Connect your Google Ads account to Codex so it can diagnose campaigns, review search terms, draft fixes, and manage approved campaign changes from your terminal.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -69,6 +69,7 @@ const jsonLd = [
     featureList: [
       "Live Google Ads campaign data access",
       "Natural language campaign diagnosis from the terminal",
+      "Search term review and negative keyword drafting",
       "Wasted spend and structural issue detection",
       "Recommended bid, keyword, negative, and ad changes via Codex",
       "Reviewable changes with human approval before execution",
