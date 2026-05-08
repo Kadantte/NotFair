@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { ArrowLeft } from "lucide-react";
 
 /**
@@ -11,14 +13,14 @@ import { ArrowLeft } from "lucide-react";
  * in the page itself — this shell is intentionally small to avoid forcing
  * Google's MCC grouping and Meta's BM/currency badges through one shape.
  */
-export async function ManageAdsAccountsShell({
+export function ManageAdsAccountsShell({
   error,
   children,
 }: {
   error?: string | null;
   children: React.ReactNode;
 }) {
-  const t = await getTranslations("ManageAdsAccounts");
+  const t = useTranslations("ManageAdsAccounts");
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden">

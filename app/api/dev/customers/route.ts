@@ -1,5 +1,5 @@
 import { db, schema } from "@/lib/db";
-import { sql, desc, inArray, isNotNull, and, gte } from "drizzle-orm";
+import { sql, desc, eq, inArray, isNotNull, and, gte } from "drizzle-orm";
 import { after } from "next/server";
 import { requireDevEmail } from "@/lib/dev-access";
 import { OP_TYPE } from "@/lib/db/tracking";
@@ -17,6 +17,16 @@ type Attribution = {
   referrer: string | null;
   label: string;
   detail: string | null;
+};
+
+type CustomerSeed = {
+  userId: string | null;
+  googleEmail: string | null;
+  customerId: string;
+  customerIds: string;
+  sessions: number;
+  lastSessionAt: Date | string;
+  firstSeen: Date | string;
 };
 
 function safeString(v: unknown): string | null {
@@ -99,6 +109,54 @@ function timestampMs(value: Date | string | null | undefined) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+function timestampJson(value: Date | string | null | undefined) {
+  if (!value) return "";
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function compareTimestamp(
+  a: Date | string | null | undefined,
+  b: Date | string | null | undefined,
+  direction: "min" | "max",
+) {
+  if (!a) return b ?? "";
+  if (!b) return a;
+  const aMs = timestampMs(a);
+  const bMs = timestampMs(b);
+  if (aMs == null) return b;
+  if (bMs == null) return a;
+  return direction === "min"
+    ? (aMs <= bMs ? a : b)
+    : (aMs >= bMs ? a : b);
+}
+
+function mergeCustomerSeeds(legacy: CustomerSeed[], connections: CustomerSeed[]) {
+  const byUser = new Map<string, CustomerSeed>();
+  const add = (seed: CustomerSeed) => {
+    const key = seed.userId ?? seed.googleEmail ?? seed.customerId;
+    if (!key) return;
+    const existing = byUser.get(key);
+    if (!existing) {
+      byUser.set(key, seed);
+      return;
+    }
+    byUser.set(key, {
+      userId: existing.userId ?? seed.userId,
+      googleEmail: existing.googleEmail ?? seed.googleEmail,
+      customerId: seed.customerId,
+      customerIds: seed.customerIds,
+      sessions: Math.max(Number(existing.sessions) || 0, Number(seed.sessions) || 0),
+      lastSessionAt: compareTimestamp(existing.lastSessionAt, seed.lastSessionAt, "max"),
+      firstSeen: compareTimestamp(existing.firstSeen, seed.firstSeen, "min"),
+    });
+  };
+  legacy.forEach(add);
+  connections.forEach(add);
+  return [...byUser.values()];
+}
+
+const connectionGoogleEmail = sql<string | null>`coalesce(${schema.adPlatformConnections.platformMetadata}->>'googleEmail', ${schema.userAttribution.email})`;
+
 function enqueueSuspiciousSnapshotRefresh(accountIds: string[]) {
   const now = Date.now();
   const uniqueIds = [...new Set(accountIds)]
@@ -138,9 +196,11 @@ export async function GET(request: Request) {
     return Response.json(cache.data);
   }
 
-  // Get unique customers from mcp_sessions. Exclude dev users so their sessions
-  // and operations are never counted in customer-level aggregates.
-  const customers = await db()
+  // Get unique customers. Legacy users still have mcp_sessions rows; new
+  // Supabase-backed users only have ad_platform_connections after
+  // STOP_CREATING_MCP_SESSIONS. Merge both so the dev dashboard does not hide
+  // new production customers.
+  const legacyCustomers = await db()
     .select({
       userId: schema.mcpSessions.userId,
       googleEmail: sql<string | null>`max(${schema.mcpSessions.googleEmail})`.as("google_email"),
@@ -156,6 +216,28 @@ export async function GET(request: Request) {
       sql`coalesce(lower(max(${schema.mcpSessions.googleEmail})), '') not in (${devEmailSqlList()})`,
     )
     .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`));
+
+  const googleConnections = await db()
+    .select({
+      userId: schema.adPlatformConnections.userId,
+      googleEmail: connectionGoogleEmail.as("google_email"),
+      customerId: sql<string>`coalesce(${schema.adPlatformConnections.activeAccountId}, ${schema.adPlatformConnections.accountIds}->0->>'id', '')`.as("customer_id"),
+      customerIds: sql<string>`coalesce(${schema.adPlatformConnections.accountIds}::text, '[]')`.as("customer_ids"),
+      sessions: sql<number>`1`.as("sessions"),
+      lastSessionAt: sql<string>`${schema.adPlatformConnections.updatedAt}`.as("last_session_at"),
+      firstSeen: sql<string>`${schema.adPlatformConnections.createdAt}`.as("first_seen"),
+    })
+    .from(schema.adPlatformConnections)
+    .leftJoin(
+      schema.userAttribution,
+      eq(schema.userAttribution.userId, schema.adPlatformConnections.userId),
+    )
+    .where(
+      sql`${schema.adPlatformConnections.platform} = 'google_ads'
+        and coalesce(lower(${connectionGoogleEmail}), '') not in (${devEmailSqlList()})`,
+    );
+
+  const customers = mergeCustomerSeeds(legacyCustomers, googleConnections);
 
   // Collect all unique account IDs across all customers
   const allAccountIds = new Set<string>();
@@ -343,7 +425,7 @@ export async function GET(request: Request) {
     enqueueSuspiciousSnapshotRefresh(suspiciousSnapshotAccountIds);
 
     // lastActive = most recent of session creation or any operation on their accounts
-    const lastActive = lastOp && (lastOp as string) > c.lastSessionAt ? lastOp : c.lastSessionAt;
+    const lastActive = compareTimestamp(lastOp, c.lastSessionAt, "max");
 
     // Outreach status from contacts table only — out-of-band Gmail drafts
     // are merged client-side from /api/dev/customers/drafts.
@@ -362,8 +444,8 @@ export async function GET(request: Request) {
       accounts,
       accountCount: c.accounts.length,
       sessions: Number(c.sessions),
-      lastActive,
-      firstSeen: c.firstSeen,
+      lastActive: timestampJson(lastActive),
+      firstSeen: timestampJson(c.firstSeen),
       reads: totalReads,
       writes: totalWrites,
       totalOps: totalReads + totalWrites,
