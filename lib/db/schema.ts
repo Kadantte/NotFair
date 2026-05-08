@@ -697,3 +697,71 @@ export const userAttribution = pgTable("user_attribution", {
   index("user_attribution_captured_idx").on(table.attributionCapturedAt),
   index("user_attribution_created_idx").on(table.createdAt),
 ]);
+
+// ─── Broadcasts (product update emails to existing users) ───────────
+//
+// One row per update campaign. Send-time fan-out writes one
+// `broadcast_recipients` row per (broadcast_id, user_id); the unique
+// index there makes a re-run after a partial send idempotent
+// (INSERT … ON CONFLICT DO NOTHING).
+//
+// Marketing unsubscribe state lives in `email_preferences` (PK userId)
+// — separate from `contacts.unsubscribed` so cold-outreach state and
+// product-update state don't entangle.
+
+export const broadcasts = pgTable("broadcasts", {
+  id: serial("id").primaryKey(),
+  /** Stable slug for URLs/logging, e.g. "release-2026-05-08-meta-ads-beta". */
+  slug: text("slug").notNull().unique(),
+  subject: text("subject").notNull(),
+  preheader: text("preheader"),
+  /** Structured `BroadcastContent` payload — renderer turns this into HTML + text. */
+  content: jsonb("content").notNull(),
+  /** draft | sending | sent | cancelled */
+  status: text("status").notNull().default("draft"),
+  /** Audience snapshot at send time (filter knobs), so re-runs target the same set. */
+  audienceFilter: jsonb("audience_filter").$type<Record<string, unknown>>().notNull().default({}),
+  fromAddress: text("from_address").notNull(),
+  replyTo: text("reply_to").notNull(),
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const broadcastRecipients = pgTable("broadcast_recipients", {
+  id: serial("id").primaryKey(),
+  broadcastId: integer("broadcast_id").notNull(),
+  userId: text("user_id").notNull(),
+  email: text("email").notNull(),
+  /** Resend message id from emails.send/batch.send — webhook joins on this. */
+  resendId: text("resend_id"),
+  /** queued | sent | delivered | opened | clicked | bounced | failed */
+  status: text("status").notNull().default("queued"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  bouncedAt: timestamp("bounced_at"),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("broadcast_recipients_broadcast_user_idx").on(table.broadcastId, table.userId),
+  index("broadcast_recipients_resend_id_idx").on(table.resendId),
+  index("broadcast_recipients_email_idx").on(table.email),
+]);
+
+// ─── Email Preferences (per-user marketing opt-out) ─────────────────
+//
+// Marketing-only. Transactional emails (login magic links, share
+// notifications) ignore this — they're operational, not promotional.
+
+export const emailPreferences = pgTable("email_preferences", {
+  userId: text("user_id").primaryKey(),
+  /** When non-null, user has opted out of product-update broadcasts. */
+  unsubscribedMarketingAt: timestamp("unsubscribed_marketing_at"),
+  unsubscribeReason: text("unsubscribe_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
