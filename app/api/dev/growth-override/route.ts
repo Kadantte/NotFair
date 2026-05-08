@@ -10,7 +10,7 @@ import { requireDevEmail } from "@/lib/dev-access";
  * suppresses that override so the dev experiences the Free plan UX
  * (paywalls, rate limits, upgrade nags). "on" or absent = default behavior.
  */
-export const COOKIE_NAME = "dev_growth_override";
+const COOKIE_NAME = "dev_growth_override";
 
 type State = "on" | "off";
 

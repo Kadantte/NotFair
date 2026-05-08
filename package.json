@@ -11,7 +11,7 @@
   "scripts": {
     "preinstall": "node -e \"if (!(process.env.npm_config_user_agent || '').startsWith('pnpm')) { console.error('\\n\\u26d4  This project uses pnpm. Run \\u0060pnpm install\\u0060 instead. See README for setup.\\n'); process.exit(1); }\"",
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
