@@ -365,7 +365,7 @@ export async function createAd(
       entityId: "",
       beforeValue: adGroupId,
       afterValue: params.finalUrl,
-      error: extractErrorMessage(error),
+      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
     };
   }
 }
