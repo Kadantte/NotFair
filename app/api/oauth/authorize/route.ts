@@ -1,12 +1,13 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql, desc, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { DEMO_OAUTH_CLIENT_ID } from "@/lib/demo/constants";
 import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
 import { identifyUser } from "@/lib/auth/identify-user";
+import { checkGhlDevAccess } from "@/lib/gohighlevel/dev-gate";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -61,6 +62,7 @@ export async function GET(request: Request) {
   const resourceUrlPath = resolvedResource?.path ?? DEFAULT_RESOURCE_PATH;
   const isMetaResource = resolvedResource?.platform === "meta_ads";
   const isDesignResource = resolvedResource?.platform === "design";
+  const isGhlResource = resolvedResource?.platform === "gohighlevel";
 
   if (responseType !== "code") {
     return NextResponse.json(
@@ -112,10 +114,10 @@ export async function GET(request: Request) {
   }
 
   // Pre-bound clients are Google-only — `oauth_clients.session_id` points
-  // at an `mcp_sessions` row. Refusing them at the Meta and Design resources
-  // avoids mismatched-target tokens (a Google session_id getting stamped onto
-  // a Meta- or Design-audience auth code, which would then violate the XOR CHECK).
-  if (client.sessionId !== null && (isMetaResource || isDesignResource)) {
+  // at an `mcp_sessions` row. Refusing them at any non-Google resource avoids
+  // mismatched-target tokens (a Google session_id getting stamped onto a
+  // non-Google audience auth code, which would then violate the XOR CHECK).
+  if (client.sessionId !== null && (isMetaResource || isDesignResource || isGhlResource)) {
     return NextResponse.json(
       {
         error: "invalid_target",
@@ -127,10 +129,12 @@ export async function GET(request: Request) {
   }
 
   // Resolve which target the auth code binds to. Polymorphic: exactly one
-  // of (resolvedSessionId, resolvedConnectionId) is non-null. Enforced by
-  // the `authorization_codes_target_xor` CHECK constraint at INSERT time.
+  // of (resolvedSessionId, resolvedConnectionId, resolvedGhlConnectionId) is
+  // non-null. Enforced by the `authorization_codes_target_xor` CHECK
+  // constraint at INSERT time.
   let resolvedSessionId: number | null = null;
   let resolvedConnectionId: number | null = null;
+  let resolvedGhlConnectionId: number | null = null;
 
   if (client.sessionId !== null) {
     // 1. Google pre-bound flow: trust the registration-time binding.
@@ -198,6 +202,48 @@ export async function GET(request: Request) {
         return NextResponse.redirect(signinUrl.toString());
       }
       resolvedSessionId = designSession.id;
+    } else if (isGhlResource) {
+      // Defense-in-depth dev gate: 404 the resource for non-devs even though
+      // /api/oauth/gohighlevel/start (the only flow that mints connections)
+      // is already gated. Belt-and-suspenders so a future code path that
+      // somehow seeds a connection for a non-dev still cannot mint a token.
+      const ghlAccess = await checkGhlDevAccess();
+      if (!ghlAccess.allowed) {
+        return NextResponse.json(
+          { error: "invalid_target", error_description: `Unknown resource: ${resourceUrlPath}` },
+          { status: 400 },
+        );
+      }
+
+      // 5. GoHighLevel DCR: bind to gohighlevel_connections row. If the user
+      // has multiple GHL connections (agency with N locations), pick the most
+      // recently updated — typical case is single-location, agencies are rare
+      // and the UI's "Connect another" button gives them an explicit choice.
+      // Excludes uninstalled rows so we don't mint a token against a
+      // tombstoned connection.
+      const [conn] = await db()
+        .select({ id: schema.goHighLevelConnections.id })
+        .from(schema.goHighLevelConnections)
+        .where(
+          and(
+            eq(schema.goHighLevelConnections.userId, userId),
+            isNull(schema.goHighLevelConnections.uninstalledAt),
+          ),
+        )
+        .orderBy(desc(schema.goHighLevelConnections.updatedAt))
+        .limit(1);
+
+      if (!conn) {
+        // No GHL connection yet — bounce through the GHL OAuth start route.
+        // It returns the user here after upstream HighLevel consent.
+        const ghlStartUrl = new URL("/api/oauth/gohighlevel/start", requestUrl);
+        ghlStartUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
+        );
+        return NextResponse.redirect(ghlStartUrl.toString());
+      }
+      resolvedGhlConnectionId = conn.id;
     } else if (isMetaResource) {
       // 3. Meta DCR: bind to ad_platform_connections row.
       const [conn] = await db()
@@ -273,11 +319,13 @@ export async function GET(request: Request) {
     }
   }
 
-  // Generate authorization code. Exactly one of sessionId / connectionId is
-  // non-null per the XOR CHECK; we assert that here defensively.
-  if ((resolvedSessionId === null) === (resolvedConnectionId === null)) {
-    // Both null or both set — shouldn't happen given the branches above,
-    // but the CHECK constraint would also catch it.
+  // Generate authorization code. Exactly one of sessionId / connectionId /
+  // gohighlevelConnectionId is non-null per the XOR CHECK; assert defensively.
+  const setCount =
+    (resolvedSessionId !== null ? 1 : 0)
+    + (resolvedConnectionId !== null ? 1 : 0)
+    + (resolvedGhlConnectionId !== null ? 1 : 0);
+  if (setCount !== 1) {
     return NextResponse.json(
       { error: "server_error", error_description: "Internal binding error." },
       { status: 500 },
@@ -291,6 +339,7 @@ export async function GET(request: Request) {
     code: authCode,
     sessionId: resolvedSessionId,
     connectionId: resolvedConnectionId,
+    gohighlevelConnectionId: resolvedGhlConnectionId,
     redirectUri,
     clientId,
     codeChallenge,

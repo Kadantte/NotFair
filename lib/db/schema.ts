@@ -259,14 +259,21 @@ export const oauthAccessTokens = pgTable("oauth_access_tokens", {
   token: text("token").primaryKey(),
   clientId: text("client_id").notNull(),
   /**
-   * Polymorphic connection FK — exactly one of `sessionId` / `connectionId`
-   * is non-null, enforced by `oauth_access_tokens_target_xor` CHECK
-   * constraint (migration 0032). Google Ads rows set `sessionId`
-   * (→ mcp_sessions.id); Meta and future-platform rows set `connectionId`
-   * (→ ad_platform_connections.id).
+   * Polymorphic connection FK — exactly one of `sessionId` / `connectionId` /
+   * `gohighlevelConnectionId` is non-null, enforced by the
+   * `oauth_access_tokens_target_xor` CHECK constraint (migrations 0032 + 0038).
+   *
+   * - Google Ads rows: `sessionId` (→ mcp_sessions.id) for legacy session-bound
+   *   tokens; phase-2 translation flips them to `connectionId`
+   *   (→ ad_platform_connections.id).
+   * - Meta Ads rows: `connectionId` (→ ad_platform_connections.id).
+   * - GoHighLevel rows: `gohighlevelConnectionId` (→ gohighlevel_connections.id),
+   *   minted by the Claude consumer-OAuth flow at /api/oauth/authorize when
+   *   `resource=/api/mcp/gohighlevel`.
    */
   sessionId: integer("session_id"),
   connectionId: integer("connection_id"),
+  gohighlevelConnectionId: integer("gohighlevel_connection_id"),
   /**
    * RFC 8707 audience. Resource URL the token is bound to (e.g. `/api/mcp`,
    * `/api/mcp/google_ads`, `/api/mcp/meta_ads`). NULL is treated as the
@@ -283,11 +290,12 @@ export const authorizationCodes = pgTable("authorization_codes", {
   code: text("code").primaryKey(),
   /**
    * Polymorphic connection FK, mirrors oauth_access_tokens. Exactly one of
-   * sessionId / connectionId is non-null per row, enforced by
-   * `authorization_codes_target_xor` CHECK (migration 0032).
+   * sessionId / connectionId / gohighlevelConnectionId is non-null per row,
+   * enforced by `authorization_codes_target_xor` CHECK (migrations 0032 + 0038).
    */
   sessionId: integer("session_id"),
   connectionId: integer("connection_id"),
+  gohighlevelConnectionId: integer("gohighlevel_connection_id"),
   redirectUri: text("redirect_uri").notNull(),
   clientId: text("client_id").notNull(),
   codeChallenge: text("code_challenge"),
@@ -420,11 +428,35 @@ export const goHighLevelConnections = pgTable("gohighlevel_connections", {
   userType: text("user_type").notNull(),
   companyName: text("company_name"),
   locationName: text("location_name"),
+  /**
+   * Tokens are encrypted at rest via `lib/crypto/secrets`. Read path uses
+   * `decryptSecret` which transparently passes pre-encryption rows through;
+   * write path always encrypts. Migration is lazy (next refresh upgrades).
+   */
   refreshToken: text("refresh_token").notNull(),
   accessToken: text("access_token"),
   accessTokenExpiresAt: timestamp("access_token_expires_at"),
   /** Granted OAuth scopes from HighLevel. */
   scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  /**
+   * HighLevel app id this connection was minted for. Used by the webhook
+   * handler when matching INSTALL_DELETE events back to local rows.
+   */
+  appId: text("app_id"),
+  /**
+   * For per-location rows minted from a bulk agency install, points at the
+   * agency-level company connection so we can re-mint a location token via
+   * `createLocationAccessToken` without re-OAuthing.
+   *
+   * The self-FK (ON DELETE SET NULL) lives in the migration. Drizzle's
+   * `.references()` syntax can't model self-references without circular
+   * type errors, so we keep the column declaration plain here and trust the
+   * migration. Documented to flag for the next drizzle-kit push: confirm the
+   * FK is preserved in any generated migration before applying it.
+   */
+  agencyConnectionId: integer("agency_connection_id"),
+  /** Soft-delete bit set by the UNINSTALL webhook. Hard-delete is the disconnect endpoint. */
+  uninstalledAt: timestamp("uninstalled_at"),
   /** Raw install/token metadata for support and future location-token expansion. */
   platformMetadata: jsonb("platform_metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -433,7 +465,31 @@ export const goHighLevelConnections = pgTable("gohighlevel_connections", {
   index("ghl_connections_user_idx").on(table.userId),
   index("ghl_connections_company_idx").on(table.companyId),
   index("ghl_connections_location_idx").on(table.locationId),
+  index("ghl_connections_agency_idx").on(table.agencyConnectionId),
   uniqueIndex("ghl_connections_user_connection_key_idx").on(table.userId, table.connectionKey),
+]);
+
+/**
+ * Personal access tokens that authenticate at `/api/mcp/gohighlevel`.
+ *
+ * Stored as SHA-256 hash; the plaintext `ghl_pat_<connectionId>_<random>` is
+ * shown to the user once at creation time. Foreign-keyed to the connection
+ * with cascade delete so disconnect cleans these up automatically.
+ */
+export const goHighLevelAccessTokens = pgTable("gohighlevel_access_tokens", {
+  id: serial("id").primaryKey(),
+  connectionId: integer("connection_id").notNull(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  label: text("label"),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  lastUsedAt: timestamp("last_used_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("ghl_access_tokens_hash_idx").on(table.tokenHash),
+  index("ghl_access_tokens_connection_idx").on(table.connectionId),
+  index("ghl_access_tokens_user_idx").on(table.userId),
 ]);
 
 // ─── Account Snapshots ──────────────────────────────────────────────

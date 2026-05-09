@@ -412,6 +412,12 @@ export async function POST(request: Request) {
   await del("ad_platform_connections", () =>
     db().delete(schema.adPlatformConnections).where(eq(schema.adPlatformConnections.userId, userId)),
   );
+  // Defensive cleanup of GHL PATs even though the FK has ON DELETE CASCADE —
+  // makes the count surface accurate and protects against the cascade not
+  // firing in test setups that bypass the FK.
+  await del("gohighlevel_access_tokens", () =>
+    db().delete(schema.goHighLevelAccessTokens).where(eq(schema.goHighLevelAccessTokens.userId, userId)),
+  );
   await del("gohighlevel_connections", () =>
     db().delete(schema.goHighLevelConnections).where(eq(schema.goHighLevelConnections.userId, userId)),
   );

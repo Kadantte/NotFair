@@ -1621,7 +1621,24 @@
     "unknown": "ไม่ทราบ",
     "connectAnother": "เชื่อมต่อบัญชี HighLevel อื่น",
     "connect": "เชื่อมต่อ GoHighLevel",
-    "marketplaceNote": "คุณจะถูกส่งไปยังขั้นตอนติดตั้งของ GoHighLevel Marketplace"
+    "marketplaceNote": "คุณจะถูกส่งไปยังขั้นตอนติดตั้งของ GoHighLevel Marketplace",
+    "uninstalled": "ถอนการติดตั้งแล้ว",
+    "patCount": "ออกโทเค็น {count} รายการแล้ว",
+    "disconnect": {
+      "label": "ตัดการเชื่อมต่อ",
+      "confirm": "ตัดการเชื่อมต่อบัญชี HighLevel นี้หรือไม่? โทเค็นการเข้าถึงที่ออกจากบัญชีนี้จะหยุดทำงานทันที",
+      "error": "ไม่สามารถตัดการเชื่อมต่อได้"
+    },
+    "pat": {
+      "mint": "โทเค็นใหม่",
+      "heading": "บันทึกโทเค็นนี้ทันที",
+      "body": "โทเค็นนี้จะแสดงเพียงครั้งเดียวเท่านั้น เก็บไว้ในที่ปลอดภัย — ใครก็ตามที่มีโทเค็นนี้สามารถเรียก HighLevel MCP แทนคุณได้",
+      "copy": "คัดลอกโทเค็น",
+      "copied": "คัดลอกแล้ว!",
+      "dismiss": "ปิด",
+      "mcpUrl": "ใช้เป็น Bearer token ที่",
+      "error": "ไม่สามารถสร้างโทเค็นได้"
+    }
   },
   "AddMetaAdsAccount": {
     "title": "เชื่อมต่อ Meta Ads",

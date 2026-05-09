@@ -3,19 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { CheckCircle2, ExternalLink, Loader2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2, ShieldCheck, Trash2, Key, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DevOnlyBadge } from '@/components/gohighlevel/dev-only-badge';
+import { GOHIGHLEVEL_READONLY_SCOPES } from '@/lib/gohighlevel/scopes';
 import type { Session } from '@/lib/session';
 
-const REQUESTED_SCOPES = [
-  'locations.readonly',
-  'contacts.readonly',
-  'conversations.readonly',
-  'conversations/message.readonly',
-  'opportunities.readonly',
-  'calendars.readonly',
-  'calendars/events.readonly',
-];
+// Single source of truth — keeps the displayed scopes list in lock-step
+// with what the OAuth flow actually requests.
+const REQUESTED_SCOPES: readonly string[] = GOHIGHLEVEL_READONLY_SCOPES;
 
 type Connection = {
   id: number;
@@ -25,6 +21,9 @@ type Connection = {
   companyName: string | null;
   locationName: string | null;
   scopes: string[];
+  agencyConnectionId: number | null;
+  uninstalledAt: string | null;
+  activePatCount: number;
   updatedAt: string;
 };
 
@@ -36,32 +35,107 @@ type Status = {
 export function GoHighLevelConnectSurface({ session }: { session: Session }) {
   const t = useTranslations('GoHighLevelConnect');
   const [status, setStatus] = useState<Status | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [issuedToken, setIssuedToken] = useState<{ token: string; connectionId: number } | null>(null);
+  const [copyOk, setCopyOk] = useState(false);
+
+  const refresh = async () => {
+    try {
+      const res = await fetch('/api/integrations/gohighlevel/status', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        setStatus({ connected: false, connections: [] });
+        return;
+      }
+      const data: Status = await res.json();
+      setStatus(data);
+    } catch {
+      setStatus({ connected: false, connections: [] });
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/integrations/gohighlevel/status', { credentials: 'include', cache: 'no-store' })
-      .then((res) => res.ok ? res.json() : { connected: false, connections: [] })
-      .then((data: Status) => {
-        if (!cancelled) setStatus(data);
-      })
-      .catch(() => {
-        if (!cancelled) setStatus({ connected: false, connections: [] });
-      });
-    return () => { cancelled = true; };
+    refresh().catch(() => {
+      if (!cancelled) setStatus({ connected: false, connections: [] });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const canConnect = session.connected;
 
+  const handleDisconnect = async (connectionId: number) => {
+    if (busyId !== null) return;
+    if (!confirm(t('disconnect.confirm'))) return;
+    setBusyId(connectionId);
+    try {
+      const res = await fetch(`/api/integrations/gohighlevel/disconnect?connectionId=${connectionId}&cascade=true`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        alert(t('disconnect.error') + (json?.error ? `: ${json.error}` : ''));
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleMintPat = async (connectionId: number) => {
+    if (busyId !== null) return;
+    setBusyId(connectionId);
+    try {
+      const res = await fetch('/api/integrations/gohighlevel/pat', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ connectionId, label: 'Generated from connect page' }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        alert(t('pat.error') + (json?.error ? `: ${json.error}` : ''));
+        return;
+      }
+      const json: { token: string; connectionId: number } = await res.json();
+      setIssuedToken(json);
+      setCopyOk(false);
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const copyToken = async () => {
+    if (!issuedToken) return;
+    try {
+      await navigator.clipboard.writeText(issuedToken.token);
+      setCopyOk(true);
+      setTimeout(() => setCopyOk(false), 1800);
+    } catch {
+      // Clipboard may be blocked — leave the token visible for manual copy.
+    }
+  };
+
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 py-8 text-left">
       <div className="space-y-4 text-center">
+        {/* Loud "DEV ONLY" pill — surfaced first so it's the very thing the
+            viewer sees. The page itself is server-side-gated to DEV_EMAILS;
+            the badge is a visual reminder for the devs who CAN see it. */}
+        <DevOnlyBadge />
+
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-2 text-sm font-medium text-[#4CAF6E]">
           <ShieldCheck className="h-4 w-4" /> {t('badge')}
         </div>
         <h2 className="text-3xl font-bold text-[#E8E4DD] md:text-5xl">{t('title')}</h2>
-        <p className="mx-auto max-w-2xl text-lg text-[#C4C0B6]">
-          {t('body')}
-        </p>
+        <p className="mx-auto max-w-2xl text-lg text-[#C4C0B6]">{t('body')}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -70,7 +144,10 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
           <p className="mt-1 text-sm text-[#C4C0B6]">{t('access.body')}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {REQUESTED_SCOPES.map((scope) => (
-              <span key={scope} className="rounded-full border border-[#3D3C36] bg-[#24231F] px-3 py-1 text-xs text-[#C4C0B6]">
+              <span
+                key={scope}
+                className="rounded-full border border-[#3D3C36] bg-[#24231F] px-3 py-1 text-xs text-[#C4C0B6]"
+              >
                 {scope}
               </span>
             ))}
@@ -87,13 +164,44 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
         </div>
       </div>
 
+      {issuedToken && (
+        <div className="rounded-2xl border border-[#FFB74D]/40 bg-[#FFB74D]/10 p-5 text-left">
+          <div className="flex items-start gap-2 text-sm font-semibold text-[#FFB74D]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{t('pat.heading')}</span>
+          </div>
+          <p className="mt-2 text-sm text-[#E8E4DD]">{t('pat.body')}</p>
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#3D3C36] bg-[#1A1917] px-3 py-2 font-mono text-xs text-[#E8E4DD] break-all">
+            {issuedToken.token}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button onClick={copyToken} className="rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]">
+              <Copy className="mr-2 h-4 w-4" /> {copyOk ? t('pat.copied') : t('pat.copy')}
+            </Button>
+            <Button
+              onClick={() => setIssuedToken(null)}
+              variant="outline"
+              className="rounded-full border-[#3D3C36] text-[#C4C0B6] hover:bg-[#24231F]"
+            >
+              {t('pat.dismiss')}
+            </Button>
+          </div>
+          <p className="mt-3 text-xs text-[#C4C0B6]/80">
+            {t('pat.mcpUrl')}{' '}
+            <code className="rounded bg-[#1A1917] px-1.5 py-0.5 text-[#E8E4DD]">/api/mcp/gohighlevel</code>
+          </p>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-[#3D3C36] bg-[#24231F] p-6 text-center">
         {!canConnect ? (
           <div className="space-y-3">
             <p className="font-medium text-[#E8E4DD]">{t('signedOut.title')}</p>
             <p className="text-sm text-[#C4C0B6]">{t('signedOut.body')}</p>
             <Button asChild className="rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]">
-              <Link href="/connect" prefetch>{t('signedOut.cta')}</Link>
+              <Link href="/connect" prefetch>
+                {t('signedOut.cta')}
+              </Link>
             </Button>
           </div>
         ) : status === null ? (
@@ -109,21 +217,77 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
                 </div>
                 <div className="mt-3 space-y-2">
                   {status.connections.map((connection) => (
-                    <div key={connection.id} className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-3 text-sm text-[#C4C0B6]">
-                      <div className="font-medium text-[#E8E4DD]">
-                        {connection.locationName || connection.companyName || connection.locationId || connection.companyId || t('fallbackConnection')}
-                      </div>
-                      <div className="mt-1 text-xs text-[#C4C0B6]/80">
-                        {connection.userType} · {t('company')} {connection.companyId ?? t('unknown')}{connection.locationId ? ` · ${t('location')} ${connection.locationId}` : ''}
+                    <div
+                      key={connection.id}
+                      className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-3 text-sm text-[#C4C0B6]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-[#E8E4DD] truncate">
+                            {connection.locationName
+                              || connection.companyName
+                              || connection.locationId
+                              || connection.companyId
+                              || t('fallbackConnection')}
+                            {connection.uninstalledAt && (
+                              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#FFB74D]/40 bg-[#FFB74D]/10 px-2 py-0.5 text-xs text-[#FFB74D]">
+                                <AlertTriangle className="h-3 w-3" /> {t('uninstalled')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 text-xs text-[#C4C0B6]/80">
+                            {connection.userType} · {t('company')}{' '}
+                            {connection.companyId ?? t('unknown')}
+                            {connection.locationId ? ` · ${t('location')} ${connection.locationId}` : ''}
+                            {connection.activePatCount > 0
+                              ? ` · ${t('patCount', { count: connection.activePatCount })}`
+                              : ''}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busyId === connection.id}
+                            onClick={() => handleMintPat(connection.id)}
+                            className="rounded-full border-[#3D3C36] text-[#C4C0B6] hover:bg-[#24231F]"
+                          >
+                            {busyId === connection.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Key className="h-4 w-4" />
+                            )}
+                            <span className="ml-1 hidden sm:inline">{t('pat.mint')}</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busyId === connection.id}
+                            onClick={() => handleDisconnect(connection.id)}
+                            className="rounded-full border-[#FF6B6B]/30 bg-[#FF6B6B]/5 text-[#FF6B6B] hover:bg-[#FF6B6B]/10"
+                          >
+                            {busyId === connection.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            <span className="ml-1 hidden sm:inline">{t('disconnect.label')}</span>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            <Button asChild size="lg" className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] hover:bg-[#3D9A5C]">
+            <Button
+              asChild
+              size="lg"
+              className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] hover:bg-[#3D9A5C]"
+            >
               <Link href="/api/oauth/gohighlevel/start?next=/connect/gohighlevel" prefetch={false}>
-                {status.connected ? t('connectAnother') : t('connect')} <ExternalLink className="ml-2 h-5 w-5" />
+                {status.connected ? t('connectAnother') : t('connect')}{' '}
+                <ExternalLink className="ml-2 h-5 w-5" />
               </Link>
             </Button>
             <p className="text-xs text-[#C4C0B6]/60">{t('marketplaceNote')}</p>

@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { db, schema } from "@/lib/db";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
 import { identifyUser } from "@/lib/auth/identify-user";
+import { getEnv } from "@/lib/env";
 import {
   exchangeCodeForToken,
   getGoHighLevelRedirectUri,
-  parseScopes,
   type GoHighLevelTokenResponse,
 } from "@/lib/gohighlevel/oauth";
+import { expandBulkInstall, upsertGoHighLevelConnection } from "@/lib/gohighlevel/install";
 
 const STATE_COOKIE = "nf_ghl_oauth_state";
 
@@ -51,15 +51,11 @@ function redirectToSurface(opts: {
 }
 
 async function exchangeWithFallback(code: string, redirectUri: string): Promise<GoHighLevelTokenResponse> {
-  try {
-    return await exchangeCodeForToken({ code, redirectUri, userType: "Company" });
-  } catch (companyError) {
-    try {
-      return await exchangeCodeForToken({ code, redirectUri, userType: "Location" });
-    } catch {
-      throw companyError;
-    }
-  }
+  // Single attempt only. We previously tried Company → Location on failure,
+  // but OAuth auth codes are single-use, so the Location retry is guaranteed
+  // to 400 with `invalid_grant` and the original error wins anyway. Removed
+  // to clean up logs and avoid implying a working dual-mode flow.
+  return await exchangeCodeForToken({ code, redirectUri, userType: "Company" });
 }
 
 export async function GET(request: Request) {
@@ -83,10 +79,6 @@ export async function GET(request: Request) {
   const nonceOk = await verifyOAuthNonce(state.nonce);
   if (!nonceOk) return redirectToSurface({ status: "error", reason: "nonce_expired", next });
 
-  // Phase-4 step 2: verify state.userId matches current session via
-  // identifyUser (Supabase first, cookie fallback). Drops the legacy
-  // `customerId <> ''` gate; GHL connections don't strictly require Google
-  // Ads to be connected first, and the UI surfaces enforce prerequisites.
   const identity = await identifyUser({ source: "gohighlevel-oauth-callback" });
   if (!identity || identity.userId !== state.userId) {
     return redirectToSurface({ status: "error", reason: "no_session", next });
@@ -100,49 +92,34 @@ export async function GET(request: Request) {
     return redirectToSurface({ status: "error", reason: "exchange_failed", next });
   }
 
-  const userType = token.userType ?? (token.locationId ? "Location" : "Company");
-  const connectionKey = token.locationId
-    ? `location:${token.companyId ?? "unknown"}:${token.locationId}`
-    : `company:${token.companyId ?? token.userId ?? "unknown"}`;
-  const accessTokenExpiresAt = new Date(Date.now() + (token.expires_in ?? 86400) * 1000);
-  const scopes = parseScopes(token.scope);
-  const platformMetadata = {
-    upstream_user_id: token.userId ?? null,
-    refresh_token_id: token.refreshTokenId ?? null,
-    is_bulk_installation: token.isBulkInstallation ?? null,
-    trace_id: token.traceId ?? null,
-    connected_at: new Date().toISOString(),
-  };
+  const appId = getEnv("GOHIGHLEVEL_APP_ID") ?? null;
 
-  await db()
-    .insert(schema.goHighLevelConnections)
-    .values({
-      userId: state.userId,
-      connectionKey,
-      companyId: token.companyId ?? null,
-      locationId: token.locationId ?? null,
-      userType,
-      refreshToken: token.refresh_token,
-      accessToken: token.access_token,
-      accessTokenExpiresAt,
-      scopes,
-      platformMetadata,
-    })
-    .onConflictDoUpdate({
-      target: [
-        schema.goHighLevelConnections.userId,
-        schema.goHighLevelConnections.connectionKey,
-      ],
-      set: {
-        userType,
-        refreshToken: token.refresh_token,
-        accessToken: token.access_token,
-        accessTokenExpiresAt,
-        scopes,
-        platformMetadata,
-        updatedAt: new Date(),
-      },
-    });
+  let agency;
+  try {
+    agency = await upsertGoHighLevelConnection({ userId: state.userId, token, appId });
+  } catch (e) {
+    console.error("[gohighlevel-oauth] persist failed:", e);
+    return redirectToSurface({ status: "error", reason: "persist_failed", next });
+  }
+
+  // Bulk-install fan-out. We do this best-effort so a single broken location
+  // doesn't fail the whole connect: per-location errors are logged into the
+  // returned `locations` array and we continue with whatever succeeded.
+  if (token.isBulkInstallation && agency.userType === "Company" && agency.companyId && appId) {
+    try {
+      const expansion = await expandBulkInstall({
+        agency,
+        agencyAccessToken: token.access_token,
+        appId,
+      });
+      const failed = expansion.locations.filter((l) => l.status === "failed");
+      if (failed.length > 0) {
+        console.warn("[gohighlevel-oauth] bulk install: some locations failed", failed);
+      }
+    } catch (e) {
+      console.warn("[gohighlevel-oauth] bulk install expansion failed:", e);
+    }
+  }
 
   const response = redirectToSurface({ status: "connected", next });
   response.cookies.delete(STATE_COOKIE);

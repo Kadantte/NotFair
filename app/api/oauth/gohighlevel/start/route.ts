@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 import { getGoHighLevelInstallUrl } from "@/lib/gohighlevel/oauth";
+import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
 import { identifyUser } from "@/lib/auth/identify-user";
 
 const STATE_COOKIE = "nf_ghl_oauth_state";
@@ -12,6 +13,11 @@ function getSafeNext(next: string | null): string {
 }
 
 export async function GET(request: Request) {
+  // Dev-only surface — 404 for non-devs before we even look at the request.
+  // Same gate as /connect/gohighlevel and the marketing pages.
+  const gate = await requireGhlDevAccessForApi();
+  if (gate) return gate;
+
   const requestUrl = new URL(request.url);
   const next = getSafeNext(requestUrl.searchParams.get("next"));
 

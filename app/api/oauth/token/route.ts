@@ -194,9 +194,10 @@ export async function POST(request: Request) {
   let expiresInSeconds: number;
   // Set to a non-null value when phase-2 translation produces a connection
   // binding for a sessionId-bound code; the INSERT below uses these instead
-  // of authCode.sessionId / authCode.connectionId.
+  // of authCode.sessionId / authCode.connectionId / authCode.gohighlevelConnectionId.
   let translatedSessionId: number | null = authCode.sessionId;
   let translatedConnectionId: number | null = authCode.connectionId;
+  const translatedGhlConnectionId: number | null = authCode.gohighlevelConnectionId;
   if (authCode.sessionId !== null) {
     const [session] = await db()
       .select({ expiresAt: schema.mcpSessions.expiresAt, userId: schema.mcpSessions.userId })
@@ -271,6 +272,33 @@ export async function POST(request: Request) {
     // hasn't refreshed yet, default to 60 days from now.
     const exp = conn.expiresAt ? new Date(conn.expiresAt).getTime() : Date.now() + 60 * 24 * 60 * 60 * 1000;
     expiresInSeconds = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+  } else if (authCode.gohighlevelConnectionId !== null) {
+    // GoHighLevel: verify the connection still exists and isn't tombstoned by
+    // an UNINSTALL webhook. We don't gate on the row's accessTokenExpiresAt —
+    // the MCP route auto-refreshes via getValidAccessToken on every call, so
+    // the surface contract is "valid until disconnect or uninstall".
+    const [conn] = await db()
+      .select({
+        id: schema.goHighLevelConnections.id,
+        uninstalledAt: schema.goHighLevelConnections.uninstalledAt,
+      })
+      .from(schema.goHighLevelConnections)
+      .where(eq(schema.goHighLevelConnections.id, authCode.gohighlevelConnectionId))
+      .limit(1);
+    if (!conn || conn.uninstalledAt) {
+      return NextResponse.json(
+        {
+          error: "invalid_grant",
+          error_description:
+            "The HighLevel connection bound to this authorization code is gone or uninstalled. Reconnect at /connect/gohighlevel.",
+        },
+        { status: 400 },
+      );
+    }
+    // 30 days. The MCP route refreshes the upstream HighLevel access token on
+    // demand inside the advisory-locked transaction; this number is just the
+    // RFC 6749 hint to the client about how often to re-auth our wrapper.
+    expiresInSeconds = 30 * 24 * 60 * 60;
   } else {
     // Should never happen — XOR CHECK at INSERT time enforces exactly one.
     return NextResponse.json(
@@ -312,6 +340,7 @@ export async function POST(request: Request) {
     // connection binding above; otherwise these match the auth code 1:1.
     sessionId: translatedSessionId,
     connectionId: translatedConnectionId,
+    gohighlevelConnectionId: translatedGhlConnectionId,
     resourceUrl: resourceUrlPath,
   });
 

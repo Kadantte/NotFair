@@ -1621,7 +1621,24 @@
     "unknown": "unbekannt",
     "connectAnother": "Weiteres HighLevel-Konto verbinden",
     "connect": "GoHighLevel verbinden",
-    "marketplaceNote": "Du wirst zum Installationsflow im GoHighLevel Marketplace weitergeleitet."
+    "marketplaceNote": "Du wirst zum Installationsflow im GoHighLevel Marketplace weitergeleitet.",
+    "uninstalled": "Deinstalliert",
+    "patCount": "{count} Tokens ausgegeben",
+    "disconnect": {
+      "label": "Trennen",
+      "confirm": "Dieses HighLevel-Konto trennen? Alle ausgestellten Zugriffstoken werden sofort ungültig.",
+      "error": "Trennen fehlgeschlagen"
+    },
+    "pat": {
+      "mint": "Neues Token",
+      "heading": "Speichere dieses Token jetzt",
+      "body": "Dieses Token wird nur einmal angezeigt. Bewahre es sicher auf — jeder mit diesem Token kann das HighLevel-MCP in deinem Namen aufrufen.",
+      "copy": "Token kopieren",
+      "copied": "Kopiert!",
+      "dismiss": "Schließen",
+      "mcpUrl": "Verwende es als Bearer-Token unter",
+      "error": "Token konnte nicht erstellt werden"
+    }
   },
   "AddMetaAdsAccount": {
     "title": "Meta Ads verbinden",

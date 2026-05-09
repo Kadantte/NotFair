@@ -1627,7 +1627,24 @@
     "unknown": "unknown",
     "connectAnother": "Connect another HighLevel account",
     "connect": "Connect GoHighLevel",
-    "marketplaceNote": "You will be sent to the GoHighLevel Marketplace install flow."
+    "marketplaceNote": "You will be sent to the GoHighLevel Marketplace install flow.",
+    "uninstalled": "Uninstalled",
+    "patCount": "{count} tokens issued",
+    "disconnect": {
+      "label": "Disconnect",
+      "confirm": "Disconnect this HighLevel account? Any access tokens issued from it will stop working immediately.",
+      "error": "Could not disconnect"
+    },
+    "pat": {
+      "mint": "New token",
+      "heading": "Save this token now",
+      "body": "This is the only time the token will be shown. Store it somewhere safe — anyone with this token can call the HighLevel MCP as you.",
+      "copy": "Copy token",
+      "copied": "Copied!",
+      "dismiss": "Dismiss",
+      "mcpUrl": "Use it as a Bearer token at",
+      "error": "Could not mint token"
+    }
   },
   "AddMetaAdsAccount": {
     "title": "Connect Meta Ads",

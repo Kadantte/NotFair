@@ -1,6 +1,6 @@
 {
   "name": "norfair",
-  "version": "0.4.1.0",
+  "version": "0.5.0.0",
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "engines": {
@@ -26,6 +26,8 @@
     "db:backfill-google-connections": "npx tsx scripts/backfill-google-connections.ts",
     "db:check-google-connection-invariant": "npx tsx scripts/check-google-connection-invariant.ts",
     "db:refresh-stale-account-snapshots": "tsx scripts/refresh-stale-account-snapshots.ts",
+    "db:apply-0040-gohighlevel": "npx tsx scripts/apply-migration-0040-gohighlevel.ts",
+    "db:apply-0041-gohighlevel-oauth": "npx tsx scripts/apply-migration-0041-gohighlevel-oauth.ts",
     "eval:mcp": "npx tsx scripts/eval-mcp/eval.ts",
     "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts"
   },

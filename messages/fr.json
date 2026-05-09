@@ -1621,7 +1621,24 @@
     "unknown": "inconnu",
     "connectAnother": "Connecter un autre compte HighLevel",
     "connect": "Connecter GoHighLevel",
-    "marketplaceNote": "Vous serez envoyé vers le flux d’installation GoHighLevel Marketplace."
+    "marketplaceNote": "Vous serez envoyé vers le flux d’installation GoHighLevel Marketplace.",
+    "uninstalled": "Désinstallé",
+    "patCount": "{count} jetons émis",
+    "disconnect": {
+      "label": "Déconnecter",
+      "confirm": "Déconnecter ce compte HighLevel ? Tous les jetons d’accès émis depuis ce compte cesseront immédiatement de fonctionner.",
+      "error": "Impossible de déconnecter"
+    },
+    "pat": {
+      "mint": "Nouveau jeton",
+      "heading": "Enregistrez ce jeton maintenant",
+      "body": "C’est la seule fois où ce jeton sera affiché. Conservez-le en lieu sûr — toute personne disposant de ce jeton peut appeler le MCP HighLevel à votre place.",
+      "copy": "Copier le jeton",
+      "copied": "Copié !",
+      "dismiss": "Ignorer",
+      "mcpUrl": "Utilisez-le comme jeton Bearer à",
+      "error": "Impossible de créer le jeton"
+    }
   },
   "AddMetaAdsAccount": {
     "title": "Connecter Meta Ads",

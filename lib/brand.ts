@@ -43,6 +43,14 @@ export const META_MCP_CONNECTOR_NAME = "NotFair-MetaAds";
 export const DESIGN_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/design`;
 export const DESIGN_MCP_CONNECTOR_NAME = "NotFair-Design";
 
+/**
+ * GoHighLevel MCP equivalents — surfaced on /connect/gohighlevel and the
+ * /gohighlevel-* marketing surfaces so users can wire up Claude / Codex
+ * against the HighLevel CRM the same way they do Google or Meta.
+ */
+export const GHL_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/gohighlevel`;
+export const GHL_MCP_CONNECTOR_NAME = "NotFair-GoHighLevel";
+
 const EMAIL_DOMAIN = "notfair.co";
 export const SUPPORT_EMAIL = `tong@${EMAIL_DOMAIN}`;
 export const OUTREACH_EMAIL = `tong@${EMAIL_DOMAIN}`;

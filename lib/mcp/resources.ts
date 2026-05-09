@@ -10,7 +10,7 @@
  * special-case Google or Meta — they are just rows.
  */
 
-export type Platform = "google_ads" | "meta_ads" | "design";
+export type Platform = "google_ads" | "meta_ads" | "design" | "gohighlevel";
 
 export type McpResource = {
   /** Path the resource is served at, e.g. `/api/mcp`. Stable; persisted in tokens. */
@@ -73,6 +73,17 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     // resource-aware OAuth flow and stamped with the platform-explicit prefix.
     legacyTokenPrefixes: [],
   },
+  {
+    path: "/api/mcp/gohighlevel",
+    platform: "gohighlevel",
+    tokenPrefix: "oat_gohighlevel_",
+    // GoHighLevel was born after the multi-platform shape — no legacy
+    // prefixes. Tokens at this resource are issued either through Claude's
+    // consumer-OAuth flow (oat_gohighlevel_*) or as user-minted PATs
+    // (ghl_pat_<connId>_<random>). Both authenticate against
+    // /api/mcp/gohighlevel; the route resolver branches on prefix.
+    legacyTokenPrefixes: [],
+  },
 ] as const;
 
 /**
@@ -85,6 +96,7 @@ export const KNOWN_RESOURCE_PATHS: readonly string[] = [
   "/api/mcp/google_ads",
   "/api/mcp/meta_ads",
   "/api/mcp/design",
+  "/api/mcp/gohighlevel",
 ];
 
 /** Default resource for callers that omit `?resource=` (back-compat). */

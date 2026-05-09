@@ -1621,7 +1621,24 @@
     "unknown": "desconhecido",
     "connectAnother": "Conectar outra conta HighLevel",
     "connect": "Conectar GoHighLevel",
-    "marketplaceNote": "Voce sera enviado ao fluxo de instalacao do GoHighLevel Marketplace."
+    "marketplaceNote": "Voce sera enviado ao fluxo de instalacao do GoHighLevel Marketplace.",
+    "uninstalled": "Desinstalado",
+    "patCount": "{count} tokens emitidos",
+    "disconnect": {
+      "label": "Desconectar",
+      "confirm": "Desconectar esta conta do HighLevel? Quaisquer tokens de acesso emitidos por ela deixarao de funcionar imediatamente.",
+      "error": "Nao foi possivel desconectar"
+    },
+    "pat": {
+      "mint": "Novo token",
+      "heading": "Salve este token agora",
+      "body": "Esta e a unica vez que o token sera exibido. Guarde-o em local seguro — qualquer pessoa com este token pode acessar o MCP do HighLevel como voce.",
+      "copy": "Copiar token",
+      "copied": "Copiado!",
+      "dismiss": "Descartar",
+      "mcpUrl": "Use-o como token Bearer em",
+      "error": "Nao foi possivel criar o token"
+    }
   },
   "AddMetaAdsAccount": {
     "title": "Conectar Meta Ads",

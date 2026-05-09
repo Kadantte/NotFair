@@ -2,6 +2,26 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.0.0] - 2026-05-09
+
+### Added
+- **NotFair now connects to GoHighLevel.** Read your HighLevel CRM through Claude — contacts, conversations, opportunities, calendars, calendar events. Supports both single sub-account and agency-with-many-locations installs (bulk install mints per-location tokens automatically).
+- **Two ways to authenticate Claude.** Claude.ai's "Add custom connector" flow uses standard OAuth 2.0 with PKCE — no Client ID or Secret to copy. CLI clients (Claude Code, Codex, custom) use a personal access token (PAT) you mint from the connect page. Tokens are scoped to a single HighLevel connection and revocable.
+- **Six read-only MCP tools:** `listLocations`, `listContacts`, `listConversations`, `listOpportunities`, `listCalendarEvents`, plus a generic read-only `request` escape hatch for endpoints not yet wrapped.
+- **Marketing surfaces:** `/gohighlevel-mcp` (server reference) and `/gohighlevel-claude-connector-setup-guide` (Claude.ai setup guide) parallel the Google/Meta equivalents.
+
+### Changed
+- **All HighLevel tokens are now encrypted at rest.** Refresh tokens and access tokens are AES-256-GCM encrypted in the database via `lib/crypto/secrets.ts`. Read path passes plaintext through transparently for back-compat (lazy upgrade on next refresh write); writes always encrypt. Set `SECRET_ENCRYPTION_KEY` in env (32-byte base64, 64-char hex, or passphrase).
+- **Token refresh is now race-safe.** A Postgres advisory lock (`pg_advisory_xact_lock`) serializes concurrent refresh calls per connection — without it, HighLevel's refresh-token rotation would brick connections under concurrent MCP traffic.
+
+### Security
+- **GHL surfaces are gated to NotFair admin emails (`DEV_EMAILS`)** while we validate end-to-end. Marketing pages and API routes 404 for non-devs; visible surfaces show a "DEV ONLY · NotFair admins" badge. To open up later, drop the gate or expand `DEV_EMAILS`.
+
+### Infrastructure
+- **Two new migrations:** `0040_gohighlevel_mcp_and_install.sql` (PAT table, bulk install columns, soft-delete bit) and `0041_gohighlevel_oauth_token_binding.sql` (polymorphic `gohighlevel_connection_id` column on `oauth_access_tokens` and `authorization_codes`, XOR check upgraded to "exactly 1 of 3"). Apply with `pnpm db:apply-0040-gohighlevel` then `pnpm db:apply-0041-gohighlevel-oauth`.
+- **Webhook receiver** at `/api/webhooks/gohighlevel` verifies RSA-SHA256 (`GOHIGHLEVEL_WEBHOOK_PUBLIC_KEY`) or HMAC (`GOHIGHLEVEL_WEBHOOK_SECRET`); UNINSTALL/INSTALL_DELETE soft-deletes connections, revokes PATs, and hard-deletes Claude OAuth tokens bound to the connection.
+- **Disconnect endpoint** at `/api/integrations/gohighlevel/disconnect` cascades cleanup across PATs, oauth_access_tokens, authorization_codes, and the connection rows.
+
 ## [0.4.1.1] - 2026-05-09
 
 ### Added
