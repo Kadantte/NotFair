@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.0.2] - 2026-05-09
+
+### Changed
+- **`fileInternalNotFairToolFeedback` now nudges agents to file at the moment of friction, not later.** Adds an explicit timing rule (file before workarounds, file before the next user-facing message if you've promised to) and reframes the volume cap from "at most 2 per session" to "freely up to 5 — underreporting is the bigger risk than overreporting." The Google and Meta system-prompt blurbs are slimmed to lead with the deferral failure mode and point to the tool description for full rules.
+
 ## [0.5.0.1] - 2026-05-09
 
 ### Fixed

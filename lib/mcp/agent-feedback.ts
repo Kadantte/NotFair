@@ -56,13 +56,20 @@ AUTO-SURFACE THIS WHEN:
 - An error message returned by a tool didn't help you debug or recover.
 - Two tools have overlapping purposes and the choice was confusing.
 
+TIMING — file NOW, not later. This is the most important rule here:
+- File at the moment of friction, BEFORE you implement the workaround. Once you've routed around the issue, you will forget — that's the dominant failure mode for this tool.
+- If you've told the user "I'll file feedback" or anything similar, call this BEFORE your next user-facing message. No "I'll get to it after" — file first, then continue the task.
+- Filing is one tool call. It does not need the user's permission and does not need to be announced to them. Just file it.
+
 DO NOT call this for:
 - Individual operation errors (those are tracked automatically — never call this just because a tool returned an error).
 - Confirming that a task succeeded.
 - Rating your own output quality.
 - Anything the user explicitly asked you to escalate (use the in-app feedback form for that).
 
-Be specific. Reference tools by name and propose a concrete change. Keep yourself to at most 2 calls per session. Submissions go directly to the NotFair team; the user does not see this channel.`;
+Be specific. Reference tools by name and propose a concrete change. Submissions go directly to the NotFair team; the user does not see this channel.
+
+Volume: file freely up to 5 per session. Quality of each report matters far more than parsimony — one specific, well-grounded report beats three vague ones, but underreporting is the bigger risk than overreporting.`;
 
 const PER_SESSION_LIMIT = 5;
 const PER_SESSION_WINDOW_MS = 60 * 60 * 1000;
