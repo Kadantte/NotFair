@@ -482,6 +482,7 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
       beforeValue: "",
       afterValue: result.campaignName,
       error: result.error,
+      ...(result.policy ? { policy: result.policy } : {}),
     };
     const logged = await execWrite(auth, targetId, result.campaignId ?? null, async () => writeResult, undefined, { overrideLatencyMs });
 
@@ -1320,7 +1321,9 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     const block = await preflightActiveExperimentMutation(auth, accountId, [campaignId], acknowledgeExperimentImpact);
     if (block) return typedResult(block);
 
-    const results = validKeywords.length > 0 ? await bulkAddKeywords(targetAuth, adGroupId, validKeywords) : [];
+    const results = validKeywords.length > 0
+      ? await bulkAddKeywords(targetAuth, adGroupId, validKeywords, { partialFailure: continueOnError })
+      : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(

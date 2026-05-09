@@ -1,5 +1,5 @@
 import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
-import { extractErrorMessage, extractPolicyDetails, normalizeCustomerId, removeNegativeKeywordHint, rewriteNegativePauseError, safeEntityId, toMicros } from "./helpers";
+import { extractErrorMessage, extractPolicyRejection, getPolicyRetryBlock, normalizeCustomerId, recordPolicyFailure, removeNegativeKeywordHint, rewriteNegativePauseError, safeEntityId, toMicros } from "./helpers";
 import type { AuthContext, Guardrails, NextToolHint, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
 import { addKeyword, pauseKeyword } from "./writes";
@@ -842,10 +842,15 @@ export type BulkAddKeywordInput = {
   matchType?: "BROAD" | "PHRASE" | "EXACT";
 };
 
+export type BulkAddKeywordsOptions = {
+  partialFailure?: boolean;
+};
+
 export async function bulkAddKeywords(
   auth: AuthContext,
   adGroupId: string,
   keywords: BulkAddKeywordInput[],
+  options: BulkAddKeywordsOptions = {},
 ): Promise<Array<WriteResult & { input: BulkAddKeywordInput }>> {
   if (keywords.length === 0) return [];
 
@@ -864,6 +869,27 @@ export async function bulkAddKeywords(
       valid.push({ input: k, text, matchType: k.matchType ?? "BROAD" });
     }
   }
+
+  const retryableValid: typeof valid = [];
+  for (const item of valid) {
+    const retryBlock = getPolicyRetryBlock(auth, "bulkAddKeywords", [item.text]);
+    if (retryBlock) {
+      results.push({
+        success: false,
+        action: "add_keyword",
+        entityId: "",
+        beforeValue: "",
+        afterValue: item.text,
+        error: retryBlock.error,
+        policy: retryBlock.policy,
+        input: item.input,
+      });
+    } else {
+      retryableValid.push(item);
+    }
+  }
+  valid.length = 0;
+  valid.push(...retryableValid);
 
   if (valid.length === 0) return results;
 
@@ -885,11 +911,45 @@ export async function bulkAddKeywords(
             },
           },
         })),
+        ...(options.partialFailure ? [{ partial_failure: true }] : []),
       );
 
-      const responses = (response as any)?.mutate_operation_responses ?? [];
+      type BulkAddMutateResponse = {
+        mutate_operation_responses?: Array<{ ad_group_criterion_result?: { resource_name?: string } }>;
+        partial_failure_error?: { errors?: Array<Record<string, unknown>> };
+      };
+      const mutateResponse = response as BulkAddMutateResponse;
+      const responses = mutateResponse.mutate_operation_responses ?? [];
+      const failedIndices = new Map<number, { error: string; policy?: NonNullable<WriteResult["policy"]> }>();
+      if (options.partialFailure) {
+        const partialErrors = mutateResponse.partial_failure_error?.errors ?? [];
+        for (const err of partialErrors) {
+          const location = err.location as { field_path_elements?: Array<{ index?: unknown }> } | undefined;
+          const opIndex = location?.field_path_elements?.[0]?.index;
+          if (typeof opIndex === "number") {
+            const policy = extractPolicyRejection(err);
+            const message = policy?.message ?? (typeof err.message === "string" ? err.message : extractErrorMessage(err));
+            failedIndices.set(opIndex, { error: message, ...(policy ? { policy } : {}) });
+          }
+        }
+      }
       for (let j = 0; j < chunk.length; j++) {
         const { input, text, matchType } = chunk[j];
+        const failed = failedIndices.get(j);
+        if (failed) {
+          if (failed.policy) recordPolicyFailure(auth, "bulkAddKeywords", [text], failed.policy);
+          results.push({
+            success: false,
+            action: "add_keyword",
+            entityId: "",
+            beforeValue: "",
+            afterValue: text,
+            error: failed.error,
+            ...(failed.policy ? { policy: failed.policy } : {}),
+            input,
+          });
+          continue;
+        }
         const resourceName = responses[j]?.ad_group_criterion_result?.resource_name as string | undefined;
         const criterionId = resourceName?.split("~").pop() ?? "";
         if (criterionId) {
@@ -899,14 +959,25 @@ export async function bulkAddKeywords(
         }
       }
     } catch (error) {
-      const policy = extractPolicyDetails(error);
+      const policy = extractPolicyRejection(error);
       const msg = extractErrorMessage(error);
+      const policyTextsToCache = policy
+        ? policy.violatingTexts.length > 0
+          ? new Set(policy.violatingTexts.map((text) => text.trim().toLowerCase().replace(/\s+/g, " ")))
+          : chunk.length === 1
+            ? new Set([chunk[0].text.trim().toLowerCase().replace(/\s+/g, " ")])
+            : new Set<string>()
+        : new Set<string>();
       for (const { input, text } of chunk) {
-        const finalError = policy
+        if (policy && policyTextsToCache.has(text.trim().toLowerCase().replace(/\s+/g, " "))) {
+          recordPolicyFailure(auth, "bulkAddKeywords", [text], policy);
+        }
+        const finalError = policy?.message
           ?? (msg.includes("ALREADY_EXISTS") ? `Keyword "${text}" already exists in this ad group` : msg);
         results.push({
           success: false, action: "add_keyword", entityId: "", beforeValue: "", afterValue: text,
           error: finalError,
+          ...(policy ? { policy } : {}),
           input,
         });
       }

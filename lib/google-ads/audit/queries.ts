@@ -298,6 +298,12 @@ export function queryLandingPages(start: string, end: string): string {
  * requires `ORDER BY change_date_time DESC`.
  */
 export function queryChangeEvents(start: string, end: string): string {
+  const today = new Date();
+  const earliest = new Date(today);
+  earliest.setDate(today.getDate() - 29);
+  const earliestStart = earliest.toISOString().slice(0, 10);
+  const safeStart = start < earliestStart ? earliestStart : start;
+
   return `
       SELECT
         change_event.change_date_time,
@@ -310,7 +316,7 @@ export function queryChangeEvents(start: string, end: string): string {
         change_event.campaign,
         change_event.ad_group
       FROM change_event
-      WHERE change_event.change_date_time >= '${start} 00:00:00'
+      WHERE change_event.change_date_time >= '${safeStart} 00:00:00'
         AND change_event.change_date_time <= '${end} 23:59:59'
       ORDER BY change_event.change_date_time DESC
       LIMIT 500
@@ -379,7 +385,7 @@ export function queryCustomerManagerLinks(): string {
         customer_manager_link.manager_link_id,
         customer_manager_link.status
       FROM customer_manager_link
-      WHERE customer_manager_link.status != 'REMOVED'
+      WHERE customer_manager_link.status IN ('ACTIVE', 'PENDING')
       LIMIT 100
     `;
 }

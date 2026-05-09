@@ -34,12 +34,14 @@
 import { getCachedCustomer, getCustomer, AD_GROUP_TYPE, MATCH_TYPE, STATUS } from "./client";
 import {
   extractErrorMessage,
-  extractPolicyDetails,
+  extractPolicyRejection,
+  getPolicyRetryBlock,
   normalizeCustomerId,
+  recordPolicyFailure,
   toMicros,
   validateRsaAssets,
 } from "./helpers";
-import type { AuthContext } from "./types";
+import type { AuthContext, PolicyRejectionDetails } from "./types";
 import type { ShoppingInventoryFilter } from "./campaign-ops";
 
 // ─── Campaign type discriminator ──────────────────────────────────────
@@ -198,9 +200,37 @@ export type CreateCampaignResult = {
   salesCountry?: string;
   inventoryFilterApplied?: boolean;
   error?: string;
+  policy?: PolicyRejectionDetails;
 };
 
 // ─── Shared helpers ───────────────────────────────────────────────────
+
+function campaignPolicyTexts(params: CreateCampaignParams): string[] {
+  const texts = [params.campaignName];
+  if ("finalUrl" in params) texts.push(params.finalUrl);
+  if ("keywords" in params) texts.push(...params.keywords);
+  if ("headlines" in params) texts.push(...params.headlines);
+  if ("longHeadline" in params && params.longHeadline) texts.push(params.longHeadline);
+  if ("longHeadlines" in params) texts.push(...params.longHeadlines);
+  if ("descriptions" in params && params.descriptions) texts.push(...params.descriptions);
+  if ("businessName" in params && params.businessName) texts.push(params.businessName);
+  if ("youtubeVideoId" in params && params.youtubeVideoId) texts.push(params.youtubeVideoId);
+  if ("appId" in params && params.appId) texts.push(params.appId);
+  return texts;
+}
+
+function campaignPolicyErrorFields(
+  auth: AuthContext,
+  params: CreateCampaignParams,
+  error: unknown,
+): Pick<CreateCampaignResult, "error" | "policy"> {
+  const policy = extractPolicyRejection(error);
+  if (policy) recordPolicyFailure(auth, "createCampaign", campaignPolicyTexts(params), policy);
+  return {
+    error: policy?.message ?? extractErrorMessage(error),
+    ...(policy ? { policy } : {}),
+  };
+}
 
 /** Normalize a geo target input to a full resource name. */
 function toGeoTargetConstant(input: string): string {
@@ -442,7 +472,7 @@ async function buildSearchResources(
       success: false,
       campaignType: "SEARCH",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -597,7 +627,7 @@ async function buildShoppingResources(
       success: false,
       campaignType: "SHOPPING",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -717,7 +747,7 @@ async function buildPerformanceMaxResources(
       success: false,
       campaignType: "PERFORMANCE_MAX",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -832,7 +862,7 @@ async function buildDemandGenResources(
       success: false,
       campaignType: "DEMAND_GEN",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -969,7 +999,7 @@ async function buildDisplayResources(
       success: false,
       campaignType: "DISPLAY",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -1096,7 +1126,7 @@ async function buildVideoResources(
       success: false,
       campaignType: "VIDEO",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -1209,7 +1239,7 @@ async function buildAppResources(
       success: false,
       campaignType: "APP",
       campaignName: params.campaignName,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      ...campaignPolicyErrorFields(auth, params, error),
     };
   }
 }
@@ -1226,6 +1256,17 @@ export async function createCampaign(
   auth: AuthContext,
   params: CreateCampaignParams,
 ): Promise<CreateCampaignResult> {
+  const retryBlock = getPolicyRetryBlock(auth, "createCampaign", campaignPolicyTexts(params));
+  if (retryBlock) {
+    return {
+      success: false,
+      campaignType: params.campaignType,
+      campaignName: params.campaignName,
+      error: retryBlock.error,
+      policy: retryBlock.policy,
+    };
+  }
+
   switch (params.campaignType) {
     case "SEARCH":
       return buildSearchResources(auth, params);

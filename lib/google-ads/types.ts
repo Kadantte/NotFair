@@ -145,6 +145,18 @@ export type NextToolHint = {
   args?: Record<string, unknown>;
 };
 
+export type PolicyRequiredAction =
+  | "request_exemption"
+  | "rewrite_or_request_exception";
+
+export type PolicyRejectionDetails = {
+  policyTopics: string[];
+  violatingTexts: string[];
+  retryable: false;
+  requiredAction: PolicyRequiredAction;
+  message: string;
+};
+
 export type WriteResult = {
   success: boolean;
   action: string;
@@ -152,6 +164,8 @@ export type WriteResult = {
   beforeValue: string;
   afterValue: string;
   error?: string;
+  /** Structured Google Ads policy rejection metadata. Agents should not retry when `retryable` is false. */
+  policy?: PolicyRejectionDetails;
   /** Structured next-tool routing for known rejection shapes (negative-pause, guardrail-blocked, etc). */
   nextTool?: NextToolHint;
   /** Human-readable label for the entity (e.g. keyword text). Stored in operations log. */

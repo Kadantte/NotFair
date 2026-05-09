@@ -152,14 +152,20 @@ describe("audit queries", () => {
   });
 
   it("queryChangeEvents — uses >= / <= (BETWEEN not supported), ORDER BY DESC, LIMIT 500", () => {
-    const q = queryChangeEvents("2026-01-01", "2026-01-30");
+    const q = queryChangeEvents("2099-01-01", "2099-01-30");
     expect(q).toMatchSnapshot();
-    expect(q).toContain("change_event.change_date_time >= '2026-01-01 00:00:00'");
-    expect(q).toContain("change_event.change_date_time <= '2026-01-30 23:59:59'");
+    expect(q).toContain("change_event.change_date_time >= '2099-01-01 00:00:00'");
+    expect(q).toContain("change_event.change_date_time <= '2099-01-30 23:59:59'");
     expect(q).toContain("ORDER BY change_event.change_date_time DESC");
     expect(q).toContain("LIMIT 500");
     expect(q).not.toContain("LIMIT 10000");
     expect(q).not.toContain("BETWEEN");
+  });
+
+  it("queryChangeEvents — clamps old starts to Google's rolling 30-day window", () => {
+    const q = queryChangeEvents("2026-01-01", "2099-01-30");
+    expect(q).not.toContain("change_event.change_date_time >= '2026-01-01 00:00:00'");
+    expect(q).toMatch(/change_event\.change_date_time >= '\d{4}-\d{2}-\d{2} 00:00:00'/);
   });
 
   it("queryDailyCampaignMetrics — date range", () => {

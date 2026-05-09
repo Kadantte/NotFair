@@ -1,5 +1,5 @@
 import { getCachedCustomer, getCustomer, AD_GROUP_TYPE, STATUS } from "./client";
-import { extractErrorMessage, extractPolicyDetails, isValidFinalUrl, normalizeCustomerId, rewriteConversionActionMutateError, rewriteRemovedResourceError, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
+import { extractErrorMessage, extractPolicyRejection, getPolicyRetryBlock, isValidFinalUrl, normalizeCustomerId, recordPolicyFailure, rewriteConversionActionMutateError, rewriteRemovedResourceError, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
 
 // ─── Create Shopping Campaign ────────────────────────────────────────
@@ -321,6 +321,7 @@ export async function createAd(
 ): Promise<WriteResult> {
   const customer = getCustomer(auth);
   const cid = normalizeCustomerId(auth.customerId);
+  const policyTexts = [...params.headlines, ...params.descriptions, params.finalUrl];
 
   const rsaError = validateRsaAssets(params.headlines, params.descriptions);
   if (rsaError) {
@@ -341,6 +342,10 @@ export async function createAd(
   }
   if (!isValidFinalUrl(params.finalUrl)) {
     return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: "Final URL must start with http:// or https://" };
+  }
+  const retryBlock = getPolicyRetryBlock(auth, "createAd", policyTexts);
+  if (retryBlock) {
+    return { success: false, action: "create_ad", entityId: "", beforeValue: adGroupId, afterValue: params.finalUrl, error: retryBlock.error, policy: retryBlock.policy };
   }
 
   try {
@@ -383,13 +388,16 @@ export async function createAd(
       afterValue: params.finalUrl,
     };
   } catch (error) {
+    const policy = extractPolicyRejection(error);
+    if (policy) recordPolicyFailure(auth, "createAd", policyTexts, policy);
     return {
       success: false,
       action: "create_ad",
       entityId: "",
       beforeValue: adGroupId,
       afterValue: params.finalUrl,
-      error: extractPolicyDetails(error) ?? extractErrorMessage(error),
+      error: policy?.message ?? extractErrorMessage(error),
+      ...(policy ? { policy } : {}),
     };
   }
 }
@@ -1516,7 +1524,7 @@ export async function updateAdAssets(
       afterValue,
     };
   } catch (error) {
-    const policy = extractPolicyDetails(error);
+    const policy = extractPolicyRejection(error);
     const raw = extractErrorMessage(error);
     const rewritten = rewriteRemovedResourceError(raw, `Ad ${adId}`);
     return {
@@ -1525,7 +1533,8 @@ export async function updateAdAssets(
       entityId,
       beforeValue,
       afterValue,
-      error: policy ?? rewritten,
+      error: policy?.message ?? rewritten,
+      ...(policy ? { policy } : {}),
     };
   }
 }

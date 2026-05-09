@@ -58,6 +58,32 @@ describe("createAd", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("Policy violation: POLICY");
     expect(result.error).toContain("Google Ads rejected this content");
+    expect(result.policy).toMatchObject({
+      policyTopics: ["POLICY"],
+      retryable: false,
+      requiredAction: "rewrite_or_request_exception",
+    });
+  });
+
+  it("suppresses exact same-session retries after a policy rejection", async () => {
+    const sessionAuth = { ...auth, sessionId: 901 };
+    mockMutateResources.mockRejectedValueOnce({
+      errors: [
+        {
+          message: "The resource has been disapproved since the policy summary includes policy topics of type PROHIBITED.",
+          error_code: { policy_finding_error: 2 },
+        },
+      ],
+    });
+
+    const first = await createAd(sessionAuth, "1234567890", validRsa);
+    const second = await createAd(sessionAuth, "1234567890", validRsa);
+
+    expect(first.success).toBe(false);
+    expect(second.success).toBe(false);
+    expect(second.error).toContain("Skipped retry");
+    expect(second.policy?.retryable).toBe(false);
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
 
   describe("path1/path2 (display URL paths)", () => {

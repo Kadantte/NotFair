@@ -1,4 +1,4 @@
-import type { NextToolHint } from "./types";
+import type { AuthContext, NextToolHint, PolicyRejectionDetails } from "./types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -62,31 +62,50 @@ export function isNegativePauseError(msg: string): boolean {
  *
  * Returns null if no policy-violation errors are present on the failure.
  */
-export function extractPolicyDetails(error: unknown): string | null {
-  if (!error || typeof error !== "object" || !("errors" in error)) return null;
-  const failures = (error as { errors: Array<Record<string, any>> }).errors;
+export function extractPolicyRejection(error: unknown): PolicyRejectionDetails | null {
+  if (!error || typeof error !== "object") return null;
+  type UnknownRecord = Record<string, unknown>;
+  const asRecord = (value: unknown): UnknownRecord =>
+    value && typeof value === "object" ? value as UnknownRecord : {};
+  const failures = "errors" in error
+    ? (error as { errors: UnknownRecord[] }).errors
+    : [error as UnknownRecord];
   if (!Array.isArray(failures) || failures.length === 0) return null;
 
   const parts: string[] = [];
   const seenPolicies = new Set<string>();
+  const violatingTexts = new Set<string>();
   for (const f of failures) {
-    const code = f?.error_code ?? {};
+    const code = asRecord(f.error_code);
     const isPolicy =
       code.policy_violation_error === 2 ||
       code.policy_violation_error === "POLICY_ERROR" ||
       code.policy_finding_error != null;
     if (!isPolicy) continue;
 
-    const pvd = f?.details?.policy_violation_details;
+    const details = asRecord(f.details);
+    const pvd = asRecord(details.policy_violation_details);
+    const key = asRecord(pvd.key);
+    const trigger = asRecord(f.trigger);
     const policyName: string | undefined =
-      pvd?.key?.policy_name ?? pvd?.external_policy_name;
+      typeof key.policy_name === "string"
+        ? key.policy_name
+        : typeof pvd.external_policy_name === "string"
+          ? pvd.external_policy_name
+          : undefined;
     const violatingText: string | undefined =
-      pvd?.key?.violating_text ?? f?.trigger?.string_value;
-    const description: string | undefined = pvd?.external_policy_description;
+      typeof key.violating_text === "string"
+        ? key.violating_text
+        : typeof trigger.string_value === "string"
+          ? trigger.string_value
+          : undefined;
+    const description: string | undefined =
+      typeof pvd.external_policy_description === "string" ? pvd.external_policy_description : undefined;
 
     const label = policyName ?? "POLICY";
-    if (policyName) seenPolicies.add(policyName.toUpperCase());
+    seenPolicies.add(label.toUpperCase());
     if (violatingText) {
+      violatingTexts.add(violatingText);
       parts.push(`${label} on text "${violatingText}"`);
     } else if (description) {
       parts.push(`${label}: ${description}`);
@@ -98,12 +117,77 @@ export function extractPolicyDetails(error: unknown): string | null {
   if (parts.length === 0) return null;
 
   const isHealthPolicy = seenPolicies.has("HEALTH_IN_PERSONALIZED_ADS");
+  const requiredAction = isHealthPolicy ? "request_exemption" : "rewrite_or_request_exception";
 
   const guidance = isHealthPolicy
     ? "Health and medical content is blocked from personalized ads targeting. Do NOT retry this specific content — healthcare topics require an advertiser exemption before they can run. To apply: Google Ads → Tools → Policy Manager → Request Exemption. Rewording health/medical phrases will NOT bypass this policy; the exemption is required."
     : "Google Ads rejected this content. Rewrite without the restricted phrase, or request a policy exception in the Google Ads UI (Tools → Policy Manager).";
 
-  return `Policy violation: ${parts.join("; ")}. ${guidance}`;
+  const message = `Policy violation: ${parts.join("; ")}. ${guidance}`;
+  return {
+    policyTopics: [...seenPolicies],
+    violatingTexts: [...violatingTexts],
+    retryable: false,
+    requiredAction,
+    message,
+  };
+}
+
+export function extractPolicyDetails(error: unknown): string | null {
+  return extractPolicyRejection(error)?.message ?? null;
+}
+
+const POLICY_RETRY_TTL_MS = 6 * 60 * 60 * 1000;
+const policyRetryCache = new Map<string, { expiresAt: number; policy: PolicyRejectionDetails; error: string }>();
+
+function normalizePolicyText(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function policyRetryScope(auth: Pick<AuthContext, "sessionId">): string | null {
+  return auth.sessionId ? `session:${auth.sessionId}` : null;
+}
+
+function policyRetryKey(
+  auth: Pick<AuthContext, "sessionId" | "customerId">,
+  toolName: string,
+  texts: string[],
+): string | null {
+  const scope = policyRetryScope(auth);
+  const normalized = texts.map(normalizePolicyText).filter(Boolean).join("\u001f");
+  if (!scope || !normalized) return null;
+  return `${scope}|${auth.customerId}|${toolName}|${normalized}`;
+}
+
+export function recordPolicyFailure(
+  auth: Pick<AuthContext, "sessionId" | "customerId">,
+  toolName: string,
+  texts: string[],
+  policy: PolicyRejectionDetails,
+  error = policy.message,
+) {
+  const key = policyRetryKey(auth, toolName, texts);
+  if (!key) return;
+  policyRetryCache.set(key, { expiresAt: Date.now() + POLICY_RETRY_TTL_MS, policy, error });
+}
+
+export function getPolicyRetryBlock(
+  auth: Pick<AuthContext, "sessionId" | "customerId">,
+  toolName: string,
+  texts: string[],
+): { policy: PolicyRejectionDetails; error: string } | null {
+  const key = policyRetryKey(auth, toolName, texts);
+  if (!key) return null;
+  const cached = policyRetryCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    policyRetryCache.delete(key);
+    return null;
+  }
+  return {
+    policy: cached.policy,
+    error: `Skipped retry: this exact ${toolName} content already hit a non-retryable Google Ads policy rejection in this session. ${cached.error}`,
+  };
 }
 
 /**
