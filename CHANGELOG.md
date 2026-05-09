@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.4.1.1] - 2026-05-09
+
+### Added
+- **`/dev/usage` now tracks successful interaction rate.** The dev usage dashboard derives 30-minute MCP interaction windows from server-observed operations, counts an interaction as successful when its final operation succeeds, and charts the daily success rate with interaction counts in the tooltip. This gives NotFair a simple product-quality signal without relying on agent-provided task IDs.
+
 ## [0.4.1.0] - 2026-05-09
 
 ### Fixed

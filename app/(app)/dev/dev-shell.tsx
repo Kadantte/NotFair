@@ -1069,6 +1069,103 @@ export function DevShell() {
                             )}
                         </div>
 
+                        {/* ── Interaction success chart ── */}
+                        <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-[#3D3C36]">
+                                <div>
+                                    <h2 className="text-base font-semibold text-[#E8E4DD]">
+                                        Successful Interaction Rate
+                                    </h2>
+                                    {stats.daily.length > 0 && (() => {
+                                        const rows = stats.daily.filter(d => d.interactions > 0 && d.interactionSuccessRate != null);
+                                        const totalInteractions = rows.reduce((sum, d) => sum + d.interactions, 0);
+                                        const totalSuccessful = rows.reduce((sum, d) => sum + d.successfulInteractions, 0);
+                                        const avg = totalInteractions > 0 ? (totalSuccessful / totalInteractions) * 100 : null;
+                                        const latest = rows[rows.length - 1];
+                                        return (
+                                            <p className="text-[11px] text-[#C4C0B6] mt-0.5 font-mono tabular-nums">
+                                                {avg == null
+                                                    ? '30-minute interaction windows · no interactions yet'
+                                                    : `avg ${avg.toFixed(1)}% · latest ${latest?.interactionSuccessRate?.toFixed(1) ?? '0.0'}% · ${totalInteractions.toLocaleString()} interactions`}
+                                            </p>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                            {stats.daily.every(d => d.interactions === 0) ? (
+                                <p className="text-sm text-[#C4C0B6] text-center py-8">No interactions in this range.</p>
+                            ) : (
+                                <div className="p-4">
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <ComposedChart
+                                            data={stats.daily.map(d => ({
+                                                ...d,
+                                                date: d.day.slice(5),
+                                            }))}
+                                            margin={CHART_MARGIN}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                                                tickLine={false}
+                                                angle={-45}
+                                                textAnchor="end"
+                                                interval="preserveStartEnd"
+                                                minTickGap={20}
+                                            />
+                                            <YAxis
+                                                domain={[0, 100]}
+                                                stroke="#3D3C36"
+                                                tick={{ fill: '#C4C0B6', fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                                                width={40}
+                                            />
+                                            <Tooltip
+                                                cursor={CHART_CURSOR}
+                                                content={({ active, payload, label }) => {
+                                                    if (!active || !payload?.length) return null;
+                                                    const row = payload[0]?.payload as {
+                                                        interactionSuccessRate?: number | null;
+                                                        interactions?: number;
+                                                        successfulInteractions?: number;
+                                                    } | undefined;
+                                                    const successRate = row?.interactionSuccessRate ?? null;
+                                                    const interactions = row?.interactions ?? 0;
+                                                    const successful = row?.successfulInteractions ?? 0;
+                                                    return (
+                                                        <ChartTooltipShell label={label}>
+                                                            <div className="flex items-center gap-2 text-[#4CAF6E]">
+                                                                <span className="w-2 h-2 rounded-full bg-[#4CAF6E] inline-block" />
+                                                                {successRate == null ? 'n/a' : `${successRate.toFixed(1)}%`} successful
+                                                            </div>
+                                                            <div className="text-[#E8E4DD] mt-1 pt-1 border-t border-[#3D3C36]">
+                                                                {successful.toLocaleString()} / {interactions.toLocaleString()} interactions
+                                                            </div>
+                                                        </ChartTooltipShell>
+                                                    );
+                                                }}
+                                            />
+                                            <Legend wrapperStyle={LEGEND_STYLE} />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="interactionSuccessRate"
+                                                name="Successful interactions"
+                                                connectNulls
+                                                dot={{ r: 3, fill: '#4CAF6E', strokeWidth: 0 }}
+                                                activeDot={{ r: 4, fill: '#4CAF6E', strokeWidth: 0 }}
+                                                stroke="#4CAF6E"
+                                                strokeWidth={1.8}
+                                            />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+
                         {/* ── DAU chart ── */}
                         <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3 border-b border-[#3D3C36]">

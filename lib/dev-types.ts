@@ -9,6 +9,9 @@ export type DailyChartRow = {
     writes: number;
     errors: number;
     dau: number;
+    interactions: number;
+    successfulInteractions: number;
+    interactionSuccessRate: number | null;
 };
 
 export type TopUserByErrors = {

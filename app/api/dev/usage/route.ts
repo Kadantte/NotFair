@@ -68,6 +68,7 @@ export async function GET(request: Request) {
 
   const sinceIso = since.toISOString();
   const nowIso = now.toISOString();
+  const interactionLookbackIso = new Date(since.getTime() - 30 * 60 * 1000).toISOString();
 
   // Build WHERE clauses for current and previous windows.
   // excludeDevOpsFilter() uses an EXISTS subquery on mcp_sessions, which is
@@ -105,7 +106,14 @@ export async function GET(request: Request) {
     ? and(whereRecent, dailySourceFilter)
     : whereRecent;
 
-  const [totalsRow, prevTotalsRow, newUsersRow, dailyCounts, topUsers, topTools] = await Promise.all([
+  const interactionSourceFilter =
+    source === "chat"
+      ? sql`AND o.client_source is null`
+      : source
+        ? sql`AND o.client_source = ${source}`
+        : sql``;
+
+  const [totalsRow, prevTotalsRow, newUsersRow, dailyCounts, dailyInteractions, topUsers, topTools] = await Promise.all([
     // ── Current-window totals ──────────────────────────────────────────────────
     db()
       .select({
@@ -161,6 +169,92 @@ export async function GET(request: Request) {
       .where(whereDaily)
       .groupBy(localDate)
       .orderBy(localDate),
+
+    // ── Per-day 30-minute interaction success rate ───────────────────────────
+    // This is deliberately derived from server-observed operation timing rather
+    // than agent-provided task/session IDs. An interaction is same user/account/
+    // client/platform until a >30-minute inactivity gap.
+    db().execute(sql`
+      WITH filtered AS (
+        SELECT
+          o.id,
+          o.user_id,
+          o.session_id,
+          o.account_id,
+          COALESCE(o.client_source, 'chat') AS client_source,
+          o.platform,
+          o.created_at,
+          o.success
+        FROM operations o
+        WHERE o.created_at >= ${interactionLookbackIso}::timestamp
+          AND o.created_at < ${nowIso}::timestamp
+          ${includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`}
+          ${platform ? sql`AND o.platform = ${platform}` : sql``}
+          ${interactionSourceFilter}
+      ),
+      ordered AS (
+        SELECT
+          *,
+          LAG(created_at) OVER (
+            PARTITION BY
+              COALESCE(user_id, 'session:' || COALESCE(session_id::text, 'none')),
+              account_id,
+              client_source,
+              platform
+            ORDER BY created_at, id
+          ) AS prev_created_at
+        FROM filtered
+      ),
+      marked AS (
+        SELECT
+          *,
+          CASE
+            WHEN prev_created_at IS NULL THEN 1
+            WHEN created_at - prev_created_at > interval '30 minutes' THEN 1
+            ELSE 0
+          END AS new_interaction
+        FROM ordered
+      ),
+      numbered AS (
+        SELECT
+          *,
+          SUM(new_interaction) OVER (
+            PARTITION BY
+              COALESCE(user_id, 'session:' || COALESCE(session_id::text, 'none')),
+              account_id,
+              client_source,
+              platform
+            ORDER BY created_at, id
+          ) AS interaction_seq
+        FROM marked
+      ),
+      interactions AS (
+        SELECT
+          COALESCE(user_id, 'session:' || COALESCE(session_id::text, 'none')) AS actor_key,
+          account_id,
+          client_source,
+          platform,
+          interaction_seq,
+          MIN(created_at) AS interaction_start,
+          (ARRAY_AGG(success ORDER BY created_at DESC, id DESC))[1] = 1 AS ended_successfully
+        FROM numbered
+        GROUP BY actor_key, account_id, client_source, platform, interaction_seq
+      ),
+      interaction_days AS (
+        SELECT
+          date((interaction_start AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral}) AS local_day,
+          ended_successfully
+        FROM interactions
+        WHERE interaction_start >= ${sinceIso}::timestamp
+      )
+      SELECT
+        to_char(local_day, 'YYYY-MM-DD') AS day,
+        count(*)::int AS interactions,
+        count(*) FILTER (WHERE ended_successfully)::int AS successful_interactions
+      FROM interaction_days
+      GROUP BY local_day
+      ORDER BY local_day
+    `),
 
     // ── Top 10 users by error count ───────────────────────────────────────────
     // JOIN mcp_sessions to get googleEmail and primaryAccountId.
@@ -251,6 +345,19 @@ export async function GET(request: Request) {
   const totals = totalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
   const prev = prevTotalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
   const newUsers = newUsersRow[0]?.newUsers ?? 0;
+  const interactionsByDay = new Map(
+    (dailyInteractions as unknown as Array<{
+      day: string;
+      interactions: number | string;
+      successful_interactions: number | string;
+    }>).map((row) => [
+      row.day,
+      {
+        interactions: Number(row.interactions ?? 0),
+        successfulInteractions: Number(row.successful_interactions ?? 0),
+      },
+    ]),
+  );
 
   // If the prior window predates the platform start, null out those fields so
   // the UI can show "new" instead of "▲ ∞%".
@@ -270,7 +377,20 @@ export async function GET(request: Request) {
       newUsers,
     },
     prevTotals,
-    daily: dailyCounts,
+    daily: dailyCounts.map((day) => {
+      const interaction = interactionsByDay.get(day.day) ?? {
+        interactions: 0,
+        successfulInteractions: 0,
+      };
+      return {
+        ...day,
+        interactions: interaction.interactions,
+        successfulInteractions: interaction.successfulInteractions,
+        interactionSuccessRate: interaction.interactions > 0
+          ? (interaction.successfulInteractions / interaction.interactions) * 100
+          : null,
+      };
+    }),
     topUsersByErrors: topUsers.map((u) => ({
       userId: u.userId,
       googleEmail: u.googleEmail,
