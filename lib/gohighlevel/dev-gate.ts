@@ -74,11 +74,9 @@ export function isGhlDevAllowed(session: Session | null | undefined): boolean {
 /**
  * Re-export for components that need to render "DEV ONLY · authorized
  * emails: …" hints. Defensive copy so callers can't mutate the constant.
+ *
+ * Server-only — this module imports `lib/session` (`"server-only"`). For
+ * the visible badge label, see `components/gohighlevel/dev-only-badge.tsx`
+ * (inlined to keep the client bundle clean).
  */
 export const GHL_DEV_EMAILS: readonly string[] = [...DEV_EMAILS];
-
-/**
- * Display string used by the "DEV ONLY" badge across the GHL surfaces.
- * Centralized so the wording is consistent and easy to update.
- */
-export const GHL_DEV_BADGE_LABEL = "DEV ONLY · NotFair admins";
