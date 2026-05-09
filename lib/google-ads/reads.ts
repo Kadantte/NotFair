@@ -1829,6 +1829,18 @@ export function rewriteInvalidDateLiterals(query: string, today: Date = new Date
   return out;
 }
 
+/**
+ * Agents sometimes use GAQL preset date literals with equality syntax:
+ * `segments.date = YESTERDAY`. Google only accepts those presets with DURING;
+ * equality requires an explicit ISO date. Rewrite the safe single-day presets.
+ */
+export function rewritePresetDateEquality(query: string): string {
+  return query.replace(
+    /\bsegments\.date\s*=\s*['"]?(TODAY|YESTERDAY)['"]?\b/gi,
+    (_match, literal: string) => `segments.date DURING ${literal.toUpperCase()}`,
+  );
+}
+
 function rawFieldForVirtualSibling(field: string): string | null {
   const lower = field.toLowerCase();
   if (lower.endsWith("_value")) {
@@ -2274,6 +2286,7 @@ export async function runSafeGaqlReport(
   options: RunSafeGaqlOptions = {},
 ): Promise<GaqlReport> {
   let query = rewriteInvalidDateLiterals(rawQuery.trim());
+  query = rewritePresetDateEquality(query);
   query = rewriteVirtualNameFields(query);
   query = clampChangeEventDateWindow(query);
   let normalized = query.toUpperCase();

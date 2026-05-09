@@ -43,6 +43,17 @@ describe("image assets", () => {
     it("rejects non-HTTPS image URLs before fetching", async () => {
       await expect(fetchImageAssetFromUrl("http://example.com/image.png")).rejects.toThrow(/HTTPS URL/);
     });
+
+    it("tells agents how to recover from non-PNG/JPEG responses", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("<html>not an image</html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+      );
+
+      await expect(fetchImageAssetFromUrl("https://example.com/image")).rejects.toThrow(/convert WebP\/SVG\/HTML image pages to PNG or JPEG/);
+    });
   });
 
   describe("createImageAsset", () => {
@@ -87,6 +98,7 @@ describe("image assets", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/exactly 1\.91:1/);
+      expect(result.error).toContain("1200x628");
       expect(mockMutateResources).not.toHaveBeenCalled();
     });
 
@@ -100,6 +112,7 @@ describe("image assets", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/exactly 1:1/);
+      expect(result.error).toContain("1200x1200");
       expect(mockMutateResources).not.toHaveBeenCalled();
     });
   });

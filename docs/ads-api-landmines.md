@@ -23,6 +23,7 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 ## GAQL — date literals
 
 - **Valid `DURING` literals are a fixed set.** `TODAY, YESTERDAY, LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS, THIS_MONTH, LAST_MONTH, LAST_BUSINESS_WEEK, LAST_WEEK_MON_SUN, LAST_WEEK_SUN_SAT, THIS_WEEK_MON_TODAY, THIS_WEEK_SUN_TODAY`.
+- **Preset date literals use `DURING`, not equality.** `segments.date = YESTERDAY` fails with GAQL syntax errors; use `segments.date DURING YESTERDAY` or `segments.date = 'YYYY-MM-DD'`. Server rewrites TODAY/YESTERDAY equality; verify in `lib/__tests__/google-ads-gaql.test.ts`.
 - **There is NO `LAST_60_DAYS`, `LAST_90_DAYS`, `LAST_180_DAYS`, `THIS_YEAR`, `LAST_YEAR`.** For windows >30 days, use `BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'`.
 - **`segments.date BETWEEN` takes explicit ISO dates only.** Never `BETWEEN 'LAST_30_DAYS' AND 'undefined'`.
 

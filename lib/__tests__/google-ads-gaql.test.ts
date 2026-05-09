@@ -24,6 +24,7 @@ import {
   buildGaqlSummary,
   buildContinuationHint,
   rewriteInvalidDateLiterals,
+  rewritePresetDateEquality,
   rewriteVirtualNameFields,
   enrichGaqlError,
   validateChangeEventFilter,
@@ -689,6 +690,28 @@ describe("rewriteInvalidDateLiterals", () => {
     const sentQuery = mockQuery.mock.calls[0][0] as string;
     expect(sentQuery).toContain("BETWEEN");
     expect(sentQuery).not.toContain("LAST_90_DAYS");
+  });
+});
+
+describe("rewritePresetDateEquality", () => {
+  it("rewrites single-day preset equality to DURING syntax", () => {
+    expect(
+      rewritePresetDateEquality("SELECT campaign.id FROM campaign WHERE segments.date = YESTERDAY"),
+    ).toContain("segments.date DURING YESTERDAY");
+    expect(
+      rewritePresetDateEquality("SELECT campaign.id FROM campaign WHERE segments.date = 'today'"),
+    ).toContain("segments.date DURING TODAY");
+  });
+
+  it("runs through runSafeGaqlReport before hitting Google", async () => {
+    mockQuery.mockResolvedValueOnce([{ campaign: { id: "1" } }]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign WHERE segments.date = YESTERDAY",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("segments.date DURING YESTERDAY");
+    expect(sentQuery).not.toContain("segments.date = YESTERDAY");
   });
 });
 

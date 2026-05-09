@@ -2,6 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.0.1] - 2026-05-09
+
+### Fixed
+- **Google Ads MCP self-heals `segments.date = TODAY/YESTERDAY` GAQL.** Agents sometimes use equality with GAQL preset date literals; the server now rewrites those safe single-day cases to valid `segments.date DURING TODAY/YESTERDAY` before querying Google.
+- **Image asset failures now give agents a concrete retry path.** `createImageAsset` errors include the received dimensions plus the expected landscape/square size, and non-PNG/JPEG URLs now tell agents to convert WebP/SVG/HTML image pages to a direct PNG/JPEG URL before retrying.
+
 ## [0.5.0.0] - 2026-05-09
 
 ### Added

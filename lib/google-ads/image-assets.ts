@@ -196,12 +196,12 @@ function validateImageAssetInput(
   const { width, height } = dimensions;
 
   if (fieldType === "SQUARE_MARKETING_IMAGE") {
-    if (width < 300 || height < 300) return { dimensions, error: "SQUARE_MARKETING_IMAGE must be at least 300x300" };
-    if (width !== height) return { dimensions, error: "SQUARE_MARKETING_IMAGE must be exactly 1:1" };
+    if (width < 300 || height < 300) return { dimensions, error: `SQUARE_MARKETING_IMAGE must be at least 300x300; got ${width}x${height}. Retry with a square PNG/JPEG such as 1200x1200.` };
+    if (width !== height) return { dimensions, error: `SQUARE_MARKETING_IMAGE must be exactly 1:1; got ${width}x${height}. Retry with a square PNG/JPEG such as 1200x1200.` };
   } else {
-    if (width < 600 || height < 314) return { dimensions, error: "MARKETING_IMAGE must be at least 600x314" };
+    if (width < 600 || height < 314) return { dimensions, error: `MARKETING_IMAGE must be at least 600x314; got ${width}x${height}. Retry with a landscape PNG/JPEG such as 1200x628.` };
     if (width * 157 !== height * 300) {
-      return { dimensions, error: "MARKETING_IMAGE must be exactly 1.91:1, e.g. 1200x628" };
+      return { dimensions, error: `MARKETING_IMAGE must be exactly 1.91:1; got ${width}x${height}. Retry with a landscape PNG/JPEG such as 1200x628, or use SQUARE_MARKETING_IMAGE for a 1:1 asset.` };
     }
   }
   return { dimensions };
@@ -229,7 +229,7 @@ export async function fetchImageAssetFromUrl(imageUrl: string): Promise<FetchedI
   const imageBytes = Buffer.from(await response.arrayBuffer());
   if (imageBytes.length > MAX_IMAGE_BYTES) throw new Error("Image file must be 5 MB or smaller");
   const mimeType = detectMimeType(imageBytes, response.headers.get("content-type"));
-  if (!mimeType) throw new Error("Image must be a PNG or JPEG");
+  if (!mimeType) throw new Error("Image must be a PNG or JPEG. Retry with a direct HTTPS URL to a PNG/JPEG file; convert WebP/SVG/HTML image pages to PNG or JPEG before calling createImageAsset.");
   const dimensions = readImageDimensions(imageBytes, mimeType);
   if (!dimensions) throw new Error("Could not read image dimensions; use a valid PNG or JPEG");
   return { imageBytes, mimeType, dimensions };
