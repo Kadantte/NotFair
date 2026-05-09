@@ -4,6 +4,9 @@ All notable changes to NotFair will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+- **runScript now blocks more high-volume invalid GAQL before hitting Google Ads.** The GAQL preflight rejects malformed `segments.date BETWEEN` ranges, `search_term_view` queries without a finite date filter, and known hallucinated fields such as `metrics.conversion_rate`, `metrics.average_cpc_micros`, and `asset.sitelink_asset.final_urls`, with targeted correction guidance for agents.
+
 ## [0.4.0.0] - 2026-05-08
 
 ### Added

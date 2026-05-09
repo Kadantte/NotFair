@@ -28,6 +28,9 @@ import {
   enrichGaqlError,
   validateChangeEventFilter,
   validateMetricsOnConversionAction,
+  validateMalformedDateRanges,
+  validateRequiredDateFilter,
+  validateKnownUnsupportedGaqlFields,
   validateEnumLiteralsInWhere,
   clampChangeEventDateWindow,
   DEFAULT_GAQL_LIMIT,
@@ -878,6 +881,84 @@ describe("validateMetricsOnConversionAction", () => {
   });
 });
 
+describe("validateMalformedDateRanges", () => {
+  it("rejects BETWEEN with DURING-style literals and undefined", () => {
+    expect(() =>
+      validateMalformedDateRanges(
+        "SELECT campaign.id FROM campaign WHERE segments.date BETWEEN 'LAST_30_DAYS' AND 'undefined'",
+      ),
+    ).toThrow(/Do not mix DURING literals with BETWEEN/);
+  });
+
+  it("allows explicit ISO date BETWEEN ranges", () => {
+    expect(() =>
+      validateMalformedDateRanges(
+        "SELECT campaign.id FROM campaign WHERE segments.date BETWEEN '2026-04-01' AND '2026-04-30'",
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("validateRequiredDateFilter", () => {
+  it("rejects search_term_view without finite segments.date filter", () => {
+    expect(() =>
+      validateRequiredDateFilter(
+        "SELECT search_term_view.search_term, metrics.cost_micros FROM search_term_view WHERE campaign.id = 123",
+      ),
+    ).toThrow(/search_term_view.*segments\.date/);
+  });
+
+  it("allows search_term_view with DURING date filter", () => {
+    expect(() =>
+      validateRequiredDateFilter(
+        "SELECT search_term_view.search_term, metrics.cost_micros FROM search_term_view WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).not.toThrow();
+  });
+
+  it("ignores non-search-term resources", () => {
+    expect(() =>
+      validateRequiredDateFilter(
+        "SELECT campaign.id, metrics.cost_micros FROM campaign WHERE campaign.id = 123",
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("validateKnownUnsupportedGaqlFields", () => {
+  it("rejects hallucinated average CPC micros field with a replacement", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, metrics.average_cpc_micros FROM campaign",
+      ),
+    ).toThrow(/metrics\.average_cpc/);
+  });
+
+  it("rejects hallucinated conversion rate field with calculation guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, metrics.conversion_rate FROM campaign",
+      ),
+    ).toThrow(/conversions.*clicks/);
+  });
+
+  it("rejects hallucinated sitelink final_urls field with metadata guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT asset.sitelink_asset.final_urls FROM asset",
+      ),
+    ).toThrow(/getResourceMetadata/);
+  });
+
+  it("allows supported fields", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, metrics.average_cpc FROM campaign",
+      ),
+    ).not.toThrow();
+  });
+});
+
 describe("validateEnumLiteralsInWhere", () => {
   it("rejects numeric literals on campaign.status", () => {
     expect(() =>
@@ -992,6 +1073,36 @@ describe("runSafeGaqlReport pre-flight integration", () => {
         "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status = 3",
       ),
     ).rejects.toThrow(/STRING names/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed segments.date BETWEEN ranges end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id FROM campaign WHERE segments.date BETWEEN 'LAST_30_DAYS' AND 'undefined'",
+      ),
+    ).rejects.toThrow(/invalid segments\.date BETWEEN/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects search_term_view without date filter end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT search_term_view.search_term, metrics.cost_micros FROM search_term_view WHERE campaign.id = 123",
+      ),
+    ).rejects.toThrow(/search_term_view.*segments\.date/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects known hallucinated fields end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id, metrics.conversion_rate FROM campaign",
+      ),
+    ).rejects.toThrow(/unsupported field/);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

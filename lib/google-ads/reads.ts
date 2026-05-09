@@ -1985,6 +1985,80 @@ export function validateMetricsOnConversionAction(query: string) {
 }
 
 /**
+ * Catch malformed date ranges LLMs create when mixing DURING-style literals
+ * with BETWEEN syntax, e.g. `BETWEEN 'LAST_30_DAYS' AND 'undefined'`.
+ * Google rejects these with query_error=26, but the fix is deterministic.
+ */
+export function validateMalformedDateRanges(query: string) {
+  const invalidBetween = query.match(
+    /\bsegments\.date\s+BETWEEN\s+(['"]?)([^'"\s)]+)\1\s+AND\s+(['"]?)([^'"\s)]+)\3/i,
+  );
+  if (!invalidBetween) return;
+
+  const [, , start, , end] = invalidBetween;
+  const badToken = [start, end].find((value) =>
+    /^(undefined|null|nan)$/i.test(value) ||
+    /^(?:LAST|THIS|TODAY|YESTERDAY)/i.test(value) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value),
+  );
+  if (!badToken) return;
+
+  throw new Error(
+    `GAQL pre-flight: invalid segments.date BETWEEN range contains \`${badToken}\`. ` +
+      "Use `segments.date DURING LAST_30_DAYS` for preset windows, or " +
+      "`segments.date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` for explicit dates. " +
+      "Do not mix DURING literals with BETWEEN.",
+  );
+}
+
+/**
+ * Some Google Ads reporting views require a finite `segments.date` predicate.
+ * The largest observed production source is `search_term_view`; catch that
+ * exact resource locally instead of building a broad fake GAQL validator.
+ */
+export function validateRequiredDateFilter(query: string) {
+  const resource = extractFromResource(query);
+  if (resource !== "search_term_view") return;
+  const whereMatch = query.match(
+    /\sWHERE\s+([\s\S]*?)(?:\sHAVING\s|\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i,
+  );
+  const whereClause = whereMatch?.[1] ?? "";
+  if (/\bsegments\.date\s+(?:DURING|BETWEEN|>=|>|<=|<|=)\b/i.test(whereClause)) return;
+
+  throw new Error(
+    "GAQL pre-flight: `search_term_view` requires a finite `segments.date` filter. " +
+      "Add `WHERE segments.date DURING LAST_30_DAYS` or " +
+      "`WHERE segments.date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` before querying search terms.",
+  );
+}
+
+/**
+ * Tiny denylist for high-volume hallucinated GAQL fields seen in production.
+ * This is intentionally not a schema clone; it only blocks fields where the
+ * replacement is stable and safer than asking the model to guess again.
+ */
+const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
+  "metrics.average_cpc_micros":
+    "`metrics.average_cpc_micros` is not a GAQL field. Select `metrics.average_cpc` instead.",
+  "metrics.conversion_rate":
+    "`metrics.conversion_rate` is not a GAQL field. Select `metrics.conversions` and `metrics.clicks`, then calculate `conversions / clicks` in JavaScript.",
+  "asset.sitelink_asset.final_urls":
+    "`asset.sitelink_asset.final_urls` is not a GAQL field. Use `getResourceMetadata('asset')` to confirm the available asset URL fields before retrying.",
+};
+
+export function validateKnownUnsupportedGaqlFields(query: string) {
+  const fields = extractSelectFields(query)
+    .map((field) => field.toLowerCase())
+    .filter((field) => field in KNOWN_UNSUPPORTED_GAQL_FIELDS);
+  if (fields.length === 0) return;
+
+  throw new Error(
+    "GAQL pre-flight: unsupported field(s) in SELECT. " +
+      fields.map((field) => KNOWN_UNSUPPORTED_GAQL_FIELDS[field]).join(" "),
+  );
+}
+
+/**
  * Status / type enums on the major Google Ads resources accept STRING names,
  * not numeric codes. LLMs sometimes paste numeric values from the Ads API
  * proto definitions; Google rejects with query_error=18, but we can catch the
@@ -2219,8 +2293,11 @@ export async function runSafeGaqlReport(
   }
 
   query = promotePredicateFieldsToSelect(query);
+  validateMalformedDateRanges(query);
   validateChangeEventFilter(query);
   validateMetricsOnConversionAction(query);
+  validateRequiredDateFilter(query);
+  validateKnownUnsupportedGaqlFields(query);
   validateEnumLiteralsInWhere(query);
 
   if (options.excludeRemovedParents ?? DEFAULT_EXCLUDE_REMOVED_PARENTS) {
