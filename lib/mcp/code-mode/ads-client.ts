@@ -2,13 +2,6 @@ import type { AuthContext } from "@/lib/google-ads";
 import { runSafeGaqlReport } from "@/lib/google-ads";
 import { humanizeGaqlRows } from "@/lib/google-ads/humanize";
 import {
-  formatDate,
-  getDateRange,
-  micros,
-  toMicros,
-  normalizeCustomerId,
-} from "@/lib/google-ads/helpers";
-import {
   queryAccountInfo,
   queryCampaigns,
   queryGeoTargeting,
@@ -38,18 +31,90 @@ import {
   RESOURCE_CHANGE_OP,
   CHANGE_RESOURCE_TYPE,
   CHANGE_CLIENT_TYPE,
-  extractChangedFields,
-  daysBetween,
 } from "@/lib/google-ads/audit/change-index";
 import { execRead } from "@/lib/tools/execute";
 import { enforceRateLimit, RateLimitError } from "@/lib/mcp/rate-limit";
 
-// Inlined from lib/google-ads/audit.ts so this module doesn't need to pull in
-// the full audit engine (keeps the code-mode commit self-contained).
-function generateBrandVariants(businessName: string): string[] {
-  const name = businessName.toLowerCase().trim();
+import type { HostApi } from "./sandbox";
+
+type GaqlOptions = {
+  excludeRemovedParents?: boolean;
+};
+
+type GaqlParallelOptions = GaqlOptions & {
+  partial?: boolean;
+};
+
+const SANDBOX_HELPER_NAMES = [
+  "formatDate",
+  "getDateRange",
+  "micros",
+  "toMicros",
+  "normalizeCustomerId",
+  "extractChangedFields",
+  "daysBetween",
+  "generateBrandVariants",
+] as const;
+
+// Keep the sandbox helper API independent of production function names.
+// Next/webpack minifies imported function identifiers in server bundles, so
+// deriving Object keys from Function.name can expose `{ m, n, o, ... }` instead
+// of the documented `ads.helpers.getDateRange`, `micros`, etc.
+const SANDBOX_HELPER_SOURCE = String.raw`
+function normalizeCustomerId(customerId) {
+  return String(customerId).replace(/-/g, "").trim();
+}
+
+function formatDate(d) {
+  return new Date(d).toISOString().slice(0, 10);
+}
+
+function getDateRange(days) {
+  const parsed = Math.floor(Number(days));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      "ads.helpers.getDateRange(days): days must be a positive integer (received " +
+      JSON.stringify(days) +
+      "). Example: ads.helpers.getDateRange(7) returns { start, end } for the last 7 days."
+    );
+  }
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - (parsed - 1));
+  return { start: formatDate(start), end: formatDate(end) };
+}
+
+function micros(v) {
+  return v ? v / 1000000 : 0;
+}
+
+function toMicros(dollars) {
+  return Math.round(dollars * 1000000);
+}
+
+function extractChangedFields(raw) {
+  if (!raw) return [];
+  if (typeof raw === "string") {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (typeof raw === "object" && "paths" in raw) {
+    const paths = raw.paths;
+    if (Array.isArray(paths)) return paths.map(String).filter(Boolean);
+  }
+  return [];
+}
+
+function daysBetween(changeISO, referenceISO) {
+  const changeMs = new Date(changeISO).getTime();
+  const refMs = new Date(referenceISO + "T23:59:59").getTime();
+  if (!isFinite(changeMs) || !isFinite(refMs)) return 0;
+  return Math.max(0, Math.floor((refMs - changeMs) / 86400000));
+}
+
+function generateBrandVariants(businessName) {
+  const name = String(businessName).toLowerCase().trim();
   if (!name) return [];
-  const variants = new Set<string>();
+  const variants = new Set();
   variants.add(name);
   for (const suffix of [" llc", " inc", " ltd", " corp"]) {
     if (name.endsWith(suffix)) variants.add(name.slice(0, -suffix.length).trim());
@@ -62,15 +127,7 @@ function generateBrandVariants(businessName: string): string[] {
   if (camelNoSpaces !== name) variants.add(camelNoSpaces);
   return Array.from(variants).filter((v) => v.length >= 4);
 }
-import type { HostApi } from "./sandbox";
-
-type GaqlOptions = {
-  excludeRemovedParents?: boolean;
-};
-
-type GaqlParallelOptions = GaqlOptions & {
-  partial?: boolean;
-};
+`;
 
 /**
  * Build the host-side `ads` namespace exposed to scripts.
@@ -242,24 +299,6 @@ function buildBootstrap(): string {
     dailyCampaignMetrics: queryDailyCampaignMetrics,
   };
 
-  // Helpers are installed as function declarations inside one IIFE so they
-  // close over each other (getDateRange references formatDate, etc.) the way
-  // they do in the host module. Each .toString() yields `function name() {...}`
-  // which is a valid declaration; concatenating them rebuilds the module's
-  // local scope. Order-insensitive because function declarations hoist.
-  const helperDeclarations = [
-    formatDate,
-    getDateRange,
-    micros,
-    toMicros,
-    normalizeCustomerId,
-    extractChangedFields,
-    daysBetween,
-    generateBrandVariants,
-  ];
-  const helperNames = helperDeclarations.map((fn) => fn.name);
-  const helperSource = helperDeclarations.map((fn) => fn.toString()).join("\n\n");
-
   return `
     (() => {
       const ads = globalThis.ads;
@@ -320,8 +359,8 @@ function buildBootstrap(): string {
       // Pure helpers, installed inside an IIFE that rebuilds the host
       // module's scope so cross-calls (getDateRange -> formatDate) still link.
       (function installHelpers() {
-        ${helperSource}
-        ads.helpers = Object.freeze({ ${helperNames.join(", ")} });
+        ${SANDBOX_HELPER_SOURCE}
+        ads.helpers = Object.freeze({ ${SANDBOX_HELPER_NAMES.join(", ")} });
       })();
     })();
   `;

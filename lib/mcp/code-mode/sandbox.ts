@@ -213,7 +213,14 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     // Disposing the context disposes the runtime it owns; do NOT double-dispose.
     // ctx may be undefined if newAsyncContext() itself threw (e.g. WASM load
     // failure) — guard so the throw isn't masked by a NPE on cleanup.
-    ctx?.dispose();
+    try {
+      ctx?.dispose();
+    } catch (disposeError) {
+      // Cleanup failures must not replace the script result. Production traces
+      // showed valid scripts bubbling raw disposal TypeErrors through the MCP
+      // handler while parse failures still returned the structured envelope.
+      console.warn("[runScript] QuickJS context dispose failed", disposeError);
+    }
   }
 }
 

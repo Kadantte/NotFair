@@ -46,6 +46,24 @@ vi.mock("@/lib/tools/execute", () => ({
   }),
 }));
 
+vi.mock("@/lib/mcp/rate-limit", () => {
+  class RateLimitError extends Error {
+    constructor(
+      public readonly used = 0,
+      public readonly limit = 0,
+      public readonly resetsAt = new Date(),
+    ) {
+      super("rate limited");
+      this.name = "RateLimitError";
+    }
+  }
+  return {
+    enforceRateLimit: vi.fn(async () => undefined),
+    RateLimitError,
+    recordOperation: vi.fn(),
+  };
+});
+
 // ─── Imports after mocks ────────────────────────────────────────────
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -53,6 +71,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerReadTools } from "../read-tools";
 import { registerWriteTools } from "../write-tools";
+import { registerCodeModeTools } from "../code-mode";
 import { PLAYBOOKS } from "../playbooks";
 import { clearCache } from "@/lib/google-ads";
 import { TEST_AUTH } from "./harness";
@@ -68,6 +87,7 @@ async function connectClient(): Promise<{ client: Client; cleanup: () => Promise
   const server = new McpServer({ name: "adsagent-test", version: "0.0.0" });
   registerReadTools(server, () => TEST_AUTH);
   registerWriteTools(server, () => TEST_AUTH);
+  registerCodeModeTools(server, () => TEST_AUTH);
 
   // Register playbooks the same way the route does, so `resources/list` is covered.
   for (const playbook of PLAYBOOKS) {
@@ -184,6 +204,23 @@ describe("MCP protocol — tools/call", () => {
         ? result.content[0].text
         : "";
       expect(text).toContain("BOOM_AT_API");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("runs the simplest code-mode script through the MCP wire envelope", async () => {
+    const { client, cleanup } = await connectClient();
+    try {
+      const result = await client.callTool({
+        name: "runScript",
+        arguments: { code: "return 1;", timeoutMs: 1000 },
+      });
+      expect(result.isError).toBeFalsy();
+      const content = (result.content as Array<{ type: string; text: string }>)[0];
+      expect(content.type).toBe("text");
+      const parsed = JSON.parse(content.text) as { ok: boolean; result: unknown };
+      expect(parsed).toMatchObject({ ok: true, result: 1 });
     } finally {
       await cleanup();
     }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { resolveToolAuth } from "../helpers";
 import { safeHandler, typedResult, accountIdParam, READ_ANNOTATIONS, type ToolRegistrar } from "../types";
 import { enforceRateLimit } from "../rate-limit";
-import { runScriptInSandbox } from "./sandbox";
+import { runScriptInSandbox, type RunScriptResult } from "./sandbox";
 import { buildAdsHost } from "./ads-client";
 
 const RUN_SCRIPT_DESCRIPTION = `Run a JavaScript orchestration script in a sandboxed QuickJS runtime. This is a REPLACEMENT for chaining individual tool calls, not a supplement — one runScript call does what would otherwise take 10+ sequential tool invocations.
@@ -144,9 +144,31 @@ export const registerCodeModeTools: ToolRegistrar = (server, currentAuth) => {
       // reach an execRead-wrapped ads.gaql call. Per-query enforceRateLimit
       // inside the host bindings still runs as defense-in-depth.
       await enforceRateLimit(targetAuth.userId);
-      const { host, bootstrap } = buildAdsHost(targetAuth, targetId);
-      const result = await runScriptInSandbox({ code, host, bootstrap, timeoutMs });
-      return typedResult(result);
+      const startedAt = Date.now();
+      try {
+        const { host, bootstrap } = buildAdsHost(targetAuth, targetId);
+        const result = await runScriptInSandbox({ code, host, bootstrap, timeoutMs });
+        return typedResult(result);
+      } catch (error) {
+        return typedResult(handlerFailureResult(error, Date.now() - startedAt));
+      }
     }),
   );
 };
+
+function handlerFailureResult(error: unknown, elapsedMs: number): RunScriptResult {
+  const err = error instanceof Error ? error : new Error(String(error));
+  return {
+    ok: false,
+    resultTruncated: false,
+    logs: [],
+    logsTruncated: false,
+    error: {
+      message: err.message,
+      name: err.name,
+      stack: err.stack,
+    },
+    timedOut: false,
+    elapsedMs,
+  };
+}

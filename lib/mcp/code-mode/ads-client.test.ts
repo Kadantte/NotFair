@@ -99,6 +99,7 @@ describe("buildAdsHost bootstrap surface", () => {
     const r = await runScriptInSandbox({
       code: `
         return {
+          keys: Object.keys(ads.helpers).sort(),
           micros: ads.helpers.micros(1234560000),
           toMicros: ads.helpers.toMicros(4.5),
           normalized: ads.helpers.normalizeCustomerId("123-456-7890"),
@@ -112,6 +113,7 @@ describe("buildAdsHost bootstrap surface", () => {
     });
     expect(r.ok).toBe(true);
     const out = r.result as {
+      keys: string[];
       micros: number;
       toMicros: number;
       normalized: string;
@@ -119,6 +121,16 @@ describe("buildAdsHost bootstrap surface", () => {
       daysBetween: number;
       dateRange: { start: string; end: string };
     };
+    expect(out.keys).toEqual([
+      "daysBetween",
+      "extractChangedFields",
+      "formatDate",
+      "generateBrandVariants",
+      "getDateRange",
+      "micros",
+      "normalizeCustomerId",
+      "toMicros",
+    ]);
     expect(out.micros).toBe(1234.56);
     expect(out.toMicros).toBe(4_500_000);
     expect(out.normalized).toBe("1234567890");
