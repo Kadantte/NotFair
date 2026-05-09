@@ -107,19 +107,6 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     };
   }
 
-  const ctx = await newAsyncContext();
-  const runtime = ctx.runtime;
-
-  const deadline = startedAt + timeoutMs;
-  let timedOut = false;
-  runtime.setInterruptHandler(() => {
-    if (Date.now() > deadline) {
-      timedOut = true;
-      return true;
-    }
-    return false;
-  });
-
   const logs: string[] = [];
   let logChars = 0;
   let logsTruncated = false;
@@ -136,7 +123,21 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     logChars += line.length;
   }
 
+  let ctx: QuickJSAsyncContext | undefined;
+  let timedOut = false;
   try {
+    ctx = await newAsyncContext();
+    const runtime = ctx.runtime;
+
+    const deadline = startedAt + timeoutMs;
+    runtime.setInterruptHandler(() => {
+      if (Date.now() > deadline) {
+        timedOut = true;
+        return true;
+      }
+      return false;
+    });
+
     installConsole(ctx, appendLog);
     installHostApis(ctx, runtime, opts.host);
     if (opts.bootstrap) runBootstrap(ctx, opts.bootstrap);
@@ -210,7 +211,9 @@ export async function runScriptInSandbox(opts: RunScriptOptions): Promise<RunScr
     };
   } finally {
     // Disposing the context disposes the runtime it owns; do NOT double-dispose.
-    ctx.dispose();
+    // ctx may be undefined if newAsyncContext() itself threw (e.g. WASM load
+    // failure) — guard so the throw isn't masked by a NPE on cleanup.
+    ctx?.dispose();
   }
 }
 

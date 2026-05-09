@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // quickjs-emscripten loads its WASM variant via dynamic import + package
+  // self-reference (`@jitl/quickjs-wasmfile-release-asyncify/emscripten-module`).
+  // Webpack mangles those into broken stubs at runtime — the failure surfaces
+  // as a minified `TypeError: a is not a function` from runScript before any
+  // user code runs. Externalize the family so Node resolves them natively.
+  serverExternalPackages: [
+    "quickjs-emscripten",
+    "quickjs-emscripten-core",
+    "@jitl/quickjs-wasmfile-release-asyncify",
+  ],
   async redirects() {
     return [
       {
