@@ -62,7 +62,9 @@ Tool-selection heuristic — pick ONE path per user question:
        SELECT ad_group_criterion.keyword.text,
               ad_group_criterion.quality_info.quality_score,
               metrics.cost_micros
-         FROM keyword_view WHERE segments.date DURING LAST_30_DAYS\` }
+         FROM keyword_view
+         WHERE segments.date DURING LAST_30_DAYS
+           AND ad_group_criterion.negative = FALSE\` }
    ]);
    const wastedSpend = (r.searchTerms.rows ?? []).filter(row =>
      row.metrics.conversions === 0 && row.metrics.cost_micros > 50_000_000);

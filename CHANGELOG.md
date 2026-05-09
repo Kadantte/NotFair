@@ -2,9 +2,17 @@
 
 All notable changes to NotFair will be documented in this file.
 
-## Unreleased
+## [0.4.1.0] - 2026-05-09
 
 ### Fixed
+- **Audits no longer flag ad-group negative keywords as zero-conversion zombies.** `keyword_view` returns both positive and negative ad-group keyword criteria; queries that filtered on `metrics.conversions = 0` were sweeping up every negative in the account (negatives accumulate 0 of every metric by definition, since they block serving). The audit GAQL builders, the user-facing audit dashboard, the runScript playbook, the system-prompt example, and the legacy chat path now all add `ad_group_criterion.negative = FALSE`. The runScript "common gotchas" section calls out the trap so agents writing custom GAQL avoid it too.
+- **`updateAdAssets` no longer silently wipes display URL paths on every call.** The `google-ads-api` library emits a parent-level field mask on `responsive_search_ad`, which Google interprets as "replace the entire sub-message" — so any RSA sub-field absent from the mutation payload (`path1`, `path2`) was being cleared. The tool now reads the existing paths in its pre-fetch and re-sends them unless the caller explicitly overrides, and exposes optional `path1`/`path2` parameters so agents can set or update them.
+
+### Added
+- **`createAd` accepts optional `path1` and `path2`** for RSA display URL components (the segments shown after the domain, e.g. `example.com/ac-repair/today`). 15-char cap each, no whitespace, `path2` requires `path1`.
+- **`/ads-mcp-plan` skill and `docs/ads-api-landmines.md`** capture the empirical Google Ads API gotchas this codebase has hit (keyword_view returning negatives, parent-level field-mask wipes, enum integer landmines, hallucinated GAQL fields). Forces upfront verification + a surface-sweep manifest before any change to `lib/google-ads/**` or `lib/mcp/**`. Wired into CLAUDE.md routing so it triggers automatically.
+
+### Fixed (previously unreleased)
 - **runScript now blocks more high-volume invalid GAQL before hitting Google Ads.** The GAQL preflight rejects malformed `segments.date BETWEEN` ranges, `search_term_view` queries without a finite date filter, and known hallucinated fields such as `metrics.conversion_rate`, `metrics.average_cpc_micros`, and `asset.sitelink_asset.final_urls`, with targeted correction guidance for agents.
 
 ## [0.4.0.0] - 2026-05-08

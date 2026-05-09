@@ -105,3 +105,4 @@ Key routing rules:
 - Design system, brand → invoke design-consultation
 - Visual audit, design polish → invoke design-review
 - Architecture review → invoke plan-eng-review
+- **Any change to `lib/google-ads/**` or `lib/mcp/**`, any Google Ads API behavior fix, any new ads MCP tool or GAQL builder → invoke ads-mcp-plan FIRST.** Forces verification against landmines before code is touched. The cost of skipping it is shipping silent data bugs (negatives mistaken for positives, RSA sub-fields wiped by parent-level field masks, etc.).

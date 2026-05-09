@@ -299,7 +299,20 @@ export type CreateAdParams = {
   headlines: string[];
   descriptions: string[];
   finalUrl: string;
+  path1?: string;
+  path2?: string;
 };
+
+/** Format-only check for a single RSA display-URL path component (15-char cap,
+ * no whitespace). Caller handles the path2-requires-path1 rule because the
+ * "is path1 effectively present?" answer differs between create (only the
+ * caller's value counts) and update (existing ad value also counts). */
+function validateAdPathFormat(value: string | undefined, fieldName: "path1" | "path2"): string | null {
+  if (value === undefined) return null;
+  if (value.length > 15) return `${fieldName} must be 15 characters or fewer (got ${value.length})`;
+  if (/\s/.test(value)) return `${fieldName} must not contain whitespace`;
+  return null;
+}
 
 export async function createAd(
   auth: AuthContext,
@@ -313,6 +326,13 @@ export async function createAd(
   if (rsaError) {
     return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: rsaError };
   }
+  const path1Error = validateAdPathFormat(params.path1, "path1");
+  if (path1Error) return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: path1Error };
+  const path2Error = validateAdPathFormat(params.path2, "path2");
+  if (path2Error) return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: path2Error };
+  if (params.path2 !== undefined && !params.path1) {
+    return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: "path2 requires path1 — Google Ads renders paths in order" };
+  }
   let adGroupIdNum: number;
   try {
     adGroupIdNum = safeEntityId(adGroupId, "ad group");
@@ -324,6 +344,13 @@ export async function createAd(
   }
 
   try {
+    const responsiveSearchAd: Record<string, unknown> = {
+      headlines: params.headlines.map((text) => ({ text })),
+      descriptions: params.descriptions.map((text) => ({ text })),
+    };
+    if (params.path1 !== undefined) responsiveSearchAd.path1 = params.path1;
+    if (params.path2 !== undefined) responsiveSearchAd.path2 = params.path2;
+
     const response = await customer.mutateResources([
       {
         entity: "ad_group_ad" as any,
@@ -333,10 +360,7 @@ export async function createAd(
           status: STATUS.ENABLED,
           ad: {
             final_urls: [params.finalUrl],
-            responsive_search_ad: {
-              headlines: params.headlines.map((text) => ({ text })),
-              descriptions: params.descriptions.map((text) => ({ text })),
-            },
+            responsive_search_ad: responsiveSearchAd,
           },
         },
       },
@@ -1310,6 +1334,12 @@ export type AdAsset = { text: string; pin?: number };
 export type UpdateAdAssetsParams = {
   headlines: AdAsset[];
   descriptions: AdAsset[];
+  /** Optional new path1. If undefined, the existing value is preserved.
+   * The library emits a parent-level field mask on `responsive_search_ad`,
+   * so omitting paths from the payload would otherwise wipe them. */
+  path1?: string;
+  /** Optional new path2. Requires path1 (current or new). */
+  path2?: string;
 };
 
 /** Convert raw API pinned_field value (number or string) to user-facing pin number (1-3). */
@@ -1369,6 +1399,13 @@ export async function updateAdAssets(
     }
   }
 
+  // Validate the new path values up-front. path2-without-path1 is checked again
+  // after the fetch (using the resolved path1, which may come from the existing ad).
+  const updatePath1Error = validateAdPathFormat(params.path1, "path1");
+  if (updatePath1Error) return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: updatePath1Error };
+  const updatePath2Error = validateAdPathFormat(params.path2, "path2");
+  if (updatePath2Error) return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: updatePath2Error };
+
   let adIdNum: number;
   let adGroupIdNum: number;
   try {
@@ -1378,20 +1415,29 @@ export async function updateAdAssets(
     return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: (e as Error).message };
   }
 
-  // Fetch current assets for undo record, scoped to the correct ad group.
-  // Abort if fetch fails — proceeding with empty beforeValue would cause undo to restore empty assets.
+  // Fetch current assets for undo AND to preserve fields the caller didn't explicitly
+  // change. The library emits a parent-level update_mask on `responsive_search_ad`,
+  // which Google interprets as "replace the entire sub-message" — so any field we
+  // don't include in the mutation payload (path1, path2, pin metadata, etc.) gets
+  // wiped. We re-send everything, swapping in caller-provided overrides.
   let beforeValue: string;
+  let existingPath1: string | undefined;
+  let existingPath2: string | undefined;
   try {
     const current = await customer.query(`
       SELECT
         ad_group_ad.ad.responsive_search_ad.headlines,
-        ad_group_ad.ad.responsive_search_ad.descriptions
+        ad_group_ad.ad.responsive_search_ad.descriptions,
+        ad_group_ad.ad.responsive_search_ad.path1,
+        ad_group_ad.ad.responsive_search_ad.path2
       FROM ad_group_ad
       WHERE ad_group_ad.ad.id = ${adIdNum}
         AND ad_group.id = ${adGroupIdNum}
       LIMIT 1
     `);
     const row = (current as any[])[0]?.ad_group_ad?.ad?.responsive_search_ad ?? {};
+    existingPath1 = typeof row.path1 === "string" && row.path1.length > 0 ? row.path1 : undefined;
+    existingPath2 = typeof row.path2 === "string" && row.path2.length > 0 ? row.path2 : undefined;
     beforeValue = JSON.stringify({
       h: (row.headlines ?? []).map((x: any) => {
         const asset: AdAsset = { text: x.text ?? "" };
@@ -1405,6 +1451,8 @@ export async function updateAdAssets(
         if (pin !== undefined) asset.pin = pin;
         return asset;
       }),
+      ...(existingPath1 !== undefined ? { p1: existingPath1 } : {}),
+      ...(existingPath2 !== undefined ? { p2: existingPath2 } : {}),
     });
   } catch (fetchError) {
     return {
@@ -1417,32 +1465,45 @@ export async function updateAdAssets(
     };
   }
 
+  // Resolve effective paths: caller value if provided, else existing.
+  const effectivePath1 = params.path1 !== undefined ? params.path1 : existingPath1;
+  const effectivePath2 = params.path2 !== undefined ? params.path2 : existingPath2;
+  if (effectivePath2 && !effectivePath1) {
+    return { success: false, action: "update_ad_assets", entityId, beforeValue, afterValue: "", error: "path2 requires path1 — provide path1 alongside path2 (Google Ads renders paths in order)" };
+  }
+
   const afterValue = JSON.stringify({
     h: params.headlines,
     d: params.descriptions,
+    ...(effectivePath1 !== undefined ? { p1: effectivePath1 } : {}),
+    ...(effectivePath2 !== undefined ? { p2: effectivePath2 } : {}),
   });
 
   try {
+    const responsiveSearchAd: Record<string, unknown> = {
+      headlines: params.headlines.map((h) => {
+        const asset: Record<string, unknown> = { text: h.text };
+        const pf = headlinePinnedField(h.pin);
+        if (pf) asset.pinned_field = pf;
+        return asset;
+      }),
+      descriptions: params.descriptions.map((d) => {
+        const asset: Record<string, unknown> = { text: d.text };
+        const pf = descriptionPinnedField(d.pin);
+        if (pf) asset.pinned_field = pf;
+        return asset;
+      }),
+    };
+    if (effectivePath1 !== undefined) responsiveSearchAd.path1 = effectivePath1;
+    if (effectivePath2 !== undefined) responsiveSearchAd.path2 = effectivePath2;
+
     await customer.mutateResources([
       {
         entity: "ad" as any,
         operation: "update",
         resource: {
           resource_name: `customers/${cid}/ads/${adId}`,
-          responsive_search_ad: {
-            headlines: params.headlines.map((h) => {
-              const asset: Record<string, unknown> = { text: h.text };
-              const pf = headlinePinnedField(h.pin);
-              if (pf) asset.pinned_field = pf;
-              return asset;
-            }),
-            descriptions: params.descriptions.map((d) => {
-              const asset: Record<string, unknown> = { text: d.text };
-              const pf = descriptionPinnedField(d.pin);
-              if (pf) asset.pinned_field = pf;
-              return asset;
-            }),
-          },
+          responsive_search_ad: responsiveSearchAd,
         },
       },
     ]);

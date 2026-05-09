@@ -1386,6 +1386,135 @@ describe("protobuf validation: ad management", () => {
     });
     assertAllCapturedOpsEncode();
   });
+
+  // Regression tests for the parent-level field-mask wipe bug.
+  // The library emits update_mask = ["responsive_search_ad"] (parent-level, not
+  // nested), so any sub-field absent from the mutation payload is wiped by
+  // Google. updateAdAssets must read existing path1/path2 and re-send them
+  // unless the caller explicitly overrides.
+  describe("updateAdAssets — path1/path2 preservation (wipe-bug fix)", () => {
+    const baseHeadlines = [{ text: "H1" }, { text: "H2" }, { text: "H3" }];
+    const baseDescriptions = [{ text: "D1" }, { text: "D2" }];
+
+    function existingAd(opts: { path1?: string; path2?: string } = {}) {
+      mockQuery.mockResolvedValueOnce([
+        {
+          ad_group_ad: {
+            ad: {
+              responsive_search_ad: {
+                headlines: [{ text: "Old H1" }],
+                descriptions: [{ text: "Old D1" }],
+                ...(opts.path1 !== undefined ? { path1: opts.path1 } : {}),
+                ...(opts.path2 !== undefined ? { path2: opts.path2 } : {}),
+              },
+            },
+          },
+        },
+      ]);
+    }
+
+    function lastRsaPayload() {
+      const lastOp = capturedOps[capturedOps.length - 1][0];
+      return (lastOp.resource as { responsive_search_ad: Record<string, unknown> }).responsive_search_ad;
+    }
+
+    it("preserves existing path1/path2 when caller omits them", async () => {
+      existingAd({ path1: "ac-repair", path2: "today" });
+
+      await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+      });
+
+      const rsa = lastRsaPayload();
+      expect(rsa.path1).toBe("ac-repair");
+      expect(rsa.path2).toBe("today");
+      assertAllCapturedOpsEncode();
+    });
+
+    it("overrides path1 when caller provides it; preserves path2", async () => {
+      existingAd({ path1: "old-path", path2: "old-path-2" });
+
+      await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+        path1: "new-path",
+      });
+
+      const rsa = lastRsaPayload();
+      expect(rsa.path1).toBe("new-path");
+      expect(rsa.path2).toBe("old-path-2");
+      assertAllCapturedOpsEncode();
+    });
+
+    it("does not include path1/path2 in payload when ad has none and caller provides none", async () => {
+      existingAd();
+
+      await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+      });
+
+      const rsa = lastRsaPayload();
+      expect(rsa).not.toHaveProperty("path1");
+      expect(rsa).not.toHaveProperty("path2");
+      assertAllCapturedOpsEncode();
+    });
+
+    it("rejects path2 when neither existing nor new path1 is present", async () => {
+      existingAd();
+
+      const result = await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+        path2: "today",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("path2 requires path1");
+      expect(capturedOps.length).toBe(0);
+    });
+
+    it("accepts path2 when existing path1 is present", async () => {
+      existingAd({ path1: "existing" });
+
+      const result = await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+        path2: "today",
+      });
+
+      expect(result.success).toBe(true);
+      const rsa = lastRsaPayload();
+      expect(rsa.path1).toBe("existing");
+      expect(rsa.path2).toBe("today");
+      assertAllCapturedOpsEncode();
+    });
+
+    it("rejects path1 over 15 characters", async () => {
+      const result = await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+        path1: "a".repeat(16),
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("path1 must be 15 characters or fewer");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("rejects path1 with whitespace", async () => {
+      const result = await updateAdAssets(AUTH, "200", "300", {
+        headlines: baseHeadlines,
+        descriptions: baseDescriptions,
+        path1: "ac repair",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("path1 must not contain whitespace");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("protobuf validation: bulk operations", () => {

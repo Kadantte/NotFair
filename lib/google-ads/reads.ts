@@ -470,7 +470,10 @@ export async function getKeywords(
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
   const { start, end } = getDateRange(boundedDays);
 
-  // Query 1: keyword_view for metrics (quality_info sub-fields aren't available here)
+  // Query 1: keyword_view for metrics (quality_info sub-fields aren't available here).
+  // Filter ad_group_criterion.negative = FALSE because keyword_view returns BOTH
+  // positives and ad-group negatives; without this, the dashboard surfaces
+  // negatives as if they were targeted keywords with zero impressions.
   const metricsResult = await customer.query(`
     SELECT
       ad_group.id,
@@ -479,10 +482,12 @@ export async function getKeywords(
       ad_group_criterion.keyword.text,
       ad_group_criterion.keyword.match_type,
       ad_group_criterion.status,
+      ad_group_criterion.negative,
       metrics.impressions, metrics.clicks, metrics.ctr,
       metrics.cost_micros, metrics.average_cpc, metrics.conversions
     FROM keyword_view
     WHERE campaign.id = ${id}
+      AND ad_group_criterion.negative = FALSE
       AND segments.date BETWEEN '${start}' AND '${end}'
     ORDER BY metrics.impressions DESC
     LIMIT ${boundedLimit}

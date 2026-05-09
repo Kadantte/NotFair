@@ -325,6 +325,7 @@ export async function getCampaignKeywords(
       ad_group_criterion.criterion_id,
       ad_group_criterion.keyword.text,
       ad_group_criterion.status,
+      ad_group_criterion.negative,
       ad_group_criterion.quality_info.quality_score,
       metrics.impressions,
       metrics.clicks,
@@ -334,6 +335,7 @@ export async function getCampaignKeywords(
       metrics.conversions
     FROM keyword_view
     WHERE campaign.id = ${Number(campaignId)}
+      AND ad_group_criterion.negative = FALSE
       AND segments.date BETWEEN '${start}' AND '${end}'
     ORDER BY metrics.impressions DESC
     LIMIT ${boundedLimit}

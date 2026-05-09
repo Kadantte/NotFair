@@ -46,6 +46,10 @@ describe("audit queries", () => {
     const q = queryKeywords("2026-01-01", "2026-01-30");
     expect(q).toMatchSnapshot();
     expect(q).toContain("LIMIT 2000");
+    // keyword_view returns positives AND ad-group negatives — the audit must filter
+    // to positives or it surfaces negatives as zombie keywords. See
+    // docs/ads-api-landmines.md.
+    expect(q).toContain("ad_group_criterion.negative = FALSE");
   });
 
   it("queryQualityScores — matches snapshot", () => {
@@ -70,6 +74,9 @@ describe("audit queries", () => {
     expect(q).toMatchSnapshot();
     expect(q).toContain("metrics.conversions = 0");
     expect(q).toContain("LIMIT 500");
+    // Without this predicate every ad-group negative would match conversions=0
+    // (negatives block serving so accumulate 0 of every metric by definition).
+    expect(q).toContain("ad_group_criterion.negative = FALSE");
   });
 
   it("queryAds — date range + LIMIT 1000", () => {

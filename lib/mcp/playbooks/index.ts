@@ -64,13 +64,17 @@ const r = await ads.gaqlParallel([
       WHERE segments.date DURING LAST_30_DAYS
         AND metrics.clicks > 5
       ORDER BY metrics.cost_micros DESC\`, limit: 200 },
-  // 3. Zero-conversion keywords burning spend
+  // 3. Zero-conversion keywords burning spend.
+  // ad_group_criterion.negative = FALSE: keyword_view returns positives AND
+  // ad-group negatives; without this filter, every negative matches conversions=0.
   { name: "zeroConvKw", query: \`
     SELECT ad_group_criterion.keyword.text, campaign.name, ad_group.name,
+           ad_group_criterion.negative,
            metrics.cost_micros, metrics.clicks,
            ad_group_criterion.quality_info.quality_score
       FROM keyword_view
       WHERE segments.date DURING LAST_30_DAYS
+        AND ad_group_criterion.negative = FALSE
         AND metrics.conversions = 0
         AND metrics.cost_micros > 0
       ORDER BY metrics.cost_micros DESC\`, limit: 100 },

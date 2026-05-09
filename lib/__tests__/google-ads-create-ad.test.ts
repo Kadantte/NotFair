@@ -59,4 +59,72 @@ describe("createAd", () => {
     expect(result.error).toContain("Policy violation: POLICY");
     expect(result.error).toContain("Google Ads rejected this content");
   });
+
+  describe("path1/path2 (display URL paths)", () => {
+    function successfulMutateResponse() {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { ad_group_ad_result: { resource_name: "customers/1234567890/adGroupAds/111~222" } },
+        ],
+      });
+    }
+
+    it("forwards path1 and path2 to responsive_search_ad when provided", async () => {
+      successfulMutateResponse();
+
+      const result = await createAd(auth, "111", { ...validRsa, path1: "ac-repair", path2: "today" });
+
+      expect(result.success).toBe(true);
+      const payload = mockMutateResources.mock.calls[0][0][0];
+      const rsa = payload.resource.ad.responsive_search_ad;
+      expect(rsa.path1).toBe("ac-repair");
+      expect(rsa.path2).toBe("today");
+    });
+
+    it("omits path1/path2 from the payload when not provided (no empty-string wipe)", async () => {
+      successfulMutateResponse();
+
+      const result = await createAd(auth, "111", validRsa);
+
+      expect(result.success).toBe(true);
+      const rsa = mockMutateResources.mock.calls[0][0][0].resource.ad.responsive_search_ad;
+      expect(rsa).not.toHaveProperty("path1");
+      expect(rsa).not.toHaveProperty("path2");
+    });
+
+    it("rejects path1 longer than 15 characters", async () => {
+      const result = await createAd(auth, "111", { ...validRsa, path1: "a".repeat(16) });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("path1 must be 15 characters or fewer");
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects path1 with whitespace", async () => {
+      const result = await createAd(auth, "111", { ...validRsa, path1: "ac repair" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("path1 must not contain whitespace");
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects path2 without path1", async () => {
+      const result = await createAd(auth, "111", { ...validRsa, path2: "today" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("path2 requires path1");
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("accepts path1 alone (path2 is independent and optional)", async () => {
+      successfulMutateResponse();
+
+      const result = await createAd(auth, "111", { ...validRsa, path1: "ac-repair" });
+
+      expect(result.success).toBe(true);
+      const rsa = mockMutateResources.mock.calls[0][0][0].resource.ad.responsive_search_ad;
+      expect(rsa.path1).toBe("ac-repair");
+      expect(rsa).not.toHaveProperty("path2");
+    });
+  });
 });

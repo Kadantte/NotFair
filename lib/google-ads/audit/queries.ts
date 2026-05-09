@@ -59,7 +59,7 @@ export function queryGeoTargeting(): string {
     `;
 }
 
-/** Q3: Top keywords by spend (with metrics). */
+/** Q3: Top keywords by spend (with metrics). Positives only — keyword_view includes ad-group negatives. */
 export function queryKeywords(start: string, end: string): string {
   return `
       SELECT
@@ -69,11 +69,13 @@ export function queryKeywords(start: string, end: string): string {
         ad_group_criterion.keyword.text,
         ad_group_criterion.keyword.match_type,
         ad_group_criterion.status,
+        ad_group_criterion.negative,
         metrics.impressions, metrics.clicks, metrics.ctr,
         metrics.cost_micros, metrics.average_cpc, metrics.conversions
       FROM keyword_view
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
+        AND ad_group_criterion.negative = FALSE
       ORDER BY metrics.cost_micros DESC
       LIMIT 2000
     `;
@@ -130,7 +132,8 @@ export function queryConvertingSearchTerms(start: string, end: string): string {
     `;
 }
 
-/** Q7: Zero-conversion keywords (candidate waste). */
+/** Q7: Zero-conversion keywords (candidate waste). Positives only — without the negative filter,
+ * ad-group negatives would all match conversions=0 by definition (they block serving). */
 export function queryZeroConversionKeywords(start: string, end: string): string {
   return `
       SELECT
@@ -139,10 +142,12 @@ export function queryZeroConversionKeywords(start: string, end: string): string 
         ad_group_criterion.keyword.text,
         ad_group_criterion.keyword.match_type,
         ad_group_criterion.criterion_id,
+        ad_group_criterion.negative,
         metrics.clicks, metrics.cost_micros
       FROM keyword_view
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
+        AND ad_group_criterion.negative = FALSE
         AND metrics.conversions = 0
       ORDER BY metrics.cost_micros DESC
       LIMIT 500
