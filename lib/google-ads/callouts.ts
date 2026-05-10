@@ -6,23 +6,17 @@
  * as `asset` resources with `asset.callout_asset`, then linked at the
  * customer (account), campaign, or ad-group level via `customer_asset`,
  * `campaign_asset`, or `ad_group_asset` respectively.
- *
- * RMF requires support at the **account level**, so we link via
- * `customer_asset` with `field_type = CALLOUT`.
  */
 
 import { getCachedCustomer } from "./client";
 import {
-  createAssetExtensionWithLinks,
+  createAssetWithLinks,
   isAutomaticallyCreatedAssetSource,
-  linkAssetExtension,
   normalizeAssetSource,
-  normalizeAssetExtensionTargets,
-  removeAssetExtensionLink,
-  type AssetExtensionMutationResult,
-  type AssetExtensionTarget,
-} from "./asset-extensions";
-import type { AuthContext, WriteResult } from "./types";
+  type AssetLinkMutationResult,
+  type AssetLinkTarget,
+} from "./asset-links";
+import type { AuthContext } from "./types";
 
 // ─── Reads ──────────────────────────────────────────────────────────
 
@@ -36,9 +30,9 @@ export type CalloutAsset = {
   accountLinkResourceName: string | null;
 };
 
-export type AddCalloutAssetParams = {
+export type CreateCalloutAssetParams = {
   text: string;
-  targets?: AssetExtensionTarget[];
+  targets?: AssetLinkTarget[];
 };
 
 type CalloutAssetRow = {
@@ -60,8 +54,6 @@ type CustomerAssetLinkRow = {
 export async function listCalloutAssets(auth: AuthContext): Promise<CalloutAsset[]> {
   const customer = getCachedCustomer(auth);
 
-  // 1. All CALLOUT-typed assets on the account.
-  // GAQL enum literals are bare identifiers (no quotes).
   const assetsResult = await customer.query(`
     SELECT
       asset.id,
@@ -73,8 +65,6 @@ export async function listCalloutAssets(auth: AuthContext): Promise<CalloutAsset
     LIMIT 500
   `);
 
-  // 2. All customer_asset links with field_type = CALLOUT, excluding REMOVED links
-  // (Google Ads returns removed rows by default unless explicitly filtered.)
   const linksResult = await customer.query(`
     SELECT
       customer_asset.asset,
@@ -112,70 +102,26 @@ export async function listCalloutAssets(auth: AuthContext): Promise<CalloutAsset
 // ─── Writes ─────────────────────────────────────────────────────────
 
 /**
- * Create a callout asset. The asset must be separately linked to the customer,
- * a campaign, or an ad group before it will serve. For RMF compliance we
- * expose a convenience flag `linkToAccount` that also creates the customer_asset
- * link in the same call.
+ * Create a callout asset. With `targets`, also link it at customer/campaign/
+ * ad-group levels in the same atomic mutate. Without `targets`, the asset is
+ * created but not linked — use `linkAsset` later.
  */
 export async function createCalloutAsset(
   auth: AuthContext,
-  params: { text: string; linkToAccount?: boolean },
-): Promise<WriteResult> {
+  params: CreateCalloutAssetParams,
+): Promise<AssetLinkMutationResult> {
   const text = params.text.trim();
+  const action = "create_callout_asset";
 
   if (!text) {
     return {
       success: false,
-      action: "create_callout_asset",
+      action,
       entityId: "",
       beforeValue: "",
       afterValue: "",
       error: "Callout text cannot be empty",
-    };
-  }
-  if (text.length > 25) {
-    return {
-      success: false,
-      action: "create_callout_asset",
-      entityId: "",
-      beforeValue: "",
-      afterValue: text,
-      error: "Callout text must be 25 characters or fewer",
-    };
-  }
-
-  return createAssetExtensionWithLinks(auth, {
-    assetType: "CALLOUT",
-    assetResource: {
-      callout_asset: { callout_text: text },
-    },
-    targets: params.linkToAccount ? [{ level: "account" }] : [],
-    action: "create_callout_asset",
-    afterValue: text,
-    label: text,
-  });
-}
-
-/**
- * Agent-friendly callout workflow: create one callout asset and link it to
- * account/campaign/ad group targets in the same tool response.
- */
-export async function addCalloutAsset(
-  auth: AuthContext,
-  params: AddCalloutAssetParams,
-): Promise<AssetExtensionMutationResult> {
-  const text = params.text.trim();
-  const targets = normalizeAssetExtensionTargets(params.targets);
-
-  if (!text) {
-    return {
-      success: false,
-      action: "add_callout_asset",
-      entityId: "",
-      beforeValue: "",
-      afterValue: "",
-      error: "Callout text cannot be empty",
-      assetType: "CALLOUT",
+      fieldType: "CALLOUT",
       assetId: "",
       assetResourceName: "",
     };
@@ -183,83 +129,25 @@ export async function addCalloutAsset(
   if (text.length > 25) {
     return {
       success: false,
-      action: "add_callout_asset",
+      action,
       entityId: "",
       beforeValue: "",
       afterValue: text,
       error: "Callout text must be 25 characters or fewer",
-      assetType: "CALLOUT",
+      fieldType: "CALLOUT",
       assetId: "",
       assetResourceName: "",
     };
   }
 
-  return createAssetExtensionWithLinks(auth, {
-    assetType: "CALLOUT",
+  return createAssetWithLinks(auth, {
+    fieldType: "CALLOUT",
     assetResource: {
       callout_asset: { callout_text: text },
     },
-    targets,
-    action: "add_callout_asset",
+    targets: params.targets ?? [],
+    action,
     afterValue: text,
     label: text,
   });
-}
-
-export async function linkCalloutAsset(
-  auth: AuthContext,
-  params: { assetId: string; target: AssetExtensionTarget },
-): Promise<AssetExtensionMutationResult> {
-  return linkAssetExtension(auth, {
-    assetType: "CALLOUT",
-    assetId: params.assetId,
-    target: params.target,
-    action: "link_callout_asset",
-  });
-}
-
-export async function unlinkCalloutAsset(
-  auth: AuthContext,
-  params: { assetId: string; target: AssetExtensionTarget },
-): Promise<AssetExtensionMutationResult> {
-  return removeAssetExtensionLink(auth, {
-    assetType: "CALLOUT",
-    assetId: params.assetId,
-    target: params.target,
-    action: "unlink_callout_asset",
-  });
-}
-
-/** Link an existing callout asset to the customer (account level). */
-export async function linkCalloutToAccount(
-  auth: AuthContext,
-  assetId: string,
-): Promise<WriteResult> {
-  return linkAssetExtension(auth, {
-    assetType: "CALLOUT",
-    assetId,
-    target: { level: "account" },
-    action: "link_callout_to_account",
-  });
-}
-
-/**
- * Remove a callout's account-level link. The underlying asset is not deleted
- * (Google Ads assets are immutable/shared); only the customer_asset link is removed.
- */
-export async function removeCalloutFromAccount(
-  auth: AuthContext,
-  assetId: string,
-): Promise<WriteResult> {
-  const result = await removeAssetExtensionLink(auth, {
-    assetType: "CALLOUT",
-    assetId,
-    target: { level: "account" },
-    action: "remove_callout_from_account",
-  });
-
-  if (!result.success && result.error?.startsWith("No CALLOUT account link")) {
-    return { ...result, error: `No account-level callout link found for asset ${assetId}` };
-  }
-  return result;
 }

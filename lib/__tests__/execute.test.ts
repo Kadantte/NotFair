@@ -203,7 +203,7 @@ describe("execWrite", () => {
     });
     const fn = vi.fn().mockResolvedValue({
       success: true,
-      action: "link_sitelink_asset",
+      action: "link_asset",
       entityId: "asset-1",
       beforeValue: "",
       afterValue: "linked",
@@ -231,7 +231,7 @@ describe("execWrite", () => {
   it("allows active-experiment campaign writes when explicitly acknowledged", async () => {
     const writeResult: WriteResult = {
       success: true,
-      action: "link_sitelink_asset",
+      action: "link_asset",
       entityId: "asset-1",
       beforeValue: "",
       afterValue: "linked",

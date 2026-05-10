@@ -137,29 +137,28 @@ export type RemoveConversionActionResponse = WriteToolResponse;
 export type PausePmaxAssetGroupResponse = WriteToolResponse;
 export type EnablePmaxAssetGroupResponse = WriteToolResponse;
 
-// Callouts
-export type AddCalloutAssetResponse = WriteToolResponse;
+// Asset creation (typed per family — input shape differs per family)
 export type CreateCalloutAssetResponse = WriteToolResponse;
-export type LinkCalloutAssetResponse = WriteToolResponse;
-export type LinkCalloutToAccountResponse = WriteToolResponse;
-export type UnlinkCalloutAssetResponse = WriteToolResponse;
-export type RemoveCalloutFromAccountResponse = WriteToolResponse;
-
-// Structured snippets
-export type AddStructuredSnippetAssetResponse = WriteToolResponse;
 export type CreateStructuredSnippetAssetResponse = WriteToolResponse;
-export type LinkStructuredSnippetAssetResponse = WriteToolResponse;
-export type UnlinkStructuredSnippetAssetResponse = WriteToolResponse;
-
-// Sitelinks
-export type AddSitelinkAssetResponse = WriteToolResponse;
 export type CreateSitelinkAssetResponse = WriteToolResponse;
-export type LinkSitelinkAssetResponse = WriteToolResponse;
-export type UnlinkSitelinkAssetResponse = WriteToolResponse;
-
-// Image assets
 export type CreateImageAssetResponse = WriteToolResponse;
-export type LinkImageAssetResponse = WriteToolResponse;
+
+// Generic asset link operations (work for every asset family)
+export type LinkAssetResponse = WriteToolResponse;
+export type UnlinkAssetLinksResponse = WriteToolResponse;
+export interface GetAssetLinksResponse {
+  assetId: string;
+  links: Array<{
+    level: "customer" | "campaign" | "ad_group" | "asset_group";
+    linkResourceName: string;
+    fieldType: string;
+    fieldTypeInt: number | null;
+    assetResourceName: string;
+    campaignId?: string;
+    adGroupId?: string;
+    assetGroupId?: string;
+  }>;
+}
 
 // Bidding strategies
 export type CreateBiddingStrategyResponse = WriteToolResponse;
@@ -277,22 +276,15 @@ export interface McpToolResponseRegistry {
   pausePmaxAssetGroup: PausePmaxAssetGroupResponse;
   enablePmaxAssetGroup: EnablePmaxAssetGroupResponse;
   updateCampaignLanguages: UpdateCampaignLanguagesResponse;
-  addCalloutAsset: AddCalloutAssetResponse;
+  // Asset creation (typed per family)
   createCalloutAsset: CreateCalloutAssetResponse;
-  linkCalloutAsset: LinkCalloutAssetResponse;
-  linkCalloutToAccount: LinkCalloutToAccountResponse;
-  unlinkCalloutAsset: UnlinkCalloutAssetResponse;
-  removeCalloutFromAccount: RemoveCalloutFromAccountResponse;
-  addStructuredSnippetAsset: AddStructuredSnippetAssetResponse;
   createStructuredSnippetAsset: CreateStructuredSnippetAssetResponse;
-  linkStructuredSnippetAsset: LinkStructuredSnippetAssetResponse;
-  unlinkStructuredSnippetAsset: UnlinkStructuredSnippetAssetResponse;
-  addSitelinkAsset: AddSitelinkAssetResponse;
   createSitelinkAsset: CreateSitelinkAssetResponse;
-  linkSitelinkAsset: LinkSitelinkAssetResponse;
-  unlinkSitelinkAsset: UnlinkSitelinkAssetResponse;
   createImageAsset: CreateImageAssetResponse;
-  linkImageAsset: LinkImageAssetResponse;
+  // Generic asset link operations
+  linkAsset: LinkAssetResponse;
+  unlinkAssetLinks: UnlinkAssetLinksResponse;
+  getAssetLinks: GetAssetLinksResponse;
   createBiddingStrategy: CreateBiddingStrategyResponse;
   updateBiddingStrategy: UpdateBiddingStrategyResponse;
   removeBiddingStrategy: RemoveBiddingStrategyResponse;

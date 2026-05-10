@@ -11,7 +11,7 @@ export * from "./bulk";
 export * from "./settings";
 export * from "./sync-account";
 export * from "./pmax";
-export * from "./asset-extensions";
+export * from "./asset-links";
 export * from "./callouts";
 export * from "./structured-snippets";
 export * from "./sitelinks";

@@ -17,7 +17,7 @@ vi.mock("google-ads-api", () => ({
   },
 }));
 
-import { linkSitelinkAsset, listSitelinkAssets } from "@/lib/google-ads";
+import { createSitelinkAsset, linkAsset, listSitelinkAssets } from "@/lib/google-ads";
 
 const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
 
@@ -88,19 +88,65 @@ describe("sitelinks", () => {
     });
   });
 
-  it("rejects automatically-created sitelinks before linking", async () => {
+  it("createSitelinkAsset (no targets) creates the asset only", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+      ],
+    });
+    const result = await createSitelinkAsset(auth, {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+    });
+    expect(result.success).toBe(true);
+    expect(result.action).toBe("create_sitelink_asset");
+    expect(result.fieldType).toBe("SITELINK");
+    expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  it("createSitelinkAsset with campaign target produces atomic create+link", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+        { campaign_asset_result: { resource_name: "customers/1301265570/campaignAssets/100~999~13" } },
+      ],
+    });
+    const result = await createSitelinkAsset(auth, {
+      linkText: "Pricing",
+      finalUrl: "https://example.com/pricing",
+      description1: "See current plans",
+      description2: "Compare every option",
+      targets: [{ level: "campaign", campaignId: "100" }],
+    });
+    expect(result.success).toBe(true);
+    expect(mockMutateResources.mock.calls[0][0][0].resource).toMatchObject({
+      final_urls: ["https://example.com/pricing"],
+      sitelink_asset: {
+        link_text: "Pricing",
+        description1: "See current plans",
+        description2: "Compare every option",
+      },
+    });
+    expect(mockMutateResources.mock.calls[0][0][1].resource).toMatchObject({
+      campaign: "customers/1301265570/campaigns/100",
+      field_type: 13,
+    });
+  });
+
+  it("linkAsset rejects automatically-created sitelinks before linking", async () => {
     mockQuery.mockResolvedValueOnce([{ asset: { source: "AUTOMATICALLY_CREATED" } }]);
 
-    const result = await linkSitelinkAsset(auth, {
+    const result = await linkAsset(auth, {
       assetId: "999",
-      target: { level: "campaign", campaignId: "123" },
+      fieldType: "SITELINK",
+      targets: [{ level: "campaign", campaignId: "123" }],
     });
 
     expect(result).toMatchObject({
       success: false,
-      action: "link_sitelink_asset",
       assetId: "999",
       assetResourceName: "customers/1301265570/assets/999",
+      fieldType: "SITELINK",
     });
     expect(result.error).toMatch(/automatically created by Google/i);
     expect(mockMutateResources).not.toHaveBeenCalled();

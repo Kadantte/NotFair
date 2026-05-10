@@ -1,16 +1,13 @@
 import { getCachedCustomer } from "./client";
 import {
-  createAssetExtensionWithLinks,
+  createAssetWithLinks,
   isAutomaticallyCreatedAssetSource,
-  linkAssetExtension,
   normalizeAssetSource,
-  normalizeAssetExtensionTargets,
-  removeAssetExtensionLink,
-  type AssetExtensionMutationResult,
-  type AssetExtensionTarget,
-} from "./asset-extensions";
+  type AssetLinkMutationResult,
+  type AssetLinkTarget,
+} from "./asset-links";
 import { isValidFinalUrl } from "./helpers";
-import type { AuthContext, WriteResult } from "./types";
+import type { AuthContext } from "./types";
 
 export type SitelinkAsset = {
   assetId: string;
@@ -32,8 +29,8 @@ export type SitelinkAssetParams = {
   description2?: string;
 };
 
-export type AddSitelinkAssetParams = SitelinkAssetParams & {
-  targets?: AssetExtensionTarget[];
+export type CreateSitelinkAssetParams = SitelinkAssetParams & {
+  targets?: AssetLinkTarget[];
 };
 
 type SitelinkAssetRow = {
@@ -147,97 +144,38 @@ export async function listSitelinkAssets(auth: AuthContext): Promise<SitelinkAss
   });
 }
 
+/**
+ * Create a sitelink asset. With `targets`, also link it at customer/campaign/
+ * ad-group levels in the same atomic mutate. Without `targets`, the asset is
+ * created but not linked — use `linkAsset` later.
+ */
 export async function createSitelinkAsset(
   auth: AuthContext,
-  params: SitelinkAssetParams & { linkToAccount?: boolean },
-): Promise<WriteResult> {
+  params: CreateSitelinkAssetParams,
+): Promise<AssetLinkMutationResult> {
+  const action = "create_sitelink_asset";
   const normalized = normalizeSitelinkInput(params);
   if (normalized.error) {
     return {
       success: false,
-      action: "create_sitelink_asset",
+      action,
       entityId: "",
       beforeValue: "",
       afterValue: JSON.stringify({ linkText: params.linkText, finalUrl: params.finalUrl }),
       error: normalized.error,
-    };
-  }
-
-  const input = normalized as { linkText: string; finalUrl: string; description1?: string; description2?: string };
-  return createAssetExtensionWithLinks(auth, {
-    assetType: "SITELINK",
-    assetResource: sitelinkAssetResource(input),
-    targets: params.linkToAccount ? [{ level: "account" }] : [],
-    action: "create_sitelink_asset",
-    afterValue: `${input.linkText} -> ${input.finalUrl}`,
-    label: input.linkText,
-  });
-}
-
-export async function addSitelinkAsset(
-  auth: AuthContext,
-  params: AddSitelinkAssetParams,
-): Promise<AssetExtensionMutationResult> {
-  const normalized = normalizeSitelinkInput(params);
-  const targets = normalizeAssetExtensionTargets(params.targets);
-  if (params.targets !== undefined && targets.length === 0) {
-    return {
-      success: false,
-      action: "add_sitelink_asset",
-      entityId: "",
-      beforeValue: "",
-      afterValue: JSON.stringify({ linkText: params.linkText, finalUrl: params.finalUrl }),
-      error: "addSitelinkAsset requires at least one target when targets is provided. Omit targets to link at account level.",
-      assetType: "SITELINK",
-      assetId: "",
-      assetResourceName: "",
-    };
-  }
-  if (normalized.error) {
-    return {
-      success: false,
-      action: "add_sitelink_asset",
-      entityId: "",
-      beforeValue: "",
-      afterValue: JSON.stringify({ linkText: params.linkText, finalUrl: params.finalUrl }),
-      error: normalized.error,
-      assetType: "SITELINK",
+      fieldType: "SITELINK",
       assetId: "",
       assetResourceName: "",
     };
   }
 
   const input = normalized as { linkText: string; finalUrl: string; description1?: string; description2?: string };
-  return createAssetExtensionWithLinks(auth, {
-    assetType: "SITELINK",
+  return createAssetWithLinks(auth, {
+    fieldType: "SITELINK",
     assetResource: sitelinkAssetResource(input),
-    targets,
-    action: "add_sitelink_asset",
+    targets: params.targets ?? [],
+    action,
     afterValue: `${input.linkText} -> ${input.finalUrl}`,
     label: input.linkText,
-  });
-}
-
-export async function linkSitelinkAsset(
-  auth: AuthContext,
-  params: { assetId: string; target: AssetExtensionTarget },
-): Promise<AssetExtensionMutationResult> {
-  return linkAssetExtension(auth, {
-    assetType: "SITELINK",
-    assetId: params.assetId,
-    target: params.target,
-    action: "link_sitelink_asset",
-  });
-}
-
-export async function unlinkSitelinkAsset(
-  auth: AuthContext,
-  params: { assetId: string; target: AssetExtensionTarget },
-): Promise<AssetExtensionMutationResult> {
-  return removeAssetExtensionLink(auth, {
-    assetType: "SITELINK",
-    assetId: params.assetId,
-    target: params.target,
-    action: "unlink_sitelink_asset",
   });
 }

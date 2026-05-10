@@ -18,17 +18,11 @@ vi.mock("google-ads-api", () => ({
 }));
 
 import {
-  addCalloutAsset,
   createCalloutAsset,
-  linkCalloutAsset,
-  linkCalloutToAccount,
-  removeCalloutFromAccount,
   listCalloutAssets,
 } from "@/lib/google-ads";
-import { DEMO_CUSTOMER_ID, DEMO_REFRESH_TOKEN } from "@/lib/demo/constants";
 
 const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
-const demoAuth = { refreshToken: DEMO_REFRESH_TOKEN, customerId: DEMO_CUSTOMER_ID };
 
 describe("callouts (RMF C.75)", () => {
   beforeEach(() => {
@@ -41,8 +35,53 @@ describe("callouts (RMF C.75)", () => {
     });
   });
 
-  describe("addCalloutAsset", () => {
-    it("creates a callout and links it to campaign targets", async () => {
+  describe("createCalloutAsset (no targets — asset only)", () => {
+    it("creates a callout without any links when targets is omitted", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+        ],
+      });
+      const result = await createCalloutAsset(auth, { text: "Free shipping" });
+      expect(result).toMatchObject({
+        success: true,
+        action: "create_callout_asset",
+        entityId: "999",
+        afterValue: "Free shipping",
+        fieldType: "CALLOUT",
+      });
+      expect(result.linksCreated).toEqual([]);
+      expect(mockMutateResources).toHaveBeenCalledTimes(1);
+      expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
+    });
+
+    it("rejects empty text", async () => {
+      const result = await createCalloutAsset(auth, { text: "  " });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/cannot be empty/i);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects text over 25 chars", async () => {
+      const result = await createCalloutAsset(auth, { text: "a".repeat(26) });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/25 characters/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("surfaces API errors", async () => {
+      mockMutateResources.mockRejectedValueOnce(new Error("INVALID_CALLOUT"));
+      const result = await createCalloutAsset(auth, {
+        text: "Free shipping",
+        targets: [{ level: "customer" }],
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/INVALID_CALLOUT/);
+    });
+  });
+
+  describe("createCalloutAsset (with targets — atomic create+link)", () => {
+    it("creates callout and links it to a campaign target in one mutate", async () => {
       mockMutateResources.mockResolvedValueOnce({
         mutate_operation_responses: [
           { asset_result: { resource_name: "customers/1301265570/assets/999" } },
@@ -50,16 +89,16 @@ describe("callouts (RMF C.75)", () => {
         ],
       });
 
-      const result = await addCalloutAsset(auth, {
+      const result = await createCalloutAsset(auth, {
         text: "Free shipping",
         targets: [{ level: "campaign", campaignId: "123" }],
       });
 
       expect(result).toMatchObject({
         success: true,
-        action: "add_callout_asset",
+        action: "create_callout_asset",
         entityId: "999",
-        assetType: "CALLOUT",
+        fieldType: "CALLOUT",
       });
       expect(mockMutateResources).toHaveBeenCalledTimes(1);
       expect(mockMutateResources.mock.calls[0][0]).toEqual([
@@ -83,210 +122,43 @@ describe("callouts (RMF C.75)", () => {
       ]);
     });
 
-    it("does not default explicit empty targets to account-level serving", async () => {
-      mockMutateResources.mockResolvedValueOnce({
-        mutate_operation_responses: [
-          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
-        ],
-      });
-
-      const result = await addCalloutAsset(auth, {
-        text: "Free shipping",
-        targets: [],
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.linksCreated).toEqual([]);
-      expect(mockMutateResources).toHaveBeenCalledTimes(1);
-      expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
-      expect(mockMutateResources.mock.calls[0][0][0]).toMatchObject({
-        entity: "asset",
-        operation: "create",
-      });
-    });
-  });
-
-  describe("createCalloutAsset", () => {
-    it("creates asset and links to customer when linkToAccount=true", async () => {
+    it("creates callout and links at customer (account) level", async () => {
       mockMutateResources.mockResolvedValueOnce({
         mutate_operation_responses: [
           { asset_result: { resource_name: "customers/1301265570/assets/999" } },
           { customer_asset_result: { resource_name: "customers/1301265570/customerAssets/999~11" } },
         ],
       });
-
-      const result = await createCalloutAsset(auth, { text: "Free shipping", linkToAccount: true });
-
-      expect(result).toMatchObject({
-        success: true,
-        action: "create_callout_asset",
-        entityId: "999",
-        afterValue: "Free shipping",
+      const result = await createCalloutAsset(auth, {
+        text: "Free shipping",
+        targets: [{ level: "customer" }],
       });
-      expect(mockMutateResources).toHaveBeenCalledTimes(1);
-      // Asset mutation sets callout_asset.callout_text
-      expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
-        resource_name: "customers/1301265570/assets/-1",
-        callout_asset: { callout_text: "Free shipping" },
-      });
-      // Customer_asset link references the temporary asset in the same atomic mutate.
+      expect(result.success).toBe(true);
       expect(mockMutateResources.mock.calls[0][0][1].resource).toEqual({
         asset: "customers/1301265570/assets/-1",
         field_type: 11,
       });
     });
 
-    it("only creates the asset when linkToAccount=false", async () => {
+    it("does not default an explicit empty targets array to anything", async () => {
       mockMutateResources.mockResolvedValueOnce({
         mutate_operation_responses: [
-          { asset_result: { resource_name: "customers/1301265570/assets/1001" } },
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
         ],
       });
-      const result = await createCalloutAsset(auth, { text: "24/7 support", linkToAccount: false });
-      expect(result.success).toBe(true);
-      expect(result.entityId).toBe("1001");
-      expect(mockMutateResources).toHaveBeenCalledTimes(1);
-    });
-
-    it("rejects empty text", async () => {
-      const result = await createCalloutAsset(auth, { text: "  ", linkToAccount: true });
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/cannot be empty/i);
-      expect(mockMutateResources).not.toHaveBeenCalled();
-    });
-
-    it("rejects text over 25 chars", async () => {
-      const result = await createCalloutAsset(auth, { text: "a".repeat(26), linkToAccount: true });
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/25 characters/);
-      expect(mockMutateResources).not.toHaveBeenCalled();
-    });
-
-    it("surfaces API errors", async () => {
-      mockMutateResources.mockRejectedValueOnce(new Error("INVALID_CALLOUT"));
-      const result = await createCalloutAsset(auth, { text: "Free shipping", linkToAccount: true });
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/INVALID_CALLOUT/);
-    });
-  });
-
-  describe("linkCalloutToAccount", () => {
-    it("creates a customer_asset link with CALLOUT field_type", async () => {
-      mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
-      mockMutateResources.mockResolvedValueOnce({
-        mutate_operation_responses: [
-          { customer_asset_result: { resource_name: "customers/1301265570/customerAssets/5~10" } },
-        ],
-      });
-      const result = await linkCalloutToAccount(auth, "5");
-      expect(result.success).toBe(true);
-      expect(result.action).toBe("link_callout_to_account");
-      expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
-        asset: "customers/1301265570/assets/5",
-        field_type: 11,
-      });
-    });
-  });
-
-  describe("linkCalloutAsset", () => {
-    it("creates an ad-group callout link", async () => {
-      mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
-      mockMutateResources.mockResolvedValueOnce({
-        mutate_operation_responses: [
-          { ad_group_asset_result: { resource_name: "customers/1301265570/adGroupAssets/111~5~11" } },
-        ],
-      });
-      const result = await linkCalloutAsset(auth, {
-        assetId: "5",
-        target: { level: "ad_group", adGroupId: "111" },
+      const result = await createCalloutAsset(auth, {
+        text: "Free shipping",
+        targets: [],
       });
       expect(result.success).toBe(true);
-      expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
-        ad_group: "customers/1301265570/adGroups/111",
-        asset: "customers/1301265570/assets/5",
-        field_type: 11,
-      });
-    });
-
-    it("rejects automatically-created callout assets before linking", async () => {
-      mockQuery.mockResolvedValueOnce([{ asset: { source: "AUTOMATICALLY_CREATED" } }]);
-
-      const result = await linkCalloutAsset(auth, {
-        assetId: "5",
-        target: { level: "ad_group", adGroupId: "111" },
-      });
-
-      expect(result).toMatchObject({
-        success: false,
-        action: "link_callout_asset",
-        assetId: "5",
-        assetResourceName: "customers/1301265570/assets/5",
-      });
-      expect(result.error).toMatch(/automatically created by Google/i);
-      expect(mockMutateResources).not.toHaveBeenCalled();
-    });
-
-    it("rejects unknown asset sources before linking", async () => {
-      mockQuery.mockResolvedValueOnce([{ asset: { source: "UNKNOWN" } }]);
-
-      const result = await linkCalloutAsset(auth, {
-        assetId: "5",
-        target: { level: "ad_group", adGroupId: "111" },
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/Could not verify/);
-      expect(mockMutateResources).not.toHaveBeenCalled();
-    });
-
-    it("keeps demo-mode existing asset links as no-op successes", async () => {
-      const result = await linkCalloutAsset(demoAuth, {
-        assetId: "5",
-        target: { level: "ad_group", adGroupId: "111" },
-      });
-
-      expect(result).toMatchObject({
-        success: true,
-        action: "link_callout_asset",
-        assetId: "5",
-      });
-      expect(mockQuery).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("removeCalloutFromAccount", () => {
-    it("finds the customer_asset link and removes it", async () => {
-      mockQuery.mockResolvedValueOnce([
-        {
-          customer_asset: {
-            resource_name: "customers/1301265570/customerAssets/5~10",
-          },
-        },
-      ]);
-      mockMutateResources.mockResolvedValueOnce({});
-      const result = await removeCalloutFromAccount(auth, "5");
-      expect(result.success).toBe(true);
-      expect(result.beforeValue).toBe("customers/1301265570/customerAssets/5~10");
-      expect(mockMutateResources.mock.calls[0][0][0]).toEqual({
-        entity: "customer_asset",
-        operation: "remove",
-        resource: "customers/1301265570/customerAssets/5~10",
-      });
-    });
-
-    it("reports not-found when no link exists", async () => {
-      mockQuery.mockResolvedValueOnce([]);
-      const result = await removeCalloutFromAccount(auth, "5");
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/No account-level callout link found/);
-      expect(mockMutateResources).not.toHaveBeenCalled();
+      expect(result.linksCreated).toEqual([]);
+      expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
     });
   });
 
   describe("listCalloutAssets", () => {
     it("returns callout assets annotated with account link status", async () => {
       mockQuery
-        // assets
         .mockResolvedValueOnce([
           {
             asset: {
@@ -305,7 +177,6 @@ describe("callouts (RMF C.75)", () => {
             },
           },
         ])
-        // links
         .mockResolvedValueOnce([
           {
             customer_asset: {

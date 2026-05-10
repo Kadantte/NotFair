@@ -265,17 +265,31 @@ describe("MCP read tools — handler execution", () => {
 describe("MCP write tools — smoke", () => {
   beforeEach(resetMocks);
 
-  it("registers image asset write tools", () => {
+  it("registers asset creation tools (typed per family) and generic link primitives", () => {
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
     const names = harness.listToolNames();
+    // Typed creation tools — input shape differs per family
+    expect(names).toContain("createCalloutAsset");
+    expect(names).toContain("createStructuredSnippetAsset");
+    expect(names).toContain("createSitelinkAsset");
     expect(names).toContain("createImageAsset");
-    expect(names).toContain("linkImageAsset");
-    expect(names).toContain("addCalloutAsset");
-    expect(names).toContain("linkCalloutAsset");
-    expect(names).toContain("addStructuredSnippetAsset");
-    expect(names).toContain("linkStructuredSnippetAsset");
-    expect(names).toContain("addSitelinkAsset");
-    expect(names).toContain("linkSitelinkAsset");
+    // Generic link primitives — work for every asset family
+    expect(names).toContain("linkAsset");
+    expect(names).toContain("unlinkAssetLinks");
+    expect(names).toContain("getAssetLinks");
+    // Deprecated tools must be gone
+    expect(names).not.toContain("addCalloutAsset");
+    expect(names).not.toContain("addSitelinkAsset");
+    expect(names).not.toContain("addStructuredSnippetAsset");
+    expect(names).not.toContain("linkCalloutAsset");
+    expect(names).not.toContain("linkSitelinkAsset");
+    expect(names).not.toContain("linkStructuredSnippetAsset");
+    expect(names).not.toContain("linkImageAsset");
+    expect(names).not.toContain("linkCalloutToAccount");
+    expect(names).not.toContain("removeCalloutFromAccount");
+    expect(names).not.toContain("unlinkCalloutAsset");
+    expect(names).not.toContain("unlinkSitelinkAsset");
+    expect(names).not.toContain("unlinkStructuredSnippetAsset");
   });
 
   it("pauseKeyword flows through execWrite and returns a WriteResult with changeId", async () => {
@@ -309,7 +323,8 @@ describe("MCP write tools — smoke", () => {
     expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
 
-  it("linkImageAsset flows through execWrite and creates an asset link", async () => {
+  it("linkAsset (image, ad_group level) flows through execWrite", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
         { ad_group_asset_result: { resource_name: "customers/1234567890/adGroupAssets/111~999~19" } },
@@ -317,18 +332,17 @@ describe("MCP write tools — smoke", () => {
     });
 
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
-    const result = await harness.callTool("linkImageAsset", {
+    const result = await harness.callTool("linkAsset", {
       assetId: "999",
       fieldType: "SQUARE_MARKETING_IMAGE",
-      level: "ad_group",
-      adGroupId: "111",
+      targets: [{ level: "ad_group", adGroupId: "111" }],
     });
     const structured = expectOk(result);
     expect(structured).toMatchObject({
       success: true,
-      action: "link_image_asset",
+      action: "link_asset",
       entityId: "999",
-      changeId: 1,
+      fieldType: "SQUARE_MARKETING_IMAGE",
     });
     expect(mockMutateResources.mock.calls[0][0][0].resource).toMatchObject({
       ad_group: "customers/1234567890/adGroups/111",
@@ -337,7 +351,7 @@ describe("MCP write tools — smoke", () => {
     });
   });
 
-  it("addStructuredSnippetAsset flows through execWrite and links to campaigns", async () => {
+  it("createStructuredSnippetAsset flows through execWrite and links to campaigns", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
         { asset_result: { resource_name: "customers/1234567890/assets/999" } },
@@ -347,7 +361,7 @@ describe("MCP write tools — smoke", () => {
     });
 
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
-    const result = await harness.callTool("addStructuredSnippetAsset", {
+    const result = await harness.callTool("createStructuredSnippetAsset", {
       header: "Services",
       values: ["Plumbing", "Electrical", "HVAC"],
       targets: [
@@ -358,7 +372,7 @@ describe("MCP write tools — smoke", () => {
     const structured = expectOk(result);
     expect(structured).toMatchObject({
       success: true,
-      action: "add_structured_snippet_asset",
+      action: "create_structured_snippet_asset",
       entityId: "999",
       changeId: 1,
       changeIds: [1, 1],
@@ -367,7 +381,7 @@ describe("MCP write tools — smoke", () => {
     expect(vi.mocked(execWrite).mock.calls.map((call) => call[2])).toEqual(["100", "200"]);
   });
 
-  it("addSitelinkAsset flows through execWrite and links to campaigns", async () => {
+  it("createSitelinkAsset flows through execWrite and links to a campaign", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
         { asset_result: { resource_name: "customers/1234567890/assets/999" } },
@@ -376,7 +390,7 @@ describe("MCP write tools — smoke", () => {
     });
 
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
-    const result = await harness.callTool("addSitelinkAsset", {
+    const result = await harness.callTool("createSitelinkAsset", {
       linkText: "Pricing",
       finalUrl: "https://example.com/pricing",
       description1: "See current plans",
@@ -386,7 +400,7 @@ describe("MCP write tools — smoke", () => {
     const structured = expectOk(result);
     expect(structured).toMatchObject({
       success: true,
-      action: "add_sitelink_asset",
+      action: "create_sitelink_asset",
       entityId: "999",
       changeId: 1,
     });
@@ -404,7 +418,7 @@ describe("MCP write tools — smoke", () => {
     });
   });
 
-  it("addSitelinkAsset blocks when any campaign target is in an active experiment before mutating", async () => {
+  it("createSitelinkAsset blocks when any campaign target is in an active experiment before mutating", async () => {
     mockQuery
       .mockResolvedValueOnce([
         {
@@ -430,7 +444,7 @@ describe("MCP write tools — smoke", () => {
       ]);
 
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
-    const result = await harness.callTool("addSitelinkAsset", {
+    const result = await harness.callTool("createSitelinkAsset", {
       linkText: "Pricing",
       finalUrl: "https://example.com/pricing",
       targets: [
@@ -449,7 +463,7 @@ describe("MCP write tools — smoke", () => {
     expect(mockMutateResources).not.toHaveBeenCalled();
   });
 
-  it("createSitelinkAsset defaults to creating without account-level link", async () => {
+  it("createSitelinkAsset (no targets) creates only the asset", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
         { asset_result: { resource_name: "customers/1234567890/assets/999" } },
@@ -472,20 +486,33 @@ describe("MCP write tools — smoke", () => {
     expect(mockMutateResources.mock.calls[0][0][0].entity).toBe("asset");
   });
 
-  it("addSitelinkAsset rejects an explicit empty targets array", async () => {
+  it("unlinkAssetLinks flows through execWrite and removes by canonical resource_name", async () => {
+    mockMutateResources.mockResolvedValueOnce({});
     const harness = buildHarness([registerWriteTools], TEST_AUTH);
-    const result = await harness.callTool("addSitelinkAsset", {
-      linkText: "Pricing",
-      finalUrl: "https://example.com/pricing",
-      targets: [],
+    const result = await harness.callTool("unlinkAssetLinks", {
+      linkResourceNames: ["customers/1234567890/campaignAssets/100~999~13"],
     });
     const structured = expectOk(result);
     expect(structured).toMatchObject({
-      success: false,
-      action: "add_sitelink_asset",
-      error: expect.stringContaining("requires at least one target"),
+      success: true,
+      action: "unlink_asset",
+      removed: 1,
       changeId: 1,
     });
+    expect(mockMutateResources.mock.calls[0][0][0]).toEqual({
+      entity: "campaign_asset",
+      operation: "remove",
+      resource: "customers/1234567890/campaignAssets/100~999~13",
+    });
+  });
+
+  it("getAssetLinks aggregates across all 4 link entities (read-only)", async () => {
+    mockQuery.mockResolvedValue([]);
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const result = await harness.callTool("getAssetLinks", { assetId: "999" });
+    const structured = expectOk(result);
+    expect(structured).toMatchObject({ assetId: "999", links: [] });
+    expect(mockQuery).toHaveBeenCalledTimes(4);
     expect(mockMutateResources).not.toHaveBeenCalled();
   });
 
@@ -884,7 +911,7 @@ describe("MCP write tools — smoke", () => {
       "pausePmaxAssetGroup", "enablePmaxAssetGroup",
       "linkCampaignToBiddingStrategy",
       "linkNegativeListToCampaign", "unlinkNegativeListFromCampaign",
-      "linkImageAsset",
+      "linkAsset",
     ];
     for (const name of simpleWriteTargetingCampaign) {
       const tool = harness.getTool(name);

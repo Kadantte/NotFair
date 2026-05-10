@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockCustomerFactory, mockMutateResources } = vi.hoisted(() => ({
+const { mockCustomerFactory, mockMutateResources, mockQuery } = vi.hoisted(() => ({
   mockCustomerFactory: vi.fn(),
   mockMutateResources: vi.fn(),
+  mockQuery: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -16,7 +17,7 @@ vi.mock("google-ads-api", () => ({
   },
 }));
 
-import { createImageAsset, fetchImageAssetFromUrl, linkImageAsset } from "@/lib/google-ads";
+import { createImageAsset, fetchImageAssetFromUrl, linkAsset } from "@/lib/google-ads";
 
 const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
 
@@ -35,7 +36,7 @@ describe("image assets", () => {
     vi.clearAllMocks();
     mockCustomerFactory.mockReturnValue({
       mutateResources: mockMutateResources,
-      query: vi.fn(),
+      query: mockQuery,
     });
   });
 
@@ -56,7 +57,7 @@ describe("image assets", () => {
     });
   });
 
-  describe("createImageAsset", () => {
+  describe("createImageAsset (no targets — asset only)", () => {
     it("uploads a landscape PNG image asset", async () => {
       mockMutateResources.mockResolvedValueOnce({
         mutate_operation_responses: [
@@ -79,7 +80,9 @@ describe("image assets", () => {
         afterValue: "Spring promo landscape (MARKETING_IMAGE, 1200x628)",
       });
       expect(mockMutateResources).toHaveBeenCalledTimes(1);
+      expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
       expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
+        resource_name: "customers/1301265570/assets/-1",
         name: "Spring promo landscape",
         image_asset: {
           data: imageBytes,
@@ -117,26 +120,80 @@ describe("image assets", () => {
     });
   });
 
-  describe("linkImageAsset", () => {
-    it("links an image asset to a campaign", async () => {
+  describe("createImageAsset (with targets — atomic create+link)", () => {
+    it("creates an image and links it to a Performance Max asset group in one mutate", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+          { asset_group_asset_result: { resource_name: "customers/1301265570/assetGroupAssets/55~999~19" } },
+        ],
+      });
+
+      const imageBytes = fakePng(1200, 1200);
+      const result = await createImageAsset(auth, {
+        imageBytes,
+        mimeType: "IMAGE_PNG",
+        fieldType: "SQUARE_MARKETING_IMAGE",
+        name: "Spring promo square",
+        targets: [{ level: "asset_group", assetGroupId: "55" }],
+      });
+
+      expect(result).toMatchObject({
+        success: true,
+        action: "create_image_asset",
+        entityId: "999",
+        fieldType: "SQUARE_MARKETING_IMAGE",
+      });
+      expect(mockMutateResources).toHaveBeenCalledTimes(1);
+      expect(mockMutateResources.mock.calls[0][0][1].resource).toEqual({
+        asset_group: "customers/1301265570/assetGroups/55",
+        asset: "customers/1301265570/assets/-1",
+        field_type: 19,
+      });
+    });
+
+    it("creates and links an image at customer level", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/999" } },
+          { customer_asset_result: { resource_name: "customers/1301265570/customerAssets/999~5" } },
+        ],
+      });
+      const result = await createImageAsset(auth, {
+        imageBytes: fakePng(1200, 628),
+        mimeType: "IMAGE_PNG",
+        fieldType: "MARKETING_IMAGE",
+        name: "Customer-level promo",
+        targets: [{ level: "customer" }],
+      });
+      expect(result.success).toBe(true);
+      expect(mockMutateResources.mock.calls[0][0][1].resource).toEqual({
+        asset: "customers/1301265570/assets/-1",
+        field_type: 5,
+      });
+    });
+  });
+
+  describe("linkAsset for image assets", () => {
+    it("links an existing image asset to a campaign", async () => {
+      mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
       mockMutateResources.mockResolvedValueOnce({
         mutate_operation_responses: [
           { campaign_asset_result: { resource_name: "customers/1301265570/campaignAssets/123~999~5" } },
         ],
       });
 
-      const result = await linkImageAsset(auth, {
+      const result = await linkAsset(auth, {
         assetId: "999",
         fieldType: "MARKETING_IMAGE",
-        level: "campaign",
-        campaignId: "123",
+        targets: [{ level: "campaign", campaignId: "123" }],
       });
 
       expect(result).toMatchObject({
         success: true,
-        action: "link_image_asset",
+        action: "link_asset",
         entityId: "999",
-        afterValue: "customers/1301265570/campaignAssets/123~999~5",
+        fieldType: "MARKETING_IMAGE",
       });
       expect(mockMutateResources.mock.calls[0][0][0]).toEqual({
         entity: "campaign_asset",
@@ -149,37 +206,24 @@ describe("image assets", () => {
       });
     });
 
-    it("links an image asset to a Performance Max asset group", async () => {
-      mockMutateResources.mockResolvedValueOnce({
-        mutate_operation_responses: [
-          { asset_group_asset_result: { resource_name: "customers/1301265570/assetGroupAssets/55~999~19" } },
-        ],
-      });
-
-      const result = await linkImageAsset(auth, {
-        assetId: "999",
-        fieldType: "SQUARE_MARKETING_IMAGE",
-        level: "asset_group",
-        assetGroupId: "55",
-      });
-
-      expect(result.success).toBe(true);
-      expect(mockMutateResources.mock.calls[0][0][0].resource).toEqual({
-        asset_group: "customers/1301265570/assetGroups/55",
-        asset: "customers/1301265570/assets/999",
-        field_type: 19,
-      });
-    });
-
-    it("requires the target ID for the selected link level", async () => {
-      const result = await linkImageAsset(auth, {
+    it("requires the matching target ID for the selected level", async () => {
+      await expect(linkAsset(auth, {
         assetId: "999",
         fieldType: "MARKETING_IMAGE",
-        level: "ad_group",
-      });
+        targets: [{ level: "ad_group" } as { level: "ad_group"; adGroupId: string }],
+      })).rejects.toThrow(/adGroupId is required/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
 
+    it("rejects unsupported levels (callout asset cannot link to asset_group)", async () => {
+      mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+      const result = await linkAsset(auth, {
+        assetId: "999",
+        fieldType: "CALLOUT",
+        targets: [{ level: "asset_group", assetGroupId: "55" }],
+      });
       expect(result.success).toBe(false);
-      expect(result.error).toMatch(/adGroupId is required/);
+      expect(result.error).toMatch(/CALLOUT assets cannot be linked at the asset_group level/);
       expect(mockMutateResources).not.toHaveBeenCalled();
     });
   });

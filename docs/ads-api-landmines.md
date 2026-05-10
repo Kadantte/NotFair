@@ -48,6 +48,14 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 - `metrics.conversion_rate` — not a field. Calculate from `metrics.conversions / metrics.clicks`.
 - `asset.sitelink_asset.final_urls` — not a field. Call `getResourceMetadata('asset')` to discover correct asset URL fields.
 
+## Assets — immutability and link semantics
+
+- **Google Ads has NO asset deletion.** `AssetService` exposes Create + Mutate (update only); there is no Remove operation. Asset rows remain permanently in the account; the only way to make an asset stop serving is to remove every link (`customer_asset` / `campaign_asset` / `ad_group_asset` / `asset_group_asset`) that references it. The MCP surface deliberately omits a `removeAsset` tool — agents call `getAssetLinks` + `unlinkAssetLinks` instead. Verify in `lib/google-ads/asset-links.ts:unlinkAssetLinks` (no `asset` entity in the entity-by-path table).
+- **A single asset can have many links** at multiple levels and field types. `getAssetLinks(assetId)` aggregates across all 4 link entities; pass the resulting `linkResourceName`s to `unlinkAssetLinks` for atomic bulk removal.
+- **Field type vs asset type for images.** Image assets have `asset.type = IMAGE` regardless of how they're being served. The link's `field_type` (`MARKETING_IMAGE` = 5 for 1.91:1, `SQUARE_MARKETING_IMAGE` = 19 for 1:1) is what controls serving. Filtering by `asset.type = MARKETING_IMAGE` will return zero rows — use `asset.type = IMAGE` and filter the link's `field_type` instead. Verified by `FIELD_TYPES.MARKETING_IMAGE.assetTypeName === "IMAGE"` in `lib/google-ads/asset-links.ts`.
+- **`asset_group_asset` is its own link entity** (Performance Max only). Image assets support all 4 link levels; callout/sitelink/structured-snippet support only customer/campaign/ad_group. `linkAsset` enforces this from the `FIELD_TYPES` registry; passing an unsupported level returns an actionable error. Verified at `lib/__tests__/google-ads-asset-links.test.ts` ("rejects unsupported levels").
+- **Field-type enums in WHERE clauses are bare names, not integers.** GAQL uses `customer_asset.field_type = CALLOUT`, never `= 11`. Same for image links: `WHERE customer_asset.field_type = MARKETING_IMAGE`. The asset-link primitive uses the bare enum name in its discovery queries.
+
 ---
 
 ## Surface manifest — where landmines tend to leak

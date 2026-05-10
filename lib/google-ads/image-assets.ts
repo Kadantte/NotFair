@@ -1,12 +1,10 @@
 import dns from "node:dns/promises";
 import net from "node:net";
-import { getCustomer } from "./client";
-import { extractErrorMessage, normalizeCustomerId, safeEntityId } from "./helpers";
-import type { AuthContext, WriteResult } from "./types";
+import { createAssetWithLinks, type AssetLinkMutationResult, type AssetLinkTarget, type FieldTypeName } from "./asset-links";
+import type { AuthContext } from "./types";
 
-export type ImageAssetFieldType = "MARKETING_IMAGE" | "SQUARE_MARKETING_IMAGE";
+export type ImageAssetFieldType = Extract<FieldTypeName, "MARKETING_IMAGE" | "SQUARE_MARKETING_IMAGE">;
 export type ImageAssetMimeType = "IMAGE_JPEG" | "IMAGE_PNG";
-export type LinkImageAssetLevel = "customer" | "campaign" | "ad_group" | "asset_group";
 
 export type ImageDimensions = {
   width: number;
@@ -19,64 +17,14 @@ export type FetchedImageAsset = {
   dimensions: ImageDimensions;
 };
 
-type MutateResultRecord = { resource_name?: string };
-type MutateResourcesResponse = {
-  mutate_operation_responses?: Array<Record<string, MutateResultRecord | undefined>>;
-};
-
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const MIME_TYPE: Record<ImageAssetMimeType, number> = {
   IMAGE_JPEG: 2,
   IMAGE_PNG: 4,
 };
-const ASSET_FIELD_TYPE: Record<ImageAssetFieldType, number> = {
-  MARKETING_IMAGE: 5,
-  SQUARE_MARKETING_IMAGE: 19,
-};
 
 const PRIVATE_HOSTNAMES = new Set(["localhost", "localhost.localdomain"]);
-const LINK_TARGET: Record<LinkImageAssetLevel, {
-  entity: string;
-  resultKey: string;
-  requiredParam: "campaignId" | "adGroupId" | "assetGroupId" | null;
-  idLabel: string;
-  resourceField: "campaign" | "ad_group" | "asset_group" | null;
-  resourceCollection: "campaigns" | "adGroups" | "assetGroups" | null;
-}> = {
-  customer: {
-    entity: "customer_asset",
-    resultKey: "customer_asset_result",
-    requiredParam: null,
-    idLabel: "customer",
-    resourceField: null,
-    resourceCollection: null,
-  },
-  campaign: {
-    entity: "campaign_asset",
-    resultKey: "campaign_asset_result",
-    requiredParam: "campaignId",
-    idLabel: "campaign",
-    resourceField: "campaign",
-    resourceCollection: "campaigns",
-  },
-  ad_group: {
-    entity: "ad_group_asset",
-    resultKey: "ad_group_asset_result",
-    requiredParam: "adGroupId",
-    idLabel: "ad group",
-    resourceField: "ad_group",
-    resourceCollection: "adGroups",
-  },
-  asset_group: {
-    entity: "asset_group_asset",
-    resultKey: "asset_group_asset_result",
-    requiredParam: "assetGroupId",
-    idLabel: "asset group",
-    resourceField: "asset_group",
-    resourceCollection: "assetGroups",
-  },
-};
 
 function isPrivateIp(address: string): boolean {
   const kind = net.isIP(address);
@@ -235,6 +183,11 @@ export async function fetchImageAssetFromUrl(imageUrl: string): Promise<FetchedI
   return { imageBytes, mimeType, dimensions };
 }
 
+/**
+ * Upload an image asset (and optionally link it to one or more serving targets
+ * in the same atomic mutate). Without `targets`, only the asset is created —
+ * use `linkAsset` later to attach it.
+ */
 export async function createImageAsset(
   auth: AuthContext,
   params: {
@@ -242,135 +195,52 @@ export async function createImageAsset(
     mimeType: ImageAssetMimeType;
     fieldType: ImageAssetFieldType;
     name: string;
+    targets?: AssetLinkTarget[];
   },
-): Promise<WriteResult> {
-  const customer = getCustomer(auth);
+): Promise<AssetLinkMutationResult> {
   const name = params.name.trim();
   const { dimensions, error } = validateImageAssetInput(params.imageBytes, params.mimeType, params.fieldType);
+  const action = "create_image_asset";
 
   if (!name) {
-    return { success: false, action: "create_image_asset", entityId: "", beforeValue: "", afterValue: "", error: "Image asset name cannot be empty" };
-  }
-  if (error) {
-    return { success: false, action: "create_image_asset", entityId: "", beforeValue: "", afterValue: name, error };
-  }
-
-  try {
-    const operations = [
-      {
-        entity: "asset",
-        operation: "create",
-        resource: {
-          name,
-          image_asset: {
-            data: params.imageBytes,
-            mime_type: MIME_TYPE[params.mimeType],
-          },
-        },
-      },
-    ] as Parameters<typeof customer.mutateResources>[0];
-    const response = await customer.mutateResources(operations);
-
-    const responses = (response as unknown as MutateResourcesResponse)?.mutate_operation_responses ?? [];
-    const assetResourceName = responses[0]?.asset_result?.resource_name as string | undefined;
-    if (!assetResourceName) {
-      return {
-        success: false,
-        action: "create_image_asset",
-        entityId: "",
-        beforeValue: "",
-        afterValue: name,
-        error: "Image asset created but no resource_name returned",
-      };
-    }
-
-    const assetId = assetResourceName.split("/").pop() ?? "";
-    return {
-      success: true,
-      action: "create_image_asset",
-      entityId: assetId,
-      beforeValue: "",
-      afterValue: `${name} (${params.fieldType}, ${dimensions?.width ?? "?"}x${dimensions?.height ?? "?"})`,
-      label: name,
-    };
-  } catch (error) {
     return {
       success: false,
-      action: "create_image_asset",
+      action,
+      entityId: "",
+      beforeValue: "",
+      afterValue: "",
+      error: "Image asset name cannot be empty",
+      fieldType: params.fieldType,
+      assetId: "",
+      assetResourceName: "",
+    };
+  }
+  if (error) {
+    return {
+      success: false,
+      action,
       entityId: "",
       beforeValue: "",
       afterValue: name,
-      error: extractErrorMessage(error),
+      error,
+      fieldType: params.fieldType,
+      assetId: "",
+      assetResourceName: "",
     };
   }
-}
 
-export async function linkImageAsset(
-  auth: AuthContext,
-  params: {
-    assetId: string;
-    fieldType: ImageAssetFieldType;
-    level: LinkImageAssetLevel;
-    campaignId?: string;
-    adGroupId?: string;
-    assetGroupId?: string;
-  },
-): Promise<WriteResult> {
-  const customer = getCustomer(auth);
-  const customerId = normalizeCustomerId(auth.customerId);
-  const assetId = String(safeEntityId(params.assetId, "asset"));
-  const asset = `customers/${customerId}/assets/${assetId}`;
-  const fieldType = ASSET_FIELD_TYPE[params.fieldType];
-  const target = LINK_TARGET[params.level];
-  const resource: Record<string, unknown> = { asset, field_type: fieldType };
-  let targetLabel = "customer";
-
-  if (target.requiredParam) {
-    const targetId = params[target.requiredParam];
-    if (!targetId) {
-      return {
-        success: false,
-        action: "link_image_asset",
-        entityId: assetId,
-        beforeValue: "",
-        afterValue: "",
-        error: `${target.requiredParam} is required when level is ${params.level}`,
-      };
-    }
-    const id = safeEntityId(targetId, target.idLabel);
-    resource[target.resourceField!] = `customers/${customerId}/${target.resourceCollection}/${id}`;
-    targetLabel = `${target.idLabel} ${id}`;
-  }
-
-  try {
-    const operations = [
-      {
-        entity: target.entity,
-        operation: "create",
-        resource,
+  return createAssetWithLinks(auth, {
+    fieldType: params.fieldType,
+    assetResource: {
+      name,
+      image_asset: {
+        data: params.imageBytes,
+        mime_type: MIME_TYPE[params.mimeType],
       },
-    ] as Parameters<typeof customer.mutateResources>[0];
-    const response = await customer.mutateResources(operations);
-    const responses = (response as unknown as MutateResourcesResponse)?.mutate_operation_responses ?? [];
-    const linkResource = responses[0]?.[target.resultKey]?.resource_name as string | undefined;
-
-    return {
-      success: true,
-      action: "link_image_asset",
-      entityId: assetId,
-      beforeValue: "",
-      afterValue: linkResource ?? `${params.fieldType} image asset ${assetId} linked to ${targetLabel}`,
-      label: `${params.fieldType} image ${assetId}`,
-      campaignId: params.campaignId ?? null,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      action: "link_image_asset",
-      entityId: assetId,
-      beforeValue: "",
-      afterValue: "",
-      error: extractErrorMessage(error),
-    };
-  }
+    },
+    targets: params.targets ?? [],
+    action,
+    afterValue: `${name} (${params.fieldType}, ${dimensions?.width ?? "?"}x${dimensions?.height ?? "?"})`,
+    label: name,
+  });
 }

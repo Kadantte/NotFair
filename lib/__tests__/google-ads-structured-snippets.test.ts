@@ -18,12 +18,11 @@ vi.mock("google-ads-api", () => ({
 }));
 
 import {
-  addStructuredSnippetAsset,
   createStructuredSnippetAsset,
-  linkStructuredSnippetAsset,
+  linkAsset,
   listStructuredSnippetAssets,
   normalizeStructuredSnippetInput,
-  unlinkStructuredSnippetAsset,
+  unlinkAssetLinks,
 } from "@/lib/google-ads";
 
 const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
@@ -68,7 +67,7 @@ describe("structured snippets", () => {
     expect(result.error).toMatch(/Services/);
   });
 
-  it("creates a structured snippet asset and links it to campaigns", async () => {
+  it("creates a structured snippet asset and links it to campaigns in one atomic mutate", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
         { asset_result: { resource_name: "customers/1301265570/assets/999" } },
@@ -77,7 +76,7 @@ describe("structured snippets", () => {
       ],
     });
 
-    const result = await addStructuredSnippetAsset(auth, {
+    const result = await createStructuredSnippetAsset(auth, {
       header: "Services",
       values: ["Plumbing", "Electrical", "HVAC"],
       targets: [
@@ -88,9 +87,9 @@ describe("structured snippets", () => {
 
     expect(result).toMatchObject({
       success: true,
-      action: "add_structured_snippet_asset",
+      action: "create_structured_snippet_asset",
       entityId: "999",
-      assetType: "STRUCTURED_SNIPPET",
+      fieldType: "STRUCTURED_SNIPPET",
       created: true,
     });
     expect(result.linksCreated).toHaveLength(2);
@@ -128,7 +127,7 @@ describe("structured snippets", () => {
     ]);
   });
 
-  it("supports low-level account linking for created snippets", async () => {
+  it("creates and links at customer level when targets includes { level: 'customer' }", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
         { asset_result: { resource_name: "customers/1301265570/assets/999" } },
@@ -139,7 +138,7 @@ describe("structured snippets", () => {
     const result = await createStructuredSnippetAsset(auth, {
       header: "Brands",
       values: ["Nest", "Nexus", "Chromebook"],
-      linkToAccount: true,
+      targets: [{ level: "customer" }],
     });
 
     expect(result).toMatchObject({
@@ -154,7 +153,7 @@ describe("structured snippets", () => {
     });
   });
 
-  it("links an existing structured snippet to an ad group", async () => {
+  it("linkAsset (STRUCTURED_SNIPPET) attaches an existing snippet to an ad group", async () => {
     mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [
@@ -162,9 +161,10 @@ describe("structured snippets", () => {
       ],
     });
 
-    const result = await linkStructuredSnippetAsset(auth, {
+    const result = await linkAsset(auth, {
       assetId: "999",
-      target: { level: "ad_group", adGroupId: "222" },
+      fieldType: "STRUCTURED_SNIPPET",
+      targets: [{ level: "ad_group", adGroupId: "222" }],
     });
 
     expect(result.success).toBe(true);
@@ -179,19 +179,20 @@ describe("structured snippets", () => {
     });
   });
 
-  it("rejects automatically-created structured snippets before linking", async () => {
+  it("linkAsset rejects automatically-created structured snippets before linking", async () => {
     mockQuery.mockResolvedValueOnce([{ asset: { source: "AUTOMATICALLY_CREATED" } }]);
 
-    const result = await linkStructuredSnippetAsset(auth, {
+    const result = await linkAsset(auth, {
       assetId: "999",
-      target: { level: "ad_group", adGroupId: "222" },
+      fieldType: "STRUCTURED_SNIPPET",
+      targets: [{ level: "ad_group", adGroupId: "222" }],
     });
 
     expect(result).toMatchObject({
       success: false,
-      action: "link_structured_snippet_asset",
       assetId: "999",
       assetResourceName: "customers/1301265570/assets/999",
+      fieldType: "STRUCTURED_SNIPPET",
     });
     expect(result.error).toMatch(/automatically created by Google/i);
     expect(mockMutateResources).not.toHaveBeenCalled();
@@ -251,20 +252,10 @@ describe("structured snippets", () => {
     });
   });
 
-  it("removes an existing structured snippet campaign link", async () => {
-    mockQuery.mockResolvedValueOnce([
-      {
-        campaign_asset: {
-          resource_name: "customers/1301265570/campaignAssets/123~999~12",
-        },
-      },
-    ]);
+  it("unlinkAssetLinks removes a structured snippet campaign link by resource_name", async () => {
     mockMutateResources.mockResolvedValueOnce({});
 
-    const result = await unlinkStructuredSnippetAsset(auth, {
-      assetId: "999",
-      target: { level: "campaign", campaignId: "123" },
-    });
+    const result = await unlinkAssetLinks(auth, ["customers/1301265570/campaignAssets/123~999~12"]);
 
     expect(result.success).toBe(true);
     expect(mockMutateResources.mock.calls[0][0][0]).toEqual({

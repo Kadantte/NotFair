@@ -1,15 +1,12 @@
 import { getCachedCustomer } from "./client";
 import {
-  createAssetExtensionWithLinks,
+  createAssetWithLinks,
   isAutomaticallyCreatedAssetSource,
-  linkAssetExtension,
   normalizeAssetSource,
-  normalizeAssetExtensionTargets,
-  removeAssetExtensionLink,
-  type AssetExtensionMutationResult,
-  type AssetExtensionTarget,
-} from "./asset-extensions";
-import type { AuthContext, WriteResult } from "./types";
+  type AssetLinkMutationResult,
+  type AssetLinkTarget,
+} from "./asset-links";
+import type { AuthContext } from "./types";
 
 export const STRUCTURED_SNIPPET_HEADERS = [
   "Brands",
@@ -45,8 +42,8 @@ export type StructuredSnippetParams = {
   values: string[];
 };
 
-export type AddStructuredSnippetAssetParams = StructuredSnippetParams & {
-  targets?: AssetExtensionTarget[];
+export type CreateStructuredSnippetAssetParams = StructuredSnippetParams & {
+  targets?: AssetLinkTarget[];
 };
 
 type StructuredSnippetAssetRow = {
@@ -161,51 +158,26 @@ export async function listStructuredSnippetAssets(auth: AuthContext): Promise<St
   });
 }
 
+/**
+ * Create a structured snippet asset. With `targets`, also link it at
+ * customer/campaign/ad-group levels in the same atomic mutate. Without
+ * `targets`, the asset is created but not linked — use `linkAsset` later.
+ */
 export async function createStructuredSnippetAsset(
   auth: AuthContext,
-  params: StructuredSnippetParams & { linkToAccount?: boolean },
-): Promise<WriteResult> {
+  params: CreateStructuredSnippetAssetParams,
+): Promise<AssetLinkMutationResult> {
+  const action = "create_structured_snippet_asset";
   const normalized = normalizeStructuredSnippetInput(params);
   if (normalized.error) {
     return {
       success: false,
-      action: "create_structured_snippet_asset",
+      action,
       entityId: "",
       beforeValue: "",
       afterValue: JSON.stringify({ header: params.header, values: params.values }),
       error: normalized.error,
-    };
-  }
-
-  const { header, values } = normalized as { header: StructuredSnippetHeader; values: string[] };
-
-  return createAssetExtensionWithLinks(auth, {
-    assetType: "STRUCTURED_SNIPPET",
-    assetResource: {
-      structured_snippet_asset: { header, values },
-    },
-    targets: params.linkToAccount ? [{ level: "account" }] : [],
-    action: "create_structured_snippet_asset",
-    afterValue: `${header}: ${values.join(", ")}`,
-    label: header,
-  });
-}
-
-export async function addStructuredSnippetAsset(
-  auth: AuthContext,
-  params: AddStructuredSnippetAssetParams,
-): Promise<AssetExtensionMutationResult> {
-  const normalized = normalizeStructuredSnippetInput(params);
-  const targets = normalizeAssetExtensionTargets(params.targets);
-  if (normalized.error) {
-    return {
-      success: false,
-      action: "add_structured_snippet_asset",
-      entityId: "",
-      beforeValue: "",
-      afterValue: JSON.stringify({ header: params.header, values: params.values }),
-      error: normalized.error,
-      assetType: "STRUCTURED_SNIPPET",
+      fieldType: "STRUCTURED_SNIPPET",
       assetId: "",
       assetResourceName: "",
     };
@@ -213,38 +185,14 @@ export async function addStructuredSnippetAsset(
 
   const { header, values } = normalized as { header: StructuredSnippetHeader; values: string[] };
 
-  return createAssetExtensionWithLinks(auth, {
-    assetType: "STRUCTURED_SNIPPET",
+  return createAssetWithLinks(auth, {
+    fieldType: "STRUCTURED_SNIPPET",
     assetResource: {
       structured_snippet_asset: { header, values },
     },
-    targets,
-    action: "add_structured_snippet_asset",
+    targets: params.targets ?? [],
+    action,
     afterValue: `${header}: ${values.join(", ")}`,
     label: header,
-  });
-}
-
-export async function linkStructuredSnippetAsset(
-  auth: AuthContext,
-  params: { assetId: string; target: AssetExtensionTarget },
-): Promise<AssetExtensionMutationResult> {
-  return linkAssetExtension(auth, {
-    assetType: "STRUCTURED_SNIPPET",
-    assetId: params.assetId,
-    target: params.target,
-    action: "link_structured_snippet_asset",
-  });
-}
-
-export async function unlinkStructuredSnippetAsset(
-  auth: AuthContext,
-  params: { assetId: string; target: AssetExtensionTarget },
-): Promise<AssetExtensionMutationResult> {
-  return removeAssetExtensionLink(auth, {
-    assetType: "STRUCTURED_SNIPPET",
-    assetId: params.assetId,
-    target: params.target,
-    action: "unlink_structured_snippet_asset",
   });
 }

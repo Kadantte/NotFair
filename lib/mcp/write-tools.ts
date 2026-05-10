@@ -44,24 +44,16 @@ import {
   pausePmaxAssetGroup,
   enablePmaxAssetGroup,
   updateCampaignLanguages,
-  addCalloutAsset,
   createCalloutAsset,
-  linkCalloutAsset,
-  linkCalloutToAccount,
-  unlinkCalloutAsset,
-  removeCalloutFromAccount,
-  addStructuredSnippetAsset,
   createStructuredSnippetAsset,
-  linkStructuredSnippetAsset,
-  unlinkStructuredSnippetAsset,
   STRUCTURED_SNIPPET_HEADERS,
-  addSitelinkAsset,
   createSitelinkAsset,
-  linkSitelinkAsset,
-  unlinkSitelinkAsset,
   createImageAsset,
   fetchImageAssetFromUrl,
-  linkImageAsset,
+  linkAsset,
+  unlinkAssetLinks,
+  getAssetLinks,
+  FIELD_TYPE_NAMES,
   createBiddingStrategy,
   updateBiddingStrategy,
   removeBiddingStrategy,
@@ -83,7 +75,7 @@ import {
   SUPPORTED_EXPERIMENT_TYPES,
   checkActiveExperimentImpact,
 } from "@/lib/google-ads";
-import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, LinkImageAssetLevel, AssetExtensionMutationResult, CreateCampaignParams, ActiveExperimentImpact } from "@/lib/google-ads";
+import type { WriteResult, AuthContext, UpdateCampaignSettingsParams, BiddingStrategyType, GoalConfigLevel, PortfolioStrategyType, TargetImpressionShareLocation, BulkValidationIssue, ImageAssetFieldType, AssetLinkMutationResult, AssetLinkTarget, FieldTypeName, CreateCampaignParams, ActiveExperimentImpact } from "@/lib/google-ads";
 import { TARGET_IMPRESSION_SHARE_LOCATIONS } from "@/lib/google-ads";
 import { logChange, getUndoableChange, markRolledBack, setGoals, getGoals } from "@/lib/db/tracking";
 import { execWrite, execRead } from "@/lib/tools/execute";
@@ -202,8 +194,19 @@ function buildBulkSkipped<T>(issues: Array<BulkValidationWithInput<T>>) {
     }));
 }
 
-const assetExtensionTargetSchema = z.discriminatedUnion("level", [
-  z.object({ level: z.literal("account") }),
+/**
+ * Asset link target — a serving location for an asset link.
+ *
+ * Levels mirror Google Ads' link entities: customer_asset / campaign_asset /
+ * ad_group_asset / asset_group_asset. `customer` is the top level (formerly
+ * called "account" in older NotFair tools — `customer` is Google's term).
+ *
+ * Not every asset family supports every level. Image assets support all 4;
+ * callout/sitelink/structured-snippet support only customer/campaign/ad_group.
+ * The runtime primitive (`linkAsset` / `createAssetWithLinks`) enforces this.
+ */
+const assetLinkTargetSchema = z.discriminatedUnion("level", [
+  z.object({ level: z.literal("customer") }),
   z.object({
     level: z.literal("campaign"),
     campaignId: z.string().describe("Campaign ID to link the asset to"),
@@ -211,6 +214,10 @@ const assetExtensionTargetSchema = z.discriminatedUnion("level", [
   z.object({
     level: z.literal("ad_group"),
     adGroupId: z.string().describe("Ad group ID to link the asset to"),
+  }),
+  z.object({
+    level: z.literal("asset_group"),
+    assetGroupId: z.string().describe("Performance Max asset group ID to link the asset to"),
   }),
 ]);
 
@@ -221,7 +228,7 @@ const experimentImpactAcknowledgementSchema = {
     .describe("Danger override. Set true only after the user explicitly accepts that this mutation touches a campaign in an active experiment, or after applying the same intended change to both arms."),
 };
 
-type AssetExtensionToolTarget = z.infer<typeof assetExtensionTargetSchema>;
+type AssetLinkToolTarget = z.infer<typeof assetLinkTargetSchema>;
 type ExperimentPreflightBlock = {
   success: false;
   executed: false;
@@ -261,14 +268,14 @@ async function preflightActiveExperimentMutation(
   );
 }
 
-function campaignTargetIds(targets: AssetExtensionToolTarget[] | undefined): string[] {
+function campaignTargetIds(targets: AssetLinkToolTarget[] | undefined): string[] {
   const ids = targets
-    ?.filter((target) => target.level === "campaign")
+    ?.filter((target): target is { level: "campaign"; campaignId: string } => target.level === "campaign")
     .map((target) => target.campaignId) ?? [];
   return [...new Set(ids)];
 }
 
-function linkedCampaignIds(result: AssetExtensionMutationResult): string[] {
+function linkedCampaignIds(result: AssetLinkMutationResult): string[] {
   const ids = [
     ...(result.linksCreated ?? []),
     ...(result.linksRemoved ?? []),
@@ -276,11 +283,15 @@ function linkedCampaignIds(result: AssetExtensionMutationResult): string[] {
   return [...new Set(ids)];
 }
 
-async function execAssetExtensionWrite(
+/**
+ * Run an asset-link write, fanning out a single change record per affected
+ * campaign (so per-campaign undo + experiment guard checks line up).
+ */
+async function execAssetLinkWrite(
   auth: AuthContext,
   targetId: string,
   campaignIds: string[],
-  fn: () => Promise<AssetExtensionMutationResult>,
+  fn: () => Promise<AssetLinkMutationResult>,
   acknowledgeExperimentImpact = false,
 ) {
   const intendedCampaignIds = [...new Set(campaignIds.filter(Boolean))];
@@ -1860,300 +1871,175 @@ export const registerWriteTools: ToolRegistrar = (server, currentAuth) => {
     return typedResult({ success: result.success, error: result.error, results: logged });
   }));
 
-  // ─── Callout Extensions (RMF C.75) ───────────────────────────────
+  // ─── Asset creation (typed per family — input shape differs per family) ──
+  //
+  // Each create*Asset tool builds a fresh Asset and (optionally) links it to
+  // one or more serving targets in a single atomic mutate. Pass `targets: []`
+  // (or omit) to create the asset only; pass targets to also link it.
+  //
+  // For LINK-ONLY operations on existing assets, use `linkAsset`.
+  // To list where an asset is currently linked, use `getAssetLinks`.
+  // To remove links, use `unlinkAssetLinks` with the link resource_name(s).
+  //
+  // Note: assets in Google Ads are immutable and cannot be deleted. To make
+  // an asset stop serving, remove every link that references it.
 
-  server.registerTool("addCalloutAsset", {
-    description: "Create a callout extension and link it to account, campaign, or ad group targets in one workflow. Use this for user requests like 'add these callouts to these campaigns'. Callout text must be ≤25 chars. Defaults to account-level when targets is omitted. Returns changeId, assetId, and link resource names.",
+  server.registerTool("createCalloutAsset", {
+    description: "Create a callout asset (≤25 char snippet shown under text ads, e.g. 'Free shipping'). Optionally link it to customer, campaign, or ad group targets in the same atomic mutate via `targets`. Returns changeId, assetId, and link resource names. To attach an existing callout to more targets later, call `linkAsset`.",
     inputSchema: {
       accountId: accountIdParam,
       text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
-      targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific extensions."),
+      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. Omit or pass [] to create the asset only; pass targets to link it in the same mutate (use { level: 'customer' } for account-wide serving)."),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
   }, safeHandler(async ({ accountId, text, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execAssetExtensionWrite(
+    const result = await execAssetLinkWrite(
       auth,
       targetId,
       campaignTargetIds(targets),
-      () => addCalloutAsset(targetAuth, { text, targets }),
-      acknowledgeExperimentImpact,
-    );
-    return typedResult(result);
-  }));
-
-  server.registerTool("createCalloutAsset", {
-    description: "Low-level compatibility tool: create a callout extension (≤25 char snippet shown under text ads, e.g. 'Free shipping'). Prefer addCalloutAsset for new workflows because it supports account/campaign/ad group targets. Set linkToAccount=true to link it at the customer/account level. Returns changeId + assetId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
-      linkToAccount: z.boolean().default(true).describe("Also link the new asset at the customer/account level"),
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, text, linkToAccount }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, null, () => createCalloutAsset(targetAuth, { text, linkToAccount }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("linkCalloutAsset", {
-    description: "Link an existing callout asset to an account, campaign, or ad group target. Prefer addCalloutAsset when creating a new callout. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId and link resource names.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
-      target: assetExtensionTargetSchema,
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => linkCalloutAsset(targetAuth, { assetId, target }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("linkCalloutToAccount", {
-    description: "Compatibility tool: link an existing callout asset to the customer/account level so it can serve across all campaigns. Prefer linkCalloutAsset for campaign/ad group targeting. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, null, () => linkCalloutToAccount(targetAuth, assetId));
-    return typedResult(result);
-  }));
-
-  server.registerTool("unlinkCalloutAsset", {
-    description: "Remove a callout asset link from an account, campaign, or ad group target. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
-      target: assetExtensionTargetSchema,
-    },
-    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkCalloutAsset(targetAuth, { assetId, target }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("removeCalloutFromAccount", {
-    description: "Compatibility tool: remove a callout's account-level link. The underlying asset is preserved (assets are shared/immutable). Prefer unlinkCalloutAsset for campaign/ad group links. Returns changeId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Callout asset ID (query asset WHERE asset.type = CALLOUT via runScript)"),
-    },
-    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, null, () => removeCalloutFromAccount(targetAuth, assetId));
-    return typedResult(result);
-  }));
-
-  // ─── Structured Snippet Extensions ───────────────────────────────
-
-  server.registerTool("addStructuredSnippetAsset", {
-    description: `Create a structured snippet asset and link it to account, campaign, or ad group targets in one workflow. Use this for requests like "add Services snippets to these 4 campaigns". Values must be 3-10 items, each ≤25 chars. Valid headers: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. Alias accepted: Service catalog -> Services. Defaults to account-level when targets is omitted. Returns changeId, assetId, and link resource names.`,
-    inputSchema: {
-      accountId: accountIdParam,
-      header: z.string().describe(`Structured snippet header. Must be one of: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. "Service catalog" is accepted and normalized to "Services".`),
-      values: z.array(z.string().min(1).max(25)).min(3).max(10).describe("Snippet values, 3-10 items, each ≤25 chars"),
-      targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific snippets."),
-      ...experimentImpactAcknowledgementSchema,
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, header, values, targets, acknowledgeExperimentImpact }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execAssetExtensionWrite(
-      auth,
-      targetId,
-      campaignTargetIds(targets),
-      () => addStructuredSnippetAsset(targetAuth, { header, values, targets }),
+      () => createCalloutAsset(targetAuth, { text, targets: targets as AssetLinkTarget[] | undefined }),
       acknowledgeExperimentImpact,
     );
     return typedResult(result);
   }));
 
   server.registerTool("createStructuredSnippetAsset", {
-    description: `Low-level tool: create a structured snippet asset. Prefer addStructuredSnippetAsset for new workflows because it supports account/campaign/ad group targets. Values must be 3-10 items, each ≤25 chars. Valid headers: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. Alias accepted: Service catalog -> Services. Set linkToAccount=true to link it at account level. Returns changeId + assetId.`,
+    description: `Create a structured snippet asset (header + 3-10 values, each ≤25 chars). Optionally link it to customer/campaign/ad-group targets via \`targets\`. Valid headers: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. Alias accepted: "Service catalog" → "Services". Returns changeId, assetId, and link resource names. To attach an existing snippet to more targets later, call \`linkAsset\`.`,
     inputSchema: {
       accountId: accountIdParam,
       header: z.string().describe(`Structured snippet header. Must be one of: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. "Service catalog" is accepted and normalized to "Services".`),
       values: z.array(z.string().min(1).max(25)).min(3).max(10).describe("Snippet values, 3-10 items, each ≤25 chars"),
-      linkToAccount: z.boolean().default(false).describe("Also link the new asset at the customer/account level"),
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, header, values, linkToAccount }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, null, () => createStructuredSnippetAsset(targetAuth, { header, values, linkToAccount }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("linkStructuredSnippetAsset", {
-    description: "Link an existing structured snippet asset to an account, campaign, or ad group target. Prefer addStructuredSnippetAsset when creating a new snippet. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId and link resource names.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Structured snippet asset ID (query asset WHERE asset.type = STRUCTURED_SNIPPET via runScript)"),
-      target: assetExtensionTargetSchema,
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => linkStructuredSnippetAsset(targetAuth, { assetId, target }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("unlinkStructuredSnippetAsset", {
-    description: "Remove a structured snippet asset link from an account, campaign, or ad group target. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Structured snippet asset ID (query asset WHERE asset.type = STRUCTURED_SNIPPET via runScript)"),
-      target: assetExtensionTargetSchema,
-    },
-    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, target.level === "campaign" ? target.campaignId : null, () => unlinkStructuredSnippetAsset(targetAuth, { assetId, target }));
-    return typedResult(result);
-  }));
-
-  // ─── Sitelink Extensions ─────────────────────────────────────────
-
-  server.registerTool("addSitelinkAsset", {
-    description: "Create a sitelink extension and link it to account, campaign, or ad group targets in one workflow. Use this for requests like 'add these sitelinks to these campaigns'. Sitelink text must be ≤25 chars; descriptions are optional but must be supplied as a pair and each ≤35 chars. Defaults to account-level when targets is omitted. Returns changeId, assetId, and link resource names.",
-    inputSchema: {
-      accountId: accountIdParam,
-      linkText: z.string().min(1).max(25).describe("Sitelink text (≤25 chars), e.g. 'Pricing'"),
-      finalUrl: z.string().url().describe("Destination URL for the sitelink"),
-      description1: z.string().max(35).optional().describe("Optional sitelink description line 1 (≤35 chars). If provided, description2 is also required."),
-      description2: z.string().max(35).optional().describe("Optional sitelink description line 2 (≤35 chars). If provided, description1 is also required."),
-      targets: z.array(assetExtensionTargetSchema).optional().describe("Where to link the asset. Omit for account-level; use campaign targets for campaign-specific sitelinks."),
+      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. Omit or pass [] to create the asset only."),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, targets, acknowledgeExperimentImpact }) => {
+  }, safeHandler(async ({ accountId, header, values, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execAssetExtensionWrite(
+    const result = await execAssetLinkWrite(
       auth,
       targetId,
       campaignTargetIds(targets),
-      () => addSitelinkAsset(targetAuth, { linkText, finalUrl, description1, description2, targets }),
+      () => createStructuredSnippetAsset(targetAuth, { header, values, targets: targets as AssetLinkTarget[] | undefined }),
       acknowledgeExperimentImpact,
     );
     return typedResult(result);
   }));
 
   server.registerTool("createSitelinkAsset", {
-    description: "Low-level compatibility tool: create a sitelink extension. Prefer addSitelinkAsset for new workflows because it supports account/campaign/ad group targets. Set linkToAccount=true to link it at the customer/account level. Returns changeId + assetId.",
+    description: "Create a sitelink asset (link text + destination URL + optional description pair). Optionally link it to customer/campaign/ad-group targets via `targets`. Sitelink text ≤25 chars; descriptions ≤35 chars each and must be provided as a pair. Returns changeId, assetId, and link resource names. To attach an existing sitelink to more targets later, call `linkAsset`.",
     inputSchema: {
       accountId: accountIdParam,
       linkText: z.string().min(1).max(25).describe("Sitelink text (≤25 chars), e.g. 'Pricing'"),
       finalUrl: z.string().url().describe("Destination URL for the sitelink"),
       description1: z.string().max(35).optional().describe("Optional sitelink description line 1 (≤35 chars). If provided, description2 is also required."),
       description2: z.string().max(35).optional().describe("Optional sitelink description line 2 (≤35 chars). If provided, description1 is also required."),
-      linkToAccount: z.boolean().default(false).describe("Also link the new asset at the customer/account level"),
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, linkToAccount }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, null, () => createSitelinkAsset(targetAuth, { linkText, finalUrl, description1, description2, linkToAccount }));
-    return typedResult(result);
-  }));
-
-  server.registerTool("linkSitelinkAsset", {
-    description: "Link an existing sitelink asset to an account, campaign, or ad group target. Prefer addSitelinkAsset when creating a new sitelink. Google automatically-created assets are not advertiser-linkable; this tool pre-checks asset.source and rejects them before the mutate. Returns changeId and link resource names.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
-      target: assetExtensionTargetSchema,
+      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. Omit or pass [] to create the asset only."),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target, acknowledgeExperimentImpact }) => {
+  }, safeHandler(async ({ accountId, linkText, finalUrl, description1, description2, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(
+    const result = await execAssetLinkWrite(
       auth,
       targetId,
-      target.level === "campaign" ? target.campaignId : null,
-      () => linkSitelinkAsset(targetAuth, { assetId, target }),
-      undefined,
-      { acknowledgeExperimentImpact },
+      campaignTargetIds(targets),
+      () => createSitelinkAsset(targetAuth, { linkText, finalUrl, description1, description2, targets: targets as AssetLinkTarget[] | undefined }),
+      acknowledgeExperimentImpact,
     );
     return typedResult(result);
   }));
-
-  server.registerTool("unlinkSitelinkAsset", {
-    description: "Remove a sitelink asset link from an account, campaign, or ad group target. The underlying asset is preserved (assets are shared/immutable). Returns changeId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Sitelink asset ID (query asset WHERE asset.type = SITELINK via runScript)"),
-      target: assetExtensionTargetSchema,
-      ...experimentImpactAcknowledgementSchema,
-    },
-    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, target, acknowledgeExperimentImpact }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(
-      auth,
-      targetId,
-      target.level === "campaign" ? target.campaignId : null,
-      () => unlinkSitelinkAsset(targetAuth, { assetId, target }),
-      undefined,
-      { acknowledgeExperimentImpact },
-    );
-    return typedResult(result);
-  }));
-
-  // ─── Image Assets ────────────────────────────────────────────────
 
   server.registerTool("createImageAsset", {
-    description: "Upload a PNG/JPEG image asset from an HTTPS URL. Use MARKETING_IMAGE for exact 1.91:1 images (min 600x314, e.g. 1200x628) or SQUARE_MARKETING_IMAGE for exact 1:1 images (min 300x300). The asset is created but not served until linked with linkImageAsset. Returns changeId + assetId.",
+    description: "Upload a PNG/JPEG image asset from an HTTPS URL. Use MARKETING_IMAGE for exact 1.91:1 (min 600x314, e.g. 1200x628) or SQUARE_MARKETING_IMAGE for exact 1:1 (min 300x300). Optionally link it to customer/campaign/ad-group/asset_group targets via `targets`. Returns changeId, assetId, and link resource names. To attach an existing image to more targets later, call `linkAsset`.",
     inputSchema: {
       accountId: accountIdParam,
       imageUrl: z.string().url().describe("Public HTTPS URL for the PNG/JPEG image to upload. Max 5 MB."),
       name: z.string().min(1).max(255).describe("Asset name shown in Google Ads, e.g. 'Spring promo landscape'"),
-      fieldType: z.enum(["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE"]).describe("Intended serving slot; used to pre-validate image dimensions before upload."),
-    },
-    annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, imageUrl, name, fieldType }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, null, async () => {
-      const image = await fetchImageAssetFromUrl(imageUrl);
-      return createImageAsset(targetAuth, {
-        imageBytes: image.imageBytes,
-        mimeType: image.mimeType,
-        fieldType: fieldType as ImageAssetFieldType,
-        name,
-      });
-    });
-    return typedResult(result);
-  }));
-
-  server.registerTool("linkImageAsset", {
-    description: "Link an existing image asset so it can serve at the customer, campaign, ad group, or Performance Max asset group level. Create the asset first with createImageAsset, then link it with MARKETING_IMAGE or SQUARE_MARKETING_IMAGE. Returns changeId.",
-    inputSchema: {
-      accountId: accountIdParam,
-      assetId: z.string().describe("Image asset ID (returned by createImageAsset, or query asset WHERE asset.type = IMAGE via runScript)"),
-      fieldType: z.enum(["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE"]).describe("Serving slot for the image link."),
-      level: z.enum(["customer", "campaign", "ad_group", "asset_group"]).describe("Where to attach the image asset."),
-      campaignId: z.string().optional().describe("Required when level=campaign. Optional for logging when linking to an ad group or asset group."),
-      adGroupId: z.string().optional().describe("Required when level=ad_group."),
-      assetGroupId: z.string().optional().describe("Required when level=asset_group (Performance Max)."),
+      fieldType: z.enum(["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE"]).describe("Serving slot; used to pre-validate dimensions and as the link field_type."),
+      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets (image assets support all 4 levels including asset_group for Performance Max). Omit or pass [] to create the asset only."),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, assetId, fieldType, level, campaignId, adGroupId, assetGroupId }) => {
+  }, safeHandler(async ({ accountId, imageUrl, name, fieldType, targets, acknowledgeExperimentImpact }) => {
     const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execWrite(auth, targetId, campaignId ?? null, () => linkImageAsset(targetAuth, {
-      assetId,
-      fieldType: fieldType as ImageAssetFieldType,
-      level: level as LinkImageAssetLevel,
-      campaignId,
-      adGroupId,
-      assetGroupId,
-    }));
+    const result = await execAssetLinkWrite(
+      auth,
+      targetId,
+      campaignTargetIds(targets),
+      async () => {
+        const image = await fetchImageAssetFromUrl(imageUrl);
+        return createImageAsset(targetAuth, {
+          imageBytes: image.imageBytes,
+          mimeType: image.mimeType,
+          fieldType: fieldType as ImageAssetFieldType,
+          name,
+          targets: targets as AssetLinkTarget[] | undefined,
+        }) as Promise<AssetLinkMutationResult>;
+      },
+      acknowledgeExperimentImpact,
+    );
     return typedResult(result);
+  }));
+
+  // ─── Generic asset link operations ──────────────────────────────────
+  //
+  // Three primitives that work for every asset family (callout / sitelink /
+  // structured snippet / image — and any future family added to the
+  // FIELD_TYPES registry).
+
+  server.registerTool("linkAsset", {
+    description: `Link an existing asset to one or more serving targets in a single atomic mutate. Bulk-by-default: pass a single-element targets array for one target, or many for fan-out. Field types: ${FIELD_TYPE_NAMES.join(", ")}. Image field types (MARKETING_IMAGE, SQUARE_MARKETING_IMAGE) support all 4 levels including asset_group; callout/sitelink/structured-snippet support customer/campaign/ad_group only. Auto-generated assets (asset.source = AUTOMATICALLY_CREATED) are rejected before the mutate. To remove links, use unlinkAssetLinks with the link resource_names returned here. Returns changeId and link resource names.`,
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Asset ID (query `asset` via runScript, or pass the assetId returned from a create*Asset call)"),
+      fieldType: z.enum(FIELD_TYPE_NAMES as [string, ...string[]]).describe("Asset field type — what kind of asset this is and which serving slot it goes in."),
+      targets: z.array(assetLinkTargetSchema).min(1).describe("One or more serving targets. Use { level: 'customer' } for account-wide serving."),
+      ...experimentImpactAcknowledgementSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId, fieldType, targets, acknowledgeExperimentImpact }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execAssetLinkWrite(
+      auth,
+      targetId,
+      campaignTargetIds(targets),
+      () => linkAsset(targetAuth, {
+        assetId,
+        fieldType: fieldType as FieldTypeName,
+        targets: targets as AssetLinkTarget[],
+      }),
+      acknowledgeExperimentImpact,
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("unlinkAssetLinks", {
+    description: "Remove one or more asset links by their canonical link resource_names (returned by `getAssetLinks`, `linkAsset`, or any create*Asset call). Bulk-by-default: pass a single-element array for one link, or many for atomic bulk removal. The underlying asset is NOT deleted — Google Ads assets are immutable. To 'delete' an asset, remove every link that references it; the asset row remains in the account but stops serving. Returns changeId(s).",
+    inputSchema: {
+      accountId: accountIdParam,
+      linkResourceNames: z.array(z.string()).min(1).describe("Canonical link resource_names. Each must be a path containing /customerAssets/, /campaignAssets/, /adGroupAssets/, or /assetGroupAssets/. Get these from `getAssetLinks(assetId)` or from a previous link operation."),
+      ...experimentImpactAcknowledgementSchema,
+    },
+    annotations: DESTRUCTIVE_WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, linkResourceNames }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execWrite(auth, targetId, null, () => unlinkAssetLinks(targetAuth, linkResourceNames));
+    return typedResult(result);
+  }));
+
+  server.registerTool("getAssetLinks", {
+    description: "List every link for an asset across all 4 levels (customer / campaign / ad_group / asset_group). Use this before `unlinkAssetLinks` to discover which link resource_names to pass. Pure read — does not mutate. Returns an array of { level, linkResourceName, fieldType, target }.",
+    inputSchema: {
+      accountId: accountIdParam,
+      assetId: z.string().describe("Asset ID (query `asset` via runScript, or pass an assetId you already have)"),
+    },
+    annotations: READ_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, assetId }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const links = await execRead(auth, targetId, "getAssetLinks", () => getAssetLinks(targetAuth, assetId));
+    return typedResult({ assetId, links });
   }));
 
   // ─── Portfolio Bidding Strategies (RMF C.96/97, M.96/97) ─────────
@@ -2903,6 +2789,53 @@ export async function executeUndoForChange(
         afterValue: beforeValue,
         error: `Experiment writes aren't reversible via undoChange. To discard a scheduled experiment without promoting/graduating, call endExperiment with the experimentResourceName.`,
       };
+    case "link_asset": {
+      // Undo a link by removing the link resource(s). The afterValue is the
+      // canonical link resource_name (single link) — for multi-target link
+      // operations, change records are split per-campaign by execAssetLinkWrite
+      // so each record carries its own link resource_name.
+      const afterVal = change.afterValue ?? "";
+      if (!afterVal || !/\/(?:customer|campaign|adGroup|assetGroup)Assets\//.test(afterVal)) {
+        return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: link resource_name was not recorded on this change. Call unlinkAssetLinks directly." };
+      }
+      return unlinkAssetLinks(auth, [afterVal]);
+    }
+    case "unlink_asset":
+      // Unlink can't be safely auto-redone — we'd need to re-create the same
+      // link with the same field_type at the same target, but the link
+      // resource_name is gone after removal. Surface a clear pointer instead.
+      return {
+        success: false,
+        action: change.toolName,
+        entityId,
+        beforeValue,
+        afterValue: beforeValue,
+        error: "Cannot auto-undo asset link removal — re-link the asset with `linkAsset` if you want to restore serving.",
+      };
+    case "create_callout_asset":
+    case "create_sitelink_asset":
+    case "create_structured_snippet_asset":
+    case "create_image_asset":
+      // Create+link operations are reversible by removing every link they
+      // produced. The asset itself remains (Google Ads has no asset deletion
+      // in the public API), but it stops serving when its links are gone. The
+      // afterValue carries the primary link resource_name when targets were
+      // provided; for asset-only creates it's text/dimensions metadata, which
+      // we can't undo.
+      {
+        const afterVal = change.afterValue ?? "";
+        if (afterVal && /\/(?:customer|campaign|adGroup|assetGroup)Assets\//.test(afterVal)) {
+          return unlinkAssetLinks(auth, [afterVal]);
+        }
+        return {
+          success: false,
+          action: change.toolName,
+          entityId,
+          beforeValue,
+          afterValue: beforeValue,
+          error: `Cannot undo: ${change.toolName} created an asset with no link to remove (Google Ads has no asset deletion). The asset row remains permanently in the account; this is harmless because it can't serve without a link.`,
+        };
+      }
     default:
       return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: `Don't know how to undo "${change.toolName}"` };
   }

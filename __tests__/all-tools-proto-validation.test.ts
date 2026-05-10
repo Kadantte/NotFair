@@ -79,13 +79,13 @@ import {
   bulkPauseKeywords,
   bulkAddKeywords,
   moveKeywords,
-  addCalloutAsset,
-  linkCalloutAsset,
-  addStructuredSnippetAsset,
-  unlinkStructuredSnippetAsset,
-  addSitelinkAsset,
-  linkSitelinkAsset,
-  unlinkSitelinkAsset,
+  createCalloutAsset,
+  createStructuredSnippetAsset,
+  createSitelinkAsset,
+  createImageAsset,
+  linkAsset,
+  unlinkAssetLinks,
+  getAssetLinks,
   type AuthContext,
 } from "@/lib/google-ads";
 
@@ -1639,10 +1639,10 @@ describe("protobuf validation: bulk operations", () => {
   });
 });
 
-describe("protobuf validation: asset extensions", () => {
+describe("protobuf validation: asset links (unified primitive)", () => {
   beforeEach(resetMocks);
 
-  it("addCalloutAsset creates an asset and campaign_asset link", async () => {
+  it("createCalloutAsset with campaign target produces asset + campaign_asset ops", async () => {
     mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve(
@@ -1655,23 +1655,14 @@ describe("protobuf validation: asset extensions", () => {
       );
     });
 
-    await addCalloutAsset(AUTH, {
+    await createCalloutAsset(AUTH, {
       text: "Free shipping",
       targets: [{ level: "campaign", campaignId: "100" }],
     });
     assertAllCapturedOpsEncode();
   });
 
-  it("linkCalloutAsset creates an ad_group_asset link", async () => {
-    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
-    await linkCalloutAsset(AUTH, {
-      assetId: "999",
-      target: { level: "ad_group", adGroupId: "111" },
-    });
-    assertAllCapturedOpsEncode();
-  });
-
-  it("addStructuredSnippetAsset creates an asset and campaign_asset links", async () => {
+  it("createStructuredSnippetAsset fan-out across multiple campaigns", async () => {
     mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve(
@@ -1685,7 +1676,7 @@ describe("protobuf validation: asset extensions", () => {
       );
     });
 
-    await addStructuredSnippetAsset(AUTH, {
+    await createStructuredSnippetAsset(AUTH, {
       header: "Services",
       values: ["Plumbing", "Electrical", "HVAC"],
       targets: [
@@ -1696,23 +1687,7 @@ describe("protobuf validation: asset extensions", () => {
     assertAllCapturedOpsEncode();
   });
 
-  it("unlinkStructuredSnippetAsset removes link resources as strings", async () => {
-    mockQuery.mockResolvedValueOnce([
-      {
-        campaign_asset: {
-          resource_name: "customers/1234567890/campaignAssets/100~999~12",
-        },
-      },
-    ]);
-
-    await unlinkStructuredSnippetAsset(AUTH, {
-      assetId: "999",
-      target: { level: "campaign", campaignId: "100" },
-    });
-    assertAllCapturedOpsEncode();
-  });
-
-  it("addSitelinkAsset creates an asset and campaign_asset link", async () => {
+  it("createSitelinkAsset attaches sitelink_asset payload at campaign level", async () => {
     mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
       capturedOps.push(ops);
       return Promise.resolve(
@@ -1725,7 +1700,7 @@ describe("protobuf validation: asset extensions", () => {
       );
     });
 
-    await addSitelinkAsset(AUTH, {
+    await createSitelinkAsset(AUTH, {
       linkText: "Pricing",
       finalUrl: "https://example.com/pricing",
       description1: "See current plans",
@@ -1735,29 +1710,98 @@ describe("protobuf validation: asset extensions", () => {
     assertAllCapturedOpsEncode();
   });
 
-  it("linkSitelinkAsset creates an account-level customer_asset link", async () => {
+  it("linkAsset (callout, customer-level) — via auto-source precheck", async () => {
     mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
-    await linkSitelinkAsset(AUTH, {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          { customer_asset_result: { resource_name: "customers/1234567890/customerAssets/999~11" } },
+        ],
+      }));
+    });
+
+    await linkAsset(AUTH, {
       assetId: "999",
-      target: { level: "account" },
+      fieldType: "CALLOUT",
+      targets: [{ level: "customer" }],
     });
     assertAllCapturedOpsEncode();
   });
 
-  it("unlinkSitelinkAsset removes link resources as strings", async () => {
-    mockQuery.mockResolvedValueOnce([
-      {
-        ad_group_asset: {
-          resource_name: "customers/1234567890/adGroupAssets/111~999~13",
-        },
-      },
-    ]);
+  it("linkAsset (image, asset_group level for Performance Max)", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          { asset_group_asset_result: { resource_name: "customers/1234567890/assetGroupAssets/55~999~19" } },
+        ],
+      }));
+    });
 
-    await unlinkSitelinkAsset(AUTH, {
+    await linkAsset(AUTH, {
       assetId: "999",
-      target: { level: "ad_group", adGroupId: "111" },
+      fieldType: "SQUARE_MARKETING_IMAGE",
+      targets: [{ level: "asset_group", assetGroupId: "55" }],
     });
     assertAllCapturedOpsEncode();
+  });
+
+  it("linkAsset (image, fan-out to two campaigns)", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~5" } },
+          { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/200~999~5" } },
+        ],
+      }));
+    });
+
+    await linkAsset(AUTH, {
+      assetId: "999",
+      fieldType: "MARKETING_IMAGE",
+      targets: [
+        { level: "campaign", campaignId: "100" },
+        { level: "campaign", campaignId: "200" },
+      ],
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("unlinkAssetLinks removes one link as a string resource", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({}));
+    });
+
+    await unlinkAssetLinks(AUTH, ["customers/1234567890/campaignAssets/100~999~13"]);
+    assertAllCapturedOpsEncode();
+  });
+
+  it("unlinkAssetLinks bulk-removes across all 4 link entities", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({}));
+    });
+
+    await unlinkAssetLinks(AUTH, [
+      "customers/1234567890/customerAssets/999~11",
+      "customers/1234567890/campaignAssets/100~999~12",
+      "customers/1234567890/adGroupAssets/111~999~13",
+      "customers/1234567890/assetGroupAssets/55~999~19",
+    ]);
+    assertAllCapturedOpsEncode();
+  });
+
+  it("getAssetLinks queries all 4 link entities (no mutate)", async () => {
+    mockQuery.mockResolvedValue([]);
+    const result = await getAssetLinks(AUTH, "999");
+    expect(result).toEqual([]);
+    // 4 read queries (customer/campaign/ad_group/asset_group), zero mutates
+    expect(mockQuery).toHaveBeenCalledTimes(4);
   });
 });
 
