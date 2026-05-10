@@ -251,6 +251,19 @@ export async function findDraftForEmail(email: string): Promise<GmailDraftLookup
  * never touch our contacts table). Caps at 500 drafts which is well above
  * anything we'd realistically have queued.
  */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const chunk = items.slice(i, i + limit);
+    results.push(...(await Promise.all(chunk.map(fn))));
+  }
+  return results;
+}
+
 export async function listDraftRecipientEmails(): Promise<Set<string>> {
   const gmail = getClient();
   const out = new Set<string>();
@@ -265,18 +278,23 @@ export async function listDraftRecipientEmails(): Promise<Set<string>> {
       });
     const drafts: gmail_v1.Schema$Draft[] = listResp.data.drafts ?? [];
     if (drafts.length === 0) break;
-    const headers = await Promise.all(
-      drafts
-        .filter((d) => !!d.id)
-        .map((d) =>
-          gmail.users.drafts.get({
+    const headers = await mapWithConcurrency(
+      drafts.filter((d) => !!d.id),
+      8,
+      async (d) => {
+        try {
+          return await gmail.users.drafts.get({
             userId: USER_ID,
             id: d.id as string,
             format: "metadata",
-          }),
-        ),
+          });
+        } catch {
+          return null;
+        }
+      },
     );
     for (const r of headers) {
+      if (!r) continue;
       const to = header(r.data.message?.payload?.headers ?? undefined, "To");
       if (!to) continue;
       // "Name <email>" or bare "email" — extract the email portion

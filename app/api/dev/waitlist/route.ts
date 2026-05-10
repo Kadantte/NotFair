@@ -1,32 +1,15 @@
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { requireDevEmail } from "@/lib/dev-access";
+import { getWaitlistData } from "@/app/(app)/dev/waitlist/data";
 
 export async function GET() {
   const denied = await requireDevEmail();
   if (denied) return denied;
 
-  const rows = await db()
-    .select({
-      id: schema.waitlistSignups.id,
-      key: schema.waitlistSignups.key,
-      userId: schema.waitlistSignups.userId,
-      email: schema.waitlistSignups.email,
-      metadata: schema.waitlistSignups.metadata,
-      createdAt: schema.waitlistSignups.createdAt,
-      approvedAt: schema.waitlistSignups.approvedAt,
-    })
-    .from(schema.waitlistSignups)
-    .orderBy(desc(schema.waitlistSignups.createdAt));
-
-  return Response.json({
-    rows: rows.map((r) => ({
-      ...r,
-      createdAt: r.createdAt.toISOString(),
-      approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
-    })),
-  });
+  const payload = await getWaitlistData();
+  return Response.json(payload);
 }
 
 /**

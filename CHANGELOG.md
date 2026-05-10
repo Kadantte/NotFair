@@ -2,6 +2,22 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.1.0] - 2026-05-10
+
+### Changed
+- **/dev dashboards load dramatically faster.** The 2,232-line monolithic `dev-shell.tsx` that every `/dev/*` route used to ship is gone. Each tab (customers, usage, waitlist, outreach, developer) now has its own colocated client view, so visiting `/dev/customers` no longer downloads recharts, the waitlist UI, the developer reset code, or any other tab's logic. recharts is dynamically imported even within `/dev/usage`. Pages are now async server components that prefetch initial data via colocated `data.ts` modules, eliminating the JS-bundle-then-fetch waterfall — the first paint already has content. The 724-line `[accountId]/page.tsx` got the same treatment: split into `account-detail-view`, `activity-panel`, `audit-card`, `impression-share-card`, plus a server-only `data.ts` that wraps the detail fetch in `unstable_cache` (120s TTL, tag-keyed per accountId).
+- **`optimizePackageImports` enabled** for `lucide-react`, `recharts`, and `date-fns`, stripping unused exports per route.
+
+### Fixed
+- **Activity refresh on the account detail page no longer ignores the user's filters.** Previously the parent's stale "30 days / All platforms" defaults silently overrode whatever the user had selected inside the activity panel. The imperative `refresh()` handle now reads the panel's own state.
+- **Three unbounded queries in `/api/dev/customers` capped at 2,000 rows** (`legacyCustomers`, `googleConnections`, `contactsByEmail`) — previously returned all rows for all users.
+- **`topTools` query in `/api/dev/usage`** rewritten from N nested `percentile_disc` correlated subqueries (one pair per tool) to a single CTE with `percentile_disc WITHIN GROUP` aggregate.
+- **`/api/dev/[accountId]` now caches** detail fetches via `unstable_cache` so repeated dashboard navigation hits don't re-query.
+- **Gmail draft enumeration in `/api/dev/customers/drafts` now throttles** at 8 concurrent requests instead of firing up to 100 simultaneously, reducing the chance of hitting Gmail rate limits under heavy use.
+
+### Added
+- **`requireDevEmailForPage()` helper in `lib/dev-access.ts`** — server-component-friendly auth gate that calls `notFound()` for unauthorized users, so `/dev` no longer leaks its existence with 200s. The existing `requireDevEmail()` API helper now shares a unified `checkDevAccess()` core.
+
 ## [0.5.0.2] - 2026-05-09
 
 ### Changed

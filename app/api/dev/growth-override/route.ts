@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireDevEmail } from "@/lib/dev-access";
+import { getGrowthOverrideData } from "@/app/(app)/dev/developer/data";
 
 /**
  * Toggle the per-session "growth override" for dev users.
@@ -18,10 +19,8 @@ export async function GET() {
   const gate = await requireDevEmail();
   if (gate) return gate;
 
-  const store = await cookies();
-  const value = store.get(COOKIE_NAME)?.value;
-  const state: State = value === "off" ? "off" : "on";
-  return NextResponse.json({ state });
+  const data = await getGrowthOverrideData();
+  return NextResponse.json(data);
 }
 
 export async function POST(request: Request) {
