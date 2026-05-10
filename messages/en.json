@@ -1649,7 +1649,7 @@
   "GoHighLevelConnect": {
     "badge": "CRM connector preview",
     "title": "Connect GoHighLevel",
-    "body": "Link agency or sub-account access so NotFair can read CRM context: contacts, conversations, opportunities, and calendar events.",
+    "body": "Link agency or sub-account access so NotFair can read CRM, calendar, intake, workflow, and revenue context from HighLevel.",
     "access": {
       "title": "Access requested",
       "body": "Read-only for the MVP. No contact edits, messages, or workflow changes."

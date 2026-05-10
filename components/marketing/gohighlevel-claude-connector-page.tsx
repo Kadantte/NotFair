@@ -16,7 +16,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is the GoHighLevel Claude Connector?",
     answer:
-      "It's a custom MCP (Model Context Protocol) connector you add inside Claude Desktop, Claude.ai Web, or Claude Cowork. Once installed, Claude can read your HighLevel CRM in real time — contacts, conversations, opportunities, calendar bookings, locations — then summarize, diagnose, and answer questions over your live pipeline.",
+      "It's a custom MCP (Model Context Protocol) connector you add inside Claude Desktop, Claude.ai Web, or Claude Cowork. Once installed, Claude can read your HighLevel CRM in real time — contacts, conversations, opportunities, calendars, users, custom fields, forms, workflows, invoices, payments, products, and locations — then summarize, diagnose, and answer questions over your live pipeline.",
   },
   {
     question: "Does the connector work with agency accounts and sub-accounts?",
@@ -31,7 +31,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Do I need a HighLevel agency account?",
     answer:
-      "No. Either an agency account or a sub-account works. The connector authenticates via the standard HighLevel Marketplace OAuth flow with read-only scopes: locations, contacts, conversations, opportunities, calendars, and calendar events.",
+      "No. Either an agency account or a sub-account works. The connector authenticates via the standard HighLevel Marketplace OAuth flow with read-only scopes for CRM records, calendars, users, custom fields, intake forms, surveys, workflows, invoices, payments, products, and related metadata.",
   },
   {
     question: "Do I need to write any code?",
@@ -51,7 +51,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Can Claude actually change my HighLevel data through the connector?",
     answer:
-      "No — the current release is read-only by design. Claude can read contacts, conversations, opportunities, calendars, and calendar events to answer questions and surface insights, but it cannot create, edit, or delete CRM records. Mutation tools are on the roadmap and will be gated by explicit human approval when they ship.",
+      "No — the current release is read-only by design. Claude can read CRM, calendar, intake, workflow, and revenue context to answer questions and surface insights, but it cannot create, edit, or delete records. Mutation tools are on the roadmap and will be gated by explicit human approval when they ship.",
   },
   {
     question: "Can I revoke access later?",
@@ -61,7 +61,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What data does Claude see when the connector is enabled?",
     answer:
-      "Live HighLevel data scoped to the locations you connect: locations, contacts (name/email/phone/custom fields), conversations and message history, opportunities by pipeline, calendars and calendar events. Tokens are encrypted at rest and refreshed server-side.",
+      "Live HighLevel data scoped to the locations you connect: locations, contacts, conversations and message history, opportunities by pipeline, calendars and events, users, custom fields, tags, tasks, forms, surveys, workflow metadata, invoices, payments, products, and other read-only CRM metadata. Tokens are encrypted at rest and refreshed server-side.",
   },
 ];
 
@@ -112,8 +112,10 @@ export function GoHighLevelClaudeConnectorPage() {
               Add NotFair as a custom MCP connector inside Claude Desktop,
               Claude.ai Web, or Claude Cowork in under 2 minutes. Once
               installed, Claude reads your HighLevel CRM — contacts,
-              conversations, opportunities, and calendar bookings — in real
-              time and helps you make sense of your pipeline through chat.
+              conversations, opportunities, calendar bookings, users,
+              custom fields, forms, workflows, invoices, payments, and
+              products — in real time and helps you make sense of your
+              pipeline through chat.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3">
               <a

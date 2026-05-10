@@ -2,6 +2,19 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.2.1] - 2026-05-10
+
+### Added
+- **GoHighLevel MCP now requests the broader read-only Marketplace scope set** needed for useful CRM context: users, pipelines, calendars, custom fields/values, tags, businesses, forms, surveys, workflows, campaigns, trigger links, media, invoices, transactions, products, custom objects, associations, emails, and document-contract metadata.
+- **Expanded GoHighLevel MCP read tools** for CRM metadata, intake assets, workflow context, and revenue context, with targeted tests for endpoint-specific pagination and HighLevel `altId`/`altType` scoping.
+
+### Changed
+- **GoHighLevel OAuth and PAT auth now force reauthorization when stored connections are missing the current read-only scope set.** Existing Claude OAuth tokens and PATs fail closed until the user reconnects.
+- **GoHighLevel MCP tool registration is centralized through a read-only helper**, so annotations, auth lookup, and error wrapping stay consistent as new tools are added.
+
+### Security
+- **Hardened GoHighLevel API path handling and generic request boundaries.** Requests are root-relative only, reject traversal/decoded backslashes, constrain the generic read escape hatch to explicit path families, and prevent Location-scoped connections from reading another location through path or query overrides.
+
 ## [0.5.2.0] - 2026-05-10
 
 ### Changed

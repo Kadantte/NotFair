@@ -10,6 +10,7 @@
 import { getValidAccessToken, GHL_API_VERSION } from "./oauth";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
+const BASE_ORIGIN = new URL(BASE_URL).origin;
 
 export type GhlRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -31,7 +32,25 @@ export class GhlApiError extends Error {
 }
 
 function buildUrl(path: string, query?: GhlRequestOptions["query"]): string {
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) {
+    throw new Error("HighLevel API path must be root-relative.");
+  }
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(path);
+  } catch {
+    throw new Error("HighLevel API path is malformed.");
+  }
+  if (decodedPath.includes("\\")) {
+    throw new Error("HighLevel API path must be root-relative.");
+  }
+  if (decodedPath.split("/").some((segment) => segment === "." || segment === "..")) {
+    throw new Error("HighLevel API path cannot contain dot segments.");
+  }
   const url = new URL(path.startsWith("/") ? path : `/${path}`, BASE_URL);
+  if (url.origin !== BASE_ORIGIN) {
+    throw new Error("HighLevel API path must stay on the HighLevel API origin.");
+  }
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v === undefined || v === null) continue;

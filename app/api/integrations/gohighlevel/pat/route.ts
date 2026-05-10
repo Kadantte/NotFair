@@ -16,6 +16,7 @@ import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { issuePat } from "@/lib/gohighlevel/pat";
 import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
+import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
 
 export async function POST(request: Request) {
   // Dev-only feature — 404 for non-devs.
@@ -39,7 +40,14 @@ export async function POST(request: Request) {
   //   - the explicit connectionId, scoped to the current user; or
   //   - the user's most recent connection.
   let connection:
-    | { id: number; userId: string; companyId: string | null; locationId: string | null; userType: string }
+    | {
+        id: number;
+        userId: string;
+        companyId: string | null;
+        locationId: string | null;
+        userType: string;
+        scopes: string[];
+      }
     | undefined;
 
   if (body.connectionId != null) {
@@ -54,6 +62,7 @@ export async function POST(request: Request) {
         companyId: schema.goHighLevelConnections.companyId,
         locationId: schema.goHighLevelConnections.locationId,
         userType: schema.goHighLevelConnections.userType,
+        scopes: schema.goHighLevelConnections.scopes,
       })
       .from(schema.goHighLevelConnections)
       .where(
@@ -72,6 +81,7 @@ export async function POST(request: Request) {
         companyId: schema.goHighLevelConnections.companyId,
         locationId: schema.goHighLevelConnections.locationId,
         userType: schema.goHighLevelConnections.userType,
+        scopes: schema.goHighLevelConnections.scopes,
       })
       .from(schema.goHighLevelConnections)
       .where(eq(schema.goHighLevelConnections.userId, identity.userId))
@@ -82,6 +92,15 @@ export async function POST(request: Request) {
 
   if (!connection) {
     return NextResponse.json({ error: "no_connection" }, { status: 404 });
+  }
+  if (!hasAllGoHighLevelReadonlyScopes(connection.scopes)) {
+    return NextResponse.json(
+      {
+        error: "reauthorization_required",
+        message: "Reconnect GoHighLevel before minting a PAT for the expanded read-only MCP tools.",
+      },
+      { status: 409 },
+    );
   }
 
   const { token, tokenHash } = issuePat(connection.id);

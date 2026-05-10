@@ -8,6 +8,7 @@ import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { checkGhlDevAccess } from "@/lib/gohighlevel/dev-gate";
+import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -222,7 +223,10 @@ export async function GET(request: Request) {
       // Excludes uninstalled rows so we don't mint a token against a
       // tombstoned connection.
       const [conn] = await db()
-        .select({ id: schema.goHighLevelConnections.id })
+        .select({
+          id: schema.goHighLevelConnections.id,
+          scopes: schema.goHighLevelConnections.scopes,
+        })
         .from(schema.goHighLevelConnections)
         .where(
           and(
@@ -236,6 +240,17 @@ export async function GET(request: Request) {
       if (!conn) {
         // No GHL connection yet — bounce through the GHL OAuth start route.
         // It returns the user here after upstream HighLevel consent.
+        const ghlStartUrl = new URL("/api/oauth/gohighlevel/start", requestUrl);
+        ghlStartUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
+        );
+        return NextResponse.redirect(ghlStartUrl.toString());
+      }
+      if (!hasAllGoHighLevelReadonlyScopes(conn.scopes)) {
+        // Existing connections may have been granted the older, smaller scope
+        // set. Re-run HighLevel consent before minting a Claude token whose
+        // tool surface assumes the expanded read-only scopes.
         const ghlStartUrl = new URL("/api/oauth/gohighlevel/start", requestUrl);
         ghlStartUrl.searchParams.set(
           "next",

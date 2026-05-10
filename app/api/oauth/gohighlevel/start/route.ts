@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
 import { getGoHighLevelClientId, getGoHighLevelInstallUrl, getGoHighLevelRedirectUri } from "@/lib/gohighlevel/oauth";
+import { GOHIGHLEVEL_READONLY_SCOPES } from "@/lib/gohighlevel/scopes";
 import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
 import { identifyUser } from "@/lib/auth/identify-user";
 
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
   const installUrl = new URL(getGoHighLevelInstallUrl());
   installUrl.searchParams.set("client_id", getGoHighLevelClientId());
   installUrl.searchParams.set("redirect_uri", getGoHighLevelRedirectUri(getAppOrigin()));
+  installUrl.searchParams.set("scope", GOHIGHLEVEL_READONLY_SCOPES.join(" "));
   // HighLevel's Marketplace install link is generated in their UI. If it
   // preserves unknown query params, this gives us normal OAuth CSRF `state`.
   // If it drops them, the callback still verifies the httpOnly cookie below.

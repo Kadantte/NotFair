@@ -40,9 +40,29 @@ const TOOLS: { name: string; description: string }[] = [
       "Date-bounded calendar events for a location. Pass startDate / endDate (ISO 8601) and optionally a calendarId.",
   },
   {
+    name: "listUsers / listPipelines / listCalendars",
+    description:
+      "Read team members, opportunity pipeline stages, and calendar configuration so Claude can explain ownership, routing, and booking context.",
+  },
+  {
+    name: "listCustomFields / listTags / listTasks / listCampaigns",
+    description:
+      "Read location metadata, task queues, campaign metadata, trigger links, and media files so Claude can interpret custom field ids, segmentation, follow-up load, and tagging conventions.",
+  },
+  {
+    name: "listForms / listSurveys / listWorkflows",
+    description:
+      "Read intake assets, submissions, and workflow metadata to understand lead sources and automation coverage.",
+  },
+  {
+    name: "listInvoices / listTransactions / listProducts",
+    description:
+      "Read commerce context attached to the CRM so Claude can connect pipeline state to orders, invoices, payments, and products.",
+  },
+  {
     name: "request",
     description:
-      "Generic read-only GET against the HighLevel API for endpoints not yet wrapped — pipelines, custom fields, users, etc. Pass path and query.",
+      "Generic read-only GET against the HighLevel API for endpoints not yet wrapped — custom objects, associations, prices, and other read endpoints.",
   },
 ];
 
@@ -67,7 +87,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What HighLevel data is exposed?",
     answer:
-      "Locations, contacts, conversations and message history, opportunities by pipeline, and calendar events — all read-only. Tokens are encrypted at rest and refreshed server-side via HighLevel's standard refresh flow.",
+      "Locations, contacts, conversations and message history, opportunities by pipeline, calendars and events, users, custom fields, tags, tasks, forms, surveys, workflows, invoices, payments, products, custom objects, and related read-only metadata. Tokens are encrypted at rest and refreshed server-side via HighLevel's standard refresh flow.",
   },
   {
     question: "Are there mutation tools?",
@@ -163,7 +183,7 @@ export function GoHighLevelMcpPage() {
               What Claude can do with HighLevel
             </h2>
             <p className="mt-3 text-base leading-relaxed text-[#C4C0B6]">
-              Six read-only tools, all scoped to the locations you connect.
+              Read-only tools, all scoped to the locations you connect.
               Mutation tools land in a future release behind explicit approval.
             </p>
           </motion.div>

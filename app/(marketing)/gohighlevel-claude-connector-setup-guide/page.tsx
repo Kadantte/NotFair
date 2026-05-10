@@ -6,7 +6,7 @@ import { checkGhlDevAccess } from "@/lib/gohighlevel/dev-gate";
 export const metadata = buildMetadata({
   title: "GoHighLevel Claude Connector — Use NotFair in Claude Desktop, Web & Cowork",
   description:
-    "Step-by-step guide to install the GoHighLevel Claude Connector. Add NotFair inside Claude Desktop, Claude.ai Web, or Claude Cowork in under 2 minutes — read your HighLevel CRM, conversations, opportunities, and calendar bookings through chat.",
+    "Step-by-step guide to install the GoHighLevel Claude Connector. Add NotFair inside Claude Desktop, Claude.ai Web, or Claude Cowork in under 2 minutes — read your HighLevel CRM, conversations, opportunities, calendars, forms, workflows, invoices, payments, and products through chat.",
   path: "/gohighlevel-claude-connector-setup-guide",
   // Belt-and-suspenders: dev-only surface. The page itself 404s for non-dev
   // viewers (including crawlers, since their session is unauthenticated), so
@@ -34,7 +34,7 @@ const faqItems = [
   {
     question: "What is the GoHighLevel Claude Connector?",
     answer:
-      "It's a custom MCP (Model Context Protocol) connector you add inside Claude Desktop, Claude.ai Web, or Claude Cowork. Once installed, Claude can read your HighLevel CRM in real time — contacts, conversations, opportunities, calendar bookings, locations — then summarize, diagnose, and answer questions over your live pipeline.",
+      "It's a custom MCP (Model Context Protocol) connector you add inside Claude Desktop, Claude.ai Web, or Claude Cowork. Once installed, Claude can read your HighLevel CRM in real time — contacts, conversations, opportunities, calendars, users, custom fields, forms, workflows, invoices, payments, products, and locations — then summarize, diagnose, and answer questions over your live pipeline.",
   },
   {
     question: "Does the connector work with agency accounts and sub-accounts?",
@@ -49,7 +49,7 @@ const faqItems = [
   {
     question: "Do I need a HighLevel agency account?",
     answer:
-      "No. Either an agency account or a sub-account works. The connector authenticates via the standard HighLevel Marketplace OAuth flow with read-only scopes: locations, contacts, conversations, opportunities, calendars, and calendar events.",
+      "No. Either an agency account or a sub-account works. The connector authenticates via the standard HighLevel Marketplace OAuth flow with read-only scopes for CRM records, calendars, users, custom fields, intake forms, surveys, workflows, invoices, payments, products, and related metadata.",
   },
   {
     question: "Do I need to write any code?",
@@ -69,7 +69,7 @@ const faqItems = [
   {
     question: "Can Claude actually change my HighLevel data through the connector?",
     answer:
-      "No — the current release is read-only by design. Claude can read contacts, conversations, opportunities, calendars, and calendar events to answer questions and surface insights, but it cannot create, edit, or delete CRM records.",
+      "No — the current release is read-only by design. Claude can read CRM, calendar, intake, workflow, and revenue context to answer questions and surface insights, but it cannot create, edit, or delete records.",
   },
   {
     question: "Can I revoke access later?",
@@ -79,7 +79,7 @@ const faqItems = [
   {
     question: "What data does Claude see when the connector is enabled?",
     answer:
-      "Live HighLevel data scoped to the locations you connect: locations, contacts (name/email/phone/custom fields), conversations and message history, opportunities by pipeline, calendars and calendar events. Tokens are encrypted at rest and refreshed server-side.",
+      "Live HighLevel data scoped to the locations you connect: locations, contacts, conversations and message history, opportunities by pipeline, calendars and events, users, custom fields, tags, tasks, forms, surveys, workflow metadata, invoices, payments, products, and other read-only CRM metadata. Tokens are encrypted at rest and refreshed server-side.",
   },
 ];
 
@@ -134,7 +134,7 @@ const jsonLd = [
     featureList: [
       "Custom MCP connector for Claude",
       "Works in Claude Desktop, Claude.ai Web, and Claude Cowork",
-      "Live HighLevel CRM access — contacts, conversations, opportunities, calendars",
+      "Live HighLevel CRM access — contacts, conversations, opportunities, calendars, workflows, and revenue context",
       "Agency and sub-account support",
       "Read-only by design; mutation tools on the roadmap",
       "Per-location access controls — pick which HighLevel sub-accounts Claude can see",
