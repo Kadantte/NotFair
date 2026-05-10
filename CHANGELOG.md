@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.2.2] - 2026-05-10
+
+### Fixed
+- **GoHighLevel OAuth requests the documented document-contract templates scope.** Replaces the singular `documents_contracts_template/list.readonly` scope with HighLevel's documented `documents_contracts_templates/list.readonly` scope so Marketplace installs do not fail before the NotFair callback.
+
 ## [0.5.2.1] - 2026-05-10
 
 ### Added

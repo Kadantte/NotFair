@@ -55,6 +55,8 @@ describe("GoHighLevel MCP tools", () => {
     expect([...tools.values()].every((tool) => tool.config.annotations?.readOnlyHint === true)).toBe(true);
     expect([...tools.values()].every((tool) => tool.config.annotations?.destructiveHint === false)).toBe(true);
     expect(GOHIGHLEVEL_READONLY_SCOPES.every((scope) => scope.endsWith(".readonly"))).toBe(true);
+    expect(GOHIGHLEVEL_READONLY_SCOPES).toContain("documents_contracts_templates/list.readonly");
+    expect(GOHIGHLEVEL_READONLY_SCOPES).not.toContain("documents_contracts_template/list.readonly");
   });
 
   it("uses HighLevel alt scoping for media, invoice, and transaction reads", async () => {
