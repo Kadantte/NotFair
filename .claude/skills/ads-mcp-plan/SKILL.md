@@ -62,6 +62,13 @@ For each hit, decide:
 - Document why it's exempt (different context, intentional difference)
 - Add it to the change scope
 
+**If the same bug pattern shows up in 3+ places, that's a signal the
+abstraction is wrong, not that you should patch 3+ sites.** Per the
+Engineering Philosophy in CLAUDE.md, prefer fixing the underlying contract
+(a shared GAQL builder, a typed mutation helper, a centralized field-mask
+utility) over scattering patches. Call the structural issue out in the plan
+so the user can approve the larger refactor before you start.
+
 ## Phase 3 — Test impact
 
 Identify tests that reference the pattern being changed. They will break and need updates BEFORE implementation, not after.

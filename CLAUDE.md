@@ -1,3 +1,47 @@
+## Engineering Philosophy
+
+Optimize for **long-term maintainability** and **user experience**. The
+marginal cost of writing code is near zero; the cost of carrying bad
+architecture forward is not. When the choice is "small patch with hidden
+maintenance cost" vs "larger change with cleaner result," choose the cleaner
+result. Diff size is not a constraint — future-reader pain is.
+
+This overrides a few harness defaults:
+
+- **Root-cause fixes beat band-aids.** If a bug points at a structural problem
+  (wrong abstraction boundary, leaky data contract, ad-hoc state scattered
+  across files), fix the structure even when a one-line workaround would
+  silence the symptom. Band-aids compound — every one makes the next change
+  harder. Name the structural issue explicitly when you propose the fix, so
+  the choice is visible.
+- **Refactor when architecture demands it.** "Don't refactor beyond what the
+  task requires" does NOT apply when the surrounding code is the reason the
+  task is hard. Clean it up first, then make the change. Two clean commits
+  (refactor, then feature) beat one tangled commit.
+- **Abstractions are allowed when they reflect real semantic duplication or
+  clarify intent.** Premature abstraction is still bad; leaving genuine
+  duplication across 5+ sites because "three similar lines beats an
+  abstraction" is worse — that rule is about 3, not 30.
+- **Comments are allowed when they help future readers** — non-obvious
+  invariants, domain quirks, API landmines, the "why" behind a non-obvious
+  choice. Self-evident code still doesn't need a comment.
+- **UX is a first-class constraint, not polish to defer.** Loading states,
+  error states, perceived performance, empty states, and interaction feedback
+  are part of "done." If you can't test the UX in a browser, say so — don't
+  declare done.
+
+What does NOT change from harness defaults:
+- Don't design for hypothetical requirements that aren't on the roadmap.
+- Don't add fallbacks for scenarios that genuinely can't happen.
+- No half-finished implementations.
+- Don't write comments that just restate the code.
+- Validate at system boundaries (user input, external APIs), not between
+  trusted internal callers.
+
+**Test for any judgment call:** would a competent engineer reading this in 6
+months thank you for the choice, or curse you for it? If the cleaner
+architecture wins that test, take it — even if the diff is bigger.
+
 ## North Star Metrics
 Always read `docs/north-stars.md` before any growth, activation, or retention analysis.
 Frame findings around Weekly Active Writers (WAW) and D0 Write Users by default.
@@ -23,55 +67,14 @@ actions to propose.
 Default bias: improve MCP as a trustworthy data/execution substrate, not as an
 over-opinionated "smart marketer" workflow app.
 
-## Frontend Performance Patterns
+## Code safety
 
-These are mandatory patterns for all frontend components. Follow them by default.
-
-### Navigation: Use `<Link>` not `router.push`
-- Always use Next.js `<Link>` with `prefetch` for navigation. This preloads the JS bundle in the background so clicks feel instant.
-- Never use `router.push` for user-initiated navigation. It skips prefetching and makes every click a cold load.
-- If buttons inside a `<Link>` need to do something else (e.g., pause, delete), use `event.preventDefault()` + `event.stopPropagation()` on those buttons.
-
-### Data fetching: Stale-while-revalidate
-- Use a module-level cache variable (outside the component) so data survives client-side navigations.
-- On mount: if cached data exists, render it immediately and fetch fresh data in the background. No loading spinner for return visits.
-- Only show a loading spinner on the very first load when there's nothing to display.
-- Pattern:
-  ```tsx
-  let cachedData: T[] | null = null;
-
-  export default function Page() {
-    const [data, setData] = useState<T[]>(cachedData ?? []);
-    const [loading, setLoading] = useState(!cachedData);
-
-    const fetchData = useCallback(async (background = false) => {
-      if (!background) setLoading(true);
-      const fresh = await fetchAction();
-      setData(fresh);
-      cachedData = fresh;
-      setLoading(false);
-    }, []);
-
-    useEffect(() => {
-      fetchData(!!cachedData);
-    }, [fetchData]);
-  }
-  ```
-
-### Server-side caching for external APIs
-- Cache external API responses (Google Ads, etc.) with a short TTL (30-60s) using an in-memory `Map` keyed by customer/user ID.
-- Invalidate the cache immediately on mutations (pause, delete, create, update).
-- The Refresh button should clear both client and server cache before fetching.
-
-### No double loading states
-- Never combine `loading.tsx` skeletons with a component's own loading spinner. Pick one:
-  - For prefetched client components: skip `loading.tsx`, let the component handle its own loading state.
-  - For server components with heavy data fetching: use `loading.tsx` skeleton, no client-side loading state.
-- If the `<Link prefetch>` has already downloaded the page bundle, a `loading.tsx` skeleton will only flash for ~100ms before the component mounts — causing a jarring double-flash, not a smooth experience.
-
-### Mutations: Optimistic where possible
-- After a mutation, invalidate caches (both client module-level and server-side) and re-fetch.
-- Disable action buttons during mutations and show a spinner on the specific button being acted on.
+Before any change to `lib/google-ads/**` or `lib/mcp/**`, any Google Ads API
+behavior fix, or any new ads MCP tool or GAQL builder, invoke `ads-mcp-plan`
+first. The Google Ads API has empirical landmines that don't show up in
+casual code-reading; the cost of skipping verification is shipping silent
+data bugs (negatives mistaken for positives, RSA sub-fields wiped by
+parent-level field masks, etc.).
 
 ## Deploy Configuration (configured by /setup-deploy)
 - Platform: Vercel
@@ -88,21 +91,3 @@ These are mandatory patterns for all frontend components. Follow them by default
 - Deploy status: poll https://www.notfair.co/api/health for 200
 - Health check: https://www.notfair.co/api/health
 
-## Skill routing
-
-When the user's request matches an available skill, ALWAYS invoke it using the Skill
-tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
-The skill has specialized workflows that produce better results than ad-hoc answers.
-
-Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
-- **Any change to `lib/google-ads/**` or `lib/mcp/**`, any Google Ads API behavior fix, any new ads MCP tool or GAQL builder → invoke ads-mcp-plan FIRST.** Forces verification against landmines before code is touched. The cost of skipping it is shipping silent data bugs (negatives mistaken for positives, RSA sub-fields wiped by parent-level field masks, etc.).
