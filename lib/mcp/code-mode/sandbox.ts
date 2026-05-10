@@ -27,6 +27,11 @@ export type RunScriptResult = {
     message: string;
     name?: string;
     stack?: string;
+    code?: string;
+    reconnectUrl?: string;
+    retryable?: boolean;
+    userAction?: string;
+    originalError?: string;
     /** 1-based line number in the user's script, if the runtime reported one. */
     line?: number;
     /** 1-based column number, if reported. */

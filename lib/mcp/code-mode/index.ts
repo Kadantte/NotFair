@@ -4,6 +4,7 @@ import { safeHandler, typedResult, accountIdParam, READ_ANNOTATIONS, type ToolRe
 import { enforceRateLimit } from "../rate-limit";
 import { runScriptInSandbox, type RunScriptResult } from "./sandbox";
 import { buildAdsHost } from "./ads-client";
+import { buildGoogleAdsReconnectError, isGoogleAdsReconnectRequired } from "../auth-error-response";
 
 const RUN_SCRIPT_DESCRIPTION = `Run a JavaScript orchestration script in a sandboxed QuickJS runtime. This is a REPLACEMENT for chaining individual tool calls, not a supplement — one runScript call does what would otherwise take 10+ sequential tool invocations.
 
@@ -152,7 +153,7 @@ export const registerCodeModeTools: ToolRegistrar = (server, currentAuth) => {
       try {
         const { host, bootstrap } = buildAdsHost(targetAuth, targetId);
         const result = await runScriptInSandbox({ code, host, bootstrap, timeoutMs });
-        return typedResult(result);
+        return typedResult(enrichRunScriptResult(result));
       } catch (error) {
         return typedResult(handlerFailureResult(error, Date.now() - startedAt));
       }
@@ -162,7 +163,7 @@ export const registerCodeModeTools: ToolRegistrar = (server, currentAuth) => {
 
 function handlerFailureResult(error: unknown, elapsedMs: number): RunScriptResult {
   const err = error instanceof Error ? error : new Error(String(error));
-  return {
+  return enrichRunScriptResult({
     ok: false,
     resultTruncated: false,
     logs: [],
@@ -174,5 +175,17 @@ function handlerFailureResult(error: unknown, elapsedMs: number): RunScriptResul
     },
     timedOut: false,
     elapsedMs,
+  });
+}
+
+function enrichRunScriptResult(result: RunScriptResult): RunScriptResult {
+  const message = result.error?.message;
+  if (!message || !isGoogleAdsReconnectRequired(message)) return result;
+  return {
+    ...result,
+    error: {
+      ...result.error,
+      ...buildGoogleAdsReconnectError(message),
+    },
   };
 }

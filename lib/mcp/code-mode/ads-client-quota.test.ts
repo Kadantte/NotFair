@@ -284,6 +284,30 @@ describe("runScript op counting", () => {
       expect(out.q4).toEqual({ rows: [] });
     });
 
+    it("returns reconnect guidance for invalid_grant when partial=true", async () => {
+      let call = 0;
+      mockExecRead.mockImplementation(
+        async (_a: unknown, _t: unknown, _n: unknown, fn: () => Promise<unknown>) => {
+          call += 1;
+          if (call === 2) throw new Error("GAQL query failed: invalid_grant");
+          return fn();
+        },
+      );
+      const { host } = buildAdsHost(STUB_AUTH, TARGET_ID);
+
+      const out = (await host.ads.gaqlParallel(makeQueries(3), { partial: true })) as Record<
+        string,
+        { error?: { code?: string; message?: string; reconnectUrl?: string; retryable?: boolean } }
+      >;
+
+      const error = out.q1.error;
+      expect(error).toBeDefined();
+      expect(error?.code).toBe("GOOGLE_ADS_RECONNECT_REQUIRED");
+      expect(error?.message).toContain("reconnect their Google Ads account");
+      expect(error?.reconnectUrl).toBe("https://www.notfair.co/connect/google-ads");
+      expect(error?.retryable).toBe(false);
+    });
+
     it("pre-check fails fast when user is already at the cap: 0 execRead calls, throws RateLimitError", async () => {
       // Import the real RateLimitError class — gaqlParallel checks instanceof,
       // so we must throw the same class the production code references.

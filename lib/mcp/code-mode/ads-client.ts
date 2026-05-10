@@ -1,6 +1,7 @@
 import type { AuthContext } from "@/lib/google-ads";
 import { runSafeGaqlReport } from "@/lib/google-ads";
 import { humanizeGaqlRows } from "@/lib/google-ads/humanize";
+import { buildGoogleAdsReconnectError, isGoogleAdsReconnectRequired } from "@/lib/mcp/auth-error-response";
 import {
   queryAccountInfo,
   queryCampaigns,
@@ -252,7 +253,9 @@ export function buildAdsHost(
         out[name] = r.value;
       } else {
         const message = r.reason instanceof Error ? r.reason.message : String(r.reason);
-        out[name] = { error: message };
+        out[name] = isGoogleAdsReconnectRequired(message)
+          ? { error: buildGoogleAdsReconnectError(message) }
+          : { error: message };
       }
     });
     return out;

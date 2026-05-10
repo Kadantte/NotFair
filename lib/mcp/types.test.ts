@@ -68,4 +68,17 @@ describe("errorResult", () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]).toEqual({ type: "text", text: "boom" });
   });
+
+  it("maps Google invalid_grant to an agent-facing reconnect instruction", () => {
+    const result = errorResult(new Error("GAQL query failed: invalid_grant"));
+    expect(result.isError).toBe(true);
+    const text = result.content[0].type === "text" ? result.content[0].text : "";
+    const parsed = JSON.parse(text) as {
+      error: { code: string; message: string; reconnectUrl: string; retryable: boolean };
+    };
+    expect(parsed.error.code).toBe("GOOGLE_ADS_RECONNECT_REQUIRED");
+    expect(parsed.error.message).toContain("reconnect their Google Ads account");
+    expect(parsed.error.reconnectUrl).toBe("https://www.notfair.co/connect/google-ads");
+    expect(parsed.error.retryable).toBe(false);
+  });
 });

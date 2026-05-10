@@ -226,6 +226,33 @@ describe("MCP protocol — tools/call", () => {
     }
   });
 
+  it("maps runScript invalid_grant failures to reconnect guidance", async () => {
+    mockQuery.mockRejectedValueOnce(new Error("invalid_grant"));
+    const { client, cleanup } = await connectClient();
+    try {
+      const result = await client.callTool({
+        name: "runScript",
+        arguments: {
+          code: "return await ads.gaql('SELECT campaign.id FROM campaign');",
+          timeoutMs: 1000,
+        },
+      });
+      expect(result.isError).toBeFalsy();
+      const content = (result.content as Array<{ type: string; text: string }>)[0];
+      const parsed = JSON.parse(content.text) as {
+        ok: boolean;
+        error: { code: string; message: string; reconnectUrl: string; retryable: boolean };
+      };
+      expect(parsed.ok).toBe(false);
+      expect(parsed.error.code).toBe("GOOGLE_ADS_RECONNECT_REQUIRED");
+      expect(parsed.error.message).toContain("reconnect their Google Ads account");
+      expect(parsed.error.reconnectUrl).toBe("https://www.notfair.co/connect/google-ads");
+      expect(parsed.error.retryable).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("surfaces unknown-tool calls as isError results with a readable message", async () => {
     const { client, cleanup } = await connectClient();
     try {

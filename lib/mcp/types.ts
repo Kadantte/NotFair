@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { extractErrorMessage } from "@/lib/google-ads";
+import { formatMcpErrorText } from "./auth-error-response";
 
 /**
  * A function that registers tools on an MCP server.
@@ -39,7 +40,7 @@ function defaultText(value: unknown): string {
 
 /** Wrap an error as an MCP error response with the actual error message. */
 export function errorResult(error: unknown): CallToolResult {
-  return { content: [{ type: "text", text: extractErrorMessage(error) }], isError: true };
+  return { content: [{ type: "text", text: formatMcpErrorText(extractErrorMessage(error)) }], isError: true };
 }
 
 /**
