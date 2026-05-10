@@ -4,6 +4,10 @@
       "type": "http",
       "url": "https://adsagent.org/api/mcp"
     },
+    "adsagent-local": {
+      "type": "http",
+      "url": "http://localhost:3000/api/mcp"
+    },
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=uzoexgcrwodqxzixenfm",

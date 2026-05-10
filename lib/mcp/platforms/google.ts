@@ -1,6 +1,10 @@
 import { registerReadTools, registerWriteTools, registerCodeModeTools, registerAgentFeedbackTools } from "@/lib/mcp";
 import { typedResult } from "@/lib/mcp/types";
 import { PLAYBOOKS } from "@/lib/mcp/playbooks";
+import {
+  INTERNAL_TOOL_FEEDBACK_INSTRUCTION,
+  RUNSCRIPT_FOLLOWUP_RULE,
+} from "@/lib/mcp/platforms/_shared-instructions";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AuthContext } from "@/lib/google-ads";
 
@@ -71,10 +75,7 @@ Tool-selection heuristic — pick ONE path per user question:
    return { campaigns: r.campaigns.rows, wastedSpend, qualityScores: r.qualityScores.rows };
    \`\`\`
 
-   Follow-up rule: after a \`runScript\` pass, don't chain
-   \`runScript\` calls unless the next one has a fundamentally
-   different shape. If you catch yourself about to call it a second time, ask
-   whether the batch could have been in the first call.
+   ${RUNSCRIPT_FOLLOWUP_RULE}
 
 2. Mutations (pause, bid change, add keyword, create campaign) → individual
    write tools (\`pauseKeyword\`, \`updateBid\`, \`createCampaign\`, etc.). Never
@@ -130,9 +131,7 @@ When a write tool returns \`success: false\`, check \`structuredContent.nextTool
 
 When a rejection's \`error\` field lists actual existing entities (e.g. \`removeNegativeKeyword\` reporting the campaign's real negative keywords), treat that list as ground truth — your planning data was stale or hallucinated. Re-plan against the listed entities before issuing more writes; do not bulk-retry the same plan.
 
-Internal tool feedback — \`fileInternalNotFairToolFeedback\`:
-
-If tool design gets in the way (unclear description, missing capability, clunky workflow, confusing error, duplicate tools), call \`fileInternalNotFairToolFeedback\` AT THE MOMENT OF FRICTION — not after the workaround, not "later". The dominant failure mode is deferring the call and forgetting; if you've said "I'll file feedback", file it before your next user-facing message. Internal engineering channel, not user-visible. Full rules in the tool's own description.`;
+${INTERNAL_TOOL_FEEDBACK_INSTRUCTION}`;
 
 /**
  * Register every Google Ads MCP tool + the playbooks resources.

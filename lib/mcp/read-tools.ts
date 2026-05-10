@@ -26,6 +26,25 @@ import { resolveToolAuth } from "./helpers";
  * as GAQL lives in `runScript` (see `./code-mode`).
  */
 export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
+  /**
+   * Closure-scoped boilerplate eliminator for the simple read pattern:
+   *   resolve auth → execRead → typedResult.
+   *
+   * Use only for handlers that go through a single execRead call and pass the
+   * raw result straight to typedResult. Skip handlers that bypass execRead
+   * (resource discovery, keyword planner with platform creds) or post-process
+   * the result before returning.
+   */
+  async function readToolCall<T>(
+    args: { accountId?: string; campaignId?: string | null },
+    toolName: string,
+    fn: (auth: AuthContext) => Promise<T>,
+  ) {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, args.accountId);
+    const result = await execRead(auth, targetId, toolName, () => fn(targetAuth), args.campaignId ?? undefined);
+    return typedResult(result);
+  }
+
   // ─── Geo Target Search ──────────────────────────────────────────
 
   server.registerTool("searchGeoTargets", {
@@ -52,11 +71,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .describe("Locale for results (default: 'en')"),
     },
     annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, query, countryCode, locale }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "search_geo_targets", () => searchGeoTargets(targetAuth, query, countryCode, locale));
-    return typedResult(result);
-  }));
+  }, safeHandler(async ({ accountId, query, countryCode, locale }) =>
+    readToolCall({ accountId }, "search_geo_targets", (a) => searchGeoTargets(a, query, countryCode, locale)),
+  ));
 
   // ─── Recommendations ─────────────────────────────────────────────
 
@@ -67,11 +84,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       campaignId: z.string().optional(),
     },
     annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "get_recommendations", () => getRecommendations(targetAuth, campaignId), campaignId);
-    return typedResult(result);
-  }));
+  }, safeHandler(async ({ accountId, campaignId }) =>
+    readToolCall({ accountId, campaignId }, "get_recommendations", (a) => getRecommendations(a, campaignId)),
+  ));
 
   // ─── Change History (NotFair-originated) ─────────────────────────
 
@@ -197,10 +212,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       limit: z.number().int().min(1).max(1000).default(500).describe("Maximum keywords to return. Default 500, max 1000."),
     },
     annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, adGroupId, positive, enabledOnly, excludeRemovedParents, includeQualityInfo, includeBidInfo, limit }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_keywords", () =>
-      listKeywords(targetAuth, {
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, positive, enabledOnly, excludeRemovedParents, includeQualityInfo, includeBidInfo, limit }) =>
+    readToolCall({ accountId, campaignId }, "list_keywords", (a) =>
+      listKeywords(a, {
         campaignId,
         adGroupId,
         positive,
@@ -210,10 +224,8 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         includeBidInfo,
         limit,
       }),
-      campaignId,
-    );
-    return typedResult(result);
-  }));
+    ),
+  ));
 
   // ─── Account Setup Snapshot ──────────────────────────────────────────
 
@@ -224,13 +236,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
       accountId: accountIdParam,
     },
     annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "summarize_account_setup", () =>
-      getAccountSummary(targetAuth),
-    );
-    return typedResult(result);
-  }));
+  }, safeHandler(async ({ accountId }) =>
+    readToolCall({ accountId }, "summarize_account_setup", (a) => getAccountSummary(a)),
+  ));
 
   server.registerTool("listActiveExperiments", {
     description:
@@ -246,13 +254,9 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
         .describe("Recent metrics window in days. Default 14, max 90."),
     },
     annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, days }) => {
-    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
-    const result = await execRead(auth, targetId, "list_active_experiments", () =>
-      listActiveExperiments(targetAuth, days),
-    );
-    return typedResult(result);
-  }));
+  }, safeHandler(async ({ accountId, days }) =>
+    readToolCall({ accountId }, "list_active_experiments", (a) => listActiveExperiments(a, days)),
+  ));
 
   // ─── Field & Resource Discovery ─────────────────────────────────────
 

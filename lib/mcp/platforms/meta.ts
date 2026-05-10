@@ -4,6 +4,10 @@ import { registerMetaReadTools } from "@/lib/mcp/meta-tools/read-tools";
 import { registerMetaWriteTools } from "@/lib/mcp/meta-tools/write-tools";
 import { registerMetaCodeModeTools } from "@/lib/mcp/code-mode-meta";
 import { registerAgentFeedbackTools } from "@/lib/mcp/agent-feedback";
+import {
+  INTERNAL_TOOL_FEEDBACK_INSTRUCTION,
+  RUNSCRIPT_FOLLOWUP_RULE,
+} from "@/lib/mcp/platforms/_shared-instructions";
 
 /**
  * Server-level routing heuristic for the Meta Ads MCP. Mirrors
@@ -58,10 +62,7 @@ Tool-selection heuristic — pick ONE path per user question:
    return { wasted, totals: { campaigns: r.campaigns.rowCount, adsets: r.adsets.rowCount } };
    \`\`\`
 
-   Follow-up rule: after a runScript pass, don't chain runScript calls unless
-   the next one has a fundamentally different shape. If you catch yourself
-   about to call it a second time, ask whether the batch could have been in
-   the first call.
+   ${RUNSCRIPT_FOLLOWUP_RULE}
 
 2. Mutations (pause, enable, budget change, rename) → individual write tools:
    \`pauseCampaign\`, \`enableCampaign\`, \`pauseAdSet\`, \`enableAdSet\`,
@@ -98,9 +99,7 @@ Handling write rejections:
 - Budget-update rejections under a CBO campaign require updating the
   campaign-level budget instead, not the ad set's.
 
-Internal tool feedback — \`fileInternalNotFairToolFeedback\`:
-
-If tool design gets in the way (unclear description, missing capability, clunky workflow, confusing error, duplicate tools), call \`fileInternalNotFairToolFeedback\` AT THE MOMENT OF FRICTION — not after the workaround, not "later". The dominant failure mode is deferring the call and forgetting; if you've said "I'll file feedback", file it before your next user-facing message. Internal engineering channel, not user-visible. Full rules in the tool's own description.`;
+${INTERNAL_TOOL_FEEDBACK_INSTRUCTION}`;
 
 /**
  * Register every Meta Ads MCP tool. Stage 4 surface:
