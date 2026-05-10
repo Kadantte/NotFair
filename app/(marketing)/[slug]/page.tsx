@@ -24,6 +24,7 @@ export async function generateMetadata({
     description: page.description,
     path: `/${page.slug}`,
     keywords: page.keywords,
+    index: page.index !== false,
   });
 }
 

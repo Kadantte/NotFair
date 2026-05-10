@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
         destination: "/google-ads-claude-connector-setup-guide",
         permanent: true,
       },
+      {
+        source: "/google-ads-mcp-server",
+        destination: "/google-ads-mcp",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {

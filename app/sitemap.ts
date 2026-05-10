@@ -12,7 +12,6 @@ const publicMarketingRoutes = [
   "/google-ads-codex",
   "/google-ads-codex-mcp-setup-guide",
   "/google-ads-mcp",
-  "/google-ads-mcp-server",
   "/meta-ads-claude-connector-setup-guide",
   "/meta-ads-claude-code-plugin-setup-guide",
   "/meta-ads-codex-mcp-setup-guide",
@@ -21,7 +20,9 @@ const publicMarketingRoutes = [
   "/privacy",
   "/terms",
   "/blog",
-  ...allLandingPages.map((page) => `/${page.slug}`),
+  ...allLandingPages
+    .filter((page) => page.index !== false)
+    .map((page) => `/${page.slug}`),
 ];
 
 const highPriorityRoutes = new Set([
@@ -33,7 +34,6 @@ const highPriorityRoutes = new Set([
   "/google-ads-codex",
   "/google-ads-codex-mcp-setup-guide",
   "/google-ads-mcp",
-  "/google-ads-mcp-server",
   "/meta-ads-claude-connector-setup-guide",
   "/meta-ads-claude-code-plugin-setup-guide",
   "/meta-ads-codex-mcp-setup-guide",
@@ -41,10 +41,10 @@ const highPriorityRoutes = new Set([
 const seoLandingRoutes = new Set([
   "/ai-google-ads-agent",
   "/google-ads-mcp",
+  "/google-ads-connector",
+  "/google-ads-ai-tool",
+  "/google-ads-optimization-tool",
   "/meta-ads-mcp",
-  "/connect-google-ads-to-claude",
-  "/connect-google-ads-to-chatgpt",
-  "/ai-google-ads-optimization",
 ]);
 const marketingPagesLastModified = new Date("2026-05-08");
 const homepageLastModified = new Date("2026-04-07");

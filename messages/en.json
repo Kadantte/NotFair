@@ -651,6 +651,18 @@
           "title": "Google Ads MCP server",
           "description": "Generic MCP config and tool list for {connectorName}."
         },
+        "googleAdsConnector": {
+          "title": "Google Ads connector",
+          "description": "Connect Google Ads to Claude, Codex, Cursor, Cline, and custom MCP clients."
+        },
+        "googleAdsAiTool": {
+          "title": "Google Ads AI tool",
+          "description": "Use the hosted MCP connection as an AI-assisted Google Ads workflow."
+        },
+        "googleAdsOptimizationTool": {
+          "title": "Google Ads optimization tool",
+          "description": "Move from diagnosis to approved negatives, bids, budgets, and campaign edits."
+        },
         "metaAdsMcp": {
           "title": "Meta Ads MCP server",
           "description": "Generic MCP config and tool list for {connectorName}."
@@ -677,23 +689,50 @@
   "GoogleAdsMcpPage": {
     "hero": {
       "eyebrow": "Google Ads MCP server",
-      "title": "Hosted Google Ads MCP server",
-      "bodyBeforeLink": "NotFair ships a hosted",
+      "title": "Google Ads MCP for Claude, Codex, and Cursor",
+      "bodyBeforeLink": "NotFair is a hosted",
       "bodyBeforeCode": "server at",
-      "bodyAfterCode": ". Drop the generic config below into any MCP-compatible client so your AI can diagnose issues and draft fixes — auth via OAuth or Bearer token.",
+      "bodyAfterCode": ". Connect once so your AI client can inspect campaigns, find issues, and prepare approved Google Ads changes through the Model Context Protocol.",
       "note": "Free · OAuth 2.0 · No credit card",
       "specPrefix": "New to MCP? Read the spec at",
       "specSuffix": "."
     },
     "config": {
-      "eyebrow": "Generic MCP config",
-      "title": "Two configs that work in any MCP client",
-      "body": "For client-specific walkthroughs (Claude.ai, Claude Code, Codex), see the per-client setup guides linked below."
+      "eyebrow": "Connector setup",
+      "title": "One hosted connector, multiple AI clients",
+      "body": "Use the same NotFair Google Ads MCP endpoint across Claude.ai, Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients."
+    },
+    "comparison": {
+      "eyebrow": "MCP server comparison",
+      "title": "Hosted execution layer, not just a read-only wrapper",
+      "body": "The official Google Ads MCP is useful for developers who want to self-host read-only access. NotFair is built for operators who want OAuth setup, live diagnosis, and approval-gated writes from their AI client.",
+      "columns": {
+        "factor": "Factor",
+        "official": "Official / self-hosted MCP",
+        "notfair": "NotFair hosted MCP"
+      },
+      "items": [
+        {
+          "label": "Setup",
+          "official": "Bring a Google Cloud project, developer token, OAuth credentials, local runtime, and client config.",
+          "notfair": "Use one hosted endpoint, sign in with Google, pick accounts, and add the connector to your AI client."
+        },
+        {
+          "label": "Actions",
+          "official": "Best fit for read-only reporting and custom GAQL exploration.",
+          "notfair": "Read live data, diagnose issues, stage writes, and approve changes such as negatives, bids, budgets, and campaign state."
+        },
+        {
+          "label": "Control",
+          "official": "You own the infrastructure and token setup.",
+          "notfair": "NotFair handles OAuth and API plumbing while keeping account writes explicit, reviewable, and traceable."
+        }
+      ]
     },
     "tools": {
       "eyebrow": "Tools exposed",
-      "title": "What your AI client can read and change",
-      "body": "Read tools provide live account context. Write tools propose changes — every write requires explicit human approval before it hits the Google Ads API.",
+      "title": "What your AI client can read, diagnose, and stage",
+      "body": "Read tools provide live account context. Write tools stage campaign edits for review — every write requires explicit human approval before it hits the Google Ads API.",
       "columns": {
         "tool": "Tool",
         "type": "Type",
@@ -703,7 +742,7 @@
         "read": "Read",
         "write": "Write"
       },
-      "more": "and 60+ more",
+      "more": "and more account, keyword, search-term, ad, and change-history tools",
       "items": [
         {
           "name": "runScript",
@@ -759,7 +798,7 @@
     },
     "cta": {
       "title": "Ready to wire up your client?",
-      "body": "Sign in with Google to generate your credentials, then paste a config above into your MCP client.",
+      "body": "Sign in with Google, pick the ad accounts your agent can see, then add the hosted MCP endpoint to your client.",
       "button": "Sign in with Google to continue",
       "secondary": "Or follow a per-client setup guide"
     },
@@ -769,7 +808,7 @@
       "items": [
         {
           "question": "What is the NotFair Google Ads MCP server?",
-          "answer": "It's a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools propose fixes that you approve in chat."
+          "answer": "It is a hosted Model Context Protocol server that exposes your Google Ads account to MCP-compatible AI clients. Read tools provide live campaign context for diagnosis; write tools stage fixes that you approve before they run."
         },
         {
           "question": "Which MCP clients are supported?",
@@ -797,6 +836,10 @@
       "title": "Per-client setup guides",
       "intro": "Walkthroughs for each supported client.",
       "links": {
+        "connector": {
+          "title": "Google Ads connector",
+          "description": "Understand the hosted connector path for Claude, Codex, Cursor, and generic MCP clients."
+        },
         "claudeConnector": {
           "title": "Claude Connector setup guide",
           "description": "Install NotFair as a custom MCP connector inside Claude.ai Web, Desktop, or Cowork."
@@ -808,6 +851,10 @@
         "codex": {
           "title": "Codex MCP setup guide",
           "description": "One-line install of the NotFair MCP for OpenAI's Codex CLI."
+        },
+        "aiTool": {
+          "title": "Google Ads AI tool",
+          "description": "See how the same MCP connection becomes an AI-assisted Google Ads workflow."
         }
       }
     }

@@ -41,7 +41,7 @@ type CapabilityCopy = {
 const capabilityIcons = [MessageSquare, Zap, Eye, Terminal];
 
 const RELATED_LINKS = [
-  { href: "/google-ads-mcp-server", key: "mcpServer" },
+  { href: "/google-ads-mcp", key: "mcpServer" },
   { href: "/", key: "home" },
 ];
 
@@ -331,10 +331,10 @@ export function GoogleAdsClaudePage() {
           >
             {t("tools.referencePrefix")}{" "}
             <Link
-              href="/google-ads-mcp-server"
+              href="/google-ads-mcp"
               className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
             >
-              /google-ads-mcp-server
+              /google-ads-mcp
             </Link>
             {t("tools.referenceSuffix")}
           </motion.p>

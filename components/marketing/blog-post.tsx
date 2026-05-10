@@ -128,19 +128,33 @@ export function BlogPostPage({ post }: { post: BlogPost }) {
           <div className="mt-16 flex flex-col gap-3 rounded-lg border border-[#3D3C36] bg-[#201F1B] p-6 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-[#E8E4DD]">
-                Try MCP with Google Ads
+                Move from article to live account work
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#C4C0B6]">
-                Connect your Google Ads account to NotFair in 30 seconds and
-                start querying campaigns from Claude.
+                Connect your account first, then use an MCP client to turn the
+                article workflow into a reviewed account action.
               </p>
             </div>
-            <Link
-              href="/connect"
-              className="inline-flex items-center text-sm font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
-            >
-              Connect Google Ads
-            </Link>
+            <div className="flex flex-col gap-3 text-sm md:items-end">
+              <Link
+                href="/connect"
+                className="inline-flex items-center justify-center rounded-lg bg-[#E8E4DD] px-4 py-2 font-medium text-[#1A1917] transition-colors hover:bg-[#4CAF6E]"
+              >
+                Connect Google Ads
+              </Link>
+              <Link
+                href="/google-ads-mcp"
+                className="font-medium text-[#C4C0B6] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
+              >
+                Google Ads MCP
+              </Link>
+              <Link
+                href="/google-ads-ai-tool"
+                className="font-medium text-[#C4C0B6] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
+              >
+                Google Ads AI tool
+              </Link>
+            </div>
           </div>
         </div>
       </article>

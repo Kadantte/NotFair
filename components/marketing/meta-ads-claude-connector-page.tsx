@@ -72,7 +72,7 @@ const RELATED_LINKS = [
       "Same setup steps for Google Ads — install the NotFair Google Ads connector inside Claude in under 2 minutes.",
   },
   {
-    href: "/google-ads-mcp-server",
+    href: "/google-ads-mcp",
     title: "NotFair MCP Server",
     description:
       "Reference for the NotFair MCP servers — Google Ads, Meta Ads, and the read/write tools each one exposes.",

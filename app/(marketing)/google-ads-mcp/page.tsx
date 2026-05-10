@@ -3,9 +3,9 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 import { MCP_SERVER_URL } from "@/lib/brand";
 
 export const metadata = buildMetadata({
-  title: "Google Ads MCP Server — Configurations for Claude, Codex, Cursor & More",
+  title: "Google Ads MCP Server for Claude, Codex, Cursor & More | NotFair",
   description:
-    "Hosted Google Ads MCP server for AI clients. Copy-paste configs so Claude, Codex, Cursor, and other MCP clients can diagnose issues and draft approved Google Ads fixes.",
+    "Hosted Google Ads MCP server for AI clients. Connect Claude, Codex, Cursor, and other MCP clients to live Google Ads data and approved account actions.",
   path: "/google-ads-mcp",
   keywords: [
     "google ads mcp",

@@ -24,15 +24,24 @@ type McpTool = {
     description: string;
 };
 
+type ComparisonItem = {
+    label: string;
+    official: string;
+    notfair: string;
+};
+
 const RELATED_LINKS = [
+    { href: "/google-ads-connector", key: "connector" },
     { href: "/google-ads-claude-connector-setup-guide", key: "claudeConnector" },
     { href: "/google-ads-claude-code-plugin-setup-guide", key: "claudeCode" },
     { href: "/google-ads-codex-mcp-setup-guide", key: "codex" },
+    { href: "/google-ads-ai-tool", key: "aiTool" },
 ];
 
 export function GoogleAdsMcpPage() {
     const t = useTranslations("GoogleAdsMcpPage");
     const tools = t.raw("tools.items") as McpTool[];
+    const comparisonItems = t.raw("comparison.items") as ComparisonItem[];
     const faqItems = (t.raw("faq.items") as FaqItem[]).map((item) => ({
         question: item.question,
         answer: item.answer.replace("{serverUrl}", SERVER_URL),
@@ -91,6 +100,57 @@ export function GoogleAdsMcpPage() {
                             </a>
                             {t("hero.specSuffix")}
                         </p>
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* ── Comparison ── */}
+            <section className="border-t border-[#3D3C36] px-4 py-16">
+                <div className="mx-auto max-w-4xl">
+                    <motion.div
+                        variants={fadeInUp}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-60px" }}
+                        className="mb-8"
+                    >
+                        <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
+                            {t("comparison.eyebrow")}
+                        </p>
+                        <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+                            {t("comparison.title")}
+                        </h2>
+                        <p className="mt-3 max-w-2xl text-base leading-relaxed text-[#C4C0B6]">
+                            {t("comparison.body")}
+                        </p>
+                    </motion.div>
+
+                    <motion.div
+                        variants={fadeInUp}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-40px" }}
+                        className="overflow-x-auto rounded-lg border border-[#3D3C36]"
+                    >
+                        <div className="min-w-[720px]">
+                        <div className="grid grid-cols-[1fr_1.25fr_1.25fr] border-b border-[#3D3C36] bg-[#24231F] text-xs font-semibold uppercase tracking-wide text-[#C4C0B6]">
+                            <div className="px-4 py-3">{t("comparison.columns.factor")}</div>
+                            <div className="px-4 py-3">{t("comparison.columns.official")}</div>
+                            <div className="px-4 py-3">{t("comparison.columns.notfair")}</div>
+                        </div>
+                        {comparisonItems.map((item, index) => (
+                            <div
+                                key={item.label}
+                                className={`grid grid-cols-[1fr_1.25fr_1.25fr] border-b border-[#3D3C36] text-sm last:border-0 ${
+                                    index % 2 === 0 ? "bg-[#1A1917]" : "bg-[#1E1D1A]"
+                                }`}
+                            >
+                                <div className="px-4 py-4 font-semibold text-[#E8E4DD]">{item.label}</div>
+                                <div className="px-4 py-4 leading-relaxed text-[#C4C0B6]">{item.official}</div>
+                                <div className="px-4 py-4 leading-relaxed text-[#C4C0B6]">{item.notfair}</div>
+                            </div>
+                        ))}
+                        </div>
                     </motion.div>
                 </div>
             </section>

@@ -33,6 +33,9 @@ type RelatedLinkCopy = {
 
 const RELATED_LINKS = [
     { href: "/google-ads-mcp", key: "googleAdsMcp", connectorName: MCP_CONNECTOR_NAME },
+    { href: "/google-ads-connector", key: "googleAdsConnector" },
+    { href: "/google-ads-ai-tool", key: "googleAdsAiTool" },
+    { href: "/google-ads-optimization-tool", key: "googleAdsOptimizationTool" },
     { href: "/meta-ads-mcp", key: "metaAdsMcp", connectorName: META_MCP_CONNECTOR_NAME },
     { href: "/google-ads-claude-connector-setup-guide", key: "claudeConnector" },
     { href: "/google-ads-claude-code-plugin-setup-guide", key: "claudeCode" },

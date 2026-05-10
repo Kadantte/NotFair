@@ -56,7 +56,7 @@ const RELATED_LINKS = [
       "Overview of how NotFair connects Claude to your Google Ads account — works with Claude Desktop, Code, and Cowork.",
   },
   {
-    href: "/google-ads-mcp-server",
+    href: "/google-ads-mcp",
     title: "Google Ads MCP Server",
     description:
       "Full reference for the NotFair MCP server — every read and write tool exposed to Claude and other MCP clients.",

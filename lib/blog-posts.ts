@@ -335,7 +335,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/google-ads-mcp-server", title: "NotFair Google Ads MCP Server", description: "The hosted server — connect Google Ads in one OAuth flow." },
+      { href: "/google-ads-mcp", title: "NotFair Google Ads MCP Server", description: "The hosted server — connect Google Ads in one OAuth flow." },
       { href: "/blog/google-ads-mcp-servers-compared", title: "Google Ads MCP Servers Compared", description: "Decision matrix for picking the right MCP server for your use case." },
       { href: "/blog/what-is-mcp", title: "What Is MCP (Model Context Protocol)?", description: "The open standard behind every Claude integration." },
     ],
@@ -434,7 +434,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/what-is-mcp", title: "What Is MCP (Model Context Protocol)?", description: "The general MCP protocol explained — clients, servers, tools, and a real Google Ads example." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every Claude surface plus ChatGPT/Codex and Cursor." },
-      { href: "/google-ads-mcp-server", title: "NotFair Google Ads MCP Server", description: "The hosted MCP server — connect Google Ads in one OAuth flow." },
+      { href: "/google-ads-mcp", title: "NotFair Google Ads MCP Server", description: "The hosted MCP server — connect Google Ads in one OAuth flow." },
     ],
   },
   "can-ai-run-google-ads-campaigns": {
@@ -2087,7 +2087,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/google-ads-mcp-servers-compared", title: "Google Ads MCP Servers Compared", description: "Picking the right MCP server for your AI tool." },
       { href: "/blog/google-ads-ai-agent", title: "Building a Google Ads AI Agent", description: "How to set up and trust a Google Ads AI agent without losing sleep." },
-      { href: "/google-ads-mcp-server", title: "NotFair Google Ads MCP Server", description: "The hosted MCP server — connect Google Ads in one OAuth flow." },
+      { href: "/google-ads-mcp", title: "NotFair Google Ads MCP Server", description: "The hosted MCP server — connect Google Ads in one OAuth flow." },
     ],
   },
   "google-ads-ai-for-agencies": {
@@ -3752,7 +3752,7 @@ export const blogPosts: Record<string, BlogPost> = {
     ],
     relatedLinks: [
       {
-        href: "/google-ads-mcp-server",
+        href: "/google-ads-mcp",
         title: "NotFair Google Ads MCP Server",
         description:
           "The hosted version — connect Google Ads in one OAuth flow, then point Claude, ChatGPT, or Cursor at it.",
@@ -4332,7 +4332,7 @@ export const blogPosts: Record<string, BlogPost> = {
         description: "Connect Google Ads to Claude to diagnose issues, recommend fixes, and manage approved changes in natural language.",
       },
       {
-        href: "/google-ads-mcp-server",
+        href: "/google-ads-mcp",
         title: "Google Ads MCP Server",
         description: "The technical details: tools, auth, and setup for the MCP server.",
       },
@@ -4601,6 +4601,141 @@ export const blogPosts: Record<string, BlogPost> = {
         title: "Connect Google Ads to Claude",
         description:
           "Step-by-step: connect your Google Ads account to Claude through MCP.",
+      },
+    ],
+  },
+  "negative-keywords-google-ads-ai": {
+    slug: "negative-keywords-google-ads-ai",
+    title: "Negative Keywords in Google Ads: How to Use AI Without Overblocking",
+    seoTitle: "Negative Keywords in Google Ads: AI Search Term Cleanup Guide",
+    description:
+      "How to find negative keywords in Google Ads with AI, review search terms safely, and apply approval-gated cleanup without blocking good intent.",
+    keywords: [
+      "negative keywords google ads",
+      "google ads negative keywords",
+      "find negative keywords",
+      "negative keywords list",
+      "performance max negative keywords",
+      "ai negative keywords google ads",
+      "negative keyword automation google ads",
+    ],
+    publishedAt: "2026-05-09",
+    updatedAt: "2026-05-09",
+    author: { name: "NotFair Team", role: "Google Ads optimization" },
+    content: [
+      {
+        type: "text",
+        content:
+          "Negative keywords are one of the highest-leverage Google Ads optimizations because they remove bad intent before it consumes budget again. The mistake is treating them like a one-time checklist. Search terms drift every week, Performance Max exposes messy intent, and broad match can pull in queries that looked reasonable until you see the actual terms.",
+      },
+      {
+        type: "text",
+        content:
+          "AI is useful here, but not because it should blindly block everything that looks odd. The right workflow is search-term cleanup with review: pull live search terms, group bad intent, explain the reason, propose match types, then apply only the negatives a human approves.",
+      },
+      {
+        type: "heading",
+        content: "What makes a good negative keyword candidate",
+      },
+      {
+        type: "list",
+        content: "",
+        items: [
+          "Repeated bad intent — Queries that clearly ask for jobs, free templates, definitions, DIY help, or unrelated services when your campaign sells something else.",
+          "Spend with no conversion signal — Search terms with meaningful cost and clicks but no leads, purchases, calls, or qualified downstream action.",
+          "Poor match to landing page — Queries that technically include a keyword but imply a different customer, location, price point, or service category.",
+          "Account-wide exclusions — Terms that are wrong everywhere, not just in one ad group, belong in shared negative lists so the cleanup compounds.",
+          "Risky near-matches — Terms that look bad but may overlap with real customers need narrower phrase or exact negatives, not broad blocking.",
+        ],
+      },
+      {
+        type: "heading",
+        content: "The AI-assisted workflow",
+      },
+      {
+        type: "list",
+        content: "",
+        items: [
+          "Pull search terms — Use live Google Ads data, not a CSV from last month. Include campaign, ad group, term, cost, clicks, conversions, and match type context.",
+          "Group by intent — Cluster terms into themes like job seekers, free information, competitor research, wrong service, wrong geography, or low-value DIY.",
+          "Score the risk — Separate obvious blocks from terms that might be valuable in a different campaign or landing-page context.",
+          "Preview negatives — Show the proposed keyword, match type, scope, and reason before anything is applied.",
+          "Apply with approval — Add only the reviewed negatives, then keep the change traceable so impact can be checked later.",
+        ],
+      },
+      {
+        type: "callout",
+        content:
+          "Prompt to try after connecting NotFair:\n\nReview my last 30 days of search terms. Group irrelevant terms by intent, show spend/clicks/conversions, propose negative keywords with match type and scope, and flag anything that might overblock valuable traffic.",
+      },
+      {
+        type: "heading",
+        content: "Why automation needs guardrails",
+      },
+      {
+        type: "text",
+        content:
+          "Negative-keyword automation is dangerous when it optimizes for a long blocked list instead of account quality. A model can misread a niche term, block a profitable variant, or apply an account-level negative when the issue only exists in one campaign. That is why NotFair treats negative-keyword cleanup as approval-gated execution, not autopilot.",
+      },
+      {
+        type: "text",
+        content:
+          "The agent can move quickly through the analysis: it can fan out Google Ads queries, identify recurring patterns, and draft the exact operations. The operator still decides whether each negative belongs at campaign, ad group, or shared-list scope.",
+      },
+      {
+        type: "heading",
+        content: "Performance Max negative keywords",
+      },
+      {
+        type: "text",
+        content:
+          "Performance Max makes negative keywords more sensitive because inventory and query matching are less transparent than standard Search campaigns. The practical rule is to start with obvious brand-safety and wrong-intent exclusions, keep them narrow, and review whether the same bad intent appears across multiple campaigns before broadening scope.",
+      },
+      {
+        type: "heading",
+        content: "FAQ",
+      },
+    ],
+    faq: [
+      {
+        question: "Can AI find negative keywords for Google Ads?",
+        answer:
+          "Yes. AI can review search terms, group irrelevant intent, and propose negative keywords. The safest workflow still requires human approval before applying the negatives.",
+      },
+      {
+        question: "Should negative keywords be added automatically?",
+        answer:
+          "Usually no. Obvious exclusions can be batched, but the final write should be reviewed because overblocking can remove valuable traffic.",
+      },
+      {
+        question: "What match type should I use for negative keywords?",
+        answer:
+          "Use the narrowest match type that blocks the bad intent. Exact or phrase negatives are often safer for ambiguous terms; broader exclusions fit terms that are wrong across the whole account.",
+      },
+      {
+        question: "Can NotFair apply negative keywords?",
+        answer:
+          "Yes. NotFair can help an AI agent review search terms, propose negatives, and apply approved negative keyword changes through the Google Ads API.",
+      },
+    ],
+    relatedLinks: [
+      {
+        href: "/google-ads-optimization-tool",
+        title: "Google Ads optimization tool",
+        description:
+          "Use NotFair to move from diagnosis to approved Google Ads optimization work.",
+      },
+      {
+        href: "/google-ads-ai-tool",
+        title: "Google Ads AI tool",
+        description:
+          "See how NotFair connects AI clients to live Google Ads data and approved actions.",
+      },
+      {
+        href: "/google-ads-mcp",
+        title: "Google Ads MCP",
+        description:
+          "Connect Claude, Codex, Cursor, or another MCP client to Google Ads.",
       },
     ],
   },

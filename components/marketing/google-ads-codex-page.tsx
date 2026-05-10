@@ -29,7 +29,7 @@ const capabilityIcons = [Terminal, Zap, Eye, MessageSquare];
 const RELATED_LINKS = [
   { href: "/google-ads-codex-mcp-setup-guide", key: "setupGuide" },
   { href: "/google-ads-claude", key: "claude" },
-  { href: "/google-ads-mcp-server", key: "mcpServer" },
+  { href: "/google-ads-mcp", key: "mcpServer" },
 ];
 
 /* ─────────────────────────────────────────────────────── Page ──────────── */
@@ -271,11 +271,11 @@ export function GoogleAdsCodexPage() {
           >
             {t("tools.referencePrefix")}{" "}
             <Link
-              href="/google-ads-mcp-server"
+              href="/google-ads-mcp"
               prefetch
               className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
             >
-              /google-ads-mcp-server
+              /google-ads-mcp
             </Link>
             {t("tools.referenceSuffix")}
           </motion.p>

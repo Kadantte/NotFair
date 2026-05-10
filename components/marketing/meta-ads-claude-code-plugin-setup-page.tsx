@@ -62,7 +62,7 @@ const RELATED_LINKS = [
       "Same plugin, Google Ads side. Wire Claude Code to your Google Ads account through NotFair.",
   },
   {
-    href: "/google-ads-mcp-server",
+    href: "/google-ads-mcp",
     title: "NotFair MCP Server",
     description:
       "Reference for the NotFair MCP servers and the read/write tools each platform exposes.",
