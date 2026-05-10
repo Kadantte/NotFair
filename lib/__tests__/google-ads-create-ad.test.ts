@@ -65,6 +65,68 @@ describe("createAd", () => {
     });
   });
 
+  it("surfaces Google policy topic entries, field path, raw errors, and topic guidance", async () => {
+    mockMutateResources.mockRejectedValueOnce({
+      errors: [
+        {
+          message: "The resource has been disapproved since the policy summary includes policy topics of type PROHIBITED.",
+          error_code: { policy_finding_error: 2 },
+          location: {
+            field_path_elements: [
+              { field_name: "operations", index: 0 },
+              { field_name: "create" },
+              { field_name: "ad" },
+              { field_name: "final_urls", index: 0 },
+            ],
+          },
+          trigger: { string_value: "https://example.com/ac-repair" },
+          details: {
+            policy_finding_details: {
+              policy_topic_entries: [
+                {
+                  topic: "CONSUMER_FINANCE",
+                  type: "PROHIBITED",
+                  evidences: [
+                    { text_list: { texts: ["Financing available"] } },
+                  ],
+                  constraints: [
+                    { country_constraint_list: { countries: ["US"] } },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await createAd(auth, "1234567890", validRsa);
+
+    expect(result.success).toBe(false);
+    expect(result.policy?.policyTopics).toEqual(["CONSUMER_FINANCE"]);
+    expect(result.policy?.violatingTexts).toContain("Financing available");
+    expect(result.policy?.diagnostics).toMatchObject({
+      summary: "Rejected for PROHIBITED Google Ads policy topic: CONSUMER_FINANCE.",
+      severity: "PROHIBITED",
+      confidence: "google_reported",
+      fieldPaths: ["operations[0]", "create", "ad", "final_urls[0]"],
+    });
+    expect(result.policy?.diagnostics?.policyTopics[0]).toMatchObject({
+      topic: "CONSUMER_FINANCE",
+      type: "PROHIBITED",
+      evidences: [{ text_list: { texts: ["Financing available"] } }],
+      constraints: [{ country_constraint_list: { countries: ["US"] } }],
+    });
+    expect(result.policy?.diagnostics?.agentGuidance.join(" ")).toContain("financing");
+    expect(result.policy?.diagnostics?.googleErrors[0]).toMatchObject({
+      message: "The resource has been disapproved since the policy summary includes policy topics of type PROHIBITED.",
+      errorCode: { policy_finding_error: 2 },
+      fieldPath: ["operations[0]", "create", "ad", "final_urls[0]"],
+      trigger: "https://example.com/ac-repair",
+    });
+    expect(result.error).toContain("CONSUMER_FINANCE (PROHIBITED)");
+  });
+
   it("suppresses exact same-session retries after a policy rejection", async () => {
     const sessionAuth = { ...auth, sessionId: 901 };
     mockMutateResources.mockRejectedValueOnce({

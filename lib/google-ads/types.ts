@@ -149,12 +149,41 @@ export type PolicyRequiredAction =
   | "request_exemption"
   | "rewrite_or_request_exception";
 
+export type PolicyTopicDiagnostic = {
+  topic: string;
+  type?: string;
+  evidences: unknown[];
+  constraints: unknown[];
+  guidance: string[];
+};
+
+export type PolicyGoogleErrorDiagnostic = {
+  message?: string;
+  errorCode?: Record<string, unknown>;
+  fieldPath: string[];
+  trigger?: unknown;
+  policyTopicEntries: PolicyTopicDiagnostic[];
+  policyViolationDetails?: unknown;
+  raw: unknown;
+};
+
+export type PolicyDiagnostics = {
+  summary: string;
+  severity?: string;
+  confidence: "google_reported" | "google_policy_error";
+  fieldPaths: string[];
+  policyTopics: PolicyTopicDiagnostic[];
+  googleErrors: PolicyGoogleErrorDiagnostic[];
+  agentGuidance: string[];
+};
+
 export type PolicyRejectionDetails = {
   policyTopics: string[];
   violatingTexts: string[];
   retryable: false;
   requiredAction: PolicyRequiredAction;
   message: string;
+  diagnostics?: PolicyDiagnostics;
 };
 
 export type WriteResult = {

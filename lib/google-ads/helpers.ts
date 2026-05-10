@@ -1,4 +1,11 @@
-import type { AuthContext, NextToolHint, PolicyRejectionDetails } from "./types";
+import type {
+  AuthContext,
+  NextToolHint,
+  PolicyDiagnostics,
+  PolicyGoogleErrorDiagnostic,
+  PolicyRejectionDetails,
+  PolicyTopicDiagnostic,
+} from "./types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -53,6 +60,70 @@ export function isNegativePauseError(msg: string): boolean {
     /ad_group_criterion_error=6/i.test(msg);
 }
 
+function guidanceForPolicyTopic(topic: string): string[] {
+  const key = topic.toUpperCase();
+  const map: Record<string, string[]> = {
+    HEALTH_IN_PERSONALIZED_ADS: [
+      "Health and medical content is blocked from personalized ads targeting. Do not retry this content unchanged; request the appropriate Google Ads exemption before it can run.",
+    ],
+    CONSUMER_FINANCE: [
+      "Check ad copy and destination for financing, loan, payment plan, APR, credit, or lender language. Remove the financial claim or make sure the advertiser has the required disclosures/certification path.",
+    ],
+    FINANCIAL_PRODUCTS_AND_SERVICES: [
+      "Check for financial product/service claims and required disclosures. Remove finance-related language if the advertiser is not intentionally promoting financial services.",
+    ],
+    PERSONAL_LOANS: [
+      "Check for personal-loan language, lead generation, APR, repayment terms, and lender claims. Either remove the loan framing or provide the required disclosures.",
+    ],
+    HIGH_APR_PERSONAL_LOANS: [
+      "Check APR and loan-term claims. Google prohibits high-APR personal-loan ads in the US.",
+    ],
+    MISREPRESENTATION: [
+      "Check for unsupported or misleading claims, missing business identity, offer mismatch, pricing mismatch, guarantees, ratings, and claims not substantiated on the landing page.",
+    ],
+    UNAVAILABLE_PROMOTIONS: [
+      "Check whether discounts, free estimates, same-day service, guarantees, or special offers are real, current, and clearly available on the landing page.",
+    ],
+    DESTINATION_NOT_WORKING: [
+      "Check final URL accessibility, redirects, robots/noindex blocks, SSL, mobile rendering, geo/IP blocking, and whether Googlebot can reach the page.",
+    ],
+    DESTINATION_NOT_ACCESSIBLE: [
+      "Check final URL accessibility, redirects, robots/noindex blocks, SSL, mobile rendering, geo/IP blocking, and whether Googlebot can reach the page.",
+    ],
+    DESTINATION_REQUIREMENTS: [
+      "Check that the landing page loads reliably, clearly identifies the business, matches the ad offer, and is not blocking review crawlers.",
+    ],
+    TRADEMARKS_IN_AD_TEXT: [
+      "Check headlines and descriptions for protected brand names. Remove trademarked terms or request authorization/exception where appropriate.",
+    ],
+    TRADEMARKS: [
+      "Check ad assets and destination for protected brand names. Remove trademarked terms or request authorization/exception where appropriate.",
+    ],
+  };
+  return map[key] ?? [
+    "Google Ads rejected this content. Use the Google-reported policy topic and evidence to change the specific ad asset or destination field, then retry with revised content or request a policy exception in Google Ads Policy Manager.",
+  ];
+}
+
+function extractEvidenceTexts(evidences: unknown[]): string[] {
+  const texts = new Set<string>();
+  const visit = (value: unknown) => {
+    if (typeof value === "string") {
+      if (value.trim()) texts.add(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value && typeof value === "object") {
+      for (const nested of Object.values(value as Record<string, unknown>)) visit(nested);
+    }
+  };
+  evidences.forEach(visit);
+  return [...texts];
+}
+
 /**
  * Extract PolicyViolationDetails from a GoogleAdsFailure and rewrite it into an
  * actionable message. Google Ads returns one or more errors with
@@ -67,6 +138,41 @@ export function extractPolicyRejection(error: unknown): PolicyRejectionDetails |
   type UnknownRecord = Record<string, unknown>;
   const asRecord = (value: unknown): UnknownRecord =>
     value && typeof value === "object" ? value as UnknownRecord : {};
+  const asArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+  const firstString = (...values: unknown[]): string | undefined =>
+    values.find((value): value is string => typeof value === "string" && value.length > 0);
+  const fieldPath = (f: UnknownRecord): string[] => {
+    const location = asRecord(f.location);
+    return asArray(location.field_path_elements ?? location.fieldPathElements)
+      .map((element) => {
+        const e = asRecord(element);
+        const field = firstString(e.field_name, e.fieldName);
+        const index = typeof e.index === "number" ? `[${e.index}]` : "";
+        return field ? `${field}${index}` : index;
+      })
+      .filter(Boolean);
+  };
+  const readPolicyTopicEntries = (f: UnknownRecord): PolicyTopicDiagnostic[] => {
+    const details = asRecord(f.details);
+    const policyFindingDetails = asRecord(details.policy_finding_details ?? details.policyFindingDetails);
+    return asArray(policyFindingDetails.policy_topic_entries ?? policyFindingDetails.policyTopicEntries)
+      .map((entry) => {
+        const e = asRecord(entry);
+        const topic = firstString(e.topic) ?? "POLICY";
+        const type = firstString(e.type) ?? (typeof e.type === "number" ? String(e.type) : undefined);
+        return {
+          topic,
+          ...(type ? { type } : {}),
+          evidences: asArray(e.evidences),
+          constraints: asArray(e.constraints),
+          guidance: guidanceForPolicyTopic(topic),
+        };
+      });
+  };
+  const triggerValue = (f: UnknownRecord): unknown => {
+    const trigger = asRecord(f.trigger);
+    return trigger.string_value ?? trigger.stringValue ?? trigger.int64_value ?? trigger.int64Value ?? undefined;
+  };
   const failures = "errors" in error
     ? (error as { errors: UnknownRecord[] }).errors
     : [error as UnknownRecord];
@@ -75,8 +181,11 @@ export function extractPolicyRejection(error: unknown): PolicyRejectionDetails |
   const parts: string[] = [];
   const seenPolicies = new Set<string>();
   const violatingTexts = new Set<string>();
+  const topicDiagnostics: PolicyTopicDiagnostic[] = [];
+  const googleErrors: PolicyGoogleErrorDiagnostic[] = [];
+  const fieldPaths = new Set<string>();
   for (const f of failures) {
-    const code = asRecord(f.error_code);
+    const code = asRecord(f.error_code ?? f.errorCode);
     const isPolicy =
       code.policy_violation_error === 2 ||
       code.policy_violation_error === "POLICY_ERROR" ||
@@ -84,9 +193,27 @@ export function extractPolicyRejection(error: unknown): PolicyRejectionDetails |
     if (!isPolicy) continue;
 
     const details = asRecord(f.details);
-    const pvd = asRecord(details.policy_violation_details);
+    const pvd = asRecord(details.policy_violation_details ?? details.policyViolationDetails);
     const key = asRecord(pvd.key);
     const trigger = asRecord(f.trigger);
+    const policyTopicEntries = readPolicyTopicEntries(f);
+    const path = fieldPath(f);
+    for (const pathElement of path) fieldPaths.add(pathElement);
+    topicDiagnostics.push(...policyTopicEntries);
+    googleErrors.push({
+      ...(typeof f.message === "string" ? { message: f.message } : {}),
+      ...(Object.keys(code).length > 0 ? { errorCode: code } : {}),
+      fieldPath: path,
+      ...(triggerValue(f) !== undefined ? { trigger: triggerValue(f) } : {}),
+      policyTopicEntries,
+      ...(Object.keys(pvd).length > 0 ? { policyViolationDetails: pvd } : {}),
+      raw: f,
+    });
+    for (const entry of policyTopicEntries) {
+      seenPolicies.add(entry.topic.toUpperCase());
+      parts.push(`${entry.topic}${entry.type ? ` (${entry.type})` : ""}`);
+      for (const evidenceText of extractEvidenceTexts(entry.evidences)) violatingTexts.add(evidenceText);
+    }
     const policyName: string | undefined =
       typeof key.policy_name === "string"
         ? key.policy_name
@@ -103,13 +230,13 @@ export function extractPolicyRejection(error: unknown): PolicyRejectionDetails |
       typeof pvd.external_policy_description === "string" ? pvd.external_policy_description : undefined;
 
     const label = policyName ?? "POLICY";
-    seenPolicies.add(label.toUpperCase());
+    if (policyTopicEntries.length === 0) seenPolicies.add(label.toUpperCase());
     if (violatingText) {
       violatingTexts.add(violatingText);
       parts.push(`${label} on text "${violatingText}"`);
-    } else if (description) {
+    } else if (description && policyTopicEntries.length === 0) {
       parts.push(`${label}: ${description}`);
-    } else {
+    } else if (policyTopicEntries.length === 0) {
       parts.push(label);
     }
   }
@@ -119,17 +246,33 @@ export function extractPolicyRejection(error: unknown): PolicyRejectionDetails |
   const isHealthPolicy = seenPolicies.has("HEALTH_IN_PERSONALIZED_ADS");
   const requiredAction = isHealthPolicy ? "request_exemption" : "rewrite_or_request_exception";
 
-  const guidance = isHealthPolicy
-    ? "Health and medical content is blocked from personalized ads targeting. Do NOT retry this specific content — healthcare topics require an advertiser exemption before they can run. To apply: Google Ads → Tools → Policy Manager → Request Exemption. Rewording health/medical phrases will NOT bypass this policy; the exemption is required."
+  const agentGuidance = [...new Set(
+    [...seenPolicies].flatMap((topic) => guidanceForPolicyTopic(topic)),
+  )];
+  const guidance = agentGuidance.length > 0
+    ? agentGuidance.join(" ")
     : "Google Ads rejected this content. Rewrite without the restricted phrase, or request a policy exception in the Google Ads UI (Tools → Policy Manager).";
 
-  const message = `Policy violation: ${parts.join("; ")}. ${guidance}`;
+  const policyTopicLabels = [...seenPolicies];
+  const severity = topicDiagnostics.find((entry) => entry.type)?.type;
+  const diagnostics: PolicyDiagnostics = {
+    summary: `Rejected for ${severity ? `${severity} ` : ""}Google Ads policy topic${policyTopicLabels.length === 1 ? "" : "s"}: ${policyTopicLabels.join(", ") || "POLICY"}.`,
+    ...(severity ? { severity } : {}),
+    confidence: topicDiagnostics.length > 0 ? "google_reported" : "google_policy_error",
+    fieldPaths: [...fieldPaths],
+    policyTopics: topicDiagnostics,
+    googleErrors,
+    agentGuidance,
+  };
+
+  const message = `Policy violation: ${[...new Set(parts)].join("; ")}. ${guidance}`;
   return {
-    policyTopics: [...seenPolicies],
+    policyTopics: policyTopicLabels,
     violatingTexts: [...violatingTexts],
     retryable: false,
     requiredAction,
     message,
+    diagnostics,
   };
 }
 
