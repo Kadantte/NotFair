@@ -2,6 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.2.0] - 2026-05-10
+
+### Changed
+- **/dev dashboard tab switches now feel instant.** DevNav lives in a route-group layout (`/dev/(tabs)/layout.tsx`) so the header stays mounted across navigation — only the page body swaps. `/dev/usage` ships a `loading.tsx` skeleton for instant feedback on click, then streams the data section via `<Suspense>`. The 30-day usage query is wrapped in `unstable_cache` (60s revalidate, `'dev-usage'` tag), so repeat tab visits hit the cache instead of re-running the DB scan.
+- **"Top Users by Errors" → "Users with Lowest Success Rate" on /dev/usage.** Replaces a raw error count with a more meaningful interaction-level success rate over the last 3 days. Each user's operations are stitched into interactions on a 30-min idle gap; the panel surfaces users with ≥3 interactions ordered by ascending success rate. Error classes are folded into the same SQL CTE so the rate and the displayed error tags are computed in one pass instead of a follow-up query.
+
 ## [0.5.1.0] - 2026-05-10
 
 ### Changed

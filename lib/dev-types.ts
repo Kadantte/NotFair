@@ -14,13 +14,21 @@ export type DailyChartRow = {
     interactionSuccessRate: number | null;
 };
 
-export type TopUserByErrors = {
-    userId: string | null;
+export type LowSuccessUser = {
+    userId: string;
     googleEmail: string | null;
     primaryAccountId: string | null;
-    calls: number;
-    errors: number;
+    interactions: number;
+    successfulInteractions: number;
+    /** 0–100. */
+    successRate: number;
     topErrorClasses: string[];
+};
+
+export type LowSuccessUsers = {
+    windowDays: number;
+    minInteractions: number;
+    users: LowSuccessUser[];
 };
 
 export type TopTool = {
@@ -50,7 +58,7 @@ export type UsageStats = {
     totals: UsageTotals;
     prevTotals: PrevTotals;
     daily: DailyChartRow[];
-    topUsersByErrors: TopUserByErrors[];
+    lowSuccessUsers: LowSuccessUsers;
     topTools: TopTool[];
 };
 

@@ -15,7 +15,7 @@ import {
     scheduleContactAction,
 } from '@/app/(app)/outreach/actions';
 import { deriveMetrics, STATUS_CONFIG, BOUNCE_RATE_WARN } from '@/lib/outreach-metrics';
-import type { Contact } from '../_components/dev-types';
+import type { Contact } from '../../_components/dev-types';
 
 // Module-level stale-while-revalidate cache.
 let cachedContacts: Contact[] | null = null;

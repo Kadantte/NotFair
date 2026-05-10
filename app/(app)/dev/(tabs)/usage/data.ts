@@ -1,7 +1,8 @@
 import 'server-only';
 
+import { unstable_cache } from 'next/cache';
 import { db, schema } from '@/lib/db';
-import { sql, and, eq, gte, lt, isNotNull, inArray, desc, type SQL } from 'drizzle-orm';
+import { sql, and, eq, gte, lt, isNotNull, type SQL } from 'drizzle-orm';
 import { OP_TYPE } from '@/lib/db/tracking';
 import {
     excludeDevOpsFilter,
@@ -13,6 +14,12 @@ import {
 
 const PLATFORM_START = new Date('2026-03-25T00:00:00Z');
 
+// "Top Users by Low Success Rate" surfaces fresh quality signal — a long
+// global window would let stale outages dominate. Pin to a short fixed window
+// and require enough interactions to filter noise from one-shot users.
+const LOW_SUCCESS_WINDOW_DAYS = 3;
+const LOW_SUCCESS_MIN_INTERACTIONS = 3;
+
 export interface GetUsageDataOptions {
     days?: number;
     tz?: string;
@@ -21,7 +28,7 @@ export interface GetUsageDataOptions {
     includeDev?: boolean;
 }
 
-export async function getUsageData({
+async function fetchUsageData({
     days: rawDays = 30,
     tz = 'UTC',
     source = null,
@@ -37,6 +44,12 @@ export async function getUsageData({
     const sinceIso = since.toISOString();
     const nowIso = now.toISOString();
     const interactionLookbackIso = new Date(since.getTime() - 30 * 60 * 1000).toISOString();
+
+    const lowSuccessSince = new Date(now.getTime() - LOW_SUCCESS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const lowSuccessSinceIso = lowSuccessSince.toISOString();
+    // 30-min buffer matches the interaction-stitching gap used elsewhere — without
+    // it, the first interaction of the window could be misclassified as "new".
+    const lowSuccessLookbackIso = new Date(lowSuccessSince.getTime() - 30 * 60 * 1000).toISOString();
 
     const platformFilter = platform ? eq(schema.operations.platform, platform) : null;
     const devExcludeForAlias = (alias: SQL) =>
@@ -75,7 +88,7 @@ export async function getUsageData({
                 ? sql`AND o.client_source = ${source}`
                 : sql``;
 
-    const [totalsRow, prevTotalsRow, newUsersRow, dailyCounts, dailyInteractions, topUsers, topTools] = await Promise.all([
+    const [totalsRow, prevTotalsRow, newUsersRow, dailyCounts, dailyInteractions, lowSuccessUsers, topTools] = await Promise.all([
         db()
             .select({
                 calls: operationRowCount(schema.operations),
@@ -208,24 +221,114 @@ export async function getUsageData({
       ORDER BY local_day
     `),
 
-        db()
-            .select({
-                userId: schema.operations.userId,
-                calls: operationRowCount(schema.operations),
-                errors: operationErrorRowCount(schema.operations),
-                googleEmail: sql<string | null>`max(${schema.mcpSessions.googleEmail})`,
-                primaryAccountId: sql<string | null>`max(${schema.mcpSessions.customerId})`,
-            })
-            .from(schema.operations)
-            .leftJoin(
-                schema.mcpSessions,
-                sql`${schema.mcpSessions.userId} = ${schema.operations.userId}`,
-            )
-            .where(and(whereRecent, isNotNull(schema.operations.userId)))
-            .groupBy(schema.operations.userId)
-            .having(sql`${operationErrorRowCount(schema.operations)} > 0`)
-            .orderBy(desc(operationErrorRowCount(schema.operations)))
-            .limit(10),
+        // Fixed short window: long ranges let stale outages dominate and one-shot
+        // users dilute the rate. Stitches ops into interactions on a 30-min gap.
+        db().execute(sql`
+      WITH filtered AS (
+        SELECT
+          o.id,
+          o.user_id,
+          o.account_id,
+          COALESCE(o.client_source, 'chat') AS client_source,
+          o.platform,
+          o.created_at,
+          o.success,
+          o.error_class
+        FROM operations o
+        WHERE o.created_at >= ${lowSuccessLookbackIso}::timestamp
+          AND o.created_at < ${nowIso}::timestamp
+          AND o.user_id IS NOT NULL
+          ${includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`}
+          ${platform ? sql`AND o.platform = ${platform}` : sql``}
+          ${interactionSourceFilter}
+      ),
+      ordered AS (
+        SELECT
+          *,
+          LAG(created_at) OVER (
+            PARTITION BY user_id, account_id, client_source, platform
+            ORDER BY created_at, id
+          ) AS prev_created_at
+        FROM filtered
+      ),
+      marked AS (
+        SELECT
+          *,
+          CASE
+            WHEN prev_created_at IS NULL THEN 1
+            WHEN created_at - prev_created_at > interval '30 minutes' THEN 1
+            ELSE 0
+          END AS new_interaction
+        FROM ordered
+      ),
+      numbered AS (
+        SELECT
+          *,
+          SUM(new_interaction) OVER (
+            PARTITION BY user_id, account_id, client_source, platform
+            ORDER BY created_at, id
+          ) AS interaction_seq
+        FROM marked
+      ),
+      interactions AS (
+        SELECT
+          user_id,
+          account_id,
+          client_source,
+          platform,
+          interaction_seq,
+          MIN(created_at) AS interaction_start,
+          (ARRAY_AGG(success ORDER BY created_at DESC, id DESC))[1] = 1 AS ended_successfully
+        FROM numbered
+        GROUP BY user_id, account_id, client_source, platform, interaction_seq
+      ),
+      per_user AS (
+        SELECT
+          user_id,
+          count(*)::int AS interactions,
+          count(*) FILTER (WHERE ended_successfully)::int AS successful_interactions
+        FROM interactions
+        WHERE interaction_start >= ${lowSuccessSinceIso}::timestamp
+        GROUP BY user_id
+        HAVING count(*) >= ${LOW_SUCCESS_MIN_INTERACTIONS}
+      ),
+      ranked_error_classes AS (
+        SELECT
+          user_id,
+          error_class,
+          count(*) AS cnt,
+          ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY count(*) DESC, error_class) AS rk
+        FROM filtered
+        WHERE error_class IS NOT NULL
+        GROUP BY user_id, error_class
+      ),
+      top_error_classes AS (
+        SELECT user_id, ARRAY_AGG(error_class ORDER BY cnt DESC) AS error_classes
+        FROM ranked_error_classes
+        WHERE rk <= 3
+        GROUP BY user_id
+      )
+      SELECT
+        pu.user_id AS "userId",
+        pu.interactions,
+        pu.successful_interactions AS "successfulInteractions",
+        s.google_email AS "googleEmail",
+        s.customer_id AS "primaryAccountId",
+        COALESCE(tec.error_classes, ARRAY[]::text[]) AS "topErrorClasses"
+      FROM per_user pu
+      LEFT JOIN top_error_classes tec ON tec.user_id = pu.user_id
+      LEFT JOIN LATERAL (
+        SELECT google_email, customer_id
+        FROM mcp_sessions
+        WHERE user_id = pu.user_id
+        ORDER BY created_at DESC NULLS LAST
+        LIMIT 1
+      ) s ON TRUE
+      ORDER BY
+        (pu.successful_interactions::float / NULLIF(pu.interactions, 0)) ASC,
+        pu.interactions DESC
+      LIMIT 10
+    `),
 
         db().execute(sql`
       WITH per_op AS (
@@ -252,36 +355,14 @@ export async function getUsageData({
     `),
     ]);
 
-    const topUserIds = topUsers
-        .map((u) => u.userId)
-        .filter((id): id is string => id != null);
-
-    const errorClassByUser = new Map<string, string[]>();
-    if (topUserIds.length > 0) {
-        const errorClassRows = await db()
-            .select({
-                userId: schema.operations.userId,
-                errorClass: schema.operations.errorClass,
-                cnt: operationRowCount(schema.operations),
-            })
-            .from(schema.operations)
-            .where(
-                and(
-                    whereRecent,
-                    isNotNull(schema.operations.errorClass),
-                    inArray(schema.operations.userId, topUserIds),
-                ),
-            )
-            .groupBy(schema.operations.userId, schema.operations.errorClass)
-            .orderBy(desc(operationRowCount(schema.operations)));
-
-        for (const row of errorClassRows) {
-            if (!row.userId || !row.errorClass) continue;
-            const arr = errorClassByUser.get(row.userId) ?? [];
-            if (arr.length < 3) arr.push(row.errorClass);
-            errorClassByUser.set(row.userId, arr);
-        }
-    }
+    const lowSuccessRows = lowSuccessUsers as unknown as Array<{
+        userId: string;
+        interactions: number | string;
+        successfulInteractions: number | string;
+        googleEmail: string | null;
+        primaryAccountId: string | null;
+        topErrorClasses: string[] | null;
+    }>;
 
     const totals = totalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
     const prev = prevTotalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
@@ -333,14 +414,26 @@ export async function getUsageData({
                         : null,
             };
         }),
-        topUsersByErrors: topUsers.map((u) => ({
-            userId: u.userId,
-            googleEmail: u.googleEmail,
-            primaryAccountId: u.primaryAccountId,
-            calls: u.calls,
-            errors: u.errors,
-            topErrorClasses: errorClassByUser.get(u.userId ?? '') ?? [],
-        })),
+        lowSuccessUsers: {
+            windowDays: LOW_SUCCESS_WINDOW_DAYS,
+            minInteractions: LOW_SUCCESS_MIN_INTERACTIONS,
+            users: lowSuccessRows.map((u) => {
+                const interactions = Number(u.interactions ?? 0);
+                const successfulInteractions = Number(u.successfulInteractions ?? 0);
+                return {
+                    userId: u.userId,
+                    googleEmail: u.googleEmail,
+                    primaryAccountId: u.primaryAccountId,
+                    interactions,
+                    successfulInteractions,
+                    successRate:
+                        interactions > 0
+                            ? (successfulInteractions / interactions) * 100
+                            : 0,
+                    topErrorClasses: u.topErrorClasses ?? [],
+                };
+            }),
+        },
         topTools: (
             topTools as unknown as Array<{
                 toolName: string | null;
@@ -359,4 +452,21 @@ export async function getUsageData({
     };
 }
 
-export type UsageData = Awaited<ReturnType<typeof getUsageData>>;
+export type UsageData = Awaited<ReturnType<typeof fetchUsageData>>;
+
+// Cache key includes every input that changes the result. Short revalidate
+// keeps repeat tab visits / refreshes near-instant without serving very stale
+// data; the API route can still pass `fresh` to bypass via a different code
+// path. Tag lets us invalidate from elsewhere if needed.
+export function getUsageData(opts: GetUsageDataOptions = {}): Promise<UsageData> {
+    const days = Number.isFinite(opts.days) ? Math.min(Math.max(opts.days as number, 1), 90) : 30;
+    const tz = opts.tz ?? 'UTC';
+    const source = opts.source ?? 'all';
+    const platform = opts.platform ?? 'all';
+    const includeDev = opts.includeDev ? '1' : '0';
+    return unstable_cache(
+        () => fetchUsageData(opts),
+        ['dev-usage', String(days), tz, source, platform, includeDev],
+        { revalidate: 60, tags: ['dev-usage'] },
+    )();
+}

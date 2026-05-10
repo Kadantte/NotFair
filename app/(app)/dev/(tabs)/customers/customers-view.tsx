@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { errorRateColor } from '@/lib/dev-format';
-import type { Customer, CustomerSortKey, SortDir } from '../_components/dev-types';
+import type { Customer, CustomerSortKey, SortDir } from '../../_components/dev-types';
 import {
     deriveBudgetDisplay,
     attributionTone,
@@ -18,7 +18,7 @@ import {
     formatCurrency,
     formatDateTime,
     formatDateShort,
-} from '../_components/dev-utils';
+} from '../../_components/dev-utils';
 
 const CUSTOMER_PAGE_SIZE = 50;
 

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, AlertCircle, Loader2, X, ChevronDown, Check, Filter, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatDateTime } from '../_components/dev-utils';
-import type { WaitlistRow } from '../_components/dev-types';
+import { formatDateTime } from '../../_components/dev-utils';
+import type { WaitlistRow } from '../../_components/dev-types';
 
 // Module-level stale-while-revalidate cache.
 let cachedWaitlist: WaitlistRow[] | null = null;

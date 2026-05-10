@@ -7,7 +7,7 @@ import { RefreshCw, AlertCircle, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { errorRateColor, SOURCE_LABELS, DEV_RANGE_OPTIONS, RangePicker } from '@/lib/dev-format';
 import type { UsageStats } from '@/lib/dev-types';
-import type { UsagePlatform } from '../_components/dev-types';
+import type { UsagePlatform } from '../../_components/dev-types';
 
 const UsageCharts = dynamic(() => import('./usage-charts'), { ssr: false });
 
@@ -280,32 +280,37 @@ export function UsageView({ initialData }: Props) {
                     {/* ── Charts (dynamically imported) ── */}
                     <UsageCharts stats={stats} usageDays={usageDays} />
 
-                    {/* ── Two-column: top users by errors + top tools ── */}
+                    {/* ── Two-column: lowest success rate + top tools ── */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        {/* Top users by errors */}
+                        {/* Users with the lowest interaction success rate */}
                         <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 overflow-hidden">
                             <div className="px-4 py-3 border-b border-[#3D3C36]">
-                                <h2 className="text-sm font-semibold text-[#E8E4DD]">Top Users by Errors</h2>
-                                <p className="text-[11px] text-[#C4C0B6] mt-0.5">Click a row to open their account</p>
+                                <h2 className="text-sm font-semibold text-[#E8E4DD]">Users with Lowest Success Rate</h2>
+                                <p className="text-[11px] text-[#C4C0B6] mt-0.5">
+                                    Last {stats.lowSuccessUsers.windowDays}d · ≥{stats.lowSuccessUsers.minInteractions} interactions · click to open account
+                                </p>
                             </div>
-                            {stats.topUsersByErrors.length === 0 ? (
+                            {stats.lowSuccessUsers.users.length === 0 ? (
                                 <div className="px-4 py-8 text-center text-sm text-[#5DBE82]">
-                                    No errors in this range.
+                                    No qualifying users in the last {stats.lowSuccessUsers.windowDays} days.
                                 </div>
                             ) : (
                                 <div className="divide-y divide-[#3D3C36]/50">
-                                    {stats.topUsersByErrors.map((u) => {
-                                        const rate = u.calls > 0 ? (u.errors / u.calls) * 100 : 0;
-                                        const rateColor = errorRateColor(rate);
+                                    {stats.lowSuccessUsers.users.map((u) => {
+                                        // Reuse error palette: lower success rate is "more red"; treat
+                                        // failure rate as the input so existing thresholds carry over.
+                                        const failureRate = 100 - u.successRate;
+                                        const rateColor = errorRateColor(failureRate);
+                                        const failed = u.interactions - u.successfulInteractions;
                                         const target = u.primaryAccountId ? `/dev/${u.primaryAccountId}` : null;
                                         const row = (
                                             <div className="flex items-start gap-3 px-4 py-2.5">
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-[13px] font-mono text-[#E8E4DD] truncate">
-                                                        {u.googleEmail ?? u.userId ?? 'Unknown'}
+                                                        {u.googleEmail ?? u.userId}
                                                     </div>
                                                     <div className="text-[11px] text-[#C4C0B6] font-mono mt-0.5">
-                                                        {u.errors.toLocaleString()} errs / {u.calls.toLocaleString()} calls
+                                                        {failed.toLocaleString()} failed / {u.interactions.toLocaleString()} interactions
                                                     </div>
                                                     {u.topErrorClasses.length > 0 && (
                                                         <div className="flex flex-wrap gap-1 mt-1">
@@ -318,13 +323,13 @@ export function UsageView({ initialData }: Props) {
                                                     )}
                                                 </div>
                                                 <div className={`shrink-0 font-mono text-sm tabular-nums font-semibold ${rateColor}`}>
-                                                    {rate.toFixed(1)}%
+                                                    {u.successRate.toFixed(1)}%
                                                 </div>
                                             </div>
                                         );
                                         return target ? (
                                             <Link
-                                                key={u.userId ?? u.googleEmail ?? 'u'}
+                                                key={u.userId}
                                                 href={target}
                                                 prefetch
                                                 className="block hover:bg-[#2E2D28] transition-colors cursor-pointer"
@@ -332,9 +337,7 @@ export function UsageView({ initialData }: Props) {
                                                 {row}
                                             </Link>
                                         ) : (
-                                            <div key={u.userId ?? u.googleEmail ?? 'u'} className="block">
-                                                {row}
-                                            </div>
+                                            <div key={u.userId}>{row}</div>
                                         );
                                     })}
                                 </div>

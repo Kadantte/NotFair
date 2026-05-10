@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireDevEmail } from "@/lib/dev-access";
-import { getGrowthOverrideData } from "@/app/(app)/dev/developer/data";
+import { getGrowthOverrideData } from "@/app/(app)/dev/(tabs)/developer/data";
 
 /**
  * Toggle the per-session "growth override" for dev users.

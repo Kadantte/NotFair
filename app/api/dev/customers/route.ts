@@ -1,5 +1,5 @@
 import { requireDevEmail } from "@/lib/dev-access";
-import { getCustomersData } from "@/app/(app)/dev/customers/data";
+import { getCustomersData } from "@/app/(app)/dev/(tabs)/customers/data";
 
 // Single-tenant admin cache: dev dashboard is hit by a tiny set of authorized
 // users, and the underlying data (sessions, ops counts, account snapshots)

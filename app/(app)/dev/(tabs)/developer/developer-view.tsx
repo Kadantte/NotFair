@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, AlertTriangle, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { ResetPreview } from '../_components/dev-types';
+import type { ResetPreview } from '../../_components/dev-types';
 
 type Props = { initialData?: { state: 'on' | 'off' } };
 

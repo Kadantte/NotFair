@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { requireDevEmail } from "@/lib/dev-access";
-import { getWaitlistData } from "@/app/(app)/dev/waitlist/data";
+import { getWaitlistData } from "@/app/(app)/dev/(tabs)/waitlist/data";
 
 export async function GET() {
   const denied = await requireDevEmail();

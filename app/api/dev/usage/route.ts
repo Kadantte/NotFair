@@ -1,5 +1,5 @@
 import { requireDevEmail } from "@/lib/dev-access";
-import { getUsageData } from "@/app/(app)/dev/usage/data";
+import { getUsageData } from "@/app/(app)/dev/(tabs)/usage/data";
 
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { data: unknown; ts: number }>();

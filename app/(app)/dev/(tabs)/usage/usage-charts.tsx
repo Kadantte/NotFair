@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import { ChartTooltipShell, DEV_RANGE_OPTIONS } from '@/lib/dev-format';
 import type { UsageStats } from '@/lib/dev-types';
-import { formatYTick, CHART_MARGIN, CHART_CURSOR, LEGEND_STYLE } from '../_components/dev-utils';
+import { formatYTick, CHART_MARGIN, CHART_CURSOR, LEGEND_STYLE } from '../../_components/dev-utils';
 
 type UsageChartsProps = {
     stats: UsageStats;
