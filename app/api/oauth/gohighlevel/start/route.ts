@@ -1,14 +1,15 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
-import { getGoHighLevelInstallUrl } from "@/lib/gohighlevel/oauth";
+import { getAppOrigin } from "@/lib/app-url";
+import { getGoHighLevelClientId, getGoHighLevelInstallUrl, getGoHighLevelRedirectUri } from "@/lib/gohighlevel/oauth";
 import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
 import { identifyUser } from "@/lib/auth/identify-user";
 
 const STATE_COOKIE = "nf_ghl_oauth_state";
 
 function getSafeNext(next: string | null): string {
-  if (!next || !next.startsWith("/")) return "/connect/gohighlevel?status=connected";
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/connect/gohighlevel?status=connected";
   return next;
 }
 
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
 
   const state = Buffer.from(JSON.stringify({ nonce, userId: identity.userId, next })).toString("base64url");
   const installUrl = new URL(getGoHighLevelInstallUrl());
+  installUrl.searchParams.set("client_id", getGoHighLevelClientId());
+  installUrl.searchParams.set("redirect_uri", getGoHighLevelRedirectUri(getAppOrigin()));
   // HighLevel's Marketplace install link is generated in their UI. If it
   // preserves unknown query params, this gives us normal OAuth CSRF `state`.
   // If it drops them, the callback still verifies the httpOnly cookie below.

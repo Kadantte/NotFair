@@ -1624,7 +1624,8 @@
     "items": {
       "googleAds": "Google Ads MCP",
       "metaAds": "Meta Ads MCP",
-      "design": "Design MCP"
+      "design": "Design MCP",
+      "gohighlevel": "GoHighLevel MCP"
     }
   },
   "MissingPlatformWarning": {
@@ -1674,9 +1675,20 @@
     "unknown": "unknown",
     "connectAnother": "Connect another HighLevel account",
     "connect": "Connect GoHighLevel",
-    "marketplaceNote": "You will be sent to the GoHighLevel Marketplace install flow.",
+    "marketplaceNote": "The GoHighLevel Marketplace install flow opens in a new tab. Return here after approving access.",
     "uninstalled": "Uninstalled",
     "patCount": "{count} tokens issued",
+    "claude": {
+      "title": "Add this to Claude Cowork",
+      "body": "In Claude Connectors, add a custom connector with this name and Remote MCP Server URL.",
+      "open": "Open Claude Connectors",
+      "nameLabel": "Connector name",
+      "urlLabel": "Remote MCP Server URL",
+      "copyUrl": "Copy",
+      "copied": "Copied",
+      "copyUrlAria": "Copy GoHighLevel MCP server URL",
+      "note": "Claude handles OAuth for this connector. No Client ID, Client Secret, or PAT is needed for Claude Cowork."
+    },
     "disconnect": {
       "label": "Disconnect",
       "confirm": "Disconnect this HighLevel account? Any access tokens issued from it will stop working immediately.",

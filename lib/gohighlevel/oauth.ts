@@ -20,7 +20,7 @@ const TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const LOCATION_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/locationToken";
 const INSTALLED_LOCATIONS_URL = "https://services.leadconnectorhq.com/oauth/installedLocations";
 export const GHL_API_VERSION = "2021-07-28";
-
+const DEFAULT_REDIRECT_PATH = "/api/oauth/crm/callback";
 
 /**
  * Refresh the access token when it has fewer than this many seconds left.
@@ -34,6 +34,10 @@ function clientId(): string {
   return getRequiredEnv("GOHIGHLEVEL_CLIENT_ID");
 }
 
+export function getGoHighLevelClientId(): string {
+  return clientId();
+}
+
 function clientSecret(): string {
   return getRequiredEnv("GOHIGHLEVEL_CLIENT_SECRET");
 }
@@ -43,7 +47,7 @@ export function getGoHighLevelInstallUrl(): string {
 }
 
 export function getGoHighLevelRedirectUri(origin: string): string {
-  return getEnv("GOHIGHLEVEL_REDIRECT_URI") ?? `${origin}/api/oauth/gohighlevel/callback`;
+  return getEnv("GOHIGHLEVEL_REDIRECT_URI") ?? `${origin}${DEFAULT_REDIRECT_PATH}`;
 }
 
 export type GoHighLevelTokenResponse = {
@@ -286,7 +290,7 @@ export async function getValidAccessToken(
     const userType = conn.userType === "Location" ? "Location" : "Company";
     const redirectUri = opts?.redirectUri
       ?? getEnv("GOHIGHLEVEL_REDIRECT_URI")
-      ?? `${getEnv("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}/api/oauth/gohighlevel/callback`;
+      ?? `${getEnv("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000"}${DEFAULT_REDIRECT_PATH}`;
 
     const refreshed = await refreshAccessToken({
       refreshToken: refreshTokenPlain,

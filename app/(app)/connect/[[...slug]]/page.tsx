@@ -1,4 +1,6 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isGhlDevAllowed } from "@/lib/gohighlevel/dev-gate";
+import { getSession } from "@/lib/session";
 
 type Props = {
   params: Promise<{ slug?: string[] }>;
@@ -18,6 +20,7 @@ type Props = {
 export default async function LegacyConnectRedirect({ params, searchParams }: Props) {
   const { slug } = await params;
   const sp = await searchParams;
+
   const tail = slug && slug.length > 0 ? `/${slug.join("/")}` : "";
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) {
@@ -25,5 +28,12 @@ export default async function LegacyConnectRedirect({ params, searchParams }: Pr
     else if (typeof v === "string") qs.set(k, v);
   }
   const query = qs.toString();
+
+  if (slug?.[0] === "gohighlevel" || slug?.[0] === "go-high-level" || slug?.[0] === "ghl") {
+    const session = await getSession();
+    if (!isGhlDevAllowed(session)) notFound();
+    redirect(`/connect/gohighlevel${query ? `?${query}` : ""}`);
+  }
+
   redirect(`/connect/google-ads${tail}${query ? `?${query}` : ""}`);
 }

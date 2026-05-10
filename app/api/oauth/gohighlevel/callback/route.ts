@@ -19,6 +19,13 @@ type DecodedState = {
   next: string;
 };
 
+function getSafeNext(next: unknown): string {
+  if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//")) {
+    return "/connect/gohighlevel";
+  }
+  return next;
+}
+
 function decodeState(raw: string | null): DecodedState | null {
   if (!raw) return null;
   try {
@@ -31,7 +38,7 @@ function decodeState(raw: string | null): DecodedState | null {
     return {
       nonce: json.nonce,
       userId: json.userId,
-      next: typeof json.next === "string" && json.next.startsWith("/") ? json.next : "/connect/gohighlevel",
+      next: getSafeNext(json.next),
     };
   } catch {
     return null;
@@ -43,7 +50,7 @@ function redirectToSurface(opts: {
   reason?: string;
   next?: string;
 }): NextResponse {
-  const url = new URL(opts.next ?? "/connect/gohighlevel", getAppOrigin());
+  const url = new URL(getSafeNext(opts.next), getAppOrigin());
   url.searchParams.set("platform", "gohighlevel");
   url.searchParams.set("status", opts.status);
   if (opts.reason) url.searchParams.set("reason", opts.reason);

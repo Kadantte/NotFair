@@ -164,7 +164,9 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
             <GoogleConnectedToast />
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
                 <div className="mx-auto max-w-4xl">
-                    {!hasGoogleCustomer && session.connected && <MissingPlatformWarning platform="google_ads" />}
+                    {activeTab !== 'gohighlevel' && !hasGoogleCustomer && session.connected && (
+                        <MissingPlatformWarning platform="google_ads" />
+                    )}
                     {(error || isKnownReason(errorReason)) && (() => {
                         const reason: ErrorReason = isKnownReason(errorReason) ? errorReason : 'generic';
                         const copy = getErrorCopy(reason, { fallbackMessage: error, t });

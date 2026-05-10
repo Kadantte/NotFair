@@ -651,6 +651,18 @@
           "title": "เซิร์ฟเวอร์ MCP สำหรับ Google Ads",
           "description": "การตั้งค่า MCP ทั่วไปและรายการเครื่องมือสำหรับ {connectorName}"
         },
+        "googleAdsConnector": {
+          "title": "คอนเนกเตอร์ Google Ads",
+          "description": "เชื่อมต่อ Google Ads กับ Claude, Codex, Cursor, Cline และไคลเอนต์ MCP แบบกำหนดเอง"
+        },
+        "googleAdsAiTool": {
+          "title": "เครื่องมือ AI สำหรับ Google Ads",
+          "description": "ใช้การเชื่อมต่อ MCP แบบโฮสต์เป็น workflow Google Ads ที่มี AI ช่วย"
+        },
+        "googleAdsOptimizationTool": {
+          "title": "เครื่องมือเพิ่มประสิทธิภาพ Google Ads",
+          "description": "ไปจากการวิเคราะห์สู่ negative keywords, bids, budgets และการแก้ไขแคมเปญที่อนุมัติแล้ว"
+        },
         "metaAdsMcp": {
           "title": "เซิร์ฟเวอร์ MCP สำหรับ Meta Ads",
           "description": "การตั้งค่า MCP ทั่วไปและรายการเครื่องมือสำหรับ {connectorName}"
@@ -689,6 +701,33 @@
       "eyebrow": "การตั้งค่า MCP ทั่วไป",
       "title": "การตั้งค่า 2 แบบที่ใช้ได้กับไคลเอนต์ MCP ทุกตัว",
       "body": "สำหรับคู่มือตามไคลเอนต์ (Claude.ai, Claude Code, Codex) ให้ดูคู่มือที่ลิงก์ไว้ด้านล่าง"
+    },
+    "comparison": {
+      "eyebrow": "เปรียบเทียบเซิร์ฟเวอร์ MCP",
+      "title": "ชั้นการทำงานแบบโฮสต์ ไม่ใช่แค่ wrapper แบบอ่านอย่างเดียว",
+      "body": "MCP ทางการของ Google Ads เหมาะกับนักพัฒนาที่ต้องการโฮสต์การเข้าถึงแบบอ่านอย่างเดียวเอง NotFair สร้างมาสำหรับผู้ดูแลแคมเปญที่ต้องการตั้งค่า OAuth, วิเคราะห์สด และให้ AI client เสนอการเขียนที่ต้องอนุมัติก่อน",
+      "columns": {
+        "factor": "ปัจจัย",
+        "official": "MCP ทางการ / โฮสต์เอง",
+        "notfair": "MCP ที่ NotFair โฮสต์"
+      },
+      "items": [
+        {
+          "label": "การตั้งค่า",
+          "official": "ต้องมีโปรเจกต์ Google Cloud, developer token, OAuth credentials, runtime ในเครื่อง และ config ของไคลเอนต์",
+          "notfair": "ใช้ endpoint แบบโฮสต์ เข้าสู่ระบบด้วย Google เลือกบัญชี แล้วเพิ่มคอนเนกเตอร์ใน AI client"
+        },
+        {
+          "label": "การทำงาน",
+          "official": "เหมาะกับรายงานแบบอ่านอย่างเดียวและการสำรวจ GAQL แบบกำหนดเอง",
+          "notfair": "อ่านข้อมูลสด วิเคราะห์ปัญหา เตรียมการเขียน และอนุมัติการเปลี่ยนแปลง เช่น negative keywords, bids, budgets และสถานะแคมเปญ"
+        },
+        {
+          "label": "การควบคุม",
+          "official": "คุณดูแล infrastructure และการตั้งค่า token เอง",
+          "notfair": "NotFair จัดการ OAuth และการเชื่อม API พร้อมคงให้การเขียนบัญชีต้องชัดเจน ตรวจสอบได้ และติดตามย้อนหลังได้"
+        }
+      ]
     },
     "tools": {
       "eyebrow": "เครื่องมือที่เปิดให้ใช้",
@@ -797,6 +836,10 @@
       "title": "คู่มือตั้งค่าตามไคลเอนต์",
       "intro": "คู่มือทีละขั้นสำหรับไคลเอนต์ที่รองรับแต่ละตัว",
       "links": {
+        "connector": {
+          "title": "คอนเนกเตอร์ Google Ads",
+          "description": "ทำความเข้าใจเส้นทางคอนเนกเตอร์แบบโฮสต์สำหรับ Claude, Codex, Cursor และไคลเอนต์ MCP ทั่วไป"
+        },
         "claudeConnector": {
           "title": "คู่มือตั้งค่า Claude Connector",
           "description": "ติดตั้ง NotFair เป็นคอนเนกเตอร์ MCP แบบกำหนดเองใน Claude.ai Web, Desktop หรือ Cowork"
@@ -808,6 +851,10 @@
         "codex": {
           "title": "คู่มือตั้งค่า MCP สำหรับ Codex",
           "description": "ติดตั้ง NotFair MCP สำหรับ OpenAI Codex CLI ด้วยคำสั่งเดียว"
+        },
+        "aiTool": {
+          "title": "เครื่องมือ AI สำหรับ Google Ads",
+          "description": "ดูว่าการเชื่อมต่อ MCP เดียวกันกลายเป็น workflow Google Ads ที่มี AI ช่วยได้อย่างไร"
         }
       }
     }
@@ -1571,7 +1618,8 @@
     "items": {
       "googleAds": "MCP สำหรับ Google Ads",
       "metaAds": "MCP สำหรับ Meta Ads",
-      "design": "MCP สำหรับงานออกแบบ"
+      "design": "MCP สำหรับงานออกแบบ",
+      "gohighlevel": "MCP สำหรับ GoHighLevel"
     }
   },
   "MissingPlatformWarning": {
@@ -1621,9 +1669,20 @@
     "unknown": "ไม่ทราบ",
     "connectAnother": "เชื่อมต่อบัญชี HighLevel อื่น",
     "connect": "เชื่อมต่อ GoHighLevel",
-    "marketplaceNote": "คุณจะถูกส่งไปยังขั้นตอนติดตั้งของ GoHighLevel Marketplace",
+    "marketplaceNote": "ขั้นตอนติดตั้งของ GoHighLevel Marketplace จะเปิดในแท็บใหม่ กลับมาที่นี่หลังจากอนุมัติสิทธิ์แล้ว",
     "uninstalled": "ถอนการติดตั้งแล้ว",
     "patCount": "ออกโทเค็น {count} รายการแล้ว",
+    "claude": {
+      "title": "เพิ่มไปยัง Claude Cowork",
+      "body": "ใน Claude Connectors ให้เพิ่ม custom connector โดยใช้ชื่อนี้และ Remote MCP Server URL นี้",
+      "open": "เปิด Claude Connectors",
+      "nameLabel": "ชื่อ connector",
+      "urlLabel": "URL เซิร์ฟเวอร์ MCP ระยะไกล",
+      "copyUrl": "คัดลอก",
+      "copied": "คัดลอกแล้ว",
+      "copyUrlAria": "คัดลอก URL เซิร์ฟเวอร์ MCP ของ GoHighLevel",
+      "note": "Claude จะจัดการ OAuth สำหรับ connector นี้ ไม่ต้องใช้ Client ID, Client Secret หรือ PAT สำหรับ Claude Cowork"
+    },
     "disconnect": {
       "label": "ตัดการเชื่อมต่อ",
       "confirm": "ตัดการเชื่อมต่อบัญชี HighLevel นี้หรือไม่? โทเค็นการเข้าถึงที่ออกจากบัญชีนี้จะหยุดทำงานทันที",

@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useTranslations } from 'next-intl';
-import { CheckCircle2, ExternalLink, Loader2, ShieldCheck, Trash2, Key, Copy, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { DevOnlyBadge } from '@/components/gohighlevel/dev-only-badge';
-import { GOHIGHLEVEL_READONLY_SCOPES } from '@/lib/gohighlevel/scopes';
-import type { Session } from '@/lib/session';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Key, Loader2, ShieldCheck, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DevOnlyBadge } from "@/components/gohighlevel/dev-only-badge";
+import { GHL_MCP_CONNECTOR_NAME, GHL_MCP_SERVER_URL } from "@/lib/brand";
+import { GOHIGHLEVEL_READONLY_SCOPES } from "@/lib/gohighlevel/scopes";
+import type { Session } from "@/lib/session";
 
 // Single source of truth — keeps the displayed scopes list in lock-step
 // with what the OAuth flow actually requests.
@@ -38,6 +39,7 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [issuedToken, setIssuedToken] = useState<{ token: string; connectionId: number } | null>(null);
   const [copyOk, setCopyOk] = useState(false);
+  const [serverUrlCopyOk, setServerUrlCopyOk] = useState(false);
 
   const refresh = async () => {
     try {
@@ -61,8 +63,21 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
     refresh().catch(() => {
       if (!cancelled) setStatus({ connected: false, connections: [] });
     });
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        refresh().catch(() => {
+          if (!cancelled) setStatus({ connected: false, connections: [] });
+        });
+      }
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 
@@ -120,6 +135,16 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
       setTimeout(() => setCopyOk(false), 1800);
     } catch {
       // Clipboard may be blocked — leave the token visible for manual copy.
+    }
+  };
+
+  const copyServerUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(GHL_MCP_SERVER_URL);
+      setServerUrlCopyOk(true);
+      setTimeout(() => setServerUrlCopyOk(false), 1800);
+    } catch {
+      // Keep the URL visible for manual copy if clipboard access is blocked.
     }
   };
 
@@ -211,72 +236,129 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
         ) : (
           <div className="space-y-5">
             {status.connected && (
-              <div className="mx-auto max-w-2xl rounded-xl border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 p-4 text-left">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#4CAF6E]">
-                  <CheckCircle2 className="h-4 w-4" /> {t('connected')}
-                </div>
-                <div className="mt-3 space-y-2">
-                  {status.connections.map((connection) => (
-                    <div
-                      key={connection.id}
-                      className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-3 text-sm text-[#C4C0B6]"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-medium text-[#E8E4DD] truncate">
-                            {connection.locationName
-                              || connection.companyName
-                              || connection.locationId
-                              || connection.companyId
-                              || t('fallbackConnection')}
-                            {connection.uninstalledAt && (
-                              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#FFB74D]/40 bg-[#FFB74D]/10 px-2 py-0.5 text-xs text-[#FFB74D]">
-                                <AlertTriangle className="h-3 w-3" /> {t('uninstalled')}
-                              </span>
-                            )}
+              <div className="mx-auto max-w-2xl space-y-4 text-left">
+                <div className="rounded-lg border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[#4CAF6E]">
+                    <CheckCircle2 className="h-4 w-4" /> {t("connected")}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {status.connections.map((connection) => (
+                      <div
+                        key={connection.id}
+                        className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-3 text-sm text-[#C4C0B6]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-[#E8E4DD]">
+                              {connection.locationName
+                                || connection.companyName
+                                || connection.locationId
+                                || connection.companyId
+                                || t("fallbackConnection")}
+                              {connection.uninstalledAt && (
+                                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#FFB74D]/40 bg-[#FFB74D]/10 px-2 py-0.5 text-xs text-[#FFB74D]">
+                                  <AlertTriangle className="h-3 w-3" /> {t("uninstalled")}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 text-xs text-[#C4C0B6]/80">
+                              {connection.userType} · {t("company")}{" "}
+                              {connection.companyId ?? t("unknown")}
+                              {connection.locationId ? ` · ${t("location")} ${connection.locationId}` : ""}
+                              {connection.activePatCount > 0
+                                ? ` · ${t("patCount", { count: connection.activePatCount })}`
+                                : ""}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs text-[#C4C0B6]/80">
-                            {connection.userType} · {t('company')}{' '}
-                            {connection.companyId ?? t('unknown')}
-                            {connection.locationId ? ` · ${t('location')} ${connection.locationId}` : ''}
-                            {connection.activePatCount > 0
-                              ? ` · ${t('patCount', { count: connection.activePatCount })}`
-                              : ''}
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busyId === connection.id}
+                              onClick={() => handleMintPat(connection.id)}
+                              className="rounded-full border-[#3D3C36] text-[#C4C0B6] hover:bg-[#24231F]"
+                            >
+                              {busyId === connection.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Key className="h-4 w-4" />
+                              )}
+                              <span className="ml-1 hidden sm:inline">{t("pat.mint")}</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busyId === connection.id}
+                              onClick={() => handleDisconnect(connection.id)}
+                              className="rounded-full border-[#FF6B6B]/30 bg-[#FF6B6B]/5 text-[#FF6B6B] hover:bg-[#FF6B6B]/10"
+                            >
+                              {busyId === connection.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                              <span className="ml-1 hidden sm:inline">{t("disconnect.label")}</span>
+                            </Button>
                           </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busyId === connection.id}
-                            onClick={() => handleMintPat(connection.id)}
-                            className="rounded-full border-[#3D3C36] text-[#C4C0B6] hover:bg-[#24231F]"
-                          >
-                            {busyId === connection.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Key className="h-4 w-4" />
-                            )}
-                            <span className="ml-1 hidden sm:inline">{t('pat.mint')}</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busyId === connection.id}
-                            onClick={() => handleDisconnect(connection.id)}
-                            className="rounded-full border-[#FF6B6B]/30 bg-[#FF6B6B]/5 text-[#FF6B6B] hover:bg-[#FF6B6B]/10"
-                          >
-                            {busyId === connection.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                            <span className="ml-1 hidden sm:inline">{t('disconnect.label')}</span>
-                          </Button>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[#3D3C36] bg-[#1A1917] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-[#E8E4DD]">{t("claude.title")}</h3>
+                      <p className="mt-1 text-sm text-[#C4C0B6]">{t("claude.body")}</p>
                     </div>
-                  ))}
+                    <Button
+                      asChild
+                      size="sm"
+                      className="shrink-0 rounded-full bg-[#4CAF6E] text-[#1A1917] hover:bg-[#3D9A5C]"
+                    >
+                      <a
+                        href="https://claude.ai/customize/connectors?modal=add-custom-connector"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("claude.open")} <ExternalLink className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                  <div className="mt-4 grid gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase text-[#C4C0B6]/80">{t("claude.nameLabel")}</p>
+                      <div className="rounded-lg border border-[#3D3C36] bg-[#24231F] px-3 py-2 font-mono text-sm text-[#E8E4DD]">
+                        {GHL_MCP_CONNECTOR_NAME}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase text-[#C4C0B6]/80">{t("claude.urlLabel")}</p>
+                      <div className="flex gap-2">
+                        <div className="min-w-0 flex-1 truncate rounded-lg border border-[#3D3C36] bg-[#24231F] px-3 py-2 font-mono text-sm text-[#E8E4DD]">
+                          {GHL_MCP_SERVER_URL}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={copyServerUrl}
+                          className="shrink-0 rounded-lg border-[#3D3C36] text-[#C4C0B6] hover:bg-[#24231F]"
+                          aria-label={t("claude.copyUrlAria")}
+                        >
+                          {serverUrlCopyOk ? (
+                            <Check className="h-4 w-4 text-[#4CAF6E]" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                          <span className="ml-2 hidden sm:inline">
+                            {serverUrlCopyOk ? t("claude.copied") : t("claude.copyUrl")}
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-[#C4C0B6]/70">{t("claude.note")}</p>
                 </div>
               </div>
             )}
@@ -285,12 +367,17 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
               size="lg"
               className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] hover:bg-[#3D9A5C]"
             >
-              <Link href="/api/oauth/gohighlevel/start?next=/connect/gohighlevel" prefetch={false}>
-                {status.connected ? t('connectAnother') : t('connect')}{' '}
+              <Link
+                href="/api/oauth/gohighlevel/start?next=/connect/gohighlevel"
+                prefetch={false}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {status.connected ? t("connectAnother") : t("connect")}{" "}
                 <ExternalLink className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <p className="text-xs text-[#C4C0B6]/60">{t('marketplaceNote')}</p>
+            <p className="text-xs text-[#C4C0B6]/60">{t("marketplaceNote")}</p>
           </div>
         )}
       </div>

@@ -4,15 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Workflow } from "lucide-react";
 
-type IconKind = "google" | "meta" | "design";
+type IconKind = "google" | "meta" | "design" | "gohighlevel";
 
 const ITEMS: Array<{
   href: string;
-  labelKey: "googleAds" | "metaAds" | "design";
+  labelKey: "googleAds" | "metaAds" | "design" | "gohighlevel";
   match: (pathname: string) => boolean;
   icon: IconKind;
+  devOnly?: boolean;
 }> = [
   {
     href: "/connect/google-ads",
@@ -32,6 +33,13 @@ const ITEMS: Array<{
     icon: "design",
     match: (p) => p.startsWith("/connect/design"),
   },
+  {
+    href: "/connect/gohighlevel",
+    labelKey: "gohighlevel",
+    icon: "gohighlevel",
+    match: (p) => p.startsWith("/connect/gohighlevel"),
+    devOnly: true,
+  },
 ];
 
 function ItemIcon({ icon }: { icon: IconKind }) {
@@ -40,22 +48,29 @@ function ItemIcon({ icon }: { icon: IconKind }) {
       <Sparkles className="h-4 w-4 shrink-0 text-current" aria-hidden="true" />
     );
   }
+  if (icon === "gohighlevel") {
+    return (
+      <Workflow className="h-4 w-4 shrink-0 text-current" aria-hidden="true" />
+    );
+  }
   const src = icon === "google" ? "/google-ads-icon.svg" : "/meta-icon.svg";
   return (
     <Image src={src} alt="" width={16} height={16} className="shrink-0" aria-hidden="true" />
   );
 }
 
-export function ConnectSubSider() {
+export function ConnectSubSider({ showGoHighLevel = false }: { showGoHighLevel?: boolean }) {
   const pathname = usePathname();
   const t = useTranslations("ConnectSubSider");
+  const items = ITEMS.filter((item) => !item.devOnly || showGoHighLevel);
+
   return (
     <aside className="hidden md:flex w-[200px] shrink-0 flex-col border-r border-[#3D3C36] bg-[#1A1917] p-2">
       <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#C4C0B6]/70">
         {t("title")}
       </div>
       <nav className="space-y-0.5">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const active = item.match(pathname);
           return (
             <Link
