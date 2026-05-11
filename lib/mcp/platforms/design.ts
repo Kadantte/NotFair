@@ -56,22 +56,32 @@ export function registerDesignTools(
     "generate_image",
     {
       description:
-        "Generate one image from a prompt using OpenAI GPT Image 2. Returns a public URL you can embed in markdown or pass to a creative-asset tool. Counts against the user's monthly quota.\n\n" +
-        "Prompt guidance (GPT Image 2 is strong at instruction-following — be specific):\n" +
-        "- Include subject, style, composition, lighting, and aspect ratio.\n" +
-        "- Always specify \"no text\" unless the user explicitly asks for text.\n" +
-        "- For marketing assets: mention brand tone and use case (hero, social post, mockup).\n" +
-        "- For diagrams/infographics: prefer a clean, minimal style.\n\n" +
-        "Aspect ratio cheat sheet: stories \"9:16\"; feed posts \"4:5\" or \"1:1\"; hero/banners \"16:9\" or \"3:2\"; portrait \"2:3\".\n\n" +
-        "Quality vs latency: \"low\" ~5s drafts; \"medium\" balanced; \"high\" runs the four-stage Understand/Plan/Generate/Review pipeline (30–50× slower than low) — use only for production-final fidelity.\n\n" +
-        "Output format: default \"png\" (lossless). Use \"webp\"/\"jpeg\" for smaller photographic assets. background=\"transparent\" requires png/webp (use for logos, cutouts, UI assets).",
+        "Generate one image from a prompt using OpenAI GPT Image 2. Returns a public URL you can embed in markdown or pass to a creative-asset tool (e.g. Google Ads `createImageAsset`). Counts against the user's monthly quota.\n\n" +
+        "Prompt craft (GPT Image 2 rewards long, specific, instruction-style prompts — write a paragraph, not keywords):\n" +
+        "- Lead with the medium: photograph, 3D render, isometric vector, watercolor, flat illustration, studio product shot. Single biggest quality lever.\n" +
+        "- Then specify subject, setting, mood, color palette, lighting (e.g. 'golden hour, soft backlight'), and camera/perspective (close-up, wide, overhead, low angle, macro).\n" +
+        "- Keep the focal subject in the center 80% of the frame — ad platforms crop edges across placements.\n" +
+        "- Prefer lifestyle / in-context scenes over isolated-on-white product shots. Google explicitly recommends 'physical settings with organic shadows and lighting' for ad creative.\n" +
+        "- Don't render text unless the user asks for specific copy. Overlaid text is often unreadable at small ad sizes and Google flags it as a quality issue.\n" +
+        "- Avoid negative prompts ('no X, no Y'). GPT Image often pulls the rejected concept in — describe what you want instead.\n\n" +
+        "Ad-policy rules to bake into prompts:\n" +
+        "- No collages, borders, watermarks, mirrored / skewed / over-filtered looks.\n" +
+        "- No fake UI elements (play buttons, download/close icons) — Google Ads policy violation.\n" +
+        "- Don't overlay a logo on the photo; logos belong inside the scene (on a product, sign, storefront).\n" +
+        "- Blank space should be under 80% of the frame — the subject is the focus.\n\n" +
+        "Aspect ratios — match the target placement:\n" +
+        "- Google Ads asset slots: '1.91:1' landscape (required), '1:1' square (required), '4:5' portrait, '9:16' vertical (Demand Gen / Shorts).\n" +
+        "- Meta / social: '1:1' or '4:5' feed; '9:16' stories/reels; '1.91:1' link previews.\n" +
+        "- Hero / web banners: '16:9' or '3:2'. Default is '1:1'.\n\n" +
+        "Quality vs latency: 'low' ~5s drafts; 'medium' balanced; 'high' runs the four-stage Understand/Plan/Generate/Review pipeline (30–50× slower than low) — use only for production-final fidelity.\n\n" +
+        "Output format: default 'png' (lossless). Use 'webp' or 'jpeg' for smaller photographic assets. background='transparent' requires png/webp (use for logos, cutouts, UI assets).",
       inputSchema: {
         prompt: z
           .string()
           .min(1)
           .max(32000)
           .describe(
-            "Image prompt. Include subject, style, composition, lighting, aspect ratio, and 'no text' if text-free. GPT Image 2 supports up to 32K characters and is strong at instruction-following.",
+            "Image prompt. Describe medium, subject, setting, mood, lighting, color palette, and camera/perspective in natural language — paragraph form outperforms keyword lists. See the tool description for ad-platform rules. Up to 32K chars.",
           ),
         aspectRatio: aspectRatioSchema
           .optional()
