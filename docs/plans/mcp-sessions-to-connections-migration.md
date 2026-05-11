@@ -710,6 +710,32 @@ Mismatch alarm is contained — all 245 hits are residual from the morning burst
 
 Day 1 verdict: clean. Continue the ≥7-day watch; nothing actionable today.
 
+## Day-4 post-flip metrics (2026-05-11, ~4 days after `STOP_CREATING_MCP_SESSIONS` flip)
+
+Dev-excluded, last 24h, PostHog project 368485.
+
+| Event | Hits | Users | Δ vs Day 1 |
+|---|---|---|---|
+| `mcp_direct_bearer_used` | 15,775 | 48 | +1 user. Frozen cohort, no new minting. Range stays 44–48. |
+| `mcp_oauth_used` | 9,384 | 150 | +46 users. Binding mix: session 86 (55%) / connection 69 (45%). Long tail of pre-phase-2 sessionId-bound Google tokens will stay forever (phase 5 cancelled). |
+| `web_session_resolved` | 7,859 | 70 | +21 users. Mix: supabase 51 (73%) / cookie_fallback 19 (27%). |
+| `google_connection_mismatch` | 245 | **4** | +1 user. Still cosmetic refresh-token drift; affected population stable in low single digits. |
+| `auth_identity_resolved` | 339 | 56 | +21 users. supabase 43 / cookie_fallback 13. `oauth-authorize` is the standout cookie holdout (138 hits / 10 users vs 75 / 32 on supabase) — DCR redirect chain doesn't always carry `sb-*` cookies. |
+
+### `web_session_resolved.via=cookie_fallback` daily decay (the unlock gate)
+
+| Day | Supabase users | Cookie users | Cookie % |
+|---|---|---|---|
+| 2026-05-07 (flip) | 30 | 25 | 45% |
+| 2026-05-08 (day 1) | 26 | 22 | 46% |
+| 2026-05-09 (day 2) | 25 | 13 | 34% |
+| 2026-05-10 (day 3) | 27 | 14 | 34% |
+| 2026-05-11 (day 4) | 45 | 15 | **25%** |
+
+Trajectory is right but cookie_fallback is still **5× the <5% gate**. At the current decay rate (~5pp/day), unlock is probably 4–7 more days away. Steps 3+4 stay gated.
+
+Day-4 verdict: clean. No regressions, no rollback signals, mismatch alarm contained. Continue the watch.
+
 ## Next action
 
 Phase 4 step 1 + 2 are live in prod. Three of the eight items in the step 3+4 code-changes table also already shipped (rotate-token deletion, option B `expiresAt` drop, bearer-block UI removal). Remaining work:
