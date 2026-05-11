@@ -49,7 +49,7 @@ export const GOHIGHLEVEL_READONLY_SCOPES = [
   "emails/builder.readonly",
   "emails/schedule.readonly",
   "documents_contracts/list.readonly",
-  "documents_contracts_templates/list.readonly",
+  "documents_contracts_template/list.readonly",
 ] as const;
 
 export type GoHighLevelScope = (typeof GOHIGHLEVEL_READONLY_SCOPES)[number];

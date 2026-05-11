@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.2.3] - 2026-05-10
+
+### Fixed
+- **GoHighLevel OAuth scope now matches the Marketplace Auth UI.** Restores `documents_contracts_template/list.readonly`, which is the scope exposed by the developer console for document-contract templates; the production CRM callback is now allowlisted in HighLevel app settings.
+
 ## [0.5.2.2] - 2026-05-10
 
 ### Fixed
