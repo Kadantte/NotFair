@@ -14,6 +14,8 @@ import {
 import { parseCustomerIds } from '@/lib/google-ads';
 import { getUsdRates, getCurrencyInfo, toUsd } from '@/lib/currency';
 import { refreshStaleAccountSnapshots } from '@/lib/google-ads/account-snapshot-refresh';
+import { stripeMode, resolvePrice } from '@/lib/stripe/config';
+import { isPlanEntitled } from '@/lib/subscription';
 
 type Attribution = {
     source: string | null;
@@ -235,7 +237,7 @@ export async function getCustomersData() {
     });
     const userIds = [...new Set(parsed.map((c) => c.userId).filter((id): id is string => !!id))];
 
-    const [snapshots, opsCounts, errorCounts30d, contactsByEmail, attributionByUser, usdRates] = await Promise.all([
+    const [snapshots, opsCounts, errorCounts30d, contactsByEmail, attributionByUser, usdRates, subscriptionsByUser] = await Promise.all([
         (async () => {
             const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null; lastSyncedAt: Date | null }>();
             if (allAccountIds.size > 0) {
@@ -346,6 +348,33 @@ export async function getCustomersData() {
             return map;
         })(),
         getUsdRates(),
+        (async () => {
+            const map = new Map<string, { plan: 'free' | 'growth'; inTrial: boolean }>();
+            if (userIds.length === 0) return map;
+            const rows = await db()
+                .select({
+                    userId: schema.subscriptions.userId,
+                    stripeStatus: sql<string | null>`${schema.subscriptions.data}->>'status'`,
+                    priceId: sql<string | null>`${schema.subscriptions.data}->'items'->'data'->0->'price'->>'id'`,
+                    trialEndsAt: schema.subscriptions.trialEndsAt,
+                })
+                .from(schema.subscriptions)
+                .where(
+                    and(
+                        inArray(schema.subscriptions.userId, userIds),
+                        eq(schema.subscriptions.env, stripeMode()),
+                    ),
+                );
+            const now = new Date();
+            for (const r of rows) {
+                const inTrial = r.trialEndsAt ? now < r.trialEndsAt : r.stripeStatus === 'trialing';
+                const isGrowth = r.stripeStatus && isPlanEntitled(r.stripeStatus) && r.priceId
+                    ? resolvePrice(r.priceId)?.plan === 'growth'
+                    : false;
+                map.set(r.userId, { plan: isGrowth ? 'growth' : 'free', inTrial });
+            }
+            return map;
+        })(),
     ]);
 
     const result = parsed.map((c) => {
@@ -428,6 +457,8 @@ export async function getCustomersData() {
             errorsCount: totalErrors30d,
             calls30d: totalCalls30d,
             errorRate,
+            plan: c.userId ? (subscriptionsByUser.get(c.userId)?.plan ?? 'free') : 'free',
+            inTrial: c.userId ? (subscriptionsByUser.get(c.userId)?.inTrial ?? false) : false,
         };
     });
 

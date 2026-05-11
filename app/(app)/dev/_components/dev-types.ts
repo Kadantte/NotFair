@@ -43,9 +43,11 @@ export type Customer = {
     errorsCount: number;
     calls30d: number;
     errorRate: number;
+    plan: 'free' | 'growth';
+    inTrial: boolean;
 };
 
-export type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive' | 'errorRate';
+export type CustomerSortKey = 'email' | 'accounts' | 'operations' | 'budget' | 'firstSeen' | 'lastActive' | 'errorRate' | 'plan';
 export type SortDir = 'asc' | 'desc';
 
 export type WaitlistRow = {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     RefreshCw, AlertCircle, ChevronRight, ChevronLeft, Loader2, X,
@@ -26,6 +27,16 @@ const CUSTOMER_PAGE_SIZE = 50;
 let cachedCustomers: Customer[] | null = null;
 let cachedDraftEmails: Set<string> | null = null;
 
+function PlanBadge({ plan, inTrial }: { plan: 'free' | 'growth'; inTrial: boolean }) {
+    if (inTrial) return (
+        <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#D4882A] bg-[#D4882A]/15 border border-[#D4882A]/30">Trial</span>
+    );
+    if (plan === 'growth') return (
+        <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#4CAF6E] bg-[#4CAF6E]/15 border border-[#4CAF6E]/30">Growth</span>
+    );
+    return null;
+}
+
 type Props = { initialData?: { customers: Customer[] } };
 
 export function CustomersView({ initialData }: Props) {
@@ -42,6 +53,7 @@ export function CustomersView({ initialData }: Props) {
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [impersonatingAccountId, setImpersonatingAccountId] = useState<string | null>(null);
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+    const router = useRouter();
 
     const applyDrafts = useCallback((list: Customer[], drafts: Set<string>): Customer[] => {
         return list.map((c) => {
@@ -158,6 +170,9 @@ export function CustomersView({ initialData }: Props) {
                 case 'errorRate':
                     cmp = a.errorRate - b.errorRate;
                     break;
+                case 'plan':
+                    cmp = (a.plan === 'growth' ? (a.inTrial ? 1 : 2) : 0) - (b.plan === 'growth' ? (b.inTrial ? 1 : 2) : 0);
+                    break;
             }
             return sortDir === 'asc' ? cmp : -cmp;
         });
@@ -252,7 +267,6 @@ export function CustomersView({ initialData }: Props) {
                 </div>
             ) : (
                 <div>
-                    <>
                         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <h2 className="text-[15px] font-semibold text-[#E8E4DD] sm:text-lg">
@@ -301,6 +315,7 @@ export function CustomersView({ initialData }: Props) {
                                     <option value="lastActive">Last Active</option>
                                     <option value="firstSeen">First Seen</option>
                                     <option value="email">Customer</option>
+                                    <option value="plan">Plan</option>
                                 </select>
                                 <button
                                     type="button"
@@ -338,7 +353,8 @@ export function CustomersView({ initialData }: Props) {
                                 return (
                                 <div
                                     key={c.userId ?? c.primaryAccountId}
-                                    className="block rounded-2xl border border-[#3D3C36] bg-[#24231F]/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.16)] transition-colors active:bg-[#2E2D28]/80"
+                                    onClick={() => router.push('/dev/' + c.primaryAccountId)}
+                                    className="block cursor-pointer rounded-2xl border border-[#3D3C36] bg-[#24231F]/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.16)] transition-colors active:bg-[#2E2D28]/80"
                                 >
                                     <div className="mb-2.5 flex items-start gap-3">
                                         <div className="min-w-0 flex-1">
@@ -369,6 +385,7 @@ export function CustomersView({ initialData }: Props) {
                                                 {c.outreachStatus === 'contacted' && (
                                                     <span className="rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#4CAF6E]">Sent</span>
                                                 )}
+                                                <PlanBadge plan={c.plan} inTrial={c.inTrial} />
                                             </div>
                                         </div>
                                         <button
@@ -463,6 +480,7 @@ export function CustomersView({ initialData }: Props) {
                                             { key: 'operations' as const, label: 'Operations' },
                                             { key: 'errorRate' as const, label: 'Errors (30d)' },
                                             { key: 'budget' as const, label: 'Annual Budget' },
+                                            { key: 'plan' as const, label: 'Plan' },
                                             { key: 'firstSeen' as const, label: 'First Seen' },
                                             { key: 'lastActive' as const, label: 'Last Active' },
                                         ]).map((col) => (
@@ -487,7 +505,7 @@ export function CustomersView({ initialData }: Props) {
                                 <tbody>
                                     {customerResultCount === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="px-4 py-10 text-center">
+                                            <td colSpan={9} className="px-4 py-10 text-center">
                                                 <Users className="mx-auto mb-3 h-7 w-7 text-[#C4C0B6]/30" />
                                                 <p className="text-sm text-[#C4C0B6]">No customers match this search.</p>
                                             </td>
@@ -498,7 +516,8 @@ export function CustomersView({ initialData }: Props) {
                                         return (
                                         <tr
                                             key={c.userId ?? c.primaryAccountId}
-                                            className="border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors"
+                                            onClick={() => router.push('/dev/' + c.primaryAccountId)}
+                                            className="cursor-pointer border-b border-[#3D3C36]/50 hover:bg-[#24231F]/60 transition-colors"
                                         >
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-2">
@@ -529,9 +548,10 @@ export function CustomersView({ initialData }: Props) {
                                                             Sent
                                                         </span>
                                                     )}
+                                                    <PlanBadge plan={c.plan} inTrial={c.inTrial} />
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs text-[#C4C0B6]/60 font-mono tabular-nums">
-                                                    <Link href={`/dev/${c.primaryAccountId}`} prefetch className="hover:text-[#E8E4DD] hover:underline">
+                                                    <Link href={`/dev/${c.primaryAccountId}`} prefetch onClick={(e) => e.stopPropagation()} className="hover:text-[#E8E4DD] hover:underline">
                                                         {c.primaryAccountId}
                                                     </Link>
                                                     {flag && (
@@ -583,6 +603,12 @@ export function CustomersView({ initialData }: Props) {
                                                     <span className="text-sm text-[#C4C0B6]/40">—</span>
                                                 )}
                                             </td>
+                                            <td className="px-4 py-2.5">
+                                                <PlanBadge plan={c.plan} inTrial={c.inTrial} />
+                                                {c.plan === 'free' && !c.inTrial && (
+                                                    <span className="text-xs text-[#C4C0B6]/40">Free</span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">{formatDateShort(c.firstSeen, true)}</td>
                                             <td className="px-4 py-2.5 text-xs text-[#C4C0B6] font-mono">{formatDateTime(c.lastActive)}</td>
                                             <td className="px-4 py-2.5">
@@ -605,7 +631,6 @@ export function CustomersView({ initialData }: Props) {
                             </table>
                         </div>
                         {customerPaginationControls}
-                    </>
                 </div>
             )}
         </div>
