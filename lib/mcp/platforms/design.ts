@@ -10,43 +10,16 @@ import {
 import { uploadImage } from "@/lib/design/storage";
 import { checkAndIncrementQuota, getQuotaState, releaseQuota } from "@/lib/design/quota";
 
-export type DesignAuthContext = {
-  userId: string;
-};
-
 /**
- * Server-level instructions surfaced to the LLM at `initialize`.
+ * Compact server-instructions snippet appended to each ad-platform MCP's main
+ * instructions block. Kept short on purpose — the full prompt-craft guidance
+ * lives in the tool description so it triggers contextually when the model
+ * actually picks `generate_image`, instead of bloating every system prompt.
  */
-export const DESIGN_MCP_INSTRUCTIONS = `NotFair Design is a hosted image generation MCP. You generate production-quality visual assets from prompts using OpenAI GPT Image 2.
-
-Tool-selection heuristic:
-1. To generate an image → \`generate_image\`. Returns a public URL you can embed in markdown or pass to the user.
-2. To check how many images remain this month → \`get_usage\`.
-
-Prompt guidance (GPT Image 2 is strong at instruction-following — be specific):
-- Include subject, style, composition, lighting, and aspect ratio.
-- Always specify "no text" unless the user explicitly asks for text in the image.
-- For marketing assets: mention the brand tone and use case (hero image, social post, product mockup).
-- For diagrams/infographics: prefer a clean, minimal style.
-
-Aspect ratio selection:
-- Social posts / stories: "9:16"
-- Feed posts: "4:5" or "1:1"
-- Hero images / banners: "16:9" or "3:2"
-- Portrait: "2:3" or "4:5"
-- Square: "1:1"
-
-Quality vs. latency tradeoff (GPT Image 2):
-- "auto" — default; OpenAI picks a quality level appropriate for the prompt.
-- "low" — fast drafts and thumbnails (~5s).
-- "medium" — balanced quality and latency.
-- "high" — full Understand/Plan/Generate/Review pipeline; 30–50× slower than low. Use only when the user needs production-final fidelity.
-
-Output format:
-- Default "png" (lossless). Use "webp" or "jpeg" for smaller files when the asset is photographic.
-- Use background="transparent" with format="png" or "webp" for cutouts/logos/UI assets.
-
-The returned URL is public and permanent (S3). You can display it inline with markdown: \`![alt](url)\`.`;
+export const DESIGN_TOOLS_INSTRUCTION = `Image generation (cross-platform creative):
+- \`generate_image\` — produce a public PNG/JPEG/WebP from a prompt via OpenAI GPT Image 2. Returns a permanent S3 URL you can embed in markdown or hand to the user. Counts against the user's monthly quota.
+- \`get_usage\` — current monthly image quota and remaining count.
+Use these whenever the user needs visual ad creative generated from scratch — banners, social posts, hero images, product mockups. Return the URL to the user; on platforms that expose an image-asset upload tool (e.g. Google Ads \`createImageAsset\`), pass the URL to that tool to put the asset into the account.`;
 
 const aspectRatioSchema = z.enum([
   "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9", "1.91:1",
@@ -56,19 +29,42 @@ const outputFormatSchema = z.enum(["png", "jpeg", "webp"]);
 const backgroundSchema = z.enum(["auto", "transparent", "opaque"]);
 
 /**
- * Register Design MCP tools on the given McpServer instance.
- * `currentAuth` is an AsyncLocalStorage getter — call it inside each tool
- * handler to retrieve the userId for the current request.
+ * Register the cross-platform design tool surface (`generate_image`,
+ * `get_usage`) on the given McpServer. Embeds in any MCP whose auth context
+ * exposes a NotFair `userId` — currently Google Ads and Meta Ads.
+ *
+ * Throws on missing userId rather than falling back to a default — quota is
+ * keyed on userId, and a missing one silently shared a quota across users in
+ * an earlier draft.
  */
 export function registerDesignTools(
   server: McpServer,
-  currentAuth: () => DesignAuthContext,
+  currentAuth: () => { userId?: string | null },
+  reconnectPath: string,
 ): void {
+  const getUserId = (): string => {
+    const userId = currentAuth().userId;
+    if (!userId) {
+      throw new Error(
+        `No NotFair userId on this session — image generation requires a NotFair-authenticated session. Reconnect at ${reconnectPath}.`,
+      );
+    }
+    return userId;
+  };
+
   server.registerTool(
     "generate_image",
     {
       description:
-        "Generate one image from a prompt using OpenAI GPT Image 2. Returns a public URL you can embed in markdown. Counts against the monthly quota. May take 5–60 seconds at medium quality; quality=\"high\" can take several minutes (30–50× longer than low).",
+        "Generate one image from a prompt using OpenAI GPT Image 2. Returns a public URL you can embed in markdown or pass to a creative-asset tool. Counts against the user's monthly quota.\n\n" +
+        "Prompt guidance (GPT Image 2 is strong at instruction-following — be specific):\n" +
+        "- Include subject, style, composition, lighting, and aspect ratio.\n" +
+        "- Always specify \"no text\" unless the user explicitly asks for text.\n" +
+        "- For marketing assets: mention brand tone and use case (hero, social post, mockup).\n" +
+        "- For diagrams/infographics: prefer a clean, minimal style.\n\n" +
+        "Aspect ratio cheat sheet: stories \"9:16\"; feed posts \"4:5\" or \"1:1\"; hero/banners \"16:9\" or \"3:2\"; portrait \"2:3\".\n\n" +
+        "Quality vs latency: \"low\" ~5s drafts; \"medium\" balanced; \"high\" runs the four-stage Understand/Plan/Generate/Review pipeline (30–50× slower than low) — use only for production-final fidelity.\n\n" +
+        "Output format: default \"png\" (lossless). Use \"webp\"/\"jpeg\" for smaller photographic assets. background=\"transparent\" requires png/webp (use for logos, cutouts, UI assets).",
       inputSchema: {
         prompt: z
           .string()
@@ -85,7 +81,7 @@ export function registerDesignTools(
         quality: qualitySchema
           .optional()
           .describe(
-            "Generation quality. Defaults to 'auto' (OpenAI picks). 'low' is fastest (~5s), 'medium' is a balanced choice, 'high' runs the four-stage Understand/Plan/Generate/Review pipeline (30–50× slower than low) and produces the most refined output.",
+            "Generation quality. Defaults to 'auto' (OpenAI picks). 'low' is fastest (~5s), 'medium' is balanced, 'high' runs the four-stage Understand/Plan/Generate/Review pipeline (30–50× slower than low) and produces the most refined output.",
           ),
         outputFormat: outputFormatSchema
           .optional()
@@ -108,8 +104,12 @@ export function registerDesignTools(
       },
     },
     async (args) => {
-      const { userId } = currentAuth();
       try {
+        // getUserId() throws when the session has no userId (legacy Google
+        // sessions can have nullable user_id). Calling it inside the try
+        // block converts the throw into a structured MCP error envelope
+        // instead of escaping to mcp-handler as an unstructured 500.
+        const userId = getUserId();
         // Reserve-then-release: increment first to keep the limit check
         // race-free, then decrement on any downstream failure so users
         // aren't charged for failed generations.
@@ -180,8 +180,8 @@ export function registerDesignTools(
       },
     },
     async () => {
-      const { userId } = currentAuth();
       try {
+        const userId = getUserId();
         const state = await getQuotaState(userId);
         return {
           content: [

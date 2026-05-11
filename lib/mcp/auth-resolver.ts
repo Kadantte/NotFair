@@ -4,7 +4,6 @@ import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { DEFAULT_RESOURCE_PATH, findResource, type Platform } from "@/lib/mcp/resources";
 import { activeLoginCustomerIdFor } from "@/lib/connections/google-read";
-import type { DesignAuthContext } from "@/lib/mcp/platforms/design";
 import { normalizeClientName } from "@/lib/mcp/client-info";
 
 /**
@@ -33,14 +32,6 @@ export type PlatformAuthConfig = {
   tokenPrefix: string;
   legacyTokenPrefixes: readonly string[];
   acceptDirectBearer?: boolean;
-};
-
-/** Same idea for the simple/Design resolver. */
-export type SimpleAuthConfig = {
-  platform: Platform;
-  resourceUrlPath: string;
-  tokenPrefix: string;
-  legacyTokenPrefixes: readonly string[];
 };
 
 /**
@@ -405,111 +396,4 @@ export async function resolvePlatformAuth(
     sessionToken: bearerToken,
     sessionId: session.id,
   };
-}
-
-/**
- * Resolve a "user-only" MCP request (currently Design) to a
- * `DesignAuthContext`. Throws on any failure mode. Unlike
- * `resolvePlatformAuth`, this never accepts direct bearers and always binds
- * to an `mcp_sessions` row — Design tokens never use connectionId.
- */
-export async function resolveSimpleAuth(
-  request: Request,
-  config: SimpleAuthConfig,
-): Promise<DesignAuthContext> {
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : null;
-
-  // Dev-only bypass mirroring createPlatformMcpHandler. Lets eval-mcp drive
-  // /api/mcp/design via raw HTTP without running the OAuth dance. Triple
-  // gated: NODE_ENV=development, DEV_LOCAL_EMAIL set, no Authorization
-  // header (real Bearer flows still work in dev).
-  if (
-    !bearerToken
-    && process.env.NODE_ENV === "development"
-    && process.env.DEV_LOCAL_EMAIL
-  ) {
-    const devEmail = process.env.DEV_LOCAL_EMAIL;
-    const [s] = await db()
-      .select({ userId: schema.mcpSessions.userId })
-      .from(schema.mcpSessions)
-      .where(
-        and(
-          eq(schema.mcpSessions.googleEmail, devEmail),
-          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        ),
-      )
-      .orderBy(desc(schema.mcpSessions.createdAt))
-      .limit(1);
-    if (!s) {
-      throw new Error(
-        `DEV_LOCAL_EMAIL bypass active but no valid mcpSession found for ${devEmail}. ` +
-        `Sign in at http://localhost:3000/connect first.`,
-      );
-    }
-    if (!s.userId) {
-      throw new Error("Dev session has no userId. Sign in at /connect first.");
-    }
-    return { userId: s.userId };
-  }
-
-  if (!bearerToken) {
-    throw new Error("No valid authentication. Sign in at /connect/design to get your MCP token.");
-  }
-
-  const isKnownPrefix =
-    bearerToken.startsWith(config.tokenPrefix)
-    || config.legacyTokenPrefixes.some((p) => bearerToken.startsWith(p));
-
-  if (!isKnownPrefix) {
-    throw new Error("Token does not match any accepted prefix for this MCP resource.");
-  }
-
-  // Design tokens bind to sessionId (mcp_sessions), never connectionId.
-  // One JOIN-ed read instead of two serial roundtrips.
-  const [row] = await db()
-    .select({
-      userId: schema.mcpSessions.userId,
-      sessionId: schema.oauthAccessTokens.sessionId,
-      resourceUrl: schema.oauthAccessTokens.resourceUrl,
-      sessionExpiresAt: schema.mcpSessions.expiresAt,
-    })
-    .from(schema.oauthAccessTokens)
-    .leftJoin(
-      schema.mcpSessions,
-      eq(schema.mcpSessions.id, schema.oauthAccessTokens.sessionId),
-    )
-    .where(eq(schema.oauthAccessTokens.token, bearerToken))
-    .limit(1);
-
-  if (!row) {
-    throw new Error("Token not found or revoked. Sign in again at /connect/design.");
-  }
-
-  assertTokenAudience(row.resourceUrl, config.platform);
-
-  if (row.sessionId === null) {
-    throw new Error("Design token has no session binding. Re-register via /connect/design.");
-  }
-
-  if (!row.sessionExpiresAt || row.sessionExpiresAt < new Date().toISOString()) {
-    throw new Error("Session expired. Sign in again at /connect/design to get a new token.");
-  }
-
-  if (!row.userId) {
-    throw new Error("Session has no user ID. Sign in again at /connect/design.");
-  }
-
-  trackServerEvent(row.userId, "mcp_oauth_used", {
-    client_name: null,
-    client_version: null,
-    resource_url: config.resourceUrlPath,
-    platform: config.platform,
-    binding: "session",
-    user_agent: request.headers.get("user-agent") ?? null,
-  });
-
-  return { userId: row.userId };
 }

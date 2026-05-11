@@ -225,10 +225,10 @@ export async function POST(request: Request) {
     );
 
     // Phase-2 Google translator: only run when the auth code's resource is
-    // google_ads. Design tokens also carry sessionId (they bind to
-    // mcp_sessions, not ad_platform_connections), so we must NOT translate
-    // them — a design user who also has Google Ads would otherwise have their
-    // design token silently rewritten to a Google connection binding.
+    // google_ads. Other session-bound platforms (none today, but reserved for
+    // future user-only resources) carry sessionId without belonging to
+    // ad_platform_connections — gating on platform avoids silently rewriting
+    // their tokens to a Google connection binding.
     const codeResource = resolveResourceFromUrl(authCode.resourceUrl ?? DEFAULT_RESOURCE_PATH);
     if (readGoogleFromConnections() && session.userId && codeResource?.platform === "google_ads") {
       const [conn] = await db()

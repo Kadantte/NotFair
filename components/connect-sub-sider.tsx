@@ -4,13 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Sparkles, Workflow } from "lucide-react";
+import { Workflow } from "lucide-react";
 
-type IconKind = "google" | "meta" | "design" | "gohighlevel";
+type IconKind = "google" | "meta" | "gohighlevel";
 
 const ITEMS: Array<{
   href: string;
-  labelKey: "googleAds" | "metaAds" | "design" | "gohighlevel";
+  labelKey: "googleAds" | "metaAds" | "gohighlevel";
   match: (pathname: string) => boolean;
   icon: IconKind;
   devOnly?: boolean;
@@ -28,12 +28,6 @@ const ITEMS: Array<{
     match: (p) => p.startsWith("/connect/meta-ads"),
   },
   {
-    href: "/connect/design",
-    labelKey: "design",
-    icon: "design",
-    match: (p) => p.startsWith("/connect/design"),
-  },
-  {
     href: "/connect/gohighlevel",
     labelKey: "gohighlevel",
     icon: "gohighlevel",
@@ -43,11 +37,6 @@ const ITEMS: Array<{
 ];
 
 function ItemIcon({ icon }: { icon: IconKind }) {
-  if (icon === "design") {
-    return (
-      <Sparkles className="h-4 w-4 shrink-0 text-current" aria-hidden="true" />
-    );
-  }
   if (icon === "gohighlevel") {
     return (
       <Workflow className="h-4 w-4 shrink-0 text-current" aria-hidden="true" />

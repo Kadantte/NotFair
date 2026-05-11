@@ -2,6 +2,15 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.3.0] - 2026-05-10
+
+### Changed
+- **Design tools now ship inside the Google Ads and Meta Ads MCPs.** `generate_image` and `get_usage` are registered into both `/api/mcp/google_ads` and `/api/mcp/meta_ads` and share a single userId-keyed monthly quota, so any connected NotFair user can generate creative directly from the same MCP they audit ads with — no separate connection. The shared logic lives in `lib/mcp/platforms/design.ts` and is registered through a generic `() => userId` getter that throws cleanly when the session has no userId.
+- **Both ad-platform MCP routes now allow up to 300s execution.** `app/api/mcp/google_ads/route.ts` and `app/api/mcp/meta_ads/route.ts` set `maxDuration = 300` so `gpt-image-2` at `quality="high"` (which can take 150–250s) completes before Vercel's function timeout fires, surfacing a structured MCP error rather than leaking the pre-incremented quota.
+
+### Removed
+- **Standalone Design MCP at `/api/mcp/design` is gone.** The route, the `/connect/design` setup page, the `connect-design-mcp-page` component, the `oat_design_*` token prefix, the `design` `Platform` variant, the `createSimpleMcpHandler` / `resolveSimpleAuth` / `DesignAuthContext` plumbing, and the design DCR branch in `/api/oauth/authorize` are all removed. Existing `oat_design_*` tokens are orphaned — affected users reconnect via `/connect/google-ads` or `/connect/meta-ads`.
+
 ## [0.5.2.4] - 2026-05-10
 
 ### Changed

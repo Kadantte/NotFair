@@ -1613,18 +1613,11 @@
     "bodyAfterCode": ". Same setup steps as Google - just a different URL and connector name.",
     "examplePrompt": "Audit my connected Meta ad account (Facebook + Instagram) and tell me the 3 biggest optimization opportunities."
   },
-  "ConnectDesignMcpPage": {
-    "title": "Connect Design MCP",
-    "bodyBeforeCode": "Wire your Claude / Codex / Cursor / MCP client up to NotFair's hosted image generation resource at",
-    "bodyAfterCode": ". Authenticate once and generate images server-side — no API keys required.",
-    "examplePrompt": "Generate a polished hero image for a SaaS landing page about AI-powered ad management. Editorial lighting, dark background, no text, 16:9."
-  },
   "ConnectSubSider": {
     "title": "Connect MCP",
     "items": {
       "googleAds": "Google Ads MCP",
       "metaAds": "Meta Ads MCP",
-      "design": "Design MCP",
       "gohighlevel": "GoHighLevel MCP"
     }
   },

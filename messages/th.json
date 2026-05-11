@@ -1618,7 +1618,6 @@
     "items": {
       "googleAds": "MCP สำหรับ Google Ads",
       "metaAds": "MCP สำหรับ Meta Ads",
-      "design": "MCP สำหรับงานออกแบบ",
       "gohighlevel": "MCP สำหรับ GoHighLevel"
     }
   },
@@ -1763,11 +1762,5 @@
     "title": "เชื่อมต่อบัญชี Google Ads ของคุณ",
     "body": "เชื่อมโยงบัญชี Google Ads เพื่อเริ่มจัดการแคมเปญด้วย AI คุณจะอนุญาตสิทธิ์อ่านและเขียนข้อมูลโฆษณาของคุณ",
     "cta": "เชื่อมต่อ Google Ads"
-  },
-  "ConnectDesignMcpPage": {
-    "title": "เชื่อมต่อ Design MCP",
-    "bodyBeforeCode": "เชื่อมต่อไคลเอนต์ Claude / Codex / Cursor / MCP ของคุณกับทรัพยากรสร้างภาพที่โฮสต์โดย NotFair ที่",
-    "bodyAfterCode": ". ตรวจสอบสิทธิ์ครั้งเดียวและสร้างภาพฝั่งเซิร์ฟเวอร์ — ไม่ต้องใช้คีย์ API",
-    "examplePrompt": "สร้างภาพฮีโร่สำหรับหน้า Landing ของ SaaS ที่เกี่ยวกับการจัดการโฆษณาด้วย AI แสงแบบนิตยสาร พื้นหลังมืด ไม่มีข้อความ 16:9"
   }
 }

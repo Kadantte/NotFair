@@ -10,7 +10,7 @@
  * special-case Google or Meta — they are just rows.
  */
 
-export type Platform = "google_ads" | "meta_ads" | "design" | "gohighlevel";
+export type Platform = "google_ads" | "meta_ads" | "gohighlevel";
 
 export type McpResource = {
   /** Path the resource is served at, e.g. `/api/mcp`. Stable; persisted in tokens. */
@@ -66,14 +66,6 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     legacyTokenPrefixes: [],
   },
   {
-    path: "/api/mcp/design",
-    platform: "design",
-    tokenPrefix: "oat_design_",
-    // Design has no legacy prefixes — every token is issued through the
-    // resource-aware OAuth flow and stamped with the platform-explicit prefix.
-    legacyTokenPrefixes: [],
-  },
-  {
     path: "/api/mcp/gohighlevel",
     platform: "gohighlevel",
     tokenPrefix: "oat_gohighlevel_",
@@ -95,7 +87,6 @@ export const KNOWN_RESOURCE_PATHS: readonly string[] = [
   "/api/mcp",
   "/api/mcp/google_ads",
   "/api/mcp/meta_ads",
-  "/api/mcp/design",
   "/api/mcp/gohighlevel",
 ];
 

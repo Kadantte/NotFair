@@ -13,10 +13,8 @@ import { type AuthContext } from "@/lib/google-ads";
 import { withMcpTelemetry } from "@/lib/mcp/telemetry";
 import { flushServerEvents } from "@/lib/analytics-server";
 import { type Platform } from "@/lib/mcp/resources";
-import type { DesignAuthContext } from "@/lib/mcp/platforms/design";
 import {
   resolvePlatformAuth,
-  resolveSimpleAuth,
   type AuthContextWithSession,
 } from "@/lib/mcp/auth-resolver";
 import {
@@ -113,68 +111,6 @@ export function createPlatformMcpHandler(config: PlatformMcpConfig) {
 
     after(flushServerEvents);
 
-    return authStore.run(auth, () => mcpHandler(request));
-  }
-
-  return handler;
-}
-
-// ─── Simple MCP handler (no customerId / platform connection required) ───────
-//
-// Used by resource types that authenticate via any valid NotFair session
-// (currently: Design). Unlike createPlatformMcpHandler, the auth context
-// carries only `userId` — there is no Google / Meta ad-platform binding.
-
-export type SimpleMcpConfig = {
-  platform: Platform;
-  resourceUrlPath: string;
-  tokenPrefix: string;
-  legacyTokenPrefixes: readonly string[];
-  instructions: string;
-  registerTools: (server: McpServer, currentAuth: () => DesignAuthContext) => void;
-};
-
-/**
- * Build a Next.js App Router request handler for a "user-only" MCP resource.
- * Auth resolves to `{ userId: string }` via an `oat_design_*`-prefixed bearer
- * token that binds to an `mcp_sessions` row (via sessionId). No customerId,
- * no ad-platform connection required.
- */
-export function createSimpleMcpHandler(config: SimpleMcpConfig) {
-  const authStore = new AsyncLocalStorage<DesignAuthContext>();
-
-  function currentAuth(): DesignAuthContext {
-    const auth = authStore.getStore();
-    if (!auth) throw new Error("No auth context — request not authenticated.");
-    return auth;
-  }
-
-  const mcpHandler = createMcpHandler(
-    (server) => {
-      withMcpTelemetry(server);
-      config.registerTools(server, currentAuth);
-    },
-    {
-      instructions: config.instructions,
-      serverInfo: {
-        name: `notfair-${config.platform.replace("_", "-")}-mcp`,
-        version: "1.0.0",
-      },
-    },
-    mcpHandlerEndpointConfig(config.resourceUrlPath),
-  );
-
-  async function handler(request: Request): Promise<Response> {
-    let auth: DesignAuthContext | null = null;
-    try {
-      auth = await resolveSimpleAuth(request, config);
-    } catch (e) {
-      const { schemaOnly, cloned } = await isSchemaRequest(request);
-      if (schemaOnly) return mcpHandler(cloned);
-      return buildUnauthorizedResponse(request, config.resourceUrlPath, (e as Error).message);
-    }
-
-    after(flushServerEvents);
     return authStore.run(auth, () => mcpHandler(request));
   }
 

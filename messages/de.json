@@ -1618,7 +1618,6 @@
     "items": {
       "googleAds": "Google Ads-MCP",
       "metaAds": "Meta Ads-MCP",
-      "design": "Design-MCP",
       "gohighlevel": "GoHighLevel-MCP"
     }
   },
@@ -1763,11 +1762,5 @@
     "title": "Verbinde dein Google Ads-Konto",
     "body": "Verknupfe dein Google Ads-Konto, um deine Kampagnen mit KI zu verwalten. Du autorisierst Lese- und Schreibzugriff auf deine Anzeigendaten.",
     "cta": "Google Ads verbinden"
-  },
-  "ConnectDesignMcpPage": {
-    "title": "Design-MCP verbinden",
-    "bodyBeforeCode": "Verbinde deinen Claude- / Codex- / Cursor- / MCP-Client mit der gehosteten Bildgenerierungs-Ressource von NotFair unter",
-    "bodyAfterCode": ". Einmal authentifizieren und serverseitig Bilder generieren — keine API-Schlüssel erforderlich.",
-    "examplePrompt": "Generiere ein hochwertiges Heldenbild für eine SaaS-Landingpage zum Thema KI-gestütztes Ad-Management. Redaktionelle Beleuchtung, dunkler Hintergrund, kein Text, 16:9."
   }
 }

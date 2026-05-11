@@ -5,6 +5,10 @@ import {
   INTERNAL_TOOL_FEEDBACK_INSTRUCTION,
   RUNSCRIPT_FOLLOWUP_RULE,
 } from "@/lib/mcp/platforms/_shared-instructions";
+import {
+  DESIGN_TOOLS_INSTRUCTION,
+  registerDesignTools,
+} from "@/lib/mcp/platforms/design";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AuthContext } from "@/lib/google-ads";
 
@@ -135,6 +139,8 @@ When a write tool returns \`success: false\`, check \`structuredContent.nextTool
 
 When a rejection's \`error\` field lists actual existing entities (e.g. \`removeNegativeKeyword\` reporting the campaign's real negative keywords), treat that list as ground truth — your planning data was stale or hallucinated. Re-plan against the listed entities before issuing more writes; do not bulk-retry the same plan.
 
+${DESIGN_TOOLS_INSTRUCTION}
+
 ${INTERNAL_TOOL_FEEDBACK_INSTRUCTION}`;
 
 /**
@@ -147,6 +153,10 @@ export function registerGoogleAdsTools(server: McpServer, currentAuth: () => Aut
   registerWriteTools(server, currentAuth);
   registerCodeModeTools(server, currentAuth);
   registerAgentFeedbackTools(server, currentAuth);
+
+  // Cross-platform creative tools. Quota is keyed on userId so the monthly
+  // bucket is shared with the Meta Ads MCP for the same NotFair user.
+  registerDesignTools(server, currentAuth, "/connect/google-ads");
 
   // ─── Session management tool ─────
   server.registerTool("listConnectedAccounts", {

@@ -30,6 +30,13 @@ if (!resource) {
   throw new Error(`MCP resource ${RESOURCE_URL_PATH} not registered in lib/mcp/resources.ts`);
 }
 
+// gpt-image-2 at quality="high" can take 150–250s; allow the function the
+// full Vercel maximum so the upstream AbortSignal timeout (280s, see
+// lib/design/generate.ts) is the one that fires first and surfaces a
+// structured MCP error rather than an upstream Vercel function timeout.
+// Affects only generate_image; every other tool returns well under 60s.
+export const maxDuration = 300;
+
 const handler = createPlatformMcpHandler({
   platform: resource.platform,
   resourceUrlPath: RESOURCE_URL_PATH,

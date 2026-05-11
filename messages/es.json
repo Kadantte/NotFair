@@ -1618,7 +1618,6 @@
     "items": {
       "googleAds": "MCP de Google Ads",
       "metaAds": "MCP de Meta Ads",
-      "design": "MCP de Diseño",
       "gohighlevel": "MCP de GoHighLevel"
     }
   },
@@ -1763,11 +1762,5 @@
     "title": "Conecta tu cuenta de Google Ads",
     "body": "Vincula tu cuenta de Google Ads para empezar a administrar tus campanas con IA. Autorizaras acceso de lectura y escritura a tus datos publicitarios.",
     "cta": "Conectar Google Ads"
-  },
-  "ConnectDesignMcpPage": {
-    "title": "Conectar MCP de Diseño",
-    "bodyBeforeCode": "Conecta tu cliente Claude / Codex / Cursor / MCP al recurso de generación de imágenes alojado de NotFair en",
-    "bodyAfterCode": ". Autentícate una vez y genera imágenes en el servidor — sin necesidad de claves API.",
-    "examplePrompt": "Genera una imagen hero pulida para una landing page de SaaS sobre gestión publicitaria con IA. Iluminación editorial, fondo oscuro, sin texto, 16:9."
   }
 }

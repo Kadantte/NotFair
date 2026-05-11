@@ -8,6 +8,10 @@ import {
   INTERNAL_TOOL_FEEDBACK_INSTRUCTION,
   RUNSCRIPT_FOLLOWUP_RULE,
 } from "@/lib/mcp/platforms/_shared-instructions";
+import {
+  DESIGN_TOOLS_INSTRUCTION,
+  registerDesignTools,
+} from "@/lib/mcp/platforms/design";
 
 /**
  * Server-level routing heuristic for the Meta Ads MCP. Mirrors
@@ -99,6 +103,8 @@ Handling write rejections:
 - Budget-update rejections under a CBO campaign require updating the
   campaign-level budget instead, not the ad set's.
 
+${DESIGN_TOOLS_INSTRUCTION}
+
 ${INTERNAL_TOOL_FEEDBACK_INSTRUCTION}`;
 
 /**
@@ -116,4 +122,8 @@ export function registerMetaAdsTools(
   registerMetaReadTools(server, currentAuth);
   registerMetaWriteTools(server, currentAuth);
   registerAgentFeedbackTools(server, currentAuth);
+
+  // Cross-platform creative tools. Quota is keyed on userId so the monthly
+  // bucket is shared with the Google Ads MCP for the same NotFair user.
+  registerDesignTools(server, currentAuth, "/connect/meta-ads");
 }

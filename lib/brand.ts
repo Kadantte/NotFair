@@ -35,15 +35,6 @@ export const META_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/meta_ads`;
 export const META_MCP_CONNECTOR_NAME = "NotFair-MetaAds";
 
 /**
- * Design MCP — hosted HTTP MCP authenticated via OAuth Bearer token.
- * Unlike the local stdio Design MCP (npx @notfair/design-mcp), this server
- * runs server-side and uses the user's NotFair account for API keys and quota.
- * Surfaced on /connect/design for Claude.ai, Codex, Cursor, and any MCP client.
- */
-export const DESIGN_MCP_SERVER_URL = `${BRAND_URL}/api/mcp/design`;
-export const DESIGN_MCP_CONNECTOR_NAME = "NotFair-Design";
-
-/**
  * GoHighLevel MCP equivalents — surfaced on /connect/gohighlevel and the
  * /gohighlevel-* marketing surfaces so users can wire up Claude / Codex
  * against the HighLevel CRM the same way they do Google or Meta.

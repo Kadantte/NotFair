@@ -62,7 +62,6 @@ export async function GET(request: Request) {
   }
   const resourceUrlPath = resolvedResource?.path ?? DEFAULT_RESOURCE_PATH;
   const isMetaResource = resolvedResource?.platform === "meta_ads";
-  const isDesignResource = resolvedResource?.platform === "design";
   const isGhlResource = resolvedResource?.platform === "gohighlevel";
 
   if (responseType !== "code") {
@@ -118,7 +117,7 @@ export async function GET(request: Request) {
   // at an `mcp_sessions` row. Refusing them at any non-Google resource avoids
   // mismatched-target tokens (a Google session_id getting stamped onto a
   // non-Google audience auth code, which would then violate the XOR CHECK).
-  if (client.sessionId !== null && (isMetaResource || isDesignResource || isGhlResource)) {
+  if (client.sessionId !== null && (isMetaResource || isGhlResource)) {
     return NextResponse.json(
       {
         error: "invalid_target",
@@ -176,34 +175,7 @@ export async function GET(request: Request) {
     const userId = identity.userId;
     const legacyMcpSessionId = identity.legacySessionId;
 
-    if (isDesignResource) {
-      // 4. Design DCR: any authenticated NotFair user can connect. Bind the
-      // auth code to the user's most-recent non-expired mcp_sessions row via
-      // sessionId (no customerId requirement). The design MCP does not need
-      // Google Ads credentials — it uses the user's server-side Gemini quota.
-      const [designSession] = await db()
-        .select({ id: schema.mcpSessions.id })
-        .from(schema.mcpSessions)
-        .where(
-          and(
-            eq(schema.mcpSessions.userId, userId),
-            gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-          ),
-        )
-        .orderBy(sql`${schema.mcpSessions.createdAt} DESC`)
-        .limit(1);
-
-      if (!designSession) {
-        // User has no session yet — bounce to sign-in, then back here.
-        const signinUrl = new URL("/api/auth/signin", requestUrl);
-        signinUrl.searchParams.set(
-          "next",
-          `${requestUrl.pathname}${requestUrl.search}`,
-        );
-        return NextResponse.redirect(signinUrl.toString());
-      }
-      resolvedSessionId = designSession.id;
-    } else if (isGhlResource) {
+    if (isGhlResource) {
       // Defense-in-depth dev gate: 404 the resource for non-devs even though
       // /api/oauth/gohighlevel/start (the only flow that mints connections)
       // is already gated. Belt-and-suspenders so a future code path that
