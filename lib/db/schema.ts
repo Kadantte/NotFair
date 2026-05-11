@@ -809,6 +809,23 @@ export const broadcastRecipients = pgTable("broadcast_recipients", {
   index("broadcast_recipients_email_idx").on(table.email),
 ]);
 
+// ─── Support Tickets ─────────────────────────────────────────────────
+//
+// Written synchronously before the askSupport tool response is returned,
+// so tickets survive Slack + PostHog after() delivery failures.
+
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  ticketId: text("ticket_id").notNull().unique(),
+  userId: text("user_id"),
+  sessionId: integer("session_id"),
+  message: text("message").notNull(),
+  context: text("context"),
+  userEmail: text("user_email"),
+  clientName: text("client_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ─── Email Preferences (per-user marketing opt-out) ─────────────────
 //
 // Marketing-only. Transactional emails (login magic links, share

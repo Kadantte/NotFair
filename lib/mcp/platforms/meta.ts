@@ -3,7 +3,7 @@ import type { AuthContext } from "@/lib/google-ads";
 import { registerMetaReadTools } from "@/lib/mcp/meta-tools/read-tools";
 import { registerMetaWriteTools } from "@/lib/mcp/meta-tools/write-tools";
 import { registerMetaCodeModeTools } from "@/lib/mcp/code-mode-meta";
-import { registerAgentFeedbackTools } from "@/lib/mcp/agent-feedback";
+import { registerAgentFeedbackTools, registerUserSupportTools } from "@/lib/mcp";
 import {
   INTERNAL_TOOL_FEEDBACK_INSTRUCTION,
   RUNSCRIPT_FOLLOWUP_RULE,
@@ -122,6 +122,7 @@ export function registerMetaAdsTools(
   registerMetaReadTools(server, currentAuth);
   registerMetaWriteTools(server, currentAuth);
   registerAgentFeedbackTools(server, currentAuth);
+  registerUserSupportTools(server, currentAuth);
 
   // Cross-platform creative tools. Quota is keyed on userId so the monthly
   // bucket is shared with the Google Ads MCP for the same NotFair user.

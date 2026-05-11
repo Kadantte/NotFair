@@ -1,4 +1,4 @@
-import { registerReadTools, registerWriteTools, registerCodeModeTools, registerAgentFeedbackTools } from "@/lib/mcp";
+import { registerReadTools, registerWriteTools, registerCodeModeTools, registerAgentFeedbackTools, registerUserSupportTools } from "@/lib/mcp";
 import { typedResult } from "@/lib/mcp/types";
 import { PLAYBOOKS } from "@/lib/mcp/playbooks";
 import {
@@ -163,6 +163,7 @@ export function registerGoogleAdsTools(server: McpServer, currentAuth: () => Aut
   registerWriteTools(server, currentAuth);
   registerCodeModeTools(server, currentAuth);
   registerAgentFeedbackTools(server, currentAuth);
+  registerUserSupportTools(server, currentAuth);
 
   // Cross-platform creative tools. Quota is keyed on userId so the monthly
   // bucket is shared with the Meta Ads MCP for the same NotFair user.
