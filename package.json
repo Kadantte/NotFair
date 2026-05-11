@@ -1,6 +1,6 @@
 {
   "name": "norfair",
-  "version": "0.5.2.1",
+  "version": "0.5.2.4",
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "engines": {
@@ -37,7 +37,6 @@
     "@ai-sdk/openai": "^3.0.48",
     "@ai-sdk/react": "^3.0.140",
     "@aws-sdk/client-s3": "^3.1045.0",
-    "@google/genai": "^1.0.0",
     "@jitl/quickjs-wasmfile-release-asyncify": "^0.32.0",
     "@modelcontextprotocol/sdk": "1.26.0",
     "@radix-ui/react-dialog": "^1.1.15",

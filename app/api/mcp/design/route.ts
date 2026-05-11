@@ -8,8 +8,8 @@
  * flow; no customerId or ad-platform connection is needed.
  *
  * Tools:
- *   - generate_image — Gemini image generation, server-side quota-gated,
- *     result uploaded to Vercel Blob and returned as a public URL.
+ *   - generate_image — OpenAI GPT Image 2 generation, server-side
+ *     quota-gated, result uploaded to S3 and returned as a public URL.
  *   - get_usage     — read-only quota snapshot for this month.
  */
 
@@ -34,5 +34,10 @@ const handler = createSimpleMcpHandler({
   instructions: DESIGN_MCP_INSTRUCTIONS,
   registerTools: registerDesignTools,
 });
+
+// gpt-image-2 at quality="high" can take 150–250s; allow the function the
+// full Vercel maximum so the upstream AbortSignal timeout (280s) is the one
+// that fires first and surfaces a structured error.
+export const maxDuration = 300;
 
 export { handler as GET, handler as POST, handler as DELETE };

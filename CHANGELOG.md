@@ -2,6 +2,17 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.2.4] - 2026-05-10
+
+### Changed
+- **Design MCP switched from Gemini Nano Banana to OpenAI GPT Image 2.** The hosted `/api/mcp/design` `generate_image` tool now calls OpenAI's `gpt-image-2` directly; aspect ratios snap to the three native sizes (`1024x1024`, `1536x1024`, `1024x1536`) for the most reliable rendering, and the schema exposes `quality` (`auto`/`low`/`medium`/`high`), `outputFormat` (`png`/`jpeg`/`webp`), and `background` (`auto`/`transparent`/`opaque`) controls. Quality defaults to `auto` so OpenAI picks the right tradeoff; `high` runs the four-stage Understand/Plan/Generate/Review pipeline and can take several minutes.
+- **Local stdio Design MCP default provider flipped from `nano_banana` to `openai`.** Pass `provider: "nano_banana"` to keep using Gemini.
+
+### Fixed
+- **Production safety for slow image generations.** `/api/mcp/design` now sets `maxDuration = 300` and the OpenAI fetch uses `AbortSignal.timeout(280000)` so high-quality runs surface a structured error instead of a Vercel function termination.
+- **Hosted Design MCP no longer leaks raw OpenAI `usage` token counts** through the MCP tool response, and error bodies are bounded to 500 characters.
+- **Size validator enforces the documented 3840×2160 area cap** rather than a per-dimension check, catching invalid combinations like `3840x3840` before they hit OpenAI.
+
 ## [0.5.2.3] - 2026-05-10
 
 ### Fixed

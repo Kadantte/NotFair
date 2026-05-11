@@ -10,7 +10,7 @@ import { DESIGN_MCP_CONNECTOR_NAME, DESIGN_MCP_SERVER_URL } from "@/lib/brand";
  * Unlike the local stdio Design MCP (npx @notfair/design-mcp), this hosted
  * server requires no API keys from the user — authentication is handled via
  * NotFair's OAuth flow. The user connects once; all image generation is
- * server-side using NotFair's Gemini quota.
+ * server-side via NotFair's OpenAI GPT Image 2 quota.
  *
  * Mirrors ConnectMetaAdsMcpPage in structure: McpSetupTabs handles the four
  * client tabs (Claude Connector, Claude Code, Codex, Any-MCP), and the OAuth

@@ -1,6 +1,12 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { generateImage, type AspectRatio, type ImageResolution } from "@/lib/design/generate";
+import {
+  generateImage,
+  type AspectRatio,
+  type ImageBackground,
+  type ImageOutputFormat,
+  type ImageQuality,
+} from "@/lib/design/generate";
 import { uploadImage } from "@/lib/design/storage";
 import { checkAndIncrementQuota, getQuotaState, releaseQuota } from "@/lib/design/quota";
 
@@ -11,13 +17,13 @@ export type DesignAuthContext = {
 /**
  * Server-level instructions surfaced to the LLM at `initialize`.
  */
-export const DESIGN_MCP_INSTRUCTIONS = `NotFair Design is a hosted image generation MCP. You generate production-quality visual assets from prompts using Gemini image models.
+export const DESIGN_MCP_INSTRUCTIONS = `NotFair Design is a hosted image generation MCP. You generate production-quality visual assets from prompts using OpenAI GPT Image 2.
 
 Tool-selection heuristic:
 1. To generate an image → \`generate_image\`. Returns a public URL you can embed in markdown or pass to the user.
 2. To check how many images remain this month → \`get_usage\`.
 
-Prompt guidance:
+Prompt guidance (GPT Image 2 is strong at instruction-following — be specific):
 - Include subject, style, composition, lighting, and aspect ratio.
 - Always specify "no text" unless the user explicitly asks for text in the image.
 - For marketing assets: mention the brand tone and use case (hero image, social post, product mockup).
@@ -30,13 +36,24 @@ Aspect ratio selection:
 - Portrait: "2:3" or "4:5"
 - Square: "1:1"
 
-The returned URL is public and permanent (Vercel Blob). You can display it inline with markdown: \`![alt](url)\`.`;
+Quality vs. latency tradeoff (GPT Image 2):
+- "auto" — default; OpenAI picks a quality level appropriate for the prompt.
+- "low" — fast drafts and thumbnails (~5s).
+- "medium" — balanced quality and latency.
+- "high" — full Understand/Plan/Generate/Review pipeline; 30–50× slower than low. Use only when the user needs production-final fidelity.
+
+Output format:
+- Default "png" (lossless). Use "webp" or "jpeg" for smaller files when the asset is photographic.
+- Use background="transparent" with format="png" or "webp" for cutouts/logos/UI assets.
+
+The returned URL is public and permanent (S3). You can display it inline with markdown: \`![alt](url)\`.`;
 
 const aspectRatioSchema = z.enum([
   "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9", "1.91:1",
 ]);
-
-const resolutionSchema = z.enum(["1K", "2K", "4K"]);
+const qualitySchema = z.enum(["auto", "low", "medium", "high"]);
+const outputFormatSchema = z.enum(["png", "jpeg", "webp"]);
+const backgroundSchema = z.enum(["auto", "transparent", "opaque"]);
 
 /**
  * Register Design MCP tools on the given McpServer instance.
@@ -51,27 +68,37 @@ export function registerDesignTools(
     "generate_image",
     {
       description:
-        "Generate one image from a prompt using the Gemini image model. Returns a public URL you can embed in markdown. Counts against the monthly quota. May take up to 30 seconds.",
+        "Generate one image from a prompt using OpenAI GPT Image 2. Returns a public URL you can embed in markdown. Counts against the monthly quota. May take 5–60 seconds at medium quality; quality=\"high\" can take several minutes (30–50× longer than low).",
       inputSchema: {
         prompt: z
           .string()
           .min(1)
-          .max(8000)
+          .max(32000)
           .describe(
-            "Image prompt. Include subject, style, composition, lighting, aspect ratio, and 'no text' if text-free.",
+            "Image prompt. Include subject, style, composition, lighting, aspect ratio, and 'no text' if text-free. GPT Image 2 supports up to 32K characters and is strong at instruction-following.",
           ),
         aspectRatio: aspectRatioSchema
           .optional()
           .describe(
-            "Aspect ratio. Common values: '1:1' (square), '16:9' (landscape), '9:16' (portrait/story), '4:5' (feed post). Defaults to '1:1'.",
+            "Aspect ratio. Common values: '1:1' (square), '16:9' (landscape), '9:16' (portrait/story), '4:5' (feed post). Defaults to '1:1'. Mapped to a 16-aligned WxH size server-side.",
           ),
-        resolution: resolutionSchema
+        quality: qualitySchema
           .optional()
-          .describe("Output resolution. '1K' (default), '2K', or '4K'. Higher resolutions use more quota."),
+          .describe(
+            "Generation quality. Defaults to 'auto' (OpenAI picks). 'low' is fastest (~5s), 'medium' is a balanced choice, 'high' runs the four-stage Understand/Plan/Generate/Review pipeline (30–50× slower than low) and produces the most refined output.",
+          ),
+        outputFormat: outputFormatSchema
+          .optional()
+          .describe("Image file format. Defaults to 'png'. Use 'webp' or 'jpeg' for smaller photographic assets."),
+        background: backgroundSchema
+          .optional()
+          .describe(
+            "Background handling. 'transparent' requires outputFormat='png' or 'webp' (use for logos, cutouts, UI assets). 'opaque' forces a solid background. 'auto' (default) lets the model decide.",
+          ),
         model: z
           .string()
           .optional()
-          .describe("Gemini model override. Defaults to gemini-3-pro-image-preview."),
+          .describe("OpenAI image model override. Defaults to gpt-image-2. Use 'gpt-image-1.5' or 'gpt-image-1-mini' to opt into older/cheaper models."),
       },
       annotations: {
         readOnlyHint: false,
@@ -94,7 +121,9 @@ export function registerDesignTools(
             prompt: args.prompt,
             model: args.model,
             aspectRatio: args.aspectRatio as AspectRatio | undefined,
-            resolution: args.resolution as ImageResolution | undefined,
+            quality: args.quality as ImageQuality | undefined,
+            outputFormat: args.outputFormat as ImageOutputFormat | undefined,
+            background: args.background as ImageBackground | undefined,
           });
           upload = await uploadImage(generated.buffer, generated.mimeType, userId);
         } catch (e) {
@@ -108,10 +137,12 @@ export function registerDesignTools(
           url: upload.url,
           model: generated.model,
           aspectRatio: generated.aspectRatio,
-          resolution: generated.resolution,
+          size: generated.size,
+          quality: generated.quality,
+          outputFormat: generated.outputFormat,
           bytes: generated.bytes,
           mimeType: generated.mimeType,
-          ...(generated.modelText ? { modelText: generated.modelText } : {}),
+          ...(generated.revisedPrompt ? { revisedPrompt: generated.revisedPrompt } : {}),
         };
 
         return {

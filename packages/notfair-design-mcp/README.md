@@ -4,8 +4,8 @@ Local stdio MCP server for image generation. The server exposes design tools to 
 
 ## Providers
 
+- `openai` (default): OpenAI Images API, default model `gpt-image-2`
 - `nano_banana`: Gemini 3 Pro Image / Nano Banana Pro, default model `gemini-3-pro-image-preview`
-- `openai`: OpenAI Images API, default model `gpt-image-2`
 
 ## Setup
 
@@ -20,7 +20,7 @@ Set at least one API key:
 ```bash
 export OPENAI_API_KEY=...
 export GEMINI_API_KEY=...
-export NOTFAIR_DESIGN_PROVIDER=nano_banana
+export NOTFAIR_DESIGN_PROVIDER=openai
 export NOTFAIR_DESIGN_USER_STATUS=free
 export NOTFAIR_DESIGN_USER_ID=local
 export NOTFAIR_DESIGN_OUTPUT_DIR=./out
@@ -52,7 +52,7 @@ Claude Desktop style config:
       "env": {
         "OPENAI_API_KEY": "YOUR_OPENAI_API_KEY",
         "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY",
-        "NOTFAIR_DESIGN_PROVIDER": "nano_banana",
+        "NOTFAIR_DESIGN_PROVIDER": "openai",
         "NOTFAIR_DESIGN_USER_STATUS": "free",
         "NOTFAIR_DESIGN_USER_ID": "local",
         "NOTFAIR_DESIGN_OUTPUT_DIR": "./out"

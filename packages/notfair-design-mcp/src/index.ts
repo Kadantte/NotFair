@@ -14,7 +14,7 @@ type UserStatus = "free" | "growth";
 const DEFAULT_OPENAI_MODEL = "gpt-image-2";
 const DEFAULT_NANO_BANANA_MODEL = "gemini-3-pro-image-preview";
 const DEFAULT_OUT_DIR = "out";
-const DEFAULT_PROVIDER: Provider = "nano_banana";
+const DEFAULT_PROVIDER: Provider = "openai";
 const DEFAULT_USER_ID = "local";
 const MONTHLY_LIMITS: Record<UserStatus, number> = {
   free: 10,
@@ -73,7 +73,7 @@ const generateImageSchema = {
     .describe("Image prompt. Include desired subject, style, composition, constraints, and text/no-text requirements."),
   provider: providerSchema
     .optional()
-    .describe("Image provider. Defaults to NOTFAIR_DESIGN_PROVIDER or nano_banana."),
+    .describe("Image provider. Defaults to NOTFAIR_DESIGN_PROVIDER or openai (GPT Image 2)."),
   model: z
     .string()
     .optional()
@@ -151,7 +151,7 @@ server.registerTool(
         configured: Boolean(geminiApiKey()),
         defaultModel: DEFAULT_NANO_BANANA_MODEL,
         env: "GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY",
-        notes: "Uses Gemini 3 Pro Image / Nano Banana Pro. This is the default provider for now.",
+        notes: "Uses Gemini 3 Pro Image / Nano Banana Pro. Available as a fallback; openai is the default provider.",
       },
     ],
     defaultProvider: normalizeProvider(process.env.NOTFAIR_DESIGN_PROVIDER),
@@ -264,8 +264,9 @@ async function generateWithOpenAI(
   if (model.startsWith("gpt-image") || model === "chatgpt-image-latest") {
     body.output_format = outputFormat;
     if (args.background) {
-      if (model === "gpt-image-2" && args.background === "transparent") {
-        throw new Error('gpt-image-2 does not support background="transparent"; use "auto" or "opaque".');
+      // transparent requires png or webp (jpeg has no alpha channel)
+      if (args.background === "transparent" && outputFormat === "jpeg") {
+        throw new Error('background="transparent" requires outputFormat="png" or "webp".');
       }
       body.background = args.background;
     }
