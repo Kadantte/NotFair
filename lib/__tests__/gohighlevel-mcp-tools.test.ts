@@ -7,9 +7,35 @@ const { ghlGetMock, ghlPostMock } = vi.hoisted(() => ({
   ghlPostMock: vi.fn(),
 }));
 
+const { selectGhlConnectionRows } = vi.hoisted(() => ({
+  selectGhlConnectionRows: vi.fn(),
+}));
+
 vi.mock("@/lib/gohighlevel/client", () => ({
   ghlGet: ghlGetMock,
   ghlPost: ghlPostMock,
+}));
+
+vi.mock("@/lib/db", () => ({
+  db: () => ({
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => selectGhlConnectionRows()),
+        })),
+      })),
+    })),
+  }),
+  schema: {
+    goHighLevelConnections: {
+      id: "id",
+      userId: "user_id",
+      agencyConnectionId: "agency_connection_id",
+      locationId: "location_id",
+      userType: "user_type",
+      uninstalledAt: "uninstalled_at",
+    },
+  },
 }));
 
 import { registerGoHighLevelTools } from "@/lib/gohighlevel/mcp-tools";
@@ -44,8 +70,10 @@ describe("GoHighLevel MCP tools", () => {
   beforeEach(() => {
     ghlGetMock.mockReset();
     ghlPostMock.mockReset();
+    selectGhlConnectionRows.mockReset();
     ghlGetMock.mockResolvedValue({ ok: true });
     ghlPostMock.mockResolvedValue({ ok: true });
+    selectGhlConnectionRows.mockResolvedValue([]);
   });
 
   it("registers a read-only tool surface and read-only OAuth scopes", () => {
@@ -85,6 +113,20 @@ describe("GoHighLevel MCP tools", () => {
       contactId: "contact_1",
       limit: 20,
       offset: undefined,
+    });
+  });
+
+  it("routes Company-scoped location reads through the matching Location connection token", async () => {
+    selectGhlConnectionRows.mockResolvedValue([{ id: 99 }]);
+    const { tools } = setupTools({ connectionId: 42, userType: "Company", locationId: null });
+
+    await tools.get("listContacts")!.handler({ locationId: "loc_child", limit: 1 });
+
+    expect(ghlGetMock).toHaveBeenCalledWith(99, "/contacts/", {
+      locationId: "loc_child",
+      limit: 1,
+      startAfterId: undefined,
+      query: undefined,
     });
   });
 

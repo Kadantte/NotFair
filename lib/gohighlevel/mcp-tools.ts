@@ -19,7 +19,11 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { and, eq, isNull } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
 import { ghlGet, ghlPost } from "@/lib/gohighlevel/client";
+
+type GhlQuery = Record<string, string | number | boolean | undefined | null>;
 
 export type GhlAuthContext = {
   connectionId: number;
@@ -140,6 +144,46 @@ function resolveLocationId(args: { locationId?: string }, auth: GhlAuthContext):
   return assertHighLevelId(id, "locationId");
 }
 
+async function resolveLocationConnectionId(auth: GhlAuthContext, locationId: string): Promise<number> {
+  if (auth.userType === "Location") return auth.connectionId;
+
+  const [row] = await db()
+    .select({ id: schema.goHighLevelConnections.id })
+    .from(schema.goHighLevelConnections)
+    .where(
+      and(
+        eq(schema.goHighLevelConnections.userId, auth.userId),
+        eq(schema.goHighLevelConnections.agencyConnectionId, auth.connectionId),
+        eq(schema.goHighLevelConnections.locationId, locationId),
+        eq(schema.goHighLevelConnections.userType, "Location"),
+        isNull(schema.goHighLevelConnections.uninstalledAt),
+      ),
+    )
+    .limit(1);
+
+  return row?.id ?? auth.connectionId;
+}
+
+async function ghlGetForLocation(
+  auth: GhlAuthContext,
+  locationId: string,
+  path: string,
+  query?: GhlQuery,
+): Promise<unknown> {
+  const connectionId = await resolveLocationConnectionId(auth, locationId);
+  return await ghlGet(connectionId, path, query);
+}
+
+async function ghlPostForLocation(
+  auth: GhlAuthContext,
+  locationId: string,
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<unknown> {
+  const connectionId = await resolveLocationConnectionId(auth, locationId);
+  return await ghlPost(connectionId, path, body);
+}
+
 function assertAllowedRequestPath(path: string): string {
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("?") || path.includes("#")) {
     throw new Error("`path` must be a root-relative API path without query string or fragment.");
@@ -195,6 +239,21 @@ function assertRequestLocationBoundary(
   return guardedQuery;
 }
 
+function inferRequestLocationId(
+  path: string,
+  query: Record<string, string | number | boolean> | undefined,
+): string | undefined {
+  for (const key of ["locationId", "location_id", "altId"] as const) {
+    const value = query?.[key];
+    if (value !== undefined) return assertHighLevelId(String(value), key);
+  }
+  if (path.startsWith("/locations/")) {
+    const locationId = decodedPathSegment(path.split("/")[2] ?? "", "locationId");
+    return assertHighLevelId(locationId, "locationId");
+  }
+  return undefined;
+}
+
 export function registerGoHighLevelTools(
   server: McpServer,
   getAuth: GhlAuthLookup,
@@ -235,7 +294,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; startAfterId?: string; query?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/contacts/", {
+      return await ghlGetForLocation(auth, locationId, "/contacts/", {
         locationId,
         limit: args.limit ?? 20,
         startAfterId: args.startAfterId,
@@ -263,7 +322,7 @@ export function registerGoHighLevelTools(
       lastMessageType?: string;
     }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/conversations/search", {
+      return await ghlGetForLocation(auth, locationId, "/conversations/search", {
         locationId,
         limit: args.limit ?? 20,
         startAfterDate: args.startAfterDate,
@@ -291,7 +350,7 @@ export function registerGoHighLevelTools(
       startAfter?: string;
     }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/opportunities/search", {
+      return await ghlGetForLocation(auth, locationId, "/opportunities/search", {
         location_id: locationId,
         pipeline_id: args.pipelineId,
         limit: args.limit ?? 20,
@@ -319,7 +378,7 @@ export function registerGoHighLevelTools(
       endDate: string;
     }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/calendars/events", {
+      return await ghlGetForLocation(auth, locationId, "/calendars/events", {
         locationId,
         calendarId: args.calendarId,
         startTime: args.startDate,
@@ -339,7 +398,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/calendars/", { locationId });
+      return await ghlGetForLocation(auth, locationId, "/calendars/", { locationId });
     },
   );
 
@@ -354,7 +413,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/opportunities/pipelines", { locationId });
+      return await ghlGetForLocation(auth, locationId, "/opportunities/pipelines", { locationId });
     },
   );
 
@@ -370,10 +429,11 @@ export function registerGoHighLevelTools(
     async (args: { locationId?: string }, auth) => {
       if (auth.userType === "Location") {
         const locationId = resolveLocationId(args, auth);
-        return await ghlGet(auth.connectionId, "/users/", { locationId });
+        return await ghlGetForLocation(auth, locationId, "/users/", { locationId });
       }
       const locationId = args.locationId ? assertHighLevelId(args.locationId, "locationId") : undefined;
-      return await ghlGet(auth.connectionId, "/users/", {
+      const connectionId = locationId ? await resolveLocationConnectionId(auth, locationId) : auth.connectionId;
+      return await ghlGet(connectionId, "/users/", {
         companyId: auth.companyId ?? undefined,
         locationId,
       });
@@ -392,7 +452,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; offset?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/businesses", {
+      return await ghlGetForLocation(auth, locationId, "/businesses", {
         locationId,
         limit: args.limit ?? 20,
         offset: args.offset,
@@ -411,7 +471,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, `/locations/${pathSegment(locationId, "locationId")}/customFields`);
+      return await ghlGetForLocation(auth, locationId, `/locations/${pathSegment(locationId, "locationId")}/customFields`);
     },
   );
 
@@ -425,7 +485,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, `/locations/${pathSegment(locationId, "locationId")}/customValues`);
+      return await ghlGetForLocation(auth, locationId, `/locations/${pathSegment(locationId, "locationId")}/customValues`);
     },
   );
 
@@ -439,7 +499,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, `/locations/${pathSegment(locationId, "locationId")}/tags`);
+      return await ghlGetForLocation(auth, locationId, `/locations/${pathSegment(locationId, "locationId")}/tags`);
     },
   );
 
@@ -466,7 +526,7 @@ export function registerGoHighLevelTools(
       offset?: number;
     }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlPost(auth.connectionId, `/locations/${pathSegment(locationId, "locationId")}/tasks/search`, {
+      return await ghlPostForLocation(auth, locationId, `/locations/${pathSegment(locationId, "locationId")}/tasks/search`, {
         assignedTo: args.assignedTo,
         completed: args.completed,
         dueDateFrom: args.dueDateFrom,
@@ -489,7 +549,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; skip?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/forms/", {
+      return await ghlGetForLocation(auth, locationId, "/forms/", {
         locationId,
         limit: args.limit ?? 20,
         skip: args.skip,
@@ -518,7 +578,7 @@ export function registerGoHighLevelTools(
       page?: number;
     }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/forms/submissions", {
+      return await ghlGetForLocation(auth, locationId, "/forms/submissions", {
         locationId,
         formId: args.formId,
         startAt: args.startAt,
@@ -540,7 +600,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; skip?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/surveys/", {
+      return await ghlGetForLocation(auth, locationId, "/surveys/", {
         locationId,
         limit: args.limit ?? 20,
         skip: args.skip,
@@ -569,7 +629,7 @@ export function registerGoHighLevelTools(
       page?: number;
     }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/surveys/submissions", {
+      return await ghlGetForLocation(auth, locationId, "/surveys/submissions", {
         locationId,
         surveyId: args.surveyId,
         startAt: args.startAt,
@@ -590,7 +650,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/workflows/", { locationId });
+      return await ghlGetForLocation(auth, locationId, "/workflows/", { locationId });
     },
   );
 
@@ -604,7 +664,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/campaigns/", { locationId });
+      return await ghlGetForLocation(auth, locationId, "/campaigns/", { locationId });
     },
   );
 
@@ -619,7 +679,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; offset?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/medias/files", {
+      return await ghlGetForLocation(auth, locationId, "/medias/files", {
         altId: locationId,
         altType: "location",
         limit: args.limit ?? 20,
@@ -639,7 +699,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; offset?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/links/", {
+      return await ghlGetForLocation(auth, locationId, "/links/", {
         locationId,
         limit: args.limit ?? 20,
         offset: args.offset,
@@ -660,7 +720,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; status?: string; limit?: number; offset?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/invoices/", {
+      return await ghlGetForLocation(auth, locationId, "/invoices/", {
         altId: locationId,
         altType: "location",
         status: args.status,
@@ -682,7 +742,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; contactId?: string; limit?: number; offset?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/payments/transactions/", {
+      return await ghlGetForLocation(auth, locationId, "/payments/transactions/", {
         altId: locationId,
         altType: "location",
         contactId: args.contactId,
@@ -703,7 +763,7 @@ export function registerGoHighLevelTools(
     },
     async (args: { locationId?: string; limit?: number; offset?: number }, auth) => {
       const locationId = resolveLocationId(args, auth);
-      return await ghlGet(auth.connectionId, "/products/", {
+      return await ghlGetForLocation(auth, locationId, "/products/", {
         locationId,
         limit: args.limit ?? 20,
         offset: args.offset,
@@ -723,7 +783,10 @@ export function registerGoHighLevelTools(
     },
     async (args: { path: string; query?: Record<string, string | number | boolean> }, auth) => {
       const path = assertAllowedRequestPath(args.path);
-      return await ghlGet(auth.connectionId, path, assertRequestLocationBoundary(path, args.query, auth));
+      const query = assertRequestLocationBoundary(path, args.query, auth);
+      const locationId = inferRequestLocationId(path, query);
+      if (!locationId) return await ghlGet(auth.connectionId, path, query);
+      return await ghlGetForLocation(auth, locationId, path, query);
     },
   );
 }
