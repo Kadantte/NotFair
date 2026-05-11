@@ -16,7 +16,6 @@
 
 import type {
   searchGeoTargets,
-  getRecommendations,
   getResourceMetadata,
   listQueryableResources,
   getKeywordIdeas,
@@ -63,7 +62,6 @@ export interface WriteToolResponse extends WriteResult {
 // are first-class here. Everything else is reached via `runScript`.
 
 export type SearchGeoTargetsResponse = StructuredShape<Unwrap<typeof searchGeoTargets>>;
-export type GetRecommendationsResponse = StructuredShape<Unwrap<typeof getRecommendations>>;
 export type GetChangesResponse = StructuredShape<Unwrap<typeof getChanges>>;
 export type ReviewChangeImpactResponse = StructuredShape<Unwrap<typeof reviewChangeImpact>>;
 export type ListChangeInterventionsResponse = StructuredShape<Unwrap<typeof listChangeInterventions>>;
@@ -223,7 +221,6 @@ export interface UndoChangeResponse extends WriteResult {
 export interface McpToolResponseRegistry {
   // Read tools (specialized, non-GAQL only)
   searchGeoTargets: SearchGeoTargetsResponse;
-  getRecommendations: GetRecommendationsResponse;
   getChanges: GetChangesResponse;
   reviewChangeImpact: ReviewChangeImpactResponse;
   listChangeInterventions: ListChangeInterventionsResponse;

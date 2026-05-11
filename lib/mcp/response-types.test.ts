@@ -83,7 +83,6 @@ describe("response-types — registry completeness", () => {
     const TOOL_NAMES: Record<McpToolName, true> = {
       // Read tools (specialized, non-GAQL)
       searchGeoTargets: true,
-      getRecommendations: true,
       getChanges: true,
       reviewChangeImpact: true,
       listChangeInterventions: true,

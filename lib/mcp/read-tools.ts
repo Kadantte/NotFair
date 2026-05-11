@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  getRecommendations,
   getResourceMetadata,
   listQueryableResources,
   searchGeoTargets,
@@ -21,7 +20,7 @@ import { resolveToolAuth } from "./helpers";
 
 /**
  * Non-GAQL read tools for Google Ads — specialized services that `runScript`
- * can't cover (recommendation engine, keyword planner, geo target search,
+ * can't cover (keyword planner, geo target search,
  * internal change log, schema introspection). Everything that's expressible
  * as GAQL lives in `runScript` (see `./code-mode`).
  */
@@ -73,19 +72,6 @@ export const registerReadTools: ToolRegistrar = (server, currentAuth) => {
     annotations: READ_ANNOTATIONS,
   }, safeHandler(async ({ accountId, query, countryCode, locale }) =>
     readToolCall({ accountId }, "search_geo_targets", (a) => searchGeoTargets(a, query, countryCode, locale)),
-  ));
-
-  // ─── Recommendations ─────────────────────────────────────────────
-
-  server.registerTool("getRecommendations", {
-    description: "Google Ads optimization recommendations with estimated impact (impressions, clicks, conversions). Optionally filter to a specific campaign. Served by Google's recommendation engine — not GAQL-expressible, use this tool (not runScript).",
-    inputSchema: {
-      accountId: accountIdParam,
-      campaignId: z.string().optional(),
-    },
-    annotations: READ_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId }) =>
-    readToolCall({ accountId, campaignId }, "get_recommendations", (a) => getRecommendations(a, campaignId)),
   ));
 
   // ─── Change History (NotFair-originated) ─────────────────────────
