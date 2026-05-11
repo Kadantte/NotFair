@@ -82,10 +82,12 @@ import {
   createCalloutAsset,
   createStructuredSnippetAsset,
   createSitelinkAsset,
+  createCallAsset,
   createImageAsset,
   linkAsset,
   unlinkAssetLinks,
   getAssetLinks,
+  FIELD_TYPES,
   type AuthContext,
 } from "@/lib/google-ads";
 
@@ -1706,6 +1708,143 @@ describe("protobuf validation: asset links (unified primitive)", () => {
       description1: "See current plans",
       description2: "Compare every option",
       targets: [{ level: "campaign", campaignId: "100" }],
+    });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("createCallAsset with campaign target produces asset + campaign_asset ops", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            { asset_result: { resource_name: "customers/1234567890/assets/-1" } },
+            { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/111~-1~16" } },
+          ],
+        }),
+      );
+    });
+
+    await createCallAsset(AUTH, {
+      phoneNumber: "+14155550123",
+      countryCode: "US",
+      targets: [{ level: "campaign", campaignId: "111" }],
+    });
+    assertAllCapturedOpsEncode();
+
+    // Verify the wire format of the captured operations explicitly
+    const ops = capturedOps[capturedOps.length - 1];
+    expect(ops[0]).toMatchObject({
+      entity: "asset",
+      operation: "create",
+      resource: {
+        call_asset: { phone_number: "+14155550123", country_code: "US" },
+      },
+    });
+    expect(ops[1]).toMatchObject({
+      entity: "campaign_asset",
+      operation: "create",
+      resource: {
+        field_type: FIELD_TYPES.CALL.fieldTypeInt,
+        campaign: "customers/1234567890/campaigns/111",
+      },
+    });
+  });
+
+  it("createCallAsset with callConversionReportingState includes it in call_asset wire payload", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            { asset_result: { resource_name: "customers/1234567890/assets/-1" } },
+          ],
+        }),
+      );
+    });
+
+    await createCallAsset(AUTH, {
+      phoneNumber: "+14155550123",
+      countryCode: "US",
+      callConversionReportingState: "USE_ACCOUNT_LEVEL_CALL_CONVERSION_ACTION",
+    });
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps[capturedOps.length - 1];
+    expect(ops[0]).toMatchObject({
+      entity: "asset",
+      operation: "create",
+      resource: {
+        call_asset: {
+          phone_number: "+14155550123",
+          country_code: "US",
+          call_conversion_reporting_state: "USE_ACCOUNT_LEVEL_CALL_CONVERSION_ACTION",
+        },
+      },
+    });
+  });
+
+  it("createCallAsset with callConversionAction includes it in call_asset wire payload", async () => {
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(
+        defaultMutateResponse({
+          mutate_operation_responses: [
+            { asset_result: { resource_name: "customers/1234567890/assets/-1" } },
+          ],
+        }),
+      );
+    });
+
+    await createCallAsset(AUTH, {
+      phoneNumber: "+14155550123",
+      countryCode: "US",
+      callConversionReportingState: "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+      callConversionAction: "customers/1234567890/conversionActions/42",
+    });
+    assertAllCapturedOpsEncode();
+
+    const ops = capturedOps[capturedOps.length - 1];
+    expect(ops[0]).toMatchObject({
+      entity: "asset",
+      operation: "create",
+      resource: {
+        call_asset: {
+          phone_number: "+14155550123",
+          country_code: "US",
+          call_conversion_reporting_state: "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+          call_conversion_action: "customers/1234567890/conversionActions/42",
+        },
+      },
+    });
+  });
+
+  it("createCallAsset rejects USE_RESOURCE_LEVEL without callConversionAction — no mutate call", async () => {
+    const result = await createCallAsset(AUTH, {
+      phoneNumber: "+14155550123",
+      countryCode: "US",
+      callConversionReportingState: "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/callConversionAction is required/);
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("linkAsset (CALL, customer-level) — via auto-source precheck", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          { customer_asset_result: { resource_name: "customers/1234567890/customerAssets/999~16" } },
+        ],
+      }));
+    });
+
+    await linkAsset(AUTH, {
+      assetId: "999",
+      fieldType: "CALL",
+      targets: [{ level: "customer" }],
     });
     assertAllCapturedOpsEncode();
   });

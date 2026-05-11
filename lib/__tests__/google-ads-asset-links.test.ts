@@ -25,6 +25,7 @@ import {
   unlinkAssetByTarget,
   unlinkAssetLinks,
 } from "@/lib/google-ads";
+import { createCallAsset } from "@/lib/google-ads/call-assets";
 
 const auth = { refreshToken: "refresh-token", customerId: "130-126-5570" };
 
@@ -42,6 +43,7 @@ describe("asset-links primitive", () => {
       expect(FIELD_TYPES.CALLOUT.fieldTypeInt).toBe(11);
       expect(FIELD_TYPES.STRUCTURED_SNIPPET.fieldTypeInt).toBe(12);
       expect(FIELD_TYPES.SITELINK.fieldTypeInt).toBe(13);
+      expect(FIELD_TYPES.CALL.fieldTypeInt).toBe(16);
       expect(FIELD_TYPES.MARKETING_IMAGE.fieldTypeInt).toBe(5);
       expect(FIELD_TYPES.SQUARE_MARKETING_IMAGE.fieldTypeInt).toBe(19);
       expect(FIELD_TYPES.AD_IMAGE.fieldTypeInt).toBe(26);
@@ -51,6 +53,7 @@ describe("asset-links primitive", () => {
       expect(FIELD_TYPES.CALLOUT.supportedLevels).toEqual(["customer", "campaign", "ad_group"]);
       expect(FIELD_TYPES.SITELINK.supportedLevels).toEqual(["customer", "campaign", "ad_group"]);
       expect(FIELD_TYPES.STRUCTURED_SNIPPET.supportedLevels).toEqual(["customer", "campaign", "ad_group"]);
+      expect(FIELD_TYPES.CALL.supportedLevels).toEqual(["customer", "campaign", "ad_group"]);
       expect(FIELD_TYPES.MARKETING_IMAGE.supportedLevels).toEqual(["customer", "campaign", "ad_group", "asset_group"]);
       expect(FIELD_TYPES.SQUARE_MARKETING_IMAGE.supportedLevels).toEqual(["customer", "campaign", "ad_group", "asset_group"]);
       // AD_IMAGE (Search/Display image extension on RSAs) — campaign/ad_group only.
@@ -64,6 +67,7 @@ describe("asset-links primitive", () => {
       expect(FIELD_TYPES.SQUARE_MARKETING_IMAGE.assetTypeName).toBe("IMAGE");
       expect(FIELD_TYPES.AD_IMAGE.assetTypeName).toBe("IMAGE");
       expect(FIELD_TYPES.CALLOUT.assetTypeName).toBe("CALLOUT");
+      expect(FIELD_TYPES.CALL.assetTypeName).toBe("CALL");
     });
   });
 
@@ -193,6 +197,44 @@ describe("asset-links primitive", () => {
           campaign: "customers/1301265570/campaigns/100",
         },
       });
+    });
+
+    it("links CALL asset at customer level (field_type 16)", async () => {
+      mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { customer_asset_result: { resource_name: "customers/1301265570/customerAssets/999~16" } },
+        ],
+      });
+
+      const result = await linkAsset(auth, {
+        assetId: "999",
+        fieldType: "CALL",
+        targets: [{ level: "customer" }],
+      });
+      expect(result.success).toBe(true);
+      expect(result.linksCreated).toHaveLength(1);
+      const ops = mockMutateResources.mock.calls[0][0];
+      expect(ops).toHaveLength(1);
+      expect(ops[0]).toMatchObject({
+        entity: "customer_asset",
+        operation: "create",
+        resource: {
+          asset: "customers/1301265570/assets/999",
+          field_type: FIELD_TYPES.CALL.fieldTypeInt,
+        },
+      });
+    });
+
+    it("rejects CALL at asset_group level (extension type — PMax not supported)", async () => {
+      const result = await linkAsset(auth, {
+        assetId: "999",
+        fieldType: "CALL",
+        targets: [{ level: "asset_group", assetGroupId: "55" }],
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/CALL assets cannot be linked at the asset_group level/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
     });
 
     it("rejects unknown field type", async () => {
@@ -386,6 +428,56 @@ describe("asset-links primitive", () => {
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/No SITELINK ad_group link found/);
       expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createCallAsset", () => {
+    it("rejects empty phoneNumber", async () => {
+      const result = await createCallAsset(auth, { phoneNumber: "   ", countryCode: "US" });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Phone number cannot be empty/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects empty countryCode", async () => {
+      const result = await createCallAsset(auth, { phoneNumber: "+14155550123", countryCode: "" });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Country code cannot be empty/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects invalid callConversionReportingState", async () => {
+      const result = await createCallAsset(auth, {
+        phoneNumber: "+14155550123",
+        countryCode: "US",
+        // @ts-expect-error — testing runtime guard
+        callConversionReportingState: "INVALID_VALUE",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Invalid callConversionReportingState/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION without callConversionAction", async () => {
+      const result = await createCallAsset(auth, {
+        phoneNumber: "+14155550123",
+        countryCode: "US",
+        callConversionReportingState: "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/callConversionAction is required/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("normalizes lowercase countryCode to uppercase before sending to API", async () => {
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { asset_result: { resource_name: "customers/1301265570/assets/123" } },
+        ],
+      });
+      await createCallAsset(auth, { phoneNumber: "+14155550123", countryCode: "us" });
+      const ops = mockMutateResources.mock.calls[0][0];
+      expect(ops[0].resource.call_asset.country_code).toBe("US");
     });
   });
 });

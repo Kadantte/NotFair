@@ -4,6 +4,7 @@ import {
   createStructuredSnippetAsset,
   STRUCTURED_SNIPPET_HEADERS,
   createSitelinkAsset,
+  createCallAsset,
   createImageAsset,
   fetchImageAssetFromUrl,
   IMAGE_FIELD_TYPE_NAMES,
@@ -119,6 +120,30 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
     return typedResult(result);
   }));
 
+  server.registerTool("createCallAsset", {
+    description: "Create a call asset (phone number + country code) and optionally link it to customer/campaign/ad-group targets in the same atomic mutate. Call assets show a phone number in search ads and enable call tracking. callConversionReportingState defaults to account-level tracking when omitted. Returns changeId, assetId, and link resource names.",
+    inputSchema: {
+      accountId: accountIdParam,
+      phoneNumber: z.string().min(1).describe("Phone number in E.164-style or local format, e.g. '+14155550123' or '(415) 555-0123'"),
+      countryCode: z.string().length(2).describe("Two-letter ISO 3166-1 alpha-2 country code, e.g. 'US'"),
+      callConversionReportingState: z.enum(["DISABLED", "USE_ACCOUNT_LEVEL_CALL_CONVERSION_ACTION", "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION"]).optional().describe("Call conversion reporting behavior. Omit to use account-level tracking (default)."),
+      callConversionAction: z.string().optional().describe("Conversion action resource_name to use when callConversionReportingState is USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION. Format: customers/{customer_id}/conversionActions/{id}."),
+      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets (customer/campaign/ad_group). Omit or pass [] to create the asset only; pass targets to link it in the same mutate."),
+      ...experimentImpactAcknowledgementSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, phoneNumber, countryCode, callConversionReportingState, callConversionAction, targets, acknowledgeExperimentImpact }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execAssetLinkWrite(
+      auth,
+      targetId,
+      campaignTargetIds(targets),
+      () => createCallAsset(targetAuth, { phoneNumber, countryCode, callConversionReportingState, callConversionAction, targets: targets as AssetLinkTarget[] | undefined }),
+      acknowledgeExperimentImpact,
+    );
+    return typedResult(result);
+  }));
+
   server.registerTool("createImageAsset", {
     description: "Upload a PNG/JPEG image asset from an HTTPS URL. Pick the field type by SERVING SLOT, not by aspect ratio: MARKETING_IMAGE (Display/PMax 1.91:1, min 600x314) | SQUARE_MARKETING_IMAGE (Display/PMax 1:1, min 300x300) | AD_IMAGE (Search/Display 'image extension' on RSAs — accepts either 1.91:1 OR 1:1 source, campaign/ad_group link levels only). Optionally link it to serving targets via `targets`. Returns changeId, assetId, and link resource names. To attach an existing image to more targets later, call `linkAsset`.",
     inputSchema: {
@@ -158,7 +183,7 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
   // FIELD_TYPES registry).
 
   server.registerTool("linkAsset", {
-    description: `Link an existing asset to one or more serving targets in a single atomic mutate. Bulk-by-default: pass a single-element targets array for one target, or many for fan-out. Field types: ${FIELD_TYPE_NAMES.join(", ")}. Level support varies by field type: MARKETING_IMAGE / SQUARE_MARKETING_IMAGE support all 4 levels including asset_group (Performance Max); CALLOUT / SITELINK / STRUCTURED_SNIPPET support customer/campaign/ad_group only; AD_IMAGE (Search/Display 'image extension' on RSAs) supports campaign/ad_group only. The underlying asset is field-type-agnostic — the same IMAGE asset can be linked as MARKETING_IMAGE at one target and AD_IMAGE at another. Auto-generated assets (asset.source = AUTOMATICALLY_CREATED) are rejected before the mutate. To remove links, use unlinkAssetLinks with the link resource_names returned here. Returns changeId and link resource names.`,
+    description: `Link an existing asset to one or more serving targets in a single atomic mutate. Bulk-by-default: pass a single-element targets array for one target, or many for fan-out. Field types: ${FIELD_TYPE_NAMES.join(", ")}. Level support varies by field type: MARKETING_IMAGE / SQUARE_MARKETING_IMAGE support all 4 levels including asset_group (Performance Max); CALLOUT / SITELINK / STRUCTURED_SNIPPET / CALL support customer/campaign/ad_group only; AD_IMAGE (Search/Display 'image extension' on RSAs) supports campaign/ad_group only. The underlying asset is field-type-agnostic — the same IMAGE asset can be linked as MARKETING_IMAGE at one target and AD_IMAGE at another. Auto-generated assets (asset.source = AUTOMATICALLY_CREATED) are rejected before the mutate. To remove links, use unlinkAssetLinks with the link resource_names returned here. Returns changeId and link resource names.`,
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Asset ID (query `asset` via runScript, or pass the assetId returned from a create*Asset call)"),

@@ -13,6 +13,7 @@ export * from "./sync-account";
 export * from "./pmax";
 export * from "./asset-links";
 export * from "./callouts";
+export * from "./call-assets";
 export * from "./structured-snippets";
 export * from "./sitelinks";
 export * from "./image-assets";

@@ -31,6 +31,7 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 
 - **`BiddingStrategyType` integers**: 9=`TARGET_SPEND` (a.k.a. Maximize Clicks), 10=`MAXIMIZE_CONVERSIONS`, 11=`MAXIMIZE_CONVERSION_VALUE`, 15=`TARGET_IMPRESSION_SHARE`. Easy to swap if you read the integer. Use the `_name` sibling, never the integer.
 - **`_name` and `_value` siblings are post-fetch augmentations**, NOT real GAQL fields. Do NOT put them in SELECT or WHERE — they appear automatically when the corresponding raw field is selected.
+- **`AssetFieldType.CALL = 16`** (not 4; `MANDATORY_AD_TEXT = 4`). Easy to mis-guess since CALL semantically feels like it should be low-numbered. Verified against the library proto JSON. Use `FIELD_TYPES.CALL.fieldTypeInt` — never hardcode the integer.
 
 ## Library — `google-ads-api` wire format
 

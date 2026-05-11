@@ -92,6 +92,12 @@ export const FIELD_TYPES = {
     assetTypeName: "SITELINK",
     supportedLevels: EXTENSION_LEVELS,
   },
+  CALL: {
+    fieldTypeName: "CALL",
+    fieldTypeInt: 16,
+    assetTypeName: "CALL",
+    supportedLevels: EXTENSION_LEVELS,
+  },
   MARKETING_IMAGE: {
     fieldTypeName: "MARKETING_IMAGE",
     fieldTypeInt: 5,
