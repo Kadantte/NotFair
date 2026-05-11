@@ -9,6 +9,7 @@ import { listConnectableAccounts, parseCustomerIds, syncAccountSnapshots } from 
 import { setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
+import { maybeFireGoogleAdsSignup } from "@/lib/google-ads-signup";
 import {
   REDDIT_SIGNUP_ID_COOKIE,
   sendRedditConversion,
@@ -215,12 +216,22 @@ export async function POST(request: Request) {
   // callback before branching; read them back so attribution is preserved.
   let redditConversionPayload: RedditConversionInput | null = null;
 
+  // Captured outside the try block so the cookie set + Google Ads upload
+  // below can reference them even if the trackServerEvent path threw.
+  // Initialize email from `identity.googleEmail` (already validated upstream)
+  // so a Supabase outage inside the try doesn't blackhole the conversion —
+  // we'll upgrade to `user.email` once we have it.
+  let signupEmail: string | null = identity.googleEmail ?? null;
+  let signupGclid: string | null = null;
+
   if (isNewSignup) {
     try {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>;
       const attribution = sanitizeAttribution(meta);
+      signupEmail = user?.email ?? identity.googleEmail ?? null;
+      signupGclid = meta.gclid ?? null;
       await recordUserAttribution({
         userId: identity.userId,
         email: user?.email ?? null,
@@ -282,12 +293,31 @@ export async function POST(request: Request) {
     if (legacyRow) setSessionCookies(response, legacyRow.accessToken);
   }
   if (isNewSignup) {
-    response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
+    // 600s TTL — single-fire is enforced by clear-on-fire in the tracker,
+    // not the TTL. Tight TTLs drop conversions when hydration is slow.
+    response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
+    if (signupEmail) {
+      // Enhanced Conversions for Leads — gtag.js hashes locally before send.
+      response.cookies.set("gads_signup_email", signupEmail, {
+        path: "/",
+        maxAge: 600,
+      });
+    }
+    // Server-side Google Ads signup conversion — source of truth for Smart
+    // Bidding (catches signups where browser pixel fails). The browser-side
+    // WEBPAGE action is now observation-only.
+    after(
+      maybeFireGoogleAdsSignup({
+        userId: identity.userId,
+        email: signupEmail,
+        gclid: signupGclid,
+      }),
+    );
   }
   if (redditConversionPayload) {
     response.cookies.set(REDDIT_SIGNUP_ID_COOKIE, redditConversionPayload.conversionId, {
       path: "/",
-      maxAge: 60,
+      maxAge: 600,
     });
     after(sendRedditConversion(redditConversionPayload));
   }

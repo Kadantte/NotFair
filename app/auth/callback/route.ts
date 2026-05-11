@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi";
+import { maybeFireGoogleAdsSignup } from "@/lib/google-ads-signup";
 import { getClientIp } from "@/lib/request-ip";
 import {
   UTM_KEYS,
@@ -551,7 +552,19 @@ async function createOrRedirectGoogleAdsSession({
       });
       if (accessToken) setSessionCookies(response, accessToken);
       if (isFirstSignup) {
-        response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
+        // 600s TTL: hydration/network can be slow on first render, and the
+        // cookie clear-on-fire (in GadsConversionTracker) is what guarantees
+        // single-fire — not the TTL.
+        response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
+        if (googleEmail) {
+          // Enhanced Conversions for Leads: gtag.js hashes this locally before
+          // sending. Same-domain, same TTL as the signup sentinel, cleared by
+          // the tracker after firing.
+          response.cookies.set("gads_signup_email", googleEmail, {
+            path: "/",
+            maxAge: 600,
+          });
+        }
       }
       response.cookies.set(
         "gads_connect_event",
@@ -564,7 +577,13 @@ async function createOrRedirectGoogleAdsSession({
     const response = NextResponse.redirect(`${origin}${next}`);
     if (accessToken) setSessionCookies(response, accessToken);
     if (isFirstSignup) {
-      response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 60 });
+      response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
+      if (googleEmail) {
+        response.cookies.set("gads_signup_email", googleEmail, {
+          path: "/",
+          maxAge: 600,
+        });
+      }
     }
     response.cookies.set(
       "gads_connect_event",
@@ -1007,7 +1026,7 @@ export async function GET(request: Request) {
     });
 
     const conversionId = randomUUID();
-    response.cookies.set(REDDIT_SIGNUP_ID_COOKIE, conversionId, { path: "/", maxAge: 60 });
+    response.cookies.set(REDDIT_SIGNUP_ID_COOKIE, conversionId, { path: "/", maxAge: 600 });
     after(
       sendRedditConversion({
         trackingType: "SignUp",
@@ -1018,6 +1037,18 @@ export async function GET(request: Request) {
         userAgent: request.headers.get("user-agent"),
         valueDecimal: 1.0,
         currency: "USD",
+      }),
+    );
+
+    // Server-side Google Ads signup conversion — catches signups where the
+    // browser pixel fails (ITP, ad blockers, slow hydration). Source of truth
+    // for the Smart Bidding signal; the browser-side WEBPAGE action is now
+    // observation-only (primary_for_goal=false).
+    after(
+      maybeFireGoogleAdsSignup({
+        userId: user.id,
+        email: user.email ?? null,
+        gclid: state.attribution?.gclid ?? null,
       }),
     );
   }

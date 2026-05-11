@@ -35,10 +35,16 @@ export function getNotFairSystemAuth(): AuthContext | null {
 }
 
 /**
- * The Google Ads conversion action id for NotFair's "First write request"
- * lead conversion. Defaults to the action that exists in account 3251706605
- * today; can be overridden per-environment via env.
+ * The Google Ads conversion action id for NotFair's "Signup (server)"
+ * UPLOAD_CLICKS conversion — the source-of-truth signup signal uploaded
+ * server-side via `uploadClickConversions`. Defaults to the action that
+ * exists in account 3251706605 today; env overridable per-environment.
+ *
+ * Distinct from the browser-side WEBPAGE action (7607467846) that fires
+ * via gtag; that one is observation-only (primary_for_goal=false). The
+ * upload-clicks action below is primary so Smart Bidding trains on the
+ * complete signal (gclid + hashed email, no ITP/ad-blocker loss).
  */
-export function getFirstWriteConversionActionId(): string {
-  return getEnv("NOTFAIR_FIRST_WRITE_CONVERSION_ACTION_ID") ?? "7556563874";
+export function getSignupConversionActionId(): string {
+  return getEnv("NOTFAIR_SIGNUP_CONVERSION_ACTION_ID") ?? "7607072543";
 }

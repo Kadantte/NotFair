@@ -9,6 +9,7 @@ const {
   mockInsertValues,
   mockIdentifyUser,
   mockLoadGoogleConnection,
+  mockMaybeFireGoogleAdsSignup,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectLimit: vi.fn(),
@@ -18,10 +19,15 @@ const {
   mockInsertValues: vi.fn(),
   mockIdentifyUser: vi.fn(),
   mockLoadGoogleConnection: vi.fn(),
+  mockMaybeFireGoogleAdsSignup: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/auth/identify-user", () => ({
   identifyUser: () => mockIdentifyUser(),
+}));
+
+vi.mock("@/lib/google-ads-signup", () => ({
+  maybeFireGoogleAdsSignup: mockMaybeFireGoogleAdsSignup,
 }));
 
 vi.mock("@/lib/connections/google-read", () => ({
@@ -386,6 +392,45 @@ describe("Select account route — POST", () => {
       // New signup (pending + no prior customerId) should redirect to the `next` param
       expect(body.redirectUrl).toContain("/onboarding");
       expect(response.cookies.get("gads_new_signup")?.value).toBe("1");
+    });
+
+    it("fires maybeFireGoogleAdsSignup with userId + email on new signup", async () => {
+      const response = await POST(
+        makeRequest({
+          pendingToken: "pending-token-abc",
+          accounts: [{ id: "1111111111", name: "Client A" }],
+          next: "/onboarding",
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      // Server-side fallback for the Google Ads signup conversion. Email
+      // comes from identity.googleEmail (mocked above) since the Supabase
+      // user lookup isn't wired in the unit test; gclid is null because
+      // no UTM/click metadata was supplied in the request.
+      expect(mockMaybeFireGoogleAdsSignup).toHaveBeenCalledTimes(1);
+      expect(mockMaybeFireGoogleAdsSignup).toHaveBeenCalledWith({
+        userId: "user-123",
+        email: "test@example.com",
+        gclid: null,
+      });
+      // gads_signup_email cookie carries the email to the browser for ECL.
+      expect(response.cookies.get("gads_signup_email")?.value).toBe(
+        "test@example.com",
+      );
+      // TTL bumped from 60 → 600 to survive slow hydration. The raw
+      // Set-Cookie header is comma-joined (`Expires=Mon, DD…` contains
+      // commas too), so use `Set-Cookie` getSetCookie() to get a clean
+      // per-cookie array.
+      const cookies = response.headers.getSetCookie();
+      const newSignupCookie = cookies.find((c) =>
+        c.startsWith("gads_new_signup="),
+      );
+      const emailCookie = cookies.find((c) =>
+        c.startsWith("gads_signup_email="),
+      );
+      expect(newSignupCookie).toMatch(/Max-Age=600/);
+      expect(emailCookie).toMatch(/Max-Age=600/);
     });
 
     it("returns 404 when no Google connection exists for the user", async () => {

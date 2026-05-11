@@ -9,6 +9,7 @@ const {
   mockCookieGet,
   mockCookieGetAll,
   mockVerifyOAuthNonce,
+  mockMaybeFireGoogleAdsSignup,
 } = vi.hoisted(() => ({
   mockSignInWithIdToken: vi.fn(),
   mockInsertValues: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockCookieGet: vi.fn(),
   mockCookieGetAll: vi.fn(),
   mockVerifyOAuthNonce: vi.fn(),
+  mockMaybeFireGoogleAdsSignup: vi.fn(async () => {}),
 }));
 
 vi.mock("next/headers", () => ({
@@ -41,6 +43,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
       signInWithIdToken: mockSignInWithIdToken,
+      updateUser: vi.fn(async () => ({ data: { user: null }, error: null })),
     },
   })),
 }));
@@ -69,6 +72,10 @@ vi.mock("@/lib/google-ads", () => ({
 
 vi.mock("@/lib/oauth-nonce", () => ({
   verifyOAuthNonce: (...args: unknown[]) => mockVerifyOAuthNonce(...args),
+}));
+
+vi.mock("@/lib/google-ads-signup", () => ({
+  maybeFireGoogleAdsSignup: mockMaybeFireGoogleAdsSignup,
 }));
 
 vi.mock("@/lib/db", () => {
@@ -298,6 +305,51 @@ describe("Auth callback route — GET", () => {
     expect(response.headers.get("location")).toContain("/tools");
     expect(mockInsertValues).toHaveBeenCalled();
     expect(mockListConnectableAccounts).toHaveBeenCalledWith("google-refresh-token");
+  });
+
+  it("fires maybeFireGoogleAdsSignup with userId + email + gclid on new signup", async () => {
+    // mockSelectRows returns [] by default → both isFirstSignup checks empty
+    // → isFirstSignup = true → outer handler fires server-side conversion.
+    const state = encodeState({
+      attribution: {
+        version: 1,
+        gclid: "EAIaIQ-test-gclid",
+        attribution_captured_at: "2026-05-11T00:00:00Z",
+      },
+    });
+    const response = await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockMaybeFireGoogleAdsSignup).toHaveBeenCalledTimes(1);
+    expect(mockMaybeFireGoogleAdsSignup).toHaveBeenCalledWith({
+      userId: "user-123",
+      email: "user@example.com",
+      gclid: "EAIaIQ-test-gclid",
+    });
+    // 600s TTL on the cookies that carry the signup signal (read from raw
+    // Set-Cookie since the test framework's cookies.get only exposes value).
+    const cookies = response.headers.getSetCookie();
+    const newSignupCookie = cookies.find((c) =>
+      c.startsWith("gads_new_signup="),
+    );
+    expect(newSignupCookie).toMatch(/Max-Age=600/);
+    expect(response.cookies.get("gads_signup_email")?.value).toBe(
+      "user@example.com",
+    );
+  });
+
+  it("does NOT fire maybeFireGoogleAdsSignup on a returning user", async () => {
+    // Returning user: mcp_sessions has a row.
+    mockSelectRows.mockResolvedValue([{ id: 1 }]);
+
+    const state = encodeState();
+    await GET(
+      makeRequest(`http://localhost:3000/auth/callback?code=valid-code&state=${state}`),
+    );
+
+    expect(mockMaybeFireGoogleAdsSignup).not.toHaveBeenCalled();
   });
 
   it("redirects to /campaigns by default after successful connect", async () => {
