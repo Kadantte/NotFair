@@ -15,7 +15,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { issuePat } from "@/lib/gohighlevel/pat";
-import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
+import { hasAllGoHighLevelScopes } from "@/lib/gohighlevel/scopes";
 
 export async function POST(request: Request) {
   const identity = await identifyUser({ source: "gohighlevel-pat-mint" });
@@ -88,11 +88,11 @@ export async function POST(request: Request) {
   if (!connection) {
     return NextResponse.json({ error: "no_connection" }, { status: 404 });
   }
-  if (!hasAllGoHighLevelReadonlyScopes(connection.scopes)) {
+  if (!hasAllGoHighLevelScopes(connection.scopes)) {
     return NextResponse.json(
       {
         error: "reauthorization_required",
-        message: "Reconnect GoHighLevel before minting a PAT for the expanded read-only MCP tools.",
+        message: "Reconnect GoHighLevel before minting a PAT for the expanded read/write MCP tools.",
       },
       { status: 409 },
     );

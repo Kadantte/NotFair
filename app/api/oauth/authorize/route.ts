@@ -7,7 +7,7 @@ import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
 import { identifyUser } from "@/lib/auth/identify-user";
-import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
+import { hasAllGoHighLevelScopes } from "@/lib/gohighlevel/scopes";
 
 /**
  * OAuth 2.0 Authorization Endpoint.
@@ -206,10 +206,10 @@ export async function GET(request: Request) {
         );
         return NextResponse.redirect(ghlStartUrl.toString());
       }
-      if (!hasAllGoHighLevelReadonlyScopes(conn.scopes)) {
-        // Existing connections may have been granted the older, smaller scope
+      if (!hasAllGoHighLevelScopes(conn.scopes)) {
+        // Existing connections may have been granted an older, smaller scope
         // set. Re-run HighLevel consent before minting a Claude token whose
-        // tool surface assumes the expanded read-only scopes.
+        // tool surface assumes the expanded read/write scopes.
         const ghlStartUrl = new URL("/api/oauth/gohighlevel/start", requestUrl);
         ghlStartUrl.searchParams.set(
           "next",

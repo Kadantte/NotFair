@@ -29,7 +29,7 @@ import {
   type GhlAuthContext,
 } from "@/lib/gohighlevel/mcp-tools";
 import { GHL_PAT_PREFIX, hashPat, parseConnectionIdFromPat } from "@/lib/gohighlevel/pat";
-import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
+import { hasAllGoHighLevelScopes } from "@/lib/gohighlevel/scopes";
 import { findResource } from "@/lib/mcp/resources";
 
 export const runtime = "nodejs";
@@ -106,8 +106,8 @@ async function resolveOatAuth(bearerToken: string): Promise<GhlAuthContext> {
   if (row.uninstalledAt) {
     throw new Error("HighLevel app has been uninstalled for this connection.");
   }
-  if (!hasAllGoHighLevelReadonlyScopes(row.scopes)) {
-    throw new Error("HighLevel connection needs reauthorization for the current read-only scope set.");
+  if (!hasAllGoHighLevelScopes(row.scopes)) {
+    throw new Error("HighLevel connection needs reauthorization for the current read/write scope set.");
   }
 
   return {
@@ -154,8 +154,8 @@ async function resolvePatAuth(bearerToken: string): Promise<GhlAuthContext> {
   if (!row) throw new Error("PAT not found or revoked.");
   if (row.connectionId !== candidateConnId) throw new Error("PAT/connection mismatch.");
   if (row.uninstalledAt) throw new Error("HighLevel app has been uninstalled for this connection.");
-  if (!hasAllGoHighLevelReadonlyScopes(row.scopes)) {
-    throw new Error("HighLevel connection needs reauthorization for the current read-only scope set.");
+  if (!hasAllGoHighLevelScopes(row.scopes)) {
+    throw new Error("HighLevel connection needs reauthorization for the current read/write scope set.");
   }
 
   // Best-effort touch of last_used_at — fire-and-forget.

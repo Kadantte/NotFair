@@ -117,3 +117,30 @@ export function ghlPost<T = unknown>(
 ): Promise<T> {
   return ghlRequest<T>(connectionId, path, { method: "POST", body, version: opts.version });
 }
+
+export function ghlPut<T = unknown>(
+  connectionId: number,
+  path: string,
+  body?: unknown,
+  opts: { version?: string } = {},
+): Promise<T> {
+  return ghlRequest<T>(connectionId, path, { method: "PUT", body, version: opts.version });
+}
+
+export function ghlPatch<T = unknown>(
+  connectionId: number,
+  path: string,
+  body?: unknown,
+  opts: { version?: string } = {},
+): Promise<T> {
+  return ghlRequest<T>(connectionId, path, { method: "PATCH", body, version: opts.version });
+}
+
+export function ghlDelete<T = unknown>(
+  connectionId: number,
+  path: string,
+  query?: GhlRequestOptions["query"],
+  opts: { version?: string } = {},
+): Promise<T> {
+  return ghlRequest<T>(connectionId, path, { method: "DELETE", query, version: opts.version });
+}

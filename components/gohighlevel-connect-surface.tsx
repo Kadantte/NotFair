@@ -6,12 +6,12 @@ import { useTranslations } from "next-intl";
 import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Key, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GHL_MCP_CONNECTOR_NAME, GHL_MCP_SERVER_URL } from "@/lib/brand";
-import { GOHIGHLEVEL_READONLY_SCOPES } from "@/lib/gohighlevel/scopes";
+import { GOHIGHLEVEL_SCOPES } from "@/lib/gohighlevel/scopes";
 import type { Session } from "@/lib/session";
 
 // Single source of truth — keeps the displayed scopes list in lock-step
 // with what the OAuth flow actually requests.
-const REQUESTED_SCOPES: readonly string[] = GOHIGHLEVEL_READONLY_SCOPES;
+const REQUESTED_SCOPES: readonly string[] = GOHIGHLEVEL_SCOPES;
 
 type Connection = {
   id: number;

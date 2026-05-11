@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { GhlAuthContext } from "@/lib/gohighlevel/mcp-tools";
 
-const { ghlGetMock, ghlPostMock } = vi.hoisted(() => ({
+const { ghlDeleteMock, ghlGetMock, ghlPatchMock, ghlPostMock, ghlPutMock } = vi.hoisted(() => ({
+  ghlDeleteMock: vi.fn(),
   ghlGetMock: vi.fn(),
+  ghlPatchMock: vi.fn(),
   ghlPostMock: vi.fn(),
+  ghlPutMock: vi.fn(),
 }));
 
 const { selectGhlConnectionRows } = vi.hoisted(() => ({
@@ -12,8 +15,11 @@ const { selectGhlConnectionRows } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/gohighlevel/client", () => ({
+  ghlDelete: ghlDeleteMock,
   ghlGet: ghlGetMock,
+  ghlPatch: ghlPatchMock,
   ghlPost: ghlPostMock,
+  ghlPut: ghlPutMock,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -39,7 +45,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { registerGoHighLevelTools } from "@/lib/gohighlevel/mcp-tools";
-import { GOHIGHLEVEL_READONLY_SCOPES } from "@/lib/gohighlevel/scopes";
+import { GOHIGHLEVEL_READONLY_SCOPES, GOHIGHLEVEL_SCOPES, GOHIGHLEVEL_WRITE_SCOPES } from "@/lib/gohighlevel/scopes";
 
 type RegisteredTool = {
   config: { annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean } };
@@ -68,21 +74,31 @@ function setupTools(authOverrides: Partial<GhlAuthContext> = {}) {
 
 describe("GoHighLevel MCP tools", () => {
   beforeEach(() => {
+    ghlDeleteMock.mockReset();
     ghlGetMock.mockReset();
+    ghlPatchMock.mockReset();
     ghlPostMock.mockReset();
+    ghlPutMock.mockReset();
     selectGhlConnectionRows.mockReset();
+    ghlDeleteMock.mockResolvedValue({ ok: true });
     ghlGetMock.mockResolvedValue({ ok: true });
+    ghlPatchMock.mockResolvedValue({ ok: true });
     ghlPostMock.mockResolvedValue({ ok: true });
+    ghlPutMock.mockResolvedValue({ ok: true });
     selectGhlConnectionRows.mockResolvedValue([]);
   });
 
-  it("registers a read-only tool surface and read-only OAuth scopes", () => {
+  it("registers read and approved-write tools with matching OAuth scopes", () => {
     const { tools } = setupTools();
 
-    expect(tools.size).toBeGreaterThan(20);
-    expect([...tools.values()].every((tool) => tool.config.annotations?.readOnlyHint === true)).toBe(true);
-    expect([...tools.values()].every((tool) => tool.config.annotations?.destructiveHint === false)).toBe(true);
+    expect(tools.size).toBeGreaterThan(25);
+    expect(tools.get("request")?.config.annotations?.readOnlyHint).toBe(true);
+    expect(tools.get("createSubAccount")?.config.annotations?.readOnlyHint).toBe(false);
+    expect(tools.get("writeRequest")?.config.annotations?.destructiveHint).toBe(true);
     expect(GOHIGHLEVEL_READONLY_SCOPES.every((scope) => scope.endsWith(".readonly"))).toBe(true);
+    expect(GOHIGHLEVEL_WRITE_SCOPES).toContain("locations.write");
+    expect(GOHIGHLEVEL_WRITE_SCOPES).toContain("users.write");
+    expect(GOHIGHLEVEL_SCOPES).not.toContain("contacts.write");
     expect(GOHIGHLEVEL_READONLY_SCOPES).toContain("documents_contracts_template/list.readonly");
     expect(GOHIGHLEVEL_READONLY_SCOPES).not.toContain("documents_contracts_templates/list.readonly");
   });
@@ -128,6 +144,63 @@ describe("GoHighLevel MCP tools", () => {
       startAfterId: undefined,
       query: undefined,
     });
+  });
+
+  it("creates agency sub-accounts with the agency connection token", async () => {
+    const { tools } = setupTools({ connectionId: 42, userType: "Company", companyId: "company_123", locationId: null });
+
+    await tools.get("createSubAccount")!.handler({
+      confirm: true,
+      payload: { name: "New Client", address: "1 Main St" },
+    });
+
+    expect(ghlPostMock).toHaveBeenCalledWith(42, "/locations/", {
+      name: "New Client",
+      address: "1 Main St",
+      companyId: "company_123",
+    });
+  });
+
+  it("creates users with the connection token", async () => {
+    const { tools } = setupTools({ connectionId: 42, userType: "Company", locationId: null });
+
+    await tools.get("createUser")!.handler({
+      confirm: true,
+      user: { firstName: "Ada", email: "ada@example.com", type: "account" },
+    });
+
+    expect(ghlPostMock).toHaveBeenCalledWith(42, "/users/", {
+      firstName: "Ada",
+      email: "ada@example.com",
+      type: "account",
+    });
+  });
+
+  it("requires explicit confirmation before write tools mutate HighLevel", async () => {
+    const { tools } = setupTools();
+
+    const result = await tools.get("writeRequest")!.handler({
+      method: "POST",
+      path: "/locations/",
+      body: { name: "Needs approval" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(ghlPostMock).not.toHaveBeenCalled();
+  });
+
+  it("limits generic writes to agency setup paths", async () => {
+    const { tools } = setupTools();
+
+    const result = await tools.get("writeRequest")!.handler({
+      confirm: true,
+      method: "POST",
+      path: "/contacts/",
+      body: { locationId: "loc_123" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(ghlPostMock).not.toHaveBeenCalled();
   });
 
   it("uses endpoint-specific pagination parameters for forms and surveys", async () => {

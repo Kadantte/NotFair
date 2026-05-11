@@ -52,10 +52,27 @@ export const GOHIGHLEVEL_READONLY_SCOPES = [
   "documents_contracts_template/list.readonly",
 ] as const;
 
-export type GoHighLevelScope = (typeof GOHIGHLEVEL_READONLY_SCOPES)[number];
+export const GOHIGHLEVEL_WRITE_SCOPES = [
+  "locations.write",
+  "users.write",
+] as const;
+
+export const GOHIGHLEVEL_SCOPES = [
+  ...GOHIGHLEVEL_READONLY_SCOPES,
+  ...GOHIGHLEVEL_WRITE_SCOPES,
+] as const;
+
+export type GoHighLevelScope = (typeof GOHIGHLEVEL_SCOPES)[number];
 
 export function hasAllGoHighLevelReadonlyScopes(grantedScopes: unknown): boolean {
+  return hasAllGoHighLevelScopes(grantedScopes, GOHIGHLEVEL_READONLY_SCOPES);
+}
+
+export function hasAllGoHighLevelScopes(
+  grantedScopes: unknown,
+  requiredScopes: readonly string[] = GOHIGHLEVEL_SCOPES,
+): boolean {
   if (!Array.isArray(grantedScopes)) return false;
   const granted = new Set(grantedScopes.filter((scope): scope is string => typeof scope === "string"));
-  return GOHIGHLEVEL_READONLY_SCOPES.every((scope) => granted.has(scope));
+  return requiredScopes.every((scope) => granted.has(scope));
 }

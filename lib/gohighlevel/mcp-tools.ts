@@ -1,7 +1,7 @@
 /**
- * Read-only MCP tools for HighLevel.
+ * MCP tools for HighLevel.
  *
- * The tool surface is read-heavy and grouped by CRM workflow:
+ * The tool surface is grouped by CRM workflow:
  *   - listLocations     — what locations does this connection have access to?
  *   - listContacts      — paginate contacts, with simple filters.
  *   - listConversations — paginate conversations, by location.
@@ -9,8 +9,10 @@
  *   - listCalendarEvents — date-bounded events.
  *   - metadata/revenue tools — users, pipelines, calendars, custom fields,
  *                              forms/surveys, invoices, payments, products.
+ *   - write helpers     — approved mutations for agency setup.
  *   - request           — generic GET escape hatch for endpoints we haven't
  *                         wrapped yet. Read-only by construction.
+ *   - writeRequest      — approved, allowlisted mutation escape hatch.
  *
  * Authn: each tool reads the current GHL connection from the AsyncLocalStorage
  * `getGhlAuth()` helper. No request shape leaks here — the route layer is
@@ -21,9 +23,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { ghlGet, ghlPost } from "@/lib/gohighlevel/client";
+import { ghlDelete, ghlGet, ghlPatch, ghlPost, ghlPut } from "@/lib/gohighlevel/client";
 
 type GhlQuery = Record<string, string | number | boolean | undefined | null>;
+type GhlBody = Record<string, unknown>;
 
 export type GhlAuthContext = {
   connectionId: number;
@@ -61,11 +64,24 @@ function safe<A>(
 }
 
 type ReadToolInput = z.ZodRawShape;
+type ToolInput = z.ZodRawShape;
 
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   destructiveHint: false,
   openWorldHint: false,
+} as const;
+
+const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: true,
+} as const;
+
+const DESTRUCTIVE_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  openWorldHint: true,
 } as const;
 
 function registerReadTool<A extends object>(
@@ -82,6 +98,26 @@ function registerReadTool<A extends object>(
       description,
       inputSchema,
       annotations: READ_ANNOTATIONS,
+    },
+    safe(handler as (args: Record<string, unknown>, auth: GhlAuthContext) => Promise<unknown>, getAuth),
+  );
+}
+
+function registerWriteTool<A extends object>(
+  server: McpServer,
+  getAuth: GhlAuthLookup,
+  name: string,
+  description: string,
+  inputSchema: ToolInput,
+  handler: (args: A, auth: GhlAuthContext) => Promise<unknown>,
+  annotations: typeof WRITE_ANNOTATIONS | typeof DESTRUCTIVE_WRITE_ANNOTATIONS = WRITE_ANNOTATIONS,
+): void {
+  server.registerTool(
+    name,
+    {
+      description,
+      inputSchema,
+      annotations,
     },
     safe(handler as (args: Record<string, unknown>, auth: GhlAuthContext) => Promise<unknown>, getAuth),
   );
@@ -119,6 +155,10 @@ const pagePaginationInput = {
   limit: z.number().int().min(1).max(100).default(20).describe("Page size, 1-100. Default 20."),
   page: z.number().int().min(1).optional().describe("One-based page number for endpoints that use page pagination."),
 } as const;
+
+const payloadInput = z
+  .record(z.string(), z.unknown())
+  .describe("HighLevel request JSON body. Field names should match the HighLevel API docs.");
 
 function assertHighLevelId(value: string, label: string): string {
   if (!HIGHLEVEL_ID_RE.test(value)) {
@@ -184,6 +224,36 @@ async function ghlPostForLocation(
   return await ghlPost(connectionId, path, body);
 }
 
+async function ghlPutForLocation(
+  auth: GhlAuthContext,
+  locationId: string,
+  path: string,
+  body?: GhlBody,
+): Promise<unknown> {
+  const connectionId = await resolveLocationConnectionId(auth, locationId);
+  return await ghlPut(connectionId, path, body);
+}
+
+async function ghlPatchForLocation(
+  auth: GhlAuthContext,
+  locationId: string,
+  path: string,
+  body?: GhlBody,
+): Promise<unknown> {
+  const connectionId = await resolveLocationConnectionId(auth, locationId);
+  return await ghlPatch(connectionId, path, body);
+}
+
+async function ghlDeleteForLocation(
+  auth: GhlAuthContext,
+  locationId: string,
+  path: string,
+  query?: GhlQuery,
+): Promise<unknown> {
+  const connectionId = await resolveLocationConnectionId(auth, locationId);
+  return await ghlDelete(connectionId, path, query);
+}
+
 function assertAllowedRequestPath(path: string): string {
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("?") || path.includes("#")) {
     throw new Error("`path` must be a root-relative API path without query string or fragment.");
@@ -196,6 +266,22 @@ function assertAllowedRequestPath(path: string): string {
     throw new Error(
       "`request` is limited to explicitly allowed HighLevel read-path families. Use a typed tool for core CRM reads.",
     );
+  }
+  return path;
+}
+
+function assertAllowedWriteRequestPath(path: string): string {
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("?") || path.includes("#")) {
+    throw new Error("`path` must be a root-relative API path without query string or fragment.");
+  }
+  const normalized = path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+  const allowed =
+    normalized === "/locations"
+    || /^\/locations\/[A-Za-z0-9_-]+$/.test(normalized)
+    || normalized === "/users"
+    || /^\/users\/[A-Za-z0-9_-]+$/.test(normalized);
+  if (!allowed) {
+    throw new Error("`writeRequest` is limited to agency setup paths: /locations and /users.");
   }
   return path;
 }
@@ -252,6 +338,29 @@ function inferRequestLocationId(
     return assertHighLevelId(locationId, "locationId");
   }
   return undefined;
+}
+
+function inferBodyLocationId(body: GhlBody | undefined): string | undefined {
+  const value = body?.locationId ?? body?.location_id ?? body?.altId;
+  return value === undefined ? undefined : assertHighLevelId(String(value), "locationId");
+}
+
+function shouldUseLocationConnectionForWrite(path: string): boolean {
+  if (path === "/locations" || path === "/locations/") return false;
+  if (/^\/locations\/[^/]+\/?$/.test(path)) return false;
+  return true;
+}
+
+function assertConfirmed(confirm: boolean): void {
+  if (confirm !== true) {
+    throw new Error("Set `confirm: true` after the user approves this HighLevel write.");
+  }
+}
+
+function assertAgencyConnection(auth: GhlAuthContext): void {
+  if (auth.userType !== "Company") {
+    throw new Error("This operation requires an agency-level HighLevel connection.");
+  }
 }
 
 export function registerGoHighLevelTools(
@@ -771,6 +880,87 @@ export function registerGoHighLevelTools(
     },
   );
 
+  // ─── write tools ─────────────────────────────────────────────────────
+  registerWriteTool(
+    server,
+    getAuth,
+    "createSubAccount",
+    "Create a new HighLevel Sub-Account (formerly Location) under an agency. Requires an agency-level connection, locations.write, and Agency Pro in HighLevel.",
+    {
+      confirm: z.literal(true).describe("Must be true after the user approves creating the HighLevel sub-account."),
+      payload: payloadInput,
+    },
+    async (args: { confirm: boolean; payload: GhlBody }, auth) => {
+      assertConfirmed(args.confirm);
+      assertAgencyConnection(auth);
+      const payload = auth.companyId && args.payload.companyId === undefined
+        ? { ...args.payload, companyId: auth.companyId }
+        : args.payload;
+      return await ghlPost(auth.connectionId, "/locations/", payload);
+    },
+  );
+
+  registerWriteTool(
+    server,
+    getAuth,
+    "createUser",
+    "Create a HighLevel user at the agency or location level. Requires users.write.",
+    {
+      confirm: z.literal(true).describe("Must be true after the user approves creating the HighLevel user."),
+      user: payloadInput,
+    },
+    async (args: { confirm: boolean; user: GhlBody }, auth) => {
+      assertConfirmed(args.confirm);
+      return await ghlPost(auth.connectionId, "/users/", args.user);
+    },
+  );
+
+  registerWriteTool(
+    server,
+    getAuth,
+    "writeRequest",
+    "Advanced approved HighLevel mutation escape hatch for agency setup writes. Prefer typed write tools when available. Path is allowlisted to /locations and /users; set `confirm: true` only after user approval.",
+    {
+      confirm: z.literal(true).describe("Must be true after the user approves this HighLevel write."),
+      method: z.enum(["POST", "PUT", "PATCH", "DELETE"]).describe("HTTP mutation method."),
+      path: z.string().describe("Root-relative HighLevel API path."),
+      locationId: optionalLocationId,
+      query: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+      body: payloadInput.optional(),
+    },
+    async (args: {
+      confirm: boolean;
+      method: "POST" | "PUT" | "PATCH" | "DELETE";
+      path: string;
+      locationId?: string;
+      query?: Record<string, string | number | boolean>;
+      body?: GhlBody;
+    }, auth) => {
+      assertConfirmed(args.confirm);
+      const path = assertAllowedWriteRequestPath(args.path);
+      const query = assertRequestLocationBoundary(path, args.query, auth);
+      const explicitLocationId = args.locationId ? resolveLocationId({ locationId: args.locationId }, auth) : undefined;
+      const inferredLocationId = explicitLocationId ?? inferRequestLocationId(path, query) ?? inferBodyLocationId(args.body);
+      const useLocationConnection = inferredLocationId && shouldUseLocationConnectionForWrite(path);
+
+      if (args.method === "POST") {
+        if (useLocationConnection) return await ghlPostForLocation(auth, inferredLocationId, path, args.body);
+        return await ghlPost(auth.connectionId, path, args.body);
+      }
+      if (args.method === "PUT") {
+        if (useLocationConnection) return await ghlPutForLocation(auth, inferredLocationId, path, args.body);
+        return await ghlPut(auth.connectionId, path, args.body);
+      }
+      if (args.method === "PATCH") {
+        if (useLocationConnection) return await ghlPatchForLocation(auth, inferredLocationId, path, args.body);
+        return await ghlPatch(auth.connectionId, path, args.body);
+      }
+      if (useLocationConnection) return await ghlDeleteForLocation(auth, inferredLocationId, path, query);
+      return await ghlDelete(auth.connectionId, path, query);
+    },
+    DESTRUCTIVE_WRITE_ANNOTATIONS,
+  );
+
   // ─── request (escape hatch) ───────────────────────────────────────────
   registerReadTool(
     server,
@@ -811,9 +1001,12 @@ Tool-selection heuristic — pick the most specific tool first:
    It is a read-only GET against the HighLevel API; pass \`path\` and \`query\`.
    Examples: /objects, /associations/, /products/:productId/price/.
 
-5. This MCP is read-only in the current release. There are no mutations
-   wired up. If the user asks for a write, tell them to perform it in
-   HighLevel directly.
+5. Approved agency setup writes → \`createSubAccount\`, \`createUser\`.
+   These mutate HighLevel and require explicit user approval before calling.
+   Use \`writeRequest\` only when an approved agency setup mutation is needed
+   and no typed write tool covers the endpoint. This app is currently
+   configured as Target User = Agency in HighLevel, so Sub-Account-only writes
+   such as contacts/opportunities/messages are intentionally not exposed here.
 
 Conventions:
 - Money fields are in account currency, with cents typically as integers.
@@ -829,4 +1022,8 @@ Auth model:
 - This MCP authenticates via personal access tokens (PATs) issued from the
   user's NotFair connect page. Each PAT is scoped to a single HighLevel
   connection (Company or Location). Tokens are revocable from the same page.
+- Agency-level (Company) tokens are used for agency operations such as
+  creating sub-accounts. Location-scoped CRM writes automatically route through
+  the matching child Location connection when an agency installed NotFair in
+  bulk.
 `;

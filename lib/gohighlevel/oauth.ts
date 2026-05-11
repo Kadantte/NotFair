@@ -2,11 +2,11 @@ import { eq, sql as drizzleSql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getEnv, getRequiredEnv } from "@/lib/env";
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secrets";
-import { GOHIGHLEVEL_READONLY_SCOPES } from "@/lib/gohighlevel/scopes";
+import { GOHIGHLEVEL_READONLY_SCOPES, GOHIGHLEVEL_SCOPES } from "@/lib/gohighlevel/scopes";
 
 // Re-export so existing callers (server-side install, callback) keep working
 // while the client-safe canonical lives in `./scopes`.
-export { GOHIGHLEVEL_READONLY_SCOPES };
+export { GOHIGHLEVEL_READONLY_SCOPES, GOHIGHLEVEL_SCOPES };
 
 /**
  * Distinguishes the GHL token-refresh advisory-lock namespace from any other
