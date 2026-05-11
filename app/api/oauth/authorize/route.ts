@@ -7,7 +7,6 @@ import { ensureDemoOAuthClient } from "@/lib/demo/seed";
 import { redirectUriMatches } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, resolveResourceFromUrl } from "@/lib/mcp/resources";
 import { identifyUser } from "@/lib/auth/identify-user";
-import { checkGhlDevAccess } from "@/lib/gohighlevel/dev-gate";
 import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
 
 /**
@@ -176,18 +175,6 @@ export async function GET(request: Request) {
     const legacyMcpSessionId = identity.legacySessionId;
 
     if (isGhlResource) {
-      // Defense-in-depth dev gate: 404 the resource for non-devs even though
-      // /api/oauth/gohighlevel/start (the only flow that mints connections)
-      // is already gated. Belt-and-suspenders so a future code path that
-      // somehow seeds a connection for a non-dev still cannot mint a token.
-      const ghlAccess = await checkGhlDevAccess();
-      if (!ghlAccess.allowed) {
-        return NextResponse.json(
-          { error: "invalid_target", error_description: `Unknown resource: ${resourceUrlPath}` },
-          { status: 400 },
-        );
-      }
-
       // 5. GoHighLevel DCR: bind to gohighlevel_connections row. If the user
       // has multiple GHL connections (agency with N locations), pick the most
       // recently updated — typical case is single-location, agencies are rare

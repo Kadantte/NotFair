@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { DevOnlyBadge } from "@/components/gohighlevel/dev-only-badge";
 import { Button } from "@/components/ui/button";
 import { fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
@@ -133,8 +132,6 @@ export function GoHighLevelMcpPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            {/* Same dev-only treatment as the connector setup guide. */}
-            <DevOnlyBadge className="mb-3" />
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
               MCP Server · Remote · Read-only
             </p>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { DevOnlyBadge } from "@/components/gohighlevel/dev-only-badge";
 import { trackEvent } from "@/lib/analytics";
 import { fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
@@ -97,11 +96,6 @@ export function GoHighLevelClaudeConnectorPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            {/* Dev-only visual reminder. Server-side gate lives in
-                app/(marketing)/gohighlevel-claude-connector-setup-guide/page.tsx;
-                the badge below just keeps unreleased product clearly labeled
-                for the devs who can see it. */}
-            <DevOnlyBadge className="mb-3" />
             <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
               Setup guide · Claude Desktop, Web &amp; Cowork
             </p>

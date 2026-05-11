@@ -1,6 +1,4 @@
-import { notFound, redirect } from "next/navigation";
-import { isGhlDevAllowed } from "@/lib/gohighlevel/dev-gate";
-import { getSession } from "@/lib/session";
+import { redirect } from "next/navigation";
 
 type Props = {
   params: Promise<{ slug?: string[] }>;
@@ -30,8 +28,6 @@ export default async function LegacyConnectRedirect({ params, searchParams }: Pr
   const query = qs.toString();
 
   if (slug?.[0] === "gohighlevel" || slug?.[0] === "go-high-level" || slug?.[0] === "ghl") {
-    const session = await getSession();
-    if (!isGhlDevAllowed(session)) notFound();
     redirect(`/connect/gohighlevel${query ? `?${query}` : ""}`);
   }
 

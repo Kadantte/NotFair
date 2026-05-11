@@ -1,7 +1,6 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { ConnectPage } from '@/components/connect-page';
 import { getSession } from '@/lib/session';
-import { isGhlDevAllowed } from '@/lib/gohighlevel/dev-gate';
 
 type Props = {
     params: Promise<{ slug?: string[] }>;
@@ -30,16 +29,6 @@ export default async function AppConnectPage({ params, searchParams }: Props) {
 
     const session = await getSession();
     const { slug } = await params;
-
-    // GoHighLevel is a dev-only surface. 404 for non-devs so we don't leak
-    // the route's existence. Mirrors the marketing pages — same gate, same
-    // 404 semantics, same single source of truth (`isGhlDevAllowed`).
-    const slugIsGhl = slug?.[0] === 'gohighlevel'
-      || slug?.[0] === 'go-high-level'
-      || slug?.[0] === 'ghl';
-    if (slugIsGhl && !isGhlDevAllowed(session)) {
-      notFound();
-    }
 
     // 0-platform users belong on onboarding (the platform picker). Users
     // with at least one platform connected — even if it's only Meta — can

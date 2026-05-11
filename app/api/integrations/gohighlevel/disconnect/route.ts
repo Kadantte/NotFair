@@ -19,14 +19,8 @@ import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
-import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
 
 export async function DELETE(request: Request) {
-  // Dev-only feature — 404 for non-devs (disconnect can't surface anything
-  // a non-dev was supposed to access in the first place).
-  const gate = await requireGhlDevAccessForApi();
-  if (gate) return gate;
-
   const identity = await identifyUser({ source: "gohighlevel-disconnect" });
   if (!identity) {
     // 401 = needs login (no identity at all). 403 = identified but forbidden.

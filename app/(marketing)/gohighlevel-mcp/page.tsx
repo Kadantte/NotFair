@@ -1,17 +1,12 @@
-import { notFound } from "next/navigation";
 import { GoHighLevelMcpPage } from "@/components/marketing/gohighlevel-mcp-page";
 import { buildMetadata, buildFaqJsonLd } from "@/lib/seo";
-import { checkGhlDevAccess } from "@/lib/gohighlevel/dev-gate";
 
 export const metadata = buildMetadata({
   title: "GoHighLevel MCP Server — Connect Claude or Codex to Your HighLevel CRM",
   description:
     "NotFair's remote MCP server for GoHighLevel. Read-only typed tools over CRM records, calendars, custom fields, forms, workflows, invoices, payments, and products. OAuth 2.0 for Claude.ai connectors, bearer-token PATs for CLI clients.",
   path: "/gohighlevel-mcp",
-  // Belt-and-suspenders: dev-only surface, see the connector setup guide
-  // page for the full rationale. `noindex` so any leaked link doesn't get
-  // indexed even if the gate is later relaxed.
-  index: false,
+  index: true,
   keywords: [
     "gohighlevel mcp",
     "gohighlevel mcp server",
@@ -43,11 +38,6 @@ const jsonLd = [
 ];
 
 export default async function Page() {
-  // Dev-only surface — 404 for non-dev viewers. See
-  // `lib/gohighlevel/dev-gate.ts` for the policy and rationale.
-  const access = await checkGhlDevAccess();
-  if (!access.allowed) notFound();
-
   return (
     <>
       {jsonLd.map((schema, i) => (

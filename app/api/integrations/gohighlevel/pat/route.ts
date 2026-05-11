@@ -15,14 +15,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { issuePat } from "@/lib/gohighlevel/pat";
-import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
 import { hasAllGoHighLevelReadonlyScopes } from "@/lib/gohighlevel/scopes";
 
 export async function POST(request: Request) {
-  // Dev-only feature — 404 for non-devs.
-  const gate = await requireGhlDevAccessForApi();
-  if (gate) return gate;
-
   const identity = await identifyUser({ source: "gohighlevel-pat-mint" });
   if (!identity) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });

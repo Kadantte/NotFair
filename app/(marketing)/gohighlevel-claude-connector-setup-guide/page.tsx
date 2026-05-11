@@ -1,19 +1,12 @@
-import { notFound } from "next/navigation";
 import { GoHighLevelClaudeConnectorPage } from "@/components/marketing/gohighlevel-claude-connector-page";
 import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
-import { checkGhlDevAccess } from "@/lib/gohighlevel/dev-gate";
 
 export const metadata = buildMetadata({
   title: "GoHighLevel Claude Connector — Use NotFair in Claude Desktop, Web & Cowork",
   description:
     "Step-by-step guide to install the GoHighLevel Claude Connector. Add NotFair inside Claude Desktop, Claude.ai Web, or Claude Cowork in under 2 minutes — read your HighLevel CRM, conversations, opportunities, calendars, forms, workflows, invoices, payments, and products through chat.",
   path: "/gohighlevel-claude-connector-setup-guide",
-  // Belt-and-suspenders: dev-only surface. The page itself 404s for non-dev
-  // viewers (including crawlers, since their session is unauthenticated), so
-  // they never see body or metadata. We still emit `index:false` so any
-  // future link from another page or sitemap entry doesn't ask Google to
-  // index the URL.
-  index: false,
+  index: true,
   keywords: [
     "gohighlevel claude connector",
     "claude connector gohighlevel",
@@ -143,12 +136,6 @@ const jsonLd = [
 ];
 
 export default async function Page() {
-  // Dev-only surface — 404 for everyone else so we don't expose the route
-  // before public launch. The 404 is deliberately indistinguishable from a
-  // missing page; we don't reveal that this is gated.
-  const access = await checkGhlDevAccess();
-  if (!access.allowed) notFound();
-
   return (
     <>
       {jsonLd.map((schema, i) => (

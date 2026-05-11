@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.4.0] - 2026-05-11
+
+### Added
+- **GoHighLevel MCP is now available to all authenticated users.** Previously limited to internal dev accounts, the GHL connect flow, PAT minting, OAuth start, and status/disconnect API routes are now open to every signed-in NotFair user. The marketing pages (`/gohighlevel-mcp` and `/gohighlevel-claude-connector-setup-guide`) are also publicly accessible and indexable.
+
 ## [0.5.3.0] - 2026-05-10
 
 ### Changed

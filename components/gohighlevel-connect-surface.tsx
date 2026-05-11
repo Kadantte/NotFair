@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Key, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DevOnlyBadge } from "@/components/gohighlevel/dev-only-badge";
 import { GHL_MCP_CONNECTOR_NAME, GHL_MCP_SERVER_URL } from "@/lib/brand";
 import { GOHIGHLEVEL_READONLY_SCOPES } from "@/lib/gohighlevel/scopes";
 import type { Session } from "@/lib/session";
@@ -151,11 +150,6 @@ export function GoHighLevelConnectSurface({ session }: { session: Session }) {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 py-8 text-left">
       <div className="space-y-4 text-center">
-        {/* Loud "DEV ONLY" pill — surfaced first so it's the very thing the
-            viewer sees. The page itself is server-side-gated to DEV_EMAILS;
-            the badge is a visual reminder for the devs who CAN see it. */}
-        <DevOnlyBadge />
-
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-4 py-2 text-sm font-medium text-[#4CAF6E]">
           <ShieldCheck className="h-4 w-4" /> {t('badge')}
         </div>

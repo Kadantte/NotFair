@@ -2,14 +2,8 @@ import { NextResponse } from "next/server";
 import { desc, eq, inArray, isNull, and } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
-import { requireGhlDevAccessForApi } from "@/lib/gohighlevel/dev-gate";
 
 export async function GET() {
-  // Dev-only feature — 404 for non-devs (consistent with the connect/marketing
-  // routes). The client treats 404 the same as "no GHL surface here".
-  const gate = await requireGhlDevAccessForApi();
-  if (gate) return gate;
-
   const identity = await identifyUser({ source: "gohighlevel-status" });
   if (!identity) return NextResponse.json({ connected: false, connections: [] });
 
