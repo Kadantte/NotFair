@@ -3,7 +3,8 @@ import net from "node:net";
 import { createAssetWithLinks, type AssetLinkMutationResult, type AssetLinkTarget, type FieldTypeName } from "./asset-links";
 import type { AuthContext } from "./types";
 
-export type ImageAssetFieldType = Extract<FieldTypeName, "MARKETING_IMAGE" | "SQUARE_MARKETING_IMAGE">;
+export const IMAGE_FIELD_TYPE_NAMES = ["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE", "AD_IMAGE"] as const satisfies readonly FieldTypeName[];
+export type ImageAssetFieldType = (typeof IMAGE_FIELD_TYPE_NAMES)[number];
 export type ImageAssetMimeType = "IMAGE_JPEG" | "IMAGE_PNG";
 
 export type ImageDimensions = {
@@ -131,6 +132,12 @@ function readImageDimensions(bytes: Buffer, mimeType: ImageAssetMimeType): Image
   return mimeType === "IMAGE_PNG" ? readPngDimensions(bytes) : readJpegDimensions(bytes);
 }
 
+// Aspect-ratio / min-dimension shape predicates. Single source of truth so
+// MARKETING_IMAGE / SQUARE_MARKETING_IMAGE / AD_IMAGE branches can't drift
+// when Google ever revises the numbers.
+const isLandscape191 = (w: number, h: number) => w >= 600 && h >= 314 && w * 157 === h * 300;
+const isSquare1to1 = (w: number, h: number) => w >= 300 && h >= 300 && w === h;
+
 function validateImageAssetInput(
   imageBytes: Buffer,
   mimeType: ImageAssetMimeType,
@@ -144,13 +151,24 @@ function validateImageAssetInput(
   const { width, height } = dimensions;
 
   if (fieldType === "SQUARE_MARKETING_IMAGE") {
-    if (width < 300 || height < 300) return { dimensions, error: `SQUARE_MARKETING_IMAGE must be at least 300x300; got ${width}x${height}. Retry with a square PNG/JPEG such as 1200x1200.` };
-    if (width !== height) return { dimensions, error: `SQUARE_MARKETING_IMAGE must be exactly 1:1; got ${width}x${height}. Retry with a square PNG/JPEG such as 1200x1200.` };
-  } else {
-    if (width < 600 || height < 314) return { dimensions, error: `MARKETING_IMAGE must be at least 600x314; got ${width}x${height}. Retry with a landscape PNG/JPEG such as 1200x628.` };
-    if (width * 157 !== height * 300) {
-      return { dimensions, error: `MARKETING_IMAGE must be exactly 1.91:1; got ${width}x${height}. Retry with a landscape PNG/JPEG such as 1200x628, or use SQUARE_MARKETING_IMAGE for a 1:1 asset.` };
+    if (!isSquare1to1(width, height)) {
+      return { dimensions, error: `SQUARE_MARKETING_IMAGE must be exactly 1:1 and at least 300x300; got ${width}x${height}. Retry with a square PNG/JPEG such as 1200x1200.` };
     }
+    return { dimensions };
+  }
+  if (fieldType === "MARKETING_IMAGE") {
+    if (!isLandscape191(width, height)) {
+      return { dimensions, error: `MARKETING_IMAGE must be exactly 1.91:1 and at least 600x314; got ${width}x${height}. Retry with a landscape PNG/JPEG such as 1200x628, or use SQUARE_MARKETING_IMAGE for a 1:1 asset.` };
+    }
+    return { dimensions };
+  }
+  // AD_IMAGE: Search/Display "image extension" slot on RSAs serves either
+  // 1.91:1 landscape OR 1:1 square sources — accept either shape.
+  if (!isLandscape191(width, height) && !isSquare1to1(width, height)) {
+    return {
+      dimensions,
+      error: `AD_IMAGE must be either 1.91:1 (min 600x314, e.g. 1200x628) or 1:1 (min 300x300, e.g. 1200x1200); got ${width}x${height}.`,
+    };
   }
   return { dimensions };
 }

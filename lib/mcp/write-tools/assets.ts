@@ -6,6 +6,7 @@ import {
   createSitelinkAsset,
   createImageAsset,
   fetchImageAssetFromUrl,
+  IMAGE_FIELD_TYPE_NAMES,
   linkAsset,
   unlinkAssetLinks,
   getAssetLinks,
@@ -119,13 +120,13 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
   }));
 
   server.registerTool("createImageAsset", {
-    description: "Upload a PNG/JPEG image asset from an HTTPS URL. Use MARKETING_IMAGE for exact 1.91:1 (min 600x314, e.g. 1200x628) or SQUARE_MARKETING_IMAGE for exact 1:1 (min 300x300). Optionally link it to customer/campaign/ad-group/asset_group targets via `targets`. Returns changeId, assetId, and link resource names. To attach an existing image to more targets later, call `linkAsset`.",
+    description: "Upload a PNG/JPEG image asset from an HTTPS URL. Pick the field type by SERVING SLOT, not by aspect ratio: MARKETING_IMAGE (Display/PMax 1.91:1, min 600x314) | SQUARE_MARKETING_IMAGE (Display/PMax 1:1, min 300x300) | AD_IMAGE (Search/Display 'image extension' on RSAs — accepts either 1.91:1 OR 1:1 source, campaign/ad_group link levels only). Optionally link it to serving targets via `targets`. Returns changeId, assetId, and link resource names. To attach an existing image to more targets later, call `linkAsset`.",
     inputSchema: {
       accountId: accountIdParam,
       imageUrl: z.string().url().describe("Public HTTPS URL for the PNG/JPEG image to upload. Max 5 MB."),
       name: z.string().min(1).max(255).describe("Asset name shown in Google Ads, e.g. 'Spring promo landscape'"),
-      fieldType: z.enum(["MARKETING_IMAGE", "SQUARE_MARKETING_IMAGE"]).describe("Serving slot; used to pre-validate dimensions and as the link field_type."),
-      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets (image assets support all 4 levels including asset_group for Performance Max). Omit or pass [] to create the asset only."),
+      fieldType: z.enum(IMAGE_FIELD_TYPE_NAMES).describe("Serving slot; pre-validates dimensions and (when `targets` is set) used as the link field_type. AD_IMAGE accepts either 1.91:1 or 1:1 source dimensions."),
+      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. MARKETING_IMAGE/SQUARE_MARKETING_IMAGE support all 4 levels (customer/campaign/ad_group/asset_group for Performance Max). AD_IMAGE supports campaign/ad_group only. Omit or pass [] to create the asset only."),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
@@ -157,7 +158,7 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
   // FIELD_TYPES registry).
 
   server.registerTool("linkAsset", {
-    description: `Link an existing asset to one or more serving targets in a single atomic mutate. Bulk-by-default: pass a single-element targets array for one target, or many for fan-out. Field types: ${FIELD_TYPE_NAMES.join(", ")}. Image field types (MARKETING_IMAGE, SQUARE_MARKETING_IMAGE) support all 4 levels including asset_group; callout/sitelink/structured-snippet support customer/campaign/ad_group only. Auto-generated assets (asset.source = AUTOMATICALLY_CREATED) are rejected before the mutate. To remove links, use unlinkAssetLinks with the link resource_names returned here. Returns changeId and link resource names.`,
+    description: `Link an existing asset to one or more serving targets in a single atomic mutate. Bulk-by-default: pass a single-element targets array for one target, or many for fan-out. Field types: ${FIELD_TYPE_NAMES.join(", ")}. Level support varies by field type: MARKETING_IMAGE / SQUARE_MARKETING_IMAGE support all 4 levels including asset_group (Performance Max); CALLOUT / SITELINK / STRUCTURED_SNIPPET support customer/campaign/ad_group only; AD_IMAGE (Search/Display 'image extension' on RSAs) supports campaign/ad_group only. The underlying asset is field-type-agnostic — the same IMAGE asset can be linked as MARKETING_IMAGE at one target and AD_IMAGE at another. Auto-generated assets (asset.source = AUTOMATICALLY_CREATED) are rejected before the mutate. To remove links, use unlinkAssetLinks with the link resource_names returned here. Returns changeId and link resource names.`,
     inputSchema: {
       accountId: accountIdParam,
       assetId: z.string().describe("Asset ID (query `asset` via runScript, or pass the assetId returned from a create*Asset call)"),

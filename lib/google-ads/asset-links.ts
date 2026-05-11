@@ -66,6 +66,12 @@ export type FieldTypeConfig = {
 
 const EXTENSION_LEVELS = ["customer", "campaign", "ad_group"] as const;
 const ALL_LEVELS = ["customer", "campaign", "ad_group", "asset_group"] as const;
+// AD_IMAGE (Search/Display "image extensions" on RSAs) is only valid at
+// campaign + ad_group levels. The Google Ads proto only defines per-resource
+// limits for those two (`AD_IMAGE_CAMPAIGN_ASSETS_PER_CAMPAIGN`,
+// `AD_IMAGE_AD_GROUP_ASSETS_PER_AD_GROUP`); customer-level and asset_group
+// (PMax) image slots use MARKETING_IMAGE / SQUARE_MARKETING_IMAGE instead.
+const AD_IMAGE_LEVELS = ["campaign", "ad_group"] as const;
 
 export const FIELD_TYPES = {
   CALLOUT: {
@@ -97,6 +103,12 @@ export const FIELD_TYPES = {
     fieldTypeInt: 19,
     assetTypeName: "IMAGE",
     supportedLevels: ALL_LEVELS,
+  },
+  AD_IMAGE: {
+    fieldTypeName: "AD_IMAGE",
+    fieldTypeInt: 26,
+    assetTypeName: "IMAGE",
+    supportedLevels: AD_IMAGE_LEVELS,
   },
 } as const satisfies Record<string, FieldTypeConfig>;
 

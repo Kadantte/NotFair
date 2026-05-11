@@ -44,6 +44,7 @@ describe("asset-links primitive", () => {
       expect(FIELD_TYPES.SITELINK.fieldTypeInt).toBe(13);
       expect(FIELD_TYPES.MARKETING_IMAGE.fieldTypeInt).toBe(5);
       expect(FIELD_TYPES.SQUARE_MARKETING_IMAGE.fieldTypeInt).toBe(19);
+      expect(FIELD_TYPES.AD_IMAGE.fieldTypeInt).toBe(26);
     });
 
     it("scopes asset extensions to the 3 non-PMax levels and image to all 4", () => {
@@ -52,11 +53,16 @@ describe("asset-links primitive", () => {
       expect(FIELD_TYPES.STRUCTURED_SNIPPET.supportedLevels).toEqual(["customer", "campaign", "ad_group"]);
       expect(FIELD_TYPES.MARKETING_IMAGE.supportedLevels).toEqual(["customer", "campaign", "ad_group", "asset_group"]);
       expect(FIELD_TYPES.SQUARE_MARKETING_IMAGE.supportedLevels).toEqual(["customer", "campaign", "ad_group", "asset_group"]);
+      // AD_IMAGE (Search/Display image extension on RSAs) — campaign/ad_group only.
+      // Google's per-resource limit enums only define
+      // AD_IMAGE_CAMPAIGN_ASSETS_PER_CAMPAIGN and AD_IMAGE_AD_GROUP_ASSETS_PER_AD_GROUP.
+      expect(FIELD_TYPES.AD_IMAGE.supportedLevels).toEqual(["campaign", "ad_group"]);
     });
 
     it("uses asset.type IMAGE for image families (not MARKETING_IMAGE)", () => {
       expect(FIELD_TYPES.MARKETING_IMAGE.assetTypeName).toBe("IMAGE");
       expect(FIELD_TYPES.SQUARE_MARKETING_IMAGE.assetTypeName).toBe("IMAGE");
+      expect(FIELD_TYPES.AD_IMAGE.assetTypeName).toBe("IMAGE");
       expect(FIELD_TYPES.CALLOUT.assetTypeName).toBe("CALLOUT");
     });
   });
@@ -137,6 +143,56 @@ describe("asset-links primitive", () => {
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/CALLOUT assets cannot be linked at the asset_group level/);
       expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects AD_IMAGE at customer level (campaign/ad_group only)", async () => {
+      const result = await linkAsset(auth, {
+        assetId: "999",
+        fieldType: "AD_IMAGE",
+        targets: [{ level: "customer" }],
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/AD_IMAGE assets cannot be linked at the customer level/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects AD_IMAGE at asset_group level (PMax uses MARKETING_IMAGE instead)", async () => {
+      const result = await linkAsset(auth, {
+        assetId: "999",
+        fieldType: "AD_IMAGE",
+        targets: [{ level: "asset_group", assetGroupId: "55" }],
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/AD_IMAGE assets cannot be linked at the asset_group level/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("links AD_IMAGE to a Search campaign (field_type 26, campaign level)", async () => {
+      mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+      mockMutateResources.mockResolvedValueOnce({
+        mutate_operation_responses: [
+          { campaign_asset_result: { resource_name: "customers/1301265570/campaignAssets/100~999~26" } },
+        ],
+      });
+
+      const result = await linkAsset(auth, {
+        assetId: "999",
+        fieldType: "AD_IMAGE",
+        targets: [{ level: "campaign", campaignId: "100" }],
+      });
+      expect(result.success).toBe(true);
+      expect(result.linksCreated).toHaveLength(1);
+      const ops = mockMutateResources.mock.calls[0][0];
+      expect(ops).toHaveLength(1);
+      expect(ops[0]).toMatchObject({
+        entity: "campaign_asset",
+        operation: "create",
+        resource: {
+          asset: "customers/1301265570/assets/999",
+          field_type: 26,
+          campaign: "customers/1301265570/campaigns/100",
+        },
+      });
     });
 
     it("rejects unknown field type", async () => {

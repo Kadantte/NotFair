@@ -99,7 +99,11 @@ Tool-selection heuristic — pick ONE path per user question:
      - \`linkAsset(assetId, fieldType, targets[])\` — attach an existing asset
        to one or more serving targets. Field types: \`CALLOUT\`,
        \`STRUCTURED_SNIPPET\`, \`SITELINK\`, \`MARKETING_IMAGE\` (1.91:1),
-       \`SQUARE_MARKETING_IMAGE\` (1:1). Auto-generated assets
+       \`SQUARE_MARKETING_IMAGE\` (1:1), \`AD_IMAGE\` (Search/Display "image
+       extension" on RSAs — campaign/ad_group levels only; accepts either
+       1.91:1 or 1:1 source). The underlying asset is field-type-agnostic —
+       the same IMAGE asset can be linked as \`MARKETING_IMAGE\` at one
+       target and \`AD_IMAGE\` at another. Auto-generated assets
        (\`asset.source = AUTOMATICALLY_CREATED\`) are rejected before the
        mutate — create a fresh asset instead of reusing those IDs.
      - \`getAssetLinks(assetId)\` — list every link for an asset across all 4

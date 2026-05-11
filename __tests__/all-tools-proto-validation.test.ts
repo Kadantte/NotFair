@@ -1748,6 +1748,25 @@ describe("protobuf validation: asset links (unified primitive)", () => {
     assertAllCapturedOpsEncode();
   });
 
+  it("linkAsset (AD_IMAGE, campaign level for Search image extension)", async () => {
+    mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
+    mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
+      capturedOps.push(ops);
+      return Promise.resolve(defaultMutateResponse({
+        mutate_operation_responses: [
+          { campaign_asset_result: { resource_name: "customers/1234567890/campaignAssets/100~999~26" } },
+        ],
+      }));
+    });
+
+    await linkAsset(AUTH, {
+      assetId: "999",
+      fieldType: "AD_IMAGE",
+      targets: [{ level: "campaign", campaignId: "100" }],
+    });
+    assertAllCapturedOpsEncode();
+  });
+
   it("linkAsset (image, fan-out to two campaigns)", async () => {
     mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
     mockMutateResources.mockImplementationOnce((ops: CapturedOperation[]) => {
