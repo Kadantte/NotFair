@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.1] - 2026-05-12
+
+### Fixed
+- **`/blog/sitemap.xml` now serves 200 in production.** The nested `app/(marketing)/blog/sitemap.ts` metadata convention lost routing precedence to the sibling `[slug]` dynamic segment in Vercel's production routing — requests for `/blog/sitemap.xml` matched `[slug]` and 404'd. Replaced with an explicit `app/(marketing)/blog/sitemap.xml/route.ts` route handler that returns hand-rendered XML, sidestepping the collision. Output is identical (urlset with index + curated + Outrank-deduped entries, daily/monthly changefreq, 0.8/0.7 priorities) but the route is now unambiguous to Vercel's edge router. Sitemap test rewritten to call the new route handler directly (39/39 vitest cases passing).
+
 ## [0.5.5.0] - 2026-05-12
 
 ### Added

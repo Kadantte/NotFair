@@ -35,7 +35,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("blog sitemap", () => {
+const fetchSitemapXml = async () => {
+  const mod = await import("@/app/(marketing)/blog/sitemap.xml/route");
+  const response = await mod.GET();
+  return response.text();
+};
+
+describe("blog sitemap route", () => {
   it("shadows outrank article when slug collides with curated", async () => {
     getStaticArticlesMock.mockResolvedValue([
       { slug: "collide", created_at: "2026-02-01", updated_at: null },
@@ -45,47 +51,58 @@ describe("blog sitemap", () => {
         updated_at: "2026-03-01",
       },
     ]);
-    const mod = await import("@/app/(marketing)/blog/sitemap");
-    const entries = await mod.default();
-    const urls = entries.map((e) => e.url);
 
-    expect(urls.filter((u) => u.endsWith("/blog/collide"))).toHaveLength(1);
-    expect(urls.some((u) => u.endsWith("/blog/outrank-only"))).toBe(true);
-    expect(urls.some((u) => u.endsWith("/blog/curated-a"))).toBe(true);
+    const xml = await fetchSitemapXml();
+    const collideMatches = xml.match(/\/blog\/collide</g) ?? [];
+
+    expect(collideMatches).toHaveLength(1);
+    expect(xml).toContain("/blog/outrank-only<");
+    expect(xml).toContain("/blog/curated-a<");
   });
 
   it("falls back to curated-only when outrank returns empty", async () => {
     getStaticArticlesMock.mockResolvedValue([]);
-    const mod = await import("@/app/(marketing)/blog/sitemap");
-    const entries = await mod.default();
 
-    expect(entries.some((e) => e.url.endsWith("/blog"))).toBe(true);
-    expect(entries.some((e) => e.url.endsWith("/blog/curated-a"))).toBe(true);
-    // No outrank-only entries when source is empty
-    expect(entries.filter((e) => e.url.match(/outrank/i))).toHaveLength(0);
+    const xml = await fetchSitemapXml();
+
+    expect(xml).toContain("<loc>https://notfair.co/blog</loc>");
+    expect(xml).toContain("/blog/curated-a<");
+    expect(xml).not.toMatch(/outrank/i);
   });
 
   it("uses created_at as fallback when updated_at is null", async () => {
     getStaticArticlesMock.mockResolvedValue([
       { slug: "no-updated", created_at: "2026-02-01", updated_at: null },
     ]);
-    const mod = await import("@/app/(marketing)/blog/sitemap");
-    const entries = await mod.default();
-    const entry = entries.find((e) => e.url.endsWith("/blog/no-updated"));
 
-    expect(entry).toBeDefined();
-    expect((entry?.lastModified as Date).toISOString()).toContain(
-      "2026-02-01",
+    const xml = await fetchSitemapXml();
+
+    expect(xml).toMatch(
+      /<loc>https:\/\/notfair\.co\/blog\/no-updated<\/loc><lastmod>2026-02-01/,
     );
   });
 
-  it("always emits the blog index entry", async () => {
+  it("always emits the blog index entry with priority 0.8", async () => {
     getStaticArticlesMock.mockResolvedValue([]);
-    const mod = await import("@/app/(marketing)/blog/sitemap");
-    const entries = await mod.default();
-    const indexEntry = entries.find((e) => e.url.endsWith("/blog"));
 
-    expect(indexEntry).toBeDefined();
-    expect(indexEntry?.priority).toBe(0.8);
+    const xml = await fetchSitemapXml();
+
+    expect(xml).toMatch(
+      /<loc>https:\/\/notfair\.co\/blog<\/loc>[\s\S]*?<priority>0\.8<\/priority>/,
+    );
+  });
+
+  it("serves application/xml with the sitemap urlset wrapper", async () => {
+    getStaticArticlesMock.mockResolvedValue([]);
+
+    const mod = await import("@/app/(marketing)/blog/sitemap.xml/route");
+    const response = await mod.GET();
+
+    expect(response.headers.get("content-type")).toMatch(/application\/xml/);
+    const body = await response.text();
+    expect(body).toMatch(/^<\?xml version="1\.0"/);
+    expect(body).toContain(
+      'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
+    );
   });
 });
