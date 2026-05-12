@@ -22,6 +22,11 @@ export async function maybeFireXFirstWrite(params: {
   justInsertedId: number;
 }): Promise<void> {
   const { userId, justInsertedId } = params;
+  const eventId = process.env.X_FIRST_WRITE_EVENT_ID;
+
+  // Signup is the default X Ads goal. Only send first-write as a separate
+  // conversion if Ads Manager has a distinct event configured for it.
+  if (!eventId) return;
 
   if (firstWriteChecked.has(userId)) return;
 
@@ -51,6 +56,7 @@ export async function maybeFireXFirstWrite(params: {
     await sendXConversion({
       conversionId: `first-write-${userId}`,
       email,
+      eventId,
       valueDecimal: 1.0,
       currency: "USD",
     });

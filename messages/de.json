@@ -6,6 +6,7 @@
   "Header": {
     "setupGuide": "Google Ads Claude Connector Setup-Anleitung",
     "setupGuideShort": "Claude Setup",
+    "blog": "Blog",
     "pricing": "Preise",
     "bookDemo": "Demo buchen",
     "startNow": "Jetzt starten"
@@ -18,6 +19,7 @@
     "terms": "Nutzungsbedingungen",
     "rights": "Alle Rechte vorbehalten.",
     "setupGuideLinks": {
+      "blog": "Blog",
       "googleAdsClaudeConnector": "Google Ads Claude Connector Einrichtungsanleitung",
       "googleAdsClaudeCode": "Google Ads Claude Code Plugin Einrichtungsanleitung",
       "googleAdsCodex": "Google Ads Codex MCP Einrichtungsanleitung",
@@ -39,6 +41,7 @@
     "eyebrow": "KI-Google-Ads-Stratege + Ausfuhrungsebene",
     "headline": "Finden, was falsch lauft. Direkt aus Claude korrigieren.",
     "subhead": "NotFair gibt Claude Live-Zugriff auf Google Ads, um Probleme zu diagnostizieren, Korrekturen zu empfehlen und Kampagnenanderungen erst nach Ihrer Freigabe auszufuhren.",
+    "blogCta": "Blog lesen",
     "trustItems": [
       "Probleme diagnostizieren",
       "Korrekturen entwerfen",

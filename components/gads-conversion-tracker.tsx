@@ -13,7 +13,19 @@ declare global {
 
 const GADS_SIGNUP_SEND_TO = "AW-18054900065/gL2_CMb-wqscEOHSn6FD";
 const GADS_SIGNUP_EMAIL_COOKIE = "gads_signup_email";
-const X_EVENT_ID = "tw-q27qa-q27qc";
+const X_SIGNUP_ID_COOKIE = "x_signup_id";
+const PIXEL_RETRY_MS = 250;
+const PIXEL_MAX_ATTEMPTS = 20;
+
+export function resolveXSignupEventId(
+  env: Partial<NodeJS.ProcessEnv> = process.env,
+): string | undefined {
+  return env.NEXT_PUBLIC_X_SIGNUP_EVENT_ID ??
+    env.NEXT_PUBLIC_X_EVENT_ID ??
+    (env.NEXT_PUBLIC_X_PIXEL_ID ? undefined : "tw-q27qa-q27qc");
+}
+
+const X_SIGNUP_EVENT_ID = resolveXSignupEventId();
 
 function readCookie(name: string): string | null {
   const prefix = `${name}=`;
@@ -30,12 +42,14 @@ function readCookie(name: string): string | null {
   }
 }
 
+function clearCookie(name: string): void {
+  document.cookie = `${name}=; max-age=0; path=/`;
+}
+
 /**
- * Fires Google Ads + Reddit + X browser-pixel SignUp events when the
- * `gads_new_signup` cookie is set server-side during the OAuth callback for
- * new users. Google Ads is observation-only here — the source-of-truth fire
- * is server-side (`lib/google-ads-signup.ts`) which avoids ITP/ad-blocker
- * loss. We still fire the browser pixel for cross-check + ECL match.
+ * Fires signup browser pixels after the server marks a real new signup.
+ * Google Ads + Reddit are gated on `gads_new_signup`; X can also fire from
+ * `x_signup_id` so email-only signups do not need Google Ads cookies.
  *
  * Enhanced Conversions for Leads: when present, `gads_signup_email` carries
  * the new user's email. gtag.js hashes it locally before sending so Google
@@ -46,41 +60,76 @@ function readCookie(name: string): string | null {
  */
 export function GadsConversionTracker() {
   useEffect(() => {
-    if (!document.cookie.includes("gads_new_signup=1")) return;
+    let attempts = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let gadsFired = false;
+    let redditFired = false;
+    let xFired = false;
 
-    const redditConversionId = readCookie(REDDIT_SIGNUP_ID_COOKIE);
-    const signupEmail = readCookie(GADS_SIGNUP_EMAIL_COOKIE);
+    function attemptFire(): void {
+      attempts += 1;
 
-    document.cookie = "gads_new_signup=; max-age=0; path=/";
-    document.cookie = `${REDDIT_SIGNUP_ID_COOKIE}=; max-age=0; path=/`;
-    document.cookie = `${GADS_SIGNUP_EMAIL_COOKIE}=; max-age=0; path=/`;
+      const hasGadsSignup = document.cookie.includes("gads_new_signup=1");
+      const hasXSignup = document.cookie.includes(`${X_SIGNUP_ID_COOKIE}=`);
+      if (!hasGadsSignup && !hasXSignup) return;
 
-    if (typeof window.gtag === "function") {
-      window.gtag("event", "conversion", {
-        send_to: GADS_SIGNUP_SEND_TO,
-        value: 1.0,
-        currency: "USD",
-        ...(signupEmail
-          ? { user_data: { email_address: signupEmail } }
-          : {}),
-      });
+      const redditConversionId = readCookie(REDDIT_SIGNUP_ID_COOKIE);
+      const xConversionId = readCookie(X_SIGNUP_ID_COOKIE) ?? redditConversionId;
+      const signupEmail = readCookie(GADS_SIGNUP_EMAIL_COOKIE);
+
+      if (hasGadsSignup && !gadsFired && typeof window.gtag === "function") {
+        window.gtag("event", "conversion", {
+          send_to: GADS_SIGNUP_SEND_TO,
+          value: 1.0,
+          currency: "USD",
+          ...(signupEmail
+            ? { user_data: { email_address: signupEmail } }
+            : {}),
+        });
+        gadsFired = true;
+      }
+
+      if (hasGadsSignup && !redditFired && typeof window.rdt === "function") {
+        window.rdt(
+          "track",
+          "SignUp",
+          redditConversionId ? { conversionId: redditConversionId } : undefined,
+        );
+        redditFired = true;
+      }
+
+      if (
+        X_SIGNUP_EVENT_ID &&
+        !xFired &&
+        (hasXSignup || xConversionId) &&
+        typeof window.twq === "function"
+      ) {
+        window.twq("event", X_SIGNUP_EVENT_ID, {
+          value: 1.0,
+          currency: "USD",
+          ...(xConversionId ? { conversion_id: xConversionId } : {}),
+        });
+        xFired = true;
+        clearCookie(X_SIGNUP_ID_COOKIE);
+      }
+
+      const retryX = hasXSignup && !xFired && X_SIGNUP_EVENT_ID;
+      const retryGads = hasGadsSignup && !gadsFired;
+      const retryReddit = hasGadsSignup && !redditFired;
+      if (attempts < PIXEL_MAX_ATTEMPTS && (retryX || retryGads || retryReddit)) {
+        timeoutId = setTimeout(attemptFire, PIXEL_RETRY_MS);
+      } else if (hasGadsSignup && ((gadsFired && redditFired) || attempts >= PIXEL_MAX_ATTEMPTS)) {
+        clearCookie("gads_new_signup");
+        clearCookie(REDDIT_SIGNUP_ID_COOKIE);
+        clearCookie(GADS_SIGNUP_EMAIL_COOKIE);
+      }
     }
 
-    if (typeof window.rdt === "function") {
-      window.rdt(
-        "track",
-        "SignUp",
-        redditConversionId ? { conversionId: redditConversionId } : undefined,
-      );
-    }
+    attemptFire();
 
-    if (typeof window.twq === "function") {
-      window.twq("event", X_EVENT_ID, {
-        value: 1.0,
-        currency: "USD",
-        ...(redditConversionId ? { conversion_id: redditConversionId } : {}),
-      });
-    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   return null;

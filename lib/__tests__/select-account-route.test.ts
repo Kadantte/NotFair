@@ -30,6 +30,11 @@ vi.mock("@/lib/google-ads-signup", () => ({
   maybeFireGoogleAdsSignup: mockMaybeFireGoogleAdsSignup,
 }));
 
+vi.mock("@/lib/x-signup", () => ({
+  X_SIGNUP_ID_COOKIE: "x_signup_id",
+  buildXSignupConversionId: vi.fn((userId: string) => `signup-${userId}`),
+}));
+
 vi.mock("@/lib/connections/google-read", () => ({
   loadGoogleConnection: () => mockLoadGoogleConnection(),
   compareForShadowRead: vi.fn(),
@@ -418,6 +423,7 @@ describe("Select account route — POST", () => {
       expect(response.cookies.get("gads_signup_email")?.value).toBe(
         "test@example.com",
       );
+      expect(response.cookies.get("x_signup_id")?.value).toBe("signup-user-123");
       // TTL bumped from 60 → 600 to survive slow hydration. The raw
       // Set-Cookie header is comma-joined (`Expires=Mon, DD…` contains
       // commas too), so use `Set-Cookie` getSetCookie() to get a clean

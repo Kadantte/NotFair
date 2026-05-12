@@ -6,6 +6,7 @@
   "Header": {
     "setupGuide": "Guia de configuracao do Google Ads Claude Connector",
     "setupGuideShort": "Configurar Claude",
+    "blog": "Blog",
     "pricing": "Preços",
     "bookDemo": "Agendar demo",
     "startNow": "Comecar agora"
@@ -18,6 +19,7 @@
     "terms": "Termos de servico",
     "rights": "Todos os direitos reservados.",
     "setupGuideLinks": {
+      "blog": "Blog",
       "googleAdsClaudeConnector": "Guia de configuração do conector Google Ads Claude",
       "googleAdsClaudeCode": "Guia de configuração do plugin Google Ads Claude Code",
       "googleAdsCodex": "Guia de configuração do Google Ads Codex MCP",
@@ -39,6 +41,7 @@
     "eyebrow": "Estrategista de Google Ads com IA + camada de execucao",
     "headline": "Encontre o que esta errado. Corrija pelo Claude.",
     "subhead": "O NotFair da ao Claude acesso ao vivo ao Google Ads para diagnosticar problemas, recomendar correcoes e executar mudancas de campanha somente depois da sua aprovacao.",
+    "blogCta": "Ler o blog",
     "trustItems": [
       "Diagnosticar problemas",
       "Preparar correcoes",

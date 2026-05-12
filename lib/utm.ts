@@ -3,7 +3,7 @@ export type UtmKey = (typeof UTM_KEYS)[number];
 export type UtmParams = Partial<Record<UtmKey, string>>;
 export const UTM_STORAGE_PREFIX = "__utm_";
 
-export const CLICK_ID_KEYS = ["gclid", "fbclid", "rdt_cid"] as const;
+export const CLICK_ID_KEYS = ["gclid", "fbclid", "rdt_cid", "twclid"] as const;
 export type ClickIdKey = (typeof CLICK_ID_KEYS)[number];
 
 export const ATTRIBUTION_COOKIE_NAME = "nf_first_touch";

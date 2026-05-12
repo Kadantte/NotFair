@@ -109,6 +109,44 @@ describe("sendXConversion", () => {
     expect(Date.parse(conversion.conversion_time)).not.toBeNaN();
   });
 
+  it("includes twclid as an attribution identifier when present", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    await sendXConversion({
+      conversionId: "signup-123",
+      email: "a@b.com",
+      twclid: "  twclid-test  ",
+      eventId: "tw-q27qa-signup",
+      valueDecimal: 1,
+      currency: "USD",
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.conversions[0].event_id).toBe("tw-q27qa-signup");
+    expect(body.conversions[0].identifiers).toEqual([
+      { twclid: "twclid-test" },
+      {
+        hashed_email:
+          "fb98d44ad7501a959f3f4f4a3f004fe2d9e581ea6207e218c4b02c08a4d75adf",
+      },
+    ]);
+  });
+
+  it("can send with only twclid when email is unavailable", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    await sendXConversion({
+      conversionId: "signup-123",
+      twclid: "twclid-only",
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body).conversions[0].identifiers).toEqual([
+      { twclid: "twclid-only" },
+    ]);
+  });
+
   it("honors custom pixel and event ids", async () => {
     process.env.X_PIXEL_ID = "pixel_custom";
     process.env.X_EVENT_ID = "tw-pixel_custom-event_custom";

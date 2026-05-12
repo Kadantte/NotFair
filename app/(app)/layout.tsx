@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, Rocket, AlertTriangle, ArrowRight, Clock, BookOpen } from 'lucide-react';
+import { Home, LayoutDashboard, Activity, PanelLeftClose, PanelLeftOpen, Plus, Trash2, PlugZap, MessageSquare, Code2, Gauge, Menu, X, AlertTriangle, ArrowRight, Clock, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
 import { AccountSwitcher } from '@/components/account-switcher';
@@ -706,6 +706,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <FeedbackButton />
                         <Link href="/usage" prefetch className={`hidden sm:inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium transition-colors ${pathname === '/usage' ? 'text-[#E8E4DD]' : 'text-[#C4C0B6] hover:text-[#E8E4DD]'}`}>
                             {t('usage')}
+                        </Link>
+                        <Link href="/upgrade" prefetch className="hidden sm:flex items-center text-[13px] font-medium text-[#C4C0B6] hover:text-[#E8E4DD] transition-colors" onClick={() => trackEvent('upgrade_clicked', { location: 'header_pricing', page: pathname })}>
+                            {t('pricing')}
                         </Link>
                         <LanguageSwitcher mode="cookie" className="hidden sm:block" />
                         {planLoaded && isFree && (

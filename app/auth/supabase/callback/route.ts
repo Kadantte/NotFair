@@ -11,6 +11,7 @@ import { db, schema } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { flushServerEvents, trackServerEvent } from "@/lib/analytics-server";
 import { getClientIp } from "@/lib/request-ip";
+import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import {
   attributionToUserMetadata,
   isInternalAttributionReferrer,
@@ -225,6 +226,8 @@ export async function GET(request: Request) {
 
   if (!hadPriorSession) {
     const clientIp = getClientIp(request);
+    const xConversionId = buildXSignupConversionId(user.id);
+    response.cookies.set(X_SIGNUP_ID_COOKIE, xConversionId, { path: "/", maxAge: 600 });
     trackServerEvent(user.id, "user_signed_up", {
       ...attributionMetadata,
       google_email: user.email,

@@ -54,6 +54,7 @@ describe("maybeFireXFirstWrite", () => {
     selectLimitMock.mockReset();
     sendMock.mockReset();
     getUserEmailMock.mockReset();
+    process.env.X_FIRST_WRITE_EVENT_ID = "tw-q27qa-firstwrite";
     _resetXFirstWriteCacheForTests();
   });
 
@@ -76,6 +77,7 @@ describe("maybeFireXFirstWrite", () => {
     expect(sendMock).toHaveBeenCalledWith({
       conversionId: "first-write-user-1",
       email: "a@b.com",
+      eventId: "tw-q27qa-firstwrite",
       valueDecimal: 1.0,
       currency: "USD",
     });
@@ -118,5 +120,14 @@ describe("maybeFireXFirstWrite", () => {
     expect(sendMock).not.toHaveBeenCalled();
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
+  });
+
+  it("skips first-write conversion when no separate X event is configured", async () => {
+    delete process.env.X_FIRST_WRITE_EVENT_ID;
+
+    await maybeFireXFirstWrite({ userId: "user-1", justInsertedId: 100 });
+
+    expect(selectLimitMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@
   "Header": {
     "setupGuide": "คู่มือตั้งค่า Google Ads Claude Connector",
     "setupGuideShort": "ตั้งค่า Claude",
+    "blog": "บล็อก",
     "pricing": "ราคา",
     "bookDemo": "จองเดโม",
     "startNow": "เริ่มเลย"
@@ -18,6 +19,7 @@
     "terms": "เงื่อนไขการใช้บริการ",
     "rights": "สงวนลิขสิทธิ์",
     "setupGuideLinks": {
+      "blog": "บล็อก",
       "googleAdsClaudeConnector": "คู่มือตั้งค่า Google Ads Claude Connector",
       "googleAdsClaudeCode": "คู่มือตั้งค่า Google Ads Claude Code Plugin",
       "googleAdsCodex": "คู่มือตั้งค่า Google Ads Codex MCP",
@@ -39,6 +41,7 @@
     "eyebrow": "นักวางกลยุทธ์ Google Ads ด้วย AI + ชั้นปฏิบัติการ",
     "headline": "หาให้เจอว่าอะไรผิด แล้วแก้จาก Claude",
     "subhead": "NotFair ให้ Claude เข้าถึง Google Ads แบบสดเพื่อวิเคราะห์ปัญหา แนะนำวิธีแก้ และแก้แคมเปญหลังจากคุณอนุมัติเท่านั้น",
+    "blogCta": "อ่านบล็อก",
     "trustItems": [
       "วิเคราะห์ปัญหา",
       "ร่างวิธีแก้",

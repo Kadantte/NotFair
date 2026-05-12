@@ -15,6 +15,7 @@ import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi";
 import { maybeFireGoogleAdsSignup } from "@/lib/google-ads-signup";
+import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import { getClientIp } from "@/lib/request-ip";
 import {
   UTM_KEYS,
@@ -1026,7 +1027,9 @@ export async function GET(request: Request) {
     });
 
     const conversionId = randomUUID();
+    const xConversionId = buildXSignupConversionId(user.id);
     response.cookies.set(REDDIT_SIGNUP_ID_COOKIE, conversionId, { path: "/", maxAge: 600 });
+    response.cookies.set(X_SIGNUP_ID_COOKIE, xConversionId, { path: "/", maxAge: 600 });
     after(
       sendRedditConversion({
         trackingType: "SignUp",

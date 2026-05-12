@@ -6,6 +6,7 @@
   "Header": {
     "setupGuide": "Google Ads Claude Connector Setup Guide",
     "setupGuideShort": "Настройка Claude",
+    "blog": "Блог",
     "pricing": "Цены",
     "bookDemo": "Забронировать демо",
     "startNow": "Начни сейчас"
@@ -18,6 +19,7 @@
     "terms": "Условия использования",
     "rights": "Все права защищены.",
     "setupGuideLinks": {
+      "blog": "Блог",
       "googleAdsClaudeConnector": "Google Ads Claude Connector Setup Guide",
       "googleAdsClaudeCode": "Google Ads Claude Code Plugin Setup Guide",
       "googleAdsCodex": "Google Ads Codex MCP Setup Guide",
@@ -39,6 +41,7 @@
     "eyebrow": "AI Google Ads стратег + исполнительный уровень",
     "headline": "Найдите, что не так. Исправьте это с Claude.",
     "subhead": "NotFair предоставляет Claude прямой Google Ads доступ для диагностики проблем, рекомендации исправлений и внесения изменений в кампанию только после вашего одобрения.",
+    "blogCta": "Читать блог",
     "trustItems": [
       "Диагностика проблем",
       "Черновые исправления",

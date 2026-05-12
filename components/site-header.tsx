@@ -31,6 +31,7 @@ function NavLink({ href, label, className = "" }: { href: string; label: string;
     return (
         <Link
             href={href}
+            prefetch
             className={`text-[14px] font-medium text-[#C4C0B6] transition-colors hover:text-[#E8E4DD] ${className}`}
         >
             {label}
@@ -54,6 +55,7 @@ export function SiteHeader() {
                 {/* Right: secondary + primary CTA */}
                 <div className="flex items-center gap-5">
                     <NavLink href="/mcp" label="MCP" className="hidden sm:inline" />
+                    <NavLink href="/blog" label={t("blog")} className="hidden sm:inline" />
                     <NavLink href="/google-ads-claude-connector-setup-guide" label={t("setupGuideShort")} className="hidden xl:inline" />
                     <SetupGuidesMenu className="hidden md:flex" />
                     <NavLink href="/pricing" label={t("pricing")} className="hidden sm:inline" />

@@ -78,6 +78,11 @@ vi.mock("@/lib/google-ads-signup", () => ({
   maybeFireGoogleAdsSignup: mockMaybeFireGoogleAdsSignup,
 }));
 
+vi.mock("@/lib/x-signup", () => ({
+  X_SIGNUP_ID_COOKIE: "x_signup_id",
+  buildXSignupConversionId: vi.fn((userId: string) => `signup-${userId}`),
+}));
+
 vi.mock("@/lib/db", () => {
   const dbObj = {
     select: vi.fn(() => ({
@@ -338,6 +343,7 @@ describe("Auth callback route — GET", () => {
     expect(response.cookies.get("gads_signup_email")?.value).toBe(
       "user@example.com",
     );
+    expect(response.cookies.get("x_signup_id")?.value).toBe("signup-user-123");
   });
 
   it("does NOT fire maybeFireGoogleAdsSignup on a returning user", async () => {

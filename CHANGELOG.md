@@ -2,6 +2,16 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.5] - 2026-05-12
+
+### Added
+- **Marketing now has direct blog entry points.** Added `/blog` links to the marketing header, homepage hero, and footer across supported locales so Outrank articles are discoverable from the landing page.
+- **X signup tracking now covers Google OAuth and email magic-link signups.** New signups set a stable non-PII `x_signup_id` cookie, the browser pixel fires the X signup event once after hydration, and the first-touch attribution layer now captures `twclid`.
+
+### Fixed
+- **X signup pixels no longer drop conversions when the script loads late.** The signup tracker retries while pixel globals initialize and only clears the X signup cookie after the event is queued.
+- **X first-write tracking no longer double-counts against the signup goal.** First-write CAPI events now require a separate `X_FIRST_WRITE_EVENT_ID` instead of defaulting to the signup conversion.
+
 ## [0.5.5.4] - 2026-05-12
 
 ### Fixed

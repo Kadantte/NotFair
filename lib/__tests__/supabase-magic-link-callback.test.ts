@@ -122,6 +122,11 @@ vi.mock("@/lib/connections/google-read", () => ({
   loadGoogleConnection: mockLoadGoogleConnection,
 }));
 
+vi.mock("@/lib/x-signup", () => ({
+  X_SIGNUP_ID_COOKIE: "x_signup_id",
+  buildXSignupConversionId: vi.fn((userId: string) => `signup-${userId}`),
+}));
+
 import { GET } from "@/app/auth/supabase/callback/route";
 
 function makeRequest(url: string): Request {
@@ -174,6 +179,7 @@ describe("Supabase magic-link callback route - GET", () => {
     });
     expect(response.cookies.get("adsagent_token")?.value).toBe(insertedRow.accessToken);
     expect(response.cookies.get("adsagent_profile")?.value).toContain("Test%20Writer");
+    expect(response.cookies.get("x_signup_id")?.value).toBe("signup-user-123");
   });
 
   it("clears Supabase cookies after minting the app session", async () => {

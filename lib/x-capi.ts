@@ -5,6 +5,9 @@ const X_CAPI_BASE = "https://ads-api.x.com/12/measurement/conversions";
 export type XConversionInput = {
   conversionId: string;
   email?: string | null;
+  twclid?: string | null;
+  eventId?: string;
+  pixelId?: string;
   valueDecimal?: number;
   currency?: string;
 };
@@ -68,8 +71,8 @@ export function buildXConversionRequest(event: XConversionInput): {
   url: string;
   init: RequestInit & { headers: Record<string, string>; body: string };
 } | null {
-  const pixelId = process.env.X_PIXEL_ID ?? "q27qa";
-  const eventId = process.env.X_EVENT_ID ?? "tw-q27qa-q27qc";
+  const pixelId = event.pixelId ?? process.env.X_PIXEL_ID ?? "q27qa";
+  const eventId = event.eventId ?? process.env.X_EVENT_ID ?? "tw-q27qa-q27qc";
   const consumerKey = process.env.X_CONSUMER_KEY;
   const consumerSecret = process.env.X_CONSUMER_SECRET;
   const accessToken = process.env.X_ACCESS_TOKEN;
@@ -80,6 +83,11 @@ export function buildXConversionRequest(event: XConversionInput): {
   }
 
   const identifiers: Array<{ [key: string]: string }> = [];
+
+  const twclid = event.twclid?.trim();
+  if (twclid) {
+    identifiers.push({ twclid });
+  }
 
   if (event.email) {
     const hashedEmail = crypto
@@ -145,7 +153,7 @@ export async function sendXConversion(event: XConversionInput): Promise<void> {
 
   const request = buildXConversionRequest(event);
   if (!request) {
-    console.warn("[x-capi] no attribution signals (email); X requires at least one for CAPI");
+    console.warn("[x-capi] no attribution signals (twclid/email); X requires at least one for CAPI");
     return;
   }
 

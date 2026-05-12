@@ -15,8 +15,9 @@ import {
   sendRedditConversion,
   type RedditConversionInput,
 } from "@/lib/reddit-capi";
+import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import { getClientIp } from "@/lib/request-ip";
-import { sanitizeAttribution } from "@/lib/utm";
+import { attributionToUserMetadata, sanitizeAttribution } from "@/lib/utm";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { loadGoogleConnection } from "@/lib/connections/google-read";
 
@@ -241,20 +242,7 @@ export async function POST(request: Request) {
       });
       const clientIp = getClientIp(request);
       trackServerEvent(identity.userId, "user_signed_up", {
-        utm_source: meta.utm_source,
-        utm_medium: meta.utm_medium,
-        utm_campaign: meta.utm_campaign,
-        utm_term: meta.utm_term,
-        utm_content: meta.utm_content,
-        gclid: meta.gclid,
-        fbclid: meta.fbclid,
-        rdt_cid: meta.rdt_cid,
-        signup_referrer: meta.signup_referrer,
-        signup_referrer_domain: meta.signup_referrer_domain,
-        first_landing_url: meta.first_landing_url,
-        first_landing_path: meta.first_landing_path,
-        attribution_captured_at: meta.attribution_captured_at,
-        attribution_version: meta.attribution_version,
+        ...attributionToUserMetadata(attribution),
         google_email: user?.email ?? identity.googleEmail,
         signup_method: "google_oauth",
         ...(clientIp ? { $ip: clientIp } : {}),
@@ -293,9 +281,11 @@ export async function POST(request: Request) {
     if (legacyRow) setSessionCookies(response, legacyRow.accessToken);
   }
   if (isNewSignup) {
+    const xConversionId = buildXSignupConversionId(identity.userId);
     // 600s TTL — single-fire is enforced by clear-on-fire in the tracker,
     // not the TTL. Tight TTLs drop conversions when hydration is slow.
     response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
+    response.cookies.set(X_SIGNUP_ID_COOKIE, xConversionId, { path: "/", maxAge: 600 });
     if (signupEmail) {
       // Enhanced Conversions for Leads — gtag.js hashes locally before send.
       response.cookies.set("gads_signup_email", signupEmail, {

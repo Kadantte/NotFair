@@ -6,6 +6,10 @@ import { useTranslations } from "next-intl";
 
 const setupGuideLinks = [
     {
+        href: "/blog",
+        key: "blog",
+    },
+    {
         href: "/google-ads-claude-connector-setup-guide",
         key: "googleAdsClaudeConnector",
     },
@@ -63,6 +67,7 @@ export function SiteFooter() {
                                 <Link
                                     key={link.href}
                                     href={link.href}
+                                    prefetch
                                     className="py-1.5 text-sm text-[#C4C0B6] transition-colors hover:text-[#E8E4DD]"
                                 >
                                     {t(`setupGuideLinks.${link.key}`)}
