@@ -4743,6 +4743,15 @@ export const blogPosts: Record<string, BlogPost> = {
 
 export const allBlogPosts = Object.values(blogPosts);
 
+export const allBlogPostsSortedDesc = [...allBlogPosts].sort(
+  (a, b) =>
+    new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+);
+
+export const curatedBlogSlugs: ReadonlySet<string> = new Set(
+  allBlogPosts.map((p) => p.slug),
+);
+
 export function getBlogPost(slug: string) {
   return blogPosts[slug] ?? null;
 }

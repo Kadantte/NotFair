@@ -2,6 +2,22 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.0] - 2026-05-12
+
+### Added
+- **Outrank blog integration at `/blog`.** Hand-curated posts from `lib/blog-posts.ts` and AI-generated articles from the Outrank Next.js Blog API now coexist under the same routes. Page 1 shows up to 3 featured curated posts followed by 9 Outrank articles (12 cards total); subsequent pages paginate Outrank with the same reduced page size so no articles are skipped at page boundaries. Curated slugs always shadow Outrank slugs at build time, runtime, and in the sitemap — hand-written SEO anchors can never be silently replaced.
+- **Server-rendered Outrank article pages with sanitized HTML.** `app/(marketing)/blog/[slug]/page.tsx` falls back to the Outrank API when a slug isn't curated. Article HTML passes through `isomorphic-dompurify` (forbids `<script>`/`<style>`/`<form>` and the `style` attribute) so a compromised Outrank tenant cannot execute JS on `notfair.co`.
+- **Combined blog sitemap at `/blog/sitemap.xml`.** Includes the listing index, every curated post, and every Outrank article (deduped against curated). Stripped duplicate `/blog/*` entries from the root sitemap so Google Search Console can subscribe to the focused blog sitemap separately.
+- **Outrank tag pages at `/blog/tag/[slug]`** — server-rendered listings filtered by tag, paginated, sharing the same `BlogCard` primitive.
+- **`safeJsonLd` helper in `lib/seo.ts`** escapes `<` to `<` and U+2028/U+2029 in JSON-LD payloads so attacker-controlled strings (Outrank fields, FAQ items) cannot break out of a `<script type="application/ld+json">` block. Applied at every blog JSON-LD render site.
+- **`buildBlogPostingJsonLd` helper in `lib/seo.ts`** collapses the previously duplicated `BlogPosting` builders for curated and Outrank articles into one structured-data primitive.
+- **Vitest coverage for the new blog surface** — `__tests__/blog-format.test.ts`, `__tests__/blog-outrank-dedup.test.ts`, `__tests__/blog-outrank-safe.test.ts`, `__tests__/blog-pagination.test.ts`, `__tests__/blog-sitemap.test.ts` (38 cases). Covers safe-wrapper short-circuits when `OUTRANK_BLOG_API_KEY` is missing, slug-collision dedup non-mutation, sitemap fallback when Outrank is empty, `getPageParam` adversarial inputs, and `getPaginationItems` boundary cases.
+- **`.env.local.example`** documents `OUTRANK_BLOG_API_KEY`. `.gitignore` now allows `.env*.example` templates through the env-files ignore rule.
+
+### Changed
+- **`formatDate` no longer throws on invalid input** — returns the original string instead of `RangeError: Invalid time value`. A malformed `created_at` from Outrank can no longer crash a blog page render.
+- **`next.config.ts`** adds `transpilePackages: ["outrank-next-js-blog"]` and `images.remotePatterns` scoped to `outrank.so` + `**.outrank.so` so `next/image` can optimize Outrank-hosted article images.
+
 ## [0.5.4.3] - 2026-05-12
 
 ### Fixed

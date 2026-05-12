@@ -1,6 +1,24 @@
-import Link from "next/link";
-import { allBlogPosts } from "@/lib/blog-posts";
+import {
+  allBlogPostsSortedDesc,
+  curatedBlogSlugs,
+} from "@/lib/blog-posts";
 import { buildMetadata } from "@/lib/seo";
+
+import BlogCard from "./_components/BlogCard";
+import Pagination from "./_components/Pagination";
+import {
+  BLOG_ARTICLES_PER_PAGE,
+  BLOG_CURATED_LEAD_LIMIT,
+  BLOG_REVALIDATE_SECONDS,
+} from "./_lib/constants";
+import { getPageParam } from "./_lib/format";
+import { filterUncuratedArticles, getArticlesSafe } from "./_lib/outrank";
+import {
+  curatedBlogPostToCard,
+  outrankArticleToCard,
+} from "./_lib/blog-card";
+
+export const revalidate = BLOG_REVALIDATE_SECONDS;
 
 export const metadata = buildMetadata({
   title: "Blog — NotFair",
@@ -15,11 +33,30 @@ export const metadata = buildMetadata({
   ],
 });
 
-export default function BlogIndex() {
-  const posts = allBlogPosts.sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-  );
+type Props = {
+  searchParams: Promise<{
+    page?: string;
+  }>;
+};
+
+// Reduced page size keeps Outrank pagination internally consistent — page 1
+// stays exactly PER_PAGE cards (curated lead + Outrank remainder) and page 2+
+// land cleanly at Outrank API page boundaries with no skipped articles.
+const curatedLead = allBlogPostsSortedDesc.slice(0, BLOG_CURATED_LEAD_LIMIT);
+const OUTRANK_PER_PAGE = BLOG_ARTICLES_PER_PAGE - curatedLead.length;
+
+export default async function BlogIndex({ searchParams }: Props) {
+  const { page } = await searchParams;
+  const currentPage = getPageParam(page);
+
+  const { articles, total_pages } = await getArticlesSafe({
+    page: currentPage,
+    limit: OUTRANK_PER_PAGE,
+  });
+  const outrankArticles = filterUncuratedArticles(articles, curatedBlogSlugs);
+
+  const showCurated = currentPage === 1 && curatedLead.length > 0;
+  const hasContent = showCurated || outrankArticles.length > 0;
 
   return (
     <section className="px-4 pb-20 pt-24">
@@ -37,37 +74,34 @@ export default function BlogIndex() {
           </p>
         </div>
 
-        <div className="mt-12 grid gap-4">
-          {posts.map((post) => (
-            <Link
-              key={post.slug}
-              href={`/blog/${post.slug}`}
-              prefetch
-              className="group rounded-lg border border-[#3D3C36] bg-[#24231F] p-6 transition-colors hover:border-[#4CAF6E]/40"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-[#E8E4DD] group-hover:text-[#4CAF6E] transition-colors">
-                    {post.title}
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-[#C4C0B6]">
-                    {post.description}
-                  </p>
-                </div>
-                <time
-                  dateTime={post.publishedAt}
-                  className="flex-shrink-0 text-sm text-[#C4C0B6]"
-                >
-                  {new Date(post.publishedAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </time>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {hasContent ? (
+          <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {showCurated
+              ? curatedLead.map((post) => (
+                  <BlogCard
+                    key={`curated-${post.slug}`}
+                    card={curatedBlogPostToCard(post)}
+                  />
+                ))
+              : null}
+            {outrankArticles.map((article) => (
+              <BlogCard
+                key={`outrank-${article.id}`}
+                card={outrankArticleToCard(article)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-12 rounded-lg border border-dashed border-[#3D3C36] bg-[#24231F] p-10 text-center text-[#C4C0B6]">
+            No articles found.
+          </div>
+        )}
+
+        <Pagination
+          basePath="/blog"
+          currentPage={currentPage}
+          totalPages={total_pages}
+        />
       </div>
     </section>
   );

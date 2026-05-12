@@ -23,6 +23,22 @@ pnpm db:generate
 pnpm db:migrate
 ```
 
+## Blog (Outrank integration)
+
+The `/blog` route renders hand-curated posts from `lib/blog-posts.ts` and AI-generated articles from the [Outrank](https://outrank.so) Next.js Blog integration. Curated slugs win when they collide with Outrank slugs.
+
+To enable Outrank articles, add a server-only API key to `.env.local`:
+
+```env
+OUTRANK_BLOG_API_KEY=your_outrank_blog_api_key
+```
+
+Get the key from the Outrank dashboard → Integrations → Next.js Blog. Never expose it with a `NEXT_PUBLIC_` prefix.
+
+Without the key, `/blog` still renders curated posts; Outrank fetches return empty lists.
+
+Submit `https://www.notfair.co/blog/sitemap.xml` to Google Search Console — it includes both curated posts and Outrank articles.
+
 ## Internationalization
 
 The app uses `next-intl` with these locales:

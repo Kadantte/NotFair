@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts", "date-fns"],
   },
+  transpilePackages: ["outrank-next-js-blog"],
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "**.outrank.so" },
+      { protocol: "https", hostname: "outrank.so" },
+    ],
+  },
   // quickjs-emscripten loads its WASM variant via dynamic import + package
   // self-reference (`@jitl/quickjs-wasmfile-release-asyncify/emscripten-module`).
   // Webpack mangles those into broken stubs at runtime — the failure surfaces

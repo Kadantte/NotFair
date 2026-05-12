@@ -114,10 +114,63 @@ export function buildHomepageJsonLd() {
   ];
 }
 
+export type BlogPostingJsonLdInput = {
+  slug: string;
+  title: string;
+  description: string;
+  datePublished: string;
+  dateModified?: string;
+  imageUrl?: string | null;
+  keywords?: string[];
+  authorName?: string;
+};
+
+export function buildBlogPostingJsonLd(input: BlogPostingJsonLdInput) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: input.title,
+    description: input.description,
+    datePublished: input.datePublished,
+    dateModified: input.dateModified ?? input.datePublished,
+    ...(input.imageUrl ? { image: input.imageUrl } : {}),
+    author: {
+      "@type": "Organization",
+      name: input.authorName ?? SITE_NAME,
+      url: SITE_URL,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: SITE_URL,
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": new URL(`/blog/${input.slug}`, SITE_URL).toString(),
+    },
+    ...(input.keywords?.length
+      ? { keywords: input.keywords.join(", ") }
+      : {}),
+  };
+}
+
 export type FaqItem = {
   question: string;
   answer: string;
 };
+
+// JSON.stringify does NOT escape `</` — any attacker-controlled string field
+// containing `</script>` would close the <script type="application/ld+json">
+// block and let arbitrary HTML follow. Escape `<` to `<` (and U+2028/2029
+// for legacy JSON-in-HTML safety) at every JSON-LD render site.
+const JSON_LD_LINE_SEPARATORS = new RegExp("[\\u2028\\u2029]", "g");
+export function safeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(JSON_LD_LINE_SEPARATORS, (ch) =>
+      ch.charCodeAt(0) === 0x2028 ? "\\u2028" : "\\u2029",
+    );
+}
 
 export function buildFaqJsonLd(items: FaqItem[]) {
   return {

@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
 import { allLandingPages } from "@/lib/marketing-pages";
-import { allBlogPosts } from "@/lib/blog-posts";
 import { SITE_URL } from "@/lib/seo";
 
+// Blog routes live in /blog/sitemap.xml (app/(marketing)/blog/sitemap.ts).
 const publicMarketingRoutes = [
   "/",
   "/mcp",
@@ -19,7 +19,6 @@ const publicMarketingRoutes = [
   "/impact",
   "/privacy",
   "/terms",
-  "/blog",
   ...allLandingPages
     .filter((page) => page.index !== false)
     .map((page) => `/${page.slug}`),
@@ -50,21 +49,14 @@ const marketingPagesLastModified = new Date("2026-05-08");
 const homepageLastModified = new Date("2026-04-07");
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const marketingEntries: MetadataRoute.Sitemap = publicMarketingRoutes.map(
-    (route) => ({
-      url: new URL(route, SITE_URL).toString(),
-      lastModified: route === "/" ? homepageLastModified : marketingPagesLastModified,
-      changeFrequency: route === "/" ? "weekly" : "monthly",
-      priority: highPriorityRoutes.has(route) ? 1 : seoLandingRoutes.has(route) ? 0.8 : 0.6,
-    })
-  );
-
-  const blogEntries: MetadataRoute.Sitemap = allBlogPosts.map((post) => ({
-    url: new URL(`/blog/${post.slug}`, SITE_URL).toString(),
-    lastModified: new Date(post.updatedAt),
-    changeFrequency: "monthly",
-    priority: 0.7,
+  return publicMarketingRoutes.map((route) => ({
+    url: new URL(route, SITE_URL).toString(),
+    lastModified: route === "/" ? homepageLastModified : marketingPagesLastModified,
+    changeFrequency: route === "/" ? "weekly" : "monthly",
+    priority: highPriorityRoutes.has(route)
+      ? 1
+      : seoLandingRoutes.has(route)
+        ? 0.8
+        : 0.6,
   }));
-
-  return [...marketingEntries, ...blogEntries];
 }
