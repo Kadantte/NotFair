@@ -3,16 +3,26 @@ import { NextRequest } from "next/server";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
 import { updateSession } from "@/lib/supabase/middleware";
 
-function makeRequest(pathname: string, token?: string): NextRequest {
+type CookieKV = { name: string; value: string };
+
+function makeRequest(pathname: string, cookies: CookieKV[] = []): NextRequest {
   const headers = new Headers();
-
-  if (token) {
-    headers.set("cookie", `${COOKIE_NAMES.token}=${token}`);
+  if (cookies.length > 0) {
+    headers.set("cookie", cookies.map((c) => `${c.name}=${c.value}`).join("; "));
   }
-
   return new NextRequest(new URL(`http://localhost:3000${pathname}`), {
     headers,
   });
+}
+
+function withLegacyToken(token: string): CookieKV[] {
+  return [{ name: COOKIE_NAMES.token, value: token }];
+}
+
+function withSupabaseSession(): CookieKV[] {
+  // The exact name format Supabase uses is `sb-<project-ref>-auth-token`;
+  // the middleware only checks the `sb-` prefix.
+  return [{ name: "sb-project-auth-token", value: "abc" }];
 }
 
 describe("Supabase middleware — updateSession", () => {
@@ -21,42 +31,54 @@ describe("Supabase middleware — updateSession", () => {
   });
 
   describe("route protection", () => {
-    it("redirects unauthenticated user from /campaigns to /connect", async () => {
+    it("redirects unauthenticated user from /campaigns to /login", async () => {
       const response = await updateSession(makeRequest("/campaigns"));
 
       expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toContain("/connect");
+      expect(response.headers.get("location")).toContain("/login");
     });
 
-    it("redirects unauthenticated user from /tools to /connect", async () => {
+    it("redirects unauthenticated user from /tools to /login", async () => {
       const response = await updateSession(makeRequest("/tools"));
 
       expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toContain("/connect");
+      expect(response.headers.get("location")).toContain("/login");
     });
 
-    it("redirects unauthenticated user from /chat to /connect", async () => {
+    it("redirects unauthenticated user from /chat to /login", async () => {
       const response = await updateSession(makeRequest("/chat"));
 
       expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toContain("/connect");
+      expect(response.headers.get("location")).toContain("/login");
     });
 
-    it("redirects unauthenticated user from /campaigns/123 to /connect", async () => {
+    it("redirects unauthenticated user from /campaigns/123 to /login", async () => {
       const response = await updateSession(makeRequest("/campaigns/123"));
 
       expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toContain("/connect");
+      expect(response.headers.get("location")).toContain("/login");
     });
 
-    it("allows authenticated user through to /campaigns", async () => {
-      const response = await updateSession(makeRequest("/campaigns", "test-token"));
+    it("allows legacy-authenticated (adsagent_token) user through to /campaigns", async () => {
+      const response = await updateSession(makeRequest("/campaigns", withLegacyToken("test-token")));
+
+      expect(response.status).toBe(200);
+    });
+
+    it("allows Supabase-authenticated (sb-* cookie) user through to /campaigns", async () => {
+      const response = await updateSession(makeRequest("/campaigns", withSupabaseSession()));
+
+      expect(response.status).toBe(200);
+    });
+
+    it("allows Supabase-authenticated user through to /operations", async () => {
+      const response = await updateSession(makeRequest("/operations", withSupabaseSession()));
 
       expect(response.status).toBe(200);
     });
 
     it("allows authenticated user through to /chat", async () => {
-      const response = await updateSession(makeRequest("/chat", "test-token"));
+      const response = await updateSession(makeRequest("/chat", withLegacyToken("test-token")));
 
       expect(response.status).toBe(200);
     });
@@ -84,16 +106,16 @@ describe("Supabase middleware — updateSession", () => {
 
   describe("redirect behavior", () => {
     it("does not redirect authenticated users away from /login", async () => {
-      const response = await updateSession(makeRequest("/login", "test-token"));
+      const response = await updateSession(makeRequest("/login", withLegacyToken("test-token")));
 
       expect(response.status).toBe(200);
     });
 
-    it("redirects protected routes to the connect screen without a next param", async () => {
+    it("redirects protected routes to /login without a next param", async () => {
       const response = await updateSession(makeRequest("/campaigns/456/edit"));
 
       const location = response.headers.get("location") ?? "";
-      expect(location).toContain("/connect");
+      expect(location).toContain("/login");
       expect(location).not.toContain("next=");
     });
   });

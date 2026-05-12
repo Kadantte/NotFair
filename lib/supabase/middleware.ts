@@ -13,11 +13,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  // Check for adsagent session cookie
-  const token = request.cookies.get(COOKIE_NAMES.token)?.value;
-  if (!token) {
+  // Authenticated when EITHER:
+  //   - legacy `adsagent_token` cookie is set (user came through Google
+  //     OAuth signin), OR
+  //   - any Supabase `sb-*` cookie is set (user came through magic link
+  //     / Supabase OAuth — they may not have connected a Google account
+  //     yet, so no adsagent_token exists).
+  //
+  // This is a UX filter, not a security boundary — server actions and
+  // layout-level session checks still do proper auth validation. A cheap
+  // cookie presence check is enough; calling Supabase getUser() here
+  // would add a round-trip on every protected request.
+  const hasLegacyToken = Boolean(request.cookies.get(COOKIE_NAMES.token)?.value);
+  const hasSupabaseSession = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+  if (!hasLegacyToken && !hasSupabaseSession) {
     const url = request.nextUrl.clone();
-    url.pathname = "/connect";
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
