@@ -5,6 +5,7 @@ All notable changes to NotFair will be documented in this file.
 ## [0.5.4.1] - 2026-05-12
 
 ### Changed
+- **Sidebar navigation reorganized.** Guide now appears above Campaigns in the main nav. Dev link (dev-only) moves to below Chat. Usage link added to the top header bar. Pricing/Upgrade deduplicated — only the Upgrade CTA remains in the header for free users. Footer now shows only Discord.
 - Removed the "Dev / API usage and operations tracking" title block from the dev nav header, freeing up vertical space in the operations dashboard.
 
 ## [0.5.4.0] - 2026-05-11

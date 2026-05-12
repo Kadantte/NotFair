@@ -404,6 +404,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Nav items */}
             <nav className="shrink-0 px-2 pb-2 space-y-0.5">
+                <NavItem href="/guide" icon={BookOpen} label="Guide" active={pathname === '/guide'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
                 <NavItem
                     href="/campaigns"
                     icon={LayoutDashboard}
@@ -442,6 +443,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                 />
+                {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
             </nav>
 
             {isOnChat && (
@@ -550,20 +552,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
-                <NavItem href="/guide" icon={BookOpen} label="Guide" active={pathname === '/guide'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem href="/usage" icon={Gauge} label={t('usage')} active={pathname === '/usage'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />
-                <NavItem
-                    href="/upgrade"
-                    icon={Rocket}
-                    label={isFree ? t('upgrade') : t('pricing')}
-                    active={pathname === '/upgrade'}
-                    collapsed={isCollapsed}
-                    onClick={() => {
-                        if (isMobile) setMobileMenuOpen(false);
-                        trackEvent('upgrade_clicked', { location: 'sidebar', page: pathname });
-                    }}
-                />
-                {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
                 <DiscordLink
                     location="sidebar"
                     className={`flex h-10 items-center rounded-lg px-3 transition-all duration-200 ease-out text-[#8B9FF5] hover:bg-[#8B9FF5]/10 hover:text-[#B0BFF9] ${isCollapsed ? 'w-10 justify-center gap-0 px-0' : 'w-full justify-start'}`}
@@ -716,6 +704,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <FeedbackButton />
+                        <Link href="/usage" prefetch className={`hidden sm:inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium transition-colors ${pathname === '/usage' ? 'text-[#E8E4DD]' : 'text-[#C4C0B6] hover:text-[#E8E4DD]'}`}>
+                            {t('usage')}
+                        </Link>
                         <LanguageSwitcher mode="cookie" className="hidden sm:block" />
                         {planLoaded && isFree && (
                             <Link href="/upgrade" prefetch onClick={() => trackEvent('upgrade_clicked', { location: 'header', page: pathname })}>
