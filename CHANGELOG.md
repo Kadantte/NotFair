@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.4.1] - 2026-05-12
+
+### Changed
+- Removed the "Dev / API usage and operations tracking" title block from the dev nav header, freeing up vertical space in the operations dashboard.
+
 ## [0.5.4.0] - 2026-05-11
 
 ### Added

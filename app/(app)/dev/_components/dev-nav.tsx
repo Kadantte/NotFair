@@ -10,12 +10,6 @@ export function DevNav() {
 
     return (
         <header className="shrink-0 border-b border-[#3D3C36] bg-[#24231F]/80 backdrop-blur-xl">
-            <div className="flex w-full items-center justify-between gap-3 px-4 py-2 sm:px-6 sm:py-4">
-                <div className="min-w-0">
-                    <h1 className="text-lg sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Dev</h1>
-                    <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">API usage and operations tracking</p>
-                </div>
-            </div>
             <div className="flex gap-0 px-2 sm:px-6 border-t border-[#3D3C36]/50">
                 {TAB_ORDER.map((tab) => (
                     <Link
