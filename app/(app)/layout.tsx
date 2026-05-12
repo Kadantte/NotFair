@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
@@ -16,11 +16,20 @@ import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
 import { BrandLockup } from '@/components/brand-lockup';
 import { LanguageSwitcher } from '@/components/language-switcher';
-import { trackEvent } from '@/lib/analytics';
+import { posthog, trackEvent } from '@/lib/analytics';
 import { getUsageSummaryAction } from '@/app/actions';
 import { BRAND_NAME } from '@/lib/brand';
 import { computePlanBadge } from '@/lib/plan-badge';
 import { MetaUnsupportedModal } from '@/components/meta-unsupported-modal';
+import {
+    CHAT_TAB_EXPERIMENT_BLOCK_EVENT,
+    CHAT_TAB_EXPERIMENT_CLICK_EVENT,
+    CHAT_TAB_EXPERIMENT_EXPOSURE_EVENT,
+    CHAT_TAB_EXPERIMENT_FLAG,
+    type ChatTabExperimentVariant,
+    isChatTabVisibleForVariant,
+    normalizeChatTabExperimentVariant,
+} from '@/lib/chat-tab-experiment';
 
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -135,16 +144,19 @@ function MobileNavItem({
     icon: Icon,
     label,
     active,
+    onClick,
 }: {
     href: string;
     icon: React.ElementType;
     label: string;
     active: boolean;
+    onClick?: () => void;
 }) {
     return (
         <Link
             href={href}
             prefetch
+            onClick={onClick}
             className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
                 active ? 'text-[#4CAF6E]' : 'text-[#C4C0B6]'
             }`}
@@ -183,8 +195,79 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [activePlatform, setActivePlatform] = useState<'google_ads' | 'meta_ads'>('google_ads');
     const [metaModalFeature, setMetaModalFeature] = useState<string | null>(null);
+    const [chatExperiment, setChatExperiment] = useState<{
+        loaded: boolean;
+        variant: ChatTabExperimentVariant;
+        visible: boolean;
+    }>({ loaded: false, variant: 'unassigned', visible: false });
+    const chatBlockTrackedRef = useRef(false);
     const isMetaActive = activePlatform === 'meta_ads';
+    const chatTabVisible = chatExperiment.visible;
     const showMetaModal = (feature: string) => setMetaModalFeature(feature);
+
+    useEffect(() => {
+        let cancelled = false;
+        let unsubscribe: (() => void) | undefined;
+        let fallbackTimer: number | undefined;
+
+        const applyAssignment = () => {
+            if (cancelled) return;
+            if (fallbackTimer) {
+                window.clearTimeout(fallbackTimer);
+                fallbackTimer = undefined;
+            }
+            const rawVariant = posthog.getFeatureFlag(CHAT_TAB_EXPERIMENT_FLAG);
+            const variant = normalizeChatTabExperimentVariant(rawVariant);
+            const visible = isChatTabVisibleForVariant(rawVariant);
+            setChatExperiment({ loaded: true, variant, visible });
+
+            try {
+                const props = {
+                    chat_tab_experiment_flag: CHAT_TAB_EXPERIMENT_FLAG,
+                    chat_tab_experiment_variant: variant,
+                    chat_tab_visible: visible,
+                };
+                posthog.setPersonPropertiesForFlags(props);
+                posthog.setPersonProperties(props);
+
+                const exposureKey = `nf_${CHAT_TAB_EXPERIMENT_FLAG}_exposed_${variant}`;
+                if (variant !== 'unassigned' && !sessionStorage.getItem(exposureKey)) {
+                    sessionStorage.setItem(exposureKey, '1');
+                    trackEvent(CHAT_TAB_EXPERIMENT_EXPOSURE_EVENT, {
+                        ...props,
+                        raw_variant: rawVariant ?? null,
+                    });
+                }
+            } catch {
+                // Analytics should never make navigation brittle.
+            }
+        };
+
+        const registerTimer = window.setTimeout(() => {
+            unsubscribe = posthog.onFeatureFlags(applyAssignment);
+        }, 0);
+        fallbackTimer = window.setTimeout(applyAssignment, 1200);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(registerTimer);
+            if (fallbackTimer) window.clearTimeout(fallbackTimer);
+            unsubscribe?.();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!chatExperiment.loaded || chatTabVisible || !pathname.startsWith('/chat')) return;
+        if (!chatBlockTrackedRef.current) {
+            chatBlockTrackedRef.current = true;
+            trackEvent(CHAT_TAB_EXPERIMENT_BLOCK_EVENT, {
+                chat_tab_experiment_flag: CHAT_TAB_EXPERIMENT_FLAG,
+                chat_tab_experiment_variant: chatExperiment.variant,
+                page: pathname,
+            });
+        }
+        router.replace('/guide');
+    }, [chatExperiment.loaded, chatExperiment.variant, chatTabVisible, pathname, router]);
 
     const refreshThreads = useCallback(() => {
         fetch('/api/chat/threads', { credentials: 'include' })
@@ -326,6 +409,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.push(`/chat/${threadId}`);
     }
 
+    function handleChatNavClick(location: 'sidebar' | 'mobile_bottom_nav' | 'mobile_sidebar') {
+        if (location === 'mobile_sidebar') setMobileMenuOpen(false);
+        trackEvent(CHAT_TAB_EXPERIMENT_CLICK_EVENT, {
+            chat_tab_experiment_flag: CHAT_TAB_EXPERIMENT_FLAG,
+            chat_tab_experiment_variant: chatExperiment.variant,
+            chat_tab_visible: chatTabVisible,
+            location,
+            page: pathname,
+        });
+    }
+
     function renderSidebar(isCollapsed: boolean, isMobile: boolean) { return (
         <>
             {/* Header */}
@@ -435,18 +529,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     collapsed={isCollapsed}
                     onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
                 />
-                <NavItem
-                    href="/chat"
-                    icon={MessageSquare}
-                    label={t('chat')}
-                    active={pathname.startsWith('/chat')}
-                    collapsed={isCollapsed}
-                    onClick={isMobile ? () => setMobileMenuOpen(false) : undefined}
-                />
+                {chatTabVisible && (
+                    <NavItem
+                        href="/chat"
+                        icon={MessageSquare}
+                        label={t('chat')}
+                        active={pathname.startsWith('/chat')}
+                        collapsed={isCollapsed}
+                        onClick={() => handleChatNavClick(isMobile ? 'mobile_sidebar' : 'sidebar')}
+                    />
+                )}
                 {isDev && <NavItem href="/dev" icon={Code2} label="Dev" active={pathname === '/dev'} collapsed={isCollapsed} onClick={isMobile ? () => setMobileMenuOpen(false) : undefined} />}
             </nav>
 
-            {isOnChat && (
+            {chatTabVisible && isOnChat && (
                 <>
                     {/* New chat */}
                     <div className="shrink-0 px-2 pb-2">
@@ -548,7 +644,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     )}
                 </>
             )}
-            {(isCollapsed || !isOnChat || sidebarThreads.length === 0) && <div className="flex-1" />}
+            {(isCollapsed || !isOnChat || !chatTabVisible || sidebarThreads.length === 0) && <div className="flex-1" />}
 
             {/* Footer */}
             <div className="shrink-0 border-t border-[#3D3C36] p-2 space-y-0.5">
@@ -797,7 +893,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <MobileNavItem href="/connect" icon={Home} label={t('home')} active={pathname === '/connect'} />
                 <MobileNavItem href="/campaigns" icon={LayoutDashboard} label={t('campaigns')} active={pathname.startsWith('/campaigns')} />
                 <MobileNavItem href="/impact-monitor" icon={Gauge} label={t('impact')} active={pathname.startsWith('/impact-monitor')} />
-                <MobileNavItem href="/chat" icon={MessageSquare} label={t('chat')} active={pathname.startsWith('/chat')} />
+                {chatTabVisible && (
+                    <MobileNavItem
+                        href="/chat"
+                        icon={MessageSquare}
+                        label={t('chat')}
+                        active={pathname.startsWith('/chat')}
+                        onClick={() => handleChatNavClick('mobile_bottom_nav')}
+                    />
+                )}
             </nav>
 
             <MetaUnsupportedModal
