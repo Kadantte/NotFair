@@ -20,7 +20,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
             {page.highlights.map((highlight) => (
               <div
                 key={highlight}
@@ -53,7 +53,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
 
       <section className="px-4 pb-20">
         <div className="container mx-auto max-w-5xl">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {page.sections.map((section) => (
               <div
                 key={section.title}
@@ -88,7 +88,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
                       {section.body}
                     </p>
                     {section.bullets?.length ? (
-                      <ul className="mt-5 grid gap-3 text-sm leading-relaxed text-[#C4C0B6] md:grid-cols-2">
+                      <ul className="mt-5 grid grid-cols-1 gap-3 text-sm leading-relaxed text-[#C4C0B6] md:grid-cols-2">
                         {section.bullets.map((bullet) => (
                           <li
                             key={bullet}
@@ -118,7 +118,7 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
                 Prompts that lead to real account work
               </h2>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {page.workflows.map((workflow) => (
                 <div
                   key={workflow.title}

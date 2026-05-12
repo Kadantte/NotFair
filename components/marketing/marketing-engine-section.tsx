@@ -284,7 +284,7 @@ export function MarketingEngineSection({
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: "-80px" }}
                             transition={{ duration: 0.6, ease: "easeOut" }}
-                            className={`grid items-center gap-10 md:grid-cols-12 md:gap-16 ${
+                            className={`grid grid-cols-1 items-center gap-10 md:grid-cols-12 md:gap-16 ${
                                 ch.reverse ? "md:[&>*:first-child]:order-2" : ""
                             }`}
                         >

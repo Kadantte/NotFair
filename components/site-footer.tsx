@@ -46,7 +46,7 @@ export function SiteFooter() {
     return (
         <footer className="border-t border-[#3D3C36] bg-[#1A1917]">
             <div className="container mx-auto px-4 py-10 md:px-8">
-                <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
+                <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
                     <div className="max-w-sm space-y-3">
                         <BrandLockup size="md" />
                         <p className="text-sm leading-relaxed text-[#C4C0B6]">

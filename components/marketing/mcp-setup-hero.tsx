@@ -550,7 +550,7 @@ export function McpSetupHero({
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, ease: "easeOut" }}
-                    className={`mx-auto mt-8 grid gap-4 ${
+                    className={`mx-auto mt-8 grid grid-cols-1 gap-4 ${
                         active.steps.length === 2
                             ? "max-w-3xl md:grid-cols-2"
                             : "max-w-5xl md:grid-cols-3"
