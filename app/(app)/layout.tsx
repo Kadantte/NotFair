@@ -15,7 +15,6 @@ import { onThreadEvent } from '@/lib/thread-events';
 import { DiscordLink } from '@/components/discord-link';
 import { FeedbackButton } from '@/components/feedback-modal';
 import { BrandLockup } from '@/components/brand-lockup';
-import { LanguageSwitcher } from '@/components/language-switcher';
 import { trackEvent } from '@/lib/analytics';
 import { getUsageSummaryAction } from '@/app/actions';
 import { BRAND_NAME } from '@/lib/brand';
@@ -704,13 +703,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="flex items-center gap-3">
                         <FeedbackButton />
-                        <Link href="/usage" prefetch className={`hidden sm:inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium transition-colors ${pathname === '/usage' ? 'text-[#E8E4DD]' : 'text-[#C4C0B6] hover:text-[#E8E4DD]'}`}>
-                            {t('usage')}
-                        </Link>
-                        <Link href="/upgrade" prefetch className="hidden sm:flex items-center text-[13px] font-medium text-[#C4C0B6] hover:text-[#E8E4DD] transition-colors" onClick={() => trackEvent('upgrade_clicked', { location: 'header_pricing', page: pathname })}>
-                            {t('pricing')}
-                        </Link>
-                        <LanguageSwitcher mode="cookie" className="hidden sm:block" />
                         {planLoaded && isFree && (
                             <Link href="/upgrade" prefetch onClick={() => trackEvent('upgrade_clicked', { location: 'header', page: pathname })}>
                                 <Button

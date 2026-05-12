@@ -1,16 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { CreditCard, LogOut } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { BarChart3, CreditCard, Languages, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
+import { localeLabels, locales, type AppLocale } from "@/i18n/locales";
+import { persistLocalePreference } from "@/i18n/locale-preference";
 
 interface SessionShape {
   connected: boolean;
@@ -51,12 +57,38 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
+function normalizePathname(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function getPathLocale(pathname: string): AppLocale | null {
+  return locales.find((entry) => pathname === `/${entry}` || pathname.startsWith(`/${entry}/`)) ?? null;
+}
+
+function getCanonicalPathname(pathname: string): string {
+  const normalized = normalizePathname(pathname);
+  const pathLocale = getPathLocale(normalized);
+  if (!pathLocale) return normalized || "/";
+  return normalized.slice(`/${pathLocale}`.length) || "/";
+}
+
 export function UserMenu() {
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale() as AppLocale;
   const t = useTranslations("UserMenu");
+  const tNav = useTranslations("AppNav");
+  const tLocale = useTranslations("LocaleSwitcher");
   const [session, setSession] = useState<SessionShape | null>(null);
   const [sub, setSub] = useState<SubscriptionShape | null>(null);
   const [loading, setLoading] = useState<null | "portal" | "signout">(null);
+
+  function switchLocale(nextLocale: AppLocale) {
+    if (nextLocale === locale) return;
+    persistLocalePreference(nextLocale);
+    const canonicalPathname = getCanonicalPathname(pathname || "/");
+    window.location.assign(`${canonicalPathname}${window.location.search}${window.location.hash}`);
+  }
 
   useEffect(() => {
     fetch("/api/auth/session", { credentials: "include" })
@@ -159,6 +191,50 @@ export function UserMenu() {
             </p>
           )}
         </div>
+
+        <DropdownMenuSeparator className="bg-[#3D3C36]" />
+
+        <DropdownMenuItem
+          asChild
+          className="cursor-pointer text-[13px] text-[#E8E4DD] focus:bg-[#2E2D28] focus:text-[#E8E4DD]"
+        >
+          <Link href="/usage" prefetch>
+            <BarChart3 className="mr-2 h-4 w-4" />
+            {tNav("usage")}
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="cursor-pointer text-[13px] text-[#E8E4DD] focus:bg-[#2E2D28] focus:text-[#E8E4DD] data-[state=open]:bg-[#2E2D28] data-[state=open]:text-[#E8E4DD]">
+            <Languages className="mr-2 h-4 w-4" />
+            <span className="flex-1">{tLocale("label")}</span>
+            <span className="mr-1 text-[12px] text-[#C4C0B6]">
+              {localeLabels[locale] ?? localeLabels.en}
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="border-[#3D3C36] bg-[#24231F] text-[#E8E4DD]">
+            {locales.map((entry) => {
+              const active = entry === locale;
+              return (
+                <DropdownMenuItem
+                  key={entry}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    switchLocale(entry);
+                  }}
+                  className={`cursor-pointer text-[13px] focus:bg-[#2E2D28] ${
+                    active
+                      ? "bg-[#4CAF6E]/12 text-[#4CAF6E] focus:text-[#4CAF6E]"
+                      : "text-[#E8E4DD] focus:text-[#E8E4DD]"
+                  }`}
+                >
+                  {localeLabels[entry]}
+                  {active ? <span className="sr-only"> - {tLocale("current")}</span> : null}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
 
         <DropdownMenuSeparator className="bg-[#3D3C36]" />
 
