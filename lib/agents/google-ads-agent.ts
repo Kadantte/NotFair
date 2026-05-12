@@ -1,6 +1,6 @@
 import { InferAgentUIMessage, stepCountIs, ToolLoopAgent, tool, type Tool } from "ai";
 import { z, type ZodTypeAny } from "zod";
-import type { AuthContext } from "@/lib/google-ads";
+import type { AuthContext, ConnectedAccount } from "@/lib/google-ads";
 import { collectAdsTools, type CollectedTool } from "@/lib/mcp/collect";
 import { chatModel } from "@/lib/agents/model";
 import {
@@ -8,9 +8,11 @@ import {
   type ToolPermissionMode,
 } from "@/lib/tool-permissions";
 
-type AgentAuth = {
+export type AgentAuth = {
   refreshToken: string;
   customerId: string;
+  customerIds?: ConnectedAccount[];
+  loginCustomerId?: string | null;
   userId?: string | null;
   authMethod?: string | null;
   /** Map of toolName -> mode overrides. Unset tools fall back to defaultModeFor(readOnly). */
@@ -40,13 +42,25 @@ function toolError(error: unknown): { error: string } {
   return { error: String(error) };
 }
 
+export function buildGoogleAdsAgentAuthContext(agentAuth: AgentAuth): AuthContext {
+  return {
+    refreshToken: agentAuth.refreshToken,
+    customerId: agentAuth.customerId,
+    customerIds: agentAuth.customerIds?.length
+      ? agentAuth.customerIds
+      : [{ id: agentAuth.customerId, name: "" }],
+    loginCustomerId: agentAuth.loginCustomerId ?? null,
+    userId: agentAuth.userId ?? null,
+    authMethod: agentAuth.authMethod ?? "chat",
+    clientName: "adsagent-chat",
+  };
+}
+
 function adaptCollectedTool(collected: CollectedTool, mode: ToolPermissionMode): Tool {
   // Strip `accountId` — chat is single-account, so the MCP handler
   // resolves to the session's default customer when accountId is undefined.
-  const { accountId: _accountId, ...inputShape } = collected.inputShape as Record<
-    string,
-    ZodTypeAny
-  >;
+  const inputShape = { ...(collected.inputShape as Record<string, ZodTypeAny>) };
+  delete inputShape.accountId;
 
   return tool({
     description: collected.description,
@@ -67,14 +81,7 @@ function adaptCollectedTool(collected: CollectedTool, mode: ToolPermissionMode):
 }
 
 export function createGoogleAdsAgent(agentAuth: AgentAuth) {
-  const authContext: AuthContext = {
-    refreshToken: agentAuth.refreshToken,
-    customerId: agentAuth.customerId,
-    customerIds: [{ id: agentAuth.customerId, name: "" }],
-    userId: agentAuth.userId ?? null,
-    authMethod: agentAuth.authMethod ?? "chat",
-    clientName: "adsagent-chat",
-  };
+  const authContext = buildGoogleAdsAgentAuthContext(agentAuth);
 
   const collected = collectAdsTools(() => authContext);
   const overrides = agentAuth.toolPermissions ?? {};

@@ -2,7 +2,7 @@ import { createAgentUIStream, createUIMessageStreamResponse } from "ai";
 import { and, eq } from "drizzle-orm";
 import { createGoogleAdsAgent } from "@/lib/agents/google-ads-agent";
 import { createMetaAdsAgent } from "@/lib/agents/meta-ads-agent";
-import { getSession, getSessionAuth } from "@/lib/session";
+import { getAuthContext, getSession } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
@@ -65,14 +65,17 @@ export async function POST(request: Request) {
   } else {
     // Google Ads default. getSessionAuth still requires a customerId, so
     // ads-less users won't reach here.
-    const sessionAuth = await getSessionAuth().catch(() => null);
-    if (!sessionAuth?.refreshToken || !sessionAuth?.customerId) {
+    const authResult = await getAuthContext().catch(() => null);
+    const auth = authResult?.auth;
+    if (!auth?.refreshToken || !auth?.customerId) {
       return new Response("Missing Google Ads auth context.", { status: 400 });
     }
-    threadAccountId = sessionAuth.customerId;
+    threadAccountId = auth.customerId;
     agent = createGoogleAdsAgent({
-      refreshToken: sessionAuth.refreshToken,
-      customerId: sessionAuth.customerId,
+      refreshToken: auth.refreshToken,
+      customerId: auth.customerId,
+      customerIds: auth.customerIds,
+      loginCustomerId: auth.loginCustomerId,
       userId,
       authMethod: "chat",
       toolPermissions,

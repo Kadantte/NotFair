@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.6] - 2026-05-12
+
+### Fixed
+- **In-app chat now works for manager-routed Google Ads accounts.** Chat now passes the full connected-account list and active `loginCustomerId` into the Google Ads agent auth context, so `runScript` audits include the required MCC header for client accounts selected through a manager. This fixes the false "connection incomplete" experience for accounts like Eupakovka where normal web reads worked but chat audit GAQL calls failed with `authorization_error=2`.
+
 ## [0.5.5.5] - 2026-05-12
 
 ### Added
