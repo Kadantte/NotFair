@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-    RefreshCw, AlertCircle, ChevronRight, ChevronLeft, Loader2, X,
+    AlertCircle, ChevronRight, ChevronLeft, Loader2, X,
     Users, Eye, ArrowUpDown, ArrowUp, ArrowDown, Check, Copy, Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -232,21 +232,6 @@ export function CustomersView({ initialData }: Props) {
     return (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-6 space-y-5 sm:space-y-8">
             <div className="flex items-center justify-end">
-                <Button
-                    onClick={() => {
-                        cachedCustomers = null;
-                        cachedDraftEmails = null;
-                        fetchCustomers(false, true);
-                        fetchDraftEmails();
-                    }}
-                    disabled={loadingCustomers}
-                    variant="outline"
-                    size="sm"
-                    className="h-8 border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 sm:h-9"
-                >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loadingCustomers ? 'animate-spin' : ''}`} />
-                    <span className="hidden sm:inline">Refresh</span>
-                </Button>
             </div>
 
             {error && (
@@ -379,13 +364,6 @@ export function CustomersView({ initialData }: Props) {
                                                     {c.primaryAccountId}
                                                 </Link>
                                                 {flag && <span className="text-[13px] leading-none" title={country ?? undefined}>{flag}</span>}
-                                                {c.outreachStatus === 'drafted' && (
-                                                    <span className="rounded-full border border-[#D4882A]/30 bg-[#D4882A]/10 px-2 py-0.5 text-[10px] font-semibold text-[#D4882A]">Draft</span>
-                                                )}
-                                                {c.outreachStatus === 'contacted' && (
-                                                    <span className="rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#4CAF6E]">Sent</span>
-                                                )}
-                                                <PlanBadge plan={c.plan} inTrial={c.inTrial} />
                                             </div>
                                         </div>
                                         <button
@@ -538,17 +516,6 @@ export function CustomersView({ initialData }: Props) {
                                                     ) : (
                                                         <div className="text-sm text-[#E8E4DD] truncate">{c.userId || 'Unknown'}</div>
                                                     )}
-                                                    {c.outreachStatus === 'drafted' && (
-                                                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#D4882A] bg-[#D4882A]/15 border border-[#D4882A]/30" title="Outreach draft ready to review">
-                                                            Draft
-                                                        </span>
-                                                    )}
-                                                    {c.outreachStatus === 'contacted' && (
-                                                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#4CAF6E] bg-[#4CAF6E]/15 border border-[#4CAF6E]/30" title={c.lastContactedAt ? `Sent ${formatDateTime(c.lastContactedAt)}` : 'Sent'}>
-                                                            Sent
-                                                        </span>
-                                                    )}
-                                                    <PlanBadge plan={c.plan} inTrial={c.inTrial} />
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs text-[#C4C0B6]/60 font-mono tabular-nums">
                                                     <Link href={`/dev/${c.primaryAccountId}`} prefetch onClick={(e) => e.stopPropagation()} className="hover:text-[#E8E4DD] hover:underline">

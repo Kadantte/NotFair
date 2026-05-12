@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.4.2] - 2026-05-12
+
+### Changed
+- **Customers page cleaned up.** Removed the Refresh button from the header. Removed Draft/Sent outreach status badges and plan badges from the Customer column — the Plan column already shows plan and trial status, so duplicating it in the customer name row was redundant noise.
+
 ## [0.5.4.1] - 2026-05-12
 
 ### Changed
