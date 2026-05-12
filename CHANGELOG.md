@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.3] - 2026-05-12
+
+### Fixed
+- **`/blog/[slug]` no longer 500s in production.** `isomorphic-dompurify` pulls `jsdom`, which pulls `html-encoding-sniffer@6`, which tries to `require()` `@exodus/bytes/encoding-lite.js` — an ESM-only module. Vercel's serverless Node CommonJS loader rejects this with `ERR_REQUIRE_ESM` (local Node was more lenient and didn't reproduce). Swapped to `sanitize-html` (pure CJS, no jsdom dependency, battle-tested for Next.js SSR sanitization of CMS HTML). Allowlist preserves Outrank's formatting tags (img, figure, headings, code, pre, blockquote, plus YouTube/Vimeo iframes) while stripping `<script>`, `<style>`, `<form>`, event handlers, and `style` attrs. Removed `isomorphic-dompurify` and `jsdom` from `next.config.ts` `serverExternalPackages` — no longer needed.
+
 ## [0.5.5.2] - 2026-05-12
 
 ### Fixed

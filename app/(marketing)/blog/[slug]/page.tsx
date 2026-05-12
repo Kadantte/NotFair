@@ -1,7 +1,7 @@
-import DOMPurify from "isomorphic-dompurify";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import sanitizeHtml from "sanitize-html";
 
 import { BlogPostPage } from "@/components/marketing/blog-post";
 import {
@@ -26,6 +26,33 @@ import {
 
 // Must be a literal — see comment in app/(marketing)/blog/page.tsx.
 export const revalidate = 86400;
+
+// sanitize-html defaults strip <script>/event handlers; we extend with
+// formatting tags Outrank uses (img/figure/headings/code/pre/blockquote)
+// and explicitly allow only safe URL schemes. style/form/input remain
+// forbidden so a compromised Outrank tenant cannot inject CSS exfiltration
+// or password fields.
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [
+    ...sanitizeHtml.defaults.allowedTags,
+    "img",
+    "figure",
+    "figcaption",
+    "h1",
+    "h2",
+    "iframe",
+  ],
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    img: ["src", "alt", "title", "width", "height", "loading"],
+    a: ["href", "title", "target", "rel"],
+    iframe: ["src", "title", "allow", "allowfullscreen", "frameborder"],
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+  allowedSchemesByTag: { img: ["http", "https", "data"] },
+  allowedIframeHostnames: ["www.youtube.com", "player.vimeo.com"],
+  disallowedTagsMode: "discard",
+};
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -175,11 +202,7 @@ export default async function BlogPostRoute({ params }: Props) {
           <div
             className={styles.articleContent}
             dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(article.html, {
-                USE_PROFILES: { html: true },
-                FORBID_TAGS: ["style", "form", "input", "button", "textarea"],
-                FORBID_ATTR: ["style"],
-              }),
+              __html: sanitizeHtml(article.html, SANITIZE_OPTIONS),
             }}
           />
         </article>
