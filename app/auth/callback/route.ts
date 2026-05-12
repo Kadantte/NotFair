@@ -696,32 +696,42 @@ async function reuseExistingSession({
       googleEmail,
     });
 
-    if (conn.customerIds.length > 0) {
-      after(async () => {
-        syncAccountSnapshots(
-          refreshToken,
-          conn.customerIds.map((a) => ({
-            id: a.id,
-            loginCustomerId: a.loginCustomerId ?? null,
-          })),
-        ).catch((err) => {
-          console.error("[sync-account] Failed to snapshot on reuse:", err);
+    // Short-circuit (skip the mcp_sessions cookie mint) only when identity
+    // is fully carried by Supabase. With `stopCreatingMcpSessions=false`
+    // (current default), `getSession()` still resolves identity from
+    // `adsagent_token` → `mcp_sessions.access_token`, and the GET handler
+    // wipes `sb-*` cookies before returning — so returning a cookieless
+    // redirect here strands the user with no session anchor and bounces
+    // them to /login on the next protected page. Falling through lets the
+    // legacy mcp_sessions lookup below mint/reissue the cookie.
+    if (stopCreatingMcpSessions()) {
+      if (conn.customerIds.length > 0) {
+        after(async () => {
+          syncAccountSnapshots(
+            refreshToken,
+            conn.customerIds.map((a) => ({
+              id: a.id,
+              loginCustomerId: a.loginCustomerId ?? null,
+            })),
+          ).catch((err) => {
+            console.error("[sync-account] Failed to snapshot on reuse:", err);
+          });
         });
-      });
+      }
+
+      const activeAccount = conn.customerIds.find((a) => a.id === conn.customerId);
+      const customerName = activeAccount?.name || "Google Ads Account";
+
+      if (popup) {
+        return popupPostMessage(origin, {
+          type: "GOOGLE_ADS_AUTH_SUCCESS",
+          customerId: conn.customerId,
+          customerName,
+        });
+      }
+
+      return NextResponse.redirect(`${origin}${next}`);
     }
-
-    const activeAccount = conn.customerIds.find((a) => a.id === conn.customerId);
-    const customerName = activeAccount?.name || "Google Ads Account";
-
-    if (popup) {
-      return popupPostMessage(origin, {
-        type: "GOOGLE_ADS_AUTH_SUCCESS",
-        customerId: conn.customerId,
-        customerName,
-      });
-    }
-
-    return NextResponse.redirect(`${origin}${next}`);
   }
 
   // Legacy fallback: pre-phase-1 users with an mcp_sessions row but no
