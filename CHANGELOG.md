@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.4.3] - 2026-05-12
+
+### Fixed
+- **/operations no longer flashes "Failed to load operations" before redirecting unauthenticated users.** The page is now gated server-side (same pattern as /chat), so users with a stale session get a clean 307 to /login instead of seeing the page render with an error banner and the empty-state card on top of each other. Mid-session expiries during pagination or undo also navigate cleanly now — NEXT_REDIRECT errors from server actions are re-thrown instead of swallowed into a generic "Please try again" message.
+
 ## [0.5.4.2] - 2026-05-12
 
 ### Changed
