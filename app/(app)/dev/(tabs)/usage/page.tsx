@@ -36,11 +36,14 @@ async function UsageDataBoundary({
     platform: UsagePlatform;
 }) {
     let initialData: UsageData | undefined;
+    // Best-guess tz for the team (PST). The client refetches on mount with the
+    // viewer's actual tz; this default just avoids a UTC flash for PST viewers,
+    // who are the common case for this internal dev dashboard.
+    const initialTz = 'America/Los_Angeles';
     try {
-        // UTC server-side; client refetches with the user's tz on mount.
-        initialData = await getUsageData({ days, platform, tz: 'UTC' });
+        initialData = await getUsageData({ days, platform, tz: initialTz });
     } catch (err) {
         console.error('[dev/usage] Server prefetch failed:', err);
     }
-    return <UsageView initialData={initialData} />;
+    return <UsageView initialData={initialData} initialTz={initialTz} />;
 }

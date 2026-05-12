@@ -18,24 +18,28 @@ const USAGE_PLATFORM_LABELS: Record<UsagePlatform, string> = {
 };
 
 // Module-level stale-while-revalidate cache (CLAUDE.md pattern).
+// Only populated by client-side fetches (which carry the viewer's tz). We do
+// NOT seed this from `initialData`, because the server prefetch uses a fixed
+// best-guess tz — a cache hit would short-circuit the tz-correct refetch in
+// fetchStats and leave non-PST viewers stuck on PST dates (or PST viewers on
+// UTC dates, before this was fixed).
 const usageStatsCache = new Map<string, UsageStats>();
 
-type Props = { initialData?: UsageStats };
+const DEFAULT_CACHE_KEY = '30|all|all|prod';
 
-export function UsageView({ initialData }: Props) {
-    // Seed the default cache slot from server prefetch (30d, all sources, all platforms, prod).
-    // The server prefetches with UTC timezone; the client will refetch with the user's local tz
-    // when the useEffect fires. This seeds the immediate render so there's no blank flash.
-    const DEFAULT_CACHE_KEY = '30|all|all|prod';
-    if (initialData && !usageStatsCache.has(DEFAULT_CACHE_KEY)) {
-        usageStatsCache.set(DEFAULT_CACHE_KEY, initialData);
-    }
+type Props = { initialData?: UsageStats; initialTz?: string };
+
+export function UsageView({ initialData, initialTz }: Props) {
     const [usageDays, setUsageDays] = useState(30);
     const [includeDev, setIncludeDev] = useState(false);
     const [usageSource, setUsageSource] = useState<string>('all');
     const [usagePlatform, setUsagePlatform] = useState<UsagePlatform>('all');
-    const [stats, setStats] = useState<UsageStats | null>(usageStatsCache.get(DEFAULT_CACHE_KEY) ?? null);
-    const [loading, setLoading] = useState(!usageStatsCache.has(DEFAULT_CACHE_KEY));
+    const [stats, setStats] = useState<UsageStats | null>(
+        usageStatsCache.get(DEFAULT_CACHE_KEY) ?? initialData ?? null,
+    );
+    const [loading, setLoading] = useState(
+        !usageStatsCache.has(DEFAULT_CACHE_KEY) && !initialData,
+    );
     const [error, setError] = useState<string | null>(null);
 
     const fetchStats = useCallback(async ({ days, source = 'all', platform = 'all', dev = false, background = false, fresh = false }: { days: number; source?: string; platform?: UsagePlatform; dev?: boolean; background?: boolean; fresh?: boolean }) => {
@@ -72,8 +76,23 @@ export function UsageView({ initialData }: Props) {
 
     useEffect(() => {
         const cacheKey = `${usageDays}|${usageSource}|${usagePlatform}|${includeDev ? 'dev' : 'prod'}`;
+        // Skip the refetch if the server already rendered with the viewer's tz
+        // and the filters are at their defaults — initialData is then exactly
+        // what the API would return. Seed the cache so subsequent mounts hit it.
+        if (
+            cacheKey === DEFAULT_CACHE_KEY
+            && initialData
+            && initialTz
+            && !usageStatsCache.has(cacheKey)
+        ) {
+            const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (viewerTz === initialTz) {
+                usageStatsCache.set(cacheKey, initialData);
+                return;
+            }
+        }
         fetchStats({ days: usageDays, source: usageSource, platform: usagePlatform, dev: includeDev, background: !!usageStatsCache.get(cacheKey) });
-    }, [fetchStats, usageDays, usageSource, usagePlatform, includeDev]);
+    }, [fetchStats, usageDays, usageSource, usagePlatform, includeDev, initialData, initialTz]);
 
     return (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-6 space-y-5 sm:space-y-8">
