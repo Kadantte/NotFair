@@ -1,13 +1,14 @@
 import { allBlogPosts, curatedBlogSlugs } from "@/lib/blog-posts";
 import { SITE_URL } from "@/lib/seo";
 
-import { BLOG_REVALIDATE_SECONDS } from "../_lib/constants";
 import { filterUncuratedArticles, getStaticArticles } from "../_lib/outrank";
 
 // Next.js's nested `sitemap.ts` metadata convention loses routing precedence
 // to a sibling dynamic `[slug]` segment in production — /blog/sitemap.xml
 // matches `[slug]` and 404s. Explicit route handler bypasses the collision.
-export const revalidate = BLOG_REVALIDATE_SECONDS;
+// `revalidate` must be a literal — Next.js's static analyzer can't resolve
+// imported constants. Keep in sync with BLOG_REVALIDATE_SECONDS (24h prod).
+export const revalidate = 86400;
 
 const BLOG_INDEX_PRIORITY = "0.8";
 const BLOG_ARTICLE_PRIORITY = "0.7";
@@ -72,7 +73,7 @@ ${entries.map(renderEntry).join("\n")}
   return new Response(body, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": `public, max-age=0, s-maxage=${BLOG_REVALIDATE_SECONDS}, stale-while-revalidate=${BLOG_REVALIDATE_SECONDS}`,
+      "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=86400",
     },
   });
 }

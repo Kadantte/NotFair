@@ -17,7 +17,6 @@ import {
 } from "@/lib/seo";
 
 import styles from "../_components/ArticleContent.module.css";
-import { BLOG_REVALIDATE_SECONDS } from "../_lib/constants";
 import { formatDate } from "../_lib/format";
 import {
   filterUncuratedArticles,
@@ -25,7 +24,8 @@ import {
   getStaticArticles,
 } from "../_lib/outrank";
 
-export const revalidate = BLOG_REVALIDATE_SECONDS;
+// Must be a literal — see comment in app/(marketing)/blog/page.tsx.
+export const revalidate = 86400;
 
 type Props = {
   params: Promise<{ slug: string }>;

@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
     "@jitl/quickjs-wasmfile-debug-sync",
     "@jitl/quickjs-wasmfile-release-asyncify",
     "@jitl/quickjs-wasmfile-release-sync",
+    // isomorphic-dompurify pulls jsdom which webpack can't bundle (jsdom
+    // reads its own CSS stylesheets from disk at runtime). Load as a
+    // regular Node module instead.
+    "isomorphic-dompurify",
+    "jsdom",
   ],
   async redirects() {
     return [

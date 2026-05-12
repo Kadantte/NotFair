@@ -9,7 +9,6 @@ import Pagination from "./_components/Pagination";
 import {
   BLOG_ARTICLES_PER_PAGE,
   BLOG_CURATED_LEAD_LIMIT,
-  BLOG_REVALIDATE_SECONDS,
 } from "./_lib/constants";
 import { getPageParam } from "./_lib/format";
 import { filterUncuratedArticles, getArticlesSafe } from "./_lib/outrank";
@@ -18,7 +17,10 @@ import {
   outrankArticleToCard,
 } from "./_lib/blog-card";
 
-export const revalidate = BLOG_REVALIDATE_SECONDS;
+// Route segment configs must be statically analyzable literals — imported
+// constants fail Next.js's static analyzer at build. Keep in sync with
+// BLOG_REVALIDATE_SECONDS in _lib/constants.ts (24h in production).
+export const revalidate = 86400;
 
 export const metadata = buildMetadata({
   title: "Blog — NotFair",

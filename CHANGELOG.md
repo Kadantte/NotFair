@@ -2,6 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.2] - 2026-05-12
+
+### Fixed
+- **Blog production build is green again.** Two issues stacked: (a) `export const revalidate = BLOG_REVALIDATE_SECONDS;` failed Next.js's static analyzer at build time — route segment configs must be literals, not imported constants. Inlined `export const revalidate = 86400;` at all 4 blog route files. (b) `isomorphic-dompurify` pulls `jsdom`, which webpack tries to bundle but can't because `jsdom` reads CSS stylesheets from disk at runtime. Added `isomorphic-dompurify` and `jsdom` to `next.config.ts` `serverExternalPackages` so they load as regular Node modules. Build now compiles in ~20s, `/blog/sitemap.xml` registers as a static route.
+- v0.5.5.0 and v0.5.5.1 deployments were silently rejected by Vercel for the same reason — production was still serving the pre-Outrank build. v0.5.5.2 is the first version of the Outrank integration that actually deploys.
+
 ## [0.5.5.1] - 2026-05-12
 
 ### Fixed

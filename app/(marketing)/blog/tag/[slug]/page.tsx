@@ -3,14 +3,12 @@ import type { Metadata } from "next";
 import BlogCard from "../../_components/BlogCard";
 import Pagination from "../../_components/Pagination";
 import { outrankArticleToCard } from "../../_lib/blog-card";
-import {
-  BLOG_ARTICLES_PER_PAGE,
-  BLOG_REVALIDATE_SECONDS,
-} from "../../_lib/constants";
+import { BLOG_ARTICLES_PER_PAGE } from "../../_lib/constants";
 import { getPageParam } from "../../_lib/format";
 import { getArticlesSafe, getStaticArticles } from "../../_lib/outrank";
 
-export const revalidate = BLOG_REVALIDATE_SECONDS;
+// Must be a literal — see comment in app/(marketing)/blog/page.tsx.
+export const revalidate = 86400;
 
 type Props = {
   params: Promise<{ slug: string }>;
