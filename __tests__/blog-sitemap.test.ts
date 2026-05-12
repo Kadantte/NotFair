@@ -105,4 +105,15 @@ describe("blog sitemap route", () => {
       'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
     );
   });
+
+  it("keeps sitemap cache short enough for newly published Outrank articles", async () => {
+    getStaticArticlesMock.mockResolvedValue([]);
+
+    const mod = await import("@/app/(marketing)/blog/sitemap.xml/route");
+    const response = await mod.GET();
+
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+    );
+  });
 });

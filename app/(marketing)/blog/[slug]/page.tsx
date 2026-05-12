@@ -25,7 +25,7 @@ import {
 } from "../_lib/outrank";
 
 // Must be a literal — see comment in app/(marketing)/blog/page.tsx.
-export const revalidate = 86400;
+export const revalidate = 60;
 
 // sanitize-html defaults strip <script>/event handlers; we extend with
 // formatting tags Outrank uses (img/figure/headings/code/pre/blockquote)
@@ -91,6 +91,8 @@ export async function generateMetadata({ params }: Props) {
       title: article.title,
       description: article.meta_description,
       path: `/blog/${article.slug}`,
+      imageUrl: article.image_url,
+      imageAlt: article.title,
     });
   }
 

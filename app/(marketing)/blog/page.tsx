@@ -19,8 +19,8 @@ import {
 
 // Route segment configs must be statically analyzable literals — imported
 // constants fail Next.js's static analyzer at build. Keep in sync with
-// BLOG_REVALIDATE_SECONDS in _lib/constants.ts (24h in production).
-export const revalidate = 86400;
+// BLOG_REVALIDATE_SECONDS in _lib/constants.ts.
+export const revalidate = 60;
 
 export const metadata = buildMetadata({
   title: "Blog — NotFair",

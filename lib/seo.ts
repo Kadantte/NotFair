@@ -25,6 +25,8 @@ type MetadataInput = {
   keywords?: string[];
   category?: string;
   index?: boolean;
+  imageUrl?: string | null;
+  imageAlt?: string;
 };
 
 export function buildMetadata({
@@ -34,8 +36,11 @@ export function buildMetadata({
   keywords = SITE_KEYWORDS,
   category = "marketing",
   index = true,
+  imageUrl,
+  imageAlt = `${SITE_NAME} logo`,
 }: MetadataInput): Metadata {
   const canonical = new URL(path, SITE_URL).toString();
+  const image = imageUrl || DEFAULT_OG_IMAGE;
 
   return {
     title: { absolute: title },
@@ -53,8 +58,8 @@ export function buildMetadata({
       siteName: SITE_NAME,
       images: [
         {
-          url: DEFAULT_OG_IMAGE,
-          alt: `${SITE_NAME} logo`,
+          url: image,
+          alt: imageAlt,
         },
       ],
     },
@@ -62,7 +67,7 @@ export function buildMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: [DEFAULT_OG_IMAGE],
+      images: [image],
     },
     robots: {
       index,

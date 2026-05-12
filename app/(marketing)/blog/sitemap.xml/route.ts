@@ -7,8 +7,8 @@ import { filterUncuratedArticles, getStaticArticles } from "../_lib/outrank";
 // to a sibling dynamic `[slug]` segment in production — /blog/sitemap.xml
 // matches `[slug]` and 404s. Explicit route handler bypasses the collision.
 // `revalidate` must be a literal — Next.js's static analyzer can't resolve
-// imported constants. Keep in sync with BLOG_REVALIDATE_SECONDS (24h prod).
-export const revalidate = 86400;
+// imported constants. Keep in sync with BLOG_REVALIDATE_SECONDS.
+export const revalidate = 60;
 
 const BLOG_INDEX_PRIORITY = "0.8";
 const BLOG_ARTICLE_PRIORITY = "0.7";
@@ -73,7 +73,7 @@ ${entries.map(renderEntry).join("\n")}
   return new Response(body, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "public, max-age=0, s-maxage=86400, stale-while-revalidate=86400",
+      "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
     },
   });
 }

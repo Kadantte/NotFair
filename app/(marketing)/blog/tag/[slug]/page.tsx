@@ -8,7 +8,7 @@ import { getPageParam } from "../../_lib/format";
 import { getArticlesSafe, getStaticArticles } from "../../_lib/outrank";
 
 // Must be a literal — see comment in app/(marketing)/blog/page.tsx.
-export const revalidate = 86400;
+export const revalidate = 60;
 
 type Props = {
   params: Promise<{ slug: string }>;

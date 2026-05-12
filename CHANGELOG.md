@@ -2,6 +2,12 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.4] - 2026-05-12
+
+### Fixed
+- **Outrank articles now appear on `/blog` shortly after publishing.** The blog list, tag pages, article pages, and blog sitemap now revalidate every 60 seconds instead of holding a 24-hour cached Outrank snapshot.
+- **Outrank article images now render and share correctly.** Allowed Outrank's current `cdnimg.co` image host through `next/image`, and article metadata now uses the article image for Open Graph and Twitter previews instead of the default NotFair logo.
+
 ## [0.5.5.3] - 2026-05-12
 
 ### Fixed

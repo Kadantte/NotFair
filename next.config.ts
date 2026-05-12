@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "**.outrank.so" },
       { protocol: "https", hostname: "outrank.so" },
+      { protocol: "https", hostname: "cdnimg.co" },
     ],
   },
   // quickjs-emscripten loads its WASM variant via dynamic import + package
