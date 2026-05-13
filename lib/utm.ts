@@ -7,6 +7,7 @@ export const CLICK_ID_KEYS = ["gclid", "fbclid", "rdt_cid", "twclid"] as const;
 export type ClickIdKey = (typeof CLICK_ID_KEYS)[number];
 
 export const ATTRIBUTION_COOKIE_NAME = "nf_first_touch";
+export const PAID_TOUCH_COOKIE_NAME = "nf_latest_paid_touch";
 export const ATTRIBUTION_VERSION = 1;
 
 export const ATTRIBUTION_PARAM_KEYS = [...UTM_KEYS, ...CLICK_ID_KEYS] as const;
@@ -20,6 +21,24 @@ export type FirstTouchAttribution = Partial<Record<AttributionParamKey, string>>
   signup_referrer_domain?: string;
   attribution_captured_at?: string;
 };
+
+export type PaidTouchAttribution = FirstTouchAttribution;
+
+const PAID_MEDIUMS = new Set([
+  "paid",
+  "paid_social",
+  "paid_search",
+  "cpc",
+  "ppc",
+  "display",
+  "retargeting",
+]);
+
+const PAID_SOCIAL_SOURCES = new Set([
+  "x",
+  "twitter",
+  "twitter_ads",
+]);
 
 const INTERNAL_REFERRER_HOSTS = new Set([
   "accounts.google.com",
@@ -55,17 +74,29 @@ export function isInternalAttributionReferrer(
 }
 
 export function parseAttributionCookie(cookieHeader: string | null | undefined): FirstTouchAttribution | null {
+  return parseAttributionCookieByName(cookieHeader, ATTRIBUTION_COOKIE_NAME, sanitizeAttribution);
+}
+
+export function parsePaidTouchCookie(cookieHeader: string | null | undefined): PaidTouchAttribution | null {
+  return parseAttributionCookieByName(cookieHeader, PAID_TOUCH_COOKIE_NAME, sanitizePaidTouch);
+}
+
+function parseAttributionCookieByName<T>(
+  cookieHeader: string | null | undefined,
+  cookieName: string,
+  sanitizer: (raw: Record<string, unknown>) => T | null,
+): T | null {
   if (!cookieHeader) return null;
   const match = cookieHeader
     .split(";")
     .map((part) => part.trim())
-    .find((part) => part.startsWith(`${ATTRIBUTION_COOKIE_NAME}=`));
+    .find((part) => part.startsWith(`${cookieName}=`));
   if (!match) return null;
 
   try {
-    const parsed = JSON.parse(decodeURIComponent(match.slice(ATTRIBUTION_COOKIE_NAME.length + 1)));
+    const parsed = JSON.parse(decodeURIComponent(match.slice(cookieName.length + 1)));
     if (!parsed || typeof parsed !== "object") return null;
-    return sanitizeAttribution(parsed as Record<string, unknown>);
+    return sanitizer(parsed as Record<string, unknown>);
   } catch {
     return null;
   }
@@ -96,6 +127,32 @@ export function sanitizeAttribution(raw: Record<string, unknown>): FirstTouchAtt
   return Object.keys(attribution).length > 1 ? attribution : null;
 }
 
+export function hasPaidTouchSignal(
+  attribution: Partial<Record<AttributionParamKey, string>> | null | undefined,
+): boolean {
+  if (!attribution) return false;
+  if (CLICK_ID_KEYS.some((key) => !!attribution[key])) return true;
+  const medium = attribution.utm_medium?.toLowerCase();
+  if (medium && PAID_MEDIUMS.has(medium)) return true;
+  const source = attribution.utm_source?.toLowerCase();
+  return !!source && PAID_SOCIAL_SOURCES.has(source);
+}
+
+export function sanitizePaidTouch(raw: Record<string, unknown>): PaidTouchAttribution | null {
+  const attribution = sanitizeAttribution(raw);
+  if (!hasPaidTouchSignal(attribution)) return null;
+  return attribution;
+}
+
+function paidSourceFallback(attribution: PaidTouchAttribution): string | undefined {
+  if (attribution.utm_source) return attribution.utm_source;
+  if (attribution.twclid) return "x";
+  if (attribution.gclid) return "google";
+  if (attribution.fbclid) return "facebook";
+  if (attribution.rdt_cid) return "reddit";
+  return undefined;
+}
+
 export function attributionToUserMetadata(
   attribution: FirstTouchAttribution | null | undefined,
 ): Record<string, string | number> {
@@ -119,6 +176,31 @@ export function attributionToUserMetadata(
     const value = attribution[key];
     if (value) metadata[key] = value;
   }
+
+  return metadata;
+}
+
+export function paidTouchToUserMetadata(
+  attribution: PaidTouchAttribution | null | undefined,
+): Record<string, string | number> {
+  if (!attribution) return {};
+  const metadata: Record<string, string | number> = {
+    paid_attribution_version: attribution.version,
+  };
+
+  const source = paidSourceFallback(attribution);
+  if (source) metadata.paid_source = source;
+  if (attribution.utm_medium) metadata.paid_medium = attribution.utm_medium;
+  if (attribution.utm_campaign) metadata.paid_campaign = attribution.utm_campaign;
+  if (attribution.utm_term) metadata.paid_term = attribution.utm_term;
+  if (attribution.utm_content) metadata.paid_content = attribution.utm_content;
+  if (attribution.gclid) metadata.paid_gclid = attribution.gclid;
+  if (attribution.fbclid) metadata.paid_fbclid = attribution.fbclid;
+  if (attribution.rdt_cid) metadata.paid_rdt_cid = attribution.rdt_cid;
+  if (attribution.twclid) metadata.paid_twclid = attribution.twclid;
+  if (attribution.first_landing_url) metadata.paid_landing_url = attribution.first_landing_url;
+  if (attribution.first_landing_path) metadata.paid_landing_path = attribution.first_landing_path;
+  if (attribution.attribution_captured_at) metadata.paid_captured_at = attribution.attribution_captured_at;
 
   return metadata;
 }

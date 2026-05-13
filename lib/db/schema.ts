@@ -733,6 +733,7 @@ export const userAttribution = pgTable("user_attribution", {
   gclid: text("gclid"),
   fbclid: text("fbclid"),
   rdtCid: text("rdt_cid"),
+  twclid: text("twclid"),
   /** First page we saw in this browser before signup/auth. */
   firstLandingUrl: text("first_landing_url"),
   firstLandingPath: text("first_landing_path"),
@@ -746,10 +747,25 @@ export const userAttribution = pgTable("user_attribution", {
   attributionVersion: integer("attribution_version").notNull().default(1),
   /** Attribution-only raw payload; do not dump full auth.user metadata here. */
   rawAttribution: jsonb("raw_attribution").$type<Record<string, unknown>>().notNull().default({}),
+  /** Latest paid click before signup. Kept separate so first-touch source is never overwritten. */
+  paidSource: text("paid_source"),
+  paidMedium: text("paid_medium"),
+  paidCampaign: text("paid_campaign"),
+  paidTerm: text("paid_term"),
+  paidContent: text("paid_content"),
+  paidGclid: text("paid_gclid"),
+  paidFbclid: text("paid_fbclid"),
+  paidRdtCid: text("paid_rdt_cid"),
+  paidTwclid: text("paid_twclid"),
+  paidLandingUrl: text("paid_landing_url"),
+  paidLandingPath: text("paid_landing_path"),
+  paidCapturedAt: timestamp("paid_captured_at"),
+  latestPaidTouch: jsonb("latest_paid_touch").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("user_attribution_source_idx").on(table.source, table.medium),
+  index("user_attribution_paid_source_idx").on(table.paidSource, table.paidMedium),
   index("user_attribution_referrer_idx").on(table.signupReferrerDomain),
   index("user_attribution_captured_idx").on(table.attributionCapturedAt),
   index("user_attribution_created_idx").on(table.createdAt),

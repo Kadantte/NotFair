@@ -2,8 +2,10 @@ import { sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import {
   attributionToUserMetadata,
+  paidTouchToUserMetadata,
   referrerDomain,
   type FirstTouchAttribution,
+  type PaidTouchAttribution,
 } from "@/lib/utm";
 
 export type RecordUserAttributionInput = {
@@ -11,6 +13,7 @@ export type RecordUserAttributionInput = {
   email?: string | null;
   signupMethod?: string | null;
   attribution?: FirstTouchAttribution | null;
+  paidTouch?: PaidTouchAttribution | null;
   attributionSource: string;
 };
 
@@ -27,11 +30,18 @@ function cleanSource(attribution: FirstTouchAttribution | null | undefined): str
     ?? null;
 }
 
+function cleanPaidSource(attribution: PaidTouchAttribution | null | undefined): string | null {
+  const metadata = paidTouchToUserMetadata(attribution);
+  return typeof metadata.paid_source === "string" ? metadata.paid_source : null;
+}
+
 export function buildUserAttributionRecord(input: RecordUserAttributionInput) {
   if (!input.userId) return null;
 
   const attribution = input.attribution ?? null;
+  const paidTouch = input.paidTouch ?? null;
   const rawAttribution = attributionToUserMetadata(attribution);
+  const latestPaidTouch = paidTouchToUserMetadata(paidTouch);
   return {
     userId: input.userId,
     email: input.email ?? null,
@@ -44,6 +54,7 @@ export function buildUserAttributionRecord(input: RecordUserAttributionInput) {
     gclid: attribution?.gclid ?? null,
     fbclid: attribution?.fbclid ?? null,
     rdtCid: attribution?.rdt_cid ?? null,
+    twclid: attribution?.twclid ?? null,
     firstLandingUrl: attribution?.first_landing_url ?? null,
     firstLandingPath: attribution?.first_landing_path ?? null,
     signupReferrer: attribution?.signup_referrer ?? null,
@@ -55,6 +66,19 @@ export function buildUserAttributionRecord(input: RecordUserAttributionInput) {
     attributionSource: input.attributionSource,
     attributionVersion: attribution?.version ?? 1,
     rawAttribution,
+    paidSource: cleanPaidSource(paidTouch),
+    paidMedium: paidTouch?.utm_medium ?? null,
+    paidCampaign: paidTouch?.utm_campaign ?? null,
+    paidTerm: paidTouch?.utm_term ?? null,
+    paidContent: paidTouch?.utm_content ?? null,
+    paidGclid: paidTouch?.gclid ?? null,
+    paidFbclid: paidTouch?.fbclid ?? null,
+    paidRdtCid: paidTouch?.rdt_cid ?? null,
+    paidTwclid: paidTouch?.twclid ?? null,
+    paidLandingUrl: paidTouch?.first_landing_url ?? null,
+    paidLandingPath: paidTouch?.first_landing_path ?? null,
+    paidCapturedAt: parseTimestamp(paidTouch?.attribution_captured_at),
+    latestPaidTouch,
     updatedAt: new Date(),
   };
 }
@@ -85,6 +109,7 @@ export async function recordUserAttribution(input: RecordUserAttributionInput): 
           gclid: sql`coalesce(${schema.userAttribution.gclid}, excluded.gclid)`,
           fbclid: sql`coalesce(${schema.userAttribution.fbclid}, excluded.fbclid)`,
           rdtCid: sql`coalesce(${schema.userAttribution.rdtCid}, excluded.rdt_cid)`,
+          twclid: sql`coalesce(${schema.userAttribution.twclid}, excluded.twclid)`,
           firstLandingUrl: sql`coalesce(${schema.userAttribution.firstLandingUrl}, excluded.first_landing_url)`,
           firstLandingPath: sql`coalesce(${schema.userAttribution.firstLandingPath}, excluded.first_landing_path)`,
           signupReferrer: sql`coalesce(${schema.userAttribution.signupReferrer}, excluded.signup_referrer)`,
@@ -93,6 +118,19 @@ export async function recordUserAttribution(input: RecordUserAttributionInput): 
           attributionSource: sql`case when ${schema.userAttribution.attributionSource} = 'unknown' then excluded.attribution_source else ${schema.userAttribution.attributionSource} end`,
           attributionVersion: sql`greatest(${schema.userAttribution.attributionVersion}, excluded.attribution_version)`,
           rawAttribution: sql`case when ${schema.userAttribution.rawAttribution} = '{}'::jsonb then excluded.raw_attribution else ${schema.userAttribution.rawAttribution} || excluded.raw_attribution end`,
+          paidSource: sql`coalesce(${schema.userAttribution.paidSource}, excluded.paid_source)`,
+          paidMedium: sql`coalesce(${schema.userAttribution.paidMedium}, excluded.paid_medium)`,
+          paidCampaign: sql`coalesce(${schema.userAttribution.paidCampaign}, excluded.paid_campaign)`,
+          paidTerm: sql`coalesce(${schema.userAttribution.paidTerm}, excluded.paid_term)`,
+          paidContent: sql`coalesce(${schema.userAttribution.paidContent}, excluded.paid_content)`,
+          paidGclid: sql`coalesce(${schema.userAttribution.paidGclid}, excluded.paid_gclid)`,
+          paidFbclid: sql`coalesce(${schema.userAttribution.paidFbclid}, excluded.paid_fbclid)`,
+          paidRdtCid: sql`coalesce(${schema.userAttribution.paidRdtCid}, excluded.paid_rdt_cid)`,
+          paidTwclid: sql`coalesce(${schema.userAttribution.paidTwclid}, excluded.paid_twclid)`,
+          paidLandingUrl: sql`coalesce(${schema.userAttribution.paidLandingUrl}, excluded.paid_landing_url)`,
+          paidLandingPath: sql`coalesce(${schema.userAttribution.paidLandingPath}, excluded.paid_landing_path)`,
+          paidCapturedAt: sql`coalesce(${schema.userAttribution.paidCapturedAt}, excluded.paid_captured_at)`,
+          latestPaidTouch: sql`case when ${schema.userAttribution.latestPaidTouch} = '{}'::jsonb then excluded.latest_paid_touch else ${schema.userAttribution.latestPaidTouch} end`,
           updatedAt: new Date(),
         },
       });

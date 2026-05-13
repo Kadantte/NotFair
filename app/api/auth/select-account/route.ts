@@ -17,7 +17,7 @@ import {
 } from "@/lib/reddit-capi";
 import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import { getClientIp } from "@/lib/request-ip";
-import { attributionToUserMetadata, sanitizeAttribution } from "@/lib/utm";
+import { attributionToUserMetadata, paidTouchToUserMetadata, sanitizeAttribution, sanitizePaidTouch } from "@/lib/utm";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { loadGoogleConnection } from "@/lib/connections/google-read";
 
@@ -231,18 +231,35 @@ export async function POST(request: Request) {
       const { data: { user } } = await supabase.auth.getUser();
       const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>;
       const attribution = sanitizeAttribution(meta);
+      const latestPaidTouch = sanitizePaidTouch({
+        version: 1,
+        utm_source: meta.paid_source,
+        utm_medium: meta.paid_medium,
+        utm_campaign: meta.paid_campaign,
+        utm_term: meta.paid_term,
+        utm_content: meta.paid_content,
+        gclid: meta.paid_gclid,
+        fbclid: meta.paid_fbclid,
+        rdt_cid: meta.paid_rdt_cid,
+        twclid: meta.paid_twclid,
+        first_landing_url: meta.paid_landing_url,
+        first_landing_path: meta.paid_landing_path,
+        attribution_captured_at: meta.paid_captured_at,
+      }) ?? sanitizePaidTouch(meta);
       signupEmail = user?.email ?? identity.googleEmail ?? null;
-      signupGclid = meta.gclid ?? null;
+      signupGclid = latestPaidTouch?.gclid ?? meta.gclid ?? null;
       await recordUserAttribution({
         userId: identity.userId,
         email: user?.email ?? null,
         signupMethod: "google_oauth",
         attribution,
+        paidTouch: latestPaidTouch,
         attributionSource: attribution ? "select_account_metadata" : "select_account_missing",
       });
       const clientIp = getClientIp(request);
       trackServerEvent(identity.userId, "user_signed_up", {
         ...attributionToUserMetadata(attribution),
+        ...paidTouchToUserMetadata(latestPaidTouch),
         google_email: user?.email ?? identity.googleEmail,
         signup_method: "google_oauth",
         ...(clientIp ? { $ip: clientIp } : {}),

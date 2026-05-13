@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.8] - 2026-05-12
+
+### Added
+- **Paid-touch attribution now preserves X ad assists without overwriting first-touch source.** A new `nf_latest_paid_touch` cookie captures paid click IDs and UTMs (`twclid`, `gclid`, `fbclid`, `rdt_cid`, `utm_source=x/twitter`, paid mediums), signup routes carry it through OAuth and magic-link flows, `user_signed_up` includes `paid_*` properties, and `user_attribution` stores queryable `twclid` plus `paid_*` columns for X spend analysis.
+
 ## [0.5.5.7] - 2026-05-12
 
 ### Fixed

@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ATTRIBUTION_COOKIE_NAME,
+  PAID_TOUCH_COOKIE_NAME,
   attributionToUserMetadata,
+  paidTouchToUserMetadata,
   isInternalAttributionReferrer,
   parseAttributionCookie,
+  parsePaidTouchCookie,
 } from "@/lib/utm";
 import { buildUserAttributionRecord } from "@/lib/db/attribution";
 import { GET as googleSignin } from "@/app/api/auth/signin/route";
@@ -94,6 +97,59 @@ describe("first-touch attribution helpers", () => {
     });
   });
 
+  it("parses paid-touch only when paid signals are present", () => {
+    const paidCookieValue = encodeURIComponent(JSON.stringify({
+      version: 1,
+      utm_source: "x",
+      utm_medium: "paid_social",
+      utm_campaign: "notfair_signup_sales_202605",
+      twclid: "twclid-123",
+      first_landing_url: "https://www.notfair.co/?twclid=twclid-123",
+      first_landing_path: "/?twclid=twclid-123",
+      attribution_captured_at: "2026-05-12T20:00:00.000Z",
+    }));
+    const organicCookieValue = encodeURIComponent(JSON.stringify({
+      version: 1,
+      utm_source: "github",
+      utm_medium: "referral",
+    }));
+
+    expect(parsePaidTouchCookie(`${PAID_TOUCH_COOKIE_NAME}=${paidCookieValue}`)).toMatchObject({
+      utm_source: "x",
+      utm_medium: "paid_social",
+      twclid: "twclid-123",
+    });
+    expect(parsePaidTouchCookie(`${PAID_TOUCH_COOKIE_NAME}=${organicCookieValue}`)).toBeNull();
+  });
+
+  it("treats explicit X UTM landings as paid touch even without utm_medium", () => {
+    const paidCookieValue = encodeURIComponent(JSON.stringify({
+      version: 1,
+      utm_source: "x",
+      utm_campaign: "notfair_signup_sales_202605",
+      first_landing_path: "/?utm_source=x&utm_campaign=notfair_signup_sales_202605",
+      attribution_captured_at: "2026-05-12T20:00:00.000Z",
+    }));
+
+    expect(parsePaidTouchCookie(`${PAID_TOUCH_COOKIE_NAME}=${paidCookieValue}`)).toMatchObject({
+      utm_source: "x",
+      utm_campaign: "notfair_signup_sales_202605",
+    });
+  });
+
+  it("converts paid-touch fields to separate signup metadata", () => {
+    expect(paidTouchToUserMetadata({
+      version: 1,
+      twclid: "twclid-123",
+      attribution_captured_at: "2026-05-12T20:00:00.000Z",
+    })).toEqual({
+      paid_attribution_version: 1,
+      paid_source: "x",
+      paid_twclid: "twclid-123",
+      paid_captured_at: "2026-05-12T20:00:00.000Z",
+    });
+  });
+
   it("builds a SQL attribution record with source fallback and raw attribution", () => {
     const record = buildUserAttributionRecord({
       userId: "user-123",
@@ -107,6 +163,15 @@ describe("first-touch attribution helpers", () => {
         first_landing_path: "/google-ads-mcp",
         attribution_captured_at: "2026-05-07T15:00:00.000Z",
       },
+      paidTouch: {
+        version: 1,
+        utm_source: "x",
+        utm_medium: "paid_social",
+        utm_campaign: "notfair_signup_sales_202605",
+        twclid: "twclid-123",
+        first_landing_path: "/?twclid=twclid-123",
+        attribution_captured_at: "2026-05-12T20:00:00.000Z",
+      },
     });
 
     expect(record).toMatchObject({
@@ -116,6 +181,20 @@ describe("first-touch attribution helpers", () => {
       source: "github.com",
       signupReferrerDomain: "github.com",
       attributionSource: "oauth_state",
+      paidSource: "x",
+      paidMedium: "paid_social",
+      paidCampaign: "notfair_signup_sales_202605",
+      paidTwclid: "twclid-123",
+      paidLandingPath: "/?twclid=twclid-123",
+      latestPaidTouch: {
+        paid_attribution_version: 1,
+        paid_source: "x",
+        paid_medium: "paid_social",
+        paid_campaign: "notfair_signup_sales_202605",
+        paid_twclid: "twclid-123",
+        paid_landing_path: "/?twclid=twclid-123",
+        paid_captured_at: "2026-05-12T20:00:00.000Z",
+      },
       rawAttribution: {
         attribution_version: 1,
         signup_referrer: "https://github.com/nowork-studio/toprank",
@@ -136,5 +215,37 @@ describe("first-touch attribution helpers", () => {
     expect(state.signup_referrer).toBeUndefined();
     expect(state.attribution).toMatchObject({ utm_source: "google" });
     expect(state.attribution).not.toHaveProperty("signup_referrer");
+  });
+
+  it("threads latest paid touch through OAuth state without overwriting first touch", async () => {
+    const firstTouch = encodeURIComponent(JSON.stringify({
+      version: 1,
+      utm_source: "github",
+      signup_referrer: "https://github.com/nowork-studio/toprank",
+      first_landing_path: "/google-ads-mcp",
+      attribution_captured_at: "2026-05-07T15:00:00.000Z",
+    }));
+    const paidTouch = encodeURIComponent(JSON.stringify({
+      version: 1,
+      utm_source: "x",
+      utm_medium: "paid_social",
+      utm_campaign: "notfair_signup_sales_202605",
+      twclid: "twclid-123",
+      first_landing_path: "/?twclid=twclid-123",
+      attribution_captured_at: "2026-05-12T20:00:00.000Z",
+    }));
+
+    const response = await googleSignin(new Request(
+      "https://www.notfair.co/api/auth/signin",
+      { headers: { cookie: `${ATTRIBUTION_COOKIE_NAME}=${firstTouch}; ${PAID_TOUCH_COOKIE_NAME}=${paidTouch}` } },
+    ));
+    const state = oauthState(response);
+
+    expect(state.attribution).toMatchObject({ utm_source: "github" });
+    expect(state.latest_paid_touch).toMatchObject({
+      utm_source: "x",
+      utm_medium: "paid_social",
+      twclid: "twclid-123",
+    });
   });
 });

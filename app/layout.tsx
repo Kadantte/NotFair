@@ -12,6 +12,7 @@ import {
   ATTRIBUTION_COOKIE_NAME,
   ATTRIBUTION_PARAM_KEYS,
   ATTRIBUTION_VERSION,
+  PAID_TOUCH_COOKIE_NAME,
   UTM_KEYS,
   UTM_STORAGE_PREFIX,
 } from "@/lib/utm";
@@ -125,14 +126,16 @@ export default async function RootLayout({
           {getLocalePreferenceBootstrapScript()}
         </Script>
         <Script id="utm-persist" strategy="beforeInteractive">
-          {`(function(){try{var u=new URLSearchParams(location.search),utm=${JSON.stringify(UTM_KEYS)},all=${JSON.stringify(ATTRIBUTION_PARAM_KEYS)},s=sessionStorage,p="${UTM_STORAGE_PREFIX}",cookie="${ATTRIBUTION_COOKIE_NAME}",internal=${JSON.stringify(["accounts.google.com","checkout.stripe.com","billing.stripe.com"])};
+          {`(function(){try{var u=new URLSearchParams(location.search),utm=${JSON.stringify(UTM_KEYS)},all=${JSON.stringify(ATTRIBUTION_PARAM_KEYS)},s=sessionStorage,p="${UTM_STORAGE_PREFIX}",cookie="${ATTRIBUTION_COOKIE_NAME}",paidCookie="${PAID_TOUCH_COOKIE_NAME}",internal=${JSON.stringify(["accounts.google.com","checkout.stripe.com","billing.stripe.com"])};
 function clean(v){return typeof v==="string"&&v.trim()?v.trim().slice(0,512):null}
 function domain(v){try{return new URL(v).hostname.replace(/^www\\./,"")}catch(e){return String(v||"").replace(/^https?:\\/\\//,"").replace(/^www\\./,"").split("/")[0]||null}}
 function isInternalRef(v){var d=domain(v),h=location.hostname.replace(/^www\\./,"");return !!d&&(d===h||internal.indexOf(d)>=0)}
 function getCookie(name){return document.cookie.split(";").map(function(x){return x.trim()}).find(function(x){return x.indexOf(name+"=")===0})}
+function hasPaidSignal(a){var clicks=["gclid","fbclid","rdt_cid","twclid"];if(clicks.some(function(x){return !!a[x]}))return true;if(/^(paid|paid_social|paid_search|cpc|ppc|display|retargeting)$/i.test(a.utm_medium||""))return true;return /^(x|twitter|twitter_ads)$/i.test(a.utm_source||"")}
 if(utm.some(function(x){return u.has(x)})){utm.forEach(function(x){var v=clean(u.get(x));if(v)s.setItem(p+x,v);else s.removeItem(p+x)})}
 if(document.referrer&&!s.getItem(p+"referrer")&&!isInternalRef(document.referrer)){s.setItem(p+"referrer",document.referrer)}
 if(!getCookie(cookie)){var a={version:${ATTRIBUTION_VERSION},first_landing_url:location.href.slice(0,512),first_landing_path:(location.pathname+location.search).slice(0,512),attribution_captured_at:new Date().toISOString()};all.forEach(function(x){var v=clean(u.get(x))||clean(s.getItem(p+x));if(v)a[x]=v});var r=s.getItem(p+"referrer");if(r&&!isInternalRef(r)){a.signup_referrer=r;a.signup_referrer_domain=domain(r)}document.cookie=cookie+"="+encodeURIComponent(JSON.stringify(a))+"; path=/; max-age=15552000; SameSite=Lax"}
+var paid={version:${ATTRIBUTION_VERSION},first_landing_url:location.href.slice(0,512),first_landing_path:(location.pathname+location.search).slice(0,512),attribution_captured_at:new Date().toISOString()};all.forEach(function(x){var v=clean(u.get(x));if(v)paid[x]=v});if(hasPaidSignal(paid)){document.cookie=paidCookie+"="+encodeURIComponent(JSON.stringify(paid))+"; path=/; max-age=7776000; SameSite=Lax"}
 }catch(e){}})()`}
         </Script>
         <Script

@@ -15,7 +15,9 @@ import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import {
   attributionToUserMetadata,
   isInternalAttributionReferrer,
+  paidTouchToUserMetadata,
   parseAttributionCookie,
+  parsePaidTouchCookie,
 } from "@/lib/utm";
 
 function getSafeNext(next: string | null): string {
@@ -171,6 +173,7 @@ export async function GET(request: Request) {
 
   const hadPriorSession = await hasAnySession(user.id);
   const attribution = parseAttributionCookie(request.headers.get("cookie"));
+  const latestPaidTouch = parsePaidTouchCookie(request.headers.get("cookie"));
   if (
     attribution?.signup_referrer &&
     isInternalAttributionReferrer(attribution.signup_referrer, new URL(request.url).hostname)
@@ -179,11 +182,20 @@ export async function GET(request: Request) {
     delete attribution.signup_referrer_domain;
   }
   const attributionMetadata = attributionToUserMetadata(attribution);
-  if (Object.keys(attributionMetadata).length > 0) {
+  const paidTouchMetadata = paidTouchToUserMetadata(latestPaidTouch);
+  if (Object.keys(attributionMetadata).length > 0 || Object.keys(paidTouchMetadata).length > 0) {
     const existingMeta = user.user_metadata ?? {};
-    if (!existingMeta.attribution_captured_at && !existingMeta.utm_source && !existingMeta.signup_referrer) {
+    const metadataUpdate = {
+      ...(!existingMeta.attribution_captured_at && !existingMeta.utm_source && !existingMeta.signup_referrer
+        ? attributionMetadata
+        : {}),
+      ...(!existingMeta.paid_captured_at && !existingMeta.paid_source && !existingMeta.paid_twclid
+        ? paidTouchMetadata
+        : {}),
+    };
+    if (Object.keys(metadataUpdate).length > 0) {
       const { error: updateError } = await supabase.auth.updateUser({
-        data: attributionMetadata,
+        data: metadataUpdate,
       });
       if (updateError) {
         console.warn("[supabase/callback] Attribution metadata update failed:", updateError);
@@ -195,6 +207,7 @@ export async function GET(request: Request) {
     email: user.email ?? null,
     signupMethod: "email_magic_link",
     attribution,
+    paidTouch: latestPaidTouch,
     attributionSource: attribution ? "supabase_magic_link_cookie" : "supabase_magic_link_missing",
   });
 
@@ -230,6 +243,7 @@ export async function GET(request: Request) {
     response.cookies.set(X_SIGNUP_ID_COOKIE, xConversionId, { path: "/", maxAge: 600 });
     trackServerEvent(user.id, "user_signed_up", {
       ...attributionMetadata,
+      ...paidTouchMetadata,
       google_email: user.email,
       signup_method: "email_magic_link",
       ...(clientIp ? { $ip: clientIp } : {}),

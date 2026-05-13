@@ -20,8 +20,12 @@ import { getClientIp } from "@/lib/request-ip";
 import {
   UTM_KEYS,
   attributionToUserMetadata,
+  paidTouchToUserMetadata,
+  parsePaidTouchCookie,
   sanitizeAttribution,
+  sanitizePaidTouch,
   type FirstTouchAttribution,
+  type PaidTouchAttribution,
   type UtmParams,
 } from "@/lib/utm";
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
@@ -56,6 +60,7 @@ type AuthState = {
   scope_retry?: boolean;
   signup_referrer?: string;
   attribution?: FirstTouchAttribution;
+  latest_paid_touch?: PaidTouchAttribution;
 };
 
 function getSafeNext(next: string | null | undefined) {
@@ -115,6 +120,10 @@ async function verifyState(stateParam: string | null, cookieNonce: string | unde
       attribution:
         parsed.attribution && typeof parsed.attribution === "object"
           ? sanitizeAttribution(parsed.attribution as Record<string, unknown>) ?? undefined
+          : undefined,
+      latest_paid_touch:
+        parsed.latest_paid_touch && typeof parsed.latest_paid_touch === "object"
+          ? sanitizePaidTouch(parsed.latest_paid_touch as Record<string, unknown>) ?? undefined
           : undefined,
     };
   } catch {
@@ -969,16 +978,26 @@ export async function GET(request: Request) {
 
   // Save first-touch attribution data to user metadata on first sign-up.
   // Keep this first-write only: later re-auth should not rewrite acquisition.
+  const latestPaidTouch = state.latest_paid_touch ?? parsePaidTouchCookie(request.headers.get("cookie"));
   const attributionMetadata = {
     ...attributionToUserMetadata(state.attribution),
     ...(state.utm ?? {}),
     ...(state.signup_referrer ? { signup_referrer: state.signup_referrer } : {}),
   };
-  if (user && Object.keys(attributionMetadata).length > 0) {
+  const paidTouchMetadata = paidTouchToUserMetadata(latestPaidTouch);
+  if (user && (Object.keys(attributionMetadata).length > 0 || Object.keys(paidTouchMetadata).length > 0)) {
     const existingMeta = user.user_metadata ?? {};
-    if (!existingMeta.attribution_captured_at && !existingMeta.utm_source && !existingMeta.signup_referrer) {
+    const metadataUpdate = {
+      ...(!existingMeta.attribution_captured_at && !existingMeta.utm_source && !existingMeta.signup_referrer
+        ? attributionMetadata
+        : {}),
+      ...(!existingMeta.paid_captured_at && !existingMeta.paid_source && !existingMeta.paid_twclid
+        ? paidTouchMetadata
+        : {}),
+    };
+    if (Object.keys(metadataUpdate).length > 0) {
       await supabase.auth.updateUser({
-        data: attributionMetadata,
+        data: metadataUpdate,
       });
     }
   }
@@ -988,6 +1007,7 @@ export async function GET(request: Request) {
       email: user.email ?? null,
       signupMethod: "google_oauth",
       attribution: state.attribution ?? null,
+      paidTouch: latestPaidTouch,
       attributionSource: state.attribution ? "oauth_state" : "oauth_state_missing",
     });
   }
@@ -1031,6 +1051,7 @@ export async function GET(request: Request) {
     const clientIp = getClientIp(request);
     trackServerEvent(user.id, "user_signed_up", {
       ...attributionMetadata,
+      ...paidTouchMetadata,
       google_email: user.email,
       signup_method: "google_oauth",
       ...(clientIp ? { $ip: clientIp } : {}),
@@ -1061,7 +1082,7 @@ export async function GET(request: Request) {
       maybeFireGoogleAdsSignup({
         userId: user.id,
         email: user.email ?? null,
-        gclid: state.attribution?.gclid ?? null,
+        gclid: latestPaidTouch?.gclid ?? state.attribution?.gclid ?? null,
       }),
     );
   }

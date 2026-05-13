@@ -392,7 +392,7 @@ No properties.
 **Category:** activation
 **Platform:** PostHog (server)
 **Trigger:** Fires once per user, the first time they complete the Google OAuth flow and create their initial Google Ads session. Detected via the `gads_new_signup` cookie set on the success response from the auth callback. Fires from two paths: single-account auto-connect in `app/auth/callback/route.ts` and multi-account selection in `app/api/auth/select-account/route.ts`. Both routes use `after(flushServerEvents)` to keep the Vercel Lambda alive until the async PostHog POST completes.
-**Hypothesis:** We believe tracking this tells us first-touch sign-up volume with full UTM attribution attached, which lets us measure paid/organic acquisition channels and tie them to long-term retention.
+**Hypothesis:** We believe tracking this tells us first-touch sign-up volume plus latest paid-touch assists, which lets us measure acquisition channels without overwriting the original source and still evaluate whether ad clicks drove D0 writers or paid customers.
 
 > **Known ~15% residual miss rate vs Supabase `mcp_sessions` first-row count (post Apr 17 2026).** A larger 43-50% gap was fixed in commit `76d1d96` on 2026-04-17 (multi-account path missing + Lambda flush race). The remaining ~15% is concentrated in the "null `client_name`" cohort — users who complete OAuth but never launch an MCP client and never fire any operation. Two things this means for analysts:
 > 1. **Trust Supabase `mcp_sessions` for signup counts**, not `user_signed_up`. Use PostHog for UTM / referrer attribution, not volume.
@@ -408,14 +408,20 @@ No properties.
 | `utm_campaign` | string \| undefined | `"brand"` | UTM campaign |
 | `utm_term` | string \| undefined | `"adsagent"` | UTM term |
 | `utm_content` | string \| undefined | `"hero_button"` | UTM content |
+| `paid_source` | string \| undefined | `"x"` | Latest paid-touch source before signup. Separate from `utm_source` so first-touch attribution is preserved. Inferred from click ID when the landing URL lacks UTM source, e.g. `twclid` -> `x`. |
+| `paid_medium` | string \| undefined | `"paid_social"` | Latest paid-touch medium before signup |
+| `paid_campaign` | string \| undefined | `"notfair_signup_sales_202605"` | Latest paid-touch campaign before signup |
+| `paid_gclid` / `paid_fbclid` / `paid_rdt_cid` / `paid_twclid` | string \| undefined | `"twclid-..."` | Paid click IDs captured from the latest paid landing before signup |
+| `paid_landing_path` | string \| undefined | `"/?twclid=..."` | Landing path for the latest paid touch |
+| `paid_captured_at` | string \| undefined | `"2026-05-12T20:00:00.000Z"` | Client timestamp for the latest paid touch |
 
-> **Note.** The UTM properties are only present when the originating click had UTM params; the spread `...utmProps` includes whichever ones existed.
+> **Note.** The UTM properties describe first-touch acquisition. `paid_*` properties describe the latest paid click before signup and must not be treated as the canonical acquisition source.
 
 ```json
-{ "event": "user_signed_up", "properties": { "signup_method": "google_oauth", "signup_referrer": "https://google.com", "google_email": "user@example.com", "utm_source": "google", "utm_medium": "cpc" } }
+{ "event": "user_signed_up", "properties": { "signup_method": "google_oauth", "google_email": "user@example.com", "utm_source": "github", "paid_source": "x", "paid_medium": "paid_social", "paid_twclid": "twclid-..." } }
 ```
 
-**Files:** `app/auth/callback/route.ts`
+**Files:** `app/auth/callback/route.ts`, `app/api/auth/select-account/route.ts`, `app/auth/supabase/callback/route.ts`
 
 ---
 

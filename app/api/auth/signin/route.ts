@@ -4,10 +4,13 @@ import { getAppOrigin } from "@/lib/app-url";
 import {
   ATTRIBUTION_PARAM_KEYS,
   type FirstTouchAttribution,
+  type PaidTouchAttribution,
   UTM_KEYS,
   isInternalAttributionReferrer,
   parseAttributionCookie,
+  parsePaidTouchCookie,
   sanitizeAttribution,
+  sanitizePaidTouch,
 } from "@/lib/utm";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 
@@ -61,6 +64,22 @@ function attributionFromRequest(
   return sanitizeAttribution(raw);
 }
 
+function paidTouchFromRequest(
+  request: Request,
+  searchParams: URLSearchParams,
+): PaidTouchAttribution | null {
+  const raw: Record<string, unknown> = {
+    ...(parsePaidTouchCookie(request.headers.get("cookie")) ?? {}),
+  };
+
+  for (const key of ATTRIBUTION_PARAM_KEYS) {
+    const val = searchParams.get(key);
+    if (val) raw[key] = val;
+  }
+
+  return sanitizePaidTouch(raw);
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const popup = searchParams.get("popup") === "1";
@@ -78,6 +97,7 @@ export async function GET(request: Request) {
   }
 
   const attribution = attributionFromRequest(request, searchParams);
+  const latestPaidTouch = paidTouchFromRequest(request, searchParams);
 
   // Capture UTM params to thread through the OAuth round-trip
   const utm: Record<string, string> = {};
@@ -106,6 +126,7 @@ export async function GET(request: Request) {
     ...(Object.keys(utm).length > 0 ? { utm } : {}),
     ...(signupReferrer ? { signup_referrer: signupReferrer } : {}),
     ...(attribution ? { attribution } : {}),
+    ...(latestPaidTouch ? { latest_paid_touch: latestPaidTouch } : {}),
   })).toString("base64url");
 
   const prompt = getSafePrompt(searchParams.get("prompt"));
