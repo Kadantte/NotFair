@@ -81,7 +81,7 @@ describe("MCP read tools — registration", () => {
     // The surface deliberately stays small — only non-GAQL specialized tools
     // live here, everything else is covered by `runScript`.
     expect(names).toContain("searchGeoTargets");
-    expect(names).toContain("getRecommendations");
+    expect(names).not.toContain("getRecommendations");
     expect(names).toContain("getChanges");
     expect(names).toContain("reviewChangeImpact");
     expect(names).toContain("listChangeInterventions");
@@ -121,26 +121,31 @@ describe("MCP read tools — registration", () => {
 describe("MCP read tools — handler execution", () => {
   beforeEach(resetMocks);
 
-  it("getRecommendations wraps object results as structuredContent", async () => {
+  it("listKeywords wraps object results as structuredContent", async () => {
     mockQuery.mockResolvedValueOnce([
       {
-        recommendation: {
-          type: "KEYWORD",
-          campaign: "customers/1234567890/campaigns/999",
-          dismissed: false,
+        campaign: { id: "100", name: "Search", status: "ENABLED" },
+        ad_group: { id: "111", name: "Dogs", status: "ENABLED" },
+        ad_group_criterion: {
+          resource_name: "customers/1234567890/adGroupCriteria/111~222",
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: false,
+          keyword: { text: "dog grooming", match_type: "PHRASE" },
         },
       },
     ]);
 
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    const result = await harness.callTool("getRecommendations", {});
+    const result = await harness.callTool("listKeywords", {});
     const structured = expectOk(result);
 
-    expect(structured).toHaveProperty("recommendations");
-    expect(Array.isArray(structured.recommendations)).toBe(true);
-    expect((structured.recommendations as unknown[])[0]).toMatchObject({
-      type: "KEYWORD",
-      campaignId: "999",
+    expect(structured).toHaveProperty("keywords");
+    expect(Array.isArray(structured.keywords)).toBe(true);
+    expect((structured.keywords as unknown[])[0]).toMatchObject({
+      text: "dog grooming",
+      campaignId: "100",
+      criterionId: "222",
     });
   });
 
@@ -164,7 +169,7 @@ describe("MCP read tools — handler execution", () => {
 
   it("surfaces unknown account errors as typed error responses, not thrown exceptions", async () => {
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    const result = await harness.callTool("getRecommendations", { accountId: "9999999999" });
+    const result = await harness.callTool("listKeywords", { accountId: "9999999999" });
     const text = expectError(result);
     expect(text).toMatch(/not connected to this session/i);
     expect(text).toContain("listConnectedAccounts");
@@ -181,22 +186,18 @@ describe("MCP read tools — handler execution", () => {
     };
     mockQuery.mockResolvedValueOnce([]);
     const harness = buildHarness([registerReadTools], multiAccountAuth);
-    await harness.callTool("getRecommendations", { accountId: "2222222222" });
+    await harness.callTool("listKeywords", { accountId: "2222222222" });
     // The real `customer` object is our stub, so we can't assert on
     // per-account instances directly — but the call must have reached the
     // query stub without throwing the "not connected" error.
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
-  it("getRecommendations gracefully handles API failures", async () => {
-    // getRecommendations catches errors internally and returns { recommendations: [], error }
-    // because the Recommendations API isn't enabled on every account.
-    mockQuery.mockRejectedValueOnce(new Error("SIMULATED_API_FAILURE"));
+  it("getKeywordIdeas returns typed errors when platform credentials are missing", async () => {
     const harness = buildHarness([registerReadTools], TEST_AUTH);
-    const result = await harness.callTool("getRecommendations", {});
-    const structured = expectOk(result);
-    expect(structured).toMatchObject({ recommendations: [] });
-    expect(structured.error).toContain("SIMULATED_API_FAILURE");
+    const result = await harness.callTool("getKeywordIdeas", { keywords: ["dog grooming"] });
+    const text = expectError(result);
+    expect(text).toContain("Keyword research is not configured");
   });
 
   it("listKeywords returns typed keyword inventory with safe default filters", async () => {

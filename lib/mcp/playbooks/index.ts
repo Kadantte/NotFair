@@ -47,6 +47,7 @@ Only pass \`{ partial: true }\` when you explicitly want \`{ error }\` entries
 mixed with successful reports. Destructure by name, read \`.rows\`.
 
 \`\`\`js
+const { start, end } = ads.helpers.getDateRange(30);
 const r = await ads.gaqlParallel([
   // 1. Account performance by campaign
   { name: "campaigns", query: \`
@@ -79,14 +80,7 @@ const r = await ads.gaqlParallel([
         AND metrics.cost_micros > 0
       ORDER BY metrics.cost_micros DESC\`, limit: 100 },
   // 4. Recent account changes (Google's change_event, capped at 30 days)
-  { name: "changes", query: \`
-    SELECT change_event.resource_name, change_event.change_date_time,
-           change_event.changed_fields, change_event.user_email,
-           change_event.resource_type, change_event.client_type,
-           change_event.change_resource_type
-      FROM change_event
-      WHERE change_event.change_date_time DURING LAST_30_DAYS
-      ORDER BY change_event.change_date_time DESC\`, limit: 50 }
+  { name: "changes", query: ads.queries.changeEvents(start, end), limit: 50 }
 ]);
 
 const campaigns = r.campaigns.rows ?? [];
@@ -150,6 +144,7 @@ Only pass \`{ partial: true }\` when you explicitly want \`{ error }\` entries
 mixed with successful reports. Destructure by name, read \`.rows\`.
 
 \`\`\`js
+const { start, end } = ads.helpers.getDateRange(30);
 const r = await ads.gaqlParallel([
   // 1. Account-wide daily timeseries (the shape of the regression)
   { name: "daily", query: \`
@@ -165,14 +160,7 @@ const r = await ads.gaqlParallel([
       WHERE segments.date DURING LAST_30_DAYS
       ORDER BY segments.date DESC\` },
   // 3. Recent changes — what was edited around the regression window
-  { name: "changes", query: \`
-    SELECT change_event.resource_name, change_event.change_date_time,
-           change_event.changed_fields, change_event.user_email,
-           change_event.resource_type, change_event.change_resource_type,
-           change_event.old_resource, change_event.new_resource
-      FROM change_event
-      WHERE change_event.change_date_time DURING LAST_30_DAYS
-      ORDER BY change_event.change_date_time DESC\` },
+  { name: "changes", query: ads.queries.changeEvents(start, end), limit: 50 },
   // 4. New wasted search terms that emerged in the window
   { name: "wastedTerms", query: \`
     SELECT search_term_view.search_term, campaign.name,

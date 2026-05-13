@@ -354,6 +354,41 @@ async function mintAdsLessSession({
   });
 }
 
+async function isFirstGoogleAdsSignup(userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+
+  const [mcpRows, connectionRows] = await Promise.all([
+    db()
+      .select({ id: schema.mcpSessions.id })
+      .from(schema.mcpSessions)
+      .where(eq(schema.mcpSessions.userId, userId))
+      .limit(1),
+    db()
+      .select({ id: schema.adPlatformConnections.id })
+      .from(schema.adPlatformConnections)
+      .where(eq(schema.adPlatformConnections.userId, userId))
+      .limit(1),
+  ]);
+
+  return mcpRows.length === 0 && connectionRows.length === 0;
+}
+
+function markGoogleAdsSignup(response: NextResponse, isFirstSignup: boolean, googleEmail: string | null) {
+  if (!isFirstSignup) return;
+
+  // 600s TTL: hydration/network can be slow on first render, and the cookie
+  // clear-on-fire path is what guarantees single-fire — not the TTL.
+  response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
+  if (googleEmail) {
+    // Enhanced Conversions for Leads: gtag.js hashes this locally before
+    // sending. Same-domain, same TTL as the signup sentinel.
+    response.cookies.set("gads_signup_email", googleEmail, {
+      path: "/",
+      maxAge: 600,
+    });
+  }
+}
+
 async function createOrRedirectGoogleAdsSession({
   origin,
   userId,
@@ -369,6 +404,7 @@ async function createOrRedirectGoogleAdsSession({
   popup: boolean;
   next: string;
 }) {
+  const isFirstSignup = await isFirstGoogleAdsSignup(userId);
   let connectable;
 
   try {
@@ -392,6 +428,7 @@ async function createOrRedirectGoogleAdsSession({
       // have a Google Ads account on this identity). Without this, they'd
       // hit /connect with no session and have nothing to do but retry OAuth.
       await mintAdsLessSession({ refreshToken, userId, googleEmail });
+      markGoogleAdsSignup(response, isFirstSignup, googleEmail);
     }
     return response;
   }
@@ -410,29 +447,9 @@ async function createOrRedirectGoogleAdsSession({
     // Same rationale as the catch branch above — mint an ads-less session
     // so the user can keep using NotFair while they sort out Ads access.
     await mintAdsLessSession({ refreshToken, userId, googleEmail });
+    markGoogleAdsSignup(response, isFirstSignup, googleEmail);
     return response;
   }
-
-  // Check if this is a first-time user (no prior sessions) for conversion tracking.
-  // New users have no mcp_sessions row (deprecated) — falsely flagging every re-login
-  // as a new signup is what would happen if we only checked one table. Treat the
-  // user as new only when neither table has a row.
-  const isFirstSignup = userId
-    ? (
-        await Promise.all([
-          db()
-            .select({ id: schema.mcpSessions.id })
-            .from(schema.mcpSessions)
-            .where(eq(schema.mcpSessions.userId, userId))
-            .limit(1),
-          db()
-            .select({ id: schema.adPlatformConnections.id })
-            .from(schema.adPlatformConnections)
-            .where(eq(schema.adPlatformConnections.userId, userId))
-            .limit(1),
-        ])
-      ).every((rows) => rows.length === 0)
-    : false;
 
   if (usableAccounts.length === 1) {
     const account = usableAccounts[0];
@@ -473,21 +490,7 @@ async function createOrRedirectGoogleAdsSession({
         customerName: account.name || "Google Ads Account",
         ...(googleEmail ? { googleEmail } : {}),
       });
-      if (isFirstSignup) {
-        // 600s TTL: hydration/network can be slow on first render, and the
-        // cookie clear-on-fire (in GadsConversionTracker) is what guarantees
-        // single-fire — not the TTL.
-        response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
-        if (googleEmail) {
-          // Enhanced Conversions for Leads: gtag.js hashes this locally before
-          // sending. Same-domain, same TTL as the signup sentinel, cleared by
-          // the tracker after firing.
-          response.cookies.set("gads_signup_email", googleEmail, {
-            path: "/",
-            maxAge: 600,
-          });
-        }
-      }
+      markGoogleAdsSignup(response, isFirstSignup, googleEmail);
       response.cookies.set(
         "gads_connect_event",
         JSON.stringify({ count: 1, first: isFirstSignup, destination: next }),
@@ -497,15 +500,7 @@ async function createOrRedirectGoogleAdsSession({
     }
 
     const response = NextResponse.redirect(`${origin}${next}`);
-    if (isFirstSignup) {
-      response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
-      if (googleEmail) {
-        response.cookies.set("gads_signup_email", googleEmail, {
-          path: "/",
-          maxAge: 600,
-        });
-      }
-    }
+    markGoogleAdsSignup(response, isFirstSignup, googleEmail);
     response.cookies.set(
       "gads_connect_event",
       JSON.stringify({ count: 1, first: isFirstSignup, destination: next }),

@@ -136,7 +136,7 @@ describe("MCP protocol — tools/list", () => {
       expect(tools.length).toBeGreaterThan(20);
 
       const byName = new Map(tools.map((t) => [t.name, t]));
-      for (const anchor of ["getRecommendations", "getChanges", "pauseKeyword"]) {
+      for (const anchor of ["listKeywords", "getChanges", "pauseKeyword"]) {
         const t = byName.get(anchor);
         expect(t, `${anchor} should be advertised`).toBeDefined();
         // The SDK turns the raw Zod shape into a JSON schema; connectors
@@ -152,9 +152,9 @@ describe("MCP protocol — tools/list", () => {
     const { client, cleanup } = await connectClient();
     try {
       const { tools } = await client.listTools();
-      const getRecommendations = tools.find((t) => t.name === "getRecommendations");
+      const listKeywords = tools.find((t) => t.name === "listKeywords");
       const pauseKeyword = tools.find((t) => t.name === "pauseKeyword");
-      expect(getRecommendations?.annotations?.readOnlyHint).toBe(true);
+      expect(listKeywords?.annotations?.readOnlyHint).toBe(true);
       expect(pauseKeyword?.annotations?.readOnlyHint).not.toBe(true);
     } finally {
       await cleanup();
@@ -168,25 +168,33 @@ describe("MCP protocol — tools/call", () => {
   it("calls a read tool and returns the JSON payload in content[0].text over the wire", async () => {
     mockQuery.mockResolvedValueOnce([
       {
-        recommendation: {
-          type: "KEYWORD",
-          campaign: "customers/1234567890/campaigns/42",
-          dismissed: false,
+        campaign: { id: "100", name: "Search", status: "ENABLED" },
+        ad_group: { id: "111", name: "Dogs", status: "ENABLED" },
+        ad_group_criterion: {
+          resource_name: "customers/1234567890/adGroupCriteria/111~222",
+          criterion_id: "222",
+          status: "ENABLED",
+          negative: false,
+          keyword: { text: "dog grooming", match_type: "PHRASE" },
         },
       },
     ]);
 
     const { client, cleanup } = await connectClient();
     try {
-      const result = await client.callTool({ name: "getRecommendations", arguments: {} });
+      const result = await client.callTool({ name: "listKeywords", arguments: {} });
       expect(result.isError).toBeFalsy();
       const content = (result.content as Array<{ type: string; text: string }>)[0];
       expect(content.type).toBe("text");
       const parsed = JSON.parse(content.text) as {
-        recommendations: Array<{ type: string; campaignId: string }>;
+        keywords: Array<{ text: string; campaignId: string; criterionId: string }>; 
       };
-      expect(parsed.recommendations).toHaveLength(1);
-      expect(parsed.recommendations[0].campaignId).toBe("42");
+      expect(parsed.keywords).toHaveLength(1);
+      expect(parsed.keywords[0]).toMatchObject({
+        text: "dog grooming",
+        campaignId: "100",
+        criterionId: "222",
+      });
     } finally {
       await cleanup();
     }

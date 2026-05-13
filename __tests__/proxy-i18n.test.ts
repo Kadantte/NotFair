@@ -99,7 +99,7 @@ describe("proxy i18n routing", () => {
     const response = await proxy(makeRequest("/campaigns", { "accept-language": "es-ES,es;q=0.9" }));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("http://localhost:3000/connect");
+    expect(response.headers.get("location")).toBe("http://localhost:3000/login");
     expect(response.cookies.get("NEXT_LOCALE")?.value).toBe("es");
   });
 

@@ -427,6 +427,13 @@ describe("Auth callback route — GET", () => {
     // No-accounts states route to /manage-ads-accounts (the platform picker),
     // not back to /connect (which is reserved for connection-flow errors).
     expect(location.pathname).toBe("/manage-ads-accounts");
+    expect(response.cookies.get("gads_new_signup")?.value).toBe("1");
+    expect(response.cookies.get("gads_signup_email")?.value).toBe("user@example.com");
+    expect(mockMaybeFireGoogleAdsSignup).toHaveBeenCalledWith({
+      userId: "user-123",
+      email: "user@example.com",
+      gclid: null,
+    });
   });
 
   // ─── Phase-1 dual-write: ad_platform_connections ───────────────────

@@ -49,8 +49,15 @@ describe("playbooks registry", () => {
   it("explain-regression playbook correlates timeseries + changes + waste", () => {
     const p = findPlaybook("adsagent://playbooks/explain-regression")!;
     expect(p.content).toContain("segments.date");
-    expect(p.content).toContain("change_event");
+    expect(p.content).toContain("ads.queries.changeEvents");
     expect(p.content).toContain("search_term_view");
+  });
+
+  it("playbooks use the canonical change_event query builder", () => {
+    const joined = PLAYBOOKS.map((p) => p.content).join("\n");
+    expect(joined).not.toContain("change_event.change_date_time DURING");
+    expect(joined).not.toContain("change_event.resource_type");
+    expect(joined).toContain("ads.queries.changeEvents");
   });
 
   it("run-experiment playbook lists the full lifecycle of write tools", () => {

@@ -703,6 +703,15 @@ describe("rewritePresetDateEquality", () => {
     ).toContain("segments.date DURING TODAY");
   });
 
+  it("rewrites preset-window equality to DURING syntax", () => {
+    expect(
+      rewritePresetDateEquality("SELECT campaign.id FROM campaign WHERE segments.date = LAST_30_DAYS"),
+    ).toContain("segments.date DURING LAST_30_DAYS");
+    expect(
+      rewritePresetDateEquality("SELECT campaign.id FROM campaign WHERE segments.date = 'THIS_MONTH'"),
+    ).toContain("segments.date DURING THIS_MONTH");
+  });
+
   it("runs through runSafeGaqlReport before hitting Google", async () => {
     mockQuery.mockResolvedValueOnce([{ campaign: { id: "1" } }]);
     await runSafeGaqlReport(
@@ -712,6 +721,29 @@ describe("rewritePresetDateEquality", () => {
     const sentQuery = mockQuery.mock.calls[0][0] as string;
     expect(sentQuery).toContain("segments.date DURING YESTERDAY");
     expect(sentQuery).not.toContain("segments.date = YESTERDAY");
+  });
+
+  it("runs preset-window equality through runSafeGaqlReport before hitting Google", async () => {
+    mockQuery.mockResolvedValueOnce([{ campaign: { id: "1" } }]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign WHERE segments.date = LAST_30_DAYS",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("segments.date DURING LAST_30_DAYS");
+    expect(sentQuery).not.toContain("segments.date = LAST_30_DAYS");
+  });
+
+  it("rewrites unsupported preset-window equality through BETWEEN end-to-end", async () => {
+    mockQuery.mockResolvedValueOnce([{ campaign: { id: "1" } }]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT campaign.id FROM campaign WHERE segments.date = LAST_90_DAYS",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("segments.date BETWEEN");
+    expect(sentQuery).not.toContain("segments.date = LAST_90_DAYS");
+    expect(sentQuery).not.toContain("segments.date DURING LAST_90_DAYS");
   });
 });
 
@@ -863,10 +895,50 @@ describe("validateChangeEventFilter", () => {
     ).toThrow(/change_event\.change_date_time/);
   });
 
-  it("allows FROM change_event when change_date_time is filtered", () => {
+  it("rejects change_event.change_date_time DURING syntax", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/does not support DURING/);
+  });
+
+  it("rejects change_event.change_date_time BETWEEN syntax", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time BETWEEN '2026-04-01' AND '2026-04-30'",
+      ),
+    ).toThrow(/does not support DURING or BETWEEN/);
+  });
+
+  it("rejects lower-only change_event windows", () => {
     expect(() =>
       validateChangeEventFilter(
         "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-04-01 00:00:00'",
+      ),
+    ).toThrow(/finite explicit timestamp window/);
+  });
+
+  it("rejects upper-only change_event windows", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time <= '2026-04-30 23:59:59'",
+      ),
+    ).toThrow(/finite explicit timestamp window/);
+  });
+
+  it("rejects inverted change_event windows", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-04-30 00:00:00' AND change_event.change_date_time <= '2026-04-01 23:59:59'",
+      ),
+    ).toThrow(/inverted/);
+  });
+
+  it("allows FROM change_event when change_date_time has explicit lower and upper bounds", () => {
+    expect(() =>
+      validateChangeEventFilter(
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2026-04-01 00:00:00' AND change_event.change_date_time <= '2026-04-30 23:59:59'",
       ),
     ).not.toThrow();
   });
@@ -955,6 +1027,22 @@ describe("validateKnownUnsupportedGaqlFields", () => {
         "SELECT campaign.id, metrics.average_cpc_micros FROM campaign",
       ),
     ).toThrow(/metrics\.average_cpc/);
+  });
+
+  it("rejects hallucinated cost per conversion micros field with a replacement", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, metrics.cost_per_conversion_micros FROM campaign",
+      ),
+    ).toThrow(/metrics\.cost_per_conversion/);
+  });
+
+  it("rejects generic impression share field with channel-specific guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, metrics.impression_share FROM campaign",
+      ),
+    ).toThrow(/metrics\.search_impression_share/);
   });
 
   it("rejects hallucinated conversion rate field with calculation guidance", () => {
@@ -1087,6 +1175,67 @@ describe("runSafeGaqlReport pre-flight integration", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  it("rejects change_event.change_date_time DURING syntax end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_30_DAYS",
+      ),
+    ).rejects.toThrow(/does not support DURING/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects change_event.change_date_time BETWEEN syntax end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time BETWEEN '2026-04-01' AND '2026-04-30'",
+      ),
+    ).rejects.toThrow(/does not support DURING or BETWEEN/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects change_event longer DURING windows after date-literal rewrite", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_90_DAYS",
+      ),
+    ).rejects.toThrow(/does not support DURING or BETWEEN/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects upper-only change_event windows end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time <= '2026-04-30 23:59:59'",
+      ),
+    ).rejects.toThrow(/finite explicit timestamp window/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects change_event windows inverted by stale upper bounds after clamp", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2025-01-01 00:00:00' AND change_event.change_date_time <= '2025-01-31 23:59:59'",
+      ),
+    ).rejects.toThrow(/inverted after normalization/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("runs valid explicit change_event windows end-to-end", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time >= '2099-01-01 00:00:00' AND change_event.change_date_time <= '2099-01-30 23:59:59'",
+    );
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("change_event.change_date_time >= '2099-01-01 00:00:00'"),
+    );
+  });
+
   it("rejects metrics.conversions FROM conversion_action end-to-end", async () => {
     await expect(
       runSafeGaqlReport(
@@ -1134,6 +1283,16 @@ describe("runSafeGaqlReport pre-flight integration", () => {
         "SELECT campaign.id, metrics.conversion_rate FROM campaign",
       ),
     ).rejects.toThrow(/unsupported field/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects newly denied hallucinated metric aliases end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id, metrics.cost_per_conversion_micros, metrics.impression_share FROM campaign",
+      ),
+    ).rejects.toThrow(/metrics\.cost_per_conversion/);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

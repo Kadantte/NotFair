@@ -18,7 +18,7 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 
 - **Fields used in WHERE must also be in SELECT (`query_error=16`).** Server auto-injects `campaign.status`/`ad_group.status` for REMOVED-parent filters and promotes non-date `segments.*` predicate fields. **Other fields are NOT auto-injected** — including `ad_group_criterion.negative`. Add it to SELECT alongside the WHERE.
 - **Enums in WHERE are STRING names, not numbers.** `WHERE campaign.status = 'PAUSED'`, never `= 3`. Same for `ad_group.status`, `ad_group_ad.status`, `ad_group_criterion.status`, `conversion_action.status`, `asset_group.status`.
-- **`change_event` REQUIRES `change_event.change_date_time` in WHERE.** `segments.date DURING ...` does NOT work for this resource (`change_event_error=3`). Window cap is 30 rolling days.
+- **`change_event` REQUIRES explicit `change_event.change_date_time` timestamp bounds in WHERE.** `segments.date DURING ...`, `change_event.change_date_time DURING ...`, and `BETWEEN` do NOT work for this resource (`change_event_error=3`). Use `>= 'YYYY-MM-DD 00:00:00' AND <= 'YYYY-MM-DD 23:59:59'`; window cap is 30 rolling days.
 
 ## GAQL — date literals
 
@@ -46,6 +46,8 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 ## Hallucinated fields (the validator will reject these)
 
 - `metrics.average_cpc_micros` — not a field. Use `metrics.average_cpc`.
+- `metrics.cost_per_conversion_micros` — not a field. Use `metrics.cost_per_conversion`.
+- `metrics.impression_share` — not a field. For Search campaigns use `metrics.search_impression_share`; for other channels call `getResourceMetadata` for the right channel-specific impression-share metric.
 - `metrics.conversion_rate` — not a field. Calculate from `metrics.conversions / metrics.clicks`.
 - `asset.sitelink_asset.final_urls` — not a field. Call `getResourceMetadata('asset')` to discover correct asset URL fields.
 

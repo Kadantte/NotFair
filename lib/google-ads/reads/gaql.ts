@@ -300,12 +300,13 @@ export function rewriteInvalidDateLiterals(query: string, today: Date = new Date
 
 /**
  * Agents sometimes use GAQL preset date literals with equality syntax:
- * `segments.date = YESTERDAY`. Google only accepts those presets with DURING;
- * equality requires an explicit ISO date. Rewrite the safe single-day presets.
+ * `segments.date = LAST_30_DAYS`. Google only accepts presets with DURING;
+ * equality requires an explicit ISO date. Rewrite preset-like tokens to DURING
+ * before the invalid-date-literal rewriter handles unsupported windows.
  */
 export function rewritePresetDateEquality(query: string): string {
   return query.replace(
-    /\bsegments\.date\s*=\s*['"]?(TODAY|YESTERDAY)['"]?\b/gi,
+    /\bsegments\.date\s*=\s*['"]?([A-Z][A-Z0-9_]+)['"]?\b/gi,
     (_match, literal: string) => `segments.date DURING ${literal.toUpperCase()}`,
   );
 }
@@ -441,11 +442,38 @@ export function validateChangeEventFilter(query: string) {
     /\sWHERE\s+([\s\S]*?)(?:\sORDER\s+BY\s|\sLIMIT\s|\sPARAMETERS\s|$)/i,
   );
   const whereClause = whereMatch?.[1] ?? "";
+  if (/\bchange_event\.change_date_time\s+(?:DURING|BETWEEN)\b/i.test(whereClause)) {
+    throw new Error(
+      "GAQL pre-flight: change_event.change_date_time does not support DURING or BETWEEN. " +
+        "Use explicit timestamp bounds: WHERE change_event.change_date_time >= '<YYYY-MM-DD> 00:00:00' AND change_event.change_date_time <= '<YYYY-MM-DD> 23:59:59' (window must be inside the last 30 days). " +
+        "Easiest path: use ads.queries.changeEvents(start, end) — it builds the correct shape.",
+    );
+  }
   if (!/\bchange_event\.change_date_time\b/i.test(whereClause)) {
     throw new Error(
       "GAQL pre-flight: queries against `change_event` REQUIRE a `change_event.change_date_time` filter in WHERE — `segments.date DURING ...` is not valid for this resource. " +
         "Add `WHERE change_event.change_date_time >= '<YYYY-MM-DD> 00:00:00' AND change_event.change_date_time <= '<YYYY-MM-DD> 23:59:59'` (window must be inside the last 30 days). " +
         "Easiest path: use `ads.queries.changeEvents(start, end)` — it builds the correct shape.",
+      );
+  }
+  const lower = whereClause.match(
+    /\bchange_event\.change_date_time\s*>=\s*['"](\d{4}-\d{2}-\d{2})[^'"]*['"]/i,
+  )?.[1];
+  const upper = whereClause.match(
+    /\bchange_event\.change_date_time\s*<=\s*['"](\d{4}-\d{2}-\d{2})[^'"]*['"]/i,
+  )?.[1];
+  if (!lower || !upper) {
+    throw new Error(
+      "GAQL pre-flight: change_event requires a finite explicit timestamp window. " +
+        "Add both lower and upper bounds: WHERE change_event.change_date_time >= '<YYYY-MM-DD> 00:00:00' AND change_event.change_date_time <= '<YYYY-MM-DD> 23:59:59' (window must be inside the last 30 days). " +
+        "Easiest path: use ads.queries.changeEvents(start, end) — it builds the correct shape.",
+    );
+  }
+  if (lower > upper) {
+    throw new Error(
+      "GAQL pre-flight: change_event timestamp window is inverted after normalization. " +
+        "Use a start date on or before the end date, inside Google's 30-day change_event window. " +
+        "Easiest path: use ads.queries.changeEvents(start, end) — it builds the correct shape.",
     );
   }
 }
@@ -526,8 +554,12 @@ export function validateRequiredDateFilter(query: string) {
 const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
   "metrics.average_cpc_micros":
     "`metrics.average_cpc_micros` is not a GAQL field. Select `metrics.average_cpc` instead.",
+  "metrics.cost_per_conversion_micros":
+    "metrics.cost_per_conversion_micros is not a GAQL field. Select metrics.cost_per_conversion instead.",
   "metrics.conversion_rate":
     "`metrics.conversion_rate` is not a GAQL field. Select `metrics.conversions` and `metrics.clicks`, then calculate `conversions / clicks` in JavaScript.",
+  "metrics.impression_share":
+    "metrics.impression_share is not a GAQL field. For Search campaigns, select metrics.search_impression_share; for other channels call getResourceMetadata to choose the right impression-share metric.",
   "asset.sitelink_asset.final_urls":
     "`asset.sitelink_asset.final_urls` is not a GAQL field. Use `getResourceMetadata('asset')` to confirm the available asset URL fields before retrying.",
   "geo_target_constant.canonical":
@@ -756,8 +788,8 @@ export async function runSafeGaqlReport(
   limit: number = DEFAULT_GAQL_LIMIT,
   options: RunSafeGaqlOptions = {},
 ): Promise<GaqlReport> {
-  let query = rewriteInvalidDateLiterals(rawQuery.trim());
-  query = rewritePresetDateEquality(query);
+  let query = rewritePresetDateEquality(rawQuery.trim());
+  query = rewriteInvalidDateLiterals(query);
   query = rewriteVirtualNameFields(query);
   query = clampChangeEventDateWindow(query);
   let normalized = query.toUpperCase();
