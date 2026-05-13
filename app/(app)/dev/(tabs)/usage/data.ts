@@ -70,9 +70,12 @@ async function fetchUsageData({
     const tzLiteral = sql.raw(`'${tz}'`);
     const localDate = sql`date((${schema.operations.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral})`;
 
+    const chatSourceFilter = sql`${schema.operations.clientSource} IN ('chat', 'adsagent-chat')`;
     const dailySourceFilter =
-        source === 'chat'
-            ? sql`${schema.operations.clientSource} is null`
+        source === 'chat' || source === 'adsagent-chat'
+            ? chatSourceFilter
+            : source === 'unknown'
+                ? sql`${schema.operations.clientSource} IS NULL`
             : source
                 ? sql`${schema.operations.clientSource} = ${source}`
                 : null;
@@ -82,8 +85,10 @@ async function fetchUsageData({
         : whereRecent;
 
     const interactionSourceFilter =
-        source === 'chat'
-            ? sql`AND o.client_source is null`
+        source === 'chat' || source === 'adsagent-chat'
+            ? sql`AND o.client_source IN ('chat', 'adsagent-chat')`
+            : source === 'unknown'
+                ? sql`AND o.client_source IS NULL`
             : source
                 ? sql`AND o.client_source = ${source}`
                 : sql``;
@@ -146,7 +151,11 @@ async function fetchUsageData({
           o.user_id,
           o.session_id,
           o.account_id,
-          COALESCE(o.client_source, 'chat') AS client_source,
+          CASE
+            WHEN o.client_source IN ('chat', 'adsagent-chat') THEN 'chat'
+            WHEN o.client_source IS NULL THEN 'unknown'
+            ELSE o.client_source
+          END AS client_source,
           o.platform,
           o.created_at,
           o.success
@@ -229,7 +238,11 @@ async function fetchUsageData({
           o.id,
           o.user_id,
           o.account_id,
-          COALESCE(o.client_source, 'chat') AS client_source,
+          CASE
+            WHEN o.client_source IN ('chat', 'adsagent-chat') THEN 'chat'
+            WHEN o.client_source IS NULL THEN 'unknown'
+            ELSE o.client_source
+          END AS client_source,
           o.platform,
           o.created_at,
           o.success,

@@ -2,7 +2,7 @@ import { db, schema } from "@/lib/db";
 import { sql, desc, eq, and, gte } from "drizzle-orm";
 import { requireDevEmail } from "@/lib/dev-access";
 import { operationErrorRowCount, operationRowCount } from "@/lib/dev-ops-filter";
-import { errorRate } from "@/lib/dev-format-pure";
+import { errorRate, normalizeClientSource } from "@/lib/dev-format-pure";
 
 /**
  * Per-account activity endpoint for the /dev/[accountId] Activity section.
@@ -120,7 +120,7 @@ export async function GET(
       id: c.id,
       toolName: c.toolName,
       opType: c.opType === 1 ? "write" : "read",
-      clientSource: c.clientSource,
+      clientSource: normalizeClientSource(c.clientSource),
       latencyMs: c.latencyMs,
       bytesOut: c.bytesOut,
       errorClass: c.errorClass,

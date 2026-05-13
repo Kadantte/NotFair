@@ -36,12 +36,19 @@ export const SOURCE_LABELS: Record<string, string> = {
     'anthropic/toolbox': 'Toolbox',
     'claude-ai': 'Claude.ai',
     'mcp-remote': 'MCP Remote',
-    'adsagent-chat': 'Chat',
-    'chat': 'Chat (web)',
+    'chat': 'Chat',
+    'unknown': 'Unknown / legacy',
 };
 
+export function normalizeClientSource(source: string | null | undefined): string {
+    if (!source) return 'unknown';
+    if (source === 'adsagent-chat') return 'chat';
+    return source;
+}
+
 export function sourceLabel(source: string): string {
-    return SOURCE_LABELS[source] ?? source;
+    const normalized = normalizeClientSource(source);
+    return SOURCE_LABELS[normalized] ?? normalized;
 }
 
 export const DEV_RANGE_OPTIONS = [

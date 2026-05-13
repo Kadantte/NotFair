@@ -52,7 +52,7 @@ export function buildGoogleAdsAgentAuthContext(agentAuth: AgentAuth): AuthContex
     loginCustomerId: agentAuth.loginCustomerId ?? null,
     userId: agentAuth.userId ?? null,
     authMethod: agentAuth.authMethod ?? "chat",
-    clientName: "adsagent-chat",
+    clientName: "chat",
   };
 }
 

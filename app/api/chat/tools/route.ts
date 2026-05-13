@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     customerIds: [],
     userId: session.userId,
     authMethod: "chat-tools-list",
-    clientName: "adsagent-chat",
+    clientName: "chat",
   };
 
   const collected =

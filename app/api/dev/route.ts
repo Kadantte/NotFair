@@ -35,8 +35,15 @@ export async function GET(request: Request) {
   const localDate = sql`date((${schema.operations.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral})`;
 
   const timeFilter = sql`${schema.operations.createdAt} >= now() - interval '30 days'`;
-  const sourceFilter = source === "chat"
-    ? sql`${schema.operations.clientSource} is null`
+  const normalizedSource = sql<string>`case
+    when ${schema.operations.clientSource} in ('chat', 'adsagent-chat') then 'chat'
+    when ${schema.operations.clientSource} is null then 'unknown'
+    else ${schema.operations.clientSource}
+  end`;
+  const sourceFilter = source === "chat" || source === "adsagent-chat"
+    ? sql`${schema.operations.clientSource} in ('chat', 'adsagent-chat')`
+    : source === "unknown"
+      ? sql`${schema.operations.clientSource} is null`
     : source
       ? sql`${schema.operations.clientSource} = ${source}`
       : undefined;
@@ -61,12 +68,12 @@ export async function GET(request: Request) {
     // Distinct sources with counts (cheap — no JOIN needed)
     db()
       .select({
-        source: sql<string>`coalesce(${schema.operations.clientSource}, 'chat')`.as("source"),
+        source: normalizedSource.as("source"),
         ops: operationRowCount(schema.operations),
       })
       .from(schema.operations)
       .where(sql`${timeFilter} and ${excludeDevs}`)
-      .groupBy(sql`coalesce(${schema.operations.clientSource}, 'chat')`)
+      .groupBy(normalizedSource)
       .orderBy(desc(operationRowCount(schema.operations))),
   ]);
 

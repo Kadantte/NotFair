@@ -19,6 +19,6 @@ describe("buildGoogleAdsAgentAuthContext", () => {
     expect(auth.customerIds).toEqual([
       { id: "6426052156", name: "Eupakovka", loginCustomerId: "3016587315" },
     ]);
-    expect(auth.clientName).toBe("adsagent-chat");
+    expect(auth.clientName).toBe("chat");
   });
 });

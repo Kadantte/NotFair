@@ -80,7 +80,7 @@ export function createMetaAdsAgent(agentAuth: AgentAuth) {
         : [{ id: agentAuth.customerId, name: "" }],
     userId: agentAuth.userId ?? null,
     authMethod: agentAuth.authMethod ?? "chat",
-    clientName: "adsagent-chat",
+    clientName: "chat",
   };
 
   const collected = collectMetaAdsTools(() => authContext);
