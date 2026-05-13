@@ -3,10 +3,7 @@ import { NextResponse, after } from "next/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { upsertGoogleConnection } from "@/lib/connections/google";
 import { recordUserAttribution } from "@/lib/db/attribution";
-import { db, schema } from "@/lib/db";
-import { eq, and, ne } from "drizzle-orm";
 import { listConnectableAccounts, parseCustomerIds, syncAccountSnapshots } from "@/lib/google-ads";
-import { setSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { maybeFireGoogleAdsSignup } from "@/lib/google-ads-signup";
@@ -56,10 +53,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Phase-4 step 2: identity comes from Supabase (with adsagent_token cookie
-  // fallback). Connection is the source of truth for refreshToken + candidate
-  // accounts; mcp_sessions UPDATE only fires for legacy cookie-resolved users
-  // (back-compat) and is skipped entirely for Supabase-only users.
+  // Identity from Supabase; connection row is the source of truth for
+  // refreshToken + candidate accounts.
   const identity = await identifyUser({ source: "select-account" });
   if (!identity) {
     return NextResponse.json(
@@ -155,44 +150,15 @@ export async function POST(request: Request) {
   // `authForAccount`) still work for the default account.
   const loginCustomerId = authorizedById.get(primaryAccount.id)?.loginCustomerId ?? null;
 
-  await db().transaction(async (tx) => {
-    // Connection upsert — source of truth for ad state. Always runs.
-    await upsertGoogleConnection(
-      {
-        userId: identity.userId,
-        refreshToken: conn.refreshToken,
-        activeAccountId: primaryAccount.id,
-        accountIds: validAccounts.map((a) => ({
-          id: a.id,
-          name: a.name || "",
-          loginCustomerId: authorizedById.get(a.id)?.loginCustomerId ?? null,
-        })),
-      },
-      tx,
-    );
-
-    // Legacy mcp_sessions UPDATE/DELETE — only when resolved via the cookie
-    // path (we have the session id to target). Supabase-only users skip
-    // this entirely; their identity isn't backed by an mcp_sessions row.
-    if (identity.legacySessionId !== null) {
-      await tx
-        .update(schema.mcpSessions)
-        .set({
-          customerId: primaryAccount.id,
-          customerIds,
-          loginCustomerId,
-        })
-        .where(eq(schema.mcpSessions.id, identity.legacySessionId));
-
-      await tx
-        .delete(schema.mcpSessions)
-        .where(
-          and(
-            eq(schema.mcpSessions.userId, identity.userId),
-            ne(schema.mcpSessions.id, identity.legacySessionId),
-          ),
-        );
-    }
+  await upsertGoogleConnection({
+    userId: identity.userId,
+    refreshToken: conn.refreshToken,
+    activeAccountId: primaryAccount.id,
+    accountIds: validAccounts.map((a) => ({
+      id: a.id,
+      name: a.name || "",
+      loginCustomerId: authorizedById.get(a.id)?.loginCustomerId ?? null,
+    })),
   });
 
   // Snapshot account budget/info for dev dashboard (runs after response is sent).
@@ -286,17 +252,6 @@ export async function POST(request: Request) {
   const response = NextResponse.json({
     redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect/google-ads?connected=1'}`,
   });
-  // Re-issue the legacy adsagent_token cookie only if the user came in via
-  // that path (preserves max-age refresh). Supabase-resolved users have
-  // sb-* cookies which the middleware already keeps fresh — no action needed.
-  if (identity.legacySessionId !== null) {
-    const [legacyRow] = await db()
-      .select({ accessToken: schema.mcpSessions.accessToken })
-      .from(schema.mcpSessions)
-      .where(eq(schema.mcpSessions.id, identity.legacySessionId))
-      .limit(1);
-    if (legacyRow) setSessionCookies(response, legacyRow.accessToken);
-  }
   if (isNewSignup) {
     const xConversionId = buildXSignupConversionId(identity.userId);
     // 600s TTL — single-fire is enforced by clear-on-fire in the tracker,

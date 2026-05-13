@@ -4,7 +4,6 @@ import { db, schema } from "@/lib/db";
 import { eq, and, gte } from "drizzle-orm";
 import { redirectUriEquivalent } from "@/lib/oauth/redirect-uri";
 import { DEFAULT_RESOURCE_PATH, findResource, resolveResourceFromUrl } from "@/lib/mcp/resources";
-import { readGoogleFromConnections } from "@/lib/connections/feature-flags";
 
 /**
  * OAuth 2.0 Token Endpoint for Claude Connector.
@@ -183,18 +182,15 @@ export async function POST(request: Request) {
   // surfaces a real error to the client so it stops retrying.
   //
   // Polymorphic dispatch: the auth code carries either session_id (Google,
-  // → mcp_sessions) or connection_id (Meta+, → ad_platform_connections).
+  // → mcp_sessions; legacy direct-bearer codes only) or connection_id
+  // (Google + Meta + GHL via ad_platform_connections / gohighlevel_connections).
   // Exactly one is non-null per the XOR CHECK constraint.
   //
-  // Phase-2 dual-aware token binding for Google: when the auth code carries
-  // session_id AND READ_GOOGLE_FROM_CONNECTIONS is on, translate the binding
-  // to the user's ad_platform_connections row at exchange time. The auth code
-  // itself is left alone (short-lived, expires in 10 min). The token row gets
-  // connectionId set / sessionId NULL — same shape Meta tokens use today.
+  // Google translator: legacy sessionId-bound auth codes are rewritten to
+  // bind to the user's ad_platform_connections row at exchange time. The
+  // auth code itself is left alone (short-lived, expires in 10 min). The
+  // token row gets connectionId set / sessionId NULL.
   let expiresInSeconds: number;
-  // Set to a non-null value when phase-2 translation produces a connection
-  // binding for a sessionId-bound code; the INSERT below uses these instead
-  // of authCode.sessionId / authCode.connectionId / authCode.gohighlevelConnectionId.
   let translatedSessionId: number | null = authCode.sessionId;
   let translatedConnectionId: number | null = authCode.connectionId;
   const translatedGhlConnectionId: number | null = authCode.gohighlevelConnectionId;
@@ -224,13 +220,11 @@ export async function POST(request: Request) {
       Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000),
     );
 
-    // Phase-2 Google translator: only run when the auth code's resource is
-    // google_ads. Other session-bound platforms (none today, but reserved for
-    // future user-only resources) carry sessionId without belonging to
-    // ad_platform_connections — gating on platform avoids silently rewriting
-    // their tokens to a Google connection binding.
+    // Only translate when the auth code's resource is google_ads. Other
+    // session-bound platforms (none today, reserved for future user-only
+    // resources) carry sessionId without belonging to ad_platform_connections.
     const codeResource = resolveResourceFromUrl(authCode.resourceUrl ?? DEFAULT_RESOURCE_PATH);
-    if (readGoogleFromConnections() && session.userId && codeResource?.platform === "google_ads") {
+    if (session.userId && codeResource?.platform === "google_ads") {
       const [conn] = await db()
         .select({ id: schema.adPlatformConnections.id })
         .from(schema.adPlatformConnections)
@@ -242,11 +236,6 @@ export async function POST(request: Request) {
         )
         .limit(1);
       if (conn) {
-        // Successful translation: bind the new token to the connection row,
-        // not the session row. Defer-fall-through if the connection lookup
-        // fails (phase-1 dual-write should have populated one for every live
-        // mcp_sessions user; the missing row is a backfill gap, not a reason
-        // to block token exchange).
         translatedSessionId = null;
         translatedConnectionId = conn.id;
       }

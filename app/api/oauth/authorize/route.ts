@@ -24,12 +24,12 @@ import { hasAllGoHighLevelScopes } from "@/lib/gohighlevel/scopes";
  *    DCR.
  *
  * 2. **Google DCR clients** (RFC 7591 via `/api/oauth/register`, e.g. Codex
- *    CLI hitting /api/mcp or /api/mcp/google_ads): identify the user from
- *    the `adsagent_token` cookie, bind the auth code to their `mcp_sessions`
- *    row via `session_id`.
+ *    CLI hitting /api/mcp or /api/mcp/google_ads): identify the user via
+ *    Supabase, bind the auth code to their `ad_platform_connections` row
+ *    via `connection_id`.
  *
  * 3. **Meta DCR clients** (resource = /api/mcp/meta_ads): identify the user
- *    via cookie, look up their `ad_platform_connections` row for
+ *    via Supabase, look up their `ad_platform_connections` row for
  *    platform='meta_ads', bind the auth code via `connection_id`. If they
  *    don't yet have a Meta connection, bounce through /api/oauth/meta/start
  *    (Layer A) first — they'll come back here after consenting.
@@ -157,8 +157,7 @@ export async function GET(request: Request) {
     }
     resolvedSessionId = session.id;
   } else {
-    // 2 + 3. DCR flow — identify the user. Phase-4 step 2: shared identifyUser
-    // helper handles Supabase-first / cookie-fallback dispatch + telemetry.
+    // 2 + 3. DCR flow — identify the user via Supabase.
     const identity = await identifyUser({ source: "oauth-authorize" });
 
     if (!identity) {
@@ -172,7 +171,6 @@ export async function GET(request: Request) {
     }
 
     const userId = identity.userId;
-    const legacyMcpSessionId = identity.legacySessionId;
 
     if (isGhlResource) {
       // 5. GoHighLevel DCR: bind to gohighlevel_connections row. If the user
@@ -255,11 +253,7 @@ export async function GET(request: Request) {
       }
       resolvedConnectionId = conn.id;
     } else {
-      // 2. Google DCR: prefer connection-bound auth codes when the user has
-      // a Google connection (post-phase-1 backfill, this is every live
-      // user). Falls back to mcp_sessions binding only for the unusual case
-      // where we resolved via cookie but the connection is absent — keeps
-      // mid-onboarding flows working until phase-1 dual-write covers them.
+      // 2. Google DCR: bind to ad_platform_connections row.
       const [googleConn] = await db()
         .select({ id: schema.adPlatformConnections.id, activeAccountId: schema.adPlatformConnections.activeAccountId })
         .from(schema.adPlatformConnections)
@@ -273,14 +267,8 @@ export async function GET(request: Request) {
 
       if (googleConn?.activeAccountId) {
         resolvedConnectionId = googleConn.id;
-      } else if (legacyMcpSessionId !== null) {
-        // Cookie path + no usable connection. Auth code carries sessionId;
-        // /token's phase-2 translator promotes it to connectionId at
-        // exchange time.
-        resolvedSessionId = legacyMcpSessionId;
       } else {
-        // Supabase-resolved + no Google connection (or no active account).
-        // No legitimate way to mint a Google MCP token — bounce to setup.
+        // No usable Google connection — bounce to setup.
         return NextResponse.json(
           {
             error: "access_denied",

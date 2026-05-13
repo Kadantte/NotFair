@@ -4,10 +4,8 @@
  *   GET  → preview (counts per table, no writes)
  *   POST → delete everything for this user (requires { confirm: true })
  *
- * Identity is resolved via `identifyUser` (Supabase first, cookie fallback)
- * so this works for users with no `mcp_sessions` row (post-phase-4
- * STOP_CREATING_MCP_SESSIONS). Account IDs are sourced from
- * `ad_platform_connections.account_ids` for the same reason.
+ * Identity resolves via `identifyUser` (Supabase). Account IDs are sourced
+ * from `ad_platform_connections.account_ids`.
  *
  * Scope:
  *   - userId-linked rows: subscriptions, chat threads/messages, tool
@@ -97,16 +95,10 @@ type RealSession = {
 };
 
 /**
- * Resolves the dev's identity for reset. Phase-4 step-2-aware: prefers
- * Supabase via `identifyUser`, falls back to the legacy `adsagent_token`
- * cookie for users who haven't re-signed-in. Sources `accountIds` from
- * `ad_platform_connections` (post-STOP_CREATING_MCP_SESSIONS users have
- * no `mcp_sessions` row, so the legacy `mcp_sessions.customer_ids`
- * lookup would silently return empty and account-scoped deletes would
- * skip).
- *
- * Refuses to run while impersonating — devs reset their own data, not
- * someone else's.
+ * Resolve the dev's identity for reset. Sources `accountIds` from
+ * `ad_platform_connections` so account-scoped deletes hit every customer
+ * the dev has connected. Refuses to run while impersonating — devs reset
+ * their own data, not someone else's.
  */
 async function loadRealSession(): Promise<RealSession | null> {
   const store = await cookies();

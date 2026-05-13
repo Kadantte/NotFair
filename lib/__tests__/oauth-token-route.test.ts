@@ -201,160 +201,113 @@ describe("OAuth token route — POST", () => {
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
-  // ─── Phase 2: sessionId → connectionId translation at exchange time ──
+  // ─── sessionId → connectionId translation at exchange time ──
 
-  describe("phase-2 connection binding (READ_GOOGLE_FROM_CONNECTIONS=true)", () => {
-    beforeEach(() => {
-      process.env.READ_GOOGLE_FROM_CONNECTIONS = "true";
-    });
+  it("translates a sessionId-bound auth code into a connectionId-bound token", async () => {
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: 42,
+        connectionId: null,
+        redirectUri: "http://localhost:3000/cb",
+        codeChallenge: null,
+        codeChallengeMethod: null,
+      },
+    ]);
+    // mcp_sessions lookup → returns expiry + userId for translation lookup
+    mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: "user-1" }]);
+    // ad_platform_connections lookup by (userId, google_ads) → returns connection
+    mockSelectRows.mockResolvedValueOnce([{ id: 7 }]);
 
-    it("translates a sessionId-bound auth code into a connectionId-bound token", async () => {
-      const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
-      mockSelectRows.mockResolvedValueOnce([
-        {
-          code: "abc",
-          clientId: "test-client",
-          sessionId: 42,
-          connectionId: null,
-          redirectUri: "http://localhost:3000/cb",
-          codeChallenge: null,
-          codeChallengeMethod: null,
-        },
-      ]);
-      // mcp_sessions lookup → returns expiry + userId for translation lookup
-      mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: "user-1" }]);
-      // ad_platform_connections lookup by (userId, google_ads) → returns connection
-      mockSelectRows.mockResolvedValueOnce([{ id: 7 }]);
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        client_secret: VALID_SECRET,
+        redirect_uri: "http://localhost:3000/cb",
+      }),
+    );
 
-      const response = await POST(
-        makeRequest({
-          grant_type: "authorization_code",
-          code: "abc",
-          client_id: "test-client",
-          client_secret: VALID_SECRET,
-          redirect_uri: "http://localhost:3000/cb",
-        }),
-      );
+    expect(response.status).toBe(200);
+    expect(mockInsertValues).toHaveBeenCalledTimes(1);
+    const insertArg = mockInsertValues.mock.calls[0][0];
+    expect(insertArg.sessionId).toBeNull();
+    expect(insertArg.connectionId).toBe(7);
 
-      expect(response.status).toBe(200);
-      expect(mockInsertValues).toHaveBeenCalledTimes(1);
-      const insertArg = mockInsertValues.mock.calls[0][0];
-      expect(insertArg.sessionId).toBeNull();
-      expect(insertArg.connectionId).toBe(7);
-
-      // oauth_clients.session_id is mcp_sessions-only — must NOT be updated
-      // when we translated to a connection binding, so only "mark code used"
-      // ran (1 update, not 2).
-      expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
-    });
-
-    it("falls back to sessionId binding when no connection row exists for the user", async () => {
-      const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
-      mockSelectRows.mockResolvedValueOnce([
-        {
-          code: "abc",
-          clientId: "test-client",
-          sessionId: 42,
-          connectionId: null,
-          redirectUri: "http://localhost:3000/cb",
-          codeChallenge: null,
-          codeChallengeMethod: null,
-        },
-      ]);
-      mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: "user-1" }]);
-      // ad_platform_connections lookup → empty (backfill gap)
-      mockSelectRows.mockResolvedValueOnce([]);
-
-      const response = await POST(
-        makeRequest({
-          grant_type: "authorization_code",
-          code: "abc",
-          client_id: "test-client",
-          client_secret: VALID_SECRET,
-          redirect_uri: "http://localhost:3000/cb",
-        }),
-      );
-
-      // Token still issues — backfill gaps should not block exchange.
-      expect(response.status).toBe(200);
-      const insertArg = mockInsertValues.mock.calls[0][0];
-      expect(insertArg.sessionId).toBe(42);
-      expect(insertArg.connectionId).toBeNull();
-    });
-
-    it("does NOT translate when the session row has no userId (legacy ads-less rows)", async () => {
-      const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
-      mockSelectRows.mockResolvedValueOnce([
-        {
-          code: "abc",
-          clientId: "test-client",
-          sessionId: 42,
-          connectionId: null,
-          redirectUri: "http://localhost:3000/cb",
-          codeChallenge: null,
-          codeChallengeMethod: null,
-        },
-      ]);
-      mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: null }]);
-
-      const response = await POST(
-        makeRequest({
-          grant_type: "authorization_code",
-          code: "abc",
-          client_id: "test-client",
-          client_secret: VALID_SECRET,
-          redirect_uri: "http://localhost:3000/cb",
-        }),
-      );
-
-      expect(response.status).toBe(200);
-      const insertArg = mockInsertValues.mock.calls[0][0];
-      expect(insertArg.sessionId).toBe(42);
-      expect(insertArg.connectionId).toBeNull();
-    });
+    // oauth_clients.session_id is mcp_sessions-only — must NOT be updated
+    // when we translated to a connection binding, so only "mark code used"
+    // ran (1 update, not 2).
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
   });
 
-  describe("phase-2 disabled (READ_GOOGLE_FROM_CONNECTIONS unset)", () => {
-    beforeEach(() => {
-      delete process.env.READ_GOOGLE_FROM_CONNECTIONS;
-    });
+  it("falls back to sessionId binding when no connection row exists for the user", async () => {
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: 42,
+        connectionId: null,
+        redirectUri: "http://localhost:3000/cb",
+        codeChallenge: null,
+        codeChallengeMethod: null,
+      },
+    ]);
+    mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: "user-1" }]);
+    // ad_platform_connections lookup → empty (no row for this user)
+    mockSelectRows.mockResolvedValueOnce([]);
 
-    it("preserves the legacy sessionId binding on the issued token", async () => {
-      const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
-      mockSelectRows.mockResolvedValueOnce([
-        {
-          code: "abc",
-          clientId: "test-client",
-          sessionId: 42,
-          connectionId: null,
-          redirectUri: "http://localhost:3000/cb",
-          codeChallenge: null,
-          codeChallengeMethod: null,
-        },
-      ]);
-      // Just expiresAt + userId — no ad_platform_connections lookup happens
-      mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: "user-1" }]);
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        client_secret: VALID_SECRET,
+        redirect_uri: "http://localhost:3000/cb",
+      }),
+    );
 
-      const response = await POST(
-        makeRequest({
-          grant_type: "authorization_code",
-          code: "abc",
-          client_id: "test-client",
-          client_secret: VALID_SECRET,
-          redirect_uri: "http://localhost:3000/cb",
-        }),
-      );
+    // Token still issues — missing connection row should not block exchange.
+    expect(response.status).toBe(200);
+    const insertArg = mockInsertValues.mock.calls[0][0];
+    expect(insertArg.sessionId).toBe(42);
+    expect(insertArg.connectionId).toBeNull();
+  });
 
-      expect(response.status).toBe(200);
-      const insertArg = mockInsertValues.mock.calls[0][0];
-      expect(insertArg.sessionId).toBe(42);
-      expect(insertArg.connectionId).toBeNull();
-      // oauth_clients.session_id update still fires (2 updates total).
-      expect(mockUpdateWhere).toHaveBeenCalledTimes(2);
-    });
+  it("does NOT translate when the session row has no userId (legacy ads-less rows)", async () => {
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: 42,
+        connectionId: null,
+        redirectUri: "http://localhost:3000/cb",
+        codeChallenge: null,
+        codeChallengeMethod: null,
+      },
+    ]);
+    mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: null }]);
+
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        client_secret: VALID_SECRET,
+        redirect_uri: "http://localhost:3000/cb",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const insertArg = mockInsertValues.mock.calls[0][0];
+    expect(insertArg.sessionId).toBe(42);
+    expect(insertArg.connectionId).toBeNull();
   });
 });

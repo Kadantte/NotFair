@@ -81,17 +81,6 @@ const IMPERSONATE_COOKIE_OPTIONS = {
   maxAge: 60 * 60 * 8, // 8 hours — safety limit for dev impersonation
 };
 
-export function setSessionCookies(response: NextResponse, token: string) {
-  response.cookies.set(COOKIE_NAMES.token, token, COOKIE_OPTIONS);
-  // Phase-2 header reclaim: `adsagent_customer` was up to ~1KB of customer-
-  // name list. Nothing reads it — getSession derives `customerName` fresh
-  // from `customerIds` on every render. Force-delete on every session set
-  // so existing browsers shed it on their next signin/account-switch/
-  // token-rotation. Drop this line once we've confirmed no live cookies
-  // remain in the wild (e.g. via shadow logging in middleware).
-  response.cookies.set("adsagent_customer", "", { maxAge: 0, path: "/" });
-}
-
 export function setImpersonateCookie(response: NextResponse, sessionId: string) {
   response.cookies.set(COOKIE_NAMES.impersonate, sessionId, IMPERSONATE_COOKIE_OPTIONS);
 }
@@ -105,6 +94,7 @@ export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(COOKIE_NAMES.impersonate);
   response.cookies.delete(COOKIE_NAMES.profile);
   response.cookies.delete(COOKIE_NAMES.activePlatform);
-  // Legacy cookie cleanup — see setSessionCookies for context.
+  // Legacy ~1KB customer-name cookie from earlier auth flows; nothing reads
+  // it now but old browsers may still carry it.
   response.cookies.delete("adsagent_customer");
 }

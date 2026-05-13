@@ -2,18 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Refresh Supabase auth cookies for the current request.
- *
- * Phase-4 prep: once `SUPABASE_SESSION_BRIDGE=true` is set and the auth
- * callback stops deleting `sb-*` cookies, every protected-path request must
- * call this so Supabase can rotate the access/refresh tokens before they
- * expire. Without it, sessions that live longer than the access-token TTL
- * (~1h) silently break and force the user to sign in again.
- *
- * No-op (returns a passthrough response) when the request carries no
- * `sb-*` cookies — i.e. with the bridge flag off, this never touches the
- * cookie jar. Safe to call unconditionally on every request that flows
- * through the proxy/middleware.
+ * Refresh Supabase auth cookies for the current request. Every
+ * protected-path request must call this so Supabase can rotate the
+ * access/refresh tokens before they expire. Without it, sessions that
+ * live longer than the access-token TTL (~1h) silently break and force
+ * the user to sign in again.
  *
  * Pattern lifted from the canonical Supabase SSR docs:
  * https://supabase.com/docs/guides/auth/server-side/nextjs

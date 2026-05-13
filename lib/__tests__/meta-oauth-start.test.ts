@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockCookieGet,
   mockSelectQueues,
   mockStoreOAuthNonce,
   mockIsWaitlistApproved,
+  mockSupabaseGetUser,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectQueues: [] as unknown[][],
@@ -15,6 +16,20 @@ const {
     void key;
     return false;
   }),
+  mockSupabaseGetUser: vi.fn(async () => ({
+    data: { user: { id: "user_1", email: "user@example.com" } },
+    error: null,
+  })),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: { getUser: mockSupabaseGetUser },
+  })),
+}));
+
+vi.mock("@/lib/analytics-server", () => ({
+  trackServerEvent: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -79,13 +94,18 @@ describe("Meta OAuth start route", () => {
     mockSelectQueues.length = 0;
     mockCookieGet.mockReturnValue({ value: "session-token" });
     mockIsWaitlistApproved.mockResolvedValue(false);
+    // Production has READ_USERID_FROM_SUPABASE=true so identifyUser resolves
+    // via the Supabase mock above; flip it on for tests too.
+    process.env.READ_USERID_FROM_SUPABASE = "true";
+  });
+
+  afterEach(() => {
+    delete process.env.READ_USERID_FROM_SUPABASE;
   });
 
   it("blocks unconnected users at the server-side waitlist gate", async () => {
-    mockSelectQueues.push(
-      [{ id: 1, userId: "user_1" }],
-      [],
-    );
+    // Meta connection lookup → empty (no existing connection).
+    mockSelectQueues.push([]);
 
     const { GET } = await import("@/app/api/oauth/meta/start/route");
     const res = await GET(new Request("https://notfair.test/api/oauth/meta/start?next=/connect/meta-ads"));
@@ -96,10 +116,8 @@ describe("Meta OAuth start route", () => {
   });
 
   it("allows existing Meta connections to reauthorize even while the wall is enabled", async () => {
-    mockSelectQueues.push(
-      [{ id: 1, userId: "user_1" }],
-      [{ id: 7 }],
-    );
+    // Meta connection lookup → existing row.
+    mockSelectQueues.push([{ id: 7 }]);
 
     const { GET } = await import("@/app/api/oauth/meta/start/route");
     const res = await GET(new Request("https://notfair.test/api/oauth/meta/start?next=/manage-ads-accounts/meta-ads"));
@@ -113,10 +131,8 @@ describe("Meta OAuth start route", () => {
 
   it("allows approved new users through to the Meta dialog", async () => {
     mockIsWaitlistApproved.mockResolvedValue(true);
-    mockSelectQueues.push(
-      [{ id: 1, userId: "user_1" }],
-      [],
-    );
+    // Meta connection lookup → empty (new user).
+    mockSelectQueues.push([]);
 
     const { GET } = await import("@/app/api/oauth/meta/start/route");
     const res = await GET(new Request("https://notfair.test/api/oauth/meta/start"));

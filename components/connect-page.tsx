@@ -231,8 +231,8 @@ function ConnectContent({ initialSession, slug }: { initialSession: Session; slu
                 rel="noopener noreferrer"
                 onClick={() => {
                     const pathname = typeof window !== 'undefined' ? window.location.pathname : '/connect';
-                    // Use session connectivity (not token presence) so post-STOP_CREATING_MCP_SESSIONS
-                    // users still report as connected — their session.token is "".
+                    // Use session connectivity (not token presence). Supabase-anchored
+                    // sessions don't carry an mcp_sessions token — session.token is "".
                     const isConnected = showSetup;
                     trackEvent('setup_help_requested', {
                         connected: isConnected,

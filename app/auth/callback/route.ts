@@ -1,15 +1,14 @@
-import { randomBytes, randomUUID } from "crypto";
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { after } from "next/server";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
-import { setLastAttemptEmailCookie, setProfileCookie, setSessionCookies } from "@/lib/auth-cookies";
-import { stopCreatingMcpSessions, supabaseSessionBridge } from "@/lib/connections/feature-flags";
+import { eq } from "drizzle-orm";
+import { setLastAttemptEmailCookie, setProfileCookie } from "@/lib/auth-cookies";
 import { refreshGoogleConnectionCredentials, upsertGoogleConnection } from "@/lib/connections/google";
 import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
-import { deriveCustomerName, listConnectableAccounts, parseCustomerIds, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
+import { listConnectableAccounts, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
 import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
@@ -31,27 +30,6 @@ import {
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyAccountLoadError, classifyGoogleError } from "@/lib/auth-errors";
 import { evaluateScopeGrant } from "@/lib/oauth-scope-retry";
-
-/**
- * Delete all Supabase `sb-*` cookies from the response.
- * Supabase SSR sets large JWT session cookies we don't need — our own
- * `adsagent_token` cookie handles session management.  Leaving the sb-*
- * cookies around pushes total header size past the 8 KB limit, causing
- * HTTP 431 errors.
- *
- * Phase-2 Supabase bridge: when `SUPABASE_SESSION_BRIDGE=true`, persist sb-*
- * instead so phase 4 can read userId from Supabase Auth directly. The size
- * audit lives on that flag — flipping it without confirming aggregate cookie
- * size stays under 4KB risks reproducing the 431 incident.
- */
-function clearSupabaseCookies(response: NextResponse, requestCookies: { name: string }[]) {
-  if (supabaseSessionBridge()) return;
-  for (const { name } of requestCookies) {
-    if (name.startsWith("sb-")) {
-      response.cookies.set(name, "", { maxAge: 0, path: "/" });
-    }
-  }
-}
 
 type AuthState = {
   next?: string;
@@ -354,63 +332,26 @@ function popupAccountSelectionResponse(
  * who hasn't picked an Ads customer yet.
  */
 async function mintAdsLessSession({
-  response,
   refreshToken,
   userId,
   googleEmail,
 }: {
-  response: NextResponse;
   refreshToken: string;
   userId: string | null;
   googleEmail: string | null;
 }) {
-  // Phase-4 step 2: when STOP_CREATING_MCP_SESSIONS is on AND we have a
-  // Supabase userId to anchor identity, skip the mcp_sessions row and the
-  // adsagent_token cookie. The connection row alone carries Google state;
-  // sb-* cookies carry web identity.
-  if (stopCreatingMcpSessions() && userId) {
-    await upsertGoogleConnection({
-      userId,
-      refreshToken,
-      activeAccountId: null,
-      accountIds: [],
-      googleEmail,
-    });
-    return;
-  }
+  // No Supabase userId means there's nothing to anchor identity to —
+  // pathological path (signInWithIdToken would normally produce one).
+  // The user has no session anchor; nothing to persist.
+  if (!userId) return;
 
-  const accessToken = randomBytes(32).toString("hex");
-  const expiresAt = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-  await db().transaction(async (tx) => {
-    await tx.insert(schema.mcpSessions).values({
-      accessToken,
-      refreshToken,
-      customerId: "",
-      customerIds: "[]",
-      userId,
-      googleEmail,
-      expiresAt: expiresAt.toISOString(),
-    });
-
-    // Phase-1 dual-write. Skip when userId is null — ad_platform_connections
-    // requires it. Only the (rare) pre-supabase-attached path hits that case.
-    if (userId) {
-      await upsertGoogleConnection(
-        {
-          userId,
-          refreshToken,
-          activeAccountId: null,
-          accountIds: [],
-          googleEmail,
-        },
-        tx,
-      );
-    }
+  await upsertGoogleConnection({
+    userId,
+    refreshToken,
+    activeAccountId: null,
+    accountIds: [],
+    googleEmail,
   });
-
-  setSessionCookies(response, accessToken);
 }
 
 async function createOrRedirectGoogleAdsSession({
@@ -450,7 +391,7 @@ async function createOrRedirectGoogleAdsSession({
       // app (set up Claude/MCP, connect Meta later, or come back when they
       // have a Google Ads account on this identity). Without this, they'd
       // hit /connect with no session and have nothing to do but retry OAuth.
-      await mintAdsLessSession({ response, refreshToken, userId, googleEmail });
+      await mintAdsLessSession({ refreshToken, userId, googleEmail });
     }
     return response;
   }
@@ -468,17 +409,14 @@ async function createOrRedirectGoogleAdsSession({
     setLastAttemptEmailCookie(response, googleEmail);
     // Same rationale as the catch branch above — mint an ads-less session
     // so the user can keep using NotFair while they sort out Ads access.
-    await mintAdsLessSession({ response, refreshToken, userId, googleEmail });
+    await mintAdsLessSession({ refreshToken, userId, googleEmail });
     return response;
   }
 
-  const expiresAt = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
   // Check if this is a first-time user (no prior sessions) for conversion tracking.
-  // Connection-first: post phase-4 step 2 new users have no mcp_sessions row, so
-  // checking only that table would falsely flag every re-login as a new signup.
-  // Treat the user as new only when neither table has a row.
+  // New users have no mcp_sessions row (deprecated) — falsely flagging every re-login
+  // as a new signup is what would happen if we only checked one table. Treat the
+  // user as new only when neither table has a row.
   const isFirstSignup = userId
     ? (
         await Promise.all([
@@ -499,52 +437,27 @@ async function createOrRedirectGoogleAdsSession({
   if (usableAccounts.length === 1) {
     const account = usableAccounts[0];
     // Emit loginCustomerId explicitly (string | null) so authForAccount can
-    // distinguish "direct" from "legacy fallback" for this entry.
+    // distinguish "direct" from "manager-routed" for this entry.
     const accountIds = [
       { id: account.id, name: account.name || "", loginCustomerId: account.loginCustomerId ?? null },
     ];
-    const skipMcpSession = stopCreatingMcpSessions() && !!userId;
-    const accessToken = skipMcpSession ? null : randomBytes(32).toString("hex");
 
-    if (skipMcpSession) {
-      await upsertGoogleConnection({
-        userId: userId as string,
-        refreshToken,
-        activeAccountId: account.id,
-        accountIds,
-        googleEmail,
-      });
-    } else {
-      const customerIds = JSON.stringify(accountIds);
-      await db().transaction(async (tx) => {
-        await tx.insert(schema.mcpSessions).values({
-          accessToken: accessToken as string,
-          refreshToken,
-          customerId: account.id,
-          customerIds,
-          loginCustomerId: account.loginCustomerId ?? null,
-          userId,
-          googleEmail,
-          expiresAt: expiresAt.toISOString(),
-        });
-
-        if (userId) {
-          await upsertGoogleConnection(
-            {
-              userId,
-              refreshToken,
-              activeAccountId: account.id,
-              accountIds,
-              googleEmail,
-            },
-            tx,
-          );
-        }
-      });
+    if (!userId) {
+      // Pathological — signInWithIdToken normally produces a userId. With no
+      // Supabase identity to anchor on, nothing to persist; fall through to
+      // an error redirect.
+      return redirectWithError(origin, "session_error", "Missing user identity after sign-in.");
     }
 
+    await upsertGoogleConnection({
+      userId,
+      refreshToken,
+      activeAccountId: account.id,
+      accountIds,
+      googleEmail,
+    });
+
     // Snapshot account budget/info for dev dashboard (runs after response is sent).
-    // Preserve per-account loginCustomerId so MCC-routed client accounts can be queried.
     after(async () => {
       syncAccountSnapshots(refreshToken, [
         { id: account.id, loginCustomerId: account.loginCustomerId ?? null },
@@ -560,7 +473,6 @@ async function createOrRedirectGoogleAdsSession({
         customerName: account.name || "Google Ads Account",
         ...(googleEmail ? { googleEmail } : {}),
       });
-      if (accessToken) setSessionCookies(response, accessToken);
       if (isFirstSignup) {
         // 600s TTL: hydration/network can be slow on first render, and the
         // cookie clear-on-fire (in GadsConversionTracker) is what guarantees
@@ -585,7 +497,6 @@ async function createOrRedirectGoogleAdsSession({
     }
 
     const response = NextResponse.redirect(`${origin}${next}`);
-    if (accessToken) setSessionCookies(response, accessToken);
     if (isFirstSignup) {
       response.cookies.set("gads_new_signup", "1", { path: "/", maxAge: 600 });
       if (googleEmail) {
@@ -603,76 +514,45 @@ async function createOrRedirectGoogleAdsSession({
     return response;
   }
 
-  // Pre-validated accounts stored on the pending session so /api/auth/select-account
-  // can verify the user's pick without a second round-trip to Google. Always emit
-  // loginCustomerId explicitly (string | null) so authForAccount has a clean signal
-  // for direct vs manager-routed instead of guessing from key absence.
+  // Pre-validated accounts stored on the connection row so /api/auth/select-account
+  // can verify the user's pick without a second round-trip to Google. Always
+  // emit loginCustomerId explicitly (string | null) so authForAccount has a
+  // clean signal for direct vs manager-routed instead of guessing from key
+  // absence.
   const accountsList = usableAccounts.map((account) => ({
     id: account.id,
     name: account.name,
     loginCustomerId: account.loginCustomerId ?? null,
   }));
 
-  const skipMcpSession = stopCreatingMcpSessions() && !!userId;
-  const pendingToken = skipMcpSession ? null : randomBytes(32).toString("hex");
-
-  if (skipMcpSession) {
-    await upsertGoogleConnection({
-      userId: userId as string,
-      refreshToken,
-      // Pending — user hasn't picked yet. accountIds carries the candidate
-      // set so /api/auth/select-account can validate the pick off the
-      // connection row directly.
-      activeAccountId: null,
-      accountIds: accountsList,
-      googleEmail,
-    });
-  } else {
-    await db().transaction(async (tx) => {
-      await tx.insert(schema.mcpSessions).values({
-        accessToken: pendingToken as string,
-        refreshToken,
-        customerId: "",
-        customerIds: JSON.stringify(accountsList),
-        userId,
-        googleEmail,
-        expiresAt: expiresAt.toISOString(),
-      });
-
-      if (userId) {
-        await upsertGoogleConnection(
-          {
-            userId,
-            refreshToken,
-            activeAccountId: null,
-            accountIds: accountsList,
-            googleEmail,
-          },
-          tx,
-        );
-      }
-    });
+  if (!userId) {
+    return redirectWithError(origin, "session_error", "Missing user identity after sign-in.");
   }
 
+  await upsertGoogleConnection({
+    userId,
+    refreshToken,
+    // Pending — user hasn't picked yet. accountIds carries the candidate
+    // set so /api/auth/select-account can validate the pick off the
+    // connection row directly.
+    activeAccountId: null,
+    accountIds: accountsList,
+    googleEmail,
+  });
+
   if (popup) {
-    // popupAccountSelectionResponse drops a pending-token cookie so the
-    // selection page can identify the in-flight flow. Under
-    // STOP_CREATING_MCP_SESSIONS, no token exists; the page identifies the
-    // user via Supabase + reads candidates off ad_platform_connections.
-    return popupAccountSelectionResponse(usableAccounts, pendingToken ?? "", origin);
+    // The selection page identifies the user via Supabase and reads
+    // candidates off ad_platform_connections.accountIds.
+    return popupAccountSelectionResponse(usableAccounts, "", origin);
   }
 
   // Land new users on /manage-ads-accounts so they can pick a platform
-  // (Google or Meta) before being routed to the Google picker. With
-  // STOP_CREATING_MCP_SESSIONS off, the pending mcp_sessions row + cookie
-  // carry auth state; with it on, Supabase carries identity and the
-  // candidate accounts come from ad_platform_connections.accountIds.
+  // (Google or Meta) before being routed to the Google picker. Supabase
+  // carries identity; candidate accounts come from the connection row.
   const nextParam = next !== "/connect" ? `?next=${encodeURIComponent(next)}` : "";
-  const pendingResponse = NextResponse.redirect(
+  return NextResponse.redirect(
     `${origin}/manage-ads-accounts${nextParam}`,
   );
-  if (pendingToken) setSessionCookies(pendingResponse, pendingToken);
-  return pendingResponse;
 }
 
 async function reuseExistingSession({
@@ -694,127 +574,39 @@ async function reuseExistingSession({
     return null;
   }
 
-  // Connection-first reuse. ad_platform_connections is the source of truth
-  // post phase-4 step 2; mcp_sessions is deprecated for new users and only
-  // checked as a fallback for legacy users who don't have a connection row.
   const conn = await loadGoogleConnection(userId);
-  if (conn && conn.customerId) {
-    await refreshGoogleConnectionCredentials({
-      userId,
-      refreshToken,
-      googleEmail,
-    });
+  if (!conn || !conn.customerId) return null;
 
-    // Short-circuit (skip the mcp_sessions cookie mint) only when identity
-    // is fully carried by Supabase. With `stopCreatingMcpSessions=false`
-    // (current default), `getSession()` still resolves identity from
-    // `adsagent_token` → `mcp_sessions.access_token`, and the GET handler
-    // wipes `sb-*` cookies before returning — so returning a cookieless
-    // redirect here strands the user with no session anchor and bounces
-    // them to /login on the next protected page. Falling through lets the
-    // legacy mcp_sessions lookup below mint/reissue the cookie.
-    if (stopCreatingMcpSessions()) {
-      if (conn.customerIds.length > 0) {
-        after(async () => {
-          syncAccountSnapshots(
-            refreshToken,
-            conn.customerIds.map((a) => ({
-              id: a.id,
-              loginCustomerId: a.loginCustomerId ?? null,
-            })),
-          ).catch((err) => {
-            console.error("[sync-account] Failed to snapshot on reuse:", err);
-          });
-        });
-      }
-
-      const activeAccount = conn.customerIds.find((a) => a.id === conn.customerId);
-      const customerName = activeAccount?.name || "Google Ads Account";
-
-      if (popup) {
-        return popupPostMessage(origin, {
-          type: "GOOGLE_ADS_AUTH_SUCCESS",
-          customerId: conn.customerId,
-          customerName,
-        });
-      }
-
-      return NextResponse.redirect(`${origin}${next}`);
-    }
-  }
-
-  // Legacy fallback: pre-phase-1 users with an mcp_sessions row but no
-  // connection row yet (rare post-backfill). Reissues the legacy
-  // adsagent_token cookie so cookie-anchored consumers keep working.
-  const [existingSession] = await db()
-    .select({
-      id: schema.mcpSessions.id,
-      accessToken: schema.mcpSessions.accessToken,
-      customerId: schema.mcpSessions.customerId,
-      customerIds: schema.mcpSessions.customerIds,
-    })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.userId, userId),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        sql`${schema.mcpSessions.customerId} <> ''`,
-      ),
-    )
-    .orderBy(desc(schema.mcpSessions.createdAt))
-    .limit(1);
-
-  if (!existingSession?.customerId) {
-    return null;
-  }
-
-  const expiresAt = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-  await db().transaction(async (tx) => {
-    await tx
-      .update(schema.mcpSessions)
-      .set({
-        refreshToken,
-        userId,
-        ...(googleEmail ? { googleEmail } : {}),
-        expiresAt: expiresAt.toISOString(),
-      })
-      .where(eq(schema.mcpSessions.id, existingSession.id));
-
-    // Mirror the credential refresh on ad_platform_connections without
-    // disturbing the user's account curation. No-op when the connection row
-    // is missing (the backfill script seeds those).
-    await refreshGoogleConnectionCredentials(
-      { userId, refreshToken, googleEmail },
-      tx,
-    );
+  await refreshGoogleConnectionCredentials({
+    userId,
+    refreshToken,
+    googleEmail,
   });
 
-  const customerName = deriveCustomerName(existingSession.customerIds);
-
-  const reusedAccounts = parseCustomerIds(existingSession.customerIds);
-  if (reusedAccounts.length > 0) {
+  if (conn.customerIds.length > 0) {
     after(async () => {
-      syncAccountSnapshots(refreshToken, reusedAccounts).catch((err) => {
+      syncAccountSnapshots(
+        refreshToken,
+        conn.customerIds.map((a) => ({
+          id: a.id,
+          loginCustomerId: a.loginCustomerId ?? null,
+        })),
+      ).catch((err) => {
         console.error("[sync-account] Failed to snapshot on reuse:", err);
       });
     });
   }
 
   if (popup) {
-    const response = popupPostMessage(origin, {
+    const activeAccount = conn.customerIds.find((a) => a.id === conn.customerId);
+    return popupPostMessage(origin, {
       type: "GOOGLE_ADS_AUTH_SUCCESS",
-      customerId: existingSession.customerId,
-      customerName,
+      customerId: conn.customerId,
+      customerName: activeAccount?.name || "Google Ads Account",
     });
-    setSessionCookies(response, existingSession.accessToken);
-    return response;
   }
 
-  const response = NextResponse.redirect(`${origin}${next}`);
-  setSessionCookies(response, existingSession.accessToken);
-  return response;
+  return NextResponse.redirect(`${origin}${next}`);
 }
 
 export async function GET(request: Request) {
@@ -946,16 +738,7 @@ export async function GET(request: Request) {
     const scopeResponse = popup
       ? popupErrorResponse(origin, msg)
       : redirectWithError(origin, AUTH_ERROR_REASON.SCOPE_DENIED);
-    // Clean up cookies even on scope failure to avoid 431 errors
     scopeResponse.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
-    if (!supabaseSessionBridge()) {
-      const requestCookiesForCleanup = (await cookies()).getAll();
-      for (const { name } of requestCookiesForCleanup) {
-        if (name.startsWith("sb-")) {
-          scopeResponse.cookies.set(name, "", { maxAge: 0, path: "/" });
-        }
-      }
-    }
     return scopeResponse;
   }
 
@@ -1011,9 +794,6 @@ export async function GET(request: Request) {
       attributionSource: state.attribution ? "oauth_state" : "oauth_state_missing",
     });
   }
-
-  // Reuse cookieStore from nonce check above to identify sb-* cookies to clear
-  const requestCookies = cookieStore.getAll();
 
   let response: NextResponse;
 
@@ -1090,10 +870,10 @@ export async function GET(request: Request) {
   // Clear the one-time OAuth nonce cookie
   response.cookies.set("oauth_nonce", "", { maxAge: 0, path: "/" });
 
-  // Stash the user's display name + avatar in a small dedicated cookie BEFORE
-  // we wipe Supabase's sb-* cookies. The Supabase user object only exists for
-  // this request — once sb-* is cleared, supabase.auth.getUser() returns null
-  // on every subsequent request, so we can't read user_metadata later.
+  // Stash display name + avatar in a small dedicated cookie. The Supabase
+  // user object only exists for this request — without the profile cookie
+  // we'd need to round-trip to Supabase Auth on every render to surface
+  // user_metadata in the navbar.
   if (user) {
     const meta = user.user_metadata as
       | { full_name?: string; name?: string; avatar_url?: string; picture?: string }
@@ -1103,10 +883,6 @@ export async function GET(request: Request) {
       picture: meta?.avatar_url ?? meta?.picture ?? null,
     });
   }
-
-  // Supabase SSR sets large JWT cookies we don't use — clear them to
-  // avoid HTTP 431 (Request Header Fields Too Large) on subsequent requests.
-  clearSupabaseCookies(response, requestCookies);
 
   return response;
 }

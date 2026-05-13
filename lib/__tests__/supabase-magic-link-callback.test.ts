@@ -1,25 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockExchangeCodeForSession,
   mockGetUser,
   mockInsertValues,
   mockSelectRows,
-  mockCookieGetAll,
-  mockLoadGoogleConnection,
 } = vi.hoisted(() => ({
   mockExchangeCodeForSession: vi.fn(),
   mockGetUser: vi.fn(),
   mockInsertValues: vi.fn(),
   mockSelectRows: vi.fn(),
-  mockCookieGetAll: vi.fn(),
-  mockLoadGoogleConnection: vi.fn(),
-}));
-
-vi.mock("next/headers", () => ({
-  cookies: vi.fn(async () => ({
-    getAll: mockCookieGetAll,
-  })),
 }));
 
 vi.mock("next/server", async (importOriginal) => {
@@ -35,6 +25,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: {
       exchangeCodeForSession: mockExchangeCodeForSession,
       getUser: mockGetUser,
+      updateUser: vi.fn(async () => ({ data: { user: null }, error: null })),
     },
   })),
 }));
@@ -45,9 +36,6 @@ vi.mock("@/lib/db", () => {
       from: vi.fn(() => ({
         where: vi.fn(() => ({
           limit: vi.fn(async () => mockSelectRows()),
-          orderBy: vi.fn(() => ({
-            limit: vi.fn(async () => mockSelectRows()),
-          })),
         })),
       })),
     })),
@@ -66,24 +54,8 @@ vi.mock("@/lib/db", () => {
   return {
     db: () => dbObj,
     schema: {
-      mcpSessions: {
-        id: "id",
-        accessToken: "access_token",
-        refreshToken: "refresh_token",
-        customerId: "customer_id",
-        customerIds: "customer_ids",
-        userId: "user_id",
-        googleEmail: "google_email",
-        expiresAt: "expires_at",
-        createdAt: "created_at",
-      },
-      adPlatformConnections: {
-        id: "id",
-        userId: "user_id",
-        platform: "platform",
-        activeAccountId: "active_account_id",
-        accountIds: "account_ids",
-      },
+      mcpSessions: { id: "id", userId: "user_id" },
+      adPlatformConnections: { id: "id", userId: "user_id", platform: "platform" },
       userAttribution: {
         userId: "user_id",
         email: "email",
@@ -124,18 +96,6 @@ vi.mock("@/lib/db", () => {
   };
 });
 
-vi.mock("@/lib/google-ads", () => ({
-  deriveCustomerName: vi.fn((raw: string | null | undefined) => {
-    if (!raw) return "";
-    const parsed = JSON.parse(raw) as Array<{ name?: string; id: string }>;
-    return parsed.map((account) => account.name ?? account.id).join(", ");
-  }),
-}));
-
-vi.mock("@/lib/connections/google-read", () => ({
-  loadGoogleConnection: mockLoadGoogleConnection,
-}));
-
 vi.mock("@/lib/x-signup", () => ({
   X_SIGNUP_ID_COOKIE: "x_signup_id",
   buildXSignupConversionId: vi.fn((userId: string) => `signup-${userId}`),
@@ -145,12 +105,6 @@ import { GET } from "@/app/auth/supabase/callback/route";
 
 function makeRequest(url: string): Request {
   return new Request(url);
-}
-
-function findSessionInsert() {
-  return mockInsertValues.mock.calls
-    .map((call) => call[0] as Record<string, unknown>)
-    .find((row) => Object.prototype.hasOwnProperty.call(row, "accessToken"));
 }
 
 describe("Supabase magic-link callback route - GET", () => {
@@ -169,11 +123,9 @@ describe("Supabase magic-link callback route - GET", () => {
     });
     mockSelectRows.mockResolvedValue([]);
     mockInsertValues.mockResolvedValue(undefined);
-    mockCookieGetAll.mockReturnValue([]);
-    mockLoadGoogleConnection.mockResolvedValue(null);
   });
 
-  it("exchanges the Supabase code and mints an email-only app session", async () => {
+  it("exchanges the Supabase code and redirects to next without touching mcp_sessions", async () => {
     const response = await GET(
       makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code&next=%2Fconnect%2Fmeta-ads"),
     );
@@ -181,55 +133,34 @@ describe("Supabase magic-link callback route - GET", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/connect/meta-ads");
     expect(mockExchangeCodeForSession).toHaveBeenCalledWith("supabase-code");
-    expect(findSessionInsert()).toBeDefined();
-
-    const insertedRow = findSessionInsert() as Record<string, unknown>;
-    expect(insertedRow).toMatchObject({
-      refreshToken: "",
-      customerId: "",
-      customerIds: "[]",
-      userId: "user-123",
-      googleEmail: "writer@example.com",
-    });
-    expect(response.cookies.get("adsagent_token")?.value).toBe(insertedRow.accessToken);
+    // No mcp_sessions row, no adsagent_token — identity is carried by Supabase sb-* cookies.
+    expect(mockInsertValues).not.toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: expect.anything() }),
+    );
+    expect(response.cookies.get("adsagent_token")?.value).toBeUndefined();
     expect(response.cookies.get("adsagent_profile")?.value).toContain("Test%20Writer");
-    expect(response.cookies.get("x_signup_id")?.value).toBe("signup-user-123");
   });
 
-  it("clears Supabase cookies after minting the app session", async () => {
-    mockCookieGetAll.mockReturnValue([
-      { name: "sb-project-auth-token" },
-      { name: "unrelated" },
-    ]);
+  it("fires the X signup cookie for first-time users", async () => {
+    // No prior mcp_sessions OR ad_platform_connections rows for this user.
+    mockSelectRows.mockResolvedValue([]);
 
     const response = await GET(
       makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code"),
     );
 
-    expect(response.cookies.get("sb-project-auth-token")?.value).toBe("");
-    expect(response.cookies.get("unrelated")).toBeUndefined();
+    expect(response.cookies.get("x_signup_id")?.value).toBe("signup-user-123");
   });
 
-  it("reuses an existing connected app session for the Supabase user", async () => {
-    mockSelectRows.mockResolvedValue([
-      {
-        accessToken: "existing-connected-token",
-        customerIds: '[{"id":"1234567890","name":"Existing Account"}]',
-      },
-    ]);
+  it("skips the X signup cookie for returning users", async () => {
+    // hasAnySession returns true (existing row in mcp_sessions OR ad_platform_connections).
+    mockSelectRows.mockResolvedValue([{ id: 1 }]);
 
     const response = await GET(
-      makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code&next=%2Fcampaigns"),
+      makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code"),
     );
 
-    expect(response.headers.get("location")).toBe("http://localhost:3000/campaigns");
-    expect(findSessionInsert()).toBeUndefined();
-    expect(response.cookies.get("adsagent_token")?.value).toBe("existing-connected-token");
-    // Phase-2 header reclaim: setSessionCookies actively deletes the legacy
-    // adsagent_customer cookie so existing browsers shed it. Verify the
-    // delete fires (Max-Age=0).
-    const customerDelete = response.cookies.get("adsagent_customer");
-    expect(customerDelete?.maxAge).toBe(0);
+    expect(response.cookies.get("x_signup_id")?.value).toBeUndefined();
   });
 
   it("redirects back to login when Supabase rejects the code", async () => {
@@ -245,46 +176,5 @@ describe("Supabase magic-link callback route - GET", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/login?error=auth_failed&reason=supabase_auth",
     );
-    expect(findSessionInsert()).toBeUndefined();
-  });
-
-  describe("STOP_CREATING_MCP_SESSIONS flag", () => {
-    beforeEach(() => {
-      process.env.STOP_CREATING_MCP_SESSIONS = "true";
-    });
-
-    afterEach(() => {
-      delete process.env.STOP_CREATING_MCP_SESSIONS;
-    });
-
-    it("skips the mcp_sessions INSERT, the adsagent_token cookie, and the sb-* clear for new users", async () => {
-      mockCookieGetAll.mockReturnValue([{ name: "sb-project-auth-token" }]);
-
-      const response = await GET(
-        makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code"),
-      );
-
-      expect(findSessionInsert()).toBeUndefined();
-      expect(response.cookies.get("adsagent_token")?.value).toBeUndefined();
-      // sb-* cookies must persist — they're now the session.
-      expect(response.cookies.get("sb-project-auth-token")).toBeUndefined();
-    });
-
-    it("still reissues the legacy cookie for users with an existing mcp_sessions row", async () => {
-      mockSelectRows.mockResolvedValue([
-        {
-          accessToken: "existing-connected-token",
-          customerIds: '[{"id":"1234567890","name":"Existing Account"}]',
-        },
-      ]);
-
-      const response = await GET(
-        makeRequest("http://localhost:3000/auth/supabase/callback?code=supabase-code"),
-      );
-
-      expect(findSessionInsert()).toBeUndefined();
-      // Legacy users keep their adsagent_token rebound — this isn't new state.
-      expect(response.cookies.get("adsagent_token")?.value).toBe("existing-connected-token");
-    });
   });
 });

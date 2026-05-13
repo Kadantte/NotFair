@@ -21,13 +21,8 @@ export type GoogleConnectionInput = {
 };
 
 /**
- * Phase-1 dual-write target. Mirrors a Google Ads connection from
- * `mcp_sessions` into `ad_platform_connections` so phase-2 readers can
- * source connection state from a single canonical place across platforms.
- *
- * Pass an active transaction so this upsert atomically rolls back with the
- * corresponding mcp_sessions write — without it a failed connection write
- * leaves the two tables out of sync.
+ * Upsert a Google Ads connection row keyed on (userId, "google_ads").
+ * `ad_platform_connections` is the source of truth for Google ad state.
  */
 export async function upsertGoogleConnection(
   input: GoogleConnectionInput,

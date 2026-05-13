@@ -33,10 +33,10 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const next = getSafeNext(requestUrl.searchParams.get("next"));
 
-  // Resolve the NotFair user (Supabase first, adsagent_token cookie fallback).
-  // Meta connections are keyed on user_id; ads-less Supabase users still need
-  // to be able to start Meta OAuth (Meta is one of the explicit "set up later"
-  // paths for users with no Google Ads account).
+  // Resolve the NotFair user via Supabase. Meta connections are keyed on
+  // user_id; ads-less Supabase users still need to start Meta OAuth (Meta is
+  // one of the explicit "set up later" paths for users with no Google Ads
+  // account).
   const identity = await identifyUser({ source: "meta-oauth-start" });
   if (!identity) {
     // Send through Google sign-in, then bounce back here.

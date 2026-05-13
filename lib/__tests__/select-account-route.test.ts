@@ -37,13 +37,6 @@ vi.mock("@/lib/x-signup", () => ({
 
 vi.mock("@/lib/connections/google-read", () => ({
   loadGoogleConnection: () => mockLoadGoogleConnection(),
-  compareForShadowRead: vi.fn(),
-}));
-
-vi.mock("@/lib/connections/feature-flags", () => ({
-  readGoogleFromConnections: () => false,
-  readUserIdFromSupabase: () => false,
-  supabaseSessionBridge: () => false,
 }));
 
 vi.mock("next/headers", () => ({
@@ -176,8 +169,6 @@ describe("Select account route — POST", () => {
     mockIdentifyUser.mockResolvedValue({
       userId: "user-123",
       googleEmail: "test@example.com",
-      legacySessionId: 7,
-      via: "cookie_fallback",
     });
     // Default connection: existing connected account.
     mockLoadGoogleConnection.mockResolvedValue({
@@ -202,7 +193,7 @@ describe("Select account route — POST", () => {
 
   // ─── Non-pending (account switcher) flow ─────────────────────────────
 
-  it("updates the current session in place when switching accounts", async () => {
+  it("upserts the connection row when switching accounts", async () => {
     const response = await POST(
       makeRequest({
         accounts: [
@@ -213,10 +204,8 @@ describe("Select account route — POST", () => {
     );
 
     expect(mockListConnectableAccounts).toHaveBeenCalledWith("refresh-token");
-    expect(mockUpdateWhere).toHaveBeenCalled();
-    expect(mockDeleteWhere).toHaveBeenCalled();
+    expect(mockInsertValues).toHaveBeenCalled();
     expect(response.status).toBe(200);
-    expect(response.cookies.get("adsagent_token")?.value).toBe("existing-token");
   });
 
   it("returns 401 when identifyUser returns null (no Supabase user, no cookie)", async () => {
@@ -284,7 +273,7 @@ describe("Select account route — POST", () => {
       expect(mockListConnectableAccounts).not.toHaveBeenCalled();
 
       // The DB update should include loginCustomerId from the stored server-side data
-      expect(mockUpdateWhere).toHaveBeenCalled();
+      expect(mockInsertValues).toHaveBeenCalled();
       // Verify redirectUrl in response body
       const body = await response.json();
       expect(body.redirectUrl).toContain("/connect");
@@ -360,7 +349,7 @@ describe("Select account route — POST", () => {
       // Verify that each manager-routed account kept its loginCustomerId in the
       // stored customerIds JSON (so authForAccount can pick the right manager
       // per tool call). Direct accounts have no loginCustomerId field.
-      expect(mockUpdateWhere).toHaveBeenCalled();
+      expect(mockInsertValues).toHaveBeenCalled();
     });
 
     it("does NOT trust loginCustomerId from the request body — reads from server-stored data", async () => {
@@ -380,7 +369,7 @@ describe("Select account route — POST", () => {
       expect(response.status).toBe(200);
       // The update call should use "9999999999" (from stored data), not "FORGED_MANAGER"
       // We verify this by checking that the route didn't blow up and used the server value
-      expect(mockUpdateWhere).toHaveBeenCalled();
+      expect(mockInsertValues).toHaveBeenCalled();
     });
 
     it("marks new signups with gads_new_signup cookie and redirects to next path", async () => {
