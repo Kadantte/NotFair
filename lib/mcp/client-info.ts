@@ -26,6 +26,22 @@ export function normalizeClientName(
 }
 
 /**
+ * Connection-bound OAuth tokens do not have an mcp_sessions row where we can
+ * persist MCP initialize.clientInfo. Use the HTTP user-agent as a best-effort
+ * stable source label so operation telemetry does not collapse into "unknown".
+ */
+export function clientNameFromUserAgent(userAgent: string | null | undefined): string | null {
+  const ua = userAgent?.toLowerCase() ?? "";
+  if (!ua) return null;
+  if (ua.includes("anthropic/toolbox")) return "anthropic/toolbox";
+  if (ua.includes("claude-code")) return "claude-code";
+  if (ua.includes("claude-desktop")) return "claude-desktop";
+  if (ua.includes("claude-user")) return "claude-ai";
+  if (ua.includes("claude")) return "claude-ai";
+  return null;
+}
+
+/**
  * Best-effort capture of clientInfo from an MCP `initialize` request body.
  * Persists `clientName` / `clientVersion` onto the bound `mcp_sessions` row
  * so subsequent telemetry can attribute traffic. Never throws — tracking

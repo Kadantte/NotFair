@@ -4,6 +4,7 @@ import { SetupGuidesMenu } from "@/components/setup-guides-menu";
 import { BrandLockup } from "@/components/brand-lockup";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ConnectClaudeCTA } from "@/components/connect-claude-cta";
+import { BOOK_DEMO_URL } from "@/lib/links";
 import { useTranslations } from "next-intl";
 
 function formatStars(count: number): string {
@@ -61,7 +62,7 @@ export function SiteHeader() {
                     <NavLink href="/pricing" label={t("pricing")} className="hidden sm:inline" />
                     <LanguageSwitcher className="hidden lg:block" />
                     <a
-                        href="https://cal.com/tong-chen-uuovdl/30min"
+                        href={BOOK_DEMO_URL}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hidden h-9 items-center rounded-full border border-[#4CAF6E]/40 bg-[#4CAF6E]/10 px-4 text-sm font-medium text-[#4CAF6E] transition-colors hover:border-[#4CAF6E]/60 hover:bg-[#4CAF6E]/20 sm:inline-flex"

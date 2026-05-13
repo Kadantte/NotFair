@@ -4,7 +4,7 @@ import { parseCustomerIds, type AuthContext } from "@/lib/google-ads";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { DEFAULT_RESOURCE_PATH, findResource, type Platform } from "@/lib/mcp/resources";
 import { activeLoginCustomerIdFor } from "@/lib/connections/google-read";
-import { normalizeClientName } from "@/lib/mcp/client-info";
+import { clientNameFromUserAgent, normalizeClientName } from "@/lib/mcp/client-info";
 
 /**
  * Per-request auth context shape, common across every platform MCP. Platform-
@@ -188,8 +188,9 @@ export async function resolvePlatformAuth(
           name: a.name ?? "",
         }));
         const userAgent = request.headers.get("user-agent") ?? null;
+        const clientName = clientNameFromUserAgent(userAgent);
         trackServerEvent(conn.userId ?? null, "mcp_oauth_used", {
-          client_name: null,
+          client_name: clientName,
           client_version: null,
           resource_url: config.resourceUrlPath,
           platform: config.platform,
@@ -204,7 +205,7 @@ export async function resolvePlatformAuth(
             : (conn.activeAccountId ? [{ id: conn.activeAccountId, name: "" }] : []),
           loginCustomerId: null,
           userId: conn.userId,
-          clientName: null,
+          clientName,
           clientVersion: null,
           authMethod: "oauth",
           userAgent,
@@ -279,8 +280,9 @@ export async function resolvePlatformAuth(
               name: a.name ?? "",
               ...("loginCustomerId" in a ? { loginCustomerId: a.loginCustomerId } : {}),
             }));
+            const clientName = clientNameFromUserAgent(userAgent);
             trackServerEvent(conn.userId ?? null, "mcp_oauth_used", {
-              client_name: null,
+              client_name: clientName,
               client_version: null,
               resource_url: config.resourceUrlPath,
               platform: config.platform,
@@ -295,7 +297,7 @@ export async function resolvePlatformAuth(
                 : [{ id: conn.activeAccountId, name: "" }],
               loginCustomerId: activeLoginCustomerIdFor(conn.activeAccountId, accounts),
               userId: conn.userId,
-              clientName: null,
+              clientName,
               clientVersion: null,
               authMethod,
               userAgent,

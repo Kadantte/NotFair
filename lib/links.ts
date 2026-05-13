@@ -1,1 +1,1 @@
-export const BOOK_DEMO_URL = 'https://cal.com/tong-chen-uuovdl/30min';
+export const BOOK_DEMO_URL = 'https://calendar.app.google/mWw5emdPw91DEhBWA';
