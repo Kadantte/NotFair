@@ -53,6 +53,28 @@ Living list of deferred work. Each item names why it was deferred and what unblo
 **Fix:** Remove the `auditCta` subkey from `GoogleAdsCodexPage` in all 6 message files.
 **Effort:** XS (5 min).
 
+## Test suite failures (pre-existing, noticed on v0.5.5.7)
+
+### P0 — lib/__tests__/resolve-auth.test.ts failing
+**What:** `resolve-auth` test suite has pre-existing failures unrelated to the impersonate-fix branch. Exact error not captured — run `npx vitest run lib/__tests__/resolve-auth.test.ts` to reproduce.
+**Why:** Noticed during /ship workflow on 2026-05-12. Not caused by the impersonate route fix.
+**Effort:** S — investigate root cause and fix.
+
+### P0 — __tests__/proxy-i18n.test.ts failing
+**What:** `proxy-i18n routing` — "still applies auth protection to protected app routes after setting a locale cookie" fails. Pre-existing.
+**Why:** Noticed during /ship workflow on 2026-05-12.
+**Effort:** S — investigate locale+auth interaction in middleware.
+
+### P0 — lib/mcp/__tests__/protocol.test.ts failing (2 tests)
+**What:** "MCP protocol — tools/list: returns every registered tool" and "attaches annotation hints" fail. Pre-existing.
+**Why:** Noticed during /ship workflow on 2026-05-12.
+**Effort:** S — likely a tool registration mismatch in test fixture.
+
+### P0 — lib/mcp/__tests__/tool-registration.test.ts failing (5 tests)
+**What:** `getRecommendations` tool not found in registered tools. All handler-execution tests fail. Pre-existing.
+**Why:** Tool may have been removed or renamed but tests not updated. Noticed 2026-05-12.
+**Effort:** S — check if getRecommendations was removed from tool-registration.ts.
+
 ### P3 — `navigator.clipboard.writeText` has no error handling on the codex setup-guide page
 **What:** `CommandCard` in `components/marketing/google-ads-codex-mcp-setup-page.tsx` calls `navigator.clipboard.writeText(...)` without a `.catch()`. Same pattern as `components/codex-setup-steps.tsx` `CommandBlock`.
 **Why:** Silent failure in non-secure contexts or when permission is denied — copy button appears to do nothing.

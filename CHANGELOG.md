@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.7] - 2026-05-12
+
+### Fixed
+- **Developer impersonation now works with Supabase-authenticated sessions.** The `/api/dev/impersonate` route previously verified the caller via the `adsagent_token` cookie only, which fails for developers who re-signed in under the Supabase auth path and no longer carry that cookie. The route now uses the shared `requireDevEmail()` helper — consistent with all other `/api/dev/*` routes — which handles both Supabase and legacy cookie auth. The `DELETE` endpoint now also requires dev authentication before clearing the impersonate cookie.
+
 ## [0.5.5.6] - 2026-05-12
 
 ### Fixed

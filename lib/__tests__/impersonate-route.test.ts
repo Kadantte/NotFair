@@ -1,18 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
 
 // ─── Hoisted mocks ──────────────────────────────────────────────────
 
-const { mockSelectLimit } = vi.hoisted(() => ({
+const { mockSelectLimit, mockRequireDevEmail } = vi.hoisted(() => ({
   mockSelectLimit: vi.fn(),
-}));
-
-const mockCookieGet = vi.fn();
-
-vi.mock("next/headers", () => ({
-  cookies: vi.fn(async () => ({
-    get: mockCookieGet,
-  })),
+  mockRequireDevEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -49,14 +41,10 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/lib/dev-access", () => ({
-  DEV_EMAILS: ["dev@example.com"],
+  requireDevEmail: mockRequireDevEmail,
 }));
 
 vi.mock("@/lib/auth-cookies", () => ({
-  COOKIE_NAMES: {
-    token: "adsagent_token",
-    impersonate: "adsagent_impersonate",
-  },
   setImpersonateCookie: vi.fn(),
   clearImpersonateCookie: vi.fn(),
 }));
@@ -75,39 +63,54 @@ function makePostRequest(body: object): Request {
 describe("POST /api/dev/impersonate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: caller is authorized
+    mockRequireDevEmail.mockResolvedValue(null);
   });
 
-  it("returns 401 when no token cookie", async () => {
-    mockCookieGet.mockReturnValue(undefined);
-
-    const res = await POST(makePostRequest({ accountId: "123" }));
-    expect(res.status).toBe(401);
-  });
-
-  it("returns 403 when caller is not a dev", async () => {
-    mockCookieGet.mockReturnValue({ value: "token" });
-    mockSelectLimit.mockResolvedValueOnce([{ googleEmail: "notdev@example.com" }]);
+  it("returns denied response when requireDevEmail rejects (not dev)", async () => {
+    mockRequireDevEmail.mockResolvedValue(Response.json({ error: "Forbidden" }, { status: 403 }));
 
     const res = await POST(makePostRequest({ accountId: "123" }));
     expect(res.status).toBe(403);
   });
 
-  it("returns 404 when no valid session for accountId", async () => {
-    mockCookieGet.mockReturnValue({ value: "token" });
-    // Caller session
-    mockSelectLimit.mockResolvedValueOnce([{ googleEmail: "dev@example.com" }]);
-    // Target session not found
+  it("returns denied response when requireDevEmail rejects (unauthenticated)", async () => {
+    mockRequireDevEmail.mockResolvedValue(Response.json({ error: "Forbidden" }, { status: 403 }));
+
+    const res = await POST(makePostRequest({ accountId: "123" }));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 500 when requireDevEmail encounters an internal error", async () => {
+    mockRequireDevEmail.mockResolvedValue(Response.json({ error: "Internal server error" }, { status: 500 }));
+
+    const res = await POST(makePostRequest({ accountId: "123" }));
+    expect(res.status).toBe(500);
+  });
+
+  it("returns 400 for missing accountId", async () => {
+    const res = await POST(makePostRequest({}));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid request body", async () => {
+    const req = new Request("http://localhost:3000/api/dev/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when no valid session found for accountId", async () => {
     mockSelectLimit.mockResolvedValueOnce([]);
 
     const res = await POST(makePostRequest({ accountId: "999" }));
     expect(res.status).toBe(404);
   });
 
-  it("sets impersonate cookie on success", async () => {
-    mockCookieGet.mockReturnValue({ value: "token" });
-    // Caller session
-    mockSelectLimit.mockResolvedValueOnce([{ googleEmail: "dev@example.com" }]);
-    // Target session found
+  it("sets impersonate cookie and returns ok on success", async () => {
     mockSelectLimit.mockResolvedValueOnce([{
       id: 42,
       customerId: "222-222-2222",
@@ -122,16 +125,12 @@ describe("POST /api/dev/impersonate", () => {
     expect(body.customerId).toBe("222-222-2222");
     expect(setImpersonateCookie).toHaveBeenCalledWith(expect.anything(), "42");
   });
-
-  it("returns 400 for missing accountId", async () => {
-    const res = await POST(makePostRequest({}));
-    expect(res.status).toBe(400);
-  });
 });
 
 describe("DELETE /api/dev/impersonate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireDevEmail.mockResolvedValue(null);
   });
 
   it("clears the impersonate cookie", async () => {
@@ -141,5 +140,13 @@ describe("DELETE /api/dev/impersonate", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(clearImpersonateCookie).toHaveBeenCalled();
+  });
+
+  it("returns denied response when not a dev", async () => {
+    mockRequireDevEmail.mockResolvedValue(Response.json({ error: "Forbidden" }, { status: 403 }));
+
+    const res = await DELETE();
+    expect(res.status).toBe(403);
+    expect(clearImpersonateCookie).not.toHaveBeenCalled();
   });
 });
