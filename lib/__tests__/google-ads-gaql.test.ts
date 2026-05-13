@@ -973,6 +973,14 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/getResourceMetadata/);
   });
 
+  it("rejects hallucinated geo target canonical field with exact replacement", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT geo_target_constant.id, geo_target_constant.name, geo_target_constant.canonical FROM geo_target_constant",
+      ),
+    ).toThrow(/geo_target_constant\.canonical_name/);
+  });
+
   it("allows supported fields", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(

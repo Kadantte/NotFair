@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.9] - 2026-05-13
+
+### Fixed
+- **`runScript` now catches a repeated geo-target GAQL hallucination before the Google round-trip.** Queries selecting `geo_target_constant.canonical` now fail fast with the exact supported replacement, `geo_target_constant.canonical_name`, instead of surfacing a generic `query_error=32`. This was the top preventable NotFair ops cluster on 2026-05-12.
+
 ## [0.5.5.8] - 2026-05-12
 
 ### Added

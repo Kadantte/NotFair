@@ -530,6 +530,8 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`metrics.conversion_rate` is not a GAQL field. Select `metrics.conversions` and `metrics.clicks`, then calculate `conversions / clicks` in JavaScript.",
   "asset.sitelink_asset.final_urls":
     "`asset.sitelink_asset.final_urls` is not a GAQL field. Use `getResourceMetadata('asset')` to confirm the available asset URL fields before retrying.",
+  "geo_target_constant.canonical":
+    "`geo_target_constant.canonical` is not a GAQL field. Select `geo_target_constant.canonical_name` instead.",
 };
 
 export function validateKnownUnsupportedGaqlFields(query: string) {
