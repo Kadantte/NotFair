@@ -42,6 +42,28 @@ const nextConfig: NextConfig = {
         destination: "/google-ads-mcp",
         permanent: true,
       },
+      // Legacy-host canonicalization to notfair.co.
+      // OAuth/MCP paths are excluded because cross-origin redirects drop the
+      // Authorization header (RFC 9110), which would break existing MCP
+      // clients pinned to legacy hostnames. Those paths continue to serve
+      // on the legacy host so the OAuth flow + bearer requests stay
+      // single-origin — and the well-known metadata routes already reflect
+      // the inbound Host, so audience stays consistent.
+      // 301 over 308: GET-only HTML traffic; if any stray POST hits a
+      // legacy marketing path, degrading to GET is the safer failure mode
+      // than blindly replaying the body to a different host.
+      {
+        source: "/:path((?!api/mcp/|api/oauth/|\\.well-known/oauth-).*)",
+        has: [{ type: "host", value: "adsagent.org" }],
+        destination: "https://notfair.co/:path",
+        statusCode: 301,
+      },
+      {
+        source: "/:path((?!api/mcp/|api/oauth/|\\.well-known/oauth-).*)",
+        has: [{ type: "host", value: "ads-agent-black.vercel.app" }],
+        destination: "https://notfair.co/:path",
+        statusCode: 301,
+      },
     ];
   },
   async rewrites() {
