@@ -2,13 +2,12 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { Type } from "@sinclair/typebox";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 const PLUGIN_ID = "openclaw-notfair";
-const PLUGIN_VERSION = "2026.5.14";
+const PLUGIN_VERSION = "2026.5.15";
 const DEFAULT_MCP_URL = "https://notfair.co/api/mcp/google_ads";
 const CONNECT_URL = "https://notfair.co/connect";
 
@@ -221,13 +220,6 @@ function startLocalCallbackServer() {
   });
 }
 
-function openBrowser(url) {
-  const platform = process.platform;
-  const command = platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
-  const args = platform === "win32" ? ["/c", "start", "", url] : [url];
-  execFile(command, args, () => {});
-}
-
 function errorResult(message) {
   return { content: [{ type: "text", text: message }], details: null };
 }
@@ -348,9 +340,9 @@ function registerCli(api, config, client) {
       const result = await client.callTool("listConnectedAccounts", {});
       console.log(result.content?.map((c) => c.text).filter(Boolean).join("\n") || JSON.stringify(result, null, 2));
     });
-    cmd.command("connect").description("Open NotFair's connection page").action(async () => {
-      console.log("Opening " + CONNECT_URL);
-      openBrowser(CONNECT_URL);
+    cmd.command("connect").description("Print NotFair's connection page").action(async () => {
+      console.log("Connect Google Ads accounts at:");
+      console.log(CONNECT_URL);
     });
     cmd.command("tool").description("Call a NotFair MCP tool by name").argument("<toolName>").argument("[jsonArgs]").action(async (toolName, jsonArgs = "{}") => {
       const args = JSON.parse(jsonArgs);
@@ -383,10 +375,8 @@ async function handleLogin(api, config, options) {
     const challenge = generateCodeChallenge(verifier);
     const state = randomUUID();
     const authUrl = buildAuthUrl({ authorizeEndpoint: endpoints.authorizeEndpoint, clientId, redirectUri, codeChallenge: challenge, state, resource: endpoints.resource });
-    console.log("\nOpening browser for NotFair authentication.");
-    console.log("\nIf it does not open, visit:\n");
+    console.log("\nVisit this URL to authenticate with NotFair:\n");
     console.log("  " + authUrl + "\n");
-    openBrowser(authUrl);
     const callbackResult = await callback.waitForCallback();
     if (callbackResult.state !== state) throw new Error("OAuth state mismatch. Please try again.");
     const tokens = await exchangeCode({ tokenEndpoint: endpoints.tokenEndpoint, code: callbackResult.code, redirectUri, codeVerifier: verifier, clientId, clientSecret });

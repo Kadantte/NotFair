@@ -68,14 +68,6 @@
         "dynamic"
       ],
       "justification": "Run a short-lived loopback callback server for OAuth login."
-    },
-    "child_process": {
-      "commands": [
-        "open",
-        "xdg-open",
-        "start"
-      ],
-      "justification": "Open the user's browser for OAuth login and connection setup."
     }
   },
   "configSchema": {
