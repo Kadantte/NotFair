@@ -78,16 +78,16 @@ parent-level field masks, etc.).
 
 ## Deploy Configuration (configured by /setup-deploy)
 - Platform: Vercel
-- Production URL: https://www.notfair.co
+- Production URL: https://notfair.co
 - Deploy workflow: auto-deploy on push (Vercel Git integration)
 - Deploy status command: HTTP health check
 - Merge method: squash
 - Project type: web app (Next.js)
-- Post-deploy health check: https://www.notfair.co/api/health
+- Post-deploy health check: https://notfair.co/api/health
 
 ### Custom deploy hooks
 - Pre-merge: none
 - Deploy trigger: automatic on push to main (Vercel)
-- Deploy status: poll https://www.notfair.co/api/health for 200
-- Health check: https://www.notfair.co/api/health
+- Deploy status: poll https://notfair.co/api/health for 200
+- Health check: https://notfair.co/api/health
 
