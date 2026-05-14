@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.11] - 2026-05-14
+
+### Fixed
+- **Vercel production builds no longer flake on a Next.js webpack worker race.** Removed the redundant `experimental.optimizePackageImports: ["lucide-react", "recharts", "date-fns"]` entry from `next.config.ts`. Next.js 16 already auto-optimizes those three packages via its built-in default list, so bundle size is unchanged — but opting in via `experimental.*` triggered an intermittent worker crash that surfaced as `TypeError: Cannot read properties of undefined (reading 'length')` with no actionable stack frames. v0.5.5.10's merge build hit this flake; the next commit on main built fine. This removes the cause.
+
 ## [0.5.5.10] - 2026-05-14
 
 ### Fixed
