@@ -26,9 +26,11 @@ import {
   rewriteInvalidDateLiterals,
   rewritePresetDateEquality,
   rewriteVirtualNameFields,
+  rewriteChangeEventDateFilters,
   enrichGaqlError,
   validateChangeEventFilter,
   validateMetricsOnConversionAction,
+  validateConversionActionMetricSegments,
   validateMalformedDateRanges,
   validateRequiredDateFilter,
   validateKnownUnsupportedGaqlFields,
@@ -762,7 +764,7 @@ describe("rewriteVirtualNameFields", () => {
 
   it("leaves real GAQL _name fields alone", () => {
     const query =
-      "SELECT customer.descriptive_name, change_event.resource_name, segments.conversion_action_name FROM campaign";
+      "SELECT customer.descriptive_name, change_event.resource_name, segments.conversion_action_name, geo_target_constant.canonical_name FROM campaign";
 
     expect(rewriteVirtualNameFields(query)).toBe(query);
   });
@@ -775,6 +777,47 @@ describe("rewriteVirtualNameFields", () => {
     const sentQuery = mockQuery.mock.calls[0][0] as string;
     expect(sentQuery).toContain("campaign.status");
     expect(sentQuery).not.toContain("campaign.status_name");
+  });
+
+  it("does not rewrite real geo target canonical_name fields end-to-end", async () => {
+    mockQuery.mockResolvedValueOnce([{ geo_target_constant: { canonical_name: "Seattle,Washington,United States" } }]);
+
+    await runSafeGaqlReport(auth, "SELECT geo_target_constant.canonical_name FROM geo_target_constant");
+
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("geo_target_constant.canonical_name");
+    expect(sentQuery).not.toContain("geo_target_constant.canonical FROM");
+  });
+});
+
+describe("rewriteChangeEventDateFilters", () => {
+  const NOW = new Date("2026-04-25T12:00:00Z");
+
+  it("rewrites change_event DURING literals to explicit timestamp bounds", () => {
+    const out = rewriteChangeEventDateFilters(
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING TODAY",
+      NOW,
+    );
+
+    expect(out).toContain("change_event.change_date_time >= '2026-04-25 00:00:00'");
+    expect(out).toContain("change_event.change_date_time <= '2026-04-25 23:59:59'");
+    expect(out).not.toContain("DURING TODAY");
+  });
+
+  it("rewrites change_event BETWEEN syntax to explicit timestamp bounds", () => {
+    const out = rewriteChangeEventDateFilters(
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time BETWEEN '2026-04-01' AND '2026-04-25'",
+      NOW,
+    );
+
+    expect(out).toContain("change_event.change_date_time >= '2026-04-01 00:00:00'");
+    expect(out).toContain("change_event.change_date_time <= '2026-04-25 23:59:59'");
+    expect(out).not.toContain("BETWEEN");
+  });
+
+  it("leaves non-change_event resources alone", () => {
+    const query = "SELECT campaign.id FROM campaign WHERE segments.date DURING TODAY";
+    expect(rewriteChangeEventDateFilters(query, NOW)).toBe(query);
   });
 });
 
@@ -971,6 +1014,32 @@ describe("validateMetricsOnConversionAction", () => {
     expect(() =>
       validateMetricsOnConversionAction(
         "SELECT campaign.id, metrics.conversions FROM campaign",
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("validateConversionActionMetricSegments", () => {
+  it("rejects conversion action segments paired with click/cost metrics", () => {
+    expect(() =>
+      validateConversionActionMetricSegments(
+        "SELECT segments.conversion_action_name, metrics.conversions, metrics.cost_micros, metrics.clicks FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/conversion_action segments/);
+  });
+
+  it("allows conversion action segments with conversion metrics only", () => {
+    expect(() =>
+      validateConversionActionMetricSegments(
+        "SELECT segments.conversion_action_name, metrics.conversions FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).not.toThrow();
+  });
+
+  it("allows click and cost metrics without conversion action segments", () => {
+    expect(() =>
+      validateConversionActionMetricSegments(
+        "SELECT campaign.id, metrics.cost_micros, metrics.clicks FROM campaign WHERE segments.date DURING LAST_30_DAYS",
       ),
     ).not.toThrow();
   });
@@ -1175,34 +1244,40 @@ describe("runSafeGaqlReport pre-flight integration", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it("rejects change_event.change_date_time DURING syntax end-to-end", async () => {
-    await expect(
-      runSafeGaqlReport(
-        auth,
-        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_30_DAYS",
-      ),
-    ).rejects.toThrow(/does not support DURING/);
-    expect(mockQuery).not.toHaveBeenCalled();
+  it("rewrites change_event.change_date_time DURING syntax end-to-end", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_30_DAYS",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("change_event.change_date_time >=");
+    expect(sentQuery).toContain("change_event.change_date_time <=");
+    expect(sentQuery).not.toContain("DURING LAST_30_DAYS");
   });
 
-  it("rejects change_event.change_date_time BETWEEN syntax end-to-end", async () => {
-    await expect(
-      runSafeGaqlReport(
-        auth,
-        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time BETWEEN '2026-04-01' AND '2026-04-30'",
-      ),
-    ).rejects.toThrow(/does not support DURING or BETWEEN/);
-    expect(mockQuery).not.toHaveBeenCalled();
+  it("rewrites change_event.change_date_time BETWEEN syntax end-to-end", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time BETWEEN '2026-04-01' AND '2026-04-30'",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("change_event.change_date_time >=");
+    expect(sentQuery).toContain("change_event.change_date_time <= '2026-04-30 23:59:59'");
+    expect(sentQuery).not.toContain("BETWEEN");
   });
 
-  it("rejects change_event longer DURING windows after date-literal rewrite", async () => {
-    await expect(
-      runSafeGaqlReport(
-        auth,
-        "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_90_DAYS",
-      ),
-    ).rejects.toThrow(/does not support DURING or BETWEEN/);
-    expect(mockQuery).not.toHaveBeenCalled();
+  it("rewrites longer change_event DURING windows after date-literal rewrite", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await runSafeGaqlReport(
+      auth,
+      "SELECT change_event.change_date_time FROM change_event WHERE change_event.change_date_time DURING LAST_90_DAYS",
+    );
+    const sentQuery = mockQuery.mock.calls[0][0] as string;
+    expect(sentQuery).toContain("change_event.change_date_time >=");
+    expect(sentQuery).toContain("change_event.change_date_time <=");
+    expect(sentQuery).not.toContain("LAST_90_DAYS");
   });
 
   it("rejects upper-only change_event windows end-to-end", async () => {
@@ -1243,6 +1318,16 @@ describe("runSafeGaqlReport pre-flight integration", () => {
         "SELECT conversion_action.name, metrics.conversions FROM conversion_action",
       ),
     ).rejects.toThrow(/metrics.*not selectable/i);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects conversion action segments with click/cost metrics end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT segments.conversion_action_name, metrics.conversions, metrics.cost_micros, metrics.clicks FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).rejects.toThrow(/conversion_action segments/);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

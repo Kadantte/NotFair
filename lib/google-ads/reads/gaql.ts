@@ -321,7 +321,7 @@ function rawFieldForVirtualSibling(field: string): string | null {
   }
   if (!lower.endsWith("_name")) return null;
   // Real GAQL fields with this suffix are not MCP-added humanized siblings.
-  if (/(descriptive|resource|conversion_action)_name$/.test(lower)) return null;
+  if (/(canonical|descriptive|resource|conversion_action)_name$/.test(lower)) return null;
   return field.replace(/_name$/i, "");
 }
 
@@ -336,6 +336,66 @@ export function rewriteVirtualNameFields(query: string): string {
     /\b([a-z][\w]*(?:\.[a-z][\w]*)+_name)\b/gi,
     (match, field: string) => rawFieldForVirtualSibling(field) ?? match,
   );
+}
+
+function dateRangeForDuringLiteral(literal: string, today: Date): { start: Date; end: Date } | null {
+  const upper = literal.toUpperCase();
+  const end = new Date(today);
+  const start = new Date(today);
+
+  if (upper === "TODAY") return { start, end };
+  if (upper === "YESTERDAY") {
+    start.setDate(end.getDate() - 1);
+    end.setDate(end.getDate() - 1);
+    return { start, end };
+  }
+
+  const lastNDays = upper.match(/^LAST_(\d+)_DAYS$/);
+  if (lastNDays) {
+    const days = Number(lastNDays[1]);
+    if (!Number.isFinite(days) || days <= 0) return null;
+    start.setDate(end.getDate() - (days - 1));
+    return { start, end };
+  }
+
+  if (upper === "THIS_MONTH") {
+    start.setDate(1);
+    return { start, end };
+  }
+  if (upper === "LAST_MONTH") {
+    start.setMonth(end.getMonth() - 1, 1);
+    end.setDate(0);
+    return { start, end };
+  }
+
+  return null;
+}
+
+function explicitChangeEventWindow(start: string, end: string): string {
+  return `change_event.change_date_time >= '${start} 00:00:00' AND change_event.change_date_time <= '${end} 23:59:59'`;
+}
+
+/**
+ * Google rejects DURING/BETWEEN syntax on change_event.change_date_time even
+ * when the date range is otherwise valid. Rewrite common agent-authored forms
+ * into the explicit timestamp bounds that the change_event resource requires.
+ */
+export function rewriteChangeEventDateFilters(query: string, today: Date = new Date()): string {
+  if (extractFromResource(query) !== "change_event") return query;
+
+  return query
+    .replace(
+      /\bchange_event\.change_date_time\s+DURING\s+([A-Z0-9_]+)\b/gi,
+      (match, literal: string) => {
+        const range = dateRangeForDuringLiteral(literal, today);
+        if (!range) return match;
+        return explicitChangeEventWindow(formatDate(range.start), formatDate(range.end));
+      },
+    )
+    .replace(
+      /\bchange_event\.change_date_time\s+BETWEEN\s+['"](\d{4}-\d{2}-\d{2})[^'"]*['"]\s+AND\s+['"](\d{4}-\d{2}-\d{2})[^'"]*['"]/gi,
+      (_match, start: string, end: string) => explicitChangeEventWindow(start, end),
+    );
 }
 
 /**
@@ -496,6 +556,43 @@ export function validateMetricsOnConversionAction(query: string) {
         "If you want config only: drop the `metrics.*` fields from SELECT and keep just `conversion_action.*` columns.",
     );
   }
+}
+
+const CONVERSION_ACTION_SEGMENTS = new Set([
+  "segments.conversion_action",
+  "segments.conversion_action_category",
+  "segments.conversion_action_name",
+]);
+
+const CONVERSION_ACTION_INCOMPATIBLE_METRICS = new Set([
+  "metrics.average_cpc",
+  "metrics.clicks",
+  "metrics.cost_micros",
+  "metrics.cost_per_conversion",
+  "metrics.ctr",
+  "metrics.impressions",
+  "metrics.interactions",
+]);
+
+/**
+ * Google does not support segmenting click/cost-side metrics by conversion
+ * action. Agents often try to compute per-action CPA in one GAQL query; make
+ * the split-query pattern explicit before the request reaches Google.
+ */
+export function validateConversionActionMetricSegments(query: string) {
+  const selectFields = extractSelectFields(query).map((field) => field.toLowerCase());
+  const selectedConversionSegments = selectFields.filter((field) => CONVERSION_ACTION_SEGMENTS.has(field));
+  if (selectedConversionSegments.length === 0) return;
+
+  const incompatibleMetrics = selectFields.filter((field) => CONVERSION_ACTION_INCOMPATIBLE_METRICS.has(field));
+  if (incompatibleMetrics.length === 0) return;
+
+  throw new Error(
+    "GAQL pre-flight: conversion_action segments cannot be selected with click/cost metrics. " +
+      `Drop ${incompatibleMetrics.map((field) => `\`${field}\``).join(", ")} or drop ${selectedConversionSegments.map((field) => `\`${field}\``).join(", ")}. ` +
+      "For per-action conversion counts, query `segments.conversion_action_name` with `metrics.conversions`. " +
+      "For spend/CPA, query campaign or ad_group cost separately and calculate the ratio in JavaScript.",
+  );
 }
 
 /**
@@ -791,6 +888,7 @@ export async function runSafeGaqlReport(
   let query = rewritePresetDateEquality(rawQuery.trim());
   query = rewriteInvalidDateLiterals(query);
   query = rewriteVirtualNameFields(query);
+  query = rewriteChangeEventDateFilters(query);
   query = clampChangeEventDateWindow(query);
   let normalized = query.toUpperCase();
 
@@ -817,6 +915,7 @@ export async function runSafeGaqlReport(
   validateMalformedDateRanges(query);
   validateChangeEventFilter(query);
   validateMetricsOnConversionAction(query);
+  validateConversionActionMetricSegments(query);
   validateRequiredDateFilter(query);
   validateKnownUnsupportedGaqlFields(query);
   validateEnumLiteralsInWhere(query);
