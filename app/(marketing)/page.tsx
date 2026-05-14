@@ -6,7 +6,7 @@ import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
 
 export const metadata = buildMetadata({
-  title: "Find and Fix Google Ads Issues from Claude | NotFair",
+  title: "Manage ads right from ChatGPT and Claude | NotFair",
   description:
     "Give Claude live Google Ads access to diagnose issues, recommend fixes, and execute keyword, ad, budget, and negative changes only after approval.",
   path: "/",
