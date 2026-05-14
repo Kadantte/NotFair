@@ -17,6 +17,7 @@ vi.mock("google-ads-api", () => ({
 }));
 
 import {
+  addNegativeKeyword,
   bulkPauseKeywords,
   DEFAULT_GUARDRAILS,
   moveKeywords,
@@ -563,5 +564,28 @@ describe("withDatabaseContentionRetry (probed via moveKeywords)", () => {
     expect(result.success).toBe(true);
     // Exactly 1 add + 1 pause mutate, no retries
     expect(mockMutateResources).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("addNegativeKeyword database contention retry", () => {
+  it("retries transient database_error=2 and succeeds", async () => {
+    mockMutateResources
+      .mockRejectedValueOnce(new Error("Multiple requests were attempting to modify the same resource at once. Retry the request. (database_error=2)"))
+      .mockResolvedValueOnce({});
+
+    const result = await addNegativeKeyword(auth, "100", "competitor", "BROAD");
+
+    expect(result.success).toBe(true);
+    expect(mockMutateResources).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry non-contention errors", async () => {
+    mockMutateResources.mockRejectedValueOnce(new Error("invalid_argument: bad keyword"));
+
+    const result = await addNegativeKeyword(auth, "100", "bad keyword", "BROAD");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("invalid_argument");
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
 });

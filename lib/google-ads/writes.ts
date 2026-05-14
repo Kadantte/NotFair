@@ -36,6 +36,23 @@ async function fetchKeywordText(customer: any, criterionId: string): Promise<str
   }
 }
 
+function isDatabaseContentionError(message: string | undefined | null): boolean {
+  if (!message) return false;
+  return (
+    message.includes("database_error=2") ||
+    message.includes("Multiple requests were attempting to modify the same resource")
+  );
+}
+
+const DB_CONTENTION_BACKOFFS_MS = [
+  { base: 200, jitter: 100 },
+  { base: 500, jitter: 200 },
+] as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // ─── Write Functions ─────────────────────────────────────────────────
 
 export async function pauseKeyword(
@@ -462,42 +479,51 @@ export async function addNegativeKeyword(
     };
   }
 
-  try {
-    await customer.mutateResources([
-      {
-        entity: "campaign_criterion" as any,
-        operation: "create",
-        resource: {
-          campaign: `customers/${normalizeCustomerId(auth.customerId)}/campaigns/${campaignId}`,
-          negative: true,
-          keyword: {
-            text,
-            match_type: MATCH_TYPE[matchType],
+  let lastError = "";
+  for (let attempt = 0; attempt <= DB_CONTENTION_BACKOFFS_MS.length; attempt += 1) {
+    try {
+      await customer.mutateResources([
+        {
+          entity: "campaign_criterion" as any,
+          operation: "create",
+          resource: {
+            campaign: `customers/${normalizeCustomerId(auth.customerId)}/campaigns/${campaignId}`,
+            negative: true,
+            keyword: {
+              text,
+              match_type: MATCH_TYPE[matchType],
+            },
           },
         },
-      },
-    ]);
+      ]);
 
-    return {
-      success: true,
-      action: "add_negative_keyword",
-      entityId: text,
-      beforeValue: "",
-      afterValue: `${text}|${matchType}`,
-    };
-  } catch (error) {
-    const msg = extractErrorMessage(error);
-    return {
-      success: false,
-      action: "add_negative_keyword",
-      entityId: text,
-      beforeValue: "",
-      afterValue: `${text}|${matchType}`,
-      error: msg.includes("ALREADY_EXISTS")
+      return {
+        success: true,
+        action: "add_negative_keyword",
+        entityId: text,
+        beforeValue: "",
+        afterValue: `${text}|${matchType}`,
+      };
+    } catch (error) {
+      const msg = extractErrorMessage(error);
+      lastError = msg.includes("ALREADY_EXISTS")
         ? `Negative keyword "${text}" already exists in this campaign`
-        : msg,
-    };
+        : msg;
+
+      const backoff = DB_CONTENTION_BACKOFFS_MS[attempt];
+      if (!backoff || !isDatabaseContentionError(lastError)) break;
+      await sleep(backoff.base + Math.floor(Math.random() * (backoff.jitter + 1)));
+    }
   }
+
+  return {
+    success: false,
+    action: "add_negative_keyword",
+    entityId: text,
+    beforeValue: "",
+    afterValue: `${text}|${matchType}`,
+    error: lastError,
+  };
 }
 
 export async function removeNegativeKeyword(
