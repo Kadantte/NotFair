@@ -1,6 +1,6 @@
 {
   "name": "openclaw-notfair",
-  "version": "2026.5.16",
+  "version": "2026.5.17",
   "type": "module",
   "description": "OpenClaw plugin for NotFair - manage Google Ads via natural language with approval-gated writes",
   "homepage": "https://www.notfair.co/google-ads-openclaw",

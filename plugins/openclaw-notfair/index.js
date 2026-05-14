@@ -1,12 +1,9 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 const PLUGIN_ID = "openclaw-notfair";
-const PLUGIN_VERSION = "2026.5.16";
+const PLUGIN_VERSION = "2026.5.17";
 const DEFAULT_MCP_URL = "https://notfair.co/api/mcp/google_ads";
 const CONNECT_URL = "https://notfair.co/connect";
 
@@ -38,55 +35,51 @@ function isAuthenticated(config) {
   return true;
 }
 
-function configPath() {
-  return join(homedir(), ".openclaw", "openclaw.json");
+function cloneConfig(config) {
+  return JSON.parse(JSON.stringify(config || {}));
 }
 
-function readOpenClawConfig() {
-  const path = configPath();
-  if (!existsSync(path)) return {};
-  return JSON.parse(readFileSync(path, "utf-8"));
+async function writePluginConfig(api, mutate) {
+  const raw = cloneConfig(api.config);
+  mutate(raw);
+  await api.runtime.config.writeConfigFile(raw);
 }
 
-function writeOpenClawConfig(raw) {
-  writeFileSync(configPath(), JSON.stringify(raw, null, 2) + "\n");
-}
-
-function ensurePluginAllowed(logger) {
+async function ensurePluginAllowed(api) {
   try {
-    const raw = readOpenClawConfig();
-    if (!raw.plugins) raw.plugins = {};
-    const allow = Array.isArray(raw.plugins.allow) ? raw.plugins.allow : [];
-    if (!allow.includes(PLUGIN_ID)) {
-      allow.push(PLUGIN_ID);
-      raw.plugins.allow = allow;
-    }
-    if (!raw.tools) raw.tools = {};
-    const alsoAllow = Array.isArray(raw.tools.alsoAllow) ? raw.tools.alsoAllow : [];
-    if (!alsoAllow.includes(PLUGIN_ID)) {
-      alsoAllow.push(PLUGIN_ID);
-      raw.tools.alsoAllow = alsoAllow;
-    }
-    writeOpenClawConfig(raw);
+    await writePluginConfig(api, (raw) => {
+      if (!raw.plugins) raw.plugins = {};
+      const allow = Array.isArray(raw.plugins.allow) ? raw.plugins.allow : [];
+      if (!allow.includes(PLUGIN_ID)) {
+        allow.push(PLUGIN_ID);
+        raw.plugins.allow = allow;
+      }
+      if (!raw.tools) raw.tools = {};
+      const alsoAllow = Array.isArray(raw.tools.alsoAllow) ? raw.tools.alsoAllow : [];
+      if (!alsoAllow.includes(PLUGIN_ID)) {
+        alsoAllow.push(PLUGIN_ID);
+        raw.tools.alsoAllow = alsoAllow;
+      }
+    });
   } catch (error) {
-    logger?.warn?.("notfair: could not patch OpenClaw allowlist: " + error.message);
+    api.logger?.warn?.("notfair: could not patch OpenClaw allowlist: " + error.message);
   }
 }
 
-function patchPluginConfig(patch) {
-  const raw = readOpenClawConfig();
-  if (!raw.plugins) raw.plugins = {};
-  if (!raw.plugins.entries) raw.plugins.entries = {};
-  if (!raw.plugins.entries[PLUGIN_ID]) raw.plugins.entries[PLUGIN_ID] = { enabled: true, config: {} };
-  if (!raw.plugins.entries[PLUGIN_ID].config) raw.plugins.entries[PLUGIN_ID].config = {};
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) {
-      delete raw.plugins.entries[PLUGIN_ID].config[key];
-    } else {
-      raw.plugins.entries[PLUGIN_ID].config[key] = value;
+async function patchPluginConfig(api, patch) {
+  await writePluginConfig(api, (raw) => {
+    if (!raw.plugins) raw.plugins = {};
+    if (!raw.plugins.entries) raw.plugins.entries = {};
+    if (!raw.plugins.entries[PLUGIN_ID]) raw.plugins.entries[PLUGIN_ID] = { enabled: true, config: {} };
+    if (!raw.plugins.entries[PLUGIN_ID].config) raw.plugins.entries[PLUGIN_ID].config = {};
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) {
+        delete raw.plugins.entries[PLUGIN_ID].config[key];
+      } else {
+        raw.plugins.entries[PLUGIN_ID].config[key] = value;
+      }
     }
-  }
-  writeOpenClawConfig(raw);
+  });
 }
 
 function originAndPathFromMcpUrl(mcpUrl) {
@@ -367,7 +360,7 @@ function registerCli(api, config, client) {
     const cmd = program.command("notfair").description("NotFair Google Ads plugin commands");
     cmd.command("login").description("Authenticate with NotFair via OAuth or Bearer token").option("--token <token>", "Bearer token for headless/server use").action(async (options) => handleLogin(api, config, options));
     cmd.command("logout").description("Clear NotFair credentials").action(async () => {
-      patchPluginConfig({ accessToken: undefined, apiKey: undefined, tokenExpiresAt: undefined });
+      await patchPluginConfig(api, { accessToken: undefined, apiKey: undefined, tokenExpiresAt: undefined });
       console.log("Logged out. Run 'openclaw notfair login' to reconnect.");
     });
     cmd.command("status").description("Show NotFair plugin status").action(async () => handleStatus(config, client));
@@ -389,8 +382,8 @@ function registerCli(api, config, client) {
 
 async function handleLogin(api, config, options) {
   if (options?.token) {
-    patchPluginConfig({ apiKey: options.token, accessToken: undefined, tokenExpiresAt: undefined });
-    ensurePluginAllowed(api.logger);
+    await patchPluginConfig(api, { apiKey: options.token, accessToken: undefined, tokenExpiresAt: undefined });
+    await ensurePluginAllowed(api);
     console.log("NotFair token stored. Restart OpenClaw to load authenticated tools.");
     return;
   }
@@ -404,7 +397,7 @@ async function handleLogin(api, config, options) {
       const registration = await registerOAuthClient(endpoints.registrationEndpoint, redirectUri);
       clientId = registration.client_id;
       clientSecret = registration.client_secret;
-      patchPluginConfig({ oauthClientId: clientId, oauthClientSecret: clientSecret });
+      await patchPluginConfig(api, { oauthClientId: clientId, oauthClientSecret: clientSecret });
     }
     const verifier = generateCodeVerifier();
     const challenge = generateCodeChallenge(verifier);
@@ -415,8 +408,8 @@ async function handleLogin(api, config, options) {
     const callbackResult = await callback.waitForCallback();
     if (callbackResult.state !== state) throw new Error("OAuth state mismatch. Please try again.");
     const tokens = await exchangeCode({ tokenEndpoint: endpoints.tokenEndpoint, code: callbackResult.code, redirectUri, codeVerifier: verifier, clientId, clientSecret });
-    patchPluginConfig({ accessToken: tokens.accessToken, tokenExpiresAt: tokens.expiresAt, apiKey: undefined });
-    ensurePluginAllowed(api.logger);
+    await patchPluginConfig(api, { accessToken: tokens.accessToken, tokenExpiresAt: tokens.expiresAt, apiKey: undefined });
+    await ensurePluginAllowed(api);
     console.log("Connected to NotFair. Restart OpenClaw to load authenticated tools.");
     console.log("Connect Google Ads accounts at " + CONNECT_URL);
   } finally {
@@ -448,7 +441,6 @@ export default definePluginEntry({
   description: "Manage Google Ads through NotFair's approval-gated MCP server.",
   configSchema: { parse: parseConfig },
   register(api) {
-    ensurePluginAllowed(api.logger);
     const config = parseConfig(api.pluginConfig);
     const client = new NotFairMcpClient(config);
     registerCli(api, config, client);
