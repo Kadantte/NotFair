@@ -10,7 +10,6 @@ const {
   mockIdentifyUser,
   mockLoadGoogleConnection,
   mockMaybeFireGoogleAdsSignup,
-  mockSendXConversion,
 } = vi.hoisted(() => ({
   mockCookieGet: vi.fn(),
   mockSelectLimit: vi.fn(),
@@ -21,7 +20,6 @@ const {
   mockIdentifyUser: vi.fn(),
   mockLoadGoogleConnection: vi.fn(),
   mockMaybeFireGoogleAdsSignup: vi.fn(async () => {}),
-  mockSendXConversion: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/auth/identify-user", () => ({
@@ -30,10 +28,6 @@ vi.mock("@/lib/auth/identify-user", () => ({
 
 vi.mock("@/lib/google-ads-signup", () => ({
   maybeFireGoogleAdsSignup: mockMaybeFireGoogleAdsSignup,
-}));
-
-vi.mock("@/lib/x-capi", () => ({
-  sendXConversion: mockSendXConversion,
 }));
 
 vi.mock("@/lib/x-signup", () => ({
@@ -413,14 +407,6 @@ describe("Select account route — POST", () => {
         userId: "user-123",
         email: "test@example.com",
         gclid: null,
-      });
-      expect(mockSendXConversion).toHaveBeenCalledTimes(1);
-      expect(mockSendXConversion).toHaveBeenCalledWith({
-        conversionId: "signup-user-123",
-        email: "test@example.com",
-        twclid: null,
-        valueDecimal: 1.0,
-        currency: "USD",
       });
       // gads_signup_email cookie carries the email to the browser for ECL.
       expect(response.cookies.get("gads_signup_email")?.value).toBe(

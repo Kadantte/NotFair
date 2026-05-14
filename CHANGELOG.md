@@ -2,6 +2,11 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.13] - 2026-05-14
+
+### Changed
+- **X signup tracking is browser-pixel only again.** Removed the server-side X Conversion API client, diagnostics script, route calls, and tests because X Ads API access is Sales-rep gated and the current app cannot send CAPI events.
+
 ## [0.5.5.12] - 2026-05-14
 
 ### Changed

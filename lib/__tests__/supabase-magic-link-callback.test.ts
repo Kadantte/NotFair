@@ -5,13 +5,11 @@ const {
   mockGetUser,
   mockInsertValues,
   mockSelectRows,
-  mockSendXConversion,
 } = vi.hoisted(() => ({
   mockExchangeCodeForSession: vi.fn(),
   mockGetUser: vi.fn(),
   mockInsertValues: vi.fn(),
   mockSelectRows: vi.fn(),
-  mockSendXConversion: vi.fn(async () => {}),
 }));
 
 vi.mock("next/server", async (importOriginal) => {
@@ -103,10 +101,6 @@ vi.mock("@/lib/x-signup", () => ({
   buildXSignupConversionId: vi.fn((userId: string) => `signup-${userId}`),
 }));
 
-vi.mock("@/lib/x-capi", () => ({
-  sendXConversion: mockSendXConversion,
-}));
-
 import { GET } from "@/app/auth/supabase/callback/route";
 
 function makeRequest(url: string): Request {
@@ -156,14 +150,6 @@ describe("Supabase magic-link callback route - GET", () => {
     );
 
     expect(response.cookies.get("x_signup_id")?.value).toBe("signup-user-123");
-    expect(mockSendXConversion).toHaveBeenCalledTimes(1);
-    expect(mockSendXConversion).toHaveBeenCalledWith({
-      conversionId: "signup-user-123",
-      email: "writer@example.com",
-      twclid: null,
-      valueDecimal: 1.0,
-      currency: "USD",
-    });
   });
 
   it("skips the X signup cookie for returning users", async () => {
@@ -175,7 +161,6 @@ describe("Supabase magic-link callback route - GET", () => {
     );
 
     expect(response.cookies.get("x_signup_id")?.value).toBeUndefined();
-    expect(mockSendXConversion).not.toHaveBeenCalled();
   });
 
   it("redirects back to login when Supabase rejects the code", async () => {

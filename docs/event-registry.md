@@ -1,7 +1,7 @@
 # Event Registry
 
 > Source of truth for all analytics events. Last updated: 2026-05-14.
-> Platforms: PostHog, X Ads Pixel, and X Ads Conversion API. Check here before adding a new event.
+> Platforms: PostHog and X Ads Pixel. Check here before adding a new event.
 
 
 
@@ -860,22 +860,22 @@ No properties.
 
 **Phase:** 1
 **Category:** identity | paid_acquisition
-**Platform:** X Ads Pixel (client) + X Ads Conversion API (server)
-**Trigger:** Fires once for a real new signup across Google OAuth single-account, Google OAuth multi-account selection, and email magic-link signup. Server routes send the signup event through X Conversion API and set `x_signup_id` with the same stable hashed conversion ID. The browser Pixel also fires the signup event after hydration and then clears the cookie, using `conversion_id` for dedupe.
+**Platform:** X Ads Pixel (client)
+**Trigger:** Fires once for a real new signup across Google OAuth single-account, Google OAuth multi-account selection, and email magic-link signup. Server routes set `x_signup_id` with a stable hashed conversion ID. The browser Pixel fires the signup event after hydration and then clears the cookie.
 **Hypothesis:** We believe tracking signup as the only X Ads conversion goal tells X which ad clicks produce new users, which lets campaigns optimize top-of-funnel acquisition without mixing signup and activation signals.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `event_id` | string | `"tw-q27qa-q27qc"` | X Ads signup event ID. Browser Pixel uses `NEXT_PUBLIC_X_SIGNUP_EVENT_ID` or `NEXT_PUBLIC_X_EVENT_ID`; CAPI uses `X_EVENT_ID`. The bundled fallback is only used with the bundled `q27qa` pixel; custom pixels must provide a matching event ID. |
-| `conversion_id` | string | `"signup-4d96794f..."` | Stable debug/dedupe key sent in both the browser Pixel and CAPI event. Built from a SHA-256 digest of the internal user ID, not the raw user ID. |
+| `event_id` | string | `"tw-q27qa-q27qc"` | X Ads signup event ID. Browser Pixel uses `NEXT_PUBLIC_X_SIGNUP_EVENT_ID` or `NEXT_PUBLIC_X_EVENT_ID`. The bundled fallback is only used with the bundled `q27qa` pixel; custom pixels must provide a matching event ID. |
+| `conversion_id` | string | `"signup-4d96794f..."` | Stable debug key sent in the browser Pixel event. Built from a SHA-256 digest of the internal user ID, not the raw user ID. |
 | `value` | string | `"1"` | Nominal conversion value. |
-| `currency` / `price_currency` | string | `"USD"` | Conversion currency. Browser Pixel sends `currency`; CAPI sends `price_currency`. |
+| `currency` | string | `"USD"` | Conversion currency. |
 
 ```json
 { "twq": ["event", "tw-q27qa-q27qc", { "conversion_id": "signup-4d96794f...", "value": 1, "currency": "USD" }] }
 ```
 
-**Files:** `app/auth/callback/route.ts`, `app/api/auth/select-account/route.ts`, `app/auth/supabase/callback/route.ts`, `components/gads-conversion-tracker.tsx`, `lib/x-capi.ts`, `lib/x-signup.ts`
+**Files:** `app/auth/callback/route.ts`, `app/api/auth/select-account/route.ts`, `app/auth/supabase/callback/route.ts`, `components/gads-conversion-tracker.tsx`, `lib/x-signup.ts`
 
 ---
 

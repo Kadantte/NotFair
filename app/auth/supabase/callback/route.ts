@@ -7,7 +7,6 @@ import { db, schema } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { flushServerEvents, trackServerEvent } from "@/lib/analytics-server";
 import { getClientIp } from "@/lib/request-ip";
-import { sendXConversion } from "@/lib/x-capi";
 import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import {
   attributionToUserMetadata,
@@ -146,15 +145,6 @@ export async function GET(request: Request) {
     const clientIp = getClientIp(request);
     const xConversionId = buildXSignupConversionId(user.id);
     response.cookies.set(X_SIGNUP_ID_COOKIE, xConversionId, { path: "/", maxAge: 600 });
-    after(
-      sendXConversion({
-        conversionId: xConversionId,
-        email: user.email ?? null,
-        twclid: latestPaidTouch?.twclid ?? attribution?.twclid ?? null,
-        valueDecimal: 1.0,
-        currency: "USD",
-      }),
-    );
     trackServerEvent(user.id, "user_signed_up", {
       ...attributionMetadata,
       ...paidTouchMetadata,

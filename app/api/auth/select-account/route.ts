@@ -12,7 +12,6 @@ import {
   sendRedditConversion,
   type RedditConversionInput,
 } from "@/lib/reddit-capi";
-import { sendXConversion } from "@/lib/x-capi";
 import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import { getClientIp } from "@/lib/request-ip";
 import { attributionToUserMetadata, paidTouchToUserMetadata, sanitizeAttribution, sanitizePaidTouch } from "@/lib/utm";
@@ -191,7 +190,6 @@ export async function POST(request: Request) {
   // we'll upgrade to `user.email` once we have it.
   let signupEmail: string | null = identity.googleEmail ?? null;
   let signupGclid: string | null = null;
-  let signupTwclid: string | null = null;
 
   if (isNewSignup) {
     try {
@@ -216,7 +214,6 @@ export async function POST(request: Request) {
       }) ?? sanitizePaidTouch(meta);
       signupEmail = user?.email ?? identity.googleEmail ?? null;
       signupGclid = latestPaidTouch?.gclid ?? meta.gclid ?? null;
-      signupTwclid = latestPaidTouch?.twclid ?? meta.twclid ?? null;
       await recordUserAttribution({
         userId: identity.userId,
         email: user?.email ?? null,
@@ -268,18 +265,6 @@ export async function POST(request: Request) {
         maxAge: 600,
       });
     }
-    // Server-side Google Ads signup conversion — source of truth for Smart
-    // Bidding (catches signups where browser pixel fails). The browser-side
-    // WEBPAGE action is now observation-only.
-    after(
-      sendXConversion({
-        conversionId: xConversionId,
-        email: signupEmail,
-        twclid: signupTwclid,
-        valueDecimal: 1.0,
-        currency: "USD",
-      }),
-    );
     after(
       maybeFireGoogleAdsSignup({
         userId: identity.userId,
