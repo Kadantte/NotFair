@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { allLandingPages } from "@/lib/marketing-pages";
-import { SITE_URL } from "@/lib/seo";
+import { allIntegrationSlugs } from "@/lib/integrations";
+import { allCompareSlugs, allUseCaseSlugs } from "@/lib/long-form-pages";
+import { absoluteUrl } from "@/lib/seo";
 
 // Blog routes live in /blog/sitemap.xml (app/(marketing)/blog/sitemap.ts).
 const publicMarketingRoutes = [
@@ -20,6 +22,12 @@ const publicMarketingRoutes = [
   "/impact",
   "/privacy",
   "/terms",
+  "/integrations",
+  ...allIntegrationSlugs.map((slug) => `/integrations/${slug}`),
+  "/compare",
+  ...allCompareSlugs.map((slug) => `/compare/${slug}`),
+  "/use-cases",
+  ...allUseCaseSlugs.map((slug) => `/use-cases/${slug}`),
   ...allLandingPages
     .filter((page) => page.index !== false)
     .map((page) => `/${page.slug}`),
@@ -47,13 +55,19 @@ const seoLandingRoutes = new Set([
   "/google-ads-ai-tool",
   "/google-ads-optimization-tool",
   "/meta-ads-mcp",
+  "/integrations",
+  "/compare",
+  "/use-cases",
+  ...allIntegrationSlugs.map((slug) => `/integrations/${slug}`),
+  ...allCompareSlugs.map((slug) => `/compare/${slug}`),
+  ...allUseCaseSlugs.map((slug) => `/use-cases/${slug}`),
 ]);
-const marketingPagesLastModified = new Date("2026-05-08");
+const marketingPagesLastModified = new Date("2026-05-14");
 const homepageLastModified = new Date("2026-04-07");
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return publicMarketingRoutes.map((route) => ({
-    url: new URL(route, SITE_URL).toString(),
+    url: absoluteUrl(route),
     lastModified: route === "/" ? homepageLastModified : marketingPagesLastModified,
     changeFrequency: route === "/" ? "weekly" : "monthly",
     priority: highPriorityRoutes.has(route)

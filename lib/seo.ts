@@ -4,6 +4,10 @@ import { BRAND_NAME, BRAND_URL } from "@/lib/brand";
 export const SITE_NAME = BRAND_NAME;
 export const SITE_URL = BRAND_URL;
 export const DEFAULT_OG_IMAGE = "/opengraph-image";
+
+export function absoluteUrl(path: string): string {
+  return new URL(path, SITE_URL).toString();
+}
 export const SITE_DESCRIPTION = `${BRAND_NAME} is the Google Ads diagnosis and execution layer for Claude. Connect your ad account, find issues, draft fixes in natural language, and approve every write before it reaches Google Ads.`;
 export const SITE_KEYWORDS = [
   "Google Ads MCP server",
@@ -188,6 +192,54 @@ export function buildFaqJsonLd(items: FaqItem[]) {
         "@type": "Answer",
         text: item.answer,
       },
+    })),
+  };
+}
+
+export type ArticleJsonLdInput = {
+  path: string;
+  headline: string;
+  description: string;
+};
+
+export function buildArticleJsonLd({ path, headline, description }: ArticleJsonLdInput) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline,
+    description,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": absoluteUrl(path),
+    },
+    author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+    publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+  };
+}
+
+export type CollectionPageJsonLdInput = {
+  path: string;
+  name: string;
+  items: Array<{ name: string; path: string; description: string }>;
+  itemType?: "WebPage" | "Article";
+};
+
+export function buildCollectionPageJsonLd({
+  path,
+  name,
+  items,
+  itemType = "WebPage",
+}: CollectionPageJsonLdInput) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name,
+    url: absoluteUrl(path),
+    hasPart: items.map((item) => ({
+      "@type": itemType,
+      name: item.name,
+      url: absoluteUrl(item.path),
+      description: item.description,
     })),
   };
 }
