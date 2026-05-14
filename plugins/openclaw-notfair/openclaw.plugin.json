@@ -1,0 +1,129 @@
+{
+  "id": "openclaw-notfair",
+  "kind": "tool",
+  "skills": [
+    "skills"
+  ],
+  "uiHints": {
+    "mcpUrl": {
+      "label": "NotFair Google Ads MCP URL",
+      "placeholder": "https://notfair.co/api/mcp/google_ads",
+      "help": "Platform-explicit NotFair Google Ads MCP endpoint.",
+      "advanced": true
+    },
+    "oauthClientId": {
+      "label": "OAuth Client ID",
+      "help": "Set automatically by dynamic client registration during login. Do not edit manually.",
+      "advanced": true
+    },
+    "oauthClientSecret": {
+      "label": "OAuth Client Secret",
+      "sensitive": true,
+      "help": "Set automatically by dynamic client registration during login. Do not edit manually.",
+      "advanced": true
+    },
+    "accessToken": {
+      "label": "Access Token",
+      "sensitive": true,
+      "help": "Set automatically by openclaw notfair login. Do not edit manually."
+    },
+    "apiKey": {
+      "label": "API Key",
+      "sensitive": true,
+      "help": "Optional Bearer token for headless use. Set with openclaw notfair login --token.",
+      "advanced": true
+    },
+    "tokenExpiresAt": {
+      "label": "Token Expiry",
+      "help": "Unix timestamp. Set automatically.",
+      "advanced": true
+    },
+    "requestTimeoutMs": {
+      "label": "Request Timeout (ms)",
+      "placeholder": "60000",
+      "help": "HTTP timeout for MCP tool calls.",
+      "advanced": true
+    }
+  },
+  "permissions": {
+    "filesystem": {
+      "paths": [
+        "~/.openclaw/openclaw.json"
+      ],
+      "operations": [
+        "read",
+        "write"
+      ],
+      "justification": "Persist NotFair OAuth tokens and keep the plugin enabled across restarts."
+    },
+    "network": {
+      "hosts": [
+        "notfair.co",
+        "www.notfair.co"
+      ],
+      "justification": "Call the NotFair hosted MCP server and OAuth endpoints via HTTPS."
+    },
+    "localhost": {
+      "ports": [
+        "dynamic"
+      ],
+      "justification": "Run a short-lived loopback callback server for OAuth login."
+    },
+    "child_process": {
+      "commands": [
+        "open",
+        "xdg-open",
+        "start"
+      ],
+      "justification": "Open the user's browser for OAuth login and connection setup."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "mcpUrl": {
+        "type": "string",
+        "default": "https://notfair.co/api/mcp/google_ads"
+      },
+      "oauthClientId": {
+        "type": "string"
+      },
+      "oauthClientSecret": {
+        "type": "string"
+      },
+      "accessToken": {
+        "type": "string"
+      },
+      "apiKey": {
+        "type": "string"
+      },
+      "tokenExpiresAt": {
+        "type": "number"
+      },
+      "requestTimeoutMs": {
+        "type": "number",
+        "default": 60000,
+        "minimum": 5000,
+        "maximum": 300000
+      }
+    },
+    "required": []
+  },
+  "contracts": {
+    "tools": [
+      "notfair_connect",
+      "notfair_google_ads_tool",
+      "notfair_list_connected_accounts",
+      "notfair_run_script"
+    ],
+    "cli": [
+      "notfair login",
+      "notfair logout",
+      "notfair status",
+      "notfair accounts",
+      "notfair connect",
+      "notfair tool"
+    ]
+  }
+}

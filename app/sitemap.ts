@@ -11,6 +11,7 @@ const publicMarketingRoutes = [
   "/google-ads-claude-code-plugin-setup-guide",
   "/google-ads-codex",
   "/google-ads-codex-mcp-setup-guide",
+  "/google-ads-openclaw",
   "/google-ads-mcp",
   "/meta-ads-claude-connector-setup-guide",
   "/meta-ads-claude-code-plugin-setup-guide",
@@ -32,6 +33,7 @@ const highPriorityRoutes = new Set([
   "/google-ads-claude-code-plugin-setup-guide",
   "/google-ads-codex",
   "/google-ads-codex-mcp-setup-guide",
+  "/google-ads-openclaw",
   "/google-ads-mcp",
   "/meta-ads-claude-connector-setup-guide",
   "/meta-ads-claude-code-plugin-setup-guide",
@@ -40,6 +42,7 @@ const highPriorityRoutes = new Set([
 const seoLandingRoutes = new Set([
   "/ai-google-ads-agent",
   "/google-ads-mcp",
+  "/google-ads-openclaw",
   "/google-ads-connector",
   "/google-ads-ai-tool",
   "/google-ads-optimization-tool",

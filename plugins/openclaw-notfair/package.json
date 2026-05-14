@@ -1,0 +1,66 @@
+{
+  "name": "openclaw-notfair",
+  "version": "2026.5.14",
+  "type": "module",
+  "description": "OpenClaw plugin for NotFair - manage Google Ads via natural language with approval-gated writes",
+  "homepage": "https://www.notfair.co/google-ads-openclaw",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nowork-studio/notfair.git",
+    "directory": "plugins/openclaw-notfair"
+  },
+  "bugs": {
+    "url": "https://github.com/nowork-studio/notfair/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "notfair",
+    "google-ads",
+    "mcp",
+    "advertising",
+    "campaign-management",
+    "ppc",
+    "sem",
+    "google-ads-automation"
+  ],
+  "license": "MIT",
+  "main": "./index.js",
+  "exports": {
+    ".": {
+      "import": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "skills/",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE",
+    "clawhub/"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=2026.3.22"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0"
+  },
+  "scripts": {
+    "pack:check": "npm pack --dry-run"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": ">=2026.3.22"
+    },
+    "build": {
+      "openclawVersion": "2026.5.12-beta.5"
+    }
+  }
+}
