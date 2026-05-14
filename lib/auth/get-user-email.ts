@@ -13,9 +13,8 @@ import { db } from "@/lib/db";
  * created by Supabase Auth via signInWithIdToken, so auth.users is the
  * authoritative source.
  *
- * Used by x-first-write, reddit-first-write, subscription, and agent
- * feedback paths that need the user's email for conversion / billing /
- * audit trails.
+ * Used by reddit-first-write, subscription, and agent feedback paths that
+ * need the user's email for conversion / billing / audit trails.
  */
 export async function getUserEmail(userId: string): Promise<string | null> {
   // Drizzle doesn't model the Supabase auth schema by default; query directly.

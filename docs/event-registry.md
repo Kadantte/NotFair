@@ -1,7 +1,7 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-05-12.
-> Platforms: PostHog, X Ads Pixel, optional X Ads CAPI for non-signup activation events. Check here before adding a new event.
+> Source of truth for all analytics events. Last updated: 2026-05-14.
+> Platforms: PostHog, X Ads Pixel, and X Ads Conversion API. Check here before adding a new event.
 
 
 
@@ -856,50 +856,26 @@ No properties.
 
 ---
 
-## x_first_write_lead_conversion
-
-**Phase:** 2
-**Category:** activation | paid_acquisition
-**Platform:** X Ads Conversion API (server)
-**Trigger:** Optional. Fires only when `X_FIRST_WRITE_EVENT_ID` is configured. After `logChange` inserts a successful write row (`operations.op_type = 1`, `success = 1`) and that user has no earlier successful write, the first-write detector checks prior successful write rows by `operations.id < justInsertedId`, then sends X the separate first-write conversion with the stable dedupe key `first-write-${userId}`.
-**Hypothesis:** We believe tracking first successful write can tell X which acquired users reached NotFair's D0 Write Users activation metric. This must use a separate X Ads event from signup; otherwise activated users are double-counted against the signup goal.
-
-| Property | Type | Example | Description |
-|---|---|---|---|
-| `event_id` | string | `"tw-q27qa-firstwrite"` | X Ads event ID configured in Ads Manager. Required via `X_FIRST_WRITE_EVENT_ID`; no default. |
-| `conversion_id` | string | `"first-write-user_abc123"` | Stable dedupe key sent to X. |
-| `identifiers.hashed_email` | string | `"0c7e..."` | SHA-256 hash of the latest session's normalized Google email. Required for this server-side path because first write does not reliably have `twclid`. |
-| `value` | string | `"1"` | Nominal conversion value. |
-| `price_currency` | string | `"USD"` | Conversion currency. |
-
-```json
-{ "conversions": [{ "event_id": "tw-q27qa-firstwrite", "conversion_id": "first-write-user_abc123", "identifiers": [{ "hashed_email": "0c7e..." }], "value": "1", "price_currency": "USD" }] }
-```
-
-**Files:** `lib/db/tracking.ts`, `lib/x-first-write.ts`, `lib/x-capi.ts`
-
----
-
 ## x_signup_conversion
 
 **Phase:** 1
 **Category:** identity | paid_acquisition
-**Platform:** X Ads Pixel (client)
-**Trigger:** Fires once for a real new signup across Google OAuth single-account, Google OAuth multi-account selection, and email magic-link signup. Server routes set `x_signup_id` with a stable hashed conversion ID. The browser Pixel fires the signup event after hydration and then clears the cookie.
-**Hypothesis:** We believe tracking signup as the X Ads conversion goal tells X which ad clicks produce new users, which lets campaigns optimize top-of-funnel acquisition without double-counting activated first-write users.
+**Platform:** X Ads Pixel (client) + X Ads Conversion API (server)
+**Trigger:** Fires once for a real new signup across Google OAuth single-account, Google OAuth multi-account selection, and email magic-link signup. Server routes send the signup event through X Conversion API and set `x_signup_id` with the same stable hashed conversion ID. The browser Pixel also fires the signup event after hydration and then clears the cookie, using `conversion_id` for dedupe.
+**Hypothesis:** We believe tracking signup as the only X Ads conversion goal tells X which ad clicks produce new users, which lets campaigns optimize top-of-funnel acquisition without mixing signup and activation signals.
 
 | Property | Type | Example | Description |
 |---|---|---|---|
-| `event_id` | string | `"tw-q27qa-q27qc"` | X Ads signup event ID. Browser Pixel uses `NEXT_PUBLIC_X_SIGNUP_EVENT_ID` or `NEXT_PUBLIC_X_EVENT_ID`. The bundled fallback is only used with the bundled `q27qa` pixel; custom pixels must provide a matching event ID. |
-| `conversion_id` | string | `"signup-4d96794f..."` | Stable debug/dedupe key sent in the browser Pixel event. Built from a SHA-256 digest of the internal user ID, not the raw user ID. |
+| `event_id` | string | `"tw-q27qa-q27qc"` | X Ads signup event ID. Browser Pixel uses `NEXT_PUBLIC_X_SIGNUP_EVENT_ID` or `NEXT_PUBLIC_X_EVENT_ID`; CAPI uses `X_EVENT_ID`. The bundled fallback is only used with the bundled `q27qa` pixel; custom pixels must provide a matching event ID. |
+| `conversion_id` | string | `"signup-4d96794f..."` | Stable debug/dedupe key sent in both the browser Pixel and CAPI event. Built from a SHA-256 digest of the internal user ID, not the raw user ID. |
 | `value` | string | `"1"` | Nominal conversion value. |
-| `price_currency` | string | `"USD"` | Conversion currency. |
+| `currency` / `price_currency` | string | `"USD"` | Conversion currency. Browser Pixel sends `currency`; CAPI sends `price_currency`. |
 
 ```json
 { "twq": ["event", "tw-q27qa-q27qc", { "conversion_id": "signup-4d96794f...", "value": 1, "currency": "USD" }] }
 ```
 
-**Files:** `app/auth/callback/route.ts`, `app/api/auth/select-account/route.ts`, `app/auth/supabase/callback/route.ts`, `components/gads-conversion-tracker.tsx`, `lib/x-signup.ts`
+**Files:** `app/auth/callback/route.ts`, `app/api/auth/select-account/route.ts`, `app/auth/supabase/callback/route.ts`, `components/gads-conversion-tracker.tsx`, `lib/x-capi.ts`, `lib/x-signup.ts`
 
 ---
 

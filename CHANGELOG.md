@@ -2,6 +2,14 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.12] - 2026-05-14
+
+### Changed
+- **X Ads conversion tracking is now signup-only.** Removed the X first-write CAPI hook from write logging so X optimizes against the signup conversion only; Reddit still receives the first-write activation conversion.
+
+### Fixed
+- **X signup conversions now have a server-side delivery path.** New Google OAuth, multi-account, and email magic-link signups now send the existing X Lead event through Conversion API with the same dedupe key as the browser pixel, so browser pixel drops no longer hide real signups from X.
+
 ## [0.5.5.11] - 2026-05-14
 
 ### Fixed

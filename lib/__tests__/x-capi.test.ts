@@ -71,7 +71,7 @@ describe("sendXConversion", () => {
     fetchMock.mockResolvedValueOnce(new Response("", { status: 200 }));
 
     await sendXConversion({
-      conversionId: "first-write-user-42",
+      conversionId: "signup-42",
       email: "  FOO@BAR.com ",
       valueDecimal: 1,
       currency: "USD",
@@ -97,7 +97,7 @@ describe("sendXConversion", () => {
     expect(body.conversions).toHaveLength(1);
     const [conversion] = body.conversions;
     expect(conversion.event_id).toBe("tw-q27qa-q27qc");
-    expect(conversion.conversion_id).toBe("first-write-user-42");
+    expect(conversion.conversion_id).toBe("signup-42");
     expect(conversion.identifiers).toEqual([
       {
         hashed_email:

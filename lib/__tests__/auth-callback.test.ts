@@ -10,6 +10,7 @@ const {
   mockCookieGetAll,
   mockVerifyOAuthNonce,
   mockMaybeFireGoogleAdsSignup,
+  mockSendXConversion,
   mockLoadGoogleConnection,
 } = vi.hoisted(() => ({
   mockSignInWithIdToken: vi.fn(),
@@ -21,6 +22,7 @@ const {
   mockCookieGetAll: vi.fn(),
   mockVerifyOAuthNonce: vi.fn(),
   mockMaybeFireGoogleAdsSignup: vi.fn(async () => {}),
+  mockSendXConversion: vi.fn(async () => {}),
   mockLoadGoogleConnection: vi.fn<() => Promise<unknown>>(async () => null),
 }));
 
@@ -82,6 +84,10 @@ vi.mock("@/lib/connections/google-read", () => ({
 
 vi.mock("@/lib/google-ads-signup", () => ({
   maybeFireGoogleAdsSignup: mockMaybeFireGoogleAdsSignup,
+}));
+
+vi.mock("@/lib/x-capi", () => ({
+  sendXConversion: mockSendXConversion,
 }));
 
 vi.mock("@/lib/x-signup", () => ({
@@ -339,6 +345,7 @@ describe("Auth callback route — GET", () => {
       attribution: {
         version: 1,
         gclid: "EAIaIQ-test-gclid",
+        twclid: "twclid-test",
         attribution_captured_at: "2026-05-11T00:00:00Z",
       },
     });
@@ -352,6 +359,14 @@ describe("Auth callback route — GET", () => {
       userId: "user-123",
       email: "user@example.com",
       gclid: "EAIaIQ-test-gclid",
+    });
+    expect(mockSendXConversion).toHaveBeenCalledTimes(1);
+    expect(mockSendXConversion).toHaveBeenCalledWith({
+      conversionId: "signup-user-123",
+      email: "user@example.com",
+      twclid: "twclid-test",
+      valueDecimal: 1.0,
+      currency: "USD",
     });
     // 600s TTL on the cookies that carry the signup signal (read from raw
     // Set-Cookie since the test framework's cookies.get only exposes value).
@@ -376,6 +391,7 @@ describe("Auth callback route — GET", () => {
     );
 
     expect(mockMaybeFireGoogleAdsSignup).not.toHaveBeenCalled();
+    expect(mockSendXConversion).not.toHaveBeenCalled();
   });
 
   it("redirects to /campaigns by default after successful connect", async () => {
