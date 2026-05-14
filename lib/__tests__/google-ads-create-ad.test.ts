@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockCustomerFactory, mockMutateResources } = vi.hoisted(() => ({
+const { mockCustomerFactory, mockMutateResources, mockQuery } = vi.hoisted(() => ({
   mockCustomerFactory: vi.fn(),
   mockMutateResources: vi.fn(),
+  mockQuery: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -15,7 +16,7 @@ vi.mock("google-ads-api", () => ({
   },
 }));
 
-import { createAd } from "@/lib/google-ads";
+import { createAd, updateAdFinalUrl } from "@/lib/google-ads";
 
 const auth = {
   refreshToken: "refresh-token",
@@ -40,7 +41,15 @@ describe("createAd", () => {
     vi.clearAllMocks();
     mockCustomerFactory.mockReturnValue({
       mutateResources: mockMutateResources,
+      query: mockQuery,
     });
+    mockQuery.mockResolvedValue([
+      {
+        ad_group_ad: {
+          ad: { final_urls: ["https://old.example.com"] },
+        },
+      },
+    ]);
   });
 
   it("rewrites Google Ads policy finding failures with actionable policy guidance", async () => {
@@ -54,6 +63,29 @@ describe("createAd", () => {
     });
 
     const result = await createAd(auth, "1234567890", validRsa);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Policy violation: POLICY");
+    expect(result.error).toContain("Google Ads rejected this content");
+    expect(result.policy).toMatchObject({
+      policyTopics: ["POLICY"],
+      retryable: false,
+      requiredAction: "rewrite_or_request_exception",
+    });
+  });
+
+  it("rewrites updateAdFinalUrl policy finding failures with actionable policy guidance", async () => {
+    mockMutateResources.mockRejectedValueOnce({
+      errors: [
+        {
+          message: "The resource has been disapproved since the policy summary includes policy topics of type PROHIBITED.",
+          error_code: { policy_finding_error: 2 },
+          trigger: { string_value: "https://example.com/packages" },
+        },
+      ],
+    });
+
+    const result = await updateAdFinalUrl(auth, "1234567890", "987654321", "https://example.com/packages");
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Policy violation: POLICY");

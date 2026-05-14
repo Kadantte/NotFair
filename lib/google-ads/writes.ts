@@ -44,6 +44,17 @@ function isDatabaseContentionError(message: string | undefined | null): boolean 
   );
 }
 
+const BIDDING_STRATEGY_TYPE_NAME: Record<number, string> = {
+  2: "ENHANCED_CPC",
+  3: "MANUAL_CPC",
+};
+
+function normalizeBiddingStrategyType(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === "number") return BIDDING_STRATEGY_TYPE_NAME[raw] ?? `UNKNOWN_${raw}`;
+  return String(raw);
+}
+
 const DB_CONTENTION_BACKOFFS_MS = [
   { base: 200, jitter: 100 },
   { base: 500, jitter: 200 },
@@ -379,7 +390,7 @@ export async function updateBid(
   `);
   const row = (preCheckResult as any[])[0];
   const keywordText: string | null = row?.ad_group_criterion?.keyword?.text ?? null;
-  const strategy = row?.campaign?.bidding_strategy_type;
+  const strategy = normalizeBiddingStrategyType(row?.campaign?.bidding_strategy_type);
   const manualStrategies = ["MANUAL_CPC", "ENHANCED_CPC"];
   if (strategy && !manualStrategies.includes(strategy)) {
     return {

@@ -246,4 +246,18 @@ describe("guardrail rejections carry a setGuardrails nextTool", () => {
     expect(result.nextTool?.name).toBe("setGuardrails");
     expect(result.nextTool?.args).toHaveProperty("maxBidChangePct");
   });
+
+  it("updateBid accepts numeric MANUAL_CPC from the Google Ads API enum", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        campaign: { bidding_strategy_type: 3 },
+        ad_group_criterion: { cpc_bid_micros: 1_000_000, keyword: { text: "shoes" } },
+      },
+    ]);
+
+    const result = await updateBid(AUTH, "100", "111", "222", 1_100_000);
+
+    expect(result.success).toBe(true);
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
+  });
 });

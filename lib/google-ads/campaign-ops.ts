@@ -1326,13 +1326,16 @@ export async function updateAdFinalUrl(
       afterValue: finalUrl,
     };
   } catch (error) {
+    const policy = extractPolicyRejection(error);
+    if (policy) recordPolicyFailure(auth, "updateAdFinalUrl", [finalUrl], policy);
     return {
       success: false,
       action: "update_ad_final_url",
       entityId,
       beforeValue,
       afterValue: finalUrl,
-      error: extractErrorMessage(error),
+      error: policy?.message ?? extractErrorMessage(error),
+      ...(policy ? { policy } : {}),
     };
   }
 }
