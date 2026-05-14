@@ -1,5 +1,4 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { Type } from "@sinclair/typebox";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -7,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const PLUGIN_ID = "openclaw-notfair";
-const PLUGIN_VERSION = "2026.5.15";
+const PLUGIN_VERSION = "2026.5.16";
 const DEFAULT_MCP_URL = "https://notfair.co/api/mcp/google_ads";
 const CONNECT_URL = "https://notfair.co/connect";
 
@@ -224,6 +223,49 @@ function errorResult(message) {
   return { content: [{ type: "text", text: message }], details: null };
 }
 
+const emptyParameters = {
+  type: "object",
+  additionalProperties: false,
+  properties: {},
+};
+
+const googleAdsToolParameters = {
+  type: "object",
+  additionalProperties: false,
+  required: ["toolName"],
+  properties: {
+    toolName: {
+      type: "string",
+      description: "Exact NotFair MCP tool name, for example listConnectedAccounts, runScript, getKeywordIdeas, addNegativeKeyword, pauseCampaign.",
+    },
+    arguments: {
+      type: "object",
+      description: "Arguments object passed to the MCP tool.",
+      additionalProperties: true,
+    },
+  },
+};
+
+const runScriptParameters = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code"],
+  properties: {
+    code: {
+      type: "string",
+      description: "JavaScript source. Top-level await is supported by NotFair's runScript tool.",
+    },
+    accountId: {
+      type: "string",
+      description: "Optional Google Ads account/customer ID override.",
+    },
+    timeoutMs: {
+      type: "number",
+      description: "Optional timeout in milliseconds. Max is enforced server-side.",
+    },
+  },
+};
+
 class NotFairMcpClient {
   constructor(config) {
     this.config = config;
@@ -292,7 +334,7 @@ function registerTools(api, client, authenticated) {
       name: "notfair_connect",
       label: "Connect NotFair",
       description: "Connect NotFair to OpenClaw. Run openclaw notfair login, then connect Google Ads at https://notfair.co/connect.",
-      parameters: Type.Object({}),
+      parameters: emptyParameters,
       execute: async () => errorResult("NotFair is not connected. Run 'openclaw notfair login', then open https://notfair.co/connect to connect Google Ads."),
     }, { name: "notfair_connect" });
     return;
@@ -301,28 +343,21 @@ function registerTools(api, client, authenticated) {
     name: "notfair_google_ads_tool",
     label: "Call NotFair Google Ads Tool",
     description: "Call any NotFair Google Ads MCP tool by name. Use this for NotFair tools not exposed as first-class OpenClaw tools yet. Writes are approval-gated by NotFair and the MCP client.",
-    parameters: Type.Object({
-      toolName: Type.String({ description: "Exact NotFair MCP tool name, for example listConnectedAccounts, runScript, getKeywordIdeas, addNegativeKeyword, pauseCampaign." }),
-      arguments: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "Arguments object passed to the MCP tool." })),
-    }),
+    parameters: googleAdsToolParameters,
     execute: async (_toolCallId, params) => client.callTool(params.toolName, params.arguments || {}),
   }, { name: "notfair_google_ads_tool" });
   api.registerTool({
     name: "notfair_list_connected_accounts",
     label: "List NotFair Google Ads Accounts",
     description: "List Google Ads accounts connected to the current NotFair session. Use before account-specific analysis or write operations.",
-    parameters: Type.Object({}),
+    parameters: emptyParameters,
     execute: async () => client.callTool("listConnectedAccounts", {}),
   }, { name: "notfair_list_connected_accounts" });
   api.registerTool({
     name: "notfair_run_script",
     label: "Run NotFair Google Ads Script",
     description: "Run a read-only JavaScript analysis script inside NotFair's Google Ads sandbox. Use for campaign diagnostics, search term analysis, wasted spend, and custom reporting. Do not use for mutations.",
-    parameters: Type.Object({
-      code: Type.String({ description: "JavaScript source. Top-level await is supported by NotFair's runScript tool." }),
-      accountId: Type.Optional(Type.String({ description: "Optional Google Ads account/customer ID override." })),
-      timeoutMs: Type.Optional(Type.Number({ description: "Optional timeout in milliseconds. Max is enforced server-side." })),
-    }),
+    parameters: runScriptParameters,
     execute: async (_toolCallId, params) => client.callTool("runScript", params),
   }, { name: "notfair_run_script" });
 }
