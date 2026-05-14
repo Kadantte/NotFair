@@ -96,7 +96,7 @@ async function fetchUsageData({
     const [totalsRow, prevTotalsRow, newUsersRow, dailyCounts, dailyInteractions, lowSuccessUsers, topTools] = await Promise.all([
         db()
             .select({
-                calls: operationRowCount(schema.operations),
+                calls: operationRowCount(),
                 errors: operationErrorRowCount(schema.operations),
                 activeUsers: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
             })
@@ -105,7 +105,7 @@ async function fetchUsageData({
 
         db()
             .select({
-                calls: operationRowCount(schema.operations),
+                calls: operationRowCount(),
                 errors: operationErrorRowCount(schema.operations),
                 activeUsers: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
             })

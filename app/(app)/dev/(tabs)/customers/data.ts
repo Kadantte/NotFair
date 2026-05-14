@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { db, schema } from '@/lib/db';
-import { sql, desc, eq, inArray, isNotNull, and, gte } from 'drizzle-orm';
+import { sql, desc, eq, inArray, and, gte } from 'drizzle-orm';
 import { after } from 'next/server';
 import { OP_TYPE } from '@/lib/db/tracking';
 import {
@@ -188,52 +188,57 @@ function enqueueSuspiciousSnapshotRefresh(accountIds: string[]) {
 }
 
 export async function getCustomersData() {
-    const legacyCustomers = await db()
-        .select({
-            userId: schema.mcpSessions.userId,
-            googleEmail: sql<string | null>`max(${schema.mcpSessions.googleEmail})`.as('google_email'),
-            customerId: sql<string>`max(${schema.mcpSessions.customerId})`.as('customer_id'),
-            customerIds: sql<string>`max(${schema.mcpSessions.customerIds})`.as('customer_ids'),
-            sessions: sql<number>`count(*)::int`.as('sessions'),
-            lastSessionAt: sql<string>`max(${schema.mcpSessions.createdAt})`.as('last_session_at'),
-            firstSeen: sql<string>`min(${schema.mcpSessions.createdAt})`.as('first_seen'),
-        })
-        .from(schema.mcpSessions)
-        .groupBy(schema.mcpSessions.userId)
-        .having(
-            sql`coalesce(lower(max(${schema.mcpSessions.googleEmail})), '') not in (${devEmailSqlList()})`,
-        )
-        .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`))
-        .limit(2000);
+    const [legacyCustomers, googleConnections] = await Promise.all([
+        db()
+            .select({
+                userId: schema.mcpSessions.userId,
+                googleEmail: sql<string | null>`max(${schema.mcpSessions.googleEmail})`.as('google_email'),
+                customerId: sql<string>`max(${schema.mcpSessions.customerId})`.as('customer_id'),
+                customerIds: sql<string>`max(${schema.mcpSessions.customerIds})`.as('customer_ids'),
+                sessions: sql<number>`count(*)::int`.as('sessions'),
+                lastSessionAt: sql<string>`max(${schema.mcpSessions.createdAt})`.as('last_session_at'),
+                firstSeen: sql<string>`min(${schema.mcpSessions.createdAt})`.as('first_seen'),
+            })
+            .from(schema.mcpSessions)
+            .groupBy(schema.mcpSessions.userId)
+            .having(
+                sql`coalesce(lower(max(${schema.mcpSessions.googleEmail})), '') not in (${devEmailSqlList()})`,
+            )
+            .orderBy(desc(sql`max(${schema.mcpSessions.createdAt})`))
+            .limit(2000),
 
-    const googleConnections = await db()
-        .select({
-            userId: schema.adPlatformConnections.userId,
-            googleEmail: connectionGoogleEmail.as('google_email'),
-            customerId: sql<string>`coalesce(${schema.adPlatformConnections.activeAccountId}, ${schema.adPlatformConnections.accountIds}->0->>'id', '')`.as('customer_id'),
-            customerIds: sql<string>`coalesce(${schema.adPlatformConnections.accountIds}::text, '[]')`.as('customer_ids'),
-            sessions: sql<number>`1`.as('sessions'),
-            lastSessionAt: sql<string>`${schema.adPlatformConnections.updatedAt}`.as('last_session_at'),
-            firstSeen: sql<string>`${schema.adPlatformConnections.createdAt}`.as('first_seen'),
-        })
-        .from(schema.adPlatformConnections)
-        .leftJoin(
-            schema.userAttribution,
-            eq(schema.userAttribution.userId, schema.adPlatformConnections.userId),
-        )
-        .where(
-            sql`${schema.adPlatformConnections.platform} = 'google_ads'
+        db()
+            .select({
+                userId: schema.adPlatformConnections.userId,
+                googleEmail: connectionGoogleEmail.as('google_email'),
+                customerId: sql<string>`coalesce(${schema.adPlatformConnections.activeAccountId}, ${schema.adPlatformConnections.accountIds}->0->>'id', '')`.as('customer_id'),
+                customerIds: sql<string>`coalesce(${schema.adPlatformConnections.accountIds}::text, '[]')`.as('customer_ids'),
+                sessions: sql<number>`1`.as('sessions'),
+                lastSessionAt: sql<string>`${schema.adPlatformConnections.updatedAt}`.as('last_session_at'),
+                firstSeen: sql<string>`${schema.adPlatformConnections.createdAt}`.as('first_seen'),
+            })
+            .from(schema.adPlatformConnections)
+            .leftJoin(
+                schema.userAttribution,
+                eq(schema.userAttribution.userId, schema.adPlatformConnections.userId),
+            )
+            .where(
+                sql`${schema.adPlatformConnections.platform} = 'google_ads'
         and coalesce(lower(${connectionGoogleEmail}), '') not in (${devEmailSqlList()})`,
-        )
-        .limit(2000);
+            )
+            .limit(2000),
+    ]);
 
     const customers = mergeCustomerSeeds(legacyCustomers, googleConnections);
 
     const allAccountIds = new Set<string>();
+    const customerEmails = new Set<string>();
     const parsed = customers.map((c) => {
         const accounts = parseCustomerIds(c.customerIds);
         for (const a of accounts) allAccountIds.add(a.id);
-        return { ...c, accounts };
+        const emailKey = c.googleEmail?.toLowerCase() ?? null;
+        if (emailKey) customerEmails.add(emailKey);
+        return { ...c, accounts, emailKey };
     });
     const userIds = [...new Set(parsed.map((c) => c.userId).filter((id): id is string => !!id))];
 
@@ -283,7 +288,7 @@ export async function getCustomersData() {
                 const rows = await db()
                     .select({
                         accountId: schema.operations.accountId,
-                        calls: operationRowCount(schema.operations),
+                        calls: operationRowCount(),
                         errorsCount: operationErrorRowCount(schema.operations),
                     })
                     .from(schema.operations)
@@ -303,6 +308,10 @@ export async function getCustomersData() {
         })(),
         (async () => {
             const map = new Map<string, { status: string; hasDraft: boolean; lastContactedAt: string | null }>();
+            if (customerEmails.size === 0) return map;
+            // contacts.email is stored normalized via `normalizeEmail` at every
+            // insert site, so `inArray` on the lowercase set hits the unique
+            // index. Replaces a prior unfiltered `LIMIT 2000` scan.
             const rows = await db()
                 .select({
                     email: schema.contacts.email,
@@ -311,10 +320,9 @@ export async function getCustomersData() {
                     lastContactedAt: schema.contacts.lastContactedAt,
                 })
                 .from(schema.contacts)
-                .where(isNotNull(schema.contacts.email))
-                .limit(2000);
+                .where(inArray(schema.contacts.email, [...customerEmails]));
             for (const r of rows) {
-                map.set(r.email.toLowerCase(), {
+                map.set(r.email, {
                     status: r.status,
                     hasDraft: !!r.draftBody,
                     lastContactedAt: r.lastContactedAt ? r.lastContactedAt.toISOString() : null,
@@ -377,6 +385,8 @@ export async function getCustomersData() {
         })(),
     ]);
 
+    const suspiciousSnapshotAccountIds: string[] = [];
+
     const result = parsed.map((c) => {
         let totalReads = 0;
         let totalWrites = 0;
@@ -384,7 +394,6 @@ export async function getCustomersData() {
         let totalDailyBudgetUsd: number | null = null;
         let totalCalls30d = 0;
         let totalErrors30d = 0;
-        const suspiciousSnapshotAccountIds: string[] = [];
         const accounts = c.accounts.map((a) => {
             const ops = opsCounts.get(a.id);
             const opTotal = (ops?.reads ?? 0) + (ops?.writes ?? 0);
@@ -426,12 +435,9 @@ export async function getCustomersData() {
             };
         });
 
-        enqueueSuspiciousSnapshotRefresh(suspiciousSnapshotAccountIds);
-
         const lastActive = compareTimestamp(lastOp, c.lastSessionAt, 'max');
 
-        const emailKey = c.googleEmail?.toLowerCase() ?? null;
-        const contact = emailKey ? contactsByEmail.get(emailKey) : undefined;
+        const contact = c.emailKey ? contactsByEmail.get(c.emailKey) : undefined;
         let outreachStatus: 'contacted' | 'drafted' | 'none' = 'none';
         if (contact?.status === 'contacted') outreachStatus = 'contacted';
         else if (contact?.hasDraft) outreachStatus = 'drafted';
@@ -463,6 +469,8 @@ export async function getCustomersData() {
     });
 
     result.sort((a, b) => (b.lastActive ?? '').localeCompare(a.lastActive ?? ''));
+
+    enqueueSuspiciousSnapshotRefresh(suspiciousSnapshotAccountIds);
 
     return { customers: result };
 }

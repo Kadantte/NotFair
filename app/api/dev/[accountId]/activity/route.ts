@@ -66,7 +66,7 @@ export async function GET(
     // Aggregate stats for the window. Count operation rows.
     db()
       .select({
-        calls: operationRowCount(schema.operations),
+        calls: operationRowCount(),
         errors: operationErrorRowCount(schema.operations),
         p50: sql<number>`coalesce(percentile_disc(0.5) within group (order by ${schema.operations.latencyMs}), 0)::int`,
         lastCallAt: sql<string | null>`max(${schema.operations.createdAt})`,

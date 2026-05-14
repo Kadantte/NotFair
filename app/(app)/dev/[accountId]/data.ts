@@ -44,7 +44,7 @@ async function fetchAccountDetail(accountId: string, tz: string): Promise<Accoun
                     date: sql<string>`${localDate}`.as('date'),
                     reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
                     writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
-                    total: operationRowCount(schema.operations),
+                    total: operationRowCount(),
                 })
                 .from(schema.operations)
                 .where(
@@ -61,7 +61,7 @@ async function fetchAccountDetail(accountId: string, tz: string): Promise<Accoun
         db()
             .select({
                 campaignId: schema.operations.campaignId,
-                ops: operationRowCount(schema.operations),
+                ops: operationRowCount(),
                 writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
                 lastOp: sql<string>`max(${schema.operations.createdAt})`.as('last_op'),
             })
@@ -73,7 +73,7 @@ async function fetchAccountDetail(accountId: string, tz: string): Promise<Accoun
                 ),
             )
             .groupBy(schema.operations.campaignId)
-            .orderBy(desc(operationRowCount(schema.operations)))
+            .orderBy(desc(operationRowCount()))
             .limit(50),
 
         // Audit snapshots (most recent 20)

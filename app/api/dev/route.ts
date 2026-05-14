@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         date: sql<string>`${localDate}`.as("date"),
         reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
         writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
-        total: operationRowCount(schema.operations),
+        total: operationRowCount(),
       })
       .from(schema.operations)
       .where(whereClause)
@@ -69,12 +69,12 @@ export async function GET(request: Request) {
     db()
       .select({
         source: normalizedSource.as("source"),
-        ops: operationRowCount(schema.operations),
+        ops: operationRowCount(),
       })
       .from(schema.operations)
       .where(sql`${timeFilter} and ${excludeDevs}`)
       .groupBy(normalizedSource)
-      .orderBy(desc(operationRowCount(schema.operations))),
+      .orderBy(desc(operationRowCount())),
   ]);
 
   const payload = { dailyUsage, sources };
