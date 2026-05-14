@@ -374,8 +374,6 @@ export function demoGetConversionActions() {
       countingType: "ONE_PER_CLICK",
       defaultValue: null,
       alwaysUseDefaultValue: false,
-      mutable: true,
-      readOnlyReason: null,
     },
     {
       id: "940000002",
@@ -388,8 +386,6 @@ export function demoGetConversionActions() {
       countingType: "ONE_PER_CLICK",
       defaultValue: null,
       alwaysUseDefaultValue: false,
-      mutable: true,
-      readOnlyReason: null,
     },
     {
       id: "940000003",
@@ -402,8 +398,6 @@ export function demoGetConversionActions() {
       countingType: "ONE_PER_CLICK",
       defaultValue: 1,
       alwaysUseDefaultValue: true,
-      mutable: true,
-      readOnlyReason: null,
     },
   ];
 }

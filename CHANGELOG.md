@@ -2,6 +2,16 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.10] - 2026-05-14
+
+### Fixed
+- **`runScript` now catches eight more hallucinated GAQL fields and three segment/resource incompatibility shapes before the Google round-trip.** Queries selecting `campaign.url_expansion_opt_out`, `campaign.budget_amount_micros`, `campaign_criterion.audience.audience`, `recommendation.impact.base_metrics.*`, `recommendation.keyword_match_type`, `auction_insight.domain`, or bare `resource_name` now fail fast with the exact supported replacement instead of a generic `query_error=32` from Google. Same story for `segments.hour` on `keyword_view`/`search_term_view`/`user_location_view`, geo segments on `user_location_view`, and bare `conversion_action` in SELECT. These together cover ~91% of recent `runScript` preventable failures.
+- **`authorization_error=26` on `auction_insight_*` metrics is now enriched with actionable guidance.** Agents querying auction insights without the special developer-token access get a clear pointer to the Google Ads UI (Tools → Auction Insights) instead of a bare permission error.
+
+### Changed
+- **`removeConversionAction` and `updateConversionAction` tool descriptions now point at the real runtime path.** Previous wording told agents to "Call getConversionActions first" — but no MCP tool by that name exists. Descriptions now direct agents to read `conversion_action.type` and `conversion_action.owner_customer` via `runScript` with `ads.queries.conversionActions` or a direct `FROM conversion_action` query, and apply the read-only type list (GA4/UA/Floodlight/Firebase/Salesforce/SA360 imports, Smart Campaign auto-actions, Store Visits, app-store actions, manager-inherited) client-side. The write-side pre-flight catches misuse regardless.
+- **Simplified `getConversionActions` return shape.** Removed the unused `mutable`/`readOnlyReason` annotation from the read path (no consumer used it). The audit page, campaigns page, dev audit route, and demo tests continue working unchanged. The `readOnlyConversionActionReason` helper stays in `campaign-ops.ts` where the write-side pre-flights authoritatively use it.
+
 ## [0.5.5.9] - 2026-05-13
 
 ### Fixed

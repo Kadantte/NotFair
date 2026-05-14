@@ -476,6 +476,9 @@ export function enrichGaqlError(message: string): string {
   if (/change_event_error=3/i.test(message) || /missing filters on change_event\.change_date_time/i.test(message)) {
     return `${message} Tip: change_event REQUIRES an explicit \`change_event.change_date_time\` filter — \`segments.date DURING …\` does NOT work for this resource. Add \`WHERE change_event.change_date_time >= '<YYYY-MM-DD> 00:00:00' AND change_event.change_date_time <= '<YYYY-MM-DD> 23:59:59'\` (window must be inside the last 30 days).`;
   }
+  if (/authorization_error=26/i.test(message) && /auction_insight/i.test(message)) {
+    return `${message} Tip: \`metrics.auction_insight_*\` and \`segments.auction_insight_domain\` are real GAQL fields, but they require special developer-token access. If your account isn't enrolled for auction-insights API access, this query will not work — view auction insights in the Google Ads UI under Tools → Auction Insights, or contact Google Ads support to request API access.`;
+  }
   return message;
 }
 
@@ -661,6 +664,22 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`asset.sitelink_asset.final_urls` is not a GAQL field. Use `getResourceMetadata('asset')` to confirm the available asset URL fields before retrying.",
   "geo_target_constant.canonical":
     "`geo_target_constant.canonical` is not a GAQL field. Select `geo_target_constant.canonical_name` instead.",
+  "campaign.url_expansion_opt_out":
+    "`campaign.url_expansion_opt_out` is not a GAQL field. Use `getResourceMetadata('campaign')` to confirm the available campaign URL/expansion fields before retrying.",
+  "campaign.budget_amount_micros":
+    "`campaign.budget_amount_micros` is not a GAQL field. Budget lives on the linked `campaign_budget` resource — SELECT `campaign_budget.amount_micros` (join is automatic when both fields are selected from a campaign-scoped FROM clause).",
+  "campaign_criterion.audience.audience":
+    "`campaign_criterion.audience.audience` is not a GAQL field. The audience-criterion resource is `campaign_criterion.user_list` / `campaign_criterion.audience`; call `getResourceMetadata('campaign_criterion')` to confirm the audience-criterion sub-fields before retrying.",
+  "recommendation.impact.base_metrics.impressions":
+    "`recommendation.impact.base_metrics.impressions` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
+  "recommendation.impact.base_metrics.clicks":
+    "`recommendation.impact.base_metrics.clicks` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
+  "recommendation.keyword_match_type":
+    "`recommendation.keyword_match_type` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the correct keyword-recommendation field path before retrying — the match-type field lives on a nested `keyword_recommendation` sub-message, not at the top level.",
+  "auction_insight.domain":
+    "`auction_insight.domain` is not a GAQL field. Auction insights ship as metrics + segments off resources like `campaign` / `ad_group`, not as an `auction_insight` resource. Required developer-token access is gated separately; if your account is enrolled, the right fields are `metrics.auction_insight_*` + `segments.auction_insight_domain` queried `FROM campaign`.",
+  "resource_name":
+    "`resource_name` is not a top-level GAQL field. Each resource has its own form: `campaign.resource_name`, `ad_group.resource_name`, etc. Replace `resource_name` with `<resource>.resource_name` matching your FROM clause.",
 };
 
 export function validateKnownUnsupportedGaqlFields(query: string) {
@@ -673,6 +692,44 @@ export function validateKnownUnsupportedGaqlFields(query: string) {
     "GAQL pre-flight: unsupported field(s) in SELECT. " +
       fields.map((field) => KNOWN_UNSUPPORTED_GAQL_FIELDS[field]).join(" "),
   );
+}
+
+/**
+ * Narrow validator for observed segment/resource incompatibility patterns.
+ * Google returns query_error=51 ("incompatible segments") for these; we can
+ * catch them locally and give a precise fix before the round-trip.
+ */
+export function validateSegmentResourceCompatibility(query: string) {
+  const resource = extractFromResource(query);
+  if (!resource) return;
+  const selectFields = extractSelectFields(query).map((f) => f.toLowerCase());
+
+  // (a) segments.hour on views that don't support hour-of-day breakdowns
+  const HOUR_INCOMPATIBLE = new Set(["keyword_view", "search_term_view", "user_location_view"]);
+  if (HOUR_INCOMPATIBLE.has(resource) && selectFields.includes("segments.hour")) {
+    throw new Error(
+      `GAQL pre-flight: \`segments.hour\` is not selectable on \`FROM ${resource}\` — Google rejects with query_error=51 (segment incompatible with FROM clause). To get hour-of-day breakdowns: query \`FROM campaign\` (or \`FROM ad_group\`) and SELECT \`segments.hour\` alongside your metrics; the per-keyword / per-search-term breakdown is not available at the hour granularity on those views.`,
+    );
+  }
+
+  // (b) geo segments not available on user_location_view
+  if (resource === "user_location_view") {
+    const offender = selectFields.find(
+      (f) => f === "segments.geo_target_country" || f === "segments.geo_target_state",
+    );
+    if (offender) {
+      throw new Error(
+        `GAQL pre-flight: \`segments.geo_target_country\` / \`segments.geo_target_state\` are not selectable on \`FROM user_location_view\` — Google rejects with query_error=51. The geo dimension on user_location_view is \`user_location_view.country_criterion_id\`; use that (and resolve names via \`geo_target_constant\`) instead of the segment.`,
+      );
+    }
+  }
+
+  // (c) bare conversion_action as a SELECT field when FROM is something else
+  if (resource !== "conversion_action" && selectFields.includes("conversion_action")) {
+    throw new Error(
+      "GAQL pre-flight: bare `conversion_action` is not a selectable SELECT field. To break down metrics per conversion action: query `FROM campaign` (or `FROM ad_group`) and SELECT `segments.conversion_action` (the resource path) or `segments.conversion_action_name`. To list configured conversion actions: query `FROM conversion_action` and SELECT the `conversion_action.*` fields you want.",
+    );
+  }
 }
 
 /**
@@ -918,6 +975,7 @@ export async function runSafeGaqlReport(
   validateConversionActionMetricSegments(query);
   validateRequiredDateFilter(query);
   validateKnownUnsupportedGaqlFields(query);
+  validateSegmentResourceCompatibility(query);
   validateEnumLiteralsInWhere(query);
 
   if (options.excludeRemovedParents ?? DEFAULT_EXCLUDE_REMOVED_PARENTS) {

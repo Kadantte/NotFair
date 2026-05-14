@@ -34,6 +34,7 @@ import {
   validateMalformedDateRanges,
   validateRequiredDateFilter,
   validateKnownUnsupportedGaqlFields,
+  validateSegmentResourceCompatibility,
   validateEnumLiteralsInWhere,
   clampChangeEventDateWindow,
   DEFAULT_GAQL_LIMIT,
@@ -925,6 +926,14 @@ describe("enrichGaqlError", () => {
     expect(out).toContain("change_event.change_date_time");
     expect(out).toMatch(/segments\.date.*not/i);
   });
+
+  it("enriches authorization_error=26 on auction_insight metrics with actionable guidance", () => {
+    const enriched = enrichGaqlError(
+      "The developer doesn't have access to metrics: 'auction_insight_search_impression_share'. (authorization_error=26)",
+    );
+    expect(enriched).toMatch(/special developer-token access/);
+    expect(enriched).toMatch(/Tools → Auction Insights/);
+  });
 });
 
 // ─── Pre-flight validators ────────────────────────────────────────────
@@ -1142,6 +1151,112 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
         "SELECT campaign.id, metrics.average_cpc FROM campaign",
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects hallucinated campaign.url_expansion_opt_out with metadata guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, campaign.url_expansion_opt_out FROM campaign",
+      ),
+    ).toThrow(/getResourceMetadata/);
+  });
+
+  it("rejects hallucinated campaign.budget_amount_micros with campaign_budget replacement", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, campaign.budget_amount_micros FROM campaign",
+      ),
+    ).toThrow(/campaign_budget\.amount_micros/);
+  });
+
+  it("rejects hallucinated campaign_criterion.audience.audience with metadata guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign_criterion.campaign, campaign_criterion.audience.audience FROM campaign_criterion",
+      ),
+    ).toThrow(/getResourceMetadata/);
+  });
+
+  it("rejects hallucinated recommendation.impact.base_metrics.impressions with recommendation guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT recommendation.type, recommendation.impact.base_metrics.impressions FROM recommendation",
+      ),
+    ).toThrow(/recommendation\.impact/);
+  });
+
+  it("rejects hallucinated recommendation.keyword_match_type with metadata guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT recommendation.type, recommendation.keyword_match_type FROM recommendation",
+      ),
+    ).toThrow(/getResourceMetadata.*recommendation/);
+  });
+
+  it("rejects hallucinated auction_insight.domain with auction_insight_ metric guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT auction_insight.domain FROM campaign",
+      ),
+    ).toThrow(/auction_insight_/);
+  });
+
+  it("rejects bare resource_name with <resource>.resource_name guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT resource_name, campaign.id FROM campaign",
+      ),
+    ).toThrow(/<resource>\.resource_name/);
+  });
+});
+
+describe("validateSegmentResourceCompatibility", () => {
+  it("rejects segments.hour on keyword_view", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT segments.hour, metrics.cost_micros FROM keyword_view WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/segments\.hour.*keyword_view/);
+  });
+
+  it("rejects segments.hour on search_term_view", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT segments.hour, metrics.impressions FROM search_term_view WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/segments\.hour.*search_term_view/);
+  });
+
+  it("rejects segments.hour on user_location_view", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT segments.hour, metrics.clicks FROM user_location_view",
+      ),
+    ).toThrow(/segments\.hour.*user_location_view/);
+  });
+
+  it("rejects segments.geo_target_country on user_location_view", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT segments.geo_target_country, metrics.clicks FROM user_location_view",
+      ),
+    ).toThrow(/geo_target_country/);
+  });
+
+  it("rejects bare conversion_action SELECT field when FROM is campaign", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT conversion_action, metrics.conversions FROM campaign",
+      ),
+    ).toThrow(/conversion_action/);
+  });
+
+  it("allows compatible pair: segments.hour on campaign", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT segments.hour, metrics.cost_micros FROM campaign WHERE segments.date DURING LAST_7_DAYS",
       ),
     ).not.toThrow();
   });
@@ -1378,6 +1493,26 @@ describe("runSafeGaqlReport pre-flight integration", () => {
         "SELECT campaign.id, metrics.cost_per_conversion_micros, metrics.impression_share FROM campaign",
       ),
     ).rejects.toThrow(/metrics\.cost_per_conversion/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects hallucinated campaign.url_expansion_opt_out end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id, campaign.url_expansion_opt_out FROM campaign",
+      ),
+    ).rejects.toThrow(/unsupported field/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects segments.hour on keyword_view end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT segments.hour, metrics.cost_micros FROM keyword_view WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).rejects.toThrow(/segments\.hour.*keyword_view/);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

@@ -9,6 +9,7 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 ## GAQL — view-vs-resource semantics
 
 - **`keyword_view` returns BOTH positive and negative ad-group-level keyword criteria.** Filter to positives with `WHERE ad_group_criterion.negative = FALSE`. Reason: `keyword_view` is a thin lens over `ad_group_criterion` of type KEYWORD; it filters by type but NOT by negative. **A "find zero-conversion keywords" query without this filter sweeps up every ad-group negative** because negatives block serving and have 0 impressions/clicks/cost/conversions by definition. Verify: `listKeywords` adds the filter; assertion at [tool-registration.test.ts:258](../lib/mcp/__tests__/tool-registration.test.ts:258).
+- **Some segments aren't selectable on view resources (`query_error=51`).** Specifically: `segments.hour` cannot be SELECTed on `keyword_view`, `search_term_view`, or `user_location_view` — query `FROM campaign` (or `ad_group`) with `segments.hour` instead. `segments.geo_target_country` / `segments.geo_target_state` cannot be SELECTed on `user_location_view` — that view exposes geo via `user_location_view.country_criterion_id`. Bare `conversion_action` is never a selectable SELECT field — use `segments.conversion_action` / `segments.conversion_action_name` from a campaign/ad_group FROM, or query `FROM conversion_action` with `conversion_action.*` fields. Verify at `validateSegmentResourceCompatibility` in `lib/google-ads/reads/gaql.ts`.
 - **`metrics.*` is NOT selectable from `FROM conversion_action`.** That resource carries dimensional fields only. To break down metric counts by conversion action, query `FROM campaign` (or `ad_group`) and SELECT `segments.conversion_action_name`.
 - **`search_term_view` requires a finite `segments.date` filter.** Either `DURING` literal or explicit `BETWEEN`.
 - **Local Services conversion actions are segment-only.** LSA / `local_services_*` conversion names appear in `segments.conversion_action_name` but not as mutable rows. If absent from `getConversionActions` or marked `mutable: false`, treat as Google-managed/read-only.
@@ -50,6 +51,13 @@ Format: `[surface] one-line rule — Why it bites — How to verify`
 - `metrics.impression_share` — not a field. For Search campaigns use `metrics.search_impression_share`; for other channels call `getResourceMetadata` for the right channel-specific impression-share metric.
 - `metrics.conversion_rate` — not a field. Calculate from `metrics.conversions / metrics.clicks`.
 - `asset.sitelink_asset.final_urls` — not a field. Call `getResourceMetadata('asset')` to discover correct asset URL fields.
+- `campaign.url_expansion_opt_out` — not a field. Call `getResourceMetadata('campaign')` for available expansion-control fields.
+- `campaign.budget_amount_micros` — not a field. Budget lives on `campaign_budget.amount_micros`; select it alongside campaign fields and the join is automatic.
+- `campaign_criterion.audience.audience` — not a field. The audience-criterion sub-fields live under `campaign_criterion.user_list` / `campaign_criterion.audience`; call `getResourceMetadata('campaign_criterion')`.
+- `recommendation.impact.base_metrics.impressions` / `recommendation.impact.base_metrics.clicks` — not fields. Call `getResourceMetadata('recommendation')` for the actual impact-metrics path.
+- `recommendation.keyword_match_type` — not a field. Use `recommendation.keyword.match_type`.
+- `auction_insight.domain` — not a field. Auction insights ship as `metrics.auction_insight_*` + `segments.auction_insight_domain` off `FROM campaign`/`ad_group`, gated by developer-token access (authorization_error=26 when unauthorized).
+- bare `resource_name` — not a field. Each resource has its own form: `campaign.resource_name`, `ad_group.resource_name`, etc.
 
 ## Assets — immutability and link semantics
 

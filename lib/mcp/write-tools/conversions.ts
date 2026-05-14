@@ -55,7 +55,7 @@ export function registerConversionWriteTools(deps: WriteToolDeps) {
   ));
 
   server.registerTool("updateConversionAction", {
-    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename. Call getConversionActions first and only pass IDs where `mutable: true`; conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, local_services_* / Local Services Ads actions, and manager-inherited actions are read-only or Google-managed via the API. LSA conversion names may appear in segments.conversion_action_name without appearing as mutable FROM conversion_action rows. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
+    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename. Conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, local_services_* / Local Services Ads actions, and manager-inherited actions are read-only via the API — the update call will be rejected locally before reaching Google. To check before calling: read `conversion_action.type` and `conversion_action.owner_customer` via `runScript` (e.g. `await ads.gaql(ads.queries.conversionActions)`) or write a direct `FROM conversion_action` query. LSA conversion names may appear in segments.conversion_action_name without appearing as mutable FROM conversion_action rows. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       conversionActionId: z.string().describe("Conversion action ID (query conversion_action via runScript)"),
@@ -90,7 +90,7 @@ export function registerConversionWriteTools(deps: WriteToolDeps) {
   ));
 
   server.registerTool("removeConversionAction", {
-    description: "Permanently delete a conversion action. Not undoable. Use this instead of updateConversionAction with status=REMOVED — Google rejects that with request_error=18. Read-only conversion actions (GA4/UA/Floodlight imports, Smart Campaign auto-actions, manager-owned, etc.) cannot be removed via the API; modify them in the source system. Returns changeId.",
+    description: "Permanently delete a conversion action. Not undoable. Use this instead of updateConversionAction with status=REMOVED — Google rejects that with request_error=18. Conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, local_services_* / Local Services Ads actions, and manager-inherited actions are read-only via the API — the remove call will be rejected locally before reaching Google. To check before calling: read `conversion_action.type` and `conversion_action.owner_customer` via `runScript` (e.g. `await ads.gaql(ads.queries.conversionActions)`) or write a direct `FROM conversion_action` query. Modify read-only actions in the Google Ads UI or in the source system (GA4, Firebase, Salesforce, Floodlight). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       conversionActionId: z.string().describe("Conversion action ID to permanently delete"),
