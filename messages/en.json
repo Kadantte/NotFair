@@ -508,7 +508,7 @@
           "7 days of unlimited access - every feature, no caps",
           "Then 300 MCP operations/mo, free forever",
           "No credit card required",
-          "Connect Google Ads to Claude, Cursor, and any MCP client",
+          "Connect Google Ads and Meta Ads to Claude, Cursor, and any MCP client",
           "Diagnose account issues and draft campaign changes",
           "Preview bid, budget, keyword, audience, and ad edits before approval",
           "Community support"
@@ -529,8 +529,8 @@
         "scheduledCancel": "Scheduled cancel",
         "renews": "Renews {interval} on {date}",
         "headlineFeatures": [
-          "Unlimited Google Ads operations",
-          "Unlimited Google Ads accounts",
+          "Unlimited Google Ads and Meta Ads operations",
+          "Unlimited Google Ads and Meta Ads accounts",
           "Bulk workflows - keywords, ads, budgets, scripts",
           "Full change history & one-call undo",
           "Priority email support"

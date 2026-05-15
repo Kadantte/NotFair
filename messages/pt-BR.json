@@ -508,7 +508,7 @@
           "7 dias de acesso ilimitado a todos os recursos",
           "Depois 300 operações MCP/mês, grátis para sempre",
           "Sem cartão de crédito",
-          "Conecte Google Ads ao Claude, Cursor e qualquer cliente MCP",
+          "Conecte Google Ads e Meta Ads ao Claude, Cursor e qualquer cliente MCP",
           "Diagnostique problemas da conta e rascunhe mudanças de campanha",
           "Pré-visualize mudanças de lances, orçamento, palavras-chave, públicos e anúncios antes de aprovar",
           "Suporte da comunidade"
@@ -529,8 +529,8 @@
         "scheduledCancel": "Cancelamento agendado",
         "renews": "Renova {interval} em {date}",
         "headlineFeatures": [
-          "Operações ilimitadas no Google Ads",
-          "Contas ilimitadas do Google Ads",
+          "Operações ilimitadas no Google Ads e Meta Ads",
+          "Contas ilimitadas do Google Ads e Meta Ads",
           "Fluxos em lote: palavras-chave, anúncios, orçamentos, scripts",
           "Histórico completo de mudanças e desfazer com uma chamada",
           "Suporte prioritário por e-mail"
