@@ -416,17 +416,12 @@ export function HomePage({
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
-                <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-                  <ConnectClaudeCTA tracking={{ page: "homepage", position: "hero" }} />
-                  <Link
-                    href="/blog"
-                    prefetch
-                    onClick={() => trackEvent("blog_clicked", { location: "homepage_hero" })}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#3D3C36] px-5 text-sm font-semibold text-[#E8E4DD] transition-colors hover:border-[#4CAF6E]/60 hover:text-[#4CAF6E]"
-                  >
-                    {t("blogCta")}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
+                <div className="flex w-full sm:w-auto">
+                  <ConnectClaudeCTA
+                    tracking={{ page: "homepage", position: "hero" }}
+                    label="Start Trial Now"
+                    size="xl"
+                  />
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-[#C4C0B6] lg:justify-start">
                   {trustItems.map((item) => (
@@ -544,7 +539,11 @@ export function HomePage({
               {t("closingHeadline")}
             </h2>
             <div className="mt-10 flex justify-center">
-              <ConnectClaudeCTA tracking={{ page: "homepage", position: "final" }} />
+              <ConnectClaudeCTA
+                tracking={{ page: "homepage", position: "final" }}
+                label="Start Trial Now"
+                size="xl"
+              />
             </div>
             <p className="mx-auto mt-6 max-w-md text-[11px] leading-relaxed text-[#C4C0B6]">
               {t("legalPrefix")}{" "}
