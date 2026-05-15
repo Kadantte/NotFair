@@ -88,14 +88,20 @@ export function buildMetadata({
 }
 
 export function buildHomepageJsonLd() {
+  const organizationId = `${SITE_URL}#organization`;
+  const logoUrl = new URL(DEFAULT_OG_IMAGE, SITE_URL).toString();
+
   return [
     {
       "@context": "https://schema.org",
       "@type": "Organization",
+      "@id": organizationId,
       name: SITE_NAME,
       url: SITE_URL,
-      logo: new URL(DEFAULT_OG_IMAGE, SITE_URL).toString(),
-      sameAs: [SITE_URL],
+      logo: logoUrl,
+      sameAs: [
+        "https://github.com/nowork-studio/toprank",
+      ],
     },
     {
       "@context": "https://schema.org",
@@ -103,6 +109,7 @@ export function buildHomepageJsonLd() {
       name: SITE_NAME,
       url: SITE_URL,
       description: SITE_DESCRIPTION,
+      publisher: { "@id": organizationId },
     },
     {
       "@context": "https://schema.org",
@@ -113,12 +120,25 @@ export function buildHomepageJsonLd() {
       operatingSystem: "Web",
       description:
         "The Google Ads diagnosis and execution layer for Claude. Find account issues, draft keyword, ad, budget, and negative fixes in natural language, then approve every write before it reaches Google Ads.",
+      url: SITE_URL,
+      image: logoUrl,
+      screenshot: logoUrl,
+      inLanguage: "en-US",
+      isAccessibleForFree: true,
+      featureList: [
+        "Connect Google Ads account to Claude via MCP",
+        "Diagnose account issues in natural language",
+        "Draft keyword, ad, budget, and negative keyword changes",
+        "Preview every write before it reaches Google Ads",
+        "Approval-gated mutations with full undo history",
+        "GAQL query support with built-in guardrails",
+      ],
       offers: {
         "@type": "Offer",
         price: "0",
         priceCurrency: "USD",
       },
-      url: SITE_URL,
+      publisher: { "@id": organizationId },
     },
   ];
 }
