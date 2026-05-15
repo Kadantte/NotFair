@@ -359,6 +359,7 @@ export function HomePage({
   pricing: Omit<PricingSectionProps, "page">;
 }) {
   const t = useTranslations("Home");
+  const tCta = useTranslations("CTA");
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
 
@@ -419,7 +420,7 @@ export function HomePage({
                 <div className="flex w-full sm:w-auto">
                   <ConnectClaudeCTA
                     tracking={{ page: "homepage", position: "hero" }}
-                    label="Start Trial Now"
+                    label={tCta("startTrialNow")}
                     size="xl"
                   />
                 </div>
