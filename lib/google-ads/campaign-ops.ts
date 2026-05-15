@@ -598,17 +598,17 @@ export function readOnlyConversionActionReason(
 ): string | null {
   if (isManagerOwnedConversionAction(cid, ownerCustomer)) {
     const ownerCid = (ownerCustomer as string).split("/").pop();
-    return `Conversion action ${conversionActionId} is owned by a manager account (${ownerCid}). Inherited conversion actions are read-only from this account; modify it in the manager account or in the Google Ads UI.`;
+    return `Conversion action ${conversionActionId} is owned by a manager account (${ownerCid}). Inherited conversion actions are read-only from this account; do not retry this operation from the current account. Modify it in the manager account or in the Google Ads UI.`;
   }
 
   if (typeof rawType === "number" && READ_ONLY_CONVERSION_ACTION_TYPES.has(rawType)) {
     const typeName = READ_ONLY_CONVERSION_ACTION_TYPES.get(rawType);
-    return `Conversion action ${conversionActionId} has type ${typeName} and is read-only via the API. Modify it in the Google Ads UI or in its source system (e.g. GA4, Firebase, Salesforce, Floodlight).`;
+    return `Conversion action ${conversionActionId} has type ${typeName} and is read-only via the API. Do not retry this operation unchanged; modify it in the Google Ads UI or in its source system (e.g. GA4, Firebase, Salesforce, Floodlight).`;
   }
   if (typeof rawType === "string") {
     for (const name of READ_ONLY_CONVERSION_ACTION_TYPES.values()) {
       if (name === rawType) {
-        return `Conversion action ${conversionActionId} has type ${rawType} and is read-only via the API. Modify it in the Google Ads UI or in its source system (e.g. GA4, Firebase, Salesforce, Floodlight).`;
+        return `Conversion action ${conversionActionId} has type ${rawType} and is read-only via the API. Do not retry this operation unchanged; modify it in the Google Ads UI or in its source system (e.g. GA4, Firebase, Salesforce, Floodlight).`;
       }
     }
   }
