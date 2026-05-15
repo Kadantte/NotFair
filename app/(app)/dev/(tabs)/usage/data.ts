@@ -158,7 +158,10 @@ async function fetchUsageData({
           END AS client_source,
           o.platform,
           o.created_at,
-          o.success
+          -- RATE_LIMIT rejections originate from our own quota enforcement
+          -- (not a bug/upstream failure), so they should not drag down the
+          -- "interaction success rate". See lib/dev-ops-filter.ts for context.
+          (o.success = 1 OR o.error_class = 'RATE_LIMIT')::int AS success
         FROM operations o
         WHERE o.created_at >= ${interactionLookbackIso}::timestamp
           AND o.created_at < ${nowIso}::timestamp
@@ -245,7 +248,9 @@ async function fetchUsageData({
           END AS client_source,
           o.platform,
           o.created_at,
-          o.success,
+          -- Mirror the daily-interactions CTE above: RATE_LIMIT is our own
+          -- quota enforcement, not a real failure.
+          (o.success = 1 OR o.error_class = 'RATE_LIMIT')::int AS success,
           o.error_class
         FROM operations o
         WHERE o.created_at >= ${lowSuccessLookbackIso}::timestamp
@@ -312,7 +317,7 @@ async function fetchUsageData({
           count(*) AS cnt,
           ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY count(*) DESC, error_class) AS rk
         FROM filtered
-        WHERE error_class IS NOT NULL
+        WHERE error_class IS NOT NULL AND error_class <> 'RATE_LIMIT'
         GROUP BY user_id, error_class
       ),
       top_error_classes AS (
@@ -348,7 +353,12 @@ async function fetchUsageData({
         SELECT
           tool_name,
           latency_ms,
-          CASE WHEN success = 0 OR error_class IS NOT NULL THEN 1 ELSE 0 END AS is_error
+          -- RATE_LIMIT is our own quota enforcement; don't count it as an error.
+          CASE
+            WHEN error_class = 'RATE_LIMIT' THEN 0
+            WHEN success = 0 OR error_class IS NOT NULL THEN 1
+            ELSE 0
+          END AS is_error
         FROM operations
         WHERE created_at >= ${sinceIso}::timestamp
           AND tool_name IS NOT NULL

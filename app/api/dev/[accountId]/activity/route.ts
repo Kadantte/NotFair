@@ -92,8 +92,10 @@ export async function GET(
       .from(schema.operations)
       .where(whereBase)
       .orderBy(
-        // Errors first (NULL sorts last for NULLS LAST = errors first when we flip)
-        sql`case when ${schema.operations.errorClass} is not null then 0 else 1 end`,
+        // Real errors first. RATE_LIMIT is our own quota enforcement, not a
+        // failure — surface it alongside successful calls so genuine bugs
+        // stay at the top. See lib/dev-ops-filter.ts.
+        sql`case when ${schema.operations.errorClass} is not null and ${schema.operations.errorClass} <> 'RATE_LIMIT' then 0 else 1 end`,
         desc(schema.operations.createdAt),
       )
       .limit(50),

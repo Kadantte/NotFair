@@ -55,7 +55,15 @@ export function operationTypeRowCount(ops: typeof schema.operations, opType: num
   return sql<number>`count(*) filter (where ${ops.opType} = ${opType})::int`;
 }
 
-/** Count failed/rejected operation rows. Bulk fan-out rows count individually. */
+/**
+ * Count failed/rejected operation rows. Bulk fan-out rows count individually.
+ *
+ * RATE_LIMIT is excluded: those rejections originate from our own quota
+ * enforcement (lib/mcp/rate-limit.ts), not from a bug or upstream failure.
+ * Counting them as errors inflates every dashboard's "error rate" with
+ * self-inflicted noise and would push us to ship band-aids that mask real
+ * issues. Real errors are THROWN / WRITE_REJECTED / LOGGING.
+ */
 export function operationErrorRowCount(ops: typeof schema.operations): SQL<number> {
-  return sql<number>`count(*) filter (where ${ops.errorClass} is not null)::int`;
+  return sql<number>`count(*) filter (where ${ops.errorClass} is not null and ${ops.errorClass} <> 'RATE_LIMIT')::int`;
 }
