@@ -12,8 +12,8 @@ export default async function DevUsagePage({
     searchParams: Promise<Record<string, string>>;
 }) {
     const sp = await searchParams;
-    const rawDays = parseInt(sp.days ?? '30', 10);
-    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 30;
+    const rawDays = parseInt(sp.days ?? '60', 10);
+    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 120) : 60;
     const rawPlatform = sp.platform;
     const platform: UsagePlatform =
         rawPlatform === 'google_ads' || rawPlatform === 'meta_ads' ? rawPlatform : null;

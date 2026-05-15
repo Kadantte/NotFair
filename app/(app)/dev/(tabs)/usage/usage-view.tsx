@@ -25,12 +25,12 @@ const USAGE_PLATFORM_LABELS: Record<UsagePlatform, string> = {
 // UTC dates, before this was fixed).
 const usageStatsCache = new Map<string, UsageStats>();
 
-const DEFAULT_CACHE_KEY = '30|all|all|prod';
+const DEFAULT_CACHE_KEY = '60|all|all|prod';
 
 type Props = { initialData?: UsageStats; initialTz?: string };
 
 export function UsageView({ initialData, initialTz }: Props) {
-    const [usageDays, setUsageDays] = useState(30);
+    const [usageDays, setUsageDays] = useState(60);
     const [includeDev, setIncludeDev] = useState(false);
     const [usageSource, setUsageSource] = useState<string>('all');
     const [usagePlatform, setUsagePlatform] = useState<UsagePlatform>('all');

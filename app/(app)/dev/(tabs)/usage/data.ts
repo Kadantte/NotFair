@@ -29,13 +29,13 @@ export interface GetUsageDataOptions {
 }
 
 async function fetchUsageData({
-    days: rawDays = 30,
+    days: rawDays = 60,
     tz = 'UTC',
     source = null,
     platform = null,
     includeDev = false,
 }: GetUsageDataOptions = {}) {
-    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 30;
+    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 120) : 60;
 
     const now = new Date();
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);

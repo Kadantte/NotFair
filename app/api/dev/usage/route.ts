@@ -10,8 +10,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
 
-  const rawDays = parseInt(url.searchParams.get("days") || "30", 10);
-  const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 90) : 30;
+  const rawDays = parseInt(url.searchParams.get("days") || "60", 10);
+  const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 120) : 60;
 
   const tz = url.searchParams.get("tz") || "America/Los_Angeles";
   if (!/^[A-Za-z0-9_/+-]+$/.test(tz)) {

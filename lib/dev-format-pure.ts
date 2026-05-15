@@ -54,6 +54,6 @@ export function sourceLabel(source: string): string {
 export const DEV_RANGE_OPTIONS = [
     { label: '24h', value: 1 },
     { label: '7d', value: 7 },
-    { label: '30d', value: 30 },
+    { label: '60d', value: 60 },
     { label: '90d', value: 90 },
 ] as const;
