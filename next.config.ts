@@ -5,13 +5,18 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Note: do NOT add `experimental.optimizePackageImports`. Next.js 16 already
-  // auto-optimizes lucide-react / recharts / date-fns (see the default list in
-  // `node_modules/next/dist/server/config.js`). Opting back in via the
-  // experimental list triggers a known webpack worker race that surfaces as
-  // `TypeError: Cannot read properties of undefined (reading 'length')` with
-  // ignore-listed frames during Vercel builds. The flake is intermittent and
-  // does not reproduce locally.
+  experimental: {
+    // Next.js 16 runs webpack compilation in a worker thread by default when
+    // there is no custom `webpack` function. Combined with the built-in
+    // `optimizePackageImports` list (lucide-react, recharts, date-fns, …),
+    // this triggers an intermittent race — `TypeError: Cannot read properties
+    // of undefined (reading 'length')` with ignore-listed frames — on Vercel
+    // builds. Forcing single-thread compilation eliminates the race; the
+    // build is slightly slower but always correct.
+    webpackBuildWorker: false,
+  },
+  // Do NOT add `experimental.optimizePackageImports` — Next.js already
+  // auto-merges the default list above. Adding it again just adds duplicates.
   transpilePackages: ["outrank-next-js-blog"],
   images: {
     remotePatterns: [
