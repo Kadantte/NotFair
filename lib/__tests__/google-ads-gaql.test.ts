@@ -34,6 +34,7 @@ import {
   validateMalformedDateRanges,
   validateRequiredDateFilter,
   validateKnownUnsupportedGaqlFields,
+  validateUnsupportedSqlSyntax,
   validateSegmentResourceCompatibility,
   validateEnumLiteralsInWhere,
   clampChangeEventDateWindow,
@@ -1123,6 +1124,14 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/metrics\.search_impression_share/);
   });
 
+  it("rejects asset link hallucinations from production with replacement guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT asset.resource_name, asset.status, asset_group_asset.performance_label FROM asset_group_asset",
+      ),
+    ).toThrow(/campaign_asset\.status|asset_group_asset\.status/);
+  });
+
   it("rejects hallucinated conversion rate field with calculation guidance", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
@@ -1171,6 +1180,38 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/campaign_budget\.amount_micros/);
   });
 
+  it("rejects campaign.budget_micros with campaign_budget replacement", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, campaign.budget_micros FROM campaign",
+      ),
+    ).toThrow(/campaign_budget\.amount_micros/);
+  });
+
+  it("rejects production conversion_action hallucinations with metric guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT conversion_action.name, conversion_action.default_value, conversion_action.last_conversion_date FROM conversion_action",
+      ),
+    ).toThrow(/value_settings\.default_value|recent conversion activity/);
+  });
+
+  it("rejects campaign experiment hallucinations with metadata guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign_experiment.name, campaign_experiment.status, campaign_experiment.traffic_split_percent FROM campaign_experiment",
+      ),
+    ).toThrow(/getResourceMetadata.*campaign_experiment/);
+  });
+
+  it("rejects proximity city hallucination with city_name replacement", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign_criterion.proximity.address.city FROM campaign_criterion",
+      ),
+    ).toThrow(/city_name/);
+  });
+
   it("rejects hallucinated campaign_criterion.audience.audience with metadata guidance", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
@@ -1212,6 +1253,24 @@ describe("validateKnownUnsupportedGaqlFields", () => {
   });
 });
 
+describe("validateUnsupportedSqlSyntax", () => {
+  it("rejects SQL JOIN syntax with GAQL-specific guidance", () => {
+    expect(() =>
+      validateUnsupportedSqlSyntax(
+        "SELECT campaign.id, campaign_budget.amount_micros FROM campaign JOIN campaign_budget ON campaign.campaign_budget = campaign_budget.resource_name",
+      ),
+    ).toThrow(/does not support SQL JOIN/);
+  });
+
+  it("allows the word join inside string literals", () => {
+    expect(() =>
+      validateUnsupportedSqlSyntax(
+        "SELECT campaign.id FROM campaign WHERE campaign.name = 'join test'",
+      ),
+    ).not.toThrow();
+  });
+});
+
 describe("validateSegmentResourceCompatibility", () => {
   it("rejects segments.hour on keyword_view", () => {
     expect(() =>
@@ -1243,6 +1302,14 @@ describe("validateSegmentResourceCompatibility", () => {
         "SELECT segments.geo_target_country, metrics.clicks FROM user_location_view",
       ),
     ).toThrow(/geo_target_country/);
+  });
+
+  it("rejects segments.geo_target_country on geographic_view", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT segments.geo_target_country, metrics.cost_micros FROM geographic_view WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/geographic_view\.country_criterion_id/);
   });
 
   it("rejects bare conversion_action SELECT field when FROM is campaign", () => {
@@ -1301,6 +1368,14 @@ describe("validateEnumLiteralsInWhere", () => {
         "SELECT campaign.id, campaign.status FROM campaign WHERE campaign.status IN ('ENABLED', 'PAUSED')",
       ),
     ).not.toThrow();
+  });
+
+  it("rejects invalid string enum values such as removed manager links", () => {
+    expect(() =>
+      validateEnumLiteralsInWhere(
+        "SELECT customer_manager_link.manager_customer, customer_manager_link.status FROM customer_manager_link WHERE customer_manager_link.status != 'REMOVED'",
+      ),
+    ).toThrow(/REMOVED.*not valid|no `REMOVED` status/);
   });
 
   it("ignores numeric comparisons on non-enum fields", () => {
@@ -1503,6 +1578,36 @@ describe("runSafeGaqlReport pre-flight integration", () => {
         "SELECT campaign.id, campaign.url_expansion_opt_out FROM campaign",
       ),
     ).rejects.toThrow(/unsupported field/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects production asset hallucinations end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT asset.status, asset_group_asset.performance_label FROM asset_group_asset",
+      ),
+    ).rejects.toThrow(/unsupported field/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects SQL JOIN syntax end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id, campaign_budget.amount_micros FROM campaign JOIN campaign_budget ON campaign.campaign_budget = campaign_budget.resource_name",
+      ),
+    ).rejects.toThrow(/does not support SQL JOIN/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid manager-link enum values end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT customer_manager_link.manager_customer, customer_manager_link.status FROM customer_manager_link WHERE customer_manager_link.status = 'REMOVED'",
+      ),
+    ).rejects.toThrow(/REMOVED/);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

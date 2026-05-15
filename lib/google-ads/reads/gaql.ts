@@ -41,11 +41,15 @@ export function extractSelectFields(query: string): string[] {
     .filter(Boolean);
 }
 
-function getNestedValue(row: any, fieldPath: string): unknown {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getNestedValue(row: unknown, fieldPath: string): unknown {
   const parts = fieldPath.split(".");
-  let v: any = row;
+  let v: unknown = row;
   for (const p of parts) {
-    if (v == null) return null;
+    if (!isRecord(v)) return null;
     v = v[p];
   }
   return v ?? null;
@@ -74,7 +78,7 @@ const ORDER_BY_COST_RE = /\bORDER\s+BY\s+metrics\.cost_micros\b/i;
  *  case the rows slice IS the top and "bottom" would just mean "rank ≈ limit",
  *  not actual low-spenders in the population. */
 export function buildGaqlSummary(
-  rows: any[],
+  rows: unknown[],
   selectFields: string[],
   query: string = "",
 ): GaqlSummary | null {
@@ -660,6 +664,10 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`metrics.conversion_rate` is not a GAQL field. Select `metrics.conversions` and `metrics.clicks`, then calculate `conversions / clicks` in JavaScript.",
   "metrics.impression_share":
     "metrics.impression_share is not a GAQL field. For Search campaigns, select metrics.search_impression_share; for other channels call getResourceMetadata to choose the right impression-share metric.",
+  "asset.status":
+    "`asset.status` is not a GAQL field. Asset serving status lives on the link resource (`campaign_asset.status`, `ad_group_asset.status`, `asset_group_asset.status`, or `customer_asset.status`); select the relevant link status for the FROM resource.",
+  "asset_group_asset.performance_label":
+    "`asset_group_asset.performance_label` is not a GAQL field. Select `asset_group_asset.field_type`, `asset_group_asset.status`, and asset fields, then evaluate performance from `asset_group_asset` metrics or campaign/ad_group metrics separately.",
   "asset.sitelink_asset.final_urls":
     "`asset.sitelink_asset.final_urls` is not a GAQL field. Use `getResourceMetadata('asset')` to confirm the available asset URL fields before retrying.",
   "geo_target_constant.canonical":
@@ -668,8 +676,30 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`campaign.url_expansion_opt_out` is not a GAQL field. Use `getResourceMetadata('campaign')` to confirm the available campaign URL/expansion fields before retrying.",
   "campaign.budget_amount_micros":
     "`campaign.budget_amount_micros` is not a GAQL field. Budget lives on the linked `campaign_budget` resource — SELECT `campaign_budget.amount_micros` (join is automatic when both fields are selected from a campaign-scoped FROM clause).",
+  "campaign.budget_micros":
+    "`campaign.budget_micros` is not a GAQL field. Budget lives on the linked `campaign_budget` resource — SELECT `campaign_budget.amount_micros` from `FROM campaign`.",
   "campaign_criterion.audience.audience":
     "`campaign_criterion.audience.audience` is not a GAQL field. The audience-criterion resource is `campaign_criterion.user_list` / `campaign_criterion.audience`; call `getResourceMetadata('campaign_criterion')` to confirm the audience-criterion sub-fields before retrying.",
+  "campaign_criterion.proximity.address.city":
+    "`campaign_criterion.proximity.address.city` is not a GAQL field. Select `campaign_criterion.proximity.address.city_name` instead.",
+  "campaign_experiment.name":
+    "`campaign_experiment.name` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
+  "campaign_experiment.status":
+    "`campaign_experiment.status` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
+  "campaign_experiment.start_date":
+    "`campaign_experiment.start_date` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
+  "campaign_experiment.end_date":
+    "`campaign_experiment.end_date` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
+  "campaign_experiment.traffic_split_percent":
+    "`campaign_experiment.traffic_split_percent` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
+  "conversion_action.default_value":
+    "`conversion_action.default_value` is not a GAQL field. Select `conversion_action.value_settings.default_value` instead.",
+  "conversion_action.most_recent_conversion_date":
+    "`conversion_action.most_recent_conversion_date` is not a GAQL field. For recent conversion activity, query metrics from `FROM campaign` or `FROM ad_group` with `segments.conversion_action_name` and a `segments.date` window.",
+  "conversion_action.last_conversion_date":
+    "`conversion_action.last_conversion_date` is not a GAQL field. For recent conversion activity, query metrics from `FROM campaign` or `FROM ad_group` with `segments.conversion_action_name` and a `segments.date` window.",
+  "conversion_action.include_in_client_account_conversions_metric":
+    "`conversion_action.include_in_client_account_conversions_metric` is not a GAQL field in this Ads API surface. Select supported `conversion_action.*` config fields or call `getResourceMetadata('conversion_action')` before retrying.",
   "recommendation.impact.base_metrics.impressions":
     "`recommendation.impact.base_metrics.impressions` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
   "recommendation.impact.base_metrics.clicks":
@@ -695,6 +725,22 @@ export function validateKnownUnsupportedGaqlFields(query: string) {
 }
 
 /**
+ * GAQL is SQL-like, but it is not SQL. Agents routinely add JOINs after seeing
+ * related-resource fields in successful rows. Google rejects with a syntax
+ * error; catch that locally and explain GAQL's implicit relationship selection.
+ */
+export function validateUnsupportedSqlSyntax(query: string) {
+  const stripped = stripQuotedGaqlLiterals(query);
+  if (!/\b(?:INNER|LEFT|RIGHT|FULL|CROSS)?\s*JOIN\b/i.test(stripped)) return;
+  throw new Error(
+    "GAQL pre-flight: GAQL does not support SQL JOIN syntax. " +
+      "Select compatible related-resource fields directly from one FROM resource instead, e.g. " +
+      "`SELECT campaign.id, campaign_budget.amount_micros FROM campaign`. " +
+      "If you need an unsupported relationship, run two ads.gaql queries and join the rows in JavaScript.",
+  );
+}
+
+/**
  * Narrow validator for observed segment/resource incompatibility patterns.
  * Google returns query_error=51 ("incompatible segments") for these; we can
  * catch them locally and give a precise fix before the round-trip.
@@ -712,14 +758,19 @@ export function validateSegmentResourceCompatibility(query: string) {
     );
   }
 
-  // (b) geo segments not available on user_location_view
-  if (resource === "user_location_view") {
+  // (b) geo segments not available on location/geographic views. These views
+  // expose criterion IDs directly; resolve names in a second geo_target_constant
+  // query instead of selecting geo_target_* segments.
+  if (resource === "user_location_view" || resource === "geographic_view") {
     const offender = selectFields.find(
       (f) => f === "segments.geo_target_country" || f === "segments.geo_target_state",
     );
     if (offender) {
+      const replacement = resource === "user_location_view"
+        ? "user_location_view.country_criterion_id"
+        : "geographic_view.country_criterion_id";
       throw new Error(
-        `GAQL pre-flight: \`segments.geo_target_country\` / \`segments.geo_target_state\` are not selectable on \`FROM user_location_view\` — Google rejects with query_error=51. The geo dimension on user_location_view is \`user_location_view.country_criterion_id\`; use that (and resolve names via \`geo_target_constant\`) instead of the segment.`,
+        `GAQL pre-flight: \`segments.geo_target_country\` / \`segments.geo_target_state\` are not selectable on \`FROM ${resource}\` — Google rejects with query_error=51. The geo dimension on ${resource} is \`${replacement}\`; use that and resolve names with a second \`FROM geo_target_constant\` query instead of selecting geo segments.`,
       );
     }
   }
@@ -750,6 +801,7 @@ const ENUM_FIELD_VALUES: Record<string, readonly string[]> = {
   "ad_group_criterion.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
   "conversion_action.status": ["ENABLED", "REMOVED", "HIDDEN", "UNKNOWN", "UNSPECIFIED"],
   "asset_group.status": ["ENABLED", "PAUSED", "REMOVED", "UNKNOWN", "UNSPECIFIED"],
+  "customer_manager_link.status": ["ACTIVE", "INACTIVE", "PENDING", "REFUSED", "CANCELED", "UNKNOWN", "UNSPECIFIED"],
 };
 
 export function validateEnumLiteralsInWhere(query: string) {
@@ -758,27 +810,39 @@ export function validateEnumLiteralsInWhere(query: string) {
   );
   if (!whereMatch) return;
   const whereClause = whereMatch[1];
-  const offenders: { field: string; literal: string; valid: readonly string[] }[] = [];
+  const offenders: { field: string; literal: string; valid: readonly string[]; reason: "numeric" | "invalid" }[] = [];
   for (const [field, valid] of Object.entries(ENUM_FIELD_VALUES)) {
     // Match: campaign.status = '3' | campaign.status = 3 | campaign.status IN (3, 5)
     // Capture the literal so the error names what was passed.
-    const pattern = new RegExp(
+    const numericPattern = new RegExp(
       String.raw`\b${field.replace(/\./g, "\\.")}\s*(?:=|!=|<>|\bIN\b|\bNOT\s+IN\b)\s*\(?\s*['"]?(\d+)['"]?`,
       "gi",
     );
-    for (const m of whereClause.matchAll(pattern)) {
-      offenders.push({ field, literal: m[1], valid });
+    for (const m of whereClause.matchAll(numericPattern)) {
+      offenders.push({ field, literal: m[1], valid, reason: "numeric" });
+    }
+
+    const enumPattern = new RegExp(
+      String.raw`\b${field.replace(/\./g, "\\.")}\s*(?:=|!=|<>|\bIN\b|\bNOT\s+IN\b)\s*\(?\s*['"]?([A-Z][A-Z0-9_]*)['"]?`,
+      "gi",
+    );
+    for (const m of whereClause.matchAll(enumPattern)) {
+      const literal = m[1].toUpperCase();
+      if (/^\d+$/.test(literal)) continue;
+      if (!valid.includes(literal)) {
+        offenders.push({ field, literal, valid, reason: "invalid" });
+      }
     }
   }
   if (offenders.length === 0) return;
   const lines = offenders.map(
     (o) =>
-      `  - \`${o.field} = ${o.literal}\` → use a string name from: ${o.valid.map((v) => `'${v}'`).join(", ")}`,
+      `  - \`${o.field} = ${o.literal}\` → ${o.reason === "numeric" ? "use a string enum name" : "that enum value is not valid for this field"}; valid values: ${o.valid.map((v) => `'${v}'`).join(", ")}`,
   );
   throw new Error(
-    "GAQL pre-flight: enum fields take STRING names in WHERE, not numeric codes.\n" +
+    "GAQL pre-flight: enum fields in WHERE must use valid Google Ads enum names; numeric codes must be STRING names.\n" +
       lines.join("\n") +
-      "\nExample fix: `WHERE campaign.status = 'PAUSED'` (not `= 3`). If you need the full enum, call getResourceMetadata with the FROM resource, e.g. `getResourceMetadata('campaign')`.",
+      "\nExample fix: `WHERE campaign.status = 'PAUSED'` (not `= 3`). For manager links, there is no `REMOVED` status; use `customer_manager_link.status != 'INACTIVE'` or omit the status filter. If you need the full enum, call getResourceMetadata with the FROM resource.",
   );
 }
 
@@ -975,6 +1039,7 @@ export async function runSafeGaqlReport(
   validateConversionActionMetricSegments(query);
   validateRequiredDateFilter(query);
   validateKnownUnsupportedGaqlFields(query);
+  validateUnsupportedSqlSyntax(query);
   validateSegmentResourceCompatibility(query);
   validateEnumLiteralsInWhere(query);
 
@@ -998,16 +1063,16 @@ export async function runSafeGaqlReport(
   const probeLimit = Math.min(effectiveLimit + 1, MAX_GAQL_LIMIT + 1);
   const queryToRun = rewriteGaqlLimit(query, probeLimit);
 
-  let fetched: any[];
+  let fetched: unknown[];
   try {
-    const customer = getCachedCustomer(auth);
-    fetched = (await customer.query(queryToRun)) as any[];
+    const customer = getCachedCustomer(auth) as { query: (query: string) => Promise<unknown[]> };
+    fetched = await customer.query(queryToRun);
   } catch (error) {
     throw new Error(`GAQL query failed: ${enrichGaqlError(extractErrorMessage(error))}`);
   }
 
   const rowTruncated = fetched.length > effectiveLimit;
-  let rows: any[] = rowTruncated ? fetched.slice(0, effectiveLimit) : fetched;
+  let rows: unknown[] = rowTruncated ? fetched.slice(0, effectiveLimit) : fetched;
   const selectFields = extractSelectFields(query);
 
   // Summary is stable across byte-budget iterations (computed over `fetched`,
@@ -1021,7 +1086,7 @@ export async function runSafeGaqlReport(
     return cachedSummary;
   };
 
-  const buildResponse = (rowsOut: any[], byteTruncated: boolean): GaqlReport => {
+  const buildResponse = (rowsOut: unknown[], byteTruncated: boolean): GaqlReport => {
     const truncated = rowTruncated || byteTruncated;
     const reason: GaqlReport["truncationReason"] = byteTruncated
       ? "byte_budget"
@@ -1192,22 +1257,35 @@ function findTrailingClauseIndex(query: string): number {
 
 // ─── Resource Metadata (Field Discovery) ────────────────────────────
 
+type GoogleAdsField = {
+  name?: string;
+  dataType?: unknown;
+  data_type?: unknown;
+  selectable?: boolean;
+  filterable?: boolean;
+  sortable?: boolean;
+  isRepeated?: boolean;
+  is_repeated?: boolean;
+};
+
+type GoogleAdsFieldService = {
+  searchGoogleAdsFields: (req: { query: string }) => Promise<[unknown]>;
+};
+
 /**
  * Discover selectable, filterable, and sortable fields for a GAQL resource.
  * Uses the GoogleAdsFieldService API — avoids hardcoded field lists.
  */
 export async function getResourceMetadata(auth: AuthContext, resourceName: string) {
-  const customer = getCustomer(auth) as any;
-  const fieldService = customer.googleAdsFields as {
-    searchGoogleAdsFields: (req: { query: string }) => Promise<[{ results?: any[] }]>;
-  };
+  const customer = getCustomer(auth) as unknown as { googleAdsFields: GoogleAdsFieldService };
+  const fieldService = customer.googleAdsFields;
   const query = `SELECT name, selectable, filterable, sortable, data_type, is_repeated WHERE name LIKE '${resourceName}.%'`;
 
   try {
     // gRPC auto-pagination: response is the results array directly, not { results: [...] }
     const [results] = await fieldService.searchGoogleAdsFields({ query });
-    const resultArray = Array.isArray(results) ? results : [];
-    const fields = resultArray.map((f: any) => ({
+    const resultArray = Array.isArray(results) ? (results as GoogleAdsField[]) : [];
+    const fields = resultArray.map((f) => ({
       name: f.name,
       dataType: f.dataType ?? f.data_type,
       selectable: f.selectable ?? false,
@@ -1245,19 +1323,17 @@ export async function getResourceMetadata(auth: AuthContext, resourceName: strin
  * List all queryable GAQL resources (e.g. campaign, ad_group, keyword_view).
  */
 export async function listQueryableResources(auth: AuthContext) {
-  const customer = getCustomer(auth) as any;
-  const fieldService = customer.googleAdsFields as {
-    searchGoogleAdsFields: (req: { query: string }) => Promise<[{ results?: any[] }]>;
-  };
+  const customer = getCustomer(auth) as unknown as { googleAdsFields: GoogleAdsFieldService };
+  const fieldService = customer.googleAdsFields;
   const query = `SELECT name WHERE category = 'RESOURCE'`;
 
   try {
     // gRPC auto-pagination: response is the results array directly, not { results: [...] }
     const [results] = await fieldService.searchGoogleAdsFields({ query });
-    const resultArray = Array.isArray(results) ? results : [];
+    const resultArray = Array.isArray(results) ? (results as GoogleAdsField[]) : [];
     const resources = resultArray
-      .map((f: any) => f.name as string)
-      .filter((name: string) => !name.includes("."))
+      .map((f) => f.name)
+      .filter((name): name is string => typeof name === "string" && !name.includes("."))
       .sort();
     return { count: resources.length, resources };
   } catch (error) {
@@ -1274,20 +1350,42 @@ export async function listQueryableResources(auth: AuthContext) {
  */
 const MAX_GEO_RESULTS = 10;
 
+type GeoTargetConstant = {
+  resource_name?: string;
+  resourceName?: string;
+  name?: string;
+  canonical_name?: string;
+  canonicalName?: string;
+  target_type?: string;
+  targetType?: string;
+  country_code?: string;
+  countryCode?: string;
+};
+
+type GeoTargetSuggestion = {
+  geo_target_constant?: GeoTargetConstant;
+  geoTargetConstant?: GeoTargetConstant;
+  reach?: unknown;
+  search_term?: string;
+  searchTerm?: string;
+};
+
 export async function searchGeoTargets(
   auth: AuthContext,
   query: string,
   countryCode?: string,
   locale?: string,
 ) {
-  const customer = getCustomer(auth) as any;
-  const geoService = customer.geoTargetConstants as {
-    suggestGeoTargetConstants: (req: {
-      locale?: string;
-      country_code?: string;
-      location_names?: { names: string[] };
-    }) => Promise<any>;
+  const customer = getCustomer(auth) as unknown as {
+    geoTargetConstants: {
+      suggestGeoTargetConstants: (req: {
+        locale?: string;
+        country_code?: string;
+        location_names?: { names: string[] };
+      }) => Promise<unknown>;
+    };
   };
+  const geoService = customer.geoTargetConstants;
 
   try {
     const normalizedCountryCode = countryCode?.trim().toUpperCase();
@@ -1298,13 +1396,15 @@ export async function searchGeoTargets(
     });
 
     // Response structure: { geo_target_constant_suggestions: [...] } or array
-    const suggestions = Array.isArray(response)
-      ? response
-      : response?.geo_target_constant_suggestions ?? response?.geoTargetConstantSuggestions ?? [];
+    const suggestions: GeoTargetSuggestion[] = Array.isArray(response)
+      ? (response as GeoTargetSuggestion[])
+      : isRecord(response)
+        ? ((response.geo_target_constant_suggestions ?? response.geoTargetConstantSuggestions ?? []) as GeoTargetSuggestion[])
+        : [];
 
     return {
       query,
-      results: suggestions.slice(0, MAX_GEO_RESULTS).map((s: any) => {
+      results: suggestions.slice(0, MAX_GEO_RESULTS).map((s) => {
         const gtc = s.geo_target_constant ?? s.geoTargetConstant ?? {};
         const resourceName = gtc.resource_name ?? gtc.resourceName ?? "";
         const id = resourceName.split("/").pop() ?? "";
@@ -1318,7 +1418,7 @@ export async function searchGeoTargets(
           reach: s.reach != null ? Number(s.reach) : null,
           searchTerm: s.search_term ?? s.searchTerm ?? null,
         };
-      }).filter((r: { id: string }) => r.id !== ""),
+      }).filter((r) => r.id !== ""),
     };
   } catch (error) {
     throw new Error(`Geo target search failed for "${query}": ${extractErrorMessage(error)}`);
