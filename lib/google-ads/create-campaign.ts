@@ -199,6 +199,7 @@ export type CreateCampaignResult = {
   merchantId?: number;
   salesCountry?: string;
   inventoryFilterApplied?: boolean;
+  warnings?: string[];
   error?: string;
   policy?: PolicyRejectionDetails;
 };
@@ -502,6 +503,11 @@ async function buildShoppingResources(
   const campaignPriority = params.campaignPriority ?? 0;
   if (![0, 1, 2].includes(campaignPriority))
     return { success: false, campaignType: "SHOPPING", campaignName: params.campaignName, error: "campaignPriority must be 0 (LOW), 1 (MEDIUM), or 2 (HIGH)" };
+  const warnings = (params.languageIds ?? []).length > 0
+    ? [
+        "Standard Shopping campaigns do not support language campaign criteria in the Google Ads API; languageIds were ignored. Use Merchant Center feed language/feed label plus salesCountry and geoTargetIds instead.",
+      ]
+    : [];
 
   const biddingFields: Record<string, unknown> = {};
   switch (strategy) {
@@ -601,7 +607,6 @@ async function buildShoppingResources(
       };
     }),
     ...buildGeoCriteriaOps(campaignTemp, params.geoTargetIds),
-    ...buildLanguageCriteriaOps(campaignTemp, params.languageIds),
   ];
 
   try {
@@ -621,6 +626,7 @@ async function buildShoppingResources(
       merchantId: params.merchantId,
       salesCountry: params.salesCountry.trim().toUpperCase(),
       inventoryFilterApplied: (params.inventoryFilter ?? []).length > 0,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {
     return {

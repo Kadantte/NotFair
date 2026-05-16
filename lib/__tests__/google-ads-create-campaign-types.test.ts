@@ -140,10 +140,40 @@ const baseApp = {
   descriptions: ["Best app ever made."],
 };
 
-const findCampaignOp = (ops: any[]) =>
-  ops.find((op) => op.entity === "campaign" && op.operation === "create");
-const findAdGroupOp = (ops: any[]) =>
-  ops.find((op) => op.entity === "ad_group" && op.operation === "create");
+type CampaignOpTest = {
+  entity: string;
+  operation?: string;
+  resource: Record<string, unknown>;
+};
+
+const findCampaignOp = (ops: CampaignOpTest[]) => {
+  const op = ops.find((item) => item.entity === "campaign" && item.operation === "create");
+  if (!op) throw new Error("campaign create op not found");
+  return op;
+};
+const findAdGroupOp = (ops: CampaignOpTest[]) => {
+  const op = ops.find((item) => item.entity === "ad_group" && item.operation === "create");
+  if (!op) throw new Error("ad group create op not found");
+  return op;
+};
+const findListingGroupOp = (ops: CampaignOpTest[]) => {
+  const op = ops.find((item) => item.entity === "ad_group_criterion" && item.resource.listing_group !== undefined);
+  if (!op) throw new Error("listing group criterion op not found");
+  return op;
+};
+
+type CampaignCriterionTestOp = {
+  entity: string;
+  resource: {
+    language?: unknown;
+    location?: { geo_target_constant?: string };
+    listing_scope?: {
+      dimensions?: Array<{
+        product_type?: { value?: string };
+      }>;
+    };
+  };
+};
 
 describe("createCampaign — bidding-strategy field per type (landmine: BiddingStrategyType integers easily swapped)", () => {
   it("SEARCH + MAXIMIZE_CONVERSIONS sets maximize_conversions={} on campaign resource", async () => {
@@ -187,10 +217,30 @@ describe("createCampaign — bidding-strategy field per type (landmine: BiddingS
     });
     const ops = mockMutateResources.mock.calls[0][0];
     expect(findAdGroupOp(ops).resource.cpc_bid_micros).toBe(500_000);
-    const listingGroupOp = ops.find(
-      (op: any) => op.entity === "ad_group_criterion" && op.resource.listing_group !== undefined,
-    );
+    const listingGroupOp = findListingGroupOp(ops as CampaignOpTest[]);
     expect(listingGroupOp.resource.cpc_bid_micros).toBe(500_000);
+  });
+
+  it("SHOPPING ignores unsupported languageIds while preserving geo and inventory filter", async () => {
+    mockMutateResources.mockResolvedValueOnce(shoppingResponses());
+    const result = await createCampaign(auth, {
+      ...baseShopping,
+      campaignName: "[SHOPPING] UCHWYTY SAMOCHODOWE",
+      merchantId: 767962919,
+      salesCountry: "PL",
+      geoTargetIds: ["2616"],
+      languageIds: ["1045"],
+      inventoryFilter: [{ productType: { level: 1, value: "do samochodu" } }],
+      bidding: { strategy: "MANUAL_CPC", defaultCpcDollars: 0.5 },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.warnings?.[0]).toMatch(/languageIds were ignored/i);
+    const ops = mockMutateResources.mock.calls[0][0] as CampaignCriterionTestOp[];
+    const criterionOps = ops.filter((op) => op.entity === "campaign_criterion");
+    expect(criterionOps.some((op) => op.resource.language)).toBe(false);
+    expect(criterionOps.some((op) => op.resource.location?.geo_target_constant === "geoTargetConstants/2616")).toBe(true);
+    expect(criterionOps.some((op) => op.resource.listing_scope?.dimensions?.[0]?.product_type?.value === "do samochodu")).toBe(true);
   });
 
   it("DISPLAY + MANUAL_CPC sets cpc_bid on ad_group level", async () => {
@@ -270,7 +320,7 @@ describe("createCampaign — early validation rejections (no API call)", () => {
       campaignType: "BOGUS",
       campaignName: "x",
       dailyBudgetDollars: 5,
-    } as any);
+    } as unknown as Parameters<typeof createCampaign>[1]);
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Unsupported|BOGUS/);
     expect(mockMutateResources).not.toHaveBeenCalled();

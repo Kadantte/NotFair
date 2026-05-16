@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { safeHandler, accountIdParam, WRITE_ANNOTATIONS } from "../types";
 import type { WriteToolDeps } from "./_deps";
+import type { ShoppingCampaignParams } from "@/lib/google-ads";
 
 export function registerCreateCampaignTools(deps: WriteToolDeps) {
   const { server, executeCreate } = deps;
@@ -95,7 +96,7 @@ export function registerCreateCampaignTools(deps: WriteToolDeps) {
         .describe("Google Merchant Center account ID."),
       salesCountry: z.string().length(2).describe("ISO-3166-1 alpha-2 sales country (e.g. 'US')."),
       geoTargetIds: z.array(z.string()).optional().describe("Geo target constant IDs (e.g. '2840' for US). Use searchGeoTargets to find IDs."),
-      languageIds: z.array(z.string()).optional().describe("Language constant IDs. Defaults to no restriction."),
+      languageIds: z.array(z.string()).optional().describe("Ignored for Standard Shopping: Google Ads does not support language campaign criteria on Shopping campaigns. Use Merchant Center feed language/feed label plus salesCountry and geoTargetIds instead."),
       campaignPriority: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional().describe("Campaign priority: 0=LOW (default), 1=MEDIUM, 2=HIGH."),
       enableLocal: z.boolean().optional().describe("Enable local inventory ads. Defaults to false."),
       searchPartners: z.boolean().optional().describe("Include search partner network. Defaults to false."),
@@ -122,7 +123,7 @@ export function registerCreateCampaignTools(deps: WriteToolDeps) {
       campaignPriority,
       enableLocal,
       searchPartners,
-      inventoryFilter: inventoryFilter as any,
+      inventoryFilter: inventoryFilter as ShoppingCampaignParams["inventoryFilter"],
       bidding,
     }, "create_shopping_campaign", "Shopping campaign created as PAUSED. Verify the Merchant Center link and inventory filter in Google Ads, then use enableCampaign to start running ads.");
   }));
