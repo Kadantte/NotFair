@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { PLAYBOOKS, findPlaybook } from "./index";
+import { PLAYBOOKS, findPlaybook, legacyUriFor } from "./index";
 
 describe("playbooks registry", () => {
-  it("publishes runScript-centric playbooks with adsagent:// URIs", () => {
+  it("publishes runScript-centric playbooks with notfair:// URIs", () => {
     expect(PLAYBOOKS.length).toBeGreaterThanOrEqual(2);
     for (const p of PLAYBOOKS) {
-      expect(p.uri).toMatch(/^adsagent:\/\/playbooks\//);
+      expect(p.uri).toMatch(/^notfair:\/\/playbooks\//);
     }
   });
 
@@ -23,13 +23,34 @@ describe("playbooks registry", () => {
   });
 
   it("findPlaybook returns the right playbook by URI", () => {
-    expect(findPlaybook("adsagent://playbooks/audit-account")?.name).toContain("Audit");
-    expect(findPlaybook("adsagent://playbooks/explain-regression")?.name).toContain("regression");
-    expect(findPlaybook("adsagent://playbooks/run-experiment")?.name).toContain("experiment");
+    expect(findPlaybook("notfair://playbooks/audit-account")?.name).toContain("Audit");
+    expect(findPlaybook("notfair://playbooks/explain-regression")?.name).toContain("regression");
+    expect(findPlaybook("notfair://playbooks/run-experiment")?.name).toContain("experiment");
   });
 
   it("findPlaybook returns undefined for an unknown URI", () => {
+    expect(findPlaybook("notfair://playbooks/does-not-exist")).toBeUndefined();
+  });
+
+  it("findPlaybook resolves the legacy adsagent:// URI scheme for pre-v0.23.0 toprank clients", () => {
+    for (const p of PLAYBOOKS) {
+      expect(findPlaybook(legacyUriFor(p))).toBe(p);
+    }
+  });
+
+  it("findPlaybook returns undefined for an unknown URI under the legacy scheme", () => {
     expect(findPlaybook("adsagent://playbooks/does-not-exist")).toBeUndefined();
+  });
+
+  it("legacyUriFor maps the canonical URI to the adsagent:// scheme", () => {
+    for (const p of PLAYBOOKS) {
+      const legacy = legacyUriFor(p);
+      expect(legacy).toMatch(/^adsagent:\/\/playbooks\//);
+      // Same slug on both sides of the rename.
+      expect(legacy.replace("adsagent://playbooks/", "")).toBe(
+        p.uri.replace("notfair://playbooks/", ""),
+      );
+    }
   });
 
   it("every playbook demonstrates the runScript + gaqlParallel pattern", () => {
@@ -39,7 +60,7 @@ describe("playbooks registry", () => {
   });
 
   it("audit-account playbook teaches the wasted-spend threshold heuristic", () => {
-    const p = findPlaybook("adsagent://playbooks/audit-account")!;
+    const p = findPlaybook("notfair://playbooks/audit-account")!;
     expect(p.content).toContain("accountCpa");
     expect(p.content).toContain("accountCpa * 2");
     expect(p.content).toContain("search_term_view");
@@ -47,7 +68,7 @@ describe("playbooks registry", () => {
   });
 
   it("explain-regression playbook correlates timeseries + changes + waste", () => {
-    const p = findPlaybook("adsagent://playbooks/explain-regression")!;
+    const p = findPlaybook("notfair://playbooks/explain-regression")!;
     expect(p.content).toContain("segments.date");
     expect(p.content).toContain("ads.queries.changeEvents");
     expect(p.content).toContain("search_term_view");
@@ -61,7 +82,7 @@ describe("playbooks registry", () => {
   });
 
   it("run-experiment playbook lists the full lifecycle of write tools", () => {
-    const p = findPlaybook("adsagent://playbooks/run-experiment")!;
+    const p = findPlaybook("notfair://playbooks/run-experiment")!;
     // Mutating tools (write side)
     expect(p.content).toContain("createExperiment");
     expect(p.content).toContain("addExperimentArms");
@@ -80,7 +101,7 @@ describe("playbooks registry", () => {
   });
 
   it("run-experiment playbook documents the RSA-asset shortcut and the manual fallback", () => {
-    const p = findPlaybook("adsagent://playbooks/run-experiment")!;
+    const p = findPlaybook("notfair://playbooks/run-experiment")!;
     expect(p.content).toContain("createAdVariationExperiment");
     // Bundled shortcut surface
     expect(p.content).toContain("baseAdId");

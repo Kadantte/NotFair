@@ -31,7 +31,7 @@ export function registerExperimentWriteTools(deps: WriteToolDeps) {
   // inDesignCampaigns[0] (e.g. updateCampaignBidding, updateAd, addKeyword)
   // → scheduleExperiment → listExperimentAsyncErrors (verify forking succeeded)
   // → run for ≥ 14 days → endExperiment | promoteExperiment | graduateExperiment.
-  // Read the `adsagent://playbooks/run-experiment` resource for the full flow.
+  // Read the `notfair://playbooks/run-experiment` resource for the full flow.
 
   server.registerTool("createExperiment", {
     description:

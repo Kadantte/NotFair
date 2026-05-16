@@ -1,6 +1,6 @@
 import { registerReadTools, registerWriteTools, registerCodeModeTools, registerAgentFeedbackTools, registerUserSupportTools } from "@/lib/mcp";
 import { typedResult } from "@/lib/mcp/types";
-import { PLAYBOOKS } from "@/lib/mcp/playbooks";
+import { PLAYBOOKS, legacyUriFor } from "@/lib/mcp/playbooks";
 import {
   INTERNAL_TOOL_FEEDBACK_INSTRUCTION,
   RUNSCRIPT_FOLLOWUP_RULE,
@@ -196,24 +196,35 @@ export function registerGoogleAdsTools(server: McpServer, currentAuth: () => Aut
   // recipe for "build a dashboard" / "explain a regression" instead
   // of rediscovering it every session. Content is bundled at build
   // time; no auth required to read.
+  //
+  // Each playbook is registered twice: under the canonical
+  // `notfair://playbooks/<slug>` URI (current) and under the legacy
+  // `adsagent://playbooks/<slug>` URI (pre-v0.23.0 toprank clients).
+  // The legacy registration can be removed once telemetry confirms no
+  // `resources/read` traffic is hitting the legacy scheme.
   for (const playbook of PLAYBOOKS) {
-    server.registerResource(
-      playbook.uri.replace("adsagent://playbooks/", ""),
-      playbook.uri,
-      {
-        title: playbook.name,
-        description: playbook.description,
-        mimeType: "text/markdown",
-      },
-      async (uri) => ({
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: "text/markdown",
-            text: playbook.content,
-          },
-        ],
-      }),
-    );
+    const slug = playbook.uri.replace("notfair://playbooks/", "");
+    const metadata = {
+      title: playbook.name,
+      description: playbook.description,
+      mimeType: "text/markdown",
+    };
+    const handler = async (uri: URL) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: playbook.content,
+        },
+      ],
+    });
+
+    // Canonical URI — appears in `resources/list` for current clients.
+    server.registerResource(slug, playbook.uri, metadata, handler);
+
+    // Legacy URI alias — registered separately so `resources/read` still
+    // resolves for pre-v0.23.0 toprank skills that look up the playbook
+    // under the old scheme.
+    server.registerResource(`${slug}-legacy`, legacyUriFor(playbook), metadata, handler);
   }
 }

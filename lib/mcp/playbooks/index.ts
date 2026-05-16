@@ -9,7 +9,7 @@
  */
 
 export interface Playbook {
-  /** MCP resource URI — `adsagent://playbooks/<slug>`. */
+  /** Canonical MCP resource URI — `notfair://playbooks/<slug>`. */
   uri: string;
   /** Short human name surfaced in `resources/list`. */
   name: string;
@@ -418,21 +418,21 @@ If criteria 1–3 aren't met, recommend "wait — n more days OR n more conversi
 
 export const PLAYBOOKS: readonly Playbook[] = [
   {
-    uri: "adsagent://playbooks/audit-account",
+    uri: "notfair://playbooks/audit-account",
     name: "Audit a Google Ads account with runScript",
     description:
       "One runScript call that fans out 4 GAQL queries in parallel: campaigns, search terms, zero-conversion keywords, recent changes. Correlates them in-script to return a ranked audit.",
     content: ANALYST_MINDSET + AUDIT_ACCOUNT,
   },
   {
-    uri: "adsagent://playbooks/explain-regression",
+    uri: "notfair://playbooks/explain-regression",
     name: "Explain a metric regression with runScript",
     description:
       "One runScript call that correlates the timeseries, per-campaign breakdown, change events, and emergent wasted search terms. Answers 'why did CPA go up' in a single pass.",
     content: ANALYST_MINDSET + EXPLAIN_REGRESSION,
   },
   {
-    uri: "adsagent://playbooks/run-experiment",
+    uri: "notfair://playbooks/run-experiment",
     name: "Run a Google Ads experiment (drafts & trials)",
     description:
       "Five-step lifecycle for SEARCH_CUSTOM and SEARCH_AUTOMATED_BIDDING_STRATEGY experiments: createExperiment → addExperimentArms → mutate the trial → scheduleExperiment → listExperimentAsyncErrors → end | promote | graduate. Plus runScript queries to monitor and decide.",
@@ -440,7 +440,32 @@ export const PLAYBOOKS: readonly Playbook[] = [
   },
 ];
 
-/** Look up a playbook by URI. Returns undefined if not found. */
+/**
+ * Legacy URI scheme served only for backward compat with toprank plugin
+ * versions prior to v0.23.0, which referenced playbooks as
+ * `adsagent://playbooks/<slug>`. Remove this alias once telemetry confirms
+ * no clients are still issuing `resources/read` calls under the legacy scheme.
+ */
+const LEGACY_PLAYBOOK_PREFIX = "adsagent://playbooks/";
+const CANONICAL_PLAYBOOK_PREFIX = "notfair://playbooks/";
+
+/**
+ * Look up a playbook by URI. Returns undefined if not found. Accepts both the
+ * canonical `notfair://playbooks/<slug>` URI and the legacy
+ * `adsagent://playbooks/<slug>` URI from pre-v0.23.0 toprank clients.
+ */
 export function findPlaybook(uri: string): Playbook | undefined {
-  return PLAYBOOKS.find((p) => p.uri === uri);
+  const normalized = uri.startsWith(LEGACY_PLAYBOOK_PREFIX)
+    ? CANONICAL_PLAYBOOK_PREFIX + uri.slice(LEGACY_PLAYBOOK_PREFIX.length)
+    : uri;
+  return PLAYBOOKS.find((p) => p.uri === normalized);
+}
+
+/**
+ * Legacy URI for a given playbook — the `adsagent://playbooks/<slug>` form
+ * still used by pre-v0.23.0 toprank clients. Dual-registered at the resource
+ * handler so `resources/read` works under either scheme during the transition.
+ */
+export function legacyUriFor(playbook: Playbook): string {
+  return LEGACY_PLAYBOOK_PREFIX + playbook.uri.slice(CANONICAL_PLAYBOOK_PREFIX.length);
 }

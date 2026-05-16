@@ -72,7 +72,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerReadTools } from "../read-tools";
 import { registerWriteTools } from "../write-tools";
 import { registerCodeModeTools } from "../code-mode";
-import { PLAYBOOKS } from "../playbooks";
+import { PLAYBOOKS, legacyUriFor } from "../playbooks";
 import { clearCache } from "@/lib/google-ads";
 import { TEST_AUTH } from "./harness";
 
@@ -89,16 +89,20 @@ async function connectClient(): Promise<{ client: Client; cleanup: () => Promise
   registerWriteTools(server, () => TEST_AUTH);
   registerCodeModeTools(server, () => TEST_AUTH);
 
-  // Register playbooks the same way the route does, so `resources/list` is covered.
+  // Register playbooks the same way the route does (canonical + legacy URI
+  // alias), so `resources/list` and `resources/read` are both covered.
   for (const playbook of PLAYBOOKS) {
-    server.registerResource(
-      playbook.uri.replace("adsagent://playbooks/", ""),
-      playbook.uri,
-      { title: playbook.name, description: playbook.description, mimeType: "text/markdown" },
-      async (uri) => ({
-        contents: [{ uri: uri.href, mimeType: "text/markdown", text: playbook.content }],
-      }),
-    );
+    const slug = playbook.uri.replace("notfair://playbooks/", "");
+    const metadata = {
+      title: playbook.name,
+      description: playbook.description,
+      mimeType: "text/markdown",
+    };
+    const handler = async (uri: URL) => ({
+      contents: [{ uri: uri.href, mimeType: "text/markdown", text: playbook.content }],
+    });
+    server.registerResource(slug, playbook.uri, metadata, handler);
+    server.registerResource(`${slug}-legacy`, legacyUriFor(playbook), metadata, handler);
   }
 
   const [clientT, serverT] = InMemoryTransport.createLinkedPair();
@@ -290,6 +294,20 @@ describe("MCP protocol — resources", () => {
 
       const sample = PLAYBOOKS[0];
       const read = await client.readResource({ uri: sample.uri });
+      const [content] = read.contents;
+      expect(content.mimeType).toBe("text/markdown");
+      if (!("text" in content)) throw new Error("expected text content");
+      expect(content.text).toBe(sample.content);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("serves playbook content under the legacy URI scheme for pre-v0.23.0 toprank clients", async () => {
+    const { client, cleanup } = await connectClient();
+    try {
+      const sample = PLAYBOOKS[0];
+      const read = await client.readResource({ uri: legacyUriFor(sample) });
       const [content] = read.contents;
       expect(content.mimeType).toBe("text/markdown");
       if (!("text" in content)) throw new Error("expected text content");
