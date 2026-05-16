@@ -664,12 +664,34 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`metrics.conversion_rate` is not a GAQL field. Select `metrics.conversions` and `metrics.clicks`, then calculate `conversions / clicks` in JavaScript.",
   "metrics.impression_share":
     "metrics.impression_share is not a GAQL field. For Search campaigns, select metrics.search_impression_share; for other channels call getResourceMetadata to choose the right impression-share metric.",
+  "metrics.search_overlap_rate":
+    "`metrics.search_overlap_rate` is not a GAQL field in this Ads API surface. Auction-insight style overlap metrics are not exposed under the old search_* names; call `getResourceMetadata('campaign')` and look for supported `metrics.auction_insight_*` fields, or use the Google Ads UI if API auction-insights access is unavailable.",
+  "metrics.search_position_above_rate":
+    "`metrics.search_position_above_rate` is not a GAQL field in this Ads API surface. Auction-insight style position-above metrics are not exposed under the old search_* names; call `getResourceMetadata('campaign')` and look for supported `metrics.auction_insight_*` fields, or use the Google Ads UI if API auction-insights access is unavailable.",
+  "metrics.search_outranking_share":
+    "`metrics.search_outranking_share` is not a GAQL field in this Ads API surface. Auction-insight style outranking-share metrics are not exposed under the old search_* names; call `getResourceMetadata('campaign')` and look for supported `metrics.auction_insight_*` fields, or use the Google Ads UI if API auction-insights access is unavailable.",
+  "metrics.video_views":
+    "`metrics.video_views` is not selectable in this Ads API surface. For video/performance analysis, call `getResourceMetadata(<FROM resource>)` and use supported video metrics for that resource, or fall back to impressions/clicks/conversions when video-specific fields are unavailable.",
+  "metrics.view_rate":
+    "`metrics.view_rate` is not selectable in this Ads API surface. For video/performance analysis, call `getResourceMetadata(<FROM resource>)` and use supported video metrics for that resource, or calculate a rate from supported view/impression fields when both exist.",
+  "metrics.average_cpv":
+    "`metrics.average_cpv` is not selectable in this Ads API surface. For video/performance analysis, call `getResourceMetadata(<FROM resource>)` and use supported video-cost fields for that resource, or calculate CPV from supported cost/view fields when both exist.",
   "asset.status":
     "`asset.status` is not a GAQL field. Asset serving status lives on the link resource (`campaign_asset.status`, `ad_group_asset.status`, `asset_group_asset.status`, or `customer_asset.status`); select the relevant link status for the FROM resource.",
   "asset_group_asset.performance_label":
     "`asset_group_asset.performance_label` is not a GAQL field. Select `asset_group_asset.field_type`, `asset_group_asset.status`, and asset fields, then evaluate performance from `asset_group_asset` metrics or campaign/ad_group metrics separately.",
+  "asset.text_asset.performance_label":
+    "`asset.text_asset.performance_label` is not a GAQL field. Asset performance labels live on asset link resources when available; select `campaign_asset.*`, `ad_group_asset.*`, or `asset_group_asset.*` fields appropriate to your FROM resource.",
+  "asset_group_listing_group_filter.path.dimensions":
+    "`asset_group_listing_group_filter.path.dimensions` is not a selectable GAQL field. Select the concrete listing-filter fields exposed by `getResourceMetadata('asset_group_listing_group_filter')`, such as type, listing_source, case_value, and parent fields.",
   "asset.sitelink_asset.final_urls":
     "`asset.sitelink_asset.final_urls` is not a GAQL field. Use `getResourceMetadata('asset')` to confirm the available asset URL fields before retrying.",
+  "asset_field_type":
+    "`asset_field_type` is not a bare GAQL field. Use the link-resource field for the surface you are querying: `campaign_asset.field_type`, `ad_group_asset.field_type`, `asset_group_asset.field_type`, or `customer_asset.field_type`.",
+  "campaign_asset.asset_type":
+    "`campaign_asset.asset_type` is not a GAQL field. Select `campaign_asset.field_type` for the attachment role and select concrete `asset.*` fields for the asset's content/type details.",
+  "group_placement_view.display":
+    "`group_placement_view.display` is not a GAQL field. Use `group_placement_view.display_name` for the placement label.",
   "geo_target_constant.canonical":
     "`geo_target_constant.canonical` is not a GAQL field. Select `geo_target_constant.canonical_name` instead.",
   "campaign.url_expansion_opt_out":
@@ -682,6 +704,12 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`campaign_criterion.audience.audience` is not a GAQL field. The audience-criterion resource is `campaign_criterion.user_list` / `campaign_criterion.audience`; call `getResourceMetadata('campaign_criterion')` to confirm the audience-criterion sub-fields before retrying.",
   "campaign_criterion.proximity.address.city":
     "`campaign_criterion.proximity.address.city` is not a GAQL field. Select `campaign_criterion.proximity.address.city_name` instead.",
+  "campaign_criterion.day_of_week":
+    "`campaign_criterion.day_of_week` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.day_of_week`, `campaign_criterion.ad_schedule.start_hour`, and `campaign_criterion.ad_schedule.end_hour`.",
+  "campaign_criterion.start_hour":
+    "`campaign_criterion.start_hour` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.start_hour`.",
+  "campaign_criterion.end_hour":
+    "`campaign_criterion.end_hour` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.end_hour`.",
   "campaign_experiment.name":
     "`campaign_experiment.name` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
   "campaign_experiment.status":
@@ -700,14 +728,30 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`conversion_action.last_conversion_date` is not a GAQL field. For recent conversion activity, query metrics from `FROM campaign` or `FROM ad_group` with `segments.conversion_action_name` and a `segments.date` window.",
   "conversion_action.include_in_client_account_conversions_metric":
     "`conversion_action.include_in_client_account_conversions_metric` is not a GAQL field in this Ads API surface. Select supported `conversion_action.*` config fields or call `getResourceMetadata('conversion_action')` before retrying.",
+  "conversion_action.google_analytics_4_settings.property":
+    "`conversion_action.google_analytics_4_settings.property` is not selectable in this Ads API surface. For GA4-imported conversion actions, select supported `conversion_action.*` config fields (id, name, type, category, status, primary_for_goal, owner_customer) and inspect GA4-specific linkage in Google Ads UI / GA4 when needed.",
+  "conversion_action.google_analytics_4_settings.event":
+    "`conversion_action.google_analytics_4_settings.event` is not selectable in this Ads API surface. For GA4-imported conversion actions, select supported `conversion_action.*` config fields and inspect event-level linkage in Google Ads UI / GA4 when needed.",
+  "conversion_action.firebase_settings.event":
+    "`conversion_action.firebase_settings.event` is not selectable in this Ads API surface. For Firebase-imported conversion actions, select supported `conversion_action.*` config fields and inspect event-level linkage in Firebase/Google Ads UI when needed.",
+  "conversion_action.primary_for_bidding":
+    "`conversion_action.primary_for_bidding` is not a GAQL field. Use `conversion_action.primary_for_goal` for primary/secondary status.",
   "recommendation.impact.base_metrics.impressions":
     "`recommendation.impact.base_metrics.impressions` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
   "recommendation.impact.base_metrics.clicks":
     "`recommendation.impact.base_metrics.clicks` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
+  "recommendation.impact.base_metrics.cost_micros":
+    "`recommendation.impact.base_metrics.cost_micros` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
+  "recommendation.impact.base_metrics.conversions":
+    "`recommendation.impact.base_metrics.conversions` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
   "recommendation.keyword_match_type":
     "`recommendation.keyword_match_type` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the correct keyword-recommendation field path before retrying — the match-type field lives on a nested `keyword_recommendation` sub-message, not at the top level.",
   "auction_insight.domain":
     "`auction_insight.domain` is not a GAQL field. Auction insights ship as metrics + segments off resources like `campaign` / `ad_group`, not as an `auction_insight` resource. Required developer-token access is gated separately; if your account is enrolled, the right fields are `metrics.auction_insight_*` + `segments.auction_insight_domain` queried `FROM campaign`.",
+  "auction_insight_domain.domain":
+    "`auction_insight_domain.domain` is not a GAQL field. Auction insights ship as metrics + segments off resources like `campaign` / `ad_group`, not as an `auction_insight_domain` resource. Required developer-token access is gated separately; if your account is enrolled, use supported `metrics.auction_insight_*` fields with `segments.auction_insight_domain`.",
+  "auction_insight.display":
+    "`auction_insight.display` is not a GAQL field. Auction insights are not exposed through an `auction_insight` resource; call `getResourceMetadata('campaign')` and look for supported `metrics.auction_insight_*` / `segments.auction_insight_domain` fields.",
   "resource_name":
     "`resource_name` is not a top-level GAQL field. Each resource has its own form: `campaign.resource_name`, `ad_group.resource_name`, etc. Replace `resource_name` with `<resource>.resource_name` matching your FROM clause.",
 };

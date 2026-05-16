@@ -1244,6 +1244,30 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/auction_insight_/);
   });
 
+  it("rejects production auction-insight field hallucinations with metadata guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT metrics.search_overlap_rate, metrics.search_position_above_rate, metrics.search_outranking_share, auction_insight_domain.domain FROM campaign",
+      ),
+    ).toThrow(/auction-insight|auction_insight/);
+  });
+
+  it("rejects production asset and schedule field hallucinations with concrete replacements", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT asset_field_type, campaign_asset.asset_type, group_placement_view.display, campaign_criterion.day_of_week FROM campaign_criterion",
+      ),
+    ).toThrow(/field_type|display_name|ad_schedule/);
+  });
+
+  it("rejects production conversion-action integration hallucinations with source-system guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT conversion_action.google_analytics_4_settings.property, conversion_action.google_analytics_4_settings.event, conversion_action.primary_for_bidding FROM conversion_action",
+      ),
+    ).toThrow(/GA4|primary_for_goal/);
+  });
+
   it("rejects bare resource_name with <resource>.resource_name guidance", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
@@ -1586,6 +1610,16 @@ describe("runSafeGaqlReport pre-flight integration", () => {
       runSafeGaqlReport(
         auth,
         "SELECT asset.status, asset_group_asset.performance_label FROM asset_group_asset",
+      ),
+    ).rejects.toThrow(/unsupported field/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects production auction/video hallucinations end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT metrics.search_overlap_rate, metrics.video_views, metrics.average_cpv FROM campaign",
       ),
     ).rejects.toThrow(/unsupported field/);
     expect(mockQuery).not.toHaveBeenCalled();
