@@ -23,8 +23,16 @@ import { TRIAL_DURATION_MS } from "@/lib/trial-config";
  *   - Adding a new field that affects the UI never requires a migration.
  */
 
+export type TiktokSubscribePayload = {
+  eventId: string;
+  externalId: string;
+  email: string | null;
+  valueDecimal: number;
+  currency: string;
+};
+
 export type SyncResult =
-  | { action: "synced"; userId: string; customerId: string }
+  | { action: "synced"; userId: string; customerId: string; email: string | null; tiktokSubscribe?: TiktokSubscribePayload }
   | { action: "demoted"; userId: string }
   | { action: "skipped"; reason: string };
 
@@ -139,7 +147,7 @@ export async function syncStripeSubscription(
       set: row,
     });
 
-  return { action: "synced", userId, customerId: stripeCustomerId };
+  return { action: "synced", userId, customerId: stripeCustomerId, email };
 }
 
 // ─── Idempotency-aware webhook router ─────────────────────────────────
@@ -163,6 +171,12 @@ async function recordEventOnce(
 /**
  * Top-level webhook event router. All event types funnel into the same
  * sync function — there are no per-event handlers, by design.
+ *
+ * Exception: on `customer.subscription.created`, attach a `tiktokSubscribe`
+ * payload so the route can fire a TikTok `Subscribe` CAPI event. We do NOT
+ * fire it from inside this function because the webhook route owns the
+ * Next.js `after()` lifecycle — firing from here would either block the
+ * webhook response or risk being killed mid-flight on Vercel.
  */
 export async function handleStripeEvent(
   event: Stripe.Event,
@@ -179,5 +193,44 @@ export async function handleStripeEvent(
     return { action: "skipped", reason: `event ${event.type} has no customer id` };
   }
 
-  return syncStripeSubscription(customerId, deps);
+  const result = await syncStripeSubscription(customerId, deps);
+
+  if (
+    event.type === "customer.subscription.created" &&
+    result.action === "synced"
+  ) {
+    const tiktokSubscribe = extractTiktokSubscribePayload(event, result.userId, result.email);
+    if (tiktokSubscribe) return { ...result, tiktokSubscribe };
+  }
+
+  return result;
+}
+
+/**
+ * Build the TikTok `Subscribe` CAPI payload from a subscription event.
+ * Returns null if the subscription has no price (shouldn't happen for
+ * paid subs) — we still want the funnel signal but won't fire a bogus
+ * zero-value event.
+ */
+function extractTiktokSubscribePayload(
+  event: Stripe.Event,
+  userId: string,
+  email: string | null,
+): TiktokSubscribePayload | null {
+  const sub = event.data.object as Stripe.Subscription;
+  const item = sub.items?.data?.[0];
+  const price = item?.price;
+  if (!price?.unit_amount) return null;
+
+  // Stripe stores amounts in the currency's smallest unit (cents for USD).
+  const valueDecimal = price.unit_amount / 100;
+  const currency = (price.currency ?? "usd").toUpperCase();
+
+  return {
+    eventId: event.id,
+    externalId: userId,
+    email,
+    valueDecimal,
+    currency,
+  };
 }

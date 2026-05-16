@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe/client";
 import { getStripeWebhookSecret } from "@/lib/stripe/config";
 import { handleStripeEvent } from "@/lib/stripe/sync";
+import { sendTiktokConversion } from "@/lib/tiktok-capi";
+import { getAppOrigin } from "@/lib/app-url";
 
 export const runtime = "nodejs";
 
@@ -24,6 +26,20 @@ export async function POST(request: Request) {
 
   try {
     const result = await handleStripeEvent(event);
+    if (result.action === "synced" && result.tiktokSubscribe) {
+      after(
+        sendTiktokConversion({
+          event: "Subscribe",
+          eventId: result.tiktokSubscribe.eventId,
+          email: result.tiktokSubscribe.email,
+          externalId: result.tiktokSubscribe.externalId,
+          userAgent: request.headers.get("user-agent"),
+          pageUrl: `${getAppOrigin()}/upgrade`,
+          valueDecimal: result.tiktokSubscribe.valueDecimal,
+          currency: result.tiktokSubscribe.currency,
+        }),
+      );
+    }
     return NextResponse.json({ received: true, result });
   } catch (err) {
     console.error("[stripe webhook] handler failed", { type: event.type, err });

@@ -1,12 +1,16 @@
 import { createHash } from "crypto";
 
 const TIKTOK_EVENTS_API = "https://business-api.tiktok.com/open_api/v1.3/pixel/track/";
+const DEFAULT_PIXEL_ID = "D84CM1JC77U42GL8VQ50";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
 }
 
+export type TiktokEvent = "CompleteRegistration" | "Subscribe" | "ViewContent" | "InitiateCheckout";
+
 export type TiktokConversionInput = {
+  event: TiktokEvent;
   eventId: string;
   email?: string | null;
   externalId?: string | null;
@@ -18,12 +22,12 @@ export type TiktokConversionInput = {
 };
 
 /**
- * Fires a CompleteRegistration server-side event to TikTok Events API.
- * PII fields (email, external_id) are SHA-256 hashed before sending.
- * eventId should match the browser pixel's event_id for deduplication.
+ * Fires a server-side event to TikTok Events API. PII (email, external_id)
+ * is SHA-256 hashed before sending. `eventId` should match the browser pixel's
+ * event_id for deduplication.
  */
-export async function sendTiktokSignupConversion(input: TiktokConversionInput): Promise<void> {
-  const pixelCode = process.env.TIKTOK_PIXEL_ID ?? process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID ?? "D84CM1JC77U42GL8VQ50";
+export async function sendTiktokConversion(input: TiktokConversionInput): Promise<void> {
+  const pixelCode = process.env.TIKTOK_PIXEL_ID ?? process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID ?? DEFAULT_PIXEL_ID;
   const token = process.env.TIKTOK_ACCESS_TOKEN;
 
   if (!token) {
@@ -41,7 +45,7 @@ export async function sendTiktokSignupConversion(input: TiktokConversionInput): 
 
   const body = {
     pixel_code: pixelCode,
-    event: "CompleteRegistration",
+    event: input.event,
     event_id: input.eventId,
     timestamp: new Date().toISOString(),
     context: {
@@ -65,14 +69,24 @@ export async function sendTiktokSignupConversion(input: TiktokConversionInput): 
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.error("[tiktok-capi] failed", { status: res.status, body: text.slice(0, 500) });
+      console.error("[tiktok-capi] failed", { event: input.event, status: res.status, body: text.slice(0, 500) });
     } else {
       const json = await res.json().catch(() => null);
       if (json?.code !== 0) {
-        console.error("[tiktok-capi] API error", { code: json?.code, message: json?.message });
+        console.error("[tiktok-capi] API error", { event: input.event, code: json?.code, message: json?.message });
       }
     }
   } catch (err) {
-    console.error("[tiktok-capi] exception", err);
+    console.error("[tiktok-capi] exception", { event: input.event, err });
   }
+}
+
+/**
+ * Back-compat: existing callers pass the old signup-specific shape.
+ * Delegates to `sendTiktokConversion` with event="CompleteRegistration".
+ */
+export async function sendTiktokSignupConversion(
+  input: Omit<TiktokConversionInput, "event">,
+): Promise<void> {
+  return sendTiktokConversion({ event: "CompleteRegistration", ...input });
 }
