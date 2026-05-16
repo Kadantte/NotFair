@@ -15,6 +15,7 @@ import {
     scheduleContactAction,
 } from '@/app/(app)/outreach/actions';
 import { deriveMetrics, STATUS_CONFIG, BOUNCE_RATE_WARN } from '@/lib/outreach-metrics';
+import { nextBusinessSendTimePT } from '@/lib/scheduling';
 import type { Contact } from '../../_components/dev-types';
 
 // Module-level stale-while-revalidate cache.
@@ -102,20 +103,7 @@ export function OutreachView({ initialContacts }: Props) {
         setSchedulingId(id);
         setSendError(null);
         try {
-            const ptOffsetMs = 7 * 60 * 60 * 1000;
-            const nowPT = new Date(Date.now() - ptOffsetMs);
-            const next = new Date(nowPT);
-            const startHour = next.getDay() === 1 ? 12 : 9;
-            next.setHours(startHour, 0, 0, 0);
-            if (next <= nowPT) {
-                next.setDate(next.getDate() + 1);
-                next.setHours(next.getDay() === 1 ? 12 : 9, 0, 0, 0);
-            }
-            while (next.getDay() === 0 || next.getDay() === 6) {
-                next.setDate(next.getDate() + 1);
-                next.setHours(next.getDay() === 1 ? 12 : 9, 0, 0, 0);
-            }
-            await scheduleContactAction(id, new Date(next.getTime() + ptOffsetMs));
+            await scheduleContactAction(id, nextBusinessSendTimePT());
             await fetchContacts(true);
         } catch (err) {
             setSendError(err instanceof Error ? err.message : 'Schedule failed');

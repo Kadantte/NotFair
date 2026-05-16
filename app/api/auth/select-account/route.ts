@@ -12,6 +12,7 @@ import {
   sendRedditConversion,
   type RedditConversionInput,
 } from "@/lib/reddit-capi";
+import { sendTiktokSignupConversion } from "@/lib/tiktok-capi";
 import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import { getClientIp } from "@/lib/request-ip";
 import { attributionToUserMetadata, paidTouchToUserMetadata, sanitizeAttribution, sanitizePaidTouch } from "@/lib/utm";
@@ -279,6 +280,18 @@ export async function POST(request: Request) {
       maxAge: 600,
     });
     after(sendRedditConversion(redditConversionPayload));
+    after(
+      sendTiktokSignupConversion({
+        eventId: redditConversionPayload.conversionId,
+        email: redditConversionPayload.email ?? null,
+        externalId: redditConversionPayload.externalId ?? null,
+        ipAddress: redditConversionPayload.ipAddress ?? null,
+        userAgent: request.headers.get("user-agent"),
+        pageUrl: `${getAppOrigin()}/auth/callback`,
+        valueDecimal: 1.0,
+        currency: "USD",
+      }),
+    );
   }
   response.cookies.set(
     "gads_connect_event",

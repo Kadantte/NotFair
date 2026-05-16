@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Mail, AlertCircle } from "lucide-react";
+import { ArrowLeft, Mail, AlertCircle, ExternalLink, Sparkles } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
@@ -9,6 +9,7 @@ import { isGmailConfigured, listThreadsForEmail, type GmailThreadSummary } from 
 import { reconcileContactFromThreads } from "@/lib/outreach-reconcile";
 import { ContactDraftEditor } from "./contact-draft-editor";
 import { ThreadCard, formatDateTime } from "@/components/outreach/thread-card";
+import { formatCompactNumber } from "@/app/(app)/dev/_components/dev-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,48 @@ export default async function ContactProfilePage({
           </div>
         </div>
 
+        {contact.kind === "influencer" && (
+          <div className="rounded-xl border border-[#3D3C36] bg-[#24231F] p-5 mb-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-[#9BC4FF]" />
+              <h2 className="text-[11px] text-[#C4C0B6] uppercase tracking-wider">Influencer profile</h2>
+            </div>
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+              {contact.platform && (
+                <Field label="Platform" value={contact.platform} capitalize />
+              )}
+              {contact.handle && (
+                <Field label="Handle" value={`@${contact.handle}`} mono />
+              )}
+              {contact.followerCount != null && (
+                <Field label="Followers" value={formatCompactNumber(contact.followerCount)} mono />
+              )}
+              {contact.niche && <Field label="Niche" value={contact.niche} />}
+              {contact.discoveredBy && (
+                <Field label="Discovered by" value={contact.discoveredBy} />
+              )}
+              {contact.discoveredAt && (
+                <Field label="Discovered" value={formatDateTime(new Date(contact.discoveredAt))} />
+              )}
+            </dl>
+            {contact.profileUrl && (
+              <a
+                href={contact.profileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-[#6B8AED] hover:text-[#9BC4FF]"
+              >
+                Open profile <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+            {contact.notes && (
+              <div className="mt-4 rounded-lg border border-[#3D3C36] bg-[#1A1917] p-3 text-[13px] text-[#C4C0B6] whitespace-pre-wrap">
+                {contact.notes}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mb-5">
           <h2 className="text-[11px] text-[#C4C0B6] uppercase tracking-wider mb-2">Draft</h2>
           <ContactDraftEditor
@@ -147,3 +190,29 @@ export default async function ContactProfilePage({
     </section>
   );
 }
+
+function Field({
+  label,
+  value,
+  mono,
+  capitalize,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  capitalize?: boolean;
+}) {
+  return (
+    <div>
+      <dt className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-0.5">
+        {label}
+      </dt>
+      <dd
+        className={`text-[13px] text-[#E8E4DD] ${mono ? "font-mono" : ""} ${capitalize ? "capitalize" : ""}`}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+

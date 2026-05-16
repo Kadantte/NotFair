@@ -22,7 +22,11 @@ export function DevNav() {
                                 : 'border-transparent text-[#C4C0B6] hover:text-[#E8E4DD]'
                         }`}
                     >
-                        {tab === 'developer' ? <><span className="sm:hidden">Options</span><span className="hidden sm:inline">Developer Options</span></> : tab}
+                        {tab === 'developer'
+                            ? <><span className="sm:hidden">Options</span><span className="hidden sm:inline">Developer Options</span></>
+                            : tab === 'influencers'
+                                ? <><span className="sm:hidden">Influencers</span><span className="hidden sm:inline">Influencer Reachout</span></>
+                                : tab}
                     </Link>
                 ))}
             </div>

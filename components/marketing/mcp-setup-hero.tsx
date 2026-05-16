@@ -5,12 +5,13 @@
  * headline, AI-client tab switcher, and per-platform setup steps.
  *
  * Used by:
- *   - /mcp marketing page (full hero, with `syncUrl` so the active tab is
- *     reflected in `?tab=<id>` for deep links and back/forward).
+ *   - /mcp marketing page (full hero, with `routeBasePath` so the active tab
+ *     is reflected as `/mcp/<client>` for deep links and refreshes).
  *   - / homepage (drop-in below the existing hero, no URL sync — the homepage
  *     URL should not pick up `?tab=...` query strings from a sub-block).
  */
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -249,6 +250,10 @@ export const PLATFORMS: Platform[] = [
     },
 ];
 
+export function isMcpPlatformId(value: string | undefined | null): value is string {
+    return !!value && PLATFORMS.some((platform) => platform.id === value);
+}
+
 function agentConnectionPrompt() {
     return `Connect to ${MCP_CONNECTOR_NAME} MCP at ${MCP_SERVER_URL} — it supports OAuth flow, discover at https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads. Run the OAuth flow, send me the link, poll until I authorize, and confirm once it succeeds.`;
 }
@@ -395,12 +400,17 @@ function PlatformStepBody({ platformId, stepId }: { platformId: string; stepId: 
 
 export type McpSetupHeroProps = {
     /**
-     * Reflect the active tab in the URL via `?tab=<id>` and seed initial state
-     * from the same. Use on the dedicated `/mcp` page; leave off when this hero
-     * is dropped into another page (e.g. the homepage) so its query string
-     * doesn't get hijacked.
+     * Legacy support for `/mcp?tab=<id>` deep links. Route state is preferred
+     * when `initialPlatformId` is present.
      */
     syncUrl?: boolean;
+    /**
+     * Initial tab selected by the route, e.g. /mcp/openclaw. Query-string
+     * tabs remain supported as a fallback for old links.
+     */
+    initialPlatformId?: string;
+    /** When set, tab clicks navigate to `${routeBasePath}/<platform>`. */
+    routeBasePath?: string;
     /**
      * Where the event came from — included on `mcp_client_tab_selected` so we
      * can split tab-click metrics by the page that surfaced the hero.
@@ -410,6 +420,8 @@ export type McpSetupHeroProps = {
 
 export function McpSetupHero({
     syncUrl = false,
+    initialPlatformId,
+    routeBasePath,
     surface = "mcp",
 }: McpSetupHeroProps) {
     const t = useTranslations("McpSetupHero");
@@ -417,20 +429,37 @@ export function McpSetupHero({
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Seed from ?tab=<id> only when this instance owns the URL.
+    const routeIdx = isMcpPlatformId(initialPlatformId)
+        ? PLATFORMS.findIndex((p) => p.id === initialPlatformId)
+        : -1;
+
+    // Seed from ?tab=<id> only when this instance owns the URL. Route state
+    // wins when both are present so /mcp/openclaw?tab=codex does not drift.
     const urlTab = syncUrl ? (searchParams?.get("tab") ?? null) : null;
     const urlIdx = urlTab ? PLATFORMS.findIndex((p) => p.id === urlTab) : -1;
-    const hasUrlTab = urlIdx >= 0;
+    const seededIdx = routeIdx >= 0 ? routeIdx : urlIdx >= 0 ? urlIdx : 0;
+    const hasSeededTab = routeIdx >= 0 || urlIdx >= 0;
 
     const [platformId, setPlatformId] = useState(
-        hasUrlTab ? PLATFORMS[urlIdx].id : PLATFORMS[0].id,
+        PLATFORMS[seededIdx].id,
     );
-    const [pillIndex, setPillIndex] = useState(hasUrlTab ? urlIdx : 0);
-    const [pillPaused, setPillPaused] = useState(hasUrlTab);
+    const [pillIndex, setPillIndex] = useState(seededIdx);
+    const [pillPaused, setPillPaused] = useState(hasSeededTab);
 
-    // Sync state when the URL changes externally (browser back/forward).
+    // Sync state when the route changes externally (browser back/forward).
     useEffect(() => {
-        if (!syncUrl || !urlTab) return;
+        if (routeIdx < 0) return;
+        const timeout = window.setTimeout(() => {
+            setPlatformId(PLATFORMS[routeIdx].id);
+            setPillIndex(routeIdx);
+            setPillPaused(true);
+        }, 0);
+        return () => window.clearTimeout(timeout);
+    }, [routeIdx]);
+
+    // Preserve old /mcp?tab=<id> deep links.
+    useEffect(() => {
+        if (routeIdx >= 0 || !syncUrl || !urlTab) return;
         const idx = PLATFORMS.findIndex((p) => p.id === urlTab);
         if (idx < 0) return;
         const timeout = window.setTimeout(() => {
@@ -439,7 +468,7 @@ export function McpSetupHero({
             setPillPaused(true);
         }, 0);
         return () => window.clearTimeout(timeout);
-    }, [syncUrl, urlTab]);
+    }, [routeIdx, syncUrl, urlTab]);
 
     // Auto-cycle the hero pill until the user picks a tab.
     useEffect(() => {
@@ -465,11 +494,18 @@ export function McpSetupHero({
             surface,
         });
 
+        if (routeBasePath) return;
+
         if (syncUrl) {
             const params = new URLSearchParams(searchParams?.toString() ?? "");
             params.set("tab", id);
             router.replace(`${pathname}?${params.toString()}`, { scroll: false });
         }
+    }
+
+    function hrefForPlatform(id: string) {
+        if (!routeBasePath) return undefined;
+        return `${routeBasePath}/${id}`;
     }
 
     return (
@@ -528,20 +564,37 @@ export function McpSetupHero({
                     transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
                     className="mx-auto mt-10 flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-full border border-[#3D3C36] bg-[#24231F] p-1"
                 >
-                    {PLATFORMS.map((p) => (
-                        <button
-                            key={p.id}
-                            onClick={() => selectTab(p.id)}
-                            className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                                p.id === platformId
-                                    ? "bg-[#E8E4DD] text-[#1A1917]"
-                                    : "text-[#C4C0B6] hover:text-[#E8E4DD]"
-                            }`}
-                        >
-                            <p.Logo className="h-5 w-5" />
-                            {p.name}
-                        </button>
-                    ))}
+                    {PLATFORMS.map((p) => {
+                        const className = `flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                            p.id === platformId
+                                ? "bg-[#E8E4DD] text-[#1A1917]"
+                                : "text-[#C4C0B6] hover:text-[#E8E4DD]"
+                        }`;
+                        const href = hrefForPlatform(p.id);
+
+                        return href ? (
+                            <Link
+                                key={p.id}
+                                href={href}
+                                prefetch
+                                onClick={() => selectTab(p.id)}
+                                className={className}
+                                aria-current={p.id === platformId ? "page" : undefined}
+                            >
+                                <p.Logo className="h-5 w-5" />
+                                {p.name}
+                            </Link>
+                        ) : (
+                            <button
+                                key={p.id}
+                                onClick={() => selectTab(p.id)}
+                                className={className}
+                            >
+                                <p.Logo className="h-5 w-5" />
+                                {p.name}
+                            </button>
+                        );
+                    })}
                 </motion.div>
 
                 {/* Step cards */}

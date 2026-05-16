@@ -1,7 +1,7 @@
 import type { Tab, Customer, CustomerAttribution } from './dev-types';
 
-export const VALID_TABS: ReadonlySet<Tab> = new Set(['customers', 'usage', 'outreach', 'developer', 'waitlist']);
-export const TAB_ORDER: readonly Tab[] = ['customers', 'usage', 'outreach', 'waitlist', 'developer'] as const;
+export const VALID_TABS: ReadonlySet<Tab> = new Set(['customers', 'usage', 'outreach', 'influencers', 'developer', 'waitlist']);
+export const TAB_ORDER: readonly Tab[] = ['customers', 'usage', 'outreach', 'influencers', 'waitlist', 'developer'] as const;
 export const DEFAULT_TAB: Tab = 'customers';
 
 export const DAYS_PER_YEAR = 365;
@@ -17,6 +17,13 @@ export function tabFromPathname(pathname: string): Tab {
 
 export function formatYTick(v: number): string {
     return v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v);
+}
+
+/** Compact number with k/M suffix. Used for follower counts, total reach, etc. */
+export function formatCompactNumber(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
+    return String(n);
 }
 
 export function formatCurrency(amount: number, currencyCode?: string | null, opts: { compact?: boolean } = {}): string {

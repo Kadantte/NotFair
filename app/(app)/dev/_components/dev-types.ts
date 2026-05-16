@@ -69,5 +69,5 @@ export type ResetPreview = {
     stripeCustomers: { env: 'test' | 'live'; stripeCustomerId: string }[];
 };
 
-export type Tab = 'customers' | 'usage' | 'outreach' | 'developer' | 'waitlist';
+export type Tab = 'customers' | 'usage' | 'outreach' | 'influencers' | 'developer' | 'waitlist';
 export type UsagePlatform = 'all' | 'google_ads' | 'meta_ads';

@@ -8,6 +8,7 @@ declare global {
     gtag?: (...args: unknown[]) => void;
     rdt?: (...args: unknown[]) => void;
     twq?: (...args: unknown[]) => void;
+    ttq?: (...args: unknown[]) => void;
   }
 }
 
@@ -65,6 +66,7 @@ export function GadsConversionTracker() {
     let gadsFired = false;
     let redditFired = false;
     let xFired = false;
+    let tiktokFired = false;
 
     function attemptFire(): void {
       attempts += 1;
@@ -113,12 +115,23 @@ export function GadsConversionTracker() {
         clearCookie(X_SIGNUP_ID_COOKIE);
       }
 
+      if (hasGadsSignup && !tiktokFired && typeof window.ttq === "function") {
+        window.ttq("track", "CompleteRegistration", {
+          value: 1.0,
+          currency: "USD",
+          // event_id deduplicates against the server-side CAPI event (same UUID)
+          ...(redditConversionId ? { event_id: redditConversionId } : {}),
+        });
+        tiktokFired = true;
+      }
+
       const retryX = hasXSignup && !xFired && X_SIGNUP_EVENT_ID;
       const retryGads = hasGadsSignup && !gadsFired;
       const retryReddit = hasGadsSignup && !redditFired;
-      if (attempts < PIXEL_MAX_ATTEMPTS && (retryX || retryGads || retryReddit)) {
+      const retryTiktok = hasGadsSignup && !tiktokFired;
+      if (attempts < PIXEL_MAX_ATTEMPTS && (retryX || retryGads || retryReddit || retryTiktok)) {
         timeoutId = setTimeout(attemptFire, PIXEL_RETRY_MS);
-      } else if (hasGadsSignup && ((gadsFired && redditFired) || attempts >= PIXEL_MAX_ATTEMPTS)) {
+      } else if (hasGadsSignup && ((gadsFired && redditFired && tiktokFired) || attempts >= PIXEL_MAX_ATTEMPTS)) {
         clearCookie("gads_new_signup");
         clearCookie(REDDIT_SIGNUP_ID_COOKIE);
         clearCookie(GADS_SIGNUP_EMAIL_COOKIE);

@@ -320,7 +320,7 @@ export const contacts = pgTable("contacts", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   company: text("company"),
-  /** 'lead' = cold prospect, 'customer' = already-connected user we're re-engaging */
+  /** 'lead' = cold prospect, 'customer' = already-connected user we're re-engaging, 'influencer' = creator/affiliate target */
   kind: text("kind").notNull().default("lead"),
   /** new, drafted, scheduled, contacted, delivered, opened, clicked, replied, bounced */
   status: text("status").notNull().default("new"),
@@ -331,10 +331,21 @@ export const contacts = pgTable("contacts", {
   scheduledAt: timestamp("scheduled_at"),
   lastContactedAt: timestamp("last_contacted_at"),
   unsubscribed: boolean("unsubscribed").default(false).notNull(),
+  // Influencer-specific metadata (only populated when kind='influencer').
+  platform: text("platform"),
+  handle: text("handle"),
+  followerCount: integer("follower_count"),
+  niche: text("niche"),
+  profileUrl: text("profile_url"),
+  notes: text("notes"),
+  discoveredAt: timestamp("discovered_at").defaultNow(),
+  discoveredBy: text("discovered_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("contacts_email_idx").on(table.email),
   index("contacts_kind_idx").on(table.kind),
+  index("contacts_platform_idx").on(table.platform),
+  index("contacts_follower_count_idx").on(table.followerCount),
 ]);
 
 // ─── OAuth Nonces (server-side CSRF protection) ─────────────────────

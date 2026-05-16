@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi";
+import { sendTiktokSignupConversion } from "@/lib/tiktok-capi";
 import { maybeFireGoogleAdsSignup } from "@/lib/google-ads-signup";
 import { buildXSignupConversionId, X_SIGNUP_ID_COOKIE } from "@/lib/x-signup";
 import { getClientIp } from "@/lib/request-ip";
@@ -858,6 +859,18 @@ export async function GET(request: Request) {
         userId: user.id,
         email: user.email ?? null,
         gclid: latestPaidTouch?.gclid ?? state.attribution?.gclid ?? null,
+      }),
+    );
+    after(
+      sendTiktokSignupConversion({
+        eventId: conversionId,
+        email: user.email ?? null,
+        externalId: user.id,
+        ipAddress: getClientIp(request) ?? null,
+        userAgent: request.headers.get("user-agent"),
+        pageUrl: `${origin}/auth/callback`,
+        valueDecimal: 1.0,
+        currency: "USD",
       }),
     );
   }

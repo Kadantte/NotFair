@@ -55,7 +55,11 @@ function ChapterBadge({ children }: { children: ReactNode }) {
 
 /* ─────────────────────────── Page ─────────────────────────── */
 
-export function McpPage() {
+type McpPageProps = {
+    initialPlatformId?: string;
+};
+
+export function McpPage({ initialPlatformId }: McpPageProps) {
     const t = useTranslations("McpPage");
     const useCases = t.raw("useCases") as UseCase[];
     const faqItems = (t.raw("faq.items") as FaqItem[]).map((item) => ({
@@ -78,7 +82,12 @@ export function McpPage() {
 
     return (
         <div className="bg-[#1A1917] text-[#E8E4DD]">
-            <McpSetupHero syncUrl surface="mcp" />
+            <McpSetupHero
+                syncUrl
+                initialPlatformId={initialPlatformId}
+                routeBasePath="/mcp"
+                surface="mcp"
+            />
 
             <MarketingEngineSection />
 
