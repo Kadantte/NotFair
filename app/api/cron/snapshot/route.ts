@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { gte } from "drizzle-orm";
-import { listCampaigns, getCampaignPerformance, toMicros, parseCustomerIds, type AuthContext } from "@/lib/google-ads";
+import { desc, eq, gte } from "drizzle-orm";
+import {
+  authForAccount,
+  getCachedCustomer,
+  parseCustomerIds,
+  type AuthContext,
+  type ConnectedAccount,
+} from "@/lib/google-ads";
 
 /**
  * Daily performance snapshot cron job.
@@ -18,69 +24,111 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Get all active MCP sessions
+    const connections = await db()
+      .select()
+      .from(schema.adPlatformConnections)
+      .where(eq(schema.adPlatformConnections.platform, "google_ads"))
+      .orderBy(desc(schema.adPlatformConnections.updatedAt));
+
     const sessions = await db()
       .select()
       .from(schema.mcpSessions)
-      .where(gte(schema.mcpSessions.expiresAt, new Date().toISOString()));
+      .where(gte(schema.mcpSessions.expiresAt, new Date().toISOString()))
+      .orderBy(desc(schema.mcpSessions.createdAt));
+
+    const snapshotDate = getCompletedSnapshotDate();
+    const dateRange = { start: snapshotDate, end: snapshotDate };
+    const accounts = new Map<string, { candidates: Array<{ source: string; auth: AuthContext }> }>();
+
+    for (const connection of connections) {
+      const connectedAccounts = normalizeConnectedAccounts(connection.accountIds ?? []);
+      const accountIds = connectedAccounts.length > 0
+        ? connectedAccounts.map((account) => account.id)
+        : connection.activeAccountId
+          ? [connection.activeAccountId]
+          : [];
+      if (!connection.activeAccountId && accountIds.length === 0) continue;
+
+      const activeAccount = connectedAccounts.find((account) => account.id === connection.activeAccountId);
+      const baseAuth: AuthContext = {
+        refreshToken: connection.refreshToken,
+        customerId: connection.activeAccountId ?? accountIds[0],
+        customerIds: connectedAccounts,
+        loginCustomerId: activeAccount?.loginCustomerId ?? null,
+        userId: connection.userId,
+        authMethod: "oauth",
+      };
+
+      for (const accountId of accountIds) {
+        addAccountCandidate(accounts, "connection", authForAccount(baseAuth, accountId));
+      }
+    }
+
+    for (const session of sessions) {
+      const connectedAccounts = parseCustomerIds(session.customerIds);
+      const accountIds = connectedAccounts.length > 0
+        ? connectedAccounts.map((account) => account.id)
+        : session.customerId
+          ? [session.customerId]
+          : [];
+
+      const baseAuth: AuthContext = {
+        refreshToken: session.refreshToken,
+        customerId: session.customerId,
+        customerIds: connectedAccounts,
+        loginCustomerId: session.loginCustomerId,
+        userId: session.userId,
+        clientName: session.clientName,
+        clientVersion: session.clientVersion,
+        authMethod: "oauth",
+        sessionId: session.id,
+      };
+
+      for (const accountId of accountIds) {
+        addAccountCandidate(accounts, `session:${session.id}`, authForAccount(baseAuth, accountId));
+      }
+    }
 
     let snapshotsCreated = 0;
     let errors = 0;
+    let campaignsSeen = 0;
 
-    for (const session of sessions) {
-      // Parse all connected account IDs
-      let accountIds = parseCustomerIds(session.customerIds).map((a) => a.id);
+    for (const { candidates } of accounts.values()) {
+      let completed = false;
 
-      // Ensure at least the primary account is included
-      if (accountIds.length === 0 && session.customerId) {
-        accountIds = [session.customerId];
-      }
-
-      for (const accountId of accountIds) {
+      for (const { source, auth } of candidates) {
         try {
-          const auth: AuthContext = {
-            refreshToken: session.refreshToken,
-            customerId: accountId,
-          };
-
-          const campaigns = await listCampaigns(auth, { limit: 100 });
-
-          for (const campaign of campaigns) {
-            if (campaign.status === "REMOVED") continue;
-
-            // Get yesterday's performance
-            const perf = await getCampaignPerformance(auth, campaign.id, 1);
-            const yesterday = perf.daily[0];
-            if (!yesterday) continue;
-
+          const rows = await fetchAccountCampaignSnapshots(auth, dateRange);
+          campaignsSeen += rows.length;
+          if (rows.length > 0) {
             await db()
               .insert(schema.performanceSnapshots)
-              .values({
-                accountId,
-                campaignId: campaign.id,
-                snapshotDate: yesterday.date,
-                impressions: yesterday.impressions,
-                clicks: yesterday.clicks,
-                costMicros: toMicros(yesterday.cost),
-                conversions: yesterday.conversions,
-                cpa: yesterday.conversions > 0
-                  ? yesterday.cost / yesterday.conversions
-                  : null,
-              })
+              .values(rows)
               .onConflictDoNothing(); // Skip if snapshot already exists for this date
 
-            snapshotsCreated++;
+            snapshotsCreated += rows.length;
           }
+          completed = true;
+          break;
         } catch (error) {
-          console.error(`[cron/snapshot] Error for session ${session.id}, account ${accountId}:`, error);
-          errors++;
+          console.warn(`[cron/snapshot] Candidate failed for ${source}, account ${auth.customerId}:`, error);
         }
+      }
+
+      if (!completed) {
+        const [{ source, auth }] = candidates;
+        console.error(`[cron/snapshot] All candidates failed for ${source}, account ${auth.customerId}`);
+        errors++;
       }
     }
 
     return NextResponse.json({
       success: true,
+      connectionsProcessed: connections.length,
       sessionsProcessed: sessions.length,
+      accountsProcessed: accounts.size,
+      dateRange,
+      campaignsSeen,
       snapshotsCreated,
       errors,
     });
@@ -91,4 +139,91 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function addAccountCandidate(
+  accounts: Map<string, { candidates: Array<{ source: string; auth: AuthContext }> }>,
+  source: string,
+  auth: AuthContext,
+) {
+  const key = `${auth.customerId}|${auth.loginCustomerId ?? ""}`;
+  const account = accounts.get(key);
+  if (account) {
+    account.candidates.push({ source, auth });
+  } else {
+    accounts.set(key, { candidates: [{ source, auth }] });
+  }
+}
+
+function getCompletedSnapshotDate(now = new Date()) {
+  const date = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 1,
+  ));
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeConnectedAccounts(
+  accounts: Array<{ id: string; name?: string; loginCustomerId?: string | null }>,
+): ConnectedAccount[] {
+  return accounts.map((account) => ({
+    id: account.id,
+    name: account.name ?? account.id,
+    ...("loginCustomerId" in account ? { loginCustomerId: account.loginCustomerId ?? null } : {}),
+  }));
+}
+
+type CampaignSnapshotRow = {
+  campaign?: { id?: string | number };
+  segments?: { date?: string };
+  metrics?: {
+    impressions?: number;
+    clicks?: number;
+    cost_micros?: number | string;
+    conversions?: number;
+  };
+};
+
+async function fetchAccountCampaignSnapshots(
+  auth: AuthContext,
+  dateRange: { start: string; end: string },
+) {
+  const customer = getCachedCustomer(auth);
+  const result = await customer.query(`
+    SELECT
+      campaign.id,
+      segments.date,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions
+    FROM campaign
+    WHERE campaign.status != 'REMOVED'
+      AND segments.date BETWEEN '${dateRange.start}' AND '${dateRange.end}'
+    ORDER BY metrics.impressions DESC
+    LIMIT 100
+  `) as CampaignSnapshotRow[];
+
+  return result
+    .map((row) => {
+      const campaignId = row.campaign?.id;
+      const snapshotDate = row.segments?.date;
+      if (campaignId == null || !snapshotDate) return null;
+
+      const costMicros = Number(row.metrics?.cost_micros ?? 0);
+      const conversions = row.metrics?.conversions ?? 0;
+
+      return {
+        accountId: auth.customerId,
+        campaignId: String(campaignId),
+        snapshotDate,
+        impressions: row.metrics?.impressions ?? 0,
+        clicks: row.metrics?.clicks ?? 0,
+        costMicros,
+        conversions,
+        cpa: conversions > 0 ? costMicros / 1_000_000 / conversions : null,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
 }
