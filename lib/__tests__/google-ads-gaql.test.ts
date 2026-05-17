@@ -1124,6 +1124,14 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/metrics\.search_impression_share/);
   });
 
+  it("rejects stale search lost impression-share aliases with exact replacements", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT campaign.id, metrics.search_lost_is_rank, metrics.search_lost_is_budget FROM campaign",
+      ),
+    ).toThrow(/search_rank_lost_impression_share.*search_budget_lost_impression_share/);
+  });
+
   it("rejects asset link hallucinations from production with replacement guidance", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
@@ -1600,6 +1608,16 @@ describe("runSafeGaqlReport pre-flight integration", () => {
         "SELECT campaign.id, metrics.cost_per_conversion_micros, metrics.impression_share FROM campaign",
       ),
     ).rejects.toThrow(/metrics\.cost_per_conversion/);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale search lost impression-share aliases end-to-end", async () => {
+    await expect(
+      runSafeGaqlReport(
+        auth,
+        "SELECT campaign.id, metrics.search_lost_is_rank, metrics.search_lost_is_budget FROM campaign",
+      ),
+    ).rejects.toThrow(/search_rank_lost_impression_share/);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

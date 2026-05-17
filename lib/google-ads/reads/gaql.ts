@@ -672,6 +672,10 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`metrics.search_position_above_rate` is not a GAQL field in this Ads API surface. Auction-insight style position-above metrics are not exposed under the old search_* names; call `getResourceMetadata('campaign')` and look for supported `metrics.auction_insight_*` fields, or use the Google Ads UI if API auction-insights access is unavailable.",
   "metrics.search_outranking_share":
     "`metrics.search_outranking_share` is not a GAQL field in this Ads API surface. Auction-insight style outranking-share metrics are not exposed under the old search_* names; call `getResourceMetadata('campaign')` and look for supported `metrics.auction_insight_*` fields, or use the Google Ads UI if API auction-insights access is unavailable.",
+  "metrics.search_lost_is_rank":
+    "`metrics.search_lost_is_rank` is not a GAQL field. Select `metrics.search_rank_lost_impression_share` for Search lost impression share due to rank, or call `getResourceMetadata(<FROM resource>)` to confirm compatibility.",
+  "metrics.search_lost_is_budget":
+    "`metrics.search_lost_is_budget` is not a GAQL field. Select `metrics.search_budget_lost_impression_share` for Search lost impression share due to budget, or call `getResourceMetadata(<FROM resource>)` to confirm compatibility.",
   "metrics.video_views":
     "`metrics.video_views` is not selectable in this Ads API surface. For video/performance analysis, call `getResourceMetadata(<FROM resource>)` and use supported video metrics for that resource, or fall back to impressions/clicks/conversions when video-specific fields are unavailable.",
   "metrics.view_rate":
