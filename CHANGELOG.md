@@ -11,6 +11,42 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.24.0] — 2026-05-17
+
+### Agency mode: client registry + advisor skill
+
+Toprank now has a first-class concept of a client. Agencies managing multiple
+clients no longer re-enter brand voice, account IDs, or goals on every run.
+Register a client once and every subsequent skill call loads that context
+automatically.
+
+Two new host-agnostic skills — work on Claude Code, Codex, Hermes, OpenClaw,
+and any other agent host. Client data lives at `~/.toprank/clients/<slug>/`
+(global, off-repo), so credentials never end up in version control.
+
+**`/toprank-client-onboard`** — registers a client: name, website URL, Google
+Search Console property, Google Ads CID, Meta Ads account ID, brand terms,
+primary goal, KPI, and deadline. Subsequent runs update the record. Lists
+existing clients so you can pick one to edit.
+
+**`/toprank-advisor`** — the "what should we work on?" skill. Reads a client's
+goal and recent history, probes active channels (Google Ads via GAQL, SEO via
+GSC, Meta via Insights API), calculates how far the client is from their goal
+vs. how much time remains, and ranks the top three actions. Runs in
+recommend-only mode — never executes changes without explicit approval. Also
+supports a portfolio view (`/toprank-advisor all`) that scores urgency across
+every registered client and tells you which one to focus on first.
+
+The OpenClaw multi-site orchestrators are unchanged and remain the deeper option
+for OpenClaw users who want Python-driven artifact persistence.
+
+### Added
+- `agency/client-onboard/SKILL.md` — `toprank-client-onboard` skill
+- `agency/advisor/SKILL.md` — `toprank-advisor` skill
+- Both skills registered in `AGENTS.md` (Agency section) and `plugin.json`
+
+---
+
 ## [0.23.0] — 2026-05-16
 
 ### Changed — full removal of legacy AdsAgent branding from active code

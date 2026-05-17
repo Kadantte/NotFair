@@ -53,6 +53,17 @@ Skills under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`, and `toprank-upgrade
 |---|---|---|
 | Second opinion / review / challenge / consult via Google Gemini | `gemini` | `gemini/SKILL.md` |
 
+## Agency (multi-client)
+
+Host-agnostic client registry. Works on every agent host. Client data is stored
+under `~/.toprank/clients/<slug>/` — not in the repo — so credentials stay off
+version control. Use these skills when managing SEO or Ads work for multiple clients.
+
+| Intent | Skill | Path |
+|---|---|---|
+| Register a new client or update an existing client record | `toprank-client-onboard` | `agency/client-onboard/SKILL.md` |
+| Get a prioritized next-action recommendation for a client, or ranked portfolio view across all clients | `toprank-advisor` | `agency/advisor/SKILL.md` |
+
 ## Plugin maintenance
 
 | Intent | Skill | Path |
