@@ -662,6 +662,8 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "metrics.cost_per_conversion_micros is not a GAQL field. Select metrics.cost_per_conversion instead.",
   "metrics.conversion_rate":
     "`metrics.conversion_rate` is not a GAQL field. Select `metrics.conversions` and `metrics.clicks`, then calculate `conversions / clicks` in JavaScript.",
+  "metrics.quality_info.quality_score":
+    "`metrics.quality_info.quality_score` is not a GAQL field. Quality score lives on keyword criteria: select `ad_group_criterion.quality_info.quality_score` from `FROM ad_group_criterion`, and query delivery metrics separately from `FROM keyword_view`.",
   "metrics.impression_share":
     "metrics.impression_share is not a GAQL field. For Search campaigns, select metrics.search_impression_share; for other channels call getResourceMetadata to choose the right impression-share metric.",
   "metrics.search_overlap_rate":
@@ -710,6 +712,10 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`campaign_criterion.start_hour` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.start_hour`.",
   "campaign_criterion.end_hour":
     "`campaign_criterion.end_hour` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.end_hour`.",
+  "ad_group_criterion.quality_info.ad_relevance":
+    "`ad_group_criterion.quality_info.ad_relevance` is not a GAQL field. Use the supported quality score components: `ad_group_criterion.quality_info.creative_quality_score`, `ad_group_criterion.quality_info.post_click_quality_score`, and `ad_group_criterion.quality_info.search_predicted_ctr`.",
+  "ad_group_criterion.quality_info.landing_page_experience":
+    "`ad_group_criterion.quality_info.landing_page_experience` is not a GAQL field. Use `ad_group_criterion.quality_info.post_click_quality_score` as Google's supported landing-page quality component.",
   "campaign_experiment.name":
     "`campaign_experiment.name` is not a GAQL field in this Ads API surface. Call `getResourceMetadata('experiment')` / `getResourceMetadata('campaign_experiment')` before querying experiment fields, or use the dedicated experiment tools when you need experiment state.",
   "campaign_experiment.status":

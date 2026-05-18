@@ -1140,6 +1140,14 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/conversions.*clicks/);
   });
 
+  it("rejects production keyword quality hallucinations with valid component guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT ad_group_criterion.quality_info.ad_relevance, ad_group_criterion.quality_info.landing_page_experience, metrics.quality_info.quality_score FROM ad_group_criterion",
+      ),
+    ).toThrow(/creative_quality_score.*post_click_quality_score.*keyword_view/);
+  });
+
   it("rejects hallucinated sitelink final_urls field with metadata guidance", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
