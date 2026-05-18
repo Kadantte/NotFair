@@ -279,6 +279,112 @@ describe("OAuth token route — POST", () => {
     expect(insertArg.connectionId).toBeNull();
   });
 
+  // ─── Public clients (token_endpoint_auth_method=none, PKCE-only) ──
+
+  it("accepts PKCE-only exchange from a public client (no client_secret)", async () => {
+    // S256 challenge derived from this verifier.
+    const codeVerifier = "test-code-verifier-1234567890abcdefghij";
+    const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    // 1) oauth_clients lookup → existing client row (secret stored but client
+    //    registered with token_endpoint_auth_method=none, so won't send it).
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    // 2) authorization_codes lookup → unused, unexpired, PKCE-bound code.
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: 42,
+        connectionId: null,
+        redirectUri: "http://localhost:53682/callback",
+        codeChallenge,
+        codeChallengeMethod: "S256",
+      },
+    ]);
+    // 3) mcp_sessions lookup → unexpired session.
+    mockSelectRows.mockResolvedValueOnce([{ expiresAt: futureExpiry, userId: null }]);
+
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        // NO client_secret — public client per RFC 7591 token_endpoint_auth_method=none.
+        redirect_uri: "http://localhost:53682/callback",
+        code_verifier: codeVerifier,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.access_token).toMatch(/^oat_[a-f0-9]{64}$/);
+  });
+
+  it("rejects a public client with no PKCE on the auth code (still requires some authenticator)", async () => {
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    // Auth code without code_challenge — no PKCE binding to authenticate against.
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: 42,
+        connectionId: null,
+        redirectUri: "http://localhost:3000/cb",
+        codeChallenge: null,
+        codeChallengeMethod: null,
+      },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        // NO client_secret AND the auth code has no code_challenge — reject.
+        redirect_uri: "http://localhost:3000/cb",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe("invalid_client");
+    expect(body.error_description).toMatch(/client_secret/i);
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it("rejects PKCE-only exchange with a bad code_verifier", async () => {
+    const goodVerifier = "test-code-verifier-1234567890abcdefghij";
+    const codeChallenge = createHash("sha256").update(goodVerifier).digest("base64url");
+
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: 42,
+        connectionId: null,
+        redirectUri: "http://localhost:53682/callback",
+        codeChallenge,
+        codeChallengeMethod: "S256",
+      },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        redirect_uri: "http://localhost:53682/callback",
+        code_verifier: "wrong-verifier",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("invalid_grant");
+  });
+
   it("does NOT translate when the session row has no userId (legacy ads-less rows)", async () => {
     const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);

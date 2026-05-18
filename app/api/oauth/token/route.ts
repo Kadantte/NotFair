@@ -68,14 +68,21 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate client_secret
-  if (!clientSecret) {
-    return NextResponse.json(
-      { error: "invalid_client", error_description: "Missing client_secret" },
-      { status: 401 },
-    );
-  }
-
+  // Authenticate the client. Two paths per RFC 6749 + RFC 7636, both advertised
+  // in our AS metadata (`token_endpoint_auth_methods_supported` includes
+  // "client_secret_post", "client_secret_basic", AND "none"):
+  //
+  //   • Confidential clients send client_secret (form body or HTTP Basic). We
+  //     verify it against the stored hash here.
+  //   • Public clients (token_endpoint_auth_method=none, e.g. stock MCP SDKs
+  //     and Codex CLI) send no secret and rely on PKCE. The proof-of-possession
+  //     check happens below against the code_challenge stored on the auth code.
+  //     If the auth code has no code_challenge, the PKCE block falls through
+  //     and we reject with "Missing client_secret" to preserve the legacy
+  //     error shape for misconfigured confidential clients.
+  //
+  // We still always look up the client row to reject unknown client_ids and
+  // to keep the response shape stable across both paths.
   const [client] = await db()
     .select({ clientSecretHash: schema.oauthClients.clientSecretHash })
     .from(schema.oauthClients)
@@ -89,12 +96,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const providedHash = createHash("sha256").update(clientSecret).digest("hex");
-  if (providedHash !== client.clientSecretHash) {
-    return NextResponse.json(
-      { error: "invalid_client", error_description: "Invalid client_secret" },
-      { status: 401 },
-    );
+  if (clientSecret) {
+    const providedHash = createHash("sha256").update(clientSecret).digest("hex");
+    if (providedHash !== client.clientSecretHash) {
+      return NextResponse.json(
+        { error: "invalid_client", error_description: "Invalid client_secret" },
+        { status: 401 },
+      );
+    }
   }
 
   // Look up the authorization code
@@ -139,7 +148,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate PKCE if code_challenge was provided during authorization
+  // Validate PKCE if code_challenge was provided during authorization.
+  // PKCE is also the sole authenticator for public clients (no client_secret),
+  // so when no secret was sent we MUST have a code_challenge on the code; if
+  // not, reject as if the secret was missing.
   if (authCode.codeChallenge) {
     if (!codeVerifier) {
       return NextResponse.json(
@@ -163,6 +175,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+  } else if (!clientSecret) {
+    // Public client (no secret) AND the auth code wasn't bound with PKCE —
+    // there's nothing left to authenticate against. This happens when an MCP
+    // client registered with token_endpoint_auth_method=none but skipped the
+    // code_challenge on /authorize. Reject explicitly so the client surfaces
+    // a clear error instead of falling through to a free token issue.
+    return NextResponse.json(
+      { error: "invalid_client", error_description: "Missing client_secret" },
+      { status: 401 },
+    );
   }
 
   // Mark code as used
