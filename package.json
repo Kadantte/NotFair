@@ -13,7 +13,7 @@
     "public/"
   ],
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 3326",
     "build": "next build && node scripts/copy-standalone-assets.mjs",
     "start": "next start",
     "cli": "tsx bin/cli.ts",
@@ -40,6 +40,8 @@
     "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.0",
     "ws": "^8.20.1",

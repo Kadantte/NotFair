@@ -13,6 +13,7 @@ import {
   type SlashCommand,
 } from "@/lib/slash-commands";
 import { SlashCommandPopover } from "./slash-command-popover";
+import { Markdown } from "./markdown";
 
 type Message = {
   id: string;
@@ -37,6 +38,11 @@ type Props = {
    * thread the resolved key through instead of reconstructing it server-side.
    */
   sessionKey: string;
+  /**
+   * Template key the agent was provisioned from (e.g. "google_ads"). Kept
+   * for future per-template chat affordances; currently unused.
+   */
+  templateKey?: string;
   initialMessages?: InitialMessage[];
 };
 
@@ -46,6 +52,7 @@ export function AgentChat({
   agentDisplayName,
   sessionId,
   sessionKey,
+  templateKey: _templateKey,
   initialMessages = [],
 }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -105,13 +112,18 @@ export function AgentChat({
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }
 
-  async function send() {
-    const text = input.trim();
+  async function send(overrideText?: string) {
+    // overrideText: bypass the composer and send a programmatic message
+    // (e.g., the MCP connect kickoff). When provided, we do NOT touch the
+    // input/textarea state so the user's draft is preserved.
+    const usingOverride = typeof overrideText === "string";
+    const text = (usingOverride ? overrideText : input).trim();
     if (!text || pending) return;
 
     // Local-only slash commands (clear, new, stop, help) — mirror OpenClaw web
-    // UI behavior: handle client-side, do NOT send to the agent.
-    const parsed = parseSlashMessage(text);
+    // UI behavior: handle client-side, do NOT send to the agent. Skip when
+    // sending programmatically: overrides are always plain prompts.
+    const parsed = usingOverride ? null : parseSlashMessage(text);
     if (parsed) {
       const action = executeLocalSlashCommand(parsed.command);
       if (action) {
@@ -149,9 +161,11 @@ export function AgentChat({
     const userMessage: Message = { id: `u-${Date.now()}`, role: "user", body: text };
     const assistantId = `a-${Date.now()}`;
     setMessages((m) => [...m, userMessage, { id: assistantId, role: "assistant", body: "" }]);
-    setInput("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
+    if (!usingOverride) {
+      setInput("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
     }
     setPending(true);
 
@@ -419,17 +433,23 @@ function MessageRow({
       </div>
     );
   }
-  // Assistant: plain prose, full width within max-w-3xl. No bubble — Claude.ai pattern.
+  // Assistant: rendered as markdown for code blocks, lists, bold, tables, etc.
+  // Plain text falls through unchanged because markdown is a superset. While
+  // streaming, partial markdown (e.g. an unclosed fence) is rendered as far as
+  // remark can parse it — visually fine because the next chunk arrives within
+  // milliseconds.
+  if (message.body === "") {
+    return (
+      <div className="group">
+        <div className="text-sm italic text-muted-foreground">
+          {`${agentDisplayName} is thinking…`}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="group">
-      <div
-        className={cn(
-          "text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground",
-          message.body === "" && "italic text-muted-foreground",
-        )}
-      >
-        {message.body || `${agentDisplayName} is thinking…`}
-      </div>
+      <Markdown>{message.body}</Markdown>
     </div>
   );
 }

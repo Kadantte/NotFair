@@ -92,6 +92,7 @@ export default async function AgentChatThreadPage({
           agentDisplayName={resolved.display_name}
           sessionId={threadId}
           sessionKey={sessionKey}
+          templateKey={resolved.template_key}
           initialMessages={history.map((m) => ({ id: m.id, role: m.role, body: m.body }))}
         />
       </div>
