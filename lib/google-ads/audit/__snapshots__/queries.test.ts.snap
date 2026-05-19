@@ -67,6 +67,17 @@ exports[`audit queries > queryAudienceSegmentCheck — LIMIT 1 (existence check 
     "
 `;
 
+exports[`audit queries > queryBillingSetups — avoids non-portable payment-account info fields 1`] = `
+"
+      SELECT
+        billing_setup.id,
+        billing_setup.status,
+        billing_setup.payments_account
+      FROM billing_setup
+      LIMIT 100
+    "
+`;
+
 exports[`audit queries > queryCampaignAssets — matches snapshot 1`] = `
 "
       SELECT
@@ -115,6 +126,21 @@ exports[`audit queries > queryChangeEvents — uses >= / <= (BETWEEN not support
       WHERE change_event.change_date_time >= '2099-01-01 00:00:00'
         AND change_event.change_date_time <= '2099-01-30 23:59:59'
       ORDER BY change_event.change_date_time DESC
+      LIMIT 500
+    "
+`;
+
+exports[`audit queries > queryConversionActionPerformance — safe conversion segment metrics only 1`] = `
+"
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        segments.conversion_action_name,
+        metrics.conversions, metrics.conversions_value,
+        metrics.all_conversions, metrics.all_conversions_value
+      FROM campaign
+      WHERE campaign.status != 'REMOVED'
+        AND segments.date BETWEEN '2026-01-01' AND '2026-01-30'
+      ORDER BY metrics.conversions DESC
       LIMIT 500
     "
 `;
@@ -288,6 +314,19 @@ exports[`audit queries > queryQualityScores — matches snapshot 1`] = `
       WHERE campaign.status = 'ENABLED'
         AND ad_group_criterion.type = 'KEYWORD'
         AND ad_group_criterion.status != 'REMOVED'
+    "
+`;
+
+exports[`audit queries > queryRecommendations — conservative recommendation overview 1`] = `
+"
+      SELECT
+        recommendation.resource_name,
+        recommendation.type,
+        recommendation.dismissed,
+        recommendation.campaign
+      FROM recommendation
+      WHERE recommendation.dismissed = FALSE
+      LIMIT 1000
     "
 `;
 

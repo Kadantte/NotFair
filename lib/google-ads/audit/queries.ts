@@ -212,6 +212,24 @@ export function queryConversionActions(): string {
     `;
 }
 
+/** Conversion counts segmented by conversion action. Cost/click metrics are
+ * intentionally omitted because Google does not allow those with
+ * segments.conversion_action_name. */
+export function queryConversionActionPerformance(start: string, end: string): string {
+  return `
+      SELECT
+        campaign.id, campaign.name, campaign.status,
+        segments.conversion_action_name,
+        metrics.conversions, metrics.conversions_value,
+        metrics.all_conversions, metrics.all_conversions_value
+      FROM campaign
+      WHERE campaign.status != 'REMOVED'
+        AND segments.date BETWEEN '${start}' AND '${end}'
+      ORDER BY metrics.conversions DESC
+      LIMIT 500
+    `;
+}
+
 /** Q11: Audience segments (existence check only — LIMIT 1). */
 export function queryAudienceSegmentCheck(): string {
   return `
@@ -261,6 +279,35 @@ export function queryNetworkSegmentation(start: string, end: string): string {
       FROM campaign
       WHERE campaign.status = 'ENABLED'
         AND segments.date BETWEEN '${start}' AND '${end}'
+    `;
+}
+
+/** Active Google Ads recommendations. Keep this conservative: agents can use
+ * the type/resource/campaign as a launcher, then call getResourceMetadata if
+ * they need type-specific nested details. */
+export function queryRecommendations(): string {
+  return `
+      SELECT
+        recommendation.resource_name,
+        recommendation.type,
+        recommendation.dismissed,
+        recommendation.campaign
+      FROM recommendation
+      WHERE recommendation.dismissed = FALSE
+      LIMIT 1000
+    `;
+}
+
+/** Billing setup overview. Avoid payments_account_info.* because it is
+ * frequently hallucinated and not portable across Ads API surfaces. */
+export function queryBillingSetups(): string {
+  return `
+      SELECT
+        billing_setup.id,
+        billing_setup.status,
+        billing_setup.payments_account
+      FROM billing_setup
+      LIMIT 100
     `;
 }
 

@@ -716,6 +716,10 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`campaign_criterion.start_hour` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.start_hour`.",
   "campaign_criterion.end_hour":
     "`campaign_criterion.end_hour` is not a GAQL field. Ad schedule fields are nested: select `campaign_criterion.ad_schedule.end_hour`.",
+  "change_event.campaign.name":
+    "`change_event.campaign.name` is not a GAQL field. Select `change_event.campaign` and join to campaign names with a separate campaign query, or use `ads.queries.changeEvents(start, end)` for the supported change_event shape.",
+  "change_event.resource_type":
+    "`change_event.resource_type` is not a GAQL field. Select `change_event.change_resource_type` instead, or use `ads.queries.changeEvents(start, end)`.",
   "ad_group_criterion.quality_info.ad_relevance":
     "`ad_group_criterion.quality_info.ad_relevance` is not a GAQL field. Use the supported quality score components: `ad_group_criterion.quality_info.creative_quality_score`, `ad_group_criterion.quality_info.post_click_quality_score`, and `ad_group_criterion.quality_info.search_predicted_ctr`.",
   "ad_group_criterion.quality_info.landing_page_experience":
@@ -756,6 +760,16 @@ const KNOWN_UNSUPPORTED_GAQL_FIELDS: Record<string, string> = {
     "`recommendation.impact.base_metrics.conversions` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the available `recommendation.impact.*` fields before retrying.",
   "recommendation.keyword_match_type":
     "`recommendation.keyword_match_type` is not a GAQL field. Call `getResourceMetadata('recommendation')` to confirm the correct keyword-recommendation field path before retrying — the match-type field lives on a nested `keyword_recommendation` sub-message, not at the top level.",
+  "billing_setup.payments_account_info.payments_account_id":
+    "`billing_setup.payments_account_info.*` fields are not portable in this Ads API surface. Use `ads.queries.billingSetups` for a safe billing setup overview, or call `getResourceMetadata('billing_setup')` before querying account-specific billing fields.",
+  "billing_setup.payments_account_info.payments_account_name":
+    "`billing_setup.payments_account_info.*` fields are not portable in this Ads API surface. Use `ads.queries.billingSetups` for a safe billing setup overview, or call `getResourceMetadata('billing_setup')` before querying account-specific billing fields.",
+  "billing_setup.payments_account_info.payments_profile_id":
+    "`billing_setup.payments_account_info.*` fields are not portable in this Ads API surface. Use `ads.queries.billingSetups` for a safe billing setup overview, or call `getResourceMetadata('billing_setup')` before querying account-specific billing fields.",
+  "billing_setup.payments_account_info.payments_profile_name":
+    "`billing_setup.payments_account_info.*` fields are not portable in this Ads API surface. Use `ads.queries.billingSetups` for a safe billing setup overview, or call `getResourceMetadata('billing_setup')` before querying account-specific billing fields.",
+  "billing_setup.payments_account_info.secondary_payments_profile_id":
+    "`billing_setup.payments_account_info.*` fields are not portable in this Ads API surface. Use `ads.queries.billingSetups` for a safe billing setup overview, or call `getResourceMetadata('billing_setup')` before querying account-specific billing fields.",
   "auction_insight.domain":
     "`auction_insight.domain` is not a GAQL field. Auction insights ship as metrics + segments off resources like `campaign` / `ad_group`, not as an `auction_insight` resource. Required developer-token access is gated separately; if your account is enrolled, the right fields are `metrics.auction_insight_*` + `segments.auction_insight_domain` queried `FROM campaign`.",
   "auction_insight_domain.domain":

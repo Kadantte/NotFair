@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runScriptInSandbox, type HostApi } from "./sandbox";
+import { runScriptInSandbox } from "./sandbox";
 
 // buildAdsHost depends on the live Google Ads client via runSafeGaqlReport.
 // We verify the *bootstrap* half independently — the RPC half is covered by
@@ -37,6 +37,7 @@ describe("buildAdsHost bootstrap surface", () => {
           campaignsIsFn: typeof ads.queries.campaigns === "function",
           campaignsOutput: ads.queries.campaigns("2026-01-01", "2026-01-31"),
           keys: Object.keys(ads.queries).sort(),
+          conversionPerfOutput: ads.queries.conversionActionPerformance("2026-01-01", "2026-01-31"),
         };
       `,
       host,
@@ -48,6 +49,7 @@ describe("buildAdsHost bootstrap surface", () => {
       campaignsIsFn: boolean;
       campaignsOutput: string;
       keys: string[];
+      conversionPerfOutput: string;
     };
     expect(out.accountInfoIsString).toBe(true);
     expect(out.campaignsIsFn).toBe(true);
@@ -56,8 +58,12 @@ describe("buildAdsHost bootstrap surface", () => {
     expect(out.campaignsOutput).toContain("2026-01-31");
     // Spot-check the surface has both parameterless and windowed entries.
     expect(out.keys).toContain("accountInfo");
+    expect(out.keys).toContain("billingSetups");
     expect(out.keys).toContain("campaigns");
     expect(out.keys).toContain("changeEvents");
+    expect(out.keys).toContain("conversionActionPerformance");
+    expect(out.keys).toContain("recommendations");
+    expect(out.conversionPerfOutput).toContain("segments.conversion_action_name");
   });
 
   it("exposes a canonical auditPack with the important factual surfaces", async () => {
@@ -70,6 +76,9 @@ describe("buildAdsHost bootstrap surface", () => {
           names: pack.map(q => q.name),
           searchTermsQuery: pack.find(q => q.name === "searchTerms").query,
           changeEventsQuery: pack.find(q => q.name === "changeEvents").query,
+          conversionPerfQuery: pack.find(q => q.name === "conversionActionPerformance").query,
+          recommendationsQuery: pack.find(q => q.name === "recommendations").query,
+          billingSetupsQuery: pack.find(q => q.name === "billingSetups").query,
         };
       `,
       host,
@@ -77,13 +86,16 @@ describe("buildAdsHost bootstrap surface", () => {
     });
 
     expect(r.ok).toBe(true);
-    const out = r.result as { count: number; names: string[]; searchTermsQuery: string; changeEventsQuery: string };
-    expect(out.count).toBe(20);
+    const out = r.result as { count: number; names: string[]; searchTermsQuery: string; changeEventsQuery: string; conversionPerfQuery: string; recommendationsQuery: string; billingSetupsQuery: string };
+    expect(out.count).toBe(23);
     expect(out.names).toEqual(expect.arrayContaining([
       "campaigns",
       "searchTerms",
       "ads",
       "conversionActions",
+      "conversionActionPerformance",
+      "recommendations",
+      "billingSetups",
       "campaignAssets",
       "sharedNegativeKeywordLists",
       "pausedCampaigns",
@@ -92,6 +104,9 @@ describe("buildAdsHost bootstrap surface", () => {
     ]));
     expect(out.searchTermsQuery).toContain("FROM search_term_view");
     expect(out.changeEventsQuery).toContain("FROM change_event");
+    expect(out.conversionPerfQuery).toContain("segments.conversion_action_name");
+    expect(out.recommendationsQuery).toContain("FROM recommendation");
+    expect(out.billingSetupsQuery).toContain("FROM billing_setup");
   });
 
   it("exposes pure helpers that behave identically to the host versions", async () => {

@@ -1236,6 +1236,14 @@ describe("validateKnownUnsupportedGaqlFields", () => {
     ).toThrow(/getResourceMetadata/);
   });
 
+  it("rejects common change_event field hallucinations with supported replacements", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT change_event.campaign.name, change_event.resource_type FROM change_event",
+      ),
+    ).toThrow(/change_event\.change_resource_type|ads\.queries\.changeEvents/);
+  });
+
   it("rejects hallucinated recommendation.impact.base_metrics.impressions with recommendation guidance", () => {
     expect(() =>
       validateKnownUnsupportedGaqlFields(
@@ -1250,6 +1258,14 @@ describe("validateKnownUnsupportedGaqlFields", () => {
         "SELECT recommendation.type, recommendation.keyword_match_type FROM recommendation",
       ),
     ).toThrow(/getResourceMetadata.*recommendation/);
+  });
+
+  it("rejects non-portable billing_setup payments_account_info fields with billingSetups guidance", () => {
+    expect(() =>
+      validateKnownUnsupportedGaqlFields(
+        "SELECT billing_setup.id, billing_setup.payments_account_info.payments_account_id FROM billing_setup",
+      ),
+    ).toThrow(/ads\.queries\.billingSetups|getResourceMetadata.*billing_setup/);
   });
 
   it("rejects hallucinated auction_insight.domain with auction_insight_ metric guidance", () => {

@@ -27,6 +27,9 @@ import {
   queryLandingPages,
   queryChangeEvents,
   queryDailyCampaignMetrics,
+  queryConversionActionPerformance,
+  queryRecommendations,
+  queryBillingSetups,
 } from "@/lib/google-ads/audit/queries";
 import {
   RESOURCE_CHANGE_OP,
@@ -276,6 +279,8 @@ function buildBootstrap(): string {
     qualityScores: queryQualityScores(),
     adGroups: queryAdGroups(),
     conversionActions: queryConversionActions(),
+    recommendations: queryRecommendations(),
+    billingSetups: queryBillingSetups(),
     audienceSegmentCheck: queryAudienceSegmentCheck(),
     negativeKeywords: queryNegativeKeywords(),
     campaignAssets: queryCampaignAssets(),
@@ -300,6 +305,7 @@ function buildBootstrap(): string {
     landingPages: queryLandingPages,
     changeEvents: queryChangeEvents,
     dailyCampaignMetrics: queryDailyCampaignMetrics,
+    conversionActionPerformance: queryConversionActionPerformance,
   };
 
   return `
@@ -338,6 +344,9 @@ function buildBootstrap(): string {
         { name: "ads", query: ads.queries.ads(start, end), limit: 1000 },
         { name: "adGroups", query: ads.queries.adGroups, limit: 1000 },
         { name: "conversionActions", query: ads.queries.conversionActions, limit: 500 },
+        { name: "conversionActionPerformance", query: ads.queries.conversionActionPerformance(start, end), limit: 500 },
+        { name: "recommendations", query: ads.queries.recommendations, limit: 1000 },
+        { name: "billingSetups", query: ads.queries.billingSetups, limit: 100 },
         { name: "negativeKeywords", query: ads.queries.negativeKeywords, limit: 1000 },
         { name: "sharedNegativeKeywordLists", query: ads.queries.sharedNegativeKeywordLists, limit: 100 },
         { name: "sharedNegativeKeywordMembers", query: ads.queries.sharedNegativeKeywordMembers, limit: 2000 },

@@ -11,10 +11,13 @@ import {
   queryAds,
   queryAdGroups,
   queryConversionActions,
+  queryConversionActionPerformance,
   queryAudienceSegmentCheck,
   queryDevicePerformance,
   queryNegativeKeywords,
   queryNetworkSegmentation,
+  queryRecommendations,
+  queryBillingSetups,
   queryCampaignAssets,
   queryAdGroupAssets,
   querySharedNegativeKeywordLists,
@@ -93,6 +96,17 @@ describe("audit queries", () => {
     expect(queryConversionActions()).toMatchSnapshot();
   });
 
+  it("queryConversionActionPerformance — safe conversion segment metrics only", () => {
+    const q = queryConversionActionPerformance("2026-01-01", "2026-01-30");
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("2026-01-01");
+    expect(q).toContain("2026-01-30");
+    expect(q).toContain("segments.conversion_action_name");
+    expect(q).toContain("metrics.conversions");
+    expect(q).not.toContain("metrics.cost_micros");
+    expect(q).not.toContain("metrics.clicks");
+  });
+
   it("queryAudienceSegmentCheck — LIMIT 1 (existence check only)", () => {
     const q = queryAudienceSegmentCheck();
     expect(q).toMatchSnapshot();
@@ -111,6 +125,20 @@ describe("audit queries", () => {
 
   it("queryNetworkSegmentation — date range", () => {
     expect(queryNetworkSegmentation("2026-01-01", "2026-01-30")).toMatchSnapshot();
+  });
+
+  it("queryRecommendations — conservative recommendation overview", () => {
+    const q = queryRecommendations();
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("FROM recommendation");
+    expect(q).not.toContain("base_metrics");
+  });
+
+  it("queryBillingSetups — avoids non-portable payment-account info fields", () => {
+    const q = queryBillingSetups();
+    expect(q).toMatchSnapshot();
+    expect(q).toContain("FROM billing_setup");
+    expect(q).not.toContain("payments_account_info");
   });
 
   it("queryCampaignAssets — matches snapshot", () => {
