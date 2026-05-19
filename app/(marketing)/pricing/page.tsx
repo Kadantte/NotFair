@@ -4,7 +4,7 @@ import { PricingPage } from "@/components/marketing/pricing-page";
 
 export const metadata = {
   title: "Pricing — NotFair",
-  description: "Plans for solo founders and growing teams. Connect Google Ads and Meta Ads to your AI tools, then ship campaigns faster.",
+  description: "Plans for solo founders and growing teams. Connect Google Ads to your AI tools, then ship campaigns faster.",
 };
 
 export default async function Pricing() {

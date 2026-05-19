@@ -44,7 +44,7 @@ export const FREE_FEATURES = [
   "7 days of unlimited access — every feature, no caps",
   "Then 300 MCP operations/mo, free forever",
   "No credit card required",
-  "Connect Google Ads and Meta Ads to Claude, Cursor, and any MCP client",
+  "Connect Google Ads to Claude, Cursor, and any MCP client",
   "Diagnose account issues and draft campaign changes",
   "Preview bid, budget, keyword, audience, and ad edits before approval",
   "Community support",
@@ -52,8 +52,8 @@ export const FREE_FEATURES = [
 
 /** Growth-only differentiators — what you get on Growth that you don't on Free. */
 export const GROWTH_HEADLINE_FEATURES = [
-  "Unlimited Google Ads and Meta Ads operations",
-  "Unlimited Google Ads and Meta Ads accounts",
+  "Unlimited Google Ads operations",
+  "Unlimited Google Ads accounts",
   "Bulk workflows — keywords, ads, budgets, scripts",
   "Full change history & one-call undo",
   "Priority email support",
