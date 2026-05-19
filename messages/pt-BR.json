@@ -750,52 +750,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "Leitura",
+          "category": "read",
           "description": "JS em sandbox com fan-out GAQL: toda leitura analítica passa por esta ferramenta."
         },
         {
           "name": "getRecommendations",
-          "category": "Leitura",
+          "category": "read",
           "description": "Sugestões de otimização do Google com impacto estimado."
         },
         {
           "name": "getKeywordIdeas",
-          "category": "Leitura",
+          "category": "read",
           "description": "Volume de busca, concorrência e estimativas de CPC do Keyword Planner."
         },
         {
           "name": "getChanges",
-          "category": "Leitura",
+          "category": "read",
           "description": "Registro de alterações da NotFair, reversível com uma chamada."
         },
         {
           "name": "reviewChangeImpact",
-          "category": "Leitura",
+          "category": "read",
           "description": "Análise de impacto antes/depois de edições recentes."
         },
         {
           "name": "getResourceMetadata",
-          "category": "Leitura",
+          "category": "read",
           "description": "Descoberta de schema GAQL para consultas personalizadas."
         },
         {
           "name": "updateBid",
-          "category": "Gravação",
+          "category": "write",
           "description": "Ajusta lances de palavras-chave ou grupos de anúncios, revisáveis antes de aplicar."
         },
         {
           "name": "pauseCampaign",
-          "category": "Gravação",
+          "category": "write",
           "description": "Pausa campanhas com baixo desempenho."
         },
         {
           "name": "addNegativeKeyword",
-          "category": "Gravação",
+          "category": "write",
           "description": "Bloqueia termos de busca irrelevantes após revisão."
         },
         {
           "name": "createAd",
-          "category": "Gravação",
+          "category": "write",
           "description": "Escreve e lança novos anúncios pelo chat."
         }
       ]
@@ -896,52 +896,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "Leitura",
+          "category": "read",
           "description": "JS em sandbox com fan-out da Graph API: dispara 20 chamadas em uma passada para auditorias e análises."
         },
         {
           "name": "getInsights",
-          "category": "Leitura",
+          "category": "read",
           "description": "Insights de desempenho com detalhamentos: gasto, impressões, cliques, CTR, CPC, CPM, conversões."
         },
         {
           "name": "listCampaigns",
-          "category": "Leitura",
+          "category": "read",
           "description": "Lista campanhas com status, objetivo, orçamento, estratégia de lance e agenda."
         },
         {
           "name": "listAdSets",
-          "category": "Leitura",
+          "category": "read",
           "description": "Detalhes do conjunto de anúncios: meta de otimização, evento de cobrança, orçamento diário/vitalício, resumo de segmentação."
         },
         {
           "name": "listAds",
-          "category": "Leitura",
+          "category": "read",
           "description": "Anúncios com status, conjunto/campanha pai, envelope criativo e status configurado."
         },
         {
           "name": "getAdAccount",
-          "category": "Leitura",
+          "category": "read",
           "description": "Snapshot da conta: moeda, fuso horário, saldo, valor gasto, limite de gasto, BM pai."
         },
         {
           "name": "pauseCampaign",
-          "category": "Gravação",
+          "category": "write",
           "description": "Pausa uma campanha da Meta, reversível via enableCampaign."
         },
         {
           "name": "pauseAdSet",
-          "category": "Gravação",
+          "category": "write",
           "description": "Pausa um conjunto de anúncios sem mexer na campanha pai."
         },
         {
           "name": "updateCampaignBudget",
-          "category": "Gravação",
+          "category": "write",
           "description": "Atualiza orçamento diário ou vitalício em uma campanha da Meta."
         },
         {
           "name": "renameCampaign",
-          "category": "Gravação",
+          "category": "write",
           "description": "Renomeia uma campanha da Meta no lugar."
         }
       ]
@@ -1086,42 +1086,42 @@
       "items": [
         {
           "name": "listCampaigns",
-          "category": "Leitura",
+          "category": "read",
           "description": "Busca desempenho, gasto e status de campanhas ao vivo"
         },
         {
           "name": "getKeywords",
-          "category": "Leitura",
+          "category": "read",
           "description": "Inspeciona lances de palavras-chave, Quality Scores e impressões"
         },
         {
           "name": "getSearchTermReport",
-          "category": "Leitura",
+          "category": "read",
           "description": "Encontra consultas irrelevantes, correspondências fracas e vazamentos de orçamento"
         },
         {
           "name": "getCampaignPerformance",
-          "category": "Leitura",
+          "category": "read",
           "description": "Aprofunda métricas de campanha em qualquer intervalo de datas"
         },
         {
           "name": "updateBid",
-          "category": "Gravação",
+          "category": "write",
           "description": "Ajusta um lance de palavra-chave, revisável antes de aplicar"
         },
         {
           "name": "pauseCampaign",
-          "category": "Gravação",
+          "category": "write",
           "description": "Pausa uma campanha com baixo desempenho pelo Claude"
         },
         {
           "name": "addNegativeKeyword",
-          "category": "Gravação",
+          "category": "write",
           "description": "Bloqueia um termo de busca desperdiçado no nível da campanha ou conta"
         },
         {
           "name": "createAd",
-          "category": "Gravação",
+          "category": "write",
           "description": "Escreve e lança novos anúncios por conversa natural"
         }
       ]
