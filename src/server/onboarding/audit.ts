@@ -962,49 +962,55 @@ function renderFirstTurn(
 
   if (nextSteps.length > 0) {
     lines.push(
-      "## Recommended ongoing work (think like an agency)",
+      "## Recommended ongoing work — DELEGATE THESE",
       "These are the daily / weekly / monthly tasks a Google Ads agency would",
-      "schedule for an account in this state. Propose them in chat via the",
-      "<propose_cron> pattern after the user accepts the first one-time action —",
-      "each suggested_action below names the cadence to schedule.",
+      "set up for an account in this state. As the CMO, your job RIGHT NOW is",
+      "to create ONE <create_task> block per item below, all assigned to",
+      "`google_ads`. Don't ask the user 'want me to...' — just delegate. The",
+      "specialist will pick them up + work them.",
       "",
     );
     for (const f of nextSteps) {
       lines.push(
         `- **${f.headline}**`,
-        `  Why: ${f.evidence}`,
-        `  Do: ${f.suggested_action}`,
+        `  Context: ${f.evidence}`,
+        `  Brief for the specialist: ${f.suggested_action}`,
         "",
       );
     }
   }
 
-  // Suggested opener — varies by what we have.
-  lines.push("## Suggested opener");
+  // Suggested opener — varies by what we have. SHORT prose, then blocks.
+  lines.push("## Suggested opener (prose, then blocks)");
   if (accountState === "empty") {
     lines.push(
-      "Greet the user by acknowledging they're just getting started with Google Ads.",
-      "Reference the budget recommendation by name. End with an open question that",
-      "invites them to talk through their first campaign. Keep it under 3 sentences.",
+      "1-2 sentences: acknowledge they're just getting started; name the budget",
+      "recommendation. Then emit <create_task> blocks for the recommended ongoing",
+      "work above (assignee: google_ads). End with one sentence: 'Handed these",
+      "to your Google Ads specialist — open /tasks to follow along.' Do NOT ask",
+      "'want me to...' — just delegate.",
     );
   } else if (topFix) {
     lines.push(
-      "Greet the user by referencing the top finding by name with the dollar figure.",
-      "Make it personal and specific. End with an open question that invites them to",
-      "either fix the top finding now or talk through the broader audit. Keep it under",
-      "3 sentences.",
+      "1-2 sentences: reference the top finding by name + dollar figure. Then",
+      "emit <create_task> blocks for the top finding AND each recommended",
+      "ongoing-work item above (assignee: google_ads). End with one sentence:",
+      "'Handed these to your Google Ads specialist — open /tasks to follow",
+      "along.' Do NOT ask 'want me to fix this?' — just create the task.",
     );
   } else if (snapshot) {
     lines.push(
-      "Greet the user by referencing the account snapshot by name (campaign + spend).",
-      "If 0 conversions, mention installing conversion tracking as the first ongoing",
-      "task. Otherwise mention the most relevant ongoing-work item from above. End",
-      "with an open question. Keep it under 3 sentences.",
+      "1-2 sentences: reference the snapshot by campaign name + spend; if 0",
+      "conversions, name conversion-tracking as the first ongoing task. Then",
+      "emit <create_task> blocks for every recommended ongoing-work item above",
+      "(assignee: google_ads). End with one sentence: 'Handed these to your",
+      "Google Ads specialist — open /tasks to follow along.' Do NOT chit-chat.",
     );
   } else {
     lines.push(
-      "Acknowledge that the audit ran cleanly and the account looks healthy from a",
-      "30-day spend perspective. Ask the user what they'd like to optimize next.",
+      "1-2 sentences: account looks healthy on 30-day spend. Then emit",
+      "<create_task> blocks for any ongoing-work items above. End with one",
+      "sentence inviting the user to /tasks.",
     );
   }
   lines.push("");

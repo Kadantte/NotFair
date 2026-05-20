@@ -4,11 +4,16 @@ import type { Task, TaskStatus } from "@/types";
 
 export type CreateTaskInput = {
   project_slug: string;
+  /** Assignee — the agent expected to do the work. */
   agent_id: string;
+  /** Short label for the kanban card. Optional but recommended. */
+  title?: string | null;
   brief: string;
   success_criteria?: string | null;
   deadline_iso?: string | null;
   status?: TaskStatus;
+  /** Agent that created this task. CMO is the typical originator. */
+  assigner_agent_id?: string | null;
 };
 
 export function createTask(input: CreateTaskInput): Task {
@@ -18,31 +23,57 @@ export function createTask(input: CreateTaskInput): Task {
     id: randomUUID(),
     project_slug: input.project_slug,
     agent_id: input.agent_id,
+    title: input.title ?? null,
     brief: input.brief,
     success_criteria: input.success_criteria ?? null,
     deadline_iso: input.deadline_iso ?? null,
     status: input.status ?? "proposed",
     result_json: null,
     error_message: null,
+    thread_id: null,
+    assigner_agent_id: input.assigner_agent_id ?? null,
     created_at: now,
     updated_at: now,
   };
   db.prepare(
     `INSERT INTO tasks
-       (id, project_slug, agent_id, brief, success_criteria, deadline_iso, status, result_json, error_message, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+       (id, project_slug, agent_id, title, brief, success_criteria, deadline_iso,
+        status, result_json, error_message, thread_id, assigner_agent_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)`,
   ).run(
     task.id,
     task.project_slug,
     task.agent_id,
+    task.title,
     task.brief,
     task.success_criteria,
     task.deadline_iso,
     task.status,
+    task.assigner_agent_id,
     task.created_at,
     task.updated_at,
   );
   return task;
+}
+
+/**
+ * Lazily set the OpenClaw chat session id for this task. Called the first
+ * time someone opens /tasks/[id] — the thread_id is generated then and
+ * remains stable forever after so the per-task chat history persists.
+ * No-op when the task already has a thread_id assigned.
+ */
+export function setTaskThreadIfMissing(
+  id: string,
+  thread_id: string,
+): Task | null {
+  const db = getDb();
+  const current = getTask(id);
+  if (!current) return null;
+  if (current.thread_id) return current;
+  db.prepare(
+    "UPDATE tasks SET thread_id = ?, updated_at = ? WHERE id = ? AND thread_id IS NULL",
+  ).run(thread_id, new Date().toISOString(), id);
+  return getTask(id);
 }
 
 export function getTask(id: string): Task | null {

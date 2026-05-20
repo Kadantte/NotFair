@@ -6,6 +6,7 @@ import {
   buildPendingSessionKey,
   findSessionBySessionId,
 } from "@/server/openclaw/sessions";
+import { processOrchestrationBlocks } from "@/server/orchestration/process-blocks";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
       request.signal?.addEventListener("abort", () => abortCtl.abort(), { once: true });
 
       let firstSseDeltaSent = false;
+      let assistantBuffer = "";
       try {
         perf.mark("stream_start");
         send("meta", {
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
               firstSseDeltaSent = true;
               perf.mark("first_sse_delta_sent");
             }
+            assistantBuffer += evt.text;
             send("text", { chunk: evt.text });
           } else if (evt.kind === "tool") {
             // tool start/update/result — keyed by toolCallId so the client
@@ -157,6 +160,46 @@ export async function POST(request: Request) {
           // "final" implicitly ends the loop after; no separate signal needed.
         }
         perf.mark("stream_done");
+
+        // Process orchestration blocks emitted by the agent during the turn.
+        // Tasks created, status updates, comments, ask_user, approval requests
+        // all materialize as DB rows here. Failures are non-fatal — the user
+        // still sees the assistant reply; orchestration just doesn't apply.
+        if (assistantBuffer.trim().length > 0) {
+          try {
+            const outcome = await processOrchestrationBlocks(assistantBuffer, {
+              project_slug: project.slug,
+              agent_id: agentName,
+            });
+            perf.mark("orchestration_done");
+            if (
+              outcome.tasks_created.length > 0 ||
+              outcome.task_status_updates.length > 0 ||
+              outcome.comments_added.length > 0 ||
+              outcome.ask_user.length > 0 ||
+              outcome.approvals_requested.length > 0 ||
+              outcome.errors.length > 0
+            ) {
+              send("orchestration", {
+                tasks_created: outcome.tasks_created.map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  assignee: t.agent_id,
+                  status: t.status,
+                })),
+                task_status_updates: outcome.task_status_updates,
+                comments_added: outcome.comments_added,
+                ask_user: outcome.ask_user,
+                approvals_requested: outcome.approvals_requested,
+                errors: outcome.errors,
+              });
+            }
+          } catch (orchErr) {
+            // Don't let an orchestration parse failure break the chat reply.
+            console.error("[chat] orchestration processing failed:", orchErr);
+          }
+        }
+
         send("perf", { marks: perf.summary() });
         send("done", {});
       } catch (err) {

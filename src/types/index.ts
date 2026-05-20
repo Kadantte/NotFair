@@ -36,13 +36,29 @@ export type TaskStatus =
 export type Task = {
   id: string;
   project_slug: string;
+  /** Assignee — the agent expected to do the work. */
   agent_id: string;
+  /** Short label shown on task cards (e.g., "Set up daily anomaly check"). */
+  title: string | null;
+  /** Full request body. Often a PRD-style description from the CMO. */
   brief: string;
   success_criteria: string | null;
   deadline_iso: string | null;
   status: TaskStatus;
   result_json: string | null;
   error_message: string | null;
+  /**
+   * OpenClaw chat session id where the assignee picks up this task. Null
+   * until first opened; populated on first /tasks/[id] visit + remains
+   * stable forever after.
+   */
+  thread_id: string | null;
+  /**
+   * Agent that created this task. For CMO-originated tasks this is the
+   * CMO agent id; in v1.1 specialists creating sub-tasks fill in their
+   * own id so the chain back to the planner is walkable.
+   */
+  assigner_agent_id: string | null;
   created_at: string;
   updated_at: string;
 };

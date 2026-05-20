@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Send,
   AlertCircle,
@@ -13,10 +14,15 @@ import {
   Edit3,
   Globe,
   Wrench,
+  ListChecks,
+  MessageSquare,
+  HelpCircle,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { stripOrchestrationBlocks } from "@/server/orchestration/blocks";
 import {
   filterSlashCommands,
   executeLocalSlashCommand,
@@ -37,6 +43,15 @@ type Step = {
   phase: "start" | "update" | "result";
 };
 
+type OrchestrationOutcome = {
+  tasks_created: Array<{ id: string; title: string | null; assignee: string; status: string }>;
+  task_status_updates: Array<{ task_id: string; status: string }>;
+  comments_added: Array<{ task_id: string }>;
+  ask_user: Array<{ task_id?: string; question: string }>;
+  approvals_requested: Array<{ approval_id: string; action_type: string }>;
+  errors: Array<{ kind: string; message: string }>;
+};
+
 type Message = {
   id: string;
   role: "user" | "assistant" | "error";
@@ -47,6 +62,13 @@ type Message = {
    * staring at "thinking…". Empty on user/error rows.
    */
   steps?: Step[];
+  /**
+   * Structured orchestration outcome the server extracted from the
+   * assistant's reply (tasks created, status updates, etc.). Rendered as
+   * a small summary card below the assistant text. Stripped from the
+   * Markdown body so the user doesn't see raw <create_task> tags.
+   */
+  orchestration?: OrchestrationOutcome;
 };
 
 export type InitialMessage = {
@@ -373,6 +395,27 @@ export function AgentChat({
               ),
             );
             toast.error(formatAgentError(msg));
+          } else if (evt === "orchestration") {
+            // Server extracted orchestration blocks from the agent's reply
+            // and turned them into DB rows. Attach the outcome to this
+            // assistant message so the UI can render a summary card below
+            // the prose ("Created 3 tasks · View tasks →").
+            const outcome = data as OrchestrationOutcome;
+            setMessages((m) =>
+              m.map((m2) =>
+                m2.id === assistantId ? { ...m2, orchestration: outcome } : m2,
+              ),
+            );
+            // Toast tasks_created so the user notices even if they're not
+            // looking at the chat surface right now.
+            if (outcome.tasks_created.length > 0) {
+              toast.success(
+                `Created ${outcome.tasks_created.length} task${outcome.tasks_created.length === 1 ? "" : "s"} for the specialist.`,
+              );
+              // Force the /tasks route to refetch since it's a server component
+              // and won't auto-update otherwise.
+              startTransition(() => router.refresh());
+            }
           }
         }
       }
@@ -587,9 +630,13 @@ function MessageRow({
   // Plain text falls through unchanged because markdown is a superset. While
   // streaming, partial markdown (e.g. an unclosed fence) is rendered as far as
   // remark can parse it — visually fine because the next chunk arrives within
-  // milliseconds.
+  // milliseconds. Orchestration blocks (<create_task> etc.) are stripped before
+  // rendering so the user sees clean prose, not raw tags.
   const hasSteps = (message.steps?.length ?? 0) > 0;
-  const isEmpty = message.body === "";
+  // Strip orchestration tags as text streams in — during streaming partially-
+  // received tags briefly render then disappear once their closing tag arrives.
+  const cleanBody = stripOrchestrationBlocks(message.body);
+  const isEmpty = cleanBody === "";
   return (
     <div className="group space-y-2">
       {hasSteps && <StepList steps={message.steps!} />}
@@ -600,9 +647,120 @@ function MessageRow({
           </div>
         )
       ) : (
-        <Markdown>{message.body}</Markdown>
+        <Markdown>{cleanBody}</Markdown>
       )}
+      {message.orchestration && <OrchestrationSummary outcome={message.orchestration} />}
     </div>
+  );
+}
+
+function OrchestrationSummary({ outcome }: { outcome: OrchestrationOutcome }) {
+  const items: React.ReactNode[] = [];
+  if (outcome.tasks_created.length > 0) {
+    items.push(
+      <div key="tasks" className="flex items-start gap-2 text-xs">
+        <ListChecks className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
+        <div className="min-w-0">
+          <div className="font-medium text-foreground">
+            Created {outcome.tasks_created.length} task
+            {outcome.tasks_created.length === 1 ? "" : "s"}
+          </div>
+          <ul className="mt-0.5 space-y-0.5">
+            {outcome.tasks_created.map((t) => (
+              <li key={t.id} className="text-muted-foreground">
+                <Link
+                  href={`/tasks/${t.id}`}
+                  className="hover:text-foreground hover:underline"
+                >
+                  {t.title ?? t.id.slice(0, 8)}
+                </Link>{" "}
+                <span className="text-[10px] tabular-nums">→ {t.assignee}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>,
+    );
+  }
+  if (outcome.task_status_updates.length > 0) {
+    items.push(
+      <div key="status" className="flex items-start gap-2 text-xs">
+        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
+        <div>
+          <div className="font-medium text-foreground">
+            Updated {outcome.task_status_updates.length} task status
+            {outcome.task_status_updates.length === 1 ? "" : "es"}
+          </div>
+          <ul className="mt-0.5 space-y-0.5 text-muted-foreground">
+            {outcome.task_status_updates.map((u) => (
+              <li key={u.task_id}>
+                <Link
+                  href={`/tasks/${u.task_id}`}
+                  className="hover:text-foreground hover:underline"
+                >
+                  {u.task_id.slice(0, 8)}
+                </Link>{" "}
+                → {u.status}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>,
+    );
+  }
+  if (outcome.comments_added.length > 0) {
+    items.push(
+      <div key="comments" className="flex items-start gap-2 text-xs text-muted-foreground">
+        <MessageSquare className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <div>
+          Posted {outcome.comments_added.length} comment
+          {outcome.comments_added.length === 1 ? "" : "s"} on existing task
+          {outcome.comments_added.length === 1 ? "" : "s"}.
+        </div>
+      </div>,
+    );
+  }
+  if (outcome.ask_user.length > 0) {
+    items.push(
+      <div key="ask" className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+        <HelpCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <div>
+          {outcome.ask_user.length === 1
+            ? "Waiting on your answer"
+            : `Waiting on your answer on ${outcome.ask_user.length} questions`}{" "}
+          — view in /activity.
+        </div>
+      </div>,
+    );
+  }
+  if (outcome.approvals_requested.length > 0) {
+    items.push(
+      <div key="approval" className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+        <Shield className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <div>
+          Requested {outcome.approvals_requested.length} approval
+          {outcome.approvals_requested.length === 1 ? "" : "s"} —{" "}
+          <Link href="/approvals" className="hover:text-foreground hover:underline">
+            review in /approvals
+          </Link>
+          .
+        </div>
+      </div>,
+    );
+  }
+  if (outcome.errors.length > 0) {
+    items.push(
+      <div key="errors" className="flex items-start gap-2 text-xs text-destructive">
+        <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <div>
+          {outcome.errors.length} orchestration block{outcome.errors.length === 1 ? "" : "s"} failed to apply.
+        </div>
+      </div>,
+    );
+  }
+  if (items.length === 0) return null;
+  return (
+    <div className="space-y-2 rounded-md border bg-muted/30 px-3 py-2.5">{items}</div>
   );
 }
 
