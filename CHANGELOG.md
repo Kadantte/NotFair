@@ -2,6 +2,15 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.5.14] - 2026-05-19
+
+### Added
+- **SEO landing pages now target high-intent Google Ads connector and audit searches.** Added public, indexable entry points for connecting Google Ads, connecting Google Ads to Codex, and the free Google Ads audit flow, plus industry-specific audit pages with FAQ structured data.
+
+### Changed
+- **Marketing internal links now point search users at public SEO pages before authentication.** Blog and setup-guide CTAs route through `/connect-google-ads`, `/connect-google-ads-to-claude`, or `/connect-google-ads-to-codex`, while app/auth paths stay noindexed.
+- **Sitemaps and robots metadata now surface the new SEO pages more explicitly.** The main sitemap prioritizes the core connector pages and `robots.txt` advertises both the main and blog sitemaps.
+
 ## [0.5.5.13] - 2026-05-14
 
 ### Changed

@@ -1,11 +1,20 @@
 import { getSession } from "@/lib/session";
 import { getUserSubscription } from "@/lib/subscription";
 import { PricingPage } from "@/components/marketing/pricing-page";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Pricing — NotFair",
-  description: "Plans for solo founders and growing teams. Connect Google Ads to your AI tools, then ship campaigns faster.",
-};
+export const metadata = buildMetadata({
+  title: "NotFair Pricing — Google Ads AI Agent Plans",
+  description:
+    "NotFair pricing for solo operators and teams using AI agents to diagnose Google Ads, connect MCP clients, and approve campaign changes safely.",
+  path: "/pricing",
+  keywords: [
+    "NotFair pricing",
+    "Google Ads AI agent pricing",
+    "Google Ads MCP pricing",
+    "AI Google Ads tool pricing",
+  ],
+});
 
 export default async function Pricing() {
   const session = await getSession();

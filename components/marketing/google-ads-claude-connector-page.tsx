@@ -62,10 +62,10 @@ const RELATED_LINKS = [
       "Full reference for the NotFair MCP server — every read and write tool exposed to Claude and other MCP clients.",
   },
   {
-    href: "/connect",
-    title: "Connect Google Ads",
+    href: "/connect-google-ads-to-claude",
+    title: "Connect Google Ads to Claude",
     description:
-      "Connect your account and let Claude diagnose issues, recommend fixes, and draft approved campaign changes.",
+      "Use the public Claude connection page before moving into the authenticated Google Ads setup flow.",
   },
 ];
 

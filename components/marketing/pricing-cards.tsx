@@ -109,7 +109,7 @@ export function PricingSection(props: PricingSectionProps) {
 
   return (
     <div>
-      <PricingHeader />
+      <PricingHeader page={props.page} />
       <PricingCards {...props} />
       <p className="mt-12 max-w-2xl text-sm text-[#C4C0B6]">
         {t("finePrint")}
@@ -118,17 +118,18 @@ export function PricingSection(props: PricingSectionProps) {
   );
 }
 
-export function PricingHeader() {
+export function PricingHeader({ page }: { page: PricingPage }) {
   const t = useTranslations("Pricing.header");
+  const Heading = page === "pricing" ? "h1" : "h2";
 
   return (
     <div className="max-w-2xl">
       <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
         {t("label")}
       </p>
-      <h2 className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
+      <Heading className="font-display mt-4 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
         {t("title")}
-      </h2>
+      </Heading>
       <p className="mt-4 text-base leading-relaxed text-[#C4C0B6]">
         {t("body")}
       </p>

@@ -23,6 +23,8 @@ const APP_PATH_PREFIXES = [
   "/outreach",
 ] as const;
 
+const NOINDEX_HEADER_VALUE = "noindex, nofollow";
+
 const RUSSIAN_RELATED_LANGUAGE_CODES = new Set([
   "ru",
   "be",
@@ -144,6 +146,7 @@ export async function proxy(request: NextRequest) {
 
   if (isAppPath(pathname)) {
     const response = await updateSession(request);
+    response.headers.set("X-Robots-Tag", NOINDEX_HEADER_VALUE);
     if (!request.cookies.has(LOCALE_COOKIE)) {
       setLocaleCookie(response, detectLocale(request));
     }

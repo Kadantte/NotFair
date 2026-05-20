@@ -9,7 +9,9 @@ export type MarketingLink = {
 export type LandingPageContent = {
   slug:
   | "ai-google-ads-agent"
+  | "connect-google-ads"
   | "connect-google-ads-to-claude"
+  | "connect-google-ads-to-codex"
   | "connect-google-ads-to-chatgpt"
   | "ai-google-ads-optimization"
   | "google-ads-ai-tool"
@@ -21,6 +23,8 @@ export type LandingPageContent = {
   index?: boolean;
   heroTitle: string;
   heroDescription: string;
+  ctaHref?: string;
+  ctaLabel?: string;
   highlights: string[];
   sections: Array<{
     title: string;
@@ -96,7 +100,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         description: "Set up Claude with live Google Ads access in under 2 minutes via MCP.",
       },
       {
-        href: "/connect",
+        href: "/connect-google-ads",
         title: "Connect Google Ads",
         description: "Connect your account and let your AI agent diagnose issues and draft fixes.",
       },
@@ -117,6 +121,127 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       },
     ],
   },
+  "connect-google-ads": {
+    slug: "connect-google-ads",
+    title: "Connect Google Ads to AI Agents & MCP Clients | NotFair",
+    description:
+      "Connect Google Ads to Claude, Codex, Cursor, and MCP clients with NotFair. Give your AI agent live account context, approval-gated writes, and change tracking.",
+    keywords: [
+      "connect Google Ads",
+      "connect Google Ads to AI",
+      "Google Ads connector",
+      "Google Ads MCP connector",
+      "Google Ads AI agent setup",
+    ],
+    ctaHref: "/connect/google-ads",
+    ctaLabel: "Connect Google Ads",
+    heroTitle: "Connect Google Ads to your AI agent without building OAuth and API plumbing",
+    heroDescription:
+      "NotFair turns Google Ads into a tool your AI client can safely use: live campaign reads, search-term review, recommendations, and approval-gated writes from one connection flow.",
+    highlights: [
+      "Works with Claude, Codex, Cursor, and MCP-compatible clients",
+      "Start with read-only diagnosis, then approve negatives, bids, budgets, and campaign edits",
+      "Keep every write tied to a user, account, and change record",
+    ],
+    sections: [
+      {
+        title: "Why this page exists instead of sending search users to login",
+        body:
+          "People searching for a Google Ads connector need to understand the workflow before they authenticate. This page explains what NotFair connects, what the AI can do, and where approval gates protect the account.",
+      },
+      {
+        title: "The first useful action after connecting",
+        body:
+          "The best first session is not a generic report. Ask your agent to inspect wasted spend, identify bad search terms, and prepare a small negative-keyword or budget recommendation you can approve.",
+      },
+    ],
+    deepSections: [
+      {
+        title: "What the connection enables",
+        body:
+          "After OAuth, NotFair gives your AI client structured Google Ads tools instead of screenshots or CSV exports. That means the agent can query campaigns, keywords, search terms, conversion actions, budgets, and recent changes, then prepare safe edits through dedicated write tools.",
+        bullets: [
+          "Account and campaign performance reads",
+          "Search term and keyword diagnostics",
+          "Negative keyword, bid, budget, ad, and campaign-state writes",
+          "Change history and impact review for follow-up sessions",
+        ],
+      },
+      {
+        title: "How approval-gated writes keep it safe",
+        body:
+          "NotFair is designed for operator-led automation, not blind autopilot. The agent can do the tedious analysis and draft the change, but account mutations remain explicit, logged, and reviewable.",
+        bullets: [
+          "Read tools are separate from write tools",
+          "Risky actions use purpose-built mutation endpoints",
+          "Every write creates a change record for undo and review",
+          "Auth routes stay noindexed; public pages explain the product before login",
+        ],
+      },
+    ],
+    workflows: [
+      {
+        title: "Find wasted spend",
+        prompt:
+          "Review the last 30 days of campaigns, keywords, and search terms. Rank wasted-spend pockets by cost, conversions, CPA, and intent.",
+        outcome:
+          "A prioritized list of account leaks with evidence and proposed next actions.",
+      },
+      {
+        title: "Prepare negative keywords",
+        prompt:
+          "Group irrelevant search terms into phrase and exact negative keyword candidates, and explain the risk of blocking each group.",
+        outcome:
+          "A reviewable negative-keyword plan that can become the first approved write.",
+      },
+      {
+        title: "Check conversion setup",
+        prompt:
+          "List conversion actions, primary/secondary status, counting type, and any campaign goal mismatches that could distort bidding.",
+        outcome:
+          "A conversion-tracking sanity check before scaling spend or changing bidding.",
+      },
+    ],
+    faq: [
+      {
+        question: "Can I connect Google Ads directly to Claude or Codex?",
+        answer:
+          "NotFair provides the connection layer. You connect Google Ads to NotFair, then use NotFair's MCP-compatible tools from Claude, Codex, Cursor, or another supported AI client.",
+      },
+      {
+        question: "What can the AI do after I connect?",
+        answer:
+          "It can inspect live Google Ads data, diagnose account problems, recommend fixes, draft changes, and apply approved writes such as negatives, bids, budgets, ads, and campaign state changes.",
+      },
+      {
+        question: "Is this safe for a live Google Ads account?",
+        answer:
+          "NotFair separates reads from writes and keeps changes approval-gated and logged. It is built for AI-assisted execution, not unreviewed autopilot.",
+      },
+    ],
+    relatedLinks: [
+      {
+        href: "/connect-google-ads-to-claude",
+        title: "Connect Google Ads to Claude",
+        description: "Use Claude with live Google Ads context through NotFair.",
+      },
+      {
+        href: "/connect-google-ads-to-codex",
+        title: "Connect Google Ads to Codex",
+        description: "Use Codex for Google Ads diagnosis, cleanup, and approved edits.",
+      },
+      {
+        href: "/google-ads-mcp",
+        title: "Google Ads MCP",
+        description: "Understand the MCP server layer behind the connection.",
+      },
+      {
+        href: "/google-ads-ai-tool",
+        title: "Google Ads AI tool",
+        description: "Compare the broader AI-tool workflow for Google Ads.",
+      },
+    ],
+  },
   "connect-google-ads-to-claude": {
     slug: "connect-google-ads-to-claude",
     title: "Connect Google Ads to Claude",
@@ -128,7 +253,8 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
       "Google Ads Claude MCP",
       "Claude Google Ads agent",
     ],
-    index: false,
+    ctaHref: "/connect/google-ads",
+    ctaLabel: "Connect Google Ads for Claude",
     heroTitle: "Connect Google Ads to Claude without building the plumbing yourself",
     heroDescription:
       "NotFair is the shortest path to getting Claude working with live Google Ads context through MCP, so you can move from vague account questions to specific approved fixes faster.",
@@ -186,6 +312,115 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
         href: "/ai-google-ads-optimization",
         title: "AI Google Ads optimization",
         description: "See the optimization use cases teams usually pursue next.",
+      },
+    ],
+  },
+  "connect-google-ads-to-codex": {
+    slug: "connect-google-ads-to-codex",
+    title: "Connect Google Ads to Codex with MCP | NotFair",
+    description:
+      "Use NotFair to connect Google Ads to Codex through MCP. Let Codex inspect account performance, find wasted spend, and prepare approved campaign edits.",
+    keywords: [
+      "connect Google Ads to Codex",
+      "Google Ads Codex MCP",
+      "Google Ads Codex setup",
+      "Codex Google Ads agent",
+    ],
+    ctaHref: "/connect/google-ads",
+    ctaLabel: "Connect Google Ads for Codex",
+    heroTitle: "Connect Google Ads to Codex so it can do real account work",
+    heroDescription:
+      "NotFair gives Codex a safe Google Ads tool layer: live account reads, structured diagnostics, and approval-gated writes for the changes you choose to ship.",
+    highlights: [
+      "Give Codex live Google Ads context without custom API work",
+      "Turn account audits into concrete negative, bid, budget, and campaign-state edits",
+      "Keep every action reviewable before and after it reaches Google Ads",
+    ],
+    sections: [
+      {
+        title: "Why Codex needs structured Google Ads tools",
+        body:
+          "Codex is useful when it can inspect real data and operate through typed tools. NotFair provides the Google Ads MCP surface so Codex can reason over campaigns and prepare account changes without brittle scripts or pasted exports.",
+      },
+      {
+        title: "Best first workflow for Codex",
+        body:
+          "Start by asking Codex to run a wasted-spend review, identify search terms worth excluding, then draft a minimal negative keyword change with evidence and risk notes.",
+      },
+    ],
+    deepSections: [
+      {
+        title: "From analysis to approved write",
+        body:
+          "The NotFair workflow is intentionally narrow: diagnose, rank opportunities, draft the smallest credible change, approve it, then review impact later. That maps well to Codex because the model can handle structured reasoning while NotFair constrains the mutation surface.",
+        bullets: [
+          "Read account setup and recent performance",
+          "Find search terms, keywords, or campaigns causing waste",
+          "Draft one explicit write instead of a vague recommendation",
+          "Review the change record before and after execution",
+        ],
+      },
+    ],
+    workflows: [
+      {
+        title: "Search term cleanup",
+        prompt:
+          "Find search terms with spend and no conversions, group them by intent, and draft negative keyword candidates with match types.",
+        outcome:
+          "A concrete negative-keyword write plan ready for human review.",
+      },
+      {
+        title: "Budget pacing review",
+        prompt:
+          "Compare campaign spend, conversions, CPA, and budget limits. Recommend which budgets should be held, reduced, or increased.",
+        outcome:
+          "A budget decision brief with clear risk and expected impact.",
+      },
+      {
+        title: "Recent change audit",
+        prompt:
+          "List recent account changes and compare performance before and after. Flag likely regressions and possible rollbacks.",
+        outcome:
+          "A focused follow-up plan instead of a generic account audit.",
+      },
+    ],
+    faq: [
+      {
+        question: "Can Codex manage Google Ads through NotFair?",
+        answer:
+          "Codex can use NotFair's MCP tools to inspect Google Ads, recommend fixes, draft changes, and execute approved writes where the operator allows it.",
+      },
+      {
+        question: "Do I need to build my own Google Ads MCP server?",
+        answer:
+          "No. NotFair provides the Google Ads connection, MCP-compatible tool surface, OAuth flow, and write safeguards so you do not need to maintain your own integration.",
+      },
+      {
+        question: "What should I ask Codex first?",
+        answer:
+          "Ask for a wasted-spend and search-term review. It is narrow, measurable, and often leads to a safe first approved write.",
+      },
+    ],
+    relatedLinks: [
+      {
+        href: "/connect-google-ads",
+        title: "Connect Google Ads",
+        description: "Start with the general connection workflow.",
+      },
+      {
+        href: "/google-ads-codex-mcp-setup-guide",
+        title: "Google Ads Codex MCP setup guide",
+        description: "Follow the deeper setup guide for Codex and MCP.",
+      },
+      {
+        href: "/google-ads-mcp",
+        title: "Google Ads MCP",
+        description: "See the protocol-level overview.",
+      },
+      {
+        href: "/google-ads-optimization-tool",
+        title: "Google Ads optimization tool",
+        description: "Move from setup into optimization workflows.",
       },
     ],
   },
@@ -312,7 +547,7 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
     ],
     relatedLinks: [
       {
-        href: "/connect",
+        href: "/connect-google-ads",
         title: "Connect Google Ads",
         description: "Connect your account and start diagnosing the highest-impact fixes.",
       },
@@ -335,9 +570,9 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
   },
   "google-ads-ai-tool": {
     slug: "google-ads-ai-tool",
-    title: "Google Ads AI Tool",
+    title: "Google Ads AI Tool for Claude, Codex & MCP Clients | NotFair",
     description:
-      "NotFair is a Google Ads AI tool for Claude, Codex, Cursor, and MCP clients. Diagnose performance, review search terms, and execute approved changes with live account data.",
+      "Use NotFair as a Google Ads AI tool for Claude, Codex, Cursor, and MCP clients. Diagnose performance, review search terms, and approve live account changes.",
     keywords: [
       "Google Ads AI tool",
       "AI for Google Ads",
@@ -458,9 +693,9 @@ export const landingPages: Record<LandingPageContent["slug"], LandingPageContent
   },
   "google-ads-optimization-tool": {
     slug: "google-ads-optimization-tool",
-    title: "Google Ads Optimization Tool",
+    title: "Google Ads Optimization Tool for Approved AI Edits | NotFair",
     description:
-      "Use NotFair as a Google Ads optimization tool for AI-assisted audits, search-term cleanup, bid changes, budget review, and approved campaign edits.",
+      "Optimize Google Ads with NotFair's AI agent workflow: search-term cleanup, bid and budget review, negative keywords, and approved campaign edits.",
     keywords: [
       "Google Ads optimization tool",
       "Google Ads optimizer",

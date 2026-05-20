@@ -62,10 +62,10 @@ const RELATED_LINKS = [
       "Overview of how NotFair connects Claude to your Google Ads account — works with Claude Code, Claude Web, and Claude Cowork.",
   },
   {
-    href: "/connect",
-    title: "Connect Google Ads",
+    href: "/connect-google-ads-to-claude",
+    title: "Connect Google Ads to Claude",
     description:
-      "Connect your account and let Claude diagnose issues, recommend fixes, and draft approved campaign changes.",
+      "Use the public Claude connection page before moving into the authenticated Google Ads setup flow.",
   },
 ];
 

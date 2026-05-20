@@ -132,7 +132,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts Claude can manage." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts Claude can manage." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for Claude Desktop, Claude Code, ChatGPT/Codex, and any MCP client." },
       { href: "/blog/google-ads-ai-agent", title: "Google Ads AI Agent: What It Actually Does", description: "What an AI agent can realistically do for ad accounts — diagnose waste, find negative keyword gaps, and optimize bids with human review." },
     ],
@@ -237,7 +237,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts Claude can manage." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts Claude can manage." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every Claude surface plus ChatGPT/Codex and Cursor." },
       { href: "/blog/what-is-mcp", title: "What Is MCP (Model Context Protocol)?", description: "The open standard behind every Claude integration." },
     ],
@@ -541,7 +541,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/google-ads-ai-agent", title: "Google Ads AI Agent: What It Actually Does", description: "What AI agents can realistically do for ad accounts." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every Claude surface plus ChatGPT/Codex and Cursor." },
-      { href: "/connect", title: "Try It on Your Account", description: "Connect Google Ads and run an audit in 5 minutes." },
+      { href: "/connect-google-ads", title: "Try It on Your Account", description: "Connect Google Ads and run an audit in 5 minutes." },
     ],
   },
   "can-claude-pause-google-ads-campaigns": {
@@ -642,7 +642,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/can-claude-manage-google-ads", title: "Can Claude Manage Google Ads?", description: "Full list of what Claude can do with your account." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup before any pause is possible." },
-      { href: "/connect", title: "Connect Google Ads", description: "Try a pause in demo mode first — no Google Ads account required." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Try a pause in demo mode first — no Google Ads account required." },
     ],
   },
   "is-it-safe-to-give-ai-access-to-google-ads": {
@@ -885,7 +885,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every supported AI client." },
       { href: "/blog/google-ads-mcp-servers-compared", title: "Google Ads MCP Servers Compared", description: "Picking the right MCP server for your AI tool." },
-      { href: "/connect", title: "Try It Now", description: "One OAuth flow, then point Claude or ChatGPT at it." },
+      { href: "/connect-google-ads", title: "Try It Now", description: "One OAuth flow, then point Claude or ChatGPT at it." },
     ],
   },
   "claude-find-wasted-ad-spend": {
@@ -1012,7 +1012,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Try It on Your Account", description: "Connect Google Ads in 5 minutes and run a waste audit." },
+      { href: "/connect-google-ads", title: "Try It on Your Account", description: "Connect Google Ads in 5 minutes and run a waste audit." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Setup walkthrough for every Claude surface." },
       { href: "/blog/google-ads-ai-agent", title: "Google Ads AI Agent: What It Actually Does", description: "Realistic capabilities and limits — context for what AI can manage end-to-end." },
     ],
@@ -1128,7 +1128,7 @@ export const blogPosts: Record<string, BlogPost> = {
     ],
     relatedLinks: [
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend With Claude", description: "The natural follow-on after a weekly report flags spend creep." },
-      { href: "/connect", title: "Try It on Your Account", description: "Connect Google Ads and generate your first report in 5 minutes." },
+      { href: "/connect-google-ads", title: "Try It on Your Account", description: "Connect Google Ads and generate your first report in 5 minutes." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Setup walkthrough." },
     ],
   },
@@ -1246,7 +1246,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend With Claude", description: "Companion analysis — search term cleanup is one of four waste buckets." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Setup before any analysis is possible." },
-      { href: "/connect", title: "Try It on Your Account", description: "5-minute setup, then run your first search terms analysis." },
+      { href: "/connect-google-ads", title: "Try It on Your Account", description: "5-minute setup, then run your first search terms analysis." },
     ],
   },
   "ai-google-ads-quality-score-audit": {
@@ -1350,7 +1350,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend With Claude", description: "Companion audit — low-QS keywords are often the same ones bleeding spend." },
       { href: "/blog/claude-search-terms-report-analysis", title: "Claude Search Terms Report Analysis", description: "Search term cleanup directly improves expected CTR." },
-      { href: "/connect", title: "Try It on Your Account", description: "Run your first QS audit in 5 minutes." },
+      { href: "/connect-google-ads", title: "Try It on Your Account", description: "Run your first QS audit in 5 minutes." },
     ],
   },
   "ai-conversion-tracking-audit": {
@@ -1470,7 +1470,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/ai-google-ads-quality-score-audit", title: "AI Google Ads Quality Score Audit", description: "Conversion tracking issues often show up as QS issues downstream — audit both." },
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend With Claude", description: "Broken conversions distort waste analysis — fix tracking first." },
-      { href: "/connect", title: "Try It on Your Account", description: "Run a tracking audit in 5 minutes." },
+      { href: "/connect-google-ads", title: "Try It on Your Account", description: "Run a tracking audit in 5 minutes." },
     ],
   },
   "claude-vs-chatgpt-for-google-ads": {
@@ -1625,7 +1625,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "One OAuth flow that powers both Claude and ChatGPT." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "One OAuth flow that powers both Claude and ChatGPT." },
       { href: "/blog/which-ai-tools-work-with-google-ads", title: "Which AI Tools Work With Google Ads?", description: "The full list of MCP-compatible clients in 2026." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every Claude surface plus ChatGPT/Codex and Cursor." },
     ],
@@ -1786,7 +1786,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "One OAuth flow that powers Claude, ChatGPT, and Cursor." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "One OAuth flow that powers Claude, ChatGPT, and Cursor." },
       { href: "/blog/which-ai-tools-work-with-google-ads", title: "Which AI Tools Work With Google Ads?", description: "The full list of MCP-compatible clients in 2026." },
       { href: "/blog/google-ads-ai-agent", title: "Building a Google Ads AI Agent", description: "How to set up and trust a Google Ads AI agent without losing sleep." },
     ],
@@ -1921,7 +1921,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts Claude can manage." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts Claude can manage." },
       { href: "/blog/which-ai-tools-work-with-google-ads", title: "Which AI Tools Work With Google Ads?", description: "The current list of MCP-compatible AI clients." },
       { href: "/blog/can-claude-manage-google-ads", title: "Can Claude Manage Google Ads?", description: "What Claude can and can't do once it has MCP access." },
     ],
@@ -2211,7 +2211,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Start the OAuth flow and pick which manager-linked accounts Claude can manage." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Start the OAuth flow and pick which manager-linked accounts Claude can manage." },
       { href: "/blog/ai-google-ads-weekly-report", title: "AI Weekly Google Ads Report", description: "Generate client-ready weekly reports across every account in one prompt." },
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend with Claude", description: "Run portfolio-wide wasted-spend audits across an MCC in minutes." },
     ],
@@ -2340,7 +2340,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Try the demo or connect your own account in under five minutes." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Try the demo or connect your own account in under five minutes." },
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend with Claude", description: "The first prompt every small business owner should run." },
       { href: "/blog/ai-conversion-tracking-audit", title: "AI Conversion Tracking Audit", description: "Catch broken conversion events before they cost you another month of budget." },
     ],
@@ -2712,7 +2712,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Complete the OAuth flow before installing the Claude Code plugin." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Complete the OAuth flow before installing the Claude Code plugin." },
       { href: "/blog/connect-google-ads-to-claude", title: "Connect Google Ads to Claude", description: "Setup for Claude Code, Claude Desktop, ChatGPT/Codex, and Cursor." },
       { href: "/blog/ai-google-ads-weekly-report", title: "AI Weekly Google Ads Report", description: "Cron-friendly weekly digest you can pipe to Slack or Notion." },
     ],
@@ -2865,7 +2865,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts the AI can talk to." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "Start the OAuth flow and pick which accounts the AI can talk to." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for Claude Desktop, Claude Code, ChatGPT, and any MCP client." },
       { href: "/blog/google-ads-ai-agent", title: "Google Ads AI Agent: What It Actually Does", description: "Concrete capabilities of an AI agent for Google Ads — diagnostics, optimization, and human-reviewed writes." },
     ],
@@ -3017,7 +3017,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/what-is-mcp-for-google-ads", title: "What Is MCP for Google Ads?", description: "The protocol that makes natural language ads management possible — explained without the jargon." },
       { href: "/blog/which-ai-tools-work-with-google-ads", title: "Which AI Tools Work With Google Ads?", description: "A current list of AI clients that support MCP and connect to Google Ads through NotFair." },
-      { href: "/connect", title: "Connect Google Ads", description: "OAuth in 30 seconds, then start typing natural-language commands at your account." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "OAuth in 30 seconds, then start typing natural-language commands at your account." },
     ],
   },
   "conversational-google-ads-management": {
@@ -3197,7 +3197,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "OAuth in 30 seconds and start using a chat interface against your account." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "OAuth in 30 seconds and start using a chat interface against your account." },
       { href: "/blog/claude-find-wasted-ad-spend", title: "Find Wasted Ad Spend With Claude", description: "The single prompt that surfaces wasted spend across an entire account in under a minute." },
       { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for Claude Desktop, Claude Code, ChatGPT, and Cursor." },
     ],
@@ -3356,7 +3356,7 @@ export const blogPosts: Record<string, BlogPost> = {
       },
     ],
     relatedLinks: [
-      { href: "/connect", title: "Connect Google Ads", description: "OAuth in 30 seconds and start using your AI copilot." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "OAuth in 30 seconds and start using your AI copilot." },
       { href: "/blog/can-claude-manage-google-ads", title: "Can Claude Manage Google Ads?", description: "What Claude can and cannot do as a copilot for your Google Ads account." },
       { href: "/blog/google-ads-ai-agent", title: "Google Ads AI Agent: What It Actually Does", description: "Concrete capabilities of an AI agent for Google Ads — diagnostics, optimization, and human-reviewed writes." },
     ],
@@ -3524,7 +3524,7 @@ export const blogPosts: Record<string, BlogPost> = {
     relatedLinks: [
       { href: "/blog/what-is-mcp-for-google-ads", title: "What Is MCP for Google Ads?", description: "The protocol making AI assistants for PPC possible — explained without the jargon." },
       { href: "/blog/which-ai-tools-work-with-google-ads", title: "Which AI Tools Work With Google Ads?", description: "Current AI clients with MCP support and how they connect to Google Ads through NotFair." },
-      { href: "/connect", title: "Connect Google Ads", description: "OAuth in 30 seconds and start using a real AI assistant on your PPC account." },
+      { href: "/connect-google-ads", title: "Connect Google Ads", description: "OAuth in 30 seconds and start using a real AI assistant on your PPC account." },
     ],
   },
   "google-ads-mcp-servers-compared": {
@@ -4105,7 +4105,7 @@ export const blogPosts: Record<string, BlogPost> = {
     ],
     relatedLinks: [
       {
-        href: "/connect",
+        href: "/connect-google-ads",
         title: "Connect Google Ads",
         description:
           "Start the OAuth flow and pick which accounts Claude can manage.",
@@ -4322,7 +4322,7 @@ export const blogPosts: Record<string, BlogPost> = {
     ],
     relatedLinks: [
       {
-        href: "/connect",
+        href: "/connect-google-ads",
         title: "Connect Google Ads",
         description: "Connect your account and let your AI agent diagnose issues, recommend fixes, and draft approved changes.",
       },

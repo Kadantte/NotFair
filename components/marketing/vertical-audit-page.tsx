@@ -216,7 +216,7 @@ export function VerticalAuditPageView({ page }: { page: VerticalAuditPage }) {
               {page.industryShort}-specific checks
             </p>
             <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-[#E8E4DD] md:text-4xl">
-              What we check that a generic audit won't.
+              What we check that a generic audit won&apos;t.
             </h2>
           </motion.div>
 

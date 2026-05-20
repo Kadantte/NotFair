@@ -36,6 +36,9 @@ const publicMarketingRoutes = [
 const highPriorityRoutes = new Set([
   "/",
   "/mcp",
+  "/connect-google-ads",
+  "/connect-google-ads-to-claude",
+  "/connect-google-ads-to-codex",
   "/google-ads-claude",
   "/google-ads-claude-connector-setup-guide",
   "/google-ads-claude-code-plugin-setup-guide",

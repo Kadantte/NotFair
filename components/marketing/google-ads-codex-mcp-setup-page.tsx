@@ -70,10 +70,10 @@ const RELATED_LINKS = [
       "For Claude Code in your terminal — install NotFair via the toprank plugin marketplace.",
   },
   {
-    href: "/connect",
-    title: "Connect Google Ads",
+    href: "/connect-google-ads-to-codex",
+    title: "Connect Google Ads to Codex",
     description:
-      "Connect your account and let Codex diagnose issues, recommend fixes, and draft approved campaign changes.",
+      "Use the public Codex connection page before moving into the authenticated Google Ads setup flow.",
   },
 ];
 

@@ -42,10 +42,10 @@ export function LandingPage({ page }: { page: LandingPageContent }) {
               </p>
             </div>
             <Link
-              href="/connect"
+              href={page.ctaHref ?? "/connect"}
               className="inline-flex items-center text-sm font-medium text-[#E8E4DD] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
             >
-              Connect Google Ads
+              {page.ctaLabel ?? "Connect Google Ads"}
             </Link>
           </div>
         </div>
