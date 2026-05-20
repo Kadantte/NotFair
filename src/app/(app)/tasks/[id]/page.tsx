@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AgentChat } from "@/components/agent-chat";
+import { TaskLivePoller } from "@/components/task-live-poller";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getActiveProject } from "@/server/active-project";
@@ -154,7 +155,11 @@ export default async function TaskDetailPage({
 
       <div className="min-h-0 flex-1 border-t">
         <AgentChat
-          key={threadId}
+          // Key includes task.status so flipping running → succeeded remounts
+          // AgentChat exactly once, pulling in the agent's final reply from
+          // JSONL. The threadId stays stable so the dedup'd kickoff guard in
+          // KICKOFF_FIRED still prevents a re-trigger.
+          key={`${threadId}:${task.status}`}
           projectSlug={project.slug}
           agentSlug={agentSlug}
           agentDisplayName={agentDisplayName}
@@ -170,6 +175,7 @@ export default async function TaskDetailPage({
           kickoffMessage={kickoffMessage}
         />
       </div>
+      <TaskLivePoller status={task.status} />
     </div>
   );
 }

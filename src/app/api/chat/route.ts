@@ -110,14 +110,34 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Track whether the SSE client is still connected. Once they navigate
+      // away or close the tab, controller.enqueue throws — we flip this flag
+      // and silently drop further sends. The agent run on OpenClaw keeps
+      // going, the assistantBuffer keeps accumulating, and orchestration
+      // still runs at the end. Persistence (JSONL) happens server-side
+      // regardless, so when the user returns, loadThreadHistory shows the
+      // full response.
+      let clientOpen = true;
       const send = (event: string, data: unknown) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
-        );
+        if (!clientOpen) return;
+        try {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+          );
+        } catch {
+          clientOpen = false;
+        }
       };
 
-      const abortCtl = new AbortController();
-      request.signal?.addEventListener("abort", () => abortCtl.abort(), { once: true });
+      // Deliberately do NOT propagate request.signal to the gateway abort
+      // signal. The user expectation: "if I switch agents or close the tab,
+      // the agent should keep responding; when I switch back, show the
+      // result." Honoring disconnect-as-cancel kills mid-flight agent runs
+      // and breaks that promise. The Stop button is now a future-TODO
+      // (separate POST /api/chat/stop endpoint) — there isn't a way to
+      // explicitly cancel a run today, only the implicit disconnect path
+      // which we no longer treat as cancel.
+      const noAbort = new AbortController(); // never aborted; just satisfies the signal param
 
       let firstSseDeltaSent = false;
       let assistantBuffer = "";
@@ -133,7 +153,7 @@ export async function POST(request: Request) {
           sessionKey,
           sessionId,
           message: body.message,
-          signal: abortCtl.signal,
+          signal: noAbort.signal,
           perf,
         })) {
           if (evt.kind === "delta") {
@@ -207,7 +227,12 @@ export async function POST(request: Request) {
           message: err instanceof Error ? err.message : String(err),
         });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Controller may already be closed if the client disconnected
+          // mid-stream — silent because the agent run continued + persisted.
+        }
       }
     },
   });
