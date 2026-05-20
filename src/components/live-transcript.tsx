@@ -625,7 +625,13 @@ function ToolGroup({ tools }: { tools: ToolEntry[] }) {
   const isLive = inFlightCount > 0;
   const headline =
     tools.find((t) => !t.done) ?? tools[tools.length - 1] ?? null;
-  const hasError = tools.some((t) => t.done && !t.ok);
+  // Group status reflects the FINAL outcome, not "any error ever". When the
+  // agent retried a failed call and the retry succeeded, the user sees
+  // green — only expanding the card reveals the intermediate stumble.
+  // Matches Claude.ai's pattern of grading by "did this turn ultimately
+  // work" rather than punishing every recoverable hiccup.
+  const lastDone = [...tools].reverse().find((t) => t.done);
+  const hasError = !!(lastDone && !lastDone.ok);
   const HeadIcon = headline ? iconForTool(headline.name) : Wrench;
   const StatusIcon = isLive
     ? Loader2
