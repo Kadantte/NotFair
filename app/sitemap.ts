@@ -3,6 +3,7 @@ import { allLandingPages } from "@/lib/marketing-pages";
 import { allIntegrationSlugs } from "@/lib/integrations";
 import { allCompareSlugs, allUseCaseSlugs } from "@/lib/long-form-pages";
 import { absoluteUrl } from "@/lib/seo";
+import { allVerticalAuditPages } from "@/lib/vertical-audit-pages";
 
 // Blog routes live in /blog/sitemap.xml (app/(marketing)/blog/sitemap.ts).
 const publicMarketingRoutes = [
@@ -20,6 +21,8 @@ const publicMarketingRoutes = [
   "/meta-ads-codex-mcp-setup-guide",
   "/meta-ads-mcp",
   "/impact",
+  "/google-ads-audit",
+  ...allVerticalAuditPages.map((page) => `/google-ads-audit/${page.slug}`),
   "/privacy",
   "/terms",
   "/integrations",
@@ -39,6 +42,7 @@ const highPriorityRoutes = new Set([
   "/connect-google-ads",
   "/connect-google-ads-to-claude",
   "/connect-google-ads-to-codex",
+  "/google-ads-audit",
   "/google-ads-claude",
   "/google-ads-claude-connector-setup-guide",
   "/google-ads-claude-code-plugin-setup-guide",
