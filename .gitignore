@@ -10,6 +10,7 @@ dist/
 out/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+coverage/
 
 # OS / editor
 .vscode/

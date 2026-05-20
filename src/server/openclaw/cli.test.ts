@@ -8,7 +8,14 @@ vi.mock("node:child_process", () => ({
   spawn: (cmd: string, args: string[]) => spawnMock(cmd, args),
 }));
 
-import { OpenClawError, openclaw } from "./cli";
+import {
+  OpenClawError,
+  getHealth,
+  isOpenClawAvailable,
+  listAgents,
+  listCrons,
+  openclaw,
+} from "./cli";
 
 type SpawnResult = {
   stdout?: string;
@@ -258,6 +265,167 @@ describe("openclaw cli", () => {
       await expect(failing).rejects.toThrow();
       // Without the `.catch` on the queue tail, this would never resolve.
       await expect(succeeding).resolves.toEqual({ ok: true });
+    });
+  });
+
+  describe("spawn-level errors", () => {
+    it("maps ENOENT (openclaw not installed) into a friendly message", async () => {
+      spawnMock.mockImplementationOnce(() => {
+        const proc = new EventEmitter() as FakeChild;
+        proc.stdout = new EventEmitter();
+        proc.stderr = new EventEmitter();
+        proc.kill = () => true;
+        // No close — the 'error' handler is the terminal event for this case.
+        setImmediate(() => {
+          const err = new Error("spawn openclaw ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          proc.emit("error", err);
+        });
+        return proc;
+      });
+
+      let caught: unknown;
+      try {
+        await openclaw(["agents", "list"]);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(OpenClawError);
+      const e = caught as OpenClawError;
+      expect(e.message).toMatch(/openclaw not found on PATH/i);
+      expect(e.exitCode).toBeNull();
+    });
+
+    it("maps a generic spawn error into an OpenClawError", async () => {
+      spawnMock.mockImplementationOnce(() => {
+        const proc = new EventEmitter() as FakeChild;
+        proc.stdout = new EventEmitter();
+        proc.stderr = new EventEmitter();
+        proc.kill = () => true;
+        setImmediate(() => {
+          proc.stderr.emit("data", Buffer.from("buffered stderr"));
+          proc.emit("error", new Error("something exploded"));
+        });
+        return proc;
+      });
+
+      let caught: unknown;
+      try {
+        await openclaw(["foo"]);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(OpenClawError);
+      const e = caught as OpenClawError;
+      expect(e.message).toMatch(/something exploded/);
+      expect(e.stderr).toMatch(/buffered stderr/);
+      expect(e.exitCode).toBeNull();
+    });
+  });
+
+  describe("convenience wrappers", () => {
+    it("listAgents spawns `agents list --json` and returns parsed JSON", async () => {
+      spawnMock.mockImplementationOnce(() => fakeChild({ stdout: "[]", exitCode: 0 }));
+      const r = await listAgents();
+      expect(r).toEqual([]);
+      expect(spawnMock).toHaveBeenCalledWith("openclaw", ["agents", "list", "--json"]);
+    });
+
+    it("listCrons spawns `cron list --json` and returns parsed JSON", async () => {
+      spawnMock.mockImplementationOnce(() => fakeChild({ stdout: '[{"id":"x"}]', exitCode: 0 }));
+      const r = await listCrons();
+      expect(r).toEqual([{ id: "x" }]);
+      expect(spawnMock).toHaveBeenCalledWith("openclaw", ["cron", "list", "--json"]);
+    });
+
+    it("getHealth spawns `health` without --json and returns raw stdout", async () => {
+      spawnMock.mockImplementationOnce(() =>
+        fakeChild({ stdout: "ok\n", exitCode: 0 }),
+      );
+      const r = await getHealth();
+      expect(r).toBe("ok\n");
+      expect(spawnMock).toHaveBeenCalledWith("openclaw", ["health"]);
+    });
+
+    it("isOpenClawAvailable returns true when --version exits 0", async () => {
+      spawnMock.mockImplementationOnce(() => fakeChild({ stdout: "v1.0.0\n", exitCode: 0 }));
+      const ok = await isOpenClawAvailable();
+      expect(ok).toBe(true);
+      expect(spawnMock).toHaveBeenCalledWith("openclaw", ["--version"]);
+    });
+
+    it("isOpenClawAvailable returns false when the spawn fails", async () => {
+      spawnMock.mockImplementationOnce(() => {
+        const proc = new EventEmitter() as FakeChild;
+        proc.stdout = new EventEmitter();
+        proc.stderr = new EventEmitter();
+        proc.kill = () => true;
+        setImmediate(() => {
+          const err = new Error("spawn openclaw ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          proc.emit("error", err);
+        });
+        return proc;
+      });
+      const ok = await isOpenClawAvailable();
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe("timeout", () => {
+    it("kills the subprocess and rejects when the process never closes", async () => {
+      vi.useFakeTimers();
+      try {
+        let killed = false;
+        spawnMock.mockImplementationOnce(() => {
+          const proc = new EventEmitter() as FakeChild;
+          proc.stdout = new EventEmitter();
+          proc.stderr = new EventEmitter();
+          proc.kill = () => {
+            killed = true;
+            return true;
+          };
+          // Never emit 'close' — let the internal timer fire.
+          return proc;
+        });
+
+        const p = openclaw(["slow"], { timeout: 50 });
+        // Attach a no-op catch so vitest doesn't warn about unhandled rejection.
+        const observed = p.catch((err) => err);
+        // Run the queue + spawn microtasks before advancing the fake clock.
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(50);
+        const err = (await observed) as OpenClawError;
+        expect(err).toBeInstanceOf(OpenClawError);
+        expect(err.message).toMatch(/timed out after 50ms/);
+        expect(killed).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("JSON parsing edge cases", () => {
+    it("resolves to null when stdout is empty + json:true (default)", async () => {
+      spawnMock.mockImplementationOnce(() => fakeChild({ stdout: "", exitCode: 0 }));
+      const r = await openclaw(["empty"]);
+      expect(r).toBeNull();
+    });
+
+    it("resolves to null when stdout is whitespace-only", async () => {
+      spawnMock.mockImplementationOnce(() => fakeChild({ stdout: "   \n  ", exitCode: 0 }));
+      const r = await openclaw(["whitespace"]);
+      expect(r).toBeNull();
+    });
+
+    it("does not append --json when caller already included it explicitly", async () => {
+      spawnMock.mockImplementationOnce(() =>
+        fakeChild({ stdout: "{}", exitCode: 0 }),
+      );
+      await openclaw(["foo", "--json"]);
+      // --json must appear exactly once.
+      const args = spawnMock.mock.calls[0]![1] as string[];
+      expect(args.filter((a) => a === "--json").length).toBe(1);
     });
   });
 });
