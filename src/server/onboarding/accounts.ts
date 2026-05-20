@@ -121,13 +121,21 @@ function parseAccountsPayload(
 }
 
 export type SetAccountResult =
-  | { ok: true; project: Project }
+  | { ok: true; project: Project; task_display_id: string }
   | { ok: false; error: string };
 
 /**
- * Persist the selected Google Ads customer ID on the project row. Validates
- * the account_id against the MCP's accounts list to prevent the UI from
- * stashing a stale or fabricated id.
+ * Finishes onboarding in one round-trip:
+ *
+ *   1. Validates the account_id against the MCP's reachable list
+ *      (anti-tamper for the form submit).
+ *   2. Persists it on the project row.
+ *   3. Mints the CMO's first task with the audit brief.
+ *
+ * The caller redirects to /agents/cmo/tasks?task=<display_id>; the
+ * workspace's startTaskIfProposed fires the kickoff so the agent does the
+ * audit live in the standard task UX. Replaces the one-off audit.ts
+ * pipeline that used to drive its own SSE stream + FIRST_TURN.md sentinel.
  */
 export async function setOnboardingAccountAction(
   project_slug: string,
@@ -158,6 +166,35 @@ export async function setOnboardingAccountAction(
 
   const updated = setProjectGoogleAdsAccount(project_slug, match.id);
   if (!updated) return { ok: false, error: "Project not found." };
+
+  // Mint the onboarding task. Avoid duplicates if the user navigates back
+  // and resubmits — reuse the existing one when a CMO audit task is
+  // already pending for this project.
+  const { buildOnboardingBrief } = await import("./cmo-task-brief");
+  const { listTasks, createTask } = await import("@/server/db/tasks");
+  const { agentNameFor } = await import("@/server/agent-templates");
+  const cmoAgentId = agentNameFor(project_slug, "cmo");
+  const existing = listTasks(project_slug).find(
+    (t) => t.agent_id === cmoAgentId && t.title?.startsWith("Audit the account"),
+  );
+  let task = existing;
+  if (!task) {
+    const { title, brief, success_criteria } = buildOnboardingBrief({
+      project_slug,
+      project_display_name: updated.display_name,
+      google_ads_account_id: match.id,
+    });
+    task = createTask({
+      project_slug,
+      agent_id: cmoAgentId,
+      title,
+      brief,
+      success_criteria,
+      assigner_agent_id: null,
+      status: "proposed",
+    });
+  }
+
   revalidatePath("/", "layout");
-  return { ok: true, project: updated };
+  return { ok: true, project: updated, task_display_id: task.display_id };
 }

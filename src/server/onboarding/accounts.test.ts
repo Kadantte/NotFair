@@ -21,6 +21,37 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// Dynamic imports inside setOnboardingAccountAction need mocks too — it
+// auto-creates the CMO's onboarding task as the final step of the action.
+const createTaskMock = vi.fn();
+const listTasksMock = vi.fn(() => [] as unknown[]);
+vi.mock("@/server/db/tasks", () => ({
+  createTask: (input: unknown) => {
+    createTaskMock(input);
+    return {
+      id: "task-uuid",
+      display_id: "acme-1",
+      project_slug: "acme",
+      agent_id: "acme-cmo",
+      title: "Audit the account and propose a starter playbook",
+      brief: "...",
+      success_criteria: null,
+      deadline_iso: null,
+      status: "proposed",
+      result_json: null,
+      error_message: null,
+      thread_id: null,
+      assigner_agent_id: null,
+      created_at: "now",
+      updated_at: "now",
+    };
+  },
+  listTasks: (...args: unknown[]) => listTasksMock(...args),
+}));
+vi.mock("@/server/agent-templates", () => ({
+  agentNameFor: (slug: string, key: string) => `${slug}-${key.replace(/_/g, "-")}`,
+}));
+
 import {
   listGoogleAdsAccounts,
   setOnboardingAccountAction,
@@ -155,6 +186,42 @@ describe("setOnboardingAccountAction", () => {
       "acme",
       "3251706605",
     );
+  });
+
+  it("mints the CMO onboarding task and returns its display_id for the redirect", async () => {
+    const r = await setOnboardingAccountAction("acme", "3251706605");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      // Caller redirects to /agents/cmo/tasks?task=<this>.
+      expect(r.task_display_id).toBe("acme-1");
+    }
+    expect(createTaskMock).toHaveBeenCalledTimes(1);
+    expect(createTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_slug: "acme",
+        agent_id: "acme-cmo",
+        status: "proposed",
+        title: expect.stringContaining("Audit"),
+        brief: expect.stringContaining("3251706605"),
+      }),
+    );
+  });
+
+  it("does NOT double-create the task when a prior audit task already exists", async () => {
+    listTasksMock.mockReturnValueOnce([
+      {
+        id: "prior-uuid",
+        display_id: "acme-7",
+        project_slug: "acme",
+        agent_id: "acme-cmo",
+        title: "Audit the account and propose a starter playbook",
+        status: "running",
+      },
+    ]);
+    const r = await setOnboardingAccountAction("acme", "3251706605");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.task_display_id).toBe("acme-7");
+    expect(createTaskMock).not.toHaveBeenCalled();
   });
 
   it("rejects an account id NOT in the bearer's list (tamper defense)", async () => {

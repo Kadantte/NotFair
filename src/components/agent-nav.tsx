@@ -43,12 +43,11 @@ export function AgentNav({ agents, inFlightCounts = {} }: Props) {
   return (
     <SidebarMenu>
       {agents.map((a) => {
-        // Specialists land on Tasks; CMO lands on Chat. The CMO doesn't own
-        // tasks (it delegates them) so Tasks would be empty for it.
-        const href =
-          a.template_key === "cmo"
-            ? `/agents/${a.slug}/chat`
-            : `/agents/${a.slug}/tasks`;
+        // Every agent lands on Tasks now. The CMO's tasks are typically
+        // its own first-turn work (onboarding audit, user-assigned planning
+        // jobs); the work it delegates to specialists shows up in those
+        // specialists' tabs. Chat tab is still one click away for free-form.
+        const href = `/agents/${a.slug}/tasks`;
         const agentBase = `/agents/${a.slug}`;
         const isActive =
           pathname === agentBase || pathname?.startsWith(`${agentBase}/`);
