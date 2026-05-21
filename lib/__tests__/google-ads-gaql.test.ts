@@ -1376,6 +1376,30 @@ describe("validateSegmentResourceCompatibility", () => {
     ).toThrow(/conversion_action/);
   });
 
+  it("rejects search lost impression-share metrics on ad_group", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT ad_group.id, metrics.search_budget_lost_impression_share FROM ad_group WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/search_budget_lost_impression_share.*FROM campaign/);
+  });
+
+  it("rejects search lost impression-share metrics on keyword_view", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT ad_group_criterion.keyword.text, metrics.search_rank_lost_impression_share FROM keyword_view WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).toThrow(/search_rank_lost_impression_share.*FROM campaign/);
+  });
+
+  it("allows search lost impression-share metrics on campaign", () => {
+    expect(() =>
+      validateSegmentResourceCompatibility(
+        "SELECT campaign.id, metrics.search_budget_lost_impression_share, metrics.search_rank_lost_impression_share FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+      ),
+    ).not.toThrow();
+  });
+
   it("allows compatible pair: segments.hour on campaign", () => {
     expect(() =>
       validateSegmentResourceCompatibility(

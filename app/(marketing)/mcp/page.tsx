@@ -9,9 +9,9 @@ import {
 } from "@/lib/brand";
 
 export const metadata = buildMetadata({
-  title: "NotFair MCP — Google Ads & Meta Ads MCP Servers for Claude, Codex, Cursor",
+  title: "MCP Servers for Google Ads & Meta Ads | NotFair",
   description:
-    "Hosted MCP servers for Google Ads and Meta Ads. Drop the config into Claude, Codex, Cursor, Cline, or any MCP-compatible client and let your AI agent diagnose, fix, and operate your ad accounts in chat.",
+    "Hosted MCP servers for Google Ads and Meta Ads. Connect Claude, Codex, Hermes, OpenClaw, and other MCP clients to diagnose, fix, and operate ad accounts in chat.",
   path: "/mcp",
   keywords: [
     "ads mcp",
@@ -23,7 +23,8 @@ export const metadata = buildMetadata({
     "mcp server for ads",
     "claude ads mcp",
     "codex ads mcp",
-    "cursor ads mcp",
+    "hermes ads mcp",
+    "openclaw ads mcp",
     "model context protocol ads",
   ],
 });
@@ -37,7 +38,7 @@ const faqItems = [
   {
     question: "Which AI clients can I use?",
     answer:
-      "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL stays the same — only the client-side config differs.",
+      "Anything that speaks the MCP Streamable HTTP transport: Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Hermes Agent, OpenClaw, Cursor, Cline, and custom MCP clients. The server URL stays the same — only the client-side config differs.",
   },
   {
     question: "Do I need to self-host anything?",
@@ -71,7 +72,7 @@ const jsonLd = [
     applicationSubCategory: "Model Context Protocol Server",
     operatingSystem: "Web",
     description:
-      "Hosted MCP servers for Google Ads and Meta Ads. Compatible with Claude.ai, Claude Code, OpenAI Codex, Cursor, Cline, and any MCP-compatible AI client. Diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
+      "Hosted MCP servers for Google Ads and Meta Ads. Compatible with Claude.ai, Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, Cursor, Cline, and any MCP-compatible AI client. Diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
     offers: {
       "@type": "Offer",
       price: "0",

@@ -146,7 +146,7 @@ export function BlogPostPage({ post }: { post: BlogPost }) {
                 href="/google-ads-mcp"
                 className="font-medium text-[#C4C0B6] underline underline-offset-4 transition-colors hover:text-[#4CAF6E]"
               >
-                Google Ads MCP
+                Google Ads MCP Server
               </Link>
               <Link
                 href="/google-ads-ai-tool"

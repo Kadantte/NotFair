@@ -61,7 +61,7 @@ export const GROWTH_HEADLINE_FEATURES = [
 
 /** Inherited from Free, surfaced explicitly so Growth doesn't look thin. */
 export const GROWTH_INHERITED_FEATURES = [
-  "All MCP clients — Claude, Codex, Cursor, OpenClaw, Hermes",
+  "All MCP clients — Claude, Codex, Hermes, OpenClaw, Cursor",
   "Diagnose issues and draft campaign changes",
   "Preview every edit before approval",
   "Cancel any time — no contracts",
