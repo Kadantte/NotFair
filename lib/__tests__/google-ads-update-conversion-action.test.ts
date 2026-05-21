@@ -291,4 +291,131 @@ describe("removeConversionAction", () => {
     expect(result.error).toMatch(/Conversion action 8888 is read-only/);
     expect(result.error).toMatch(/mutate_error=9/);
   });
+
+  // ─── currencyCode ──────────────────────────────────────────────────
+
+  describe("currencyCode", () => {
+    function setMutableRowWithValueSettings(opts: {
+      defaultValue?: number;
+      alwaysUseDefaultValue?: boolean;
+      defaultCurrencyCode?: string | null;
+    } = {}) {
+      const value_settings: Record<string, unknown> = {};
+      if (opts.defaultValue !== undefined) value_settings.default_value = opts.defaultValue;
+      if (opts.alwaysUseDefaultValue !== undefined) value_settings.always_use_default_value = opts.alwaysUseDefaultValue;
+      if (opts.defaultCurrencyCode !== undefined && opts.defaultCurrencyCode !== null) {
+        value_settings.default_currency_code = opts.defaultCurrencyCode;
+      }
+      setRow({
+        name: "Web purchase",
+        status: 2,
+        category: 0,
+        counting_type: 3,
+        type: 7, // UPLOAD_CLICKS — mutable
+        owner_customer: "customers/1301265570",
+        value_settings,
+      });
+    }
+
+    it("sends value_settings.default_currency_code (not currency_code)", async () => {
+      setMutableRowWithValueSettings({ defaultValue: 1, alwaysUseDefaultValue: true, defaultCurrencyCode: "XXX" });
+      const result = await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "EUR",
+      });
+      expect(result.success).toBe(true);
+      expect(mockMutateResources).toHaveBeenCalledTimes(1);
+      const op = mockMutateResources.mock.calls[0][0][0];
+      expect(op.resource.value_settings).toBeDefined();
+      expect(op.resource.value_settings.default_currency_code).toBe("EUR");
+      // Critical: the proto field is `default_currency_code`, NOT `currency_code`.
+      expect(op.resource.value_settings.currency_code).toBeUndefined();
+    });
+
+    it("round-trips defaultValue and alwaysUseDefaultValue from existing state when patching currency only", async () => {
+      setMutableRowWithValueSettings({ defaultValue: 25, alwaysUseDefaultValue: true, defaultCurrencyCode: "XXX" });
+      await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "EUR",
+      });
+      const op = mockMutateResources.mock.calls[0][0][0];
+      expect(op.resource.value_settings.default_value).toBe(25);
+      expect(op.resource.value_settings.always_use_default_value).toBe(true);
+      expect(op.resource.value_settings.default_currency_code).toBe("EUR");
+    });
+
+    it("caller-provided value wins over existing when both present", async () => {
+      setMutableRowWithValueSettings({ defaultValue: 25, defaultCurrencyCode: "USD" });
+      await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        defaultValue: 50,
+        currencyCode: "EUR",
+      });
+      const op = mockMutateResources.mock.calls[0][0][0];
+      expect(op.resource.value_settings.default_value).toBe(50);
+      expect(op.resource.value_settings.default_currency_code).toBe("EUR");
+    });
+
+    it("rejects XXX explicitly", async () => {
+      setMutableRowWithValueSettings({});
+      const result = await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "XXX",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/XXX.*legacy/i);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("rejects non-3-letter codes", async () => {
+      setMutableRowWithValueSettings({});
+      const result = await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "EURO",
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/ISO 4217/);
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
+    it("normalizes lowercase to uppercase", async () => {
+      setMutableRowWithValueSettings({});
+      const result = await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "eur",
+      });
+      expect(result.success).toBe(true);
+      const op = mockMutateResources.mock.calls[0][0][0];
+      expect(op.resource.value_settings.default_currency_code).toBe("EUR");
+    });
+
+    it("includes currencyCode in beforeValue / afterValue JSON", async () => {
+      setMutableRowWithValueSettings({ defaultCurrencyCode: "XXX" });
+      const result = await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "EUR",
+      });
+      expect(result.success).toBe(true);
+      const before = JSON.parse(result.beforeValue);
+      const after = JSON.parse(result.afterValue);
+      expect(before.currencyCode).toBe("XXX");
+      expect(after.currencyCode).toBe("EUR");
+    });
+
+    it("does not include resource_name in value_settings field-mask wipe risk", async () => {
+      // Regression: confirm we don't accidentally send a stripped sub-message.
+      // The library emits nested field-mask paths for value_settings scalars
+      // (verified empirically in the planning probe); we still round-trip
+      // for safety.
+      setMutableRowWithValueSettings({ defaultValue: 10, alwaysUseDefaultValue: false, defaultCurrencyCode: "USD" });
+      await updateConversionAction(auth, {
+        conversionActionId: "9999",
+        currencyCode: "EUR",
+      });
+      const op = mockMutateResources.mock.calls[0][0][0];
+      expect(Object.keys(op.resource.value_settings).sort()).toEqual(
+        ["always_use_default_value", "default_currency_code", "default_value"].sort(),
+      );
+    });
+  });
 });

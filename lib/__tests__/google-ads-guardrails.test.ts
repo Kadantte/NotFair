@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_GUARDRAILS, type Guardrails } from "@/lib/google-ads";
+import { guardrailRejection } from "@/lib/google-ads/helpers";
 
 describe("Google Ads Guardrails", () => {
   describe("DEFAULT_GUARDRAILS", () => {
@@ -97,6 +98,52 @@ describe("Google Ads Guardrails", () => {
         maxKeywordPausePct: 0.50,  // 50%
       };
       expect(loose.maxBidChangePct).toBe(0.50);
+    });
+  });
+
+  describe("guardrailRejection hint", () => {
+    it("suggests a reasonable bump for a sub-100% bid change", () => {
+      // Requested 30%, current 25%. Suggested: max(40, 35) = 40.
+      const rej = guardrailRejection("bid", 0.30, 0.25);
+      expect(rej.nextTool.args.maxBidChangePct).toBe(0.40);
+      expect(rej.error).toMatch(/exceeds maximum allowed 25%/);
+      expect(rej.error).toMatch(/maxBidChangePct: 0\.4 /);
+    });
+
+    it("CLIPS the suggestion to the schema cap (1.0) — never suggest something setGuardrails would reject", () => {
+      // Regression for the misleading-hint user feedback: with the new
+      // plumbing exposing real configured values, a 200% requested change
+      // with a 25% current cap previously suggested 2.1 (Math.max(210,35)
+      // / 100) — which Zod immediately bounces because the schema caps at
+      // 1.0. The new behavior switches to an "iterate" message instead.
+      const rej = guardrailRejection("bid", 2.0, 0.25);
+      expect(rej.nextTool.args.maxBidChangePct).toBeLessThanOrEqual(1.0);
+      expect(rej.error).toMatch(/per-call maximum guardrail of 100%/);
+      expect(rej.error).toMatch(/iterate/i);
+    });
+
+    it("for >100% requested change, suggests the schema cap (1.0) and the iterate pattern", () => {
+      const rej = guardrailRejection("bid", 3.0, 1.0);
+      expect(rej.nextTool.args.maxBidChangePct).toBe(1.0);
+      expect(rej.error).toMatch(/iterate/i);
+      // Critical: don't tell the user to call setGuardrails with a value
+      // they already have. The fact that current is 1.0 + requested is 300%
+      // means the only path forward is iteration.
+      expect(rej.error).not.toMatch(/0\.6/); // pre-fix bug: hint said "set to 0.6" even when already at 1.0
+    });
+
+    it("never suggests a value > GUARDRAIL_PCT_MAX in the typed nextTool args", () => {
+      for (const requested of [1.01, 1.5, 3.0, 50.0]) {
+        const rej = guardrailRejection("bid", requested, 0.25);
+        expect(rej.nextTool.args.maxBidChangePct).toBeLessThanOrEqual(1.0);
+      }
+    });
+
+    it("budget kind uses maxBudgetChangePct, not maxBidChangePct", () => {
+      const rej = guardrailRejection("budget", 0.80, 0.50);
+      expect(rej.nextTool.args.maxBudgetChangePct).toBeDefined();
+      expect(rej.nextTool.args.maxBidChangePct).toBeUndefined();
+      expect(rej.error).toMatch(/^Budget change/);
     });
   });
 });

@@ -412,10 +412,28 @@ export function removeNegativeKeywordHint(
 }
 
 /**
+ * The `setGuardrails` MCP tool's Zod schema caps `maxBidChangePct` and
+ * `maxBudgetChangePct` at 1.0 (100%) per call — see
+ * lib/mcp/write-tools/guardrails.ts:20. The rejection hint MUST NOT
+ * suggest a value above this cap, otherwise the agent calls
+ * `setGuardrails`, gets a Zod rejection, and burns retries against a
+ * suggestion the system itself refuses. Past production traces show this
+ * exact loop (user feedback 2026-05).
+ */
+const GUARDRAIL_PCT_MAX = 1.0;
+
+/**
  * Structured guardrail rejection — both the prose error AND a `nextTool` hint
  * the agent can act on without parsing free text. Production traces showed
  * agents retrying the original mutation 5+ times despite a clear "call
  * setGuardrails with X" message, so we surface it as a typed field too.
+ *
+ * Two cases:
+ *  - Requested change ≤ 100% → suggest a one-shot guardrail bump (clipped
+ *    to the schema's 1.0 max).
+ *  - Requested change > 100% → no single call can land it; tell the agent
+ *    to iterate (e.g. 100% + 100% = 4× in two steps) rather than offering
+ *    a suggestion `setGuardrails` will reject.
  */
 export function guardrailRejection(
   kind: "budget" | "bid",
@@ -424,11 +442,34 @@ export function guardrailRejection(
 ): { error: string; nextTool: { name: "setGuardrails"; reason: string; args: Record<string, unknown> } } {
   const requested = Math.ceil(requestedChangePct * 100);
   const current = Math.round(currentMaxPct * 100);
-  // Suggest rounding up to the next 10% above requested, at least +5 over current.
-  const suggested = Math.max(Math.ceil((requested + 5) / 10) * 10, current + 10);
   const argName = kind === "budget" ? "maxBudgetChangePct" : "maxBidChangePct";
   const kindLabel = kind === "budget" ? "Budget" : "Bid";
-  const error = `${kindLabel} change of ${requested}% exceeds maximum allowed ${current}%. To allow larger changes, call setGuardrails with { ${argName}: ${suggested / 100} } (or higher). Use this only if you've confirmed with the user.`;
+  const maxPct = Math.round(GUARDRAIL_PCT_MAX * 100);
+
+  if (requested > maxPct) {
+    // One-shot impossible — even at the schema max the change exceeds the cap.
+    // Suggest iterating in maxPct chunks rather than a setGuardrails call that
+    // would itself be rejected by the schema.
+    const error =
+      `${kindLabel} change of ${requested}% exceeds the per-call maximum guardrail of ${maxPct}% ` +
+      `(schema cap on setGuardrails). One-shot changes >${maxPct}% aren't supported — ` +
+      `iterate in ${maxPct}% steps (e.g. ${maxPct}% × 2 ≈ ${(1 + GUARDRAIL_PCT_MAX) ** 2 | 0}× over two calls). ` +
+      `Raise to ${maxPct}% first with setGuardrails, then call this tool repeatedly.`;
+    return {
+      error,
+      nextTool: {
+        name: "setGuardrails",
+        reason: `${kindLabel} change of ${requested}% can't land in one call (schema cap ${maxPct}%). Raise guardrail to ${maxPct}% and iterate.`,
+        args: { [argName]: GUARDRAIL_PCT_MAX },
+      },
+    };
+  }
+
+  // Suggest rounding up to the next 10% above requested, at least +5 over current,
+  // and clipped to the schema cap so the agent doesn't get bounced.
+  const rawSuggested = Math.max(Math.ceil((requested + 5) / 10) * 10, current + 10);
+  const suggested = Math.min(rawSuggested, maxPct);
+  const error = `${kindLabel} change of ${requested}% exceeds maximum allowed ${current}%. To allow larger changes, call setGuardrails with { ${argName}: ${suggested / 100} } (or higher, up to ${GUARDRAIL_PCT_MAX}). Use this only if you've confirmed with the user.`;
   return {
     error,
     nextTool: {

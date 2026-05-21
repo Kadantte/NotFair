@@ -1,5 +1,6 @@
 import { getCustomer, MATCH_TYPE, MATCH_TYPE_NAME, STATUS } from "./client";
 import { extractErrorMessage, guardrailRejection, isNegativePauseError, normalizeCustomerId, removeNegativeKeywordHint, rewriteNegativePauseError, rewriteRemovedResourceError, safeEntityId } from "./helpers";
+import { normalizeBiddingStrategyName } from "./settings";
 import type { AuthContext, Guardrails, UpdateCampaignBiddingParams, WriteResult } from "./types";
 import { DEFAULT_GUARDRAILS } from "./types";
 import { isDemoAuth } from "@/lib/demo/constants";
@@ -865,6 +866,24 @@ export async function updateCampaignBidding(
     }
   }
 
+  // cpcBidCeilingMicros is meaningful only for TARGET_IMPRESSION_SHARE
+  // (required) and MAXIMIZE_CLICKS (optional, sets target_spend.cpc_bid_ceiling_micros).
+  // Other strategies have no campaign-level CPC ceiling field. Previously the
+  // code silently dropped the value for MAXIMIZE_CLICKS and silently accepted-
+  // then-ignored it for the rest — both confusing.
+  if (
+    params.cpcBidCeilingMicros != null &&
+    params.biddingStrategy !== "TARGET_IMPRESSION_SHARE" &&
+    params.biddingStrategy !== "MAXIMIZE_CLICKS"
+  ) {
+    return fail(
+      `cpcBidCeilingMicros is not valid for ${params.biddingStrategy}. It's required for TARGET_IMPRESSION_SHARE and optional for MAXIMIZE_CLICKS — other strategies (TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, MAXIMIZE_CONVERSION_VALUE, MANUAL_CPC) have no campaign-level CPC ceiling.`,
+    );
+  }
+  if (params.biddingStrategy === "MAXIMIZE_CLICKS" && params.cpcBidCeilingMicros != null && params.cpcBidCeilingMicros < 10_000) {
+    return fail("cpcBidCeilingMicros must be at least $0.01 (10,000 micros)");
+  }
+
   // For non-conversion strategies, auto-clear campaign-specific goals
   // (otherwise Google silently ignores the bidding change). TARGET_IMPRESSION_SHARE
   // is presence-based, not conversion-based, so it needs the same treatment.
@@ -929,8 +948,13 @@ export async function updateCampaignBidding(
     case "MAXIMIZE_CLICKS":
       // An empty {} is skipped by the library's update mask computation (no field mask paths
       // generated for empty objects), so we must set an explicit field value.
-      // 10_000_000_000 micros = $10,000 ceiling — effectively uncapped.
-      resource.target_spend = { cpc_bid_ceiling_micros: 10_000_000_000 };
+      // When the caller doesn't pass cpcBidCeilingMicros, 10_000_000_000 micros = $10,000
+      // ceiling — effectively uncapped. Previously the hardcoded value was written
+      // unconditionally, silently overwriting any user-provided ceiling — agents had no way
+      // to lower an oversized cap without leaving MAXIMIZE_CLICKS entirely.
+      resource.target_spend = {
+        cpc_bid_ceiling_micros: params.cpcBidCeilingMicros ?? 10_000_000_000,
+      };
       break;
     case "MANUAL_CPC":
       resource.manual_cpc = { enhanced_cpc_enabled: false };
@@ -952,6 +976,13 @@ export async function updateCampaignBidding(
       impressionShareLocation: params.impressionShareLocation,
       locationFractionMicros: params.locationFractionMicros,
       cpcBidCeilingMicros: params.cpcBidCeilingMicros,
+    }),
+    ...(params.biddingStrategy === "MAXIMIZE_CLICKS" && {
+      // Report the effective ceiling (user value or the 10B default). This
+      // closes the silent-overwrite trap: if a user passed 1.0 and we wrote
+      // 10_000_000_000, the afterValue used to show only `strategy: "MAXIMIZE_CLICKS"`
+      // and the change-tracking log lost the actual value.
+      cpcBidCeilingMicros: params.cpcBidCeilingMicros ?? 10_000_000_000,
     }),
     ...(goalConfigCleared && { goalConfigCleared: true }),
   });
@@ -1285,6 +1316,261 @@ export async function renameCampaign(
       beforeValue: "",
       afterValue: trimmed,
       error: rewriteRemovedResourceError(extractErrorMessage(error), `Campaign ${campaignId}`),
+    };
+  }
+}
+
+// ─── Ad Group Bid / Settings Update ───────────────────────────────────
+
+export type UpdateAdGroupParams = {
+  /**
+   * New ad-group default max CPC bid, in micros. Only honored for
+   * MANUAL_CPC / ENHANCED_CPC campaigns; for smart-bidding strategies
+   * the field is set but ignored by Google. Subject to the
+   * `maxBidChangePct` guardrail unless the current bid is the
+   * campaign-default placeholder (null or 0), in which case the
+   * first-time-set bypasses the cap so agents can ramp a freshly
+   * created ad group from 0.01€ to a working value.
+   */
+  cpcBidMicros?: number;
+  /**
+   * Override the campaign's target CPA at the ad-group level, in
+   * micros. Only effective on TARGET_CPA / MAXIMIZE_CONVERSIONS
+   * campaigns; surfaces a warning otherwise rather than failing —
+   * Google still accepts the write, it just won't influence bidding.
+   */
+  targetCpaMicros?: number;
+  /** ENABLED or PAUSED. Subsumes the older pauseAdGroup pattern (not yet exposed). */
+  status?: "ENABLED" | "PAUSED";
+  /** Rename. Equivalent to `renameAdGroup` but bundleable with other changes. */
+  name?: string;
+};
+
+/**
+ * Update an ad group's default CPC bid, target CPA, status, and/or name in
+ * one atomic mutate. Companion to `updateBid` (per-keyword override) and
+ * `updateCampaignBudget` (campaign-level money).
+ *
+ * Common use case: freshly-built MANUAL_CPC campaigns where Google created
+ * each ad group with `cpc_bid_micros = 10000` (€0.01). At that bid no
+ * keywords will win auctions, so the campaign launches and produces zero
+ * impressions. Raising the default to a market-realistic value (~€1) is the
+ * standard unblock — but with the 25% guardrail and a current value of
+ * 10_000 micros, the cap would force 200+ tiny steps. We bypass the cap
+ * when the current value is null/0 (first-time set), matching how
+ * `updateCampaignBudget` would behave if budgets started at $0.
+ */
+export async function updateAdGroup(
+  auth: AuthContext,
+  adGroupId: string,
+  params: UpdateAdGroupParams,
+  guardrails: Guardrails = DEFAULT_GUARDRAILS,
+): Promise<WriteResult> {
+  const customer = getCustomer(auth);
+  const cid = normalizeCustomerId(auth.customerId);
+  const agId = safeEntityId(adGroupId, "ad group");
+
+  // Validate name first so an explicit empty/whitespace name reports the
+  // clearer "name cannot be empty" rather than the generic "at least one
+  // field" — the caller obviously meant to set name and we should say so.
+  if (params.name !== undefined && !params.name.trim()) {
+    return {
+      success: false,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: "",
+      error: "Ad group name cannot be empty",
+    };
+  }
+
+  const hasAnyField =
+    params.cpcBidMicros !== undefined ||
+    params.targetCpaMicros !== undefined ||
+    params.status !== undefined ||
+    params.name !== undefined;
+  if (!hasAnyField) {
+    return {
+      success: false,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: "",
+      error: "Provide at least one field to update: cpcBidMicros, targetCpaMicros, status, or name",
+    };
+  }
+  if (params.cpcBidMicros !== undefined && params.cpcBidMicros <= 0) {
+    return {
+      success: false,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: "",
+      error: "cpcBidMicros must be greater than zero",
+    };
+  }
+  if (params.targetCpaMicros !== undefined && params.targetCpaMicros < 100_000) {
+    return {
+      success: false,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: "",
+      error: "Target CPA must be at least $0.10 (100,000 micros)",
+    };
+  }
+
+  // Fetch current state for beforeValue + first-time-set detection.
+  let currentName = "";
+  let currentStatus: string | number | null = null;
+  let currentCpcBidMicros: number | null = null;
+  let currentTargetCpaMicros: number | null = null;
+  let strategy = "UNKNOWN";
+  try {
+    const rows = await customer.query(`
+      SELECT
+        ad_group.name,
+        ad_group.status,
+        ad_group.cpc_bid_micros,
+        ad_group.target_cpa_micros,
+        campaign.bidding_strategy_type
+      FROM ad_group
+      WHERE ad_group.id = ${agId}
+      LIMIT 1
+    `);
+    const row = (rows as any[])[0];
+    if (!row) {
+      return {
+        success: false,
+        action: "update_ad_group",
+        entityId: adGroupId,
+        beforeValue: "",
+        afterValue: "",
+        error: `Ad group ${adGroupId} not found`,
+      };
+    }
+    currentName = row.ad_group?.name ?? "";
+    currentStatus = row.ad_group?.status ?? null;
+    currentCpcBidMicros = row.ad_group?.cpc_bid_micros != null ? Number(row.ad_group.cpc_bid_micros) : null;
+    currentTargetCpaMicros = row.ad_group?.target_cpa_micros != null ? Number(row.ad_group.target_cpa_micros) : null;
+    strategy = normalizeBiddingStrategyName(row.campaign?.bidding_strategy_type);
+  } catch (fetchError) {
+    return {
+      success: false,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue: "",
+      afterValue: "",
+      error: `Could not read current ad group before writing (undo would be unsafe): ${extractErrorMessage(fetchError)}`,
+    };
+  }
+
+  // Normalize current status to its string name once so every result path
+  // (guardrail rejection, success, error) reports the same shape.
+  const currentStatusName = typeof currentStatus === "number"
+    ? (currentStatus === STATUS.ENABLED ? "ENABLED" : currentStatus === STATUS.PAUSED ? "PAUSED" : String(currentStatus))
+    : currentStatus;
+  const beforeValue = JSON.stringify({
+    name: currentName,
+    status: currentStatusName,
+    cpcBidMicros: currentCpcBidMicros,
+    targetCpaMicros: currentTargetCpaMicros,
+  });
+
+  // Guardrail check on cpcBidMicros. Skip ONLY when there's no real
+  // ad-group-level bid yet — `cpc_bid_micros` is either null (inheriting
+  // the campaign default) or 0 (set-but-unset). Any positive existing
+  // value is treated as a real bid, even Google's €0.01 (10,000 micros)
+  // placeholder, because we can't reliably distinguish a placeholder
+  // from an intentional low bid by value alone. Trade-off: an account
+  // that launched with the literal 10K micro default loses the
+  // first-time-set bypass on the first ramp; raise the account-level
+  // guardrail before the bumps and reset it after.
+  if (
+    params.cpcBidMicros !== undefined &&
+    currentCpcBidMicros != null &&
+    currentCpcBidMicros > 0
+  ) {
+    const changePct = Math.abs(params.cpcBidMicros - currentCpcBidMicros) / currentCpcBidMicros;
+    if (changePct > guardrails.maxBidChangePct) {
+      const rejection = guardrailRejection("bid", changePct, guardrails.maxBidChangePct);
+      return {
+        success: false,
+        action: "update_ad_group",
+        entityId: adGroupId,
+        beforeValue,
+        afterValue: JSON.stringify({ cpcBidMicros: params.cpcBidMicros }),
+        error: rejection.error,
+        nextTool: rejection.nextTool,
+      };
+    }
+  }
+
+  // Build the mutate resource. ad_group fields are flat top-level, so
+  // the library emits a flat field mask (verified via Phase 4 probe).
+  const resource: Record<string, unknown> = {
+    resource_name: `customers/${cid}/adGroups/${agId}`,
+  };
+  if (params.cpcBidMicros !== undefined) resource.cpc_bid_micros = params.cpcBidMicros;
+  if (params.targetCpaMicros !== undefined) resource.target_cpa_micros = params.targetCpaMicros;
+  if (params.status !== undefined) resource.status = STATUS[params.status];
+  if (params.name !== undefined) resource.name = params.name.trim();
+  const afterValue = JSON.stringify({
+    name: params.name?.trim() ?? currentName,
+    status: params.status ?? currentStatusName,
+    cpcBidMicros: params.cpcBidMicros ?? currentCpcBidMicros,
+    targetCpaMicros: params.targetCpaMicros ?? currentTargetCpaMicros,
+  });
+
+  // Warn-but-don't-block when targetCpaMicros is set on a non-conversion
+  // strategy. The write succeeds (Google accepts it) but won't influence
+  // bidding — surfacing the warning prevents the silent no-op trap that
+  // burned us on cpcBidCeiling for MAXIMIZE_CLICKS.
+  const warnings: string[] = [];
+  if (
+    params.targetCpaMicros !== undefined &&
+    strategy !== "UNKNOWN" &&
+    strategy !== "TARGET_CPA" &&
+    strategy !== "MAXIMIZE_CONVERSIONS"
+  ) {
+    warnings.push(
+      `targetCpaMicros was set, but campaign uses ${strategy} bidding — the value is stored on the ad group but won't influence bidding until the campaign switches to TARGET_CPA or MAXIMIZE_CONVERSIONS.`,
+    );
+  }
+
+  try {
+    await customer.mutateResources([
+      {
+        entity: "ad_group" as any,
+        operation: "update",
+        resource,
+      },
+    ]);
+
+    // Pre-existing pattern (see updateConversionAction): pack warnings into
+    // the `label` field as "Warning: …" so they reach the operations log
+    // without expanding WriteResult.
+    const labelPieces: string[] = [];
+    const baseLabel = params.name?.trim() ?? currentName;
+    if (baseLabel) labelPieces.push(baseLabel);
+    if (warnings.length > 0) labelPieces.push(`Warning: ${warnings.join(". ")}`);
+
+    return {
+      success: true,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue,
+      afterValue,
+      ...(labelPieces.length > 0 ? { label: labelPieces.join(" — ") } : {}),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      action: "update_ad_group",
+      entityId: adGroupId,
+      beforeValue,
+      afterValue,
+      error: rewriteRemovedResourceError(extractErrorMessage(error), `Ad group ${adGroupId}`),
     };
   }
 }

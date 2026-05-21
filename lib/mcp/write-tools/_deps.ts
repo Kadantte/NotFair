@@ -1,14 +1,17 @@
 import { z } from "zod";
 import {
   authForAccount,
+  DEFAULT_GUARDRAILS,
   type AssetLinkMutationResult,
   type ActiveExperimentImpact,
   type AuthContext,
   type BulkValidationIssue,
   type CreateCampaignParams,
+  type Guardrails,
   type WriteResult,
   checkActiveExperimentImpact,
 } from "@/lib/google-ads";
+import { getGoals } from "@/lib/db/tracking";
 import { execWrite } from "@/lib/tools/execute";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -166,6 +169,21 @@ export const assetLinkTargetSchema = z.discriminatedUnion("level", [
   }),
 ]);
 
+/**
+ * Reused shape doc for every `targets` array parameter on asset-creation /
+ * linking tools. Past production traces show agents passing bare resource
+ * strings like `"customers/123"` and getting the cryptic "targets[0]
+ * expected object, received string" error — surface the discriminated-union
+ * shape in the description so callers see it at schema-introspection time.
+ */
+export const ASSET_LINK_TARGETS_SHAPE_DOC =
+  "Array of targets. Each target is an OBJECT with a `level` discriminator — bare resource strings (e.g. \"customers/123\") are rejected. " +
+  "Shapes: { level: 'customer' } (account-wide), " +
+  "{ level: 'campaign', campaignId: '123' }, " +
+  "{ level: 'ad_group', adGroupId: '456' }, " +
+  "{ level: 'asset_group', assetGroupId: '789' } (Performance Max only). " +
+  "Example: [{ level: 'customer' }, { level: 'campaign', campaignId: '12345' }].";
+
 export const experimentImpactAcknowledgementSchema = {
   acknowledgeExperimentImpact: z
     .boolean()
@@ -272,4 +290,41 @@ export async function execAssetLinkWrite(
     ...first,
     changeIds: [first.changeId, ...extraLogs.map((log) => log.changeId)],
   };
+}
+
+/**
+ * Resolve the effective guardrails for a write operation, reading the
+ * persisted goals row written by `setGuardrails` and falling back to
+ * `DEFAULT_GUARDRAILS` for any unset field. Campaign-specific guardrails
+ * take precedence over account-level when `campaignId` is provided
+ * (`getGoals` already implements that lookup order).
+ *
+ * The lib/google-ads layer accepts a guardrails parameter but treats
+ * `DEFAULT_GUARDRAILS` (0.25 / 0.50 / 0.30) as the silent default — so any
+ * MCP write path that doesn't call this helper effectively ignores the
+ * user's `setGuardrails` configuration. Every bid / budget mutation in
+ * the MCP layer must resolve through here.
+ *
+ * If the goals lookup fails (DB hiccup, missing DATABASE_URL in tests,
+ * etc.) we fall back to `DEFAULT_GUARDRAILS` rather than failing the
+ * write — the user can retry, and the worst case is they get the tighter
+ * default cap instead of their custom one. Blocking a bid update on a
+ * goals-table outage would be worse UX.
+ */
+export async function resolveGuardrails(
+  accountId: string,
+  campaignId?: string,
+): Promise<Guardrails> {
+  try {
+    const goals = await getGoals(accountId, campaignId);
+    return {
+      maxBidChangePct: goals?.maxBidChangePct ?? DEFAULT_GUARDRAILS.maxBidChangePct,
+      maxBudgetChangePct: goals?.maxBudgetChangePct ?? DEFAULT_GUARDRAILS.maxBudgetChangePct,
+      maxKeywordPausePct: goals?.maxKeywordPausePct ?? DEFAULT_GUARDRAILS.maxKeywordPausePct,
+    };
+  } catch (error) {
+    // Surface the failure for ops visibility but don't fail the write.
+    console.warn("[resolveGuardrails] failed to read goals row, falling back to defaults:", error);
+    return { ...DEFAULT_GUARDRAILS };
+  }
 }

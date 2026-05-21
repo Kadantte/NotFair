@@ -66,6 +66,7 @@ import {
   // Ad group management
   createAdGroup,
   renameAdGroup,
+  updateAdGroup,
   // Ad management
   createAd,
   pauseAd,
@@ -1293,6 +1294,32 @@ describe("protobuf validation: ad group management", () => {
       { ad_group: { name: "Old Group" } },
     ]);
     await renameAdGroup(AUTH, "100", "200", "New Group");
+    assertAllCapturedOpsEncode();
+  });
+
+  it("updateAdGroup — cpcBidMicros (first-time set from inherited null)", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        ad_group: { name: "Group", status: 2, cpc_bid_micros: null, target_cpa_micros: null },
+        campaign: { bidding_strategy_type: 3 }, // MANUAL_CPC
+      },
+    ]);
+    await updateAdGroup(AUTH, "200", { cpcBidMicros: 1_000_000 });
+    assertAllCapturedOpsEncode();
+  });
+
+  it("updateAdGroup — combined name + status + targetCpa", async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        ad_group: { name: "Old", status: 2, cpc_bid_micros: 500_000, target_cpa_micros: 5_000_000 },
+        campaign: { bidding_strategy_type: 6 }, // TARGET_CPA
+      },
+    ]);
+    await updateAdGroup(AUTH, "200", {
+      name: "Renamed",
+      status: "PAUSED",
+      targetCpaMicros: 7_500_000,
+    });
     assertAllCapturedOpsEncode();
   });
 });

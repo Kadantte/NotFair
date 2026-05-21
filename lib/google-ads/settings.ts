@@ -619,7 +619,17 @@ async function getCampaignBiddingStrategy(
   return normalizeBiddingStrategyName((rows as CampaignBiddingStrategyRow[])[0]?.campaign?.bidding_strategy_type);
 }
 
-function normalizeBiddingStrategyName(raw: unknown): string {
+/**
+ * Normalize a `campaign.bidding_strategy_type` GAQL value (which the
+ * `google-ads-api` library returns as either a numeric protobuf enum or the
+ * uppercase string name) into a canonical string. Returns `"UNKNOWN"` for
+ * null/undefined and `"UNKNOWN_<n>"` for unrecognized numeric values.
+ *
+ * Shared by `updateCampaignSettings`, `updateAdGroup`, and any other write
+ * path that needs to gate behavior on the campaign's bidding strategy
+ * without re-declaring the type map.
+ */
+export function normalizeBiddingStrategyName(raw: unknown): string {
   if (raw == null) return "UNKNOWN";
   if (typeof raw === "number") return BIDDING_STRATEGY_TYPE_NAME[raw] ?? `UNKNOWN_${raw}`;
   const asNumber = Number(raw);

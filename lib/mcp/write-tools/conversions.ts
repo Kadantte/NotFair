@@ -55,7 +55,7 @@ export function registerConversionWriteTools(deps: WriteToolDeps) {
   ));
 
   server.registerTool("updateConversionAction", {
-    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename. Conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, local_services_* / Local Services Ads actions, and manager-inherited actions are read-only via the API — the update call will be rejected locally before reaching Google. To check before calling: read `conversion_action.type` and `conversion_action.owner_customer` via `runScript` (e.g. `await ads.gaql(ads.queries.conversionActions)`) or write a direct `FROM conversion_action` query. LSA conversion names may appear in segments.conversion_action_name without appearing as mutable FROM conversion_action rows. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
+    description: "Update an existing conversion action's settings — promote secondary to primary, change value, rename, fix currency. Conversion actions imported from GA4/UA/Floodlight/Firebase/Salesforce/Search Ads 360, Smart Campaign auto-actions, Store Visits, app-store actions, local_services_* / Local Services Ads actions, and manager-inherited actions are read-only via the API — the update call will be rejected locally before reaching Google. To check before calling: read `conversion_action.type` and `conversion_action.owner_customer` via `runScript` (e.g. `await ads.gaql(ads.queries.conversionActions)`) or write a direct `FROM conversion_action` query. LSA conversion names may appear in segments.conversion_action_name without appearing as mutable FROM conversion_action rows. To delete a conversion action, use removeConversionAction (status=REMOVED is not accepted by Google for updates). Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       conversionActionId: z.string().describe("Conversion action ID (query conversion_action via runScript)"),
@@ -70,6 +70,12 @@ export function registerConversionWriteTools(deps: WriteToolDeps) {
       countingType: z.enum(["ONE_PER_CLICK", "MANY_PER_CLICK"]).optional(),
       defaultValue: z.number().optional().describe("Default conversion value in account currency"),
       alwaysUseDefaultValue: z.boolean().optional(),
+      currencyCode: z
+        .string()
+        .length(3)
+        .regex(/^[A-Za-z]{3}$/, "Must be a 3-letter ISO 4217 code (e.g. 'USD', 'EUR')")
+        .optional()
+        .describe("ISO 4217 currency code (e.g. 'USD', 'EUR') for this action's conversion values. Use this to migrate legacy 'XXX' (unset) actions to a real currency so reporting can roll up. 'XXX' is rejected on writes."),
       status: z.enum(["ENABLED"]).optional()
         .describe("ENABLED = active. To delete, use removeConversionAction instead — Google rejects status=REMOVED on update."),
       primaryForGoal: z.boolean().optional()
@@ -80,10 +86,10 @@ export function registerConversionWriteTools(deps: WriteToolDeps) {
       clickThroughLookbackWindowDays: z.number().int().min(1).max(90).optional(),
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue, status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) =>
+  }, safeHandler(async ({ accountId, conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue, currencyCode, status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays }) =>
     writeToolCall({ accountId }, (a) =>
       updateConversionAction(a, {
-        conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue,
+        conversionActionId, name, category, countingType, defaultValue, alwaysUseDefaultValue, currencyCode,
         status, primaryForGoal, enhancedConversionsForLeads, viewThroughLookbackWindowDays, clickThroughLookbackWindowDays,
       }),
     ),

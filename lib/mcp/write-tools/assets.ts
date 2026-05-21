@@ -32,6 +32,7 @@ import { resolveToolAuth } from "../helpers";
 import type { WriteToolDeps } from "./_deps";
 import {
   assetLinkTargetSchema,
+  ASSET_LINK_TARGETS_SHAPE_DOC,
   experimentImpactAcknowledgementSchema,
   campaignTargetIds,
   execAssetLinkWrite,
@@ -58,7 +59,9 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
     inputSchema: {
       accountId: accountIdParam,
       text: z.string().min(1).max(25).describe("Callout text (≤25 chars), e.g. 'Free shipping'"),
-      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. Omit or pass [] to create the asset only; pass targets to link it in the same mutate (use { level: 'customer' } for account-wide serving)."),
+      targets: z.array(assetLinkTargetSchema).optional().describe(
+        `Optional serving targets. Omit or pass [] to create the asset only; pass targets to link it in the same mutate. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
@@ -80,7 +83,9 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
       accountId: accountIdParam,
       header: z.string().describe(`Structured snippet header. Must be one of: ${STRUCTURED_SNIPPET_HEADERS.join(", ")}. "Service catalog" is accepted and normalized to "Services".`),
       values: z.array(z.string().min(1).max(25)).min(3).max(10).describe("Snippet values, 3-10 items, each ≤25 chars"),
-      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. Omit or pass [] to create the asset only."),
+      targets: z.array(assetLinkTargetSchema).optional().describe(
+        `Optional serving targets. Omit or pass [] to create the asset only. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
@@ -104,7 +109,9 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
       finalUrl: z.string().url().describe("Destination URL for the sitelink"),
       description1: z.string().max(35).optional().describe("Optional sitelink description line 1 (≤35 chars). If provided, description2 is also required."),
       description2: z.string().max(35).optional().describe("Optional sitelink description line 2 (≤35 chars). If provided, description1 is also required."),
-      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. Omit or pass [] to create the asset only."),
+      targets: z.array(assetLinkTargetSchema).optional().describe(
+        `Optional serving targets. Omit or pass [] to create the asset only. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
@@ -128,7 +135,9 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
       countryCode: z.string().length(2).describe("Two-letter ISO 3166-1 alpha-2 country code, e.g. 'US'"),
       callConversionReportingState: z.enum(["DISABLED", "USE_ACCOUNT_LEVEL_CALL_CONVERSION_ACTION", "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION"]).optional().describe("Call conversion reporting behavior. Omit to use account-level tracking (default)."),
       callConversionAction: z.string().optional().describe("Conversion action resource_name to use when callConversionReportingState is USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION. Format: customers/{customer_id}/conversionActions/{id}."),
-      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets (customer/campaign/ad_group). Omit or pass [] to create the asset only; pass targets to link it in the same mutate."),
+      targets: z.array(assetLinkTargetSchema).optional().describe(
+        `Optional serving targets (customer/campaign/ad_group — call assets don't support asset_group). Omit or pass [] to create the asset only. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
@@ -151,7 +160,9 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
       imageUrl: z.string().url().describe("Public HTTPS URL for the PNG/JPEG image to upload. Max 5 MB."),
       name: z.string().min(1).max(255).describe("Asset name shown in Google Ads, e.g. 'Spring promo landscape'"),
       fieldType: z.enum(IMAGE_FIELD_TYPE_NAMES).describe("Serving slot; pre-validates dimensions and (when `targets` is set) used as the link field_type. AD_IMAGE accepts either 1.91:1 or 1:1 source dimensions."),
-      targets: z.array(assetLinkTargetSchema).optional().describe("Optional serving targets. MARKETING_IMAGE/SQUARE_MARKETING_IMAGE support all 4 levels (customer/campaign/ad_group/asset_group for Performance Max). AD_IMAGE supports campaign/ad_group only. Omit or pass [] to create the asset only."),
+      targets: z.array(assetLinkTargetSchema).optional().describe(
+        `Optional serving targets. MARKETING_IMAGE/SQUARE_MARKETING_IMAGE support all 4 levels (customer/campaign/ad_group/asset_group for Performance Max). AD_IMAGE supports campaign/ad_group only. Omit or pass [] to create the asset only. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
@@ -188,7 +199,9 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
       accountId: accountIdParam,
       assetId: z.string().describe("Asset ID (query `asset` via runScript, or pass the assetId returned from a create*Asset call)"),
       fieldType: z.enum(FIELD_TYPE_NAMES as [string, ...string[]]).describe("Asset field type — what kind of asset this is and which serving slot it goes in."),
-      targets: z.array(assetLinkTargetSchema).min(1).describe("One or more serving targets. Use { level: 'customer' } for account-wide serving."),
+      targets: z.array(assetLinkTargetSchema).min(1).describe(
+        `One or more serving targets. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,

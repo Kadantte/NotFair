@@ -110,7 +110,7 @@ export function registerCampaignWriteTools(deps: WriteToolDeps) {
   // ─── Campaign Bidding Strategy ──────────────────────────────────
 
   server.registerTool("updateCampaignBidding", {
-    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), MAXIMIZE_CONVERSION_VALUE (maximize total conversion value, optionally with a target ROAS — required for PMAX value-based bidding), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS, MANUAL_CPC, TARGET_IMPRESSION_SHARE (presence-based — 'just win' on a given SERP position, ideal for brand campaigns). For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS and MAXIMIZE_CONVERSION_VALUE, targetRoas is required/optional respectively (e.g. 2.0 = 200% ROAS). For TARGET_IMPRESSION_SHARE, impressionShareLocation, locationFraction, and cpcBidCeiling are all required — Google will not accept this strategy without all three. Returns a changeId for undo support.",
+    description: "Update a campaign's bidding strategy. Supports: TARGET_CPA (set a target cost per acquisition), MAXIMIZE_CONVERSIONS (optionally with a target CPA cap), MAXIMIZE_CONVERSION_VALUE (maximize total conversion value, optionally with a target ROAS — required for PMAX value-based bidding), TARGET_ROAS (target return on ad spend), MAXIMIZE_CLICKS (optionally with cpcBidCeiling), MANUAL_CPC, TARGET_IMPRESSION_SHARE (presence-based — 'just win' on a given SERP position, ideal for brand campaigns). For TARGET_CPA, targetCpa is required (in dollars). For MAXIMIZE_CONVERSIONS, targetCpa is optional (acts as a cap). For TARGET_ROAS and MAXIMIZE_CONVERSION_VALUE, targetRoas is required/optional respectively (e.g. 2.0 = 200% ROAS). For TARGET_IMPRESSION_SHARE, impressionShareLocation, locationFraction, and cpcBidCeiling are all required — Google will not accept this strategy without all three. For MAXIMIZE_CLICKS, cpcBidCeiling is optional (defaults to effectively uncapped). Passing cpcBidCeiling with any other strategy is rejected. Returns a changeId for undo support.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -125,7 +125,7 @@ export function registerCampaignWriteTools(deps: WriteToolDeps) {
       locationFraction: z.number().min(0.01).max(1).optional()
         .describe("TARGET_IMPRESSION_SHARE only: the IS target as a fraction from 0.01 to 1.00 (e.g. 0.95 = 95%). Typical brand target is 0.90–0.95."),
       cpcBidCeiling: z.number().positive().optional()
-        .describe("TARGET_IMPRESSION_SHARE only: max CPC bid cap in dollars (e.g. 2.00 = $2.00). Required — without a ceiling Google can bid unbounded to hit the IS target."),
+        .describe("Max CPC bid cap in dollars (e.g. 2.00 = $2.00). REQUIRED for TARGET_IMPRESSION_SHARE — without a ceiling Google can bid unbounded to hit the IS target. OPTIONAL for MAXIMIZE_CLICKS (default: effectively uncapped at $10,000) — use this to lower an oversized cap on Target Spend / Maximize Clicks campaigns. REJECTED for all other strategies; they have no campaign-level CPC ceiling."),
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,

@@ -905,7 +905,7 @@ describe("MCP write tools — smoke", () => {
       "pauseKeyword", "addKeyword", "updateBid",
       "addNegativeKeyword", "removeNegativeKeyword", "updateCampaignBudget",
       "pauseCampaign", "enableCampaign", "removeCampaign",
-      "createAdGroup", "createAd", "pauseAd", "enableAd", "removeAd",
+      "createAdGroup", "updateAdGroup", "createAd", "pauseAd", "enableAd", "removeAd",
       "updateAdFinalUrl", "updateAdAssets",
       "renameCampaign", "renameAdGroup",
       "updateCampaignBidding", "updateCampaignGoals",

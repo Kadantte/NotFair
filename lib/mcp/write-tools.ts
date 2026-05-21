@@ -357,6 +357,13 @@ export async function executeUndoForChange(
         // only valid status mutation value, so coerce anything else to undefined
         // and the caller's status field stays unchanged.
         const prevStatus = typeof prev.status === "string" && prev.status === "ENABLED" ? "ENABLED" : undefined;
+        // Restore currency too. Skip the legacy 'XXX' placeholder on undo —
+        // updateConversionAction rejects it, and the alternative is leaving
+        // the currency at whatever the user just changed it to (which is the
+        // less-surprising failure mode than crashing the undo).
+        const prevCurrency = typeof prev.currencyCode === "string" && prev.currencyCode.toUpperCase() !== "XXX"
+          ? prev.currencyCode
+          : undefined;
         return updateConversionAction(auth, {
           conversionActionId: entityId,
           name: prev.name as string | undefined,
@@ -365,6 +372,7 @@ export async function executeUndoForChange(
           countingType: prev.countingType as string | undefined,
           defaultValue: prev.defaultValue as number | undefined,
           alwaysUseDefaultValue: prev.alwaysUseDefaultValue as boolean | undefined,
+          currencyCode: prevCurrency,
         });
       } catch {
         return { success: false, action: change.toolName, entityId, beforeValue, afterValue: beforeValue, error: "Cannot undo: failed to parse previous conversion action state" };

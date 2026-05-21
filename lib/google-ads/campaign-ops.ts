@@ -781,6 +781,14 @@ export type UpdateConversionActionParams = {
   countingType?: string;
   defaultValue?: number;
   alwaysUseDefaultValue?: boolean;
+  /**
+   * ISO 4217 currency code (e.g. "USD", "EUR"). Maps to the proto field
+   * `conversion_action.value_settings.default_currency_code` (NOT
+   * `currency_code` — that's a hallucinated path; see
+   * docs/ads-api-landmines.md). Reject the legacy "XXX" placeholder so we
+   * don't perpetuate unset currency on new writes.
+   */
+  currencyCode?: string;
   status?: string;
   primaryForGoal?: boolean;
   enhancedConversionsForLeads?: boolean;
@@ -804,6 +812,11 @@ export async function updateConversionAction(
   let beforeValue: string;
   let rawType: unknown;
   let ownerCustomer: unknown;
+  let existingValueSettings: {
+    defaultValue?: number;
+    alwaysUseDefaultValue?: boolean;
+    defaultCurrencyCode?: string;
+  } = {};
   try {
     const current = await customer.query(`
       SELECT
@@ -814,7 +827,8 @@ export async function updateConversionAction(
         conversion_action.type,
         conversion_action.owner_customer,
         conversion_action.value_settings.default_value,
-        conversion_action.value_settings.always_use_default_value
+        conversion_action.value_settings.always_use_default_value,
+        conversion_action.value_settings.default_currency_code
       FROM conversion_action
       WHERE conversion_action.id = ${safeEntityId(params.conversionActionId, "conversion action")}
       LIMIT 1
@@ -828,6 +842,11 @@ export async function updateConversionAction(
     const rawCounting = row.counting_type;
     rawType = row.type;
     ownerCustomer = row.owner_customer;
+    existingValueSettings = {
+      ...(row.value_settings?.default_value != null ? { defaultValue: Number(row.value_settings.default_value) } : {}),
+      ...(row.value_settings?.always_use_default_value != null ? { alwaysUseDefaultValue: Boolean(row.value_settings.always_use_default_value) } : {}),
+      ...(row.value_settings?.default_currency_code ? { defaultCurrencyCode: String(row.value_settings.default_currency_code) } : {}),
+    };
     beforeValue = JSON.stringify({
       name: row.name,
       status: typeof rawStatus === "number" ? STATUS_REVERSE[rawStatus] : rawStatus,
@@ -835,6 +854,7 @@ export async function updateConversionAction(
       countingType: typeof rawCounting === "number" ? COUNTING_REVERSE[rawCounting] : rawCounting,
       defaultValue: row.value_settings?.default_value,
       alwaysUseDefaultValue: row.value_settings?.always_use_default_value,
+      currencyCode: row.value_settings?.default_currency_code,
     });
   } catch (fetchError) {
     return {
@@ -896,11 +916,65 @@ export async function updateConversionAction(
     resource.status = CONVERSION_STATUS_MAP[params.status] ?? CONVERSION_STATUS_MAP.ENABLED;
     hasFieldChanges = true;
   }
-  if (params.defaultValue !== undefined || params.alwaysUseDefaultValue !== undefined) {
-    resource.value_settings = {
-      ...(params.defaultValue !== undefined && { default_value: params.defaultValue }),
-      ...(params.alwaysUseDefaultValue !== undefined && { always_use_default_value: params.alwaysUseDefaultValue }),
-    };
+  // value_settings sub-message. The google-ads-api library emits NESTED
+  // field-mask paths for scalar sub-fields (verified empirically via
+  // node_modules/google-ads-api/build/src/utils.js:76 — see
+  // docs/ads-api-landmines.md), so sending only the changed sub-field is
+  // safe. We still round-trip the unchanged scalars from existing state as
+  // a belt-and-suspenders measure mirroring updateAdAssets's path1/path2
+  // preservation — the cost is one map entry per field and the read
+  // already runs for beforeValue.
+  if (
+    params.defaultValue !== undefined ||
+    params.alwaysUseDefaultValue !== undefined ||
+    params.currencyCode !== undefined
+  ) {
+    if (params.currencyCode !== undefined) {
+      const code = params.currencyCode.trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(code)) {
+        return {
+          success: false,
+          action: "update_conversion_action",
+          entityId: params.conversionActionId,
+          beforeValue,
+          afterValue: "",
+          error: `currencyCode must be a 3-letter ISO 4217 code (e.g. 'USD', 'EUR'). Got: ${JSON.stringify(params.currencyCode)}`,
+        };
+      }
+      if (code === "XXX") {
+        return {
+          success: false,
+          action: "update_conversion_action",
+          entityId: params.conversionActionId,
+          beforeValue,
+          afterValue: "",
+          error:
+            "currencyCode='XXX' is the legacy unset placeholder Google itself accepts for back-compat but should not be perpetuated on new writes. Provide a real ISO 4217 code (e.g. 'EUR', 'USD').",
+        };
+      }
+      params.currencyCode = code;
+    }
+
+    const valueSettings: Record<string, unknown> = {};
+    // Round-trip unchanged scalars from existing state. Skip when the
+    // caller is explicitly providing the field, so a deliberate change
+    // wins over the snapshot.
+    if (params.defaultValue !== undefined) {
+      valueSettings.default_value = params.defaultValue;
+    } else if (existingValueSettings.defaultValue !== undefined) {
+      valueSettings.default_value = existingValueSettings.defaultValue;
+    }
+    if (params.alwaysUseDefaultValue !== undefined) {
+      valueSettings.always_use_default_value = params.alwaysUseDefaultValue;
+    } else if (existingValueSettings.alwaysUseDefaultValue !== undefined) {
+      valueSettings.always_use_default_value = existingValueSettings.alwaysUseDefaultValue;
+    }
+    if (params.currencyCode !== undefined) {
+      valueSettings.default_currency_code = params.currencyCode;
+    } else if (existingValueSettings.defaultCurrencyCode !== undefined) {
+      valueSettings.default_currency_code = existingValueSettings.defaultCurrencyCode;
+    }
+    resource.value_settings = valueSettings;
     hasFieldChanges = true;
   }
   if (params.viewThroughLookbackWindowDays !== undefined) {
@@ -919,6 +993,7 @@ export async function updateConversionAction(
     countingType: params.countingType,
     defaultValue: params.defaultValue,
     alwaysUseDefaultValue: params.alwaysUseDefaultValue,
+    currencyCode: params.currencyCode,
   });
 
   try {

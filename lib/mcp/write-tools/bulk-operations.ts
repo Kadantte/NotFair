@@ -16,6 +16,7 @@ import {
   preflightActiveExperimentMutation,
   buildBulkValidationResponse,
   buildBulkSkipped,
+  resolveGuardrails,
   summarizeBulkValidationIssues,
 } from "./_deps";
 
@@ -25,7 +26,7 @@ export function registerBulkOperationTools(deps: WriteToolDeps) {
   // ─── Bulk Operations ────────────────────────────────────────────
 
   server.registerTool("bulkUpdateBids", {
-    description: "Update up to 50 keyword bids in one call. Atomic by default: the server pre-validates every item and executes nothing if any item fails static checks. Set continueOnError=true to skip invalid items and update the valid subset. Set dryRun=true to validate only. Each bid capped at 25% change. Returns per-keyword results with individual changeIds when executed.",
+    description: "Update up to 50 keyword bids in one call. Atomic by default: the server pre-validates every item and executes nothing if any item fails static checks. Set continueOnError=true to skip invalid items and update the valid subset. Set dryRun=true to validate only. Each bid change is capped by the per-account `maxBidChangePct` guardrail (default 25%); raise it with `setGuardrails` (max 100% per call) and confirm with the user before stepping bigger — for multi-step ramps, iterate (e.g. 100% → 100% to go 4× in two calls). Returns per-keyword results with individual changeIds when executed.",
     inputSchema: {
       accountId: accountIdParam,
       updates: z
@@ -55,7 +56,11 @@ export function registerBulkOperationTools(deps: WriteToolDeps) {
     const targetId = resolveAccountId(auth, accountId);
     const t0 = performance.now();
     const targetAuth = authForAccount(auth, accountId);
-    const validation = await preValidateBulkMutation(targetAuth, "update_bid", updates);
+    // bulkUpdateBids spans multiple campaigns, so resolve account-level
+    // guardrails. Per-campaign overrides would need per-row resolution;
+    // defer that until someone hits the gap.
+    const guardrails = await resolveGuardrails(targetId);
+    const validation = await preValidateBulkMutation(targetAuth, "update_bid", updates, guardrails);
     const validUpdates = validation.valid.map((item) => item.input);
 
     if (dryRun) {
@@ -68,7 +73,7 @@ export function registerBulkOperationTools(deps: WriteToolDeps) {
     const block = await preflightActiveExperimentMutation(auth, accountId, validUpdates.map((update) => update.campaignId), acknowledgeExperimentImpact);
     if (block) return typedResult(block);
 
-    const results = validUpdates.length > 0 ? await bulkUpdateBids(targetAuth, validUpdates) : [];
+    const results = validUpdates.length > 0 ? await bulkUpdateBids(targetAuth, validUpdates, guardrails) : [];
     const overrideLatencyMs = Math.round(performance.now() - t0);
 
     const logged = await Promise.all(

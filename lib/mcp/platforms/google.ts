@@ -100,6 +100,13 @@ Tool-selection heuristic — pick ONE path per user question:
        \`targets\` array to link in the same atomic mutate. Image assets
        support all 4 levels (including \`asset_group\` for Performance Max);
        callout/sitelink/structured-snippet support customer/campaign/ad_group.
+     - \`targets\` is an array of OBJECTS keyed by \`level\`, never bare
+       resource strings. Shapes: \`{ level: 'customer' }\` (account-wide),
+       \`{ level: 'campaign', campaignId: '123' }\`,
+       \`{ level: 'ad_group', adGroupId: '456' }\`, or
+       \`{ level: 'asset_group', assetGroupId: '789' }\` (PMax only).
+       Passing \`"customers/4115216415"\` (or any string) is rejected with
+       "targets[0] expected object, received string".
      - \`linkAsset(assetId, fieldType, targets[])\` — attach an existing asset
        to one or more serving targets. Field types: \`CALLOUT\`,
        \`STRUCTURED_SNIPPET\`, \`SITELINK\`, \`MARKETING_IMAGE\` (1.91:1),

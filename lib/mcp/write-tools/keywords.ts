@@ -6,14 +6,15 @@ import {
   updateBid,
   addNegativeKeyword,
   removeNegativeKeyword,
+  resolveAccountId,
   toMicros,
 } from "@/lib/google-ads";
 import { accountIdParam, safeHandler, WRITE_ANNOTATIONS } from "../types";
 import type { WriteToolDeps } from "./_deps";
-import { experimentImpactAcknowledgementSchema } from "./_deps";
+import { experimentImpactAcknowledgementSchema, resolveGuardrails } from "./_deps";
 
 export function registerKeywordWriteTools(deps: WriteToolDeps) {
-  const { server, writeToolCall } = deps;
+  const { server, currentAuth, writeToolCall } = deps;
 
   // ─── Keyword Management ─────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export function registerKeywordWriteTools(deps: WriteToolDeps) {
   // ─── Bid Management ─────────────────────────────────────────────
 
   server.registerTool("updateBid", {
-    description: "Update a keyword's CPC bid. Only works with MANUAL_CPC or ENHANCED_CPC bidding. Capped at 25% change per adjustment. Returns changeId.",
+    description: "Update a keyword's CPC bid. Only works with MANUAL_CPC or ENHANCED_CPC bidding. Each call is capped by the per-account/per-campaign `maxBidChangePct` guardrail (default 25%); raise it with `setGuardrails` (max 100% per call) and confirm with the user before stepping bigger. Returns changeId.",
     inputSchema: {
       accountId: accountIdParam,
       campaignId: z.string(),
@@ -71,11 +72,14 @@ export function registerKeywordWriteTools(deps: WriteToolDeps) {
       ...experimentImpactAcknowledgementSchema,
     },
     annotations: WRITE_ANNOTATIONS,
-  }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) =>
-    writeToolCall({ accountId, campaignId }, (a) =>
-      updateBid(a, campaignId, adGroupId, criterionId, toMicros(newBidDollars)),
-    ),
-  ));
+  }, safeHandler(async ({ accountId, campaignId, adGroupId, criterionId, newBidDollars }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const guardrails = await resolveGuardrails(targetId, campaignId);
+    return writeToolCall({ accountId, campaignId }, (a) =>
+      updateBid(a, campaignId, adGroupId, criterionId, toMicros(newBidDollars), guardrails),
+    );
+  }));
 
   // ─── Negative Keywords ──────────────────────────────────────────
 

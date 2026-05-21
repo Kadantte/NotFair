@@ -54,6 +54,7 @@ import {
   pauseCampaign,
   enableCampaign,
   addNegativeKeyword,
+  updateAdGroup,
   updateCampaignSettings,
   updateCampaignBidding,
   type AuthContext,
@@ -485,10 +486,11 @@ describe("updateCampaignBidding", () => {
     expect(op.resource.target_roas).toEqual({ target_roas: 2.5 });
   });
 
-  it("MAXIMIZE_CLICKS sets target_spend with an effectively-uncapped ceiling", async () => {
+  it("MAXIMIZE_CLICKS without cpcBidCeiling defaults to effectively-uncapped ceiling", async () => {
     // cpc_bid_ceiling_micros = 10_000_000_000 ($10,000) = effectively uncapped.
-    // We must set an explicit field so the update_mask is non-empty; see
-    // lib/google-ads/writes.ts for the full rationale (commit 1e88de0).
+    // We must set an explicit field so the update_mask is non-empty — an empty
+    // sub-message generates no mask paths and Google silently ignores the
+    // strategy switch. See the MAXIMIZE_CLICKS branch in lib/google-ads/writes.ts.
     mockCurrentBidding();
     const result = await updateCampaignBidding(AUTH, "100", {
       biddingStrategy: "MAXIMIZE_CLICKS",
@@ -496,6 +498,59 @@ describe("updateCampaignBidding", () => {
     expect(result.success).toBe(true);
     const op = mockMutateResources.mock.calls[0][0][0];
     expect(op.resource.target_spend).toEqual({ cpc_bid_ceiling_micros: 10_000_000_000 });
+    // Critical: the effective ceiling MUST be visible in afterValue so the
+    // change-tracking log shows what actually landed in Google Ads.
+    const after = JSON.parse(result.afterValue!);
+    expect(after.cpcBidCeilingMicros).toBe(10_000_000_000);
+  });
+
+  it("MAXIMIZE_CLICKS with cpcBidCeiling honors the user value", async () => {
+    // Regression for the silent-overwrite bug: previously the code hardcoded
+    // 10_000_000_000 micros and silently dropped the caller's value, leaving
+    // an oversized TRY 10,000 cap impossible to lower without leaving the
+    // strategy. afterValue must reflect the user's value.
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+      cpcBidCeilingMicros: 2_000_000, // $2.00
+    });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.target_spend).toEqual({ cpc_bid_ceiling_micros: 2_000_000 });
+    const after = JSON.parse(result.afterValue!);
+    expect(after.cpcBidCeilingMicros).toBe(2_000_000);
+  });
+
+  it("rejects cpcBidCeiling paired with MANUAL_CPC (no campaign-level ceiling)", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MANUAL_CPC",
+      cpcBidCeilingMicros: 2_000_000,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not valid for MANUAL_CPC");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("rejects cpcBidCeiling paired with TARGET_CPA", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "TARGET_CPA",
+      targetCpaMicros: 5_000_000,
+      cpcBidCeilingMicros: 2_000_000,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not valid for TARGET_CPA");
+  });
+
+  it("rejects cpcBidCeiling below 10k micros for MAXIMIZE_CLICKS", async () => {
+    mockCurrentBidding();
+    const result = await updateCampaignBidding(AUTH, "100", {
+      biddingStrategy: "MAXIMIZE_CLICKS",
+      cpcBidCeilingMicros: 5_000,
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("at least $0.01");
   });
 
   it("MANUAL_CPC sets manual_cpc field", async () => {
@@ -627,5 +682,159 @@ describe("updateCampaignBidding", () => {
       expect(before.locationFractionMicros).toBe(900_000);
       expect(before.cpcBidCeilingMicros).toBe(1_500_000);
     });
+  });
+});
+
+describe("updateAdGroup", () => {
+  beforeEach(() => {
+    mockMutateResources.mockClear();
+    mockQuery.mockClear();
+    mockMutateResources.mockResolvedValue({ mutate_operation_responses: [] });
+  });
+
+  function mockCurrentAdGroup(opts: {
+    cpcBidMicros?: number | null;
+    targetCpaMicros?: number | null;
+    name?: string;
+    status?: number;
+    strategy?: number | string;
+  } = {}) {
+    mockQuery.mockResolvedValueOnce([
+      {
+        ad_group: {
+          name: opts.name ?? "Test Group",
+          status: opts.status ?? 2,
+          cpc_bid_micros: opts.cpcBidMicros ?? null,
+          target_cpa_micros: opts.targetCpaMicros ?? null,
+        },
+        campaign: { bidding_strategy_type: opts.strategy ?? 3 }, // MANUAL_CPC
+      },
+    ]);
+  }
+
+  it("requires at least one field", async () => {
+    const result = await updateAdGroup(AUTH, "200", {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("at least one field");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("returns not-found when ad group doesn't exist", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    const result = await updateAdGroup(AUTH, "999", { cpcBidMicros: 1_000_000 });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not found");
+  });
+
+  it("bypasses guardrail when current cpc is null (truly inherited from campaign default)", async () => {
+    // The narrowest, safest bypass: only when there's no ad-group bid at all.
+    // Any positive value — even Google's literal €0.01 default — could be a
+    // real low bid the user set, so we don't second-guess it. To ramp from
+    // €0.01 default, raise the guardrail first.
+    mockCurrentAdGroup({ cpcBidMicros: null });
+    const result = await updateAdGroup(AUTH, "200", { cpcBidMicros: 1_000_000 });
+    expect(result.success).toBe(true);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.cpc_bid_micros).toBe(1_000_000);
+  });
+
+  it("guardrail applies to a tiny positive bid (no auto-bypass below threshold)", async () => {
+    // Even at 10_000 micros (Google's MANUAL_CPC placeholder), the guardrail
+    // fires. Agents ramping freshly-launched ad groups must raise the cap
+    // explicitly with setGuardrails first. This is intentional — we can't
+    // distinguish a placeholder from a real low bid by value alone.
+    mockCurrentAdGroup({ cpcBidMicros: 10_000 });
+    const result = await updateAdGroup(AUTH, "200", { cpcBidMicros: 1_000_000 });
+    expect(result.success).toBe(false);
+    // 9900% change → ">100% iterate" branch of guardrailRejection
+    expect(result.error).toMatch(/per-call maximum guardrail|exceeds maximum allowed/);
+    expect(result.nextTool?.name).toBe("setGuardrails");
+  });
+
+  it("guardrail applies once a real bid is in place", async () => {
+    mockCurrentAdGroup({ cpcBidMicros: 1_000_000 });
+    // 30% change exceeds default 25% guardrail (sub-100% branch)
+    const result = await updateAdGroup(AUTH, "200", { cpcBidMicros: 1_300_000 });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("exceeds maximum allowed");
+    expect(result.nextTool?.name).toBe("setGuardrails");
+  });
+
+  it("guardrail respects passed value", async () => {
+    mockCurrentAdGroup({ cpcBidMicros: 1_000_000 });
+    const result = await updateAdGroup(AUTH, "200", { cpcBidMicros: 1_500_000 }, {
+      maxBidChangePct: 1.0,
+      maxBudgetChangePct: 1.0,
+      maxKeywordPausePct: 1.0,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("warns when targetCpa set on non-conversion strategy", async () => {
+    mockCurrentAdGroup({ strategy: 3 }); // MANUAL_CPC
+    const result = await updateAdGroup(AUTH, "200", { targetCpaMicros: 5_000_000 });
+    expect(result.success).toBe(true);
+    expect(result.label).toContain("Warning");
+    expect(result.label).toContain("MANUAL_CPC");
+  });
+
+  it("does not warn when targetCpa set on TARGET_CPA campaign", async () => {
+    mockCurrentAdGroup({ strategy: 6 }); // TARGET_CPA
+    const result = await updateAdGroup(AUTH, "200", { targetCpaMicros: 5_000_000 });
+    expect(result.success).toBe(true);
+    expect(result.label ?? "").not.toContain("Warning");
+  });
+
+  it("rejects targetCpa below $0.10", async () => {
+    const result = await updateAdGroup(AUTH, "200", { targetCpaMicros: 50_000 });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("at least $0.10");
+  });
+
+  it("rejects zero cpcBid", async () => {
+    const result = await updateAdGroup(AUTH, "200", { cpcBidMicros: 0 });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("greater than zero");
+  });
+
+  it("rejects empty name", async () => {
+    const result = await updateAdGroup(AUTH, "200", { name: "   " });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("name cannot be empty");
+  });
+
+  it("combines fields in a single mutate", async () => {
+    // Inherited (null) cpc → first-time set bypasses guardrail so the
+    // combined-fields path can be exercised in one call.
+    mockCurrentAdGroup({ cpcBidMicros: null, strategy: 6 });
+    const result = await updateAdGroup(AUTH, "200", {
+      cpcBidMicros: 1_000_000,
+      targetCpaMicros: 5_000_000,
+      status: "PAUSED",
+      name: "Renamed",
+    });
+    expect(result.success).toBe(true);
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.entity).toBe("ad_group");
+    expect(op.operation).toBe("update");
+    expect(op.resource.cpc_bid_micros).toBe(1_000_000);
+    expect(op.resource.target_cpa_micros).toBe(5_000_000);
+    expect(op.resource.status).toBe(3); // PAUSED
+    expect(op.resource.name).toBe("Renamed");
+  });
+
+  it("trims name before sending", async () => {
+    mockCurrentAdGroup();
+    await updateAdGroup(AUTH, "200", { name: "  Spaced  " });
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.name).toBe("Spaced");
+  });
+
+  it("includes resource_name in the resource (required for update)", async () => {
+    mockCurrentAdGroup();
+    await updateAdGroup(AUTH, "200", { cpcBidMicros: 1_000_000 });
+    const op = mockMutateResources.mock.calls[0][0][0];
+    expect(op.resource.resource_name).toBe("customers/1234567890/adGroups/200");
   });
 });
