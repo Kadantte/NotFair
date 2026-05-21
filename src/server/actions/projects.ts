@@ -343,6 +343,23 @@ export async function renameProjectFullAction(
     };
   }
 
+  // 2.5) Move the canonical PROJECT.md directory from old slug → new slug
+  //      so the brief survives the rename. The per-agent sidecar copies
+  //      get rewritten on the next ensureProjectAgents pass (or
+  //      writeIdentityFile call); the canonical file is the source of
+  //      truth they read from, so moving this is what matters.
+  try {
+    const { renameProjectBriefDir } = await import(
+      "@/server/onboarding/project-brief"
+    );
+    await renameProjectBriefDir(current.slug, newSlug);
+  } catch (err) {
+    console.warn(
+      `[rename-project] failed to move PROJECT.md dir from ${current.slug} to ${newSlug}:`,
+      err,
+    );
+  }
+
   // 3) Repoint the active-project cookie if it was this one.
   const c = await cookies();
   if (c.get("notfair_active_project")?.value === current.slug) {
@@ -462,10 +479,29 @@ export async function deleteProjectAction(
   //    the same slug starts fresh (and we don't leak the old Promise).
   clearProvisioning(slug);
 
-  // 5) Local DB rows.
+  // 5) Canonical PROJECT.md directory at ~/.notfair-cmo/projects/<slug>/.
+  //    The per-agent sidecar copies inside each workspace were already wiped
+  //    by cascadeDeleteAgent's `rm -rf` on the workspace dir; this is the
+  //    last surface that holds the project brief on disk. Without this,
+  //    recreating a project with the same slug later would silently inherit
+  //    the prior tenant's PROJECT.md (writeIdentityFile inlines it if it
+  //    exists). Best-effort — a missing dir is a no-op.
+  try {
+    const { deleteProjectBriefDir } = await import(
+      "@/server/onboarding/project-brief"
+    );
+    await deleteProjectBriefDir(slug);
+  } catch (err) {
+    console.warn(
+      `[delete-project] failed to remove PROJECT.md dir for ${slug}:`,
+      err,
+    );
+  }
+
+  // 6) Local DB rows.
   deleteProjectRow(slug);
 
-  // 6) Clear active-project cookie if it pointed at this one.
+  // 7) Clear active-project cookie if it pointed at this one.
   const c = await cookies();
   if (c.get("notfair_active_project")?.value === slug) {
     await clearActiveProject();

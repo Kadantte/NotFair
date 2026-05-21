@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -26,8 +26,12 @@ function dataDir(): string {
   return process.env.NOTFAIR_CMO_DATA_DIR ?? join(homedir(), ".notfair-cmo");
 }
 
+export function projectBriefDir(project_slug: string): string {
+  return join(dataDir(), "projects", project_slug);
+}
+
 export function projectBriefPath(project_slug: string): string {
-  return join(dataDir(), "projects", project_slug, "PROJECT.md");
+  return join(projectBriefDir(project_slug), "PROJECT.md");
 }
 
 /**
@@ -58,4 +62,43 @@ export async function writeProjectBrief(
   const path = projectBriefPath(project_slug);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, body, "utf8");
+}
+
+/**
+ * Remove the canonical PROJECT.md directory for a project — called from
+ * the project-delete cascade so we don't orphan briefs on disk. Without
+ * this, recreating a project with the same slug would inherit the prior
+ * tenant's brief (writeIdentityFile reads PROJECT.md if it exists).
+ *
+ * Best-effort: missing dir is a no-op, other fs errors propagate so the
+ * caller can decide whether to surface them.
+ */
+export async function deleteProjectBriefDir(
+  project_slug: string,
+): Promise<void> {
+  await rm(projectBriefDir(project_slug), { recursive: true, force: true });
+}
+
+/**
+ * Move the canonical PROJECT.md directory when a project's slug changes.
+ * Called by the rename cascade in changeProjectSlug. No-op when the
+ * source dir doesn't exist (project never had a brief written). Throws
+ * if the destination already exists — that would be a slug-collision
+ * higher up the call chain that we should not silently paper over.
+ */
+export async function renameProjectBriefDir(
+  old_slug: string,
+  new_slug: string,
+): Promise<void> {
+  if (old_slug === new_slug) return;
+  const from = projectBriefDir(old_slug);
+  try {
+    await stat(from);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw err;
+  }
+  const to = projectBriefDir(new_slug);
+  await mkdir(dirname(to), { recursive: true });
+  await rename(from, to);
 }
