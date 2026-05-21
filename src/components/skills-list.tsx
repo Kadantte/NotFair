@@ -9,27 +9,17 @@ import { toast } from "sonner";
 import type { SkillEntry } from "@/server/openclaw/gateway-rpc";
 import { setSkillEnabledAction } from "@/server/actions/skills";
 
-type FilterKey = "all" | "enabled" | "disabled" | "visible";
+type FilterKey = "all" | "enabled" | "disabled";
 
 const FILTER_LABELS: Record<FilterKey, string> = {
   all: "All",
   enabled: "Enabled",
   disabled: "Disabled",
-  visible: "Visible to model",
 };
-
 
 type Props = {
   skills: SkillEntry[];
   agentSlug: string;
-  /**
-   * Per-agent skill allowlist sourced from openclaw.json (not the gateway
-   * RPC, whose `agentSkillFilter` collapses "empty allowlist" and "no
-   * allowlist" to the same response). `undefined` = no allowlist applied
-   * (allow all enabled). `[]` = empty allowlist (block all). `[...]` =
-   * allow only listed.
-   */
-  agentAllowlist?: string[];
 };
 
 /**
@@ -40,37 +30,24 @@ type Props = {
  * `eligible`. So our toggle binds to `!disabled`, and we surface ineligibility
  * with a side badge instead of locking the switch.
  */
-export function SkillsList({ skills, agentSlug, agentAllowlist }: Props) {
+export function SkillsList({ skills, agentSlug }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
-
-  // Decide per skill whether the allowlist blocks it. The truth source is
-  // openclaw.json — we don't trust the RPC's `blockedByAgentFilter` here
-  // because it doesn't differentiate "empty allowlist" from "no allowlist."
-  const isBlockedByAllowlist = useMemo(() => {
-    if (agentAllowlist === undefined) return () => false; // no per-agent filter
-    const set = new Set(agentAllowlist);
-    return (s: SkillEntry) => !set.has(s.skillKey);
-  }, [agentAllowlist]);
 
   const counts = useMemo(() => {
     let enabled = 0;
     let disabled = 0;
-    let visible = 0;
     for (const s of skills) {
       if (s.disabled) disabled++;
       else enabled++;
-      if (!s.disabled && !isBlockedByAllowlist(s)) visible++;
     }
-    return { all: skills.length, enabled, disabled, visible };
-  }, [skills, isBlockedByAllowlist]);
+    return { all: skills.length, enabled, disabled };
+  }, [skills]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return skills;
     if (filter === "enabled") return skills.filter((s) => !s.disabled);
-    if (filter === "visible")
-      return skills.filter((s) => !s.disabled && !isBlockedByAllowlist(s));
     return skills.filter((s) => s.disabled);
-  }, [skills, filter, isBlockedByAllowlist]);
+  }, [skills, filter]);
 
   return (
     <div className="space-y-4">
@@ -111,12 +88,7 @@ export function SkillsList({ skills, agentSlug, agentAllowlist }: Props) {
       ) : (
         <ul className="divide-y rounded-lg border bg-card">
           {filtered.map((s) => (
-            <SkillRow
-              key={s.skillKey}
-              skill={s}
-              agentSlug={agentSlug}
-              blockedByAllowlist={isBlockedByAllowlist(s)}
-            />
+            <SkillRow key={s.skillKey} skill={s} agentSlug={agentSlug} />
           ))}
         </ul>
       )}
@@ -124,15 +96,7 @@ export function SkillsList({ skills, agentSlug, agentAllowlist }: Props) {
   );
 }
 
-function SkillRow({
-  skill,
-  agentSlug,
-  blockedByAllowlist,
-}: {
-  skill: SkillEntry;
-  agentSlug: string;
-  blockedByAllowlist: boolean;
-}) {
+function SkillRow({ skill, agentSlug }: { skill: SkillEntry; agentSlug: string }) {
   const [pending, startTransition] = useTransition();
   // Optimistic flag so the row reflects the toggle instantly while the server
   // round-trip + revalidation finishes.
@@ -177,20 +141,11 @@ function SkillRow({
               always-on
             </Badge>
           )}
-          {isEnabled && blockedByAllowlist && (
-            <Badge
-              variant="outline"
-              className="h-4 px-1 text-[9px] uppercase tracking-wide text-muted-foreground"
-              title="Workspace-enabled, but this agent's allowlist excludes it — the model does not see this skill."
-            >
-              excluded for this agent
-            </Badge>
-          )}
-          {isEnabled && !blockedByAllowlist && !skill.eligible && (
+          {isEnabled && !skill.eligible && (
             <Badge
               variant="outline"
               className="h-4 px-1 text-[9px] uppercase tracking-wide text-amber-600 dark:text-amber-400"
-              title="Enabled in config, but a requirement is missing (binary, allowlist)."
+              title="Enabled in config, but a requirement is missing (binary, allowlist, agent filter)."
             >
               needs setup
             </Badge>
