@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { RateLimitError } from "@/lib/mcp/rate-limit";
 import { typedResult, errorResult } from "./types";
 
 describe("typedResult", () => {
@@ -80,5 +81,43 @@ describe("errorResult", () => {
     expect(parsed.error.message).toContain("reconnect their Google Ads account");
     expect(parsed.error.reconnectUrl).toBe("https://www.notfair.co/connect/google-ads");
     expect(parsed.error.retryable).toBe(false);
+  });
+
+  it("maps quota exhaustion to an agent-facing upgrade instruction", () => {
+    const result = errorResult(new RateLimitError(300, 300, new Date("2026-06-14T00:00:00.000Z")));
+    expect(result.isError).toBe(true);
+    const text = result.content[0].type === "text" ? result.content[0].text : "";
+    const parsed = JSON.parse(text) as {
+      error: {
+        code: string;
+        message: string;
+        upgradeUrl: string;
+        retryable: boolean;
+        used: number;
+        limit: number;
+        resetsAt: string;
+        userAction: string;
+      };
+    };
+    expect(parsed.error.code).toBe("NOTFAIR_QUOTA_EXHAUSTED");
+    expect(parsed.error.message).toContain("Free monthly cap reached (300/300)");
+    expect(parsed.error.message).toContain("Tell the user they need to upgrade");
+    expect(parsed.error.upgradeUrl).toBe("https://notfair.co/upgrade");
+    expect(parsed.error.retryable).toBe(false);
+    expect(parsed.error.used).toBe(300);
+    expect(parsed.error.limit).toBe(300);
+    expect(parsed.error.resetsAt).toBe("2026-06-14T00:00:00.000Z");
+    expect(parsed.error.userAction).toContain("Upgrade to Growth");
+  });
+
+  it("does not rewrite unrelated rate limit errors as NotFair quota exhaustion", () => {
+    const error = new Error("Too many requests. Retry later.");
+    error.name = "RateLimitError";
+
+    const result = errorResult(error);
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0].type === "text" ? result.content[0].text : "";
+    expect(text).toBe("Too many requests. Retry later.");
   });
 });

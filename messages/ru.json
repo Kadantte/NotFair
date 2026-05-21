@@ -312,20 +312,12 @@
       },
       "openclaw": {
         "install": {
-          "title": "Install the OpenClaw plugin",
-          "body": "Run this in your terminal. The plugin uses the NotFair Google Ads MCP server by default:"
-        },
-        "login": {
-          "title": "Sign in to NotFair",
-          "body": "Start the NotFair login flow. OpenClaw prints an OAuth URL and stores your token after you sign in:"
-        },
-        "connect": {
-          "title": "Connect Google Ads",
-          "body": "Connect your Google Ads account through NotFair at <connectUrl></connectUrl>, or run the helper command:"
+          "title": "Подключите NotFair к OpenClaw",
+          "body": "Выполните эти команды один раз. Настройка выполнит вход, направит к подключению Google Ads и покажет, как проверить:"
         },
         "status": {
-          "title": "Verify and start asking",
-          "body": "Check that OpenClaw can see your NotFair connection, then try: <tryPrompt></tryPrompt>"
+          "title": "Проверьте и начните спрашивать",
+          "body": "Проверьте, что OpenClaw видит подключение NotFair, затем попробуйте: <tryPrompt></tryPrompt>"
         }
       },
       "codex": {
@@ -354,16 +346,16 @@
       },
       "hermes": {
         "add": {
-          "title": "Add the MCP server",
-          "body": "Run this in your terminal to register NotFair with Hermes:"
+          "title": "Добавьте MCP-сервер",
+          "body": "Выполните это в терминале, чтобы зарегистрировать NotFair в Hermes:"
         },
         "test": {
-          "title": "Test the connection",
-          "body": "Ask Hermes to verify the MCP server and complete the sign-in flow if prompted:"
+          "title": "Проверьте подключение",
+          "body": "Попросите Hermes проверить MCP-сервер и завершить вход, если потребуется:"
         },
         "firstPrompt": {
-          "title": "Start asking",
-          "body": "Once the test succeeds, use Hermes with NotFair. Try this prompt:"
+          "title": "Начните спрашивать",
+          "body": "Когда проверка пройдет успешно, используйте Hermes с NotFair. Попробуйте этот запрос:"
         }
       }
     }
@@ -762,52 +754,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "читать",
+          "category": "read",
           "description": "Изолированный JS с разветвлением GAQL — каждое аналитическое чтение проходит через этот единственный инструмент."
         },
         {
           "name": "получить рекомендации",
-          "category": "читать",
+          "category": "read",
           "description": "Предложения Google по оптимизации с предполагаемым эффектом."
         },
         {
           "name": "getKeywordIdeas",
-          "category": "читать",
+          "category": "read",
           "description": "Объем поиска в Планировщике ключевых слов, конкуренция и оценки CPC."
         },
         {
           "name": "получить изменения",
-          "category": "читать",
+          "category": "read",
           "description": "Собственный журнал изменений NotFair — можно отменить одним вызовом."
         },
         {
           "name": "ОбзорИзменениеВлияние",
-          "category": "читать",
+          "category": "read",
           "description": "Анализ влияния недавних изменений до/после."
         },
         {
           "name": "getResourceMetadata",
-          "category": "читать",
+          "category": "read",
           "description": "GAQL обнаружение схемы для пользовательских запросов."
         },
         {
           "name": "обновить ставку",
-          "category": "писать",
+          "category": "write",
           "description": "Скорректируйте ставки для ключевых слов или групп объявлений — их можно проверить перед применением."
         },
         {
           "name": "паузаКампания",
-          "category": "писать",
+          "category": "write",
           "description": "Приостановите неэффективные кампании."
         },
         {
           "name": "добавитьнегативеключевое слово",
-          "category": "писать",
+          "category": "write",
           "description": "Блокируйте нерелевантные поисковые запросы после проверки."
         },
         {
           "name": "создатьобъявление",
-          "category": "писать",
+          "category": "write",
           "description": "Напишите и запустите новый текст объявления через чат."
         }
       ]
@@ -908,52 +900,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "читать",
+          "category": "read",
           "description": "Изолированный JS с разветвлением Graph API — разветвление 20 вызовов за один проход для аудита и анализа."
         },
         {
           "name": "getInsights",
-          "category": "читать",
+          "category": "read",
           "description": "Анализ эффективности с разбивкой: расходы, показы, клики, CTR, CPC, цена за тысячу показов, конверсии."
         },
         {
           "name": "списокКампании",
-          "category": "читать",
+          "category": "read",
           "description": "Перечислите кампании со статусом, целью, бюджетом, стратегией назначения ставок и расписанием."
         },
         {
           "name": "списокAdSets",
-          "category": "читать",
+          "category": "read",
           "description": "Подробности набора объявлений: цель оптимизации, платежное событие, дневной/пожизненный бюджет, сводка таргетинга."
         },
         {
           "name": "списокобъявлений",
-          "category": "читать",
+          "category": "read",
           "description": "Объявления со статусом, родительской группой объявлений/кампанией, креативным конвертом, настроенным статусом."
         },
         {
           "name": "getAdAccount",
-          "category": "читать",
+          "category": "read",
           "description": "Снимок учетной записи: валюта, часовой пояс, баланс, потраченная сумма, предел расходов, родительский BM."
         },
         {
           "name": "паузаКампания",
-          "category": "писать",
+          "category": "write",
           "description": "Приостановить кампанию Meta — можно отменить с помощью EnableCampaign."
         },
         {
           "name": "паузаAdSet",
-          "category": "писать",
+          "category": "write",
           "description": "Приостановите группу объявлений, не затрагивая ее родительскую кампанию."
         },
         {
           "name": "обновить бюджет кампании",
-          "category": "писать",
+          "category": "write",
           "description": "Обновите дневной или пожизненный бюджет кампании Meta."
         },
         {
           "name": "переименоватьКампанию",
-          "category": "писать",
+          "category": "write",
           "description": "Переименуйте кампанию Meta на месте."
         }
       ]
@@ -1098,42 +1090,42 @@
       "items": [
         {
           "name": "списокКампании",
-          "category": "читать",
+          "category": "read",
           "description": "Извлекайте эффективность, расходы и статус кампании в реальном времени."
         },
         {
           "name": "получить ключевые слова",
-          "category": "читать",
+          "category": "read",
           "description": "Проверяйте ставки ключевых слов, показатели качества и показы."
         },
         {
           "name": "getSearchTermReport",
-          "category": "читать",
+          "category": "read",
           "description": "Найдите нерелевантные запросы, слабые типы соответствия и утечки бюджета."
         },
         {
           "name": "getCampaignPerformance",
-          "category": "читать",
+          "category": "read",
           "description": "Подробное изучение показателей кампании за любой диапазон дат."
         },
         {
           "name": "обновить ставку",
-          "category": "писать",
+          "category": "write",
           "description": "Скорректируйте ставку для ключевого слова — можно проверить перед применением"
         },
         {
           "name": "паузаКампания",
-          "category": "писать",
+          "category": "write",
           "description": "Приостановите неэффективную кампанию до Claude."
         },
         {
           "name": "добавитьнегативеключевое слово",
-          "category": "писать",
+          "category": "write",
           "description": "Заблокируйте ненужный поисковый запрос на уровне кампании или аккаунта."
         },
         {
           "name": "создатьобъявление",
-          "category": "писать",
+          "category": "write",
           "description": "Напишите и запустите новый текст объявления в ходе естественного разговора."
         }
       ]
@@ -1259,42 +1251,42 @@
       "items": [
         {
           "name": "списокКампании",
-          "category": "читать",
+          "category": "read",
           "description": "Извлекайте эффективность, расходы и статус кампании в реальном времени."
         },
         {
           "name": "получить ключевые слова",
-          "category": "читать",
+          "category": "read",
           "description": "Проверяйте ставки ключевых слов, показатели качества и показы."
         },
         {
           "name": "getSearchTermReport",
-          "category": "читать",
+          "category": "read",
           "description": "Найдите нерелевантные запросы, слабые типы соответствия и утечки бюджета."
         },
         {
           "name": "getCampaignPerformance",
-          "category": "читать",
+          "category": "read",
           "description": "Подробное изучение показателей кампании за любой диапазон дат."
         },
         {
           "name": "обновить ставку",
-          "category": "писать",
+          "category": "write",
           "description": "Скорректируйте ставку для ключевого слова — можно проверить перед применением"
         },
         {
           "name": "паузаКампания",
-          "category": "писать",
+          "category": "write",
           "description": "Приостановить неэффективную кампанию через Кодекс"
         },
         {
           "name": "добавитьнегативеключевое слово",
-          "category": "писать",
+          "category": "write",
           "description": "Заблокируйте ненужный поисковый запрос на уровне кампании или аккаунта."
         },
         {
           "name": "создатьобъявление",
-          "category": "писать",
+          "category": "write",
           "description": "Напишите и запустите новый текст объявления в ходе естественного разговора."
         }
       ]

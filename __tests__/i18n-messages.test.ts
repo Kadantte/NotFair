@@ -102,7 +102,7 @@ function normalizeCopyValue(value: string): string {
 function isAllowedIdenticalCopy(key: string, value: string): boolean {
   if (!/[A-Za-z]/.test(value)) return true;
   if (allowedIdenticalCopyValues.has(value.replace(/[.:?]$/u, ""))) return true;
-  if (/\.(agentName|connectorName|delta|href|id|impact|num|path|platform|rank|roas|serverUrl|slug|spend|url|value)$/.test(key)) {
+  if (/\.(agentName|category|connectorName|delta|href|id|impact|num|path|platform|rank|roas|serverUrl|slug|spend|url|value)$/.test(key)) {
     return true;
   }
   if (/^MarketingEngine\.chat\.[^.]+\.rows\.\d+\.name$/.test(key)) return true;

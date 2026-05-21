@@ -40,6 +40,10 @@ function cloneConfig(config) {
 }
 
 async function writePluginConfig(api, mutate) {
+  if (typeof api.runtime?.config?.mutateConfigFile === "function") {
+    await api.runtime.config.mutateConfigFile({ mutate });
+    return;
+  }
   const raw = cloneConfig(api.config);
   mutate(raw);
   await api.runtime.config.writeConfigFile(raw);
@@ -326,9 +330,9 @@ function registerTools(api, client, authenticated) {
     api.registerTool({
       name: "notfair_connect",
       label: "Connect NotFair",
-      description: "Connect NotFair to OpenClaw. Run openclaw notfair login, then connect Google Ads at https://notfair.co/connect.",
+      description: "Connect NotFair to OpenClaw. Run openclaw notfair setup to sign in, connect Google Ads, and verify.",
       parameters: emptyParameters,
-      execute: async () => errorResult("NotFair is not connected. Run 'openclaw notfair login', then open https://notfair.co/connect to connect Google Ads."),
+      execute: async () => errorResult("NotFair is not connected. Run 'openclaw notfair setup' to sign in, connect Google Ads, and verify."),
     }, { name: "notfair_connect" });
     return;
   }
@@ -372,12 +376,29 @@ function registerCli(api, config, client) {
       console.log("Connect Google Ads accounts at:");
       console.log(CONNECT_URL);
     });
+    cmd.command("setup").description("Guided NotFair setup: login, connect Google Ads, then verify").option("--token <token>", "Bearer token for headless/server use").action(async (options) => handleSetup(api, config, client, options));
     cmd.command("tool").description("Call a NotFair MCP tool by name").argument("<toolName>").argument("[jsonArgs]").action(async (toolName, jsonArgs = "{}") => {
       const args = JSON.parse(jsonArgs);
       const result = await client.callTool(toolName, args);
       console.log(result.content?.map((c) => c.text).filter(Boolean).join("\n") || JSON.stringify(result, null, 2));
     });
   }, { commands: ["notfair"] });
+}
+
+async function handleSetup(api, config, client, options) {
+  if (!isAuthenticated(config) || options?.token) {
+    await handleLogin(api, config, options);
+    console.log("\nNext: connect your Google Ads account if you have not already:");
+    console.log("  " + CONNECT_URL);
+    console.log("\nThen verify with:");
+    console.log("  openclaw notfair status");
+    return;
+  }
+
+  console.log("NotFair auth is already configured.");
+  console.log("Connect Google Ads accounts at:");
+  console.log(CONNECT_URL);
+  await handleStatus(config, client);
 }
 
 async function handleLogin(api, config, options) {
@@ -427,7 +448,7 @@ async function handleStatus(config, client) {
     if (config.tokenExpiresAt) console.log("Token expires: " + new Date(config.tokenExpiresAt).toLocaleString());
   } else {
     console.log("Auth: not connected");
-    console.log("Run 'openclaw notfair login'.");
+    console.log("Run 'openclaw notfair setup'.");
     return;
   }
   const result = await client.callTool("listConnectedAccounts", {});

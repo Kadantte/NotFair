@@ -40,7 +40,8 @@ function defaultText(value: unknown): string {
 
 /** Wrap an error as an MCP error response with the actual error message. */
 export function errorResult(error: unknown): CallToolResult {
-  return { content: [{ type: "text", text: formatMcpErrorText(extractErrorMessage(error)) }], isError: true };
+  const message = extractErrorMessage(error);
+  return { content: [{ type: "text", text: formatMcpErrorText(message, error) }], isError: true };
 }
 
 /**

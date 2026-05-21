@@ -219,7 +219,7 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#5B6CFF]/40",
         pillBgClass: "bg-[#5B6CFF]/15",
-        steps: ["install", "login", "connect", "status"],
+        steps: ["install", "status"],
     },
     {
         id: "codex",
@@ -326,37 +326,10 @@ function PlatformStepBody({ platformId, stepId }: { platformId: string; stepId: 
             <>
                 {t("platforms.openclaw.install.body")}
                 <CopyField
-                    value="openclaw plugins install openclaw-notfair"
+                    value={"openclaw plugins install clawhub:openclaw-notfair\nopenclaw plugins enable openclaw-notfair\nopenclaw notfair setup"}
                     className="mt-3"
+                    multiline
                     onCopy={() => trackSetupCopied("openclaw", "install_command")}
-                />
-            </>
-        );
-    }
-
-    if (platformId === "openclaw" && stepId === "login") {
-        return (
-            <>
-                {t("platforms.openclaw.login.body")}
-                <CopyField
-                    value="openclaw notfair login"
-                    className="mt-3"
-                    onCopy={() => trackSetupCopied("openclaw", "login_command")}
-                />
-            </>
-        );
-    }
-
-    if (platformId === "openclaw" && stepId === "connect") {
-        return (
-            <>
-                {t.rich("platforms.openclaw.connect.body", {
-                    connectUrl: () => <CodeInline>https://notfair.co/connect</CodeInline>,
-                })}
-                <CopyField
-                    value="openclaw notfair connect"
-                    className="mt-3"
-                    onCopy={() => trackSetupCopied("openclaw", "connect_command")}
                 />
             </>
         );

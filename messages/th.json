@@ -312,20 +312,12 @@
       },
       "openclaw": {
         "install": {
-          "title": "Install the OpenClaw plugin",
-          "body": "Run this in your terminal. The plugin uses the NotFair Google Ads MCP server by default:"
-        },
-        "login": {
-          "title": "Sign in to NotFair",
-          "body": "Start the NotFair login flow. OpenClaw prints an OAuth URL and stores your token after you sign in:"
-        },
-        "connect": {
-          "title": "Connect Google Ads",
-          "body": "Connect your Google Ads account through NotFair at <connectUrl></connectUrl>, or run the helper command:"
+          "title": "เชื่อมต่อ NotFair กับ OpenClaw",
+          "body": "รันคำสั่งเหล่านี้ครั้งเดียว ขั้นตอน setup จะพาคุณเข้าสู่ระบบ ชี้ไปยังการเชื่อมต่อ Google Ads และบอกวิธีตรวจสอบ:"
         },
         "status": {
-          "title": "Verify and start asking",
-          "body": "Check that OpenClaw can see your NotFair connection, then try: <tryPrompt></tryPrompt>"
+          "title": "ตรวจสอบแล้วเริ่มถามได้เลย",
+          "body": "ตรวจสอบว่า OpenClaw เห็นการเชื่อมต่อ NotFair ของคุณแล้ว จากนั้นลอง: <tryPrompt></tryPrompt>"
         }
       },
       "codex": {
@@ -354,16 +346,16 @@
       },
       "hermes": {
         "add": {
-          "title": "Add the MCP server",
-          "body": "Run this in your terminal to register NotFair with Hermes:"
+          "title": "เพิ่มเซิร์ฟเวอร์ MCP",
+          "body": "รันคำสั่งนี้ในเทอร์มินัลเพื่อลงทะเบียน NotFair กับ Hermes:"
         },
         "test": {
-          "title": "Test the connection",
-          "body": "Ask Hermes to verify the MCP server and complete the sign-in flow if prompted:"
+          "title": "ทดสอบการเชื่อมต่อ",
+          "body": "ขอให้ Hermes ตรวจสอบเซิร์ฟเวอร์ MCP และทำขั้นตอนเข้าสู่ระบบให้เสร็จหากมีการแจ้ง:"
         },
         "firstPrompt": {
-          "title": "Start asking",
-          "body": "Once the test succeeds, use Hermes with NotFair. Try this prompt:"
+          "title": "เริ่มถามได้เลย",
+          "body": "เมื่อการทดสอบสำเร็จ ให้ใช้ Hermes กับ NotFair ลองพรอมป์นี้:"
         }
       }
     }
@@ -762,52 +754,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "อ่าน",
+          "category": "read",
           "description": "JS แบบ sandbox พร้อม GAQL fan-out การอ่านเชิงวิเคราะห์ทุกครั้งผ่านเครื่องมือนี้"
         },
         {
           "name": "getRecommendations",
-          "category": "อ่าน",
+          "category": "read",
           "description": "คำแนะนำการปรับแต่งจาก Google พร้อมผลกระทบโดยประมาณ"
         },
         {
           "name": "getKeywordIdeas",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ปริมาณการค้นหา การแข่งขัน และค่าประมาณ CPC จาก Keyword Planner"
         },
         {
           "name": "getChanges",
-          "category": "อ่าน",
+          "category": "read",
           "description": "บันทึกการเปลี่ยนแปลงของ NotFair ย้อนกลับได้ด้วยการเรียกครั้งเดียว"
         },
         {
           "name": "reviewChangeImpact",
-          "category": "อ่าน",
+          "category": "read",
           "description": "วิเคราะห์ผลกระทบก่อนและหลังของการแก้ไขล่าสุด"
         },
         {
           "name": "getResourceMetadata",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ค้นหา schema ของ GAQL สำหรับ query แบบกำหนดเอง"
         },
         {
           "name": "updateBid",
-          "category": "เขียน",
+          "category": "write",
           "description": "ปรับ bid ของคีย์เวิร์ดหรือ ad group และตรวจสอบได้ก่อนใช้จริง"
         },
         {
           "name": "pauseCampaign",
-          "category": "เขียน",
+          "category": "write",
           "description": "หยุดแคมเปญที่ผลงานต่ำชั่วคราว"
         },
         {
           "name": "addNegativeKeyword",
-          "category": "เขียน",
+          "category": "write",
           "description": "บล็อกคำค้นที่ไม่เกี่ยวข้องหลังตรวจสอบ"
         },
         {
           "name": "createAd",
-          "category": "เขียน",
+          "category": "write",
           "description": "เขียนและเปิดใช้ข้อความโฆษณาใหม่ผ่านแชต"
         }
       ]
@@ -908,52 +900,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "อ่าน",
+          "category": "read",
           "description": "JS แบบ sandbox พร้อม Graph API fan-out เรียก 20 ครั้งในรอบเดียวสำหรับออดิทและการวิเคราะห์"
         },
         {
           "name": "getInsights",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ข้อมูลเชิงลึกด้านผลงานพร้อม breakdown: ค่าใช้จ่าย impressions คลิก CTR CPC CPM conversions"
         },
         {
           "name": "listCampaigns",
-          "category": "อ่าน",
+          "category": "read",
           "description": "แสดงแคมเปญพร้อมสถานะ วัตถุประสงค์ งบประมาณ กลยุทธ์ bid และกำหนดเวลา"
         },
         {
           "name": "listAdSets",
-          "category": "อ่าน",
+          "category": "read",
           "description": "รายละเอียด ad set: เป้าหมายการปรับแต่ง billing event งบรายวัน/ตลอดอายุ และสรุป targeting"
         },
         {
           "name": "listAds",
-          "category": "อ่าน",
+          "category": "read",
           "description": "โฆษณาพร้อมสถานะ ad set/แคมเปญหลัก ข้อมูล creative และสถานะที่ตั้งค่าไว้"
         },
         {
           "name": "getAdAccount",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ภาพรวมบัญชี: สกุลเงิน timezone ยอดคงเหลือ ยอดใช้จ่าย spend cap และ BM หลัก"
         },
         {
           "name": "pauseCampaign",
-          "category": "เขียน",
+          "category": "write",
           "description": "หยุดแคมเปญ Meta ชั่วคราว ย้อนกลับได้ผ่าน enableCampaign"
         },
         {
           "name": "pauseAdSet",
-          "category": "เขียน",
+          "category": "write",
           "description": "หยุด ad set ชั่วคราวโดยไม่แตะแคมเปญหลัก"
         },
         {
           "name": "updateCampaignBudget",
-          "category": "เขียน",
+          "category": "write",
           "description": "อัปเดตงบรายวันหรือตลอดอายุของแคมเปญ Meta"
         },
         {
           "name": "renameCampaign",
-          "category": "เขียน",
+          "category": "write",
           "description": "เปลี่ยนชื่อแคมเปญ Meta โดยตรง"
         }
       ]
@@ -1098,42 +1090,42 @@
       "items": [
         {
           "name": "listCampaigns",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ดึงผลงาน ค่าใช้จ่าย และสถานะแคมเปญแบบสด"
         },
         {
           "name": "getKeywords",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ตรวจ bid คีย์เวิร์ด Quality Scores และ impressions"
         },
         {
           "name": "getSearchTermReport",
-          "category": "อ่าน",
+          "category": "read",
           "description": "ค้นหา query ที่ไม่เกี่ยวข้อง match type ที่อ่อน และงบที่รั่ว"
         },
         {
           "name": "getCampaignPerformance",
-          "category": "อ่าน",
+          "category": "read",
           "description": "เจาะลึก metrics ของแคมเปญในช่วงวันที่ใดก็ได้"
         },
         {
           "name": "updateBid",
-          "category": "เขียน",
+          "category": "write",
           "description": "ปรับ bid คีย์เวิร์ด และตรวจสอบได้ก่อนใช้จริง"
         },
         {
           "name": "pauseCampaign",
-          "category": "เขียน",
+          "category": "write",
           "description": "หยุดแคมเปญผลงานต่ำผ่าน Claude"
         },
         {
           "name": "addNegativeKeyword",
-          "category": "เขียน",
+          "category": "write",
           "description": "บล็อกคำค้นที่เปลืองงบในระดับแคมเปญหรือบัญชี"
         },
         {
           "name": "createAd",
-          "category": "เขียน",
+          "category": "write",
           "description": "เขียนและเปิดใช้ข้อความโฆษณาใหม่ผ่านบทสนทนาธรรมชาติ"
         }
       ]

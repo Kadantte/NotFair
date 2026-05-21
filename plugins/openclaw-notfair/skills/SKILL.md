@@ -39,12 +39,11 @@ Use this skill when the user asks to manage, audit, diagnose, or optimize Google
 
 ## Setup
 
-    openclaw plugins install openclaw-notfair
-    openclaw notfair login
-    openclaw notfair connect
-    openclaw notfair status
+    openclaw plugins install clawhub:openclaw-notfair
+    openclaw plugins enable openclaw-notfair
+    openclaw notfair setup
 
-If the plugin is not authenticated, ask the user to run openclaw notfair login.
+If the plugin is not authenticated, ask the user to run openclaw notfair setup.
 
 ## Available OpenClaw Tools
 

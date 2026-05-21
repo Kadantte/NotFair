@@ -312,20 +312,12 @@
       },
       "openclaw": {
         "install": {
-          "title": "Install the OpenClaw plugin",
-          "body": "Run this in your terminal. The plugin uses the NotFair Google Ads MCP server by default:"
-        },
-        "login": {
-          "title": "Sign in to NotFair",
-          "body": "Start the NotFair login flow. OpenClaw prints an OAuth URL and stores your token after you sign in:"
-        },
-        "connect": {
-          "title": "Connect Google Ads",
-          "body": "Connect your Google Ads account through NotFair at <connectUrl></connectUrl>, or run the helper command:"
+          "title": "Conecte o NotFair ao OpenClaw",
+          "body": "Execute estes comandos uma vez. A configuração faz login, aponta para a conexão do Google Ads e mostra como verificar:"
         },
         "status": {
-          "title": "Verify and start asking",
-          "body": "Check that OpenClaw can see your NotFair connection, then try: <tryPrompt></tryPrompt>"
+          "title": "Verifique e comece a perguntar",
+          "body": "Confira se o OpenClaw consegue ver sua conexão do NotFair e depois tente: <tryPrompt></tryPrompt>"
         }
       },
       "codex": {
@@ -354,16 +346,16 @@
       },
       "hermes": {
         "add": {
-          "title": "Add the MCP server",
-          "body": "Run this in your terminal to register NotFair with Hermes:"
+          "title": "Adicione o servidor MCP",
+          "body": "Execute isto no terminal para registrar o NotFair no Hermes:"
         },
         "test": {
-          "title": "Test the connection",
-          "body": "Ask Hermes to verify the MCP server and complete the sign-in flow if prompted:"
+          "title": "Teste a conexão",
+          "body": "Peça ao Hermes para verificar o servidor MCP e concluir o login se solicitado:"
         },
         "firstPrompt": {
-          "title": "Start asking",
-          "body": "Once the test succeeds, use Hermes with NotFair. Try this prompt:"
+          "title": "Comece a perguntar",
+          "body": "Quando o teste passar, use o Hermes com o NotFair. Experimente este prompt:"
         }
       }
     }

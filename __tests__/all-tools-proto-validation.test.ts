@@ -364,7 +364,9 @@ describe("protobuf validation: campaign management", () => {
     expect(networkSettings.target_google_search).toBe(true);
     expect(networkSettings.target_search_network).toBe(true);
 
-    // Verify geo and language criteria exist
+    // Verify geo criteria exist. Standard Shopping does not support language
+    // campaign criteria in the Google Ads API, so languageIds are ignored with
+    // a warning rather than sending an invalid mutate operation.
     const geoCriterion = ops.find(
       (op) => op.entity === "campaign_criterion" &&
         (op.resource as Record<string, unknown>).location !== undefined,
@@ -374,7 +376,10 @@ describe("protobuf validation: campaign management", () => {
       (op) => op.entity === "campaign_criterion" &&
         (op.resource as Record<string, unknown>).language !== undefined,
     );
-    expect(langCriterion).toBeDefined();
+    expect(langCriterion).toBeUndefined();
+    expect(result.warnings).toContain(
+      "Standard Shopping campaigns do not support language campaign criteria in the Google Ads API; languageIds were ignored. Use Merchant Center feed language/feed label plus salesCountry and geoTargetIds instead.",
+    );
   });
 
   it("createCampaign (SHOPPING, target ROAS, no filter + geo)", async () => {

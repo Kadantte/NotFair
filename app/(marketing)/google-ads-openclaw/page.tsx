@@ -28,7 +28,7 @@ const faqItems = [
   {
     question: "How do I install it?",
     answer:
-      "After the package is published, run openclaw plugins install openclaw-notfair, then openclaw notfair login, then openclaw notfair connect.",
+      "Run openclaw plugins install clawhub:openclaw-notfair, enable the plugin, then run openclaw notfair setup.",
   },
   {
     question: "Can it change my Google Ads account?",
@@ -139,7 +139,7 @@ export default function Page() {
               <span className="font-mono text-xs text-[#C4C0B6]">install</span>
             </div>
             <pre className="overflow-x-auto rounded-md bg-[#11100E] p-4 text-sm leading-7 text-[#E8E4DD]">
-              {"openclaw plugins install openclaw-notfair\nopenclaw notfair login\nopenclaw notfair connect\nopenclaw notfair status"}
+              {"openclaw plugins install clawhub:openclaw-notfair\nopenclaw plugins enable openclaw-notfair\nopenclaw notfair setup"}
             </pre>
             <p className="mt-4 text-sm leading-relaxed text-[#C4C0B6]">
               The plugin defaults to {MCP_SERVER_URL}. It stores OpenClaw plugin

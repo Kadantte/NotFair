@@ -4,10 +4,9 @@ OpenClaw plugin for NotFair's hosted Google Ads MCP server.
 
 ## Install
 
-    openclaw plugins install openclaw-notfair
-    openclaw notfair login
-    openclaw notfair connect
-    openclaw notfair status
+    openclaw plugins install clawhub:openclaw-notfair
+    openclaw plugins enable openclaw-notfair
+    openclaw notfair setup
 
 The plugin defaults to:
 
@@ -24,6 +23,7 @@ The plugin defaults to:
 
     openclaw notfair login
     openclaw notfair login --token <bearer-token>
+    openclaw notfair setup
     openclaw notfair logout
     openclaw notfair status
     openclaw notfair accounts

@@ -312,20 +312,12 @@
       },
       "openclaw": {
         "install": {
-          "title": "Install the OpenClaw plugin",
-          "body": "Run this in your terminal. The plugin uses the NotFair Google Ads MCP server by default:"
-        },
-        "login": {
-          "title": "Sign in to NotFair",
-          "body": "Start the NotFair login flow. OpenClaw prints an OAuth URL and stores your token after you sign in:"
-        },
-        "connect": {
-          "title": "Connect Google Ads",
-          "body": "Connect your Google Ads account through NotFair at <connectUrl></connectUrl>, or run the helper command:"
+          "title": "Conecta NotFair a OpenClaw",
+          "body": "Ejecuta estos comandos una vez. La configuración inicia sesión, te lleva a conectar Google Ads y te indica cómo verificar:"
         },
         "status": {
-          "title": "Verify and start asking",
-          "body": "Check that OpenClaw can see your NotFair connection, then try: <tryPrompt></tryPrompt>"
+          "title": "Verifica y empieza a preguntar",
+          "body": "Comprueba que OpenClaw pueda ver tu conexión de NotFair y luego prueba: <tryPrompt></tryPrompt>"
         }
       },
       "codex": {
@@ -354,16 +346,16 @@
       },
       "hermes": {
         "add": {
-          "title": "Add the MCP server",
-          "body": "Run this in your terminal to register NotFair with Hermes:"
+          "title": "Añade el servidor MCP",
+          "body": "Ejecuta esto en tu terminal para registrar NotFair con Hermes:"
         },
         "test": {
-          "title": "Test the connection",
-          "body": "Ask Hermes to verify the MCP server and complete the sign-in flow if prompted:"
+          "title": "Prueba la conexión",
+          "body": "Pide a Hermes que verifique el servidor MCP y complete el inicio de sesión si se solicita:"
         },
         "firstPrompt": {
-          "title": "Start asking",
-          "body": "Once the test succeeds, use Hermes with NotFair. Try this prompt:"
+          "title": "Empieza a preguntar",
+          "body": "Cuando la prueba funcione, usa Hermes con NotFair. Prueba este prompt:"
         }
       }
     }
@@ -762,52 +754,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "Lectura",
+          "category": "read",
           "description": "JS en sandbox con fan-out GAQL: cada lectura analítica pasa por esta herramienta."
         },
         {
           "name": "getRecommendations",
-          "category": "Lectura",
+          "category": "read",
           "description": "Sugerencias de optimización de Google con impacto estimado."
         },
         {
           "name": "getKeywordIdeas",
-          "category": "Lectura",
+          "category": "read",
           "description": "Volumen de búsqueda, competencia y estimaciones de CPC de Keyword Planner."
         },
         {
           "name": "getChanges",
-          "category": "Lectura",
+          "category": "read",
           "description": "Registro de cambios propio de NotFair, reversible con una llamada."
         },
         {
           "name": "reviewChangeImpact",
-          "category": "Lectura",
+          "category": "read",
           "description": "Análisis de impacto antes/después de cambios recientes."
         },
         {
           "name": "getResourceMetadata",
-          "category": "Lectura",
+          "category": "read",
           "description": "Descubrimiento del esquema GAQL para consultas personalizadas."
         },
         {
           "name": "updateBid",
-          "category": "Escritura",
+          "category": "write",
           "description": "Ajusta pujas de palabras clave o grupos de anuncios, revisables antes de aplicar."
         },
         {
           "name": "pauseCampaign",
-          "category": "Escritura",
+          "category": "write",
           "description": "Pausa campañas con bajo rendimiento."
         },
         {
           "name": "addNegativeKeyword",
-          "category": "Escritura",
+          "category": "write",
           "description": "Bloquea términos de búsqueda irrelevantes tras la revisión."
         },
         {
           "name": "createAd",
-          "category": "Escritura",
+          "category": "write",
           "description": "Redacta y lanza nuevos anuncios desde el chat."
         }
       ]
@@ -908,52 +900,52 @@
       "items": [
         {
           "name": "runScript",
-          "category": "Lectura",
+          "category": "read",
           "description": "JS en sandbox con fan-out de Graph API: lanza 20 llamadas en una pasada para auditorías y análisis."
         },
         {
           "name": "getInsights",
-          "category": "Lectura",
+          "category": "read",
           "description": "Insights de rendimiento con desgloses: gasto, impresiones, clics, CTR, CPC, CPM, conversiones."
         },
         {
           "name": "listCampaigns",
-          "category": "Lectura",
+          "category": "read",
           "description": "Lista campañas con estado, objetivo, presupuesto, estrategia de puja y calendario."
         },
         {
           "name": "listAdSets",
-          "category": "Lectura",
+          "category": "read",
           "description": "Detalles del conjunto de anuncios: objetivo de optimización, evento de facturación, presupuesto diario/de vida, resumen de segmentación."
         },
         {
           "name": "listAds",
-          "category": "Lectura",
+          "category": "read",
           "description": "Anuncios con estado, conjunto/campaña padre, envoltorio creativo y estado configurado."
         },
         {
           "name": "getAdAccount",
-          "category": "Lectura",
+          "category": "read",
           "description": "Instantánea de cuenta: moneda, zona horaria, saldo, importe gastado, límite de gasto, BM padre."
         },
         {
           "name": "pauseCampaign",
-          "category": "Escritura",
+          "category": "write",
           "description": "Pausa una campaña de Meta, reversible con enableCampaign."
         },
         {
           "name": "pauseAdSet",
-          "category": "Escritura",
+          "category": "write",
           "description": "Pausa un conjunto de anuncios sin tocar su campaña padre."
         },
         {
           "name": "updateCampaignBudget",
-          "category": "Escritura",
+          "category": "write",
           "description": "Actualiza el presupuesto diario o de vida de una campaña de Meta."
         },
         {
           "name": "renameCampaign",
-          "category": "Escritura",
+          "category": "write",
           "description": "Renombra una campaña de Meta en su lugar."
         }
       ]
@@ -1098,42 +1090,42 @@
       "items": [
         {
           "name": "listCampaigns",
-          "category": "Lectura",
+          "category": "read",
           "description": "Obtiene rendimiento, gasto y estado de campañas en vivo"
         },
         {
           "name": "getKeywords",
-          "category": "Lectura",
+          "category": "read",
           "description": "Inspecciona pujas de palabras clave, Quality Scores e impresiones"
         },
         {
           "name": "getSearchTermReport",
-          "category": "Lectura",
+          "category": "read",
           "description": "Encuentra consultas irrelevantes, concordancias débiles y fugas de presupuesto"
         },
         {
           "name": "getCampaignPerformance",
-          "category": "Lectura",
+          "category": "read",
           "description": "Profundiza en métricas de campaña en cualquier rango de fechas"
         },
         {
           "name": "updateBid",
-          "category": "Escritura",
+          "category": "write",
           "description": "Ajusta una puja de palabra clave, revisable antes de aplicarse"
         },
         {
           "name": "pauseCampaign",
-          "category": "Escritura",
+          "category": "write",
           "description": "Pausa una campaña con bajo rendimiento mediante Claude"
         },
         {
           "name": "addNegativeKeyword",
-          "category": "Escritura",
+          "category": "write",
           "description": "Bloquea un término de búsqueda desperdiciado a nivel campaña o cuenta"
         },
         {
           "name": "createAd",
-          "category": "Escritura",
+          "category": "write",
           "description": "Redacta y lanza nuevos anuncios mediante conversación natural"
         }
       ]

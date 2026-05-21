@@ -6,9 +6,9 @@ nowork-studio/notfair-google-ads-agent
 
 ## Install
 
-    openclaw plugins install openclaw-notfair
-    openclaw notfair login
-    openclaw notfair connect
+    openclaw plugins install clawhub:openclaw-notfair
+    openclaw plugins enable openclaw-notfair
+    openclaw notfair setup
 
 ## Title
 
@@ -44,6 +44,6 @@ google ads, ppc, sem, mcp, openclaw, notfair, campaign management, wasted spend,
 
 - npm pack --dry-run
 - openclaw plugins install ./plugins/openclaw-notfair
-- openclaw notfair login
+- openclaw notfair setup
 - openclaw notfair status
 - Run one read-only notfair_run_script
