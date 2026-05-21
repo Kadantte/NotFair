@@ -31,6 +31,7 @@ import {
 import { verifyOAuthNonce } from "@/lib/oauth-nonce";
 import { AUTH_ERROR_REASON, AUTH_ERROR_STEP, AUTH_ERROR_MESSAGES, classifyAccountLoadError, classifyGoogleError } from "@/lib/auth-errors";
 import { evaluateScopeGrant } from "@/lib/oauth-scope-retry";
+import { DEFAULT_ACTIVATION_PATH, safeInternalPathOrDefault } from "@/lib/app-routes";
 
 type AuthState = {
   next?: string;
@@ -43,11 +44,7 @@ type AuthState = {
 };
 
 function getSafeNext(next: string | null | undefined) {
-  if (!next || !next.startsWith("/")) {
-    return "/campaigns";
-  }
-
-  return next;
+  return safeInternalPathOrDefault(next, DEFAULT_ACTIVATION_PATH);
 }
 
 /**
@@ -173,10 +170,12 @@ function popupAccountSelectionResponse(
   accounts: ConnectableAccount[],
   pendingToken: string,
   origin: string,
+  next: string,
 ) {
   const accountsJson = safeJsonForScript(accounts);
   const pendingTokenJson = safeJsonForScript(pendingToken);
   const originJson = safeJsonForScript(origin);
+  const nextJson = safeJsonForScript(next);
 
   return new NextResponse(
     `<!DOCTYPE html>
@@ -217,6 +216,7 @@ function popupAccountSelectionResponse(
     const accounts = ${accountsJson};
     const pendingToken = ${pendingTokenJson};
     const origin = ${originJson};
+    const next = ${nextJson};
     const selected = new Set();
 
     function updateUI() {
@@ -303,6 +303,7 @@ function popupAccountSelectionResponse(
         window.opener.postMessage({
           type: "GOOGLE_ADS_AUTH_SUCCESS",
           pendingToken,
+          next,
           accounts: selectedAccounts.map(a => ({ id: a.id, name: a.name })),
           customerId: selectedAccounts[0].id,
           customerName: selectedAccounts[0].name,
@@ -489,6 +490,7 @@ async function createOrRedirectGoogleAdsSession({
         type: "GOOGLE_ADS_AUTH_SUCCESS",
         customerId: account.id,
         customerName: account.name || "Google Ads Account",
+        redirectUrl: `${origin}${next}`,
         ...(googleEmail ? { googleEmail } : {}),
       });
       markGoogleAdsSignup(response, isFirstSignup, googleEmail);
@@ -539,7 +541,7 @@ async function createOrRedirectGoogleAdsSession({
   if (popup) {
     // The selection page identifies the user via Supabase and reads
     // candidates off ad_platform_connections.accountIds.
-    return popupAccountSelectionResponse(usableAccounts, "", origin);
+    return popupAccountSelectionResponse(usableAccounts, "", origin, next);
   }
 
   // Land new users on /manage-ads-accounts so they can pick a platform
@@ -599,6 +601,7 @@ async function reuseExistingSession({
       type: "GOOGLE_ADS_AUTH_SUCCESS",
       customerId: conn.customerId,
       customerName: activeAccount?.name || "Google Ads Account",
+      redirectUrl: `${origin}${next}`,
     });
   }
 
@@ -794,7 +797,10 @@ export async function GET(request: Request) {
   let response: NextResponse;
 
   try {
-    const reusedResponse = await reuseExistingSession({
+    // Popup connects are account-management flows. Do not short-circuit on the
+    // previous selected account; list accounts from the new OAuth grant so the
+    // user can actually change/select accounts.
+    const reusedResponse = popup ? null : await reuseExistingSession({
       origin,
       userId: user?.id ?? null,
       googleEmail: user?.email ?? null,

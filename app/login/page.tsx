@@ -9,6 +9,7 @@ import { Loader2, Mail } from "lucide-react";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { AUTH_ERROR_REASON } from "@/lib/auth-errors";
 import { BRAND_NAME } from "@/lib/brand";
+import { DEFAULT_ACTIVATION_PATH } from "@/lib/app-routes";
 
 export default function LoginPage() {
   return (
@@ -29,7 +30,7 @@ export default function LoginPage() {
 function LoginForm() {
   const t = useTranslations("Login");
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/campaigns";
+  const next = searchParams.get("next") ?? DEFAULT_ACTIVATION_PATH;
   const errorParam = searchParams.get("error");
 
   const [email, setEmail] = useState("");

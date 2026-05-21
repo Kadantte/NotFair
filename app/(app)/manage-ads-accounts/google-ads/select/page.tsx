@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { AccountSelector, type SelectableAccount } from '@/components/account-selector';
 import { getSession } from '@/lib/session';
+import { DEFAULT_ACTIVATION_PATH, safeInternalPathOrDefault } from '@/lib/app-routes';
 
 type Props = {
     searchParams: Promise<{
@@ -56,10 +57,9 @@ export default async function GoogleAdsSelectRoute({ searchParams }: Props) {
             ? session.customerIds.map((a) => a.id)
             : parseSelected(sp.selected);
 
-    // Default post-save destination is the Google Ads MCP setup page,
-    // with `?connected=1` so the toast fires. The AccountSelector falls
-    // back to this when the API doesn't return a redirectUrl.
-    const next = sp.next && sp.next.startsWith('/') ? sp.next : '/connect/google-ads?connected=1';
+    // New signup default is auto mode: after account selection NotFair should
+    // start working, not ask the user to invent a prompt.
+    const next = safeInternalPathOrDefault(sp.next, DEFAULT_ACTIVATION_PATH);
 
     return (
         <section className="flex h-full min-h-0 flex-col overflow-hidden">

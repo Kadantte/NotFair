@@ -1,9 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { AUTO_MODE_QUERY, isAutoModeValue } from "@/lib/app-routes";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatRedirect() {
+type Props = {
+  searchParams: Promise<{ auto?: string }>;
+};
+
+export default async function ChatRedirect({ searchParams }: Props) {
   // Always default to a fresh thread when the user clicks Chat. Resuming the
   // most recent thread cost a DB roundtrip on every nav; the sidebar already
   // exposes prior threads when the user wants to revisit one.
@@ -14,5 +19,7 @@ export default async function ChatRedirect() {
   const hasMeta = session.metaAccounts.length > 0;
   if (!hasGoogle && !hasMeta) redirect("/manage-ads-accounts");
 
-  redirect(`/chat/${crypto.randomUUID()}`);
+  const sp = await searchParams;
+  const autoParam = isAutoModeValue(sp.auto) ? AUTO_MODE_QUERY : "";
+  redirect(`/chat/${crypto.randomUUID()}${autoParam}`);
 }

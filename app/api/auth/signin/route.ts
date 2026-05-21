@@ -13,13 +13,10 @@ import {
   sanitizePaidTouch,
 } from "@/lib/utm";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
+import { safeInternalPathOrDefault } from "@/lib/app-routes";
 
 function getSafeNext(next: string | null) {
-  if (!next || !next.startsWith("/")) {
-    return "/connect";
-  }
-
-  return next;
+  return safeInternalPathOrDefault(next);
 }
 
 // Narrow allowlist — anything outside this falls back to "consent" so a

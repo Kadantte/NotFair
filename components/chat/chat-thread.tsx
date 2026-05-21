@@ -13,6 +13,7 @@ import { Message, ThinkingIndicator } from "@/components/chat/chat-shared";
 import { McpToolsSheet } from "@/components/chat/mcp-tools-sheet";
 import { useMcpTools } from "@/components/chat/use-mcp-tools";
 import { UseInYourClaudePill } from "@/components/chat/model-selector";
+import { isAutoModeSearchParams } from "@/lib/app-routes";
 
 export type ChatThreadInitialAccount = {
   customerId: string | null;
@@ -26,7 +27,7 @@ type ChatThreadProps = {
   initialMessages: GoogleAdsAgentUIMessage[];
 };
 
-const primaryPrompt = "Run an audit on my account and suggest the 3 biggest fixes with dollar impact.";
+const primaryPrompt = "Start working on my ad account in read-only mode. Look across performance, spend, and obvious opportunities, then tell me the best next actions. Do not make any changes unless I explicitly approve them.";
 const secondaryPrompts = [
   "List my top 10 campaigns by spend and explain which are inefficient.",
   "For campaign 123456789, diagnose the last 30 days and recommend fixes.",
@@ -66,15 +67,18 @@ export default function ChatThread({ threadId, initialAccount, initialMessages }
   const shouldScrollRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
-  // Auto-submit audit when redirected with ?auto=audit (first-signup OAuth flow)
+  // Auto-start when redirected with ?auto=1 (first-signup OAuth flow)
   const autoFiredRef = useRef(false);
+  const [autoModeStarted, setAutoModeStarted] = useState(() => isAutoModeSearchParams(searchParams));
   useEffect(() => {
     if (autoFiredRef.current) return;
     if (messages.length !== 0) return;
-    if (searchParams.get("auto") !== "audit") return;
+    if (!isAutoModeSearchParams(searchParams)) return;
     autoFiredRef.current = true;
     shouldScrollRef.current = true;
-    sendMessage({ text: primaryPrompt });
+    void sendMessage({ text: primaryPrompt }).catch(() => {
+      setAutoModeStarted(false);
+    });
     // Strip query param so refresh doesn't re-fire on navigation
     router.replace(`/chat/${threadId}`);
   }, [messages.length, searchParams, sendMessage, router, threadId]);
@@ -129,6 +133,7 @@ export default function ChatThread({ threadId, initialAccount, initialMessages }
 
   const isSending = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
+  const isAutoMode = !error && (isAutoModeSearchParams(searchParams) || (autoModeStarted && isEmpty));
 
   const currentTitle = useMemo(() => {
     const firstUserMsg = messages.find(m => m.role === "user");
@@ -237,30 +242,48 @@ export default function ChatThread({ threadId, initialAccount, initialMessages }
         <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 md:px-6">
           <div className="mx-auto w-full max-w-3xl pb-10">
             <h1 className="text-center text-2xl font-medium text-white md:text-3xl">
-              {initialAccount.platform === "meta_ads"
+              {isAutoMode
+                ? `NotFair is getting started on your ${initialAccount.platform === "meta_ads" ? "Meta Ads" : "Google Ads"} account`
+                : initialAccount.platform === "meta_ads"
                 ? "What can I help with your Meta Ads account today?"
                 : "What can I help with your Google Ads account today?"}
             </h1>
-            <div className="mt-8">{composer}</div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => handleSend(primaryPrompt)}
-                className="rounded-xl border border-[#4a4a48] bg-[#2c2c2b] px-3 py-2 text-left text-xs leading-5 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white sm:col-span-2"
-              >
-                {primaryPrompt}
-              </button>
-              {secondaryPrompts.map(prompt => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => handleSend(prompt)}
-                  className="rounded-xl border border-[#4a4a48] bg-[#2c2c2b] px-3 py-2 text-left text-xs leading-5 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
+            {isAutoMode ? (
+              <div className="mx-auto mt-8 max-w-xl rounded-2xl border border-[#4a4a48] bg-[#2c2c2b] p-5">
+                <ThinkingIndicator />
+                <ul className="mt-4 space-y-2 text-sm text-[#b0b0ae]">
+                  <li>Reading the account structure and recent performance</li>
+                  <li>Finding the clearest opportunities and risks</li>
+                  <li>Preparing simple next steps for your approval</li>
+                </ul>
+                <p className="mt-4 text-xs leading-5 text-[#8b8b89]">
+                  This first pass is read-only. NotFair will ask before making any account changes.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="mt-8">{composer}</div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSend(primaryPrompt)}
+                    className="rounded-xl border border-[#4a4a48] bg-[#2c2c2b] px-3 py-2 text-left text-xs leading-5 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white sm:col-span-2"
+                  >
+                    {primaryPrompt}
+                  </button>
+                  {secondaryPrompts.map(prompt => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => handleSend(prompt)}
+                      className="rounded-xl border border-[#4a4a48] bg-[#2c2c2b] px-3 py-2 text-left text-xs leading-5 text-[#b0b0ae] transition-colors hover:bg-[#3a3a39] hover:text-white"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {error && (
               <div className="mt-3 rounded-lg bg-[#C45D4A]/10 px-4 py-3 text-sm text-[#C45D4A]">
                 {error.message}

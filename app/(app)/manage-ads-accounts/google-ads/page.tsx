@@ -8,6 +8,7 @@ import { listConnectableAccounts } from "@/lib/google-ads";
 import { AccountSelector, type SelectableAccount } from "@/components/account-selector";
 import { ManageAdsAccountsShell } from "@/components/manage-ads-accounts-shell";
 import { DisconnectGoogleCard } from "@/components/disconnect-google-card";
+import { GOOGLE_ADS_CONNECTED_PATH } from "@/lib/app-routes";
 
 /**
  * Page for managing the user's Google ad-account selection.
@@ -105,7 +106,7 @@ export default async function AddGoogleAdsAccountPagePath() {
         accounts={availableAccounts}
         mode={session.pendingSetup ? "create" : "update"}
         preselectedIds={preselectedIds}
-        next="/connect/google-ads?connected=1"
+        next={GOOGLE_ADS_CONNECTED_PATH}
         submitEndpoint="/api/auth/select-account"
         headline={session.pendingSetup ? t("selectGoogleHeadline") : t("manageGoogleHeadline")}
         body={t("googleSelectorBody")}

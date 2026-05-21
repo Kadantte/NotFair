@@ -18,6 +18,7 @@ import { getClientIp } from "@/lib/request-ip";
 import { attributionToUserMetadata, paidTouchToUserMetadata, sanitizeAttribution, sanitizePaidTouch } from "@/lib/utm";
 import { identifyUser } from "@/lib/auth/identify-user";
 import { loadGoogleConnection } from "@/lib/connections/google-read";
+import { DEFAULT_ACTIVATION_PATH, GOOGLE_ADS_CONNECTED_PATH, safeInternalPathOrDefault } from "@/lib/app-routes";
 
 export async function POST(request: Request) {
   after(flushServerEvents);
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   const { pendingToken, accounts, next: rawNext } = body;
-  const next = typeof rawNext === 'string' && rawNext.startsWith('/') ? rawNext : '/connect/google-ads?connected=1';
+  const next = safeInternalPathOrDefault(typeof rawNext === 'string' ? rawNext : null, DEFAULT_ACTIVATION_PATH);
 
   if (!Array.isArray(accounts) || accounts.length === 0) {
     return NextResponse.json(
@@ -247,11 +248,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // After save we always land on the Google MCP setup page. New-signup
-  // flows can override via `next` (e.g. /audit) — they don't get the toast
-  // since they're not on /connect/google-ads.
+  // New signups land in auto mode by default so NotFair starts working
+  // immediately instead of dropping users on passive setup docs.
+  // Existing users keep the account-management confirmation path.
   const response = NextResponse.json({
-    redirectUrl: `${getAppOrigin()}${isNewSignup ? next : '/connect/google-ads?connected=1'}`,
+    redirectUrl: `${getAppOrigin()}${isNewSignup ? next : GOOGLE_ADS_CONNECTED_PATH}`,
   });
   if (isNewSignup) {
     const xConversionId = buildXSignupConversionId(identity.userId);

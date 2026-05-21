@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DEFAULT_ACTIVATION_PATH } from '@/lib/app-routes';
 
 /**
  * One ad account the user can pick. The optional grouping fields
@@ -157,11 +158,10 @@ export function AccountSelector({
                 setSubmitting(false);
                 return;
             }
-            // Save succeeded → land the user on the Google MCP setup page
-            // for MCP setup (with the success toast firing on arrival). The
-            // server may also have included a redirectUrl (post-signup); use
-            // that when present, otherwise fall back to /connect/google-ads.
-            window.location.assign(data.redirectUrl ?? '/connect/google-ads?connected=1');
+            // Save succeeded. Prefer the server redirect; if an old response
+            // omits one, fall back to auto mode so a fresh user lands in an
+            // active agent flow rather than a passive setup surface.
+            window.location.assign(data.redirectUrl ?? DEFAULT_ACTIVATION_PATH);
         } catch (err) {
             setError(err instanceof Error ? err.message : t('saveFailed'));
             setSubmitting(false);

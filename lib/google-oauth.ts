@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_ACTIVATION_PATH } from "@/lib/app-routes";
 import { ATTRIBUTION_PARAM_KEYS, UTM_STORAGE_PREFIX } from "@/lib/utm";
 
 export type GoogleConnectOptions = {
@@ -35,11 +36,11 @@ function buildAuthUrl(next: string, popup: boolean, options?: GoogleConnectOptio
   return url.toString();
 }
 
-export async function startGoogleConnect(next = "/connect", options?: GoogleConnectOptions) {
+export async function startGoogleConnect(next = DEFAULT_ACTIVATION_PATH, options?: GoogleConnectOptions) {
   window.location.assign(buildAuthUrl(next, false, options));
 }
 
-export async function startGoogleConnectPopup(next = "/connect", options?: GoogleConnectOptions) {
+export async function startGoogleConnectPopup(next = DEFAULT_ACTIVATION_PATH, options?: GoogleConnectOptions) {
   const width = 600;
   const height = 700;
   const left = window.screen.width / 2 - width / 2;

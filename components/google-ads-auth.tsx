@@ -29,6 +29,8 @@ type PopupSuccessMessage = {
     type: "GOOGLE_ADS_AUTH_SUCCESS";
     customerId?: string;
     customerName?: string;
+    redirectUrl?: string;
+    next?: string;
     pendingToken?: string;
     accounts?: { id: string; name: string }[];
 };
@@ -77,12 +79,24 @@ export function GoogleAdsAuth({ onConnect, onDisconnect, className, size = "sm",
                         body: JSON.stringify({
                             pendingToken: event.data.pendingToken,
                             accounts: event.data.accounts,
+                            next: event.data.next,
                         }),
                     });
 
                     if (!response.ok) {
                         throw new Error("Failed to finalize Google Ads account selection");
                     }
+
+                    const data = await response.json() as { redirectUrl?: string };
+                    if (data.redirectUrl) {
+                        window.location.assign(data.redirectUrl);
+                        return;
+                    }
+                }
+
+                if (event.data.redirectUrl) {
+                    window.location.assign(event.data.redirectUrl);
+                    return;
                 }
 
                 const session = await readServerSession();

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Play, Trash2, Target } from 'lucide-react';
+import { RefreshCw, BarChart3, TrendingUp, DollarSign, MousePointer2, AlertCircle, Loader2, ChevronRight, Pause, Play, Trash2, Target, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { listCampaignsAction, pauseCampaignAction, enableCampaignAction, removeCampaignAction } from '@/app/actions';
+import { DEFAULT_ACTIVATION_PATH } from '@/lib/app-routes';
 import { formatMoney } from '@/lib/currency';
 
 interface Campaign {
@@ -186,16 +187,26 @@ export default function CampaignsPage() {
                         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#E8E4DD]">Campaigns</h1>
                         <p className="mt-0.5 text-xs sm:text-sm text-[#C4C0B6] hidden sm:block">Manage and track your Google Ads performance</p>
                     </div>
-                    <Button
-                        onClick={() => { cachedCampaigns = null; fetchCampaigns(false, true); }}
-                        disabled={loading}
-                        variant="outline"
-                        size="sm"
-                        className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5 shrink-0"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        <span className="hidden sm:inline">Refresh</span>
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <Link
+                            href={DEFAULT_ACTIVATION_PATH}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#4CAF6E] px-3 text-sm font-semibold text-[#1A1917] transition-colors hover:bg-[#3D9A5C]"
+                        >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Let NotFair start</span>
+                            <span className="sm:hidden">Start</span>
+                        </Link>
+                        <Button
+                            onClick={() => { cachedCampaigns = null; fetchCampaigns(false, true); }}
+                            disabled={loading}
+                            variant="outline"
+                            size="sm"
+                            className="border-[#3D3C36] bg-[#24231F] hover:bg-[#2E2D28] text-[#C4C0B6] hover:text-[#E8E4DD] gap-1.5"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">Refresh</span>
+                        </Button>
+                    </div>
                 </div>
             </header>
 
