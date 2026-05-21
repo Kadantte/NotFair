@@ -1209,14 +1209,18 @@ function deriveWorkingView(input: {
     };
   }
   if (!lastEvent || lastEvent.kind === "user_message" || lastEvent.kind === "unknown") {
+    // Agent name is rendered separately as the accent prefix in the
+    // indicator, so headlines stay tight + verb-only here. Subtitle
+    // is only set when the gateway has told us a concrete phase —
+    // otherwise we just say "Starting" without a redundant restatement
+    // ("Delivering the brief to OpenClaw" was both jargony and said
+    // the same thing as the headline, which read as contradictory).
     const lifecycleSummary = lifecyclePhase
       ? humanLifecyclePhase(lifecyclePhase)
       : null;
     return {
-      // Agent name is rendered separately as the accent prefix in the
-      // indicator, so headlines stay tight + verb-only here.
       headline: "Starting",
-      subtitle: lifecycleSummary ?? "Delivering the brief to OpenClaw",
+      subtitle: lifecycleSummary,
       phases,
       mood: "waiting",
     };
