@@ -843,7 +843,27 @@ export function validateSegmentResourceCompatibility(query: string) {
     }
   }
 
-  // (c) bare conversion_action as a SELECT field when FROM is something else
+  // (c) Search lost IS metrics are campaign-only in practice. Production
+  // agents have tried them from `ad_group` and `keyword_view`; Google rejects
+  // after the round-trip with "metric is incompatible with the resource in the
+  // FROM clause". Catch the observed bad pair locally and point to the safe
+  // workflow: campaign aggregate first, then drill into ad groups/keywords with
+  // delivery metrics only.
+  const searchLostImpressionShareMetrics = selectFields.filter(
+    (f) =>
+      f === "metrics.search_budget_lost_impression_share" ||
+      f === "metrics.search_rank_lost_impression_share",
+  );
+  if (
+    searchLostImpressionShareMetrics.length > 0 &&
+    (resource === "ad_group" || resource === "keyword_view")
+  ) {
+    throw new Error(
+      `GAQL pre-flight: ${searchLostImpressionShareMetrics.map((f) => `\`${f}\``).join(", ")} is not selectable from \`FROM ${resource}\`. Query impression-share loss from \`FROM campaign\` using \`metrics.search_budget_lost_impression_share\` / \`metrics.search_rank_lost_impression_share\`; for ad-group or keyword drilldowns, use compatible delivery metrics such as \`metrics.impressions\`, \`metrics.clicks\`, \`metrics.cost_micros\`, and \`metrics.conversions\`.`,
+    );
+  }
+
+  // (d) bare conversion_action as a SELECT field when FROM is something else
   if (resource !== "conversion_action" && selectFields.includes("conversion_action")) {
     throw new Error(
       "GAQL pre-flight: bare `conversion_action` is not a selectable SELECT field. To break down metrics per conversion action: query `FROM campaign` (or `FROM ad_group`) and SELECT `segments.conversion_action` (the resource path) or `segments.conversion_action_name`. To list configured conversion actions: query `FROM conversion_action` and SELECT the `conversion_action.*` fields you want.",
