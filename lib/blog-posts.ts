@@ -359,7 +359,12 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         type: "text",
         content:
-          "MCP for Google Ads is an MCP (Model Context Protocol) server that exposes Google Ads API operations as structured tools an AI assistant can call. Plug it into Claude, ChatGPT, Cursor, or any MCP-compatible client and the assistant can read campaigns, run audits, pause keywords, adjust bids — all from a normal conversation.",
+          "MCP for Google Ads is an MCP (Model Context Protocol) server that exposes Google Ads API operations as structured tools an AI assistant can call. Plug it into Claude, Codex, Hermes Agent, OpenClaw, or any MCP-compatible client and the assistant can read campaigns, run audits, pause keywords, adjust bids — all from a normal conversation.",
+      },
+      {
+        type: "callout",
+        content:
+          "Looking for the hosted server? Use NotFair’s Google Ads MCP Server for Claude, Codex, Hermes Agent, OpenClaw, and other MCP clients at /google-ads-mcp.",
       },
       {
         type: "text",
@@ -413,7 +418,7 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         question: "Is MCP for Google Ads the same as Google's AI features?",
         answer:
-          "No. Smart Bidding, Performance Max, and other Google-built AI features run inside the Google Ads platform. MCP for Google Ads is what lets external AI assistants — Claude, ChatGPT, Cursor — read and act on your account. They are complementary, not competing.",
+          "No. Smart Bidding, Performance Max, and other Google-built AI features run inside the Google Ads platform. MCP for Google Ads is what lets external AI assistants — Claude, Codex, Hermes Agent, OpenClaw, and other MCP clients — read and act on your account. They are complementary, not competing.",
       },
       {
         question: "Does MCP work with Microsoft Ads or Meta Ads?",
@@ -428,13 +433,13 @@ export const blogPosts: Record<string, BlogPost> = {
       {
         question: "What client should I use to connect MCP for Google Ads?",
         answer:
-          "Claude Desktop is the easiest entry point — one-click install via the Connectors UI. Claude Code, ChatGPT (via Codex), and Cursor all also work.",
+          "Claude Desktop is the easiest entry point — one-click install via the Connectors UI. Claude Code, Codex, Hermes Agent, OpenClaw, Cursor, and other MCP clients all also work.",
       },
     ],
     relatedLinks: [
       { href: "/blog/what-is-mcp", title: "What Is MCP (Model Context Protocol)?", description: "The general MCP protocol explained — clients, servers, tools, and a real Google Ads example." },
-      { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every Claude surface plus ChatGPT/Codex and Cursor." },
-      { href: "/google-ads-mcp", title: "NotFair Google Ads MCP Server", description: "The hosted MCP server — connect Google Ads in one OAuth flow." },
+      { href: "/blog/connect-google-ads-to-claude", title: "How to Connect Google Ads to Claude", description: "Step-by-step setup for every Claude surface plus Codex, Hermes Agent, OpenClaw, and generic MCP clients." },
+      { href: "/google-ads-mcp", title: "Google Ads MCP Server", description: "The hosted MCP server — connect Google Ads in one OAuth flow." },
     ],
   },
   "can-ai-run-google-ads-campaigns": {

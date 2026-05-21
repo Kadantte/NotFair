@@ -3,9 +3,9 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 import { MCP_SERVER_URL } from "@/lib/brand";
 
 export const metadata = buildMetadata({
-  title: "Google Ads MCP Server for Claude, Codex, Cursor & More | NotFair",
+  title: "Google Ads MCP Server for Claude, Codex, Hermes & OpenClaw | NotFair",
   description:
-    "Hosted Google Ads MCP server for AI clients. Connect Claude, Codex, Cursor, and other MCP clients to live Google Ads data and approved account actions.",
+    "Hosted Google Ads MCP server for AI agents. Connect Claude, Codex, Hermes, OpenClaw, and other MCP clients to live Google Ads data and approved actions.",
   path: "/google-ads-mcp",
   keywords: [
     "google ads mcp",
@@ -13,7 +13,8 @@ export const metadata = buildMetadata({
     "mcp google ads",
     "claude google ads mcp",
     "codex google ads mcp",
-    "cursor google ads mcp",
+    "hermes google ads mcp",
+    "openclaw google ads mcp",
     "google ads mcp config",
     "model context protocol google ads",
   ],
@@ -28,7 +29,7 @@ const faqItems = [
   {
     question: "Which MCP clients are supported?",
     answer:
-      "Any client that speaks the MCP Streamable HTTP transport — Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Cursor, Cline, and custom MCP clients. The server URL is the same; only the client-side config differs.",
+      "Any client that speaks the MCP Streamable HTTP transport — Claude.ai (Web, Desktop, Cowork), Claude Code, OpenAI Codex CLI, Hermes Agent, OpenClaw, Cursor, Cline, and custom MCP clients. The server URL is the same; only the client-side config differs.",
   },
   {
     question: "Do I need to self-host anything?",
@@ -62,7 +63,7 @@ const jsonLd = [
     applicationSubCategory: "Model Context Protocol Server",
     operatingSystem: "Web",
     description:
-      "Hosted Google Ads MCP server for Claude.ai, Claude Code, OpenAI Codex, Cursor, Cline, and any MCP-compatible AI client. Diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
+      "Hosted Google Ads MCP server for Claude.ai, Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, Cursor, Cline, and any MCP-compatible AI client. Diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -84,7 +85,7 @@ const jsonLd = [
     "@type": "WebAPI",
     name: "NotFair Google Ads MCP API",
     description:
-      "Model Context Protocol API for Google Ads diagnosis, recommendations, and approved execution. Compatible with Claude, Codex, Cursor, and any MCP-compatible client.",
+      "Model Context Protocol API for Google Ads diagnosis, recommendations, and approved execution. Compatible with Claude, Codex, Hermes Agent, OpenClaw, and any MCP-compatible client.",
     documentation: new URL("/google-ads-mcp", SITE_URL).toString(),
     termsOfService: new URL("/terms", SITE_URL).toString(),
     provider: {
