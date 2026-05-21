@@ -311,13 +311,21 @@
         }
       },
       "openclaw": {
-        "sendPrompt": {
-          "title": "Diesen Prompt senden",
-          "body": "Kopieren Sie diesen Prompt und senden Sie ihn im Chat Ihres Agenten, um die Verbindung zu starten:"
+        "install": {
+          "title": "Install the OpenClaw plugin",
+          "body": "Run this in your terminal. The plugin uses the NotFair Google Ads MCP server by default:"
         },
-        "signIn": {
-          "title": "Anmelden und loslegen",
-          "body": "Ihr Agent antwortet mit einem Anmeldelink. Öffnen Sie ihn, melden Sie sich mit NotFair an, dann ist alles bereit. Testen Sie: <tryPrompt></tryPrompt>"
+        "login": {
+          "title": "Sign in to NotFair",
+          "body": "Start the NotFair login flow. OpenClaw prints an OAuth URL and stores your token after you sign in:"
+        },
+        "connect": {
+          "title": "Connect Google Ads",
+          "body": "Connect your Google Ads account through NotFair at <connectUrl></connectUrl>, or run the helper command:"
+        },
+        "status": {
+          "title": "Verify and start asking",
+          "body": "Check that OpenClaw can see your NotFair connection, then try: <tryPrompt></tryPrompt>"
         }
       },
       "codex": {
@@ -345,13 +353,17 @@
         }
       },
       "hermes": {
-        "sendPrompt": {
-          "title": "Diesen Prompt senden",
-          "body": "Kopieren Sie diesen Prompt und senden Sie ihn im Chat Ihres Agenten, um die Verbindung zu starten:"
+        "add": {
+          "title": "Add the MCP server",
+          "body": "Run this in your terminal to register NotFair with Hermes:"
         },
-        "signIn": {
-          "title": "Anmelden und loslegen",
-          "body": "Ihr Agent antwortet mit einem Anmeldelink. Öffnen Sie ihn, melden Sie sich mit NotFair an, dann ist alles bereit. Testen Sie: <tryPrompt></tryPrompt>"
+        "test": {
+          "title": "Test the connection",
+          "body": "Ask Hermes to verify the MCP server and complete the sign-in flow if prompted:"
+        },
+        "firstPrompt": {
+          "title": "Start asking",
+          "body": "Once the test succeeds, use Hermes with NotFair. Try this prompt:"
         }
       }
     }

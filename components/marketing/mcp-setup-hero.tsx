@@ -219,7 +219,7 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#5B6CFF]/40",
         pillBgClass: "bg-[#5B6CFF]/15",
-        steps: ["sendPrompt", "signIn"],
+        steps: ["install", "login", "connect", "status"],
     },
     {
         id: "codex",
@@ -246,16 +246,12 @@ export const PLATFORMS: Platform[] = [
         nameColor: "text-[#E8E4DD]",
         ringClass: "ring-[#A78BFA]/40",
         pillBgClass: "bg-[#A78BFA]/15",
-        steps: ["sendPrompt", "signIn"],
+        steps: ["add", "test", "firstPrompt"],
     },
 ];
 
 export function isMcpPlatformId(value: string | undefined | null): value is string {
     return !!value && PLATFORMS.some((platform) => platform.id === value);
-}
-
-function agentConnectionPrompt() {
-    return `Connect to ${MCP_CONNECTOR_NAME} MCP at ${MCP_SERVER_URL} — it supports OAuth flow, discover at https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads. Run the OAuth flow, send me the link, poll until I authorize, and confirm once it succeeds.`;
 }
 
 function cursorConfig() {
@@ -325,24 +321,100 @@ function PlatformStepBody({ platformId, stepId }: { platformId: string; stepId: 
         });
     }
 
-    if ((platformId === "openclaw" || platformId === "hermes") && stepId === "sendPrompt") {
+    if (platformId === "openclaw" && stepId === "install") {
         return (
             <>
-                {t(`platforms.${platformId}.sendPrompt.body`)}
+                {t("platforms.openclaw.install.body")}
                 <CopyField
-                    value={agentConnectionPrompt()}
+                    value="openclaw plugins install openclaw-notfair"
                     className="mt-3"
-                    prose
-                    onCopy={() => trackSetupCopied(platformId, "prompt")}
+                    onCopy={() => trackSetupCopied("openclaw", "install_command")}
                 />
             </>
         );
     }
 
-    if ((platformId === "openclaw" || platformId === "hermes") && stepId === "signIn") {
-        return t.rich(`platforms.${platformId}.signIn.body`, {
-            tryPrompt: () => tryPrompt,
-        });
+    if (platformId === "openclaw" && stepId === "login") {
+        return (
+            <>
+                {t("platforms.openclaw.login.body")}
+                <CopyField
+                    value="openclaw notfair login"
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("openclaw", "login_command")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "openclaw" && stepId === "connect") {
+        return (
+            <>
+                {t.rich("platforms.openclaw.connect.body", {
+                    connectUrl: () => <CodeInline>https://notfair.co/connect</CodeInline>,
+                })}
+                <CopyField
+                    value="openclaw notfair connect"
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("openclaw", "connect_command")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "openclaw" && stepId === "status") {
+        return (
+            <>
+                {t.rich("platforms.openclaw.status.body", {
+                    tryPrompt: () => tryPrompt,
+                })}
+                <CopyField
+                    value="openclaw notfair status"
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("openclaw", "status_command")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "hermes" && stepId === "add") {
+        return (
+            <>
+                {t("platforms.hermes.add.body")}
+                <CopyField
+                    value={`hermes mcp add ${MCP_CONNECTOR_NAME} --url ${MCP_SERVER_URL}`}
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("hermes", "add_command")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "hermes" && stepId === "test") {
+        return (
+            <>
+                {t("platforms.hermes.test.body")}
+                <CopyField
+                    value={`hermes mcp test ${MCP_CONNECTOR_NAME}`}
+                    className="mt-3"
+                    onCopy={() => trackSetupCopied("hermes", "test_command")}
+                />
+            </>
+        );
+    }
+
+    if (platformId === "hermes" && stepId === "firstPrompt") {
+        return (
+            <>
+                {t("platforms.hermes.firstPrompt.body")}
+                <CopyField
+                    value={t("tryPrompt")}
+                    className="mt-3"
+                    prose
+                    onCopy={() => trackSetupCopied("hermes", "first_prompt")}
+                />
+            </>
+        );
     }
 
     if (platformId === "codex" && stepId === "install") {
