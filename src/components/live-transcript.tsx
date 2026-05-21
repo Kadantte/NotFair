@@ -442,16 +442,18 @@ export function LiveTranscript({
   }, [autoKickoff, threadId]);
 
   const rendered = useMemo(() => collapseEvents(events), [events]);
-  // Pulse the "thinking" indicator any time the agent could plausibly be
-  // working: the user just sent (sendingChat) OR the parent told us this is
-  // an in-flight task (composerDisabled) with no streaming output yet to
-  // show. Without the second branch, server-side kickoffs land the user on
-  // a silent page until the first poll picks up bytes — that's the "did my
-  // task even get delivered?" gap the user flagged.
-  const showThinking =
-    pendingAssistant === "" &&
-    pendingTools.length === 0 &&
-    (sendingChat || composerDisabled);
+  // Show the working indicator any time the agent is plausibly running —
+  // the user just sent (sendingChat) OR the parent says the task is in
+  // flight (composerDisabled). Keep it at the bottom of the transcript
+  // throughout the turn, BELOW pending tool calls and streaming text,
+  // so the user sees the same anchor whether the agent is mid-call,
+  // mid-stream, or waiting on the next model token.
+  //
+  // (Earlier we hid the indicator once anything pending was rendered.
+  // That made the chat read as "stuck" the moment streaming started —
+  // there was no longer any active animation to telegraph "I'm still
+  // working.")
+  const showThinking = sendingChat || composerDisabled;
 
   return (
     <div className="flex h-full flex-col">
@@ -505,6 +507,8 @@ export function LiveTranscript({
                       events={events}
                       turnStartedAt={turnStartedAt}
                       lifecyclePhase={pendingLifecycle}
+                      pendingTools={pendingTools}
+                      hasPendingAssistant={pendingAssistant.length > 0}
                     />
                   )}
                 </li>
@@ -1050,6 +1054,8 @@ function WorkingStatus({
   events,
   turnStartedAt,
   lifecyclePhase,
+  pendingTools,
+  hasPendingAssistant,
 }: {
   agentDisplayName: string;
   events: TranscriptEvent[];
@@ -1068,6 +1074,21 @@ function WorkingStatus({
    * gpt-5.5 with a multi-KB system prompt.
    */
   lifecyclePhase?: string | null;
+  /**
+   * Tool calls streamed via the active SSE connection. These can lead the
+   * committed JSONL `events` list by a few seconds (the file is buffered
+   * per turn in codex-app-server mode), so consulting both gives us a
+   * more accurate "what's the agent doing right now?" headline while the
+   * indicator sits at the bottom of the transcript.
+   */
+  pendingTools?: ToolEntry[];
+  /**
+   * True when the active SSE stream has emitted at least one assistant
+   * text delta — indicates the model is currently writing its response.
+   * Drives a "Writing the response…" headline so the indicator's caption
+   * matches what the user is watching scroll in above it.
+   */
+  hasPendingAssistant?: boolean;
 }) {
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
@@ -1096,6 +1117,21 @@ function WorkingStatus({
     0,
   );
 
+  // Pick the strongest "what's happening right now" signal across SSE
+  // pending state (leads) and committed JSONL events (trails). During SSE
+  // streaming, pendingTools / pendingAssistant know the truth seconds
+  // before the file flushes. After polling catches up, `events` reflects
+  // the same content. Either way the indicator at the bottom of the
+  // transcript stays accurate.
+  const pendingInFlightTool =
+    pendingTools && pendingTools.length > 0
+      ? pendingTools.find((t) => !t.done) ?? null
+      : null;
+  const pendingLastDoneTool =
+    !pendingInFlightTool && pendingTools && pendingTools.length > 0
+      ? [...pendingTools].reverse().find((t) => t.done) ?? null
+      : null;
+
   // Two display modes:
   //   - `beam`: cycle through "Pondering… / Cogitating… / Beaming…" verbs
   //     with a morphing ✳ glyph. Used whenever we have nothing more
@@ -1103,8 +1139,9 @@ function WorkingStatus({
   //     keeps the chat visibly alive during the 10-20s Codex pause that
   //     used to read as "stuck".
   //   - `static`: render a fixed headline + subtitle (specific tool in
-  //     flight, last tool result, wrapping up assistant text). The
-  //     specific info is more useful than a quirky verb, so we keep it.
+  //     flight, currently writing the response, last tool result, wrapping
+  //     up assistant text). The specific info is more useful than a quirky
+  //     verb, so we keep it.
   //
   // The leading glyph is morphing in both modes so the eye always has
   // something animating.
@@ -1112,7 +1149,20 @@ function WorkingStatus({
   let headline: string = `${agentDisplayName} is thinking…`;
   let subtitle: string | null = null;
   let beamPrefix: string | null = agentDisplayName;
-  if (!lastEvent || lastEvent.kind === "user_message" || lastEvent.kind === "unknown") {
+  if (pendingInFlightTool) {
+    // SSE-derived in-flight tool wins: most accurate live signal.
+    mode = "static";
+    headline = `Calling ${formatToolName(pendingInFlightTool.name)}…`;
+    subtitle = pendingInFlightTool.label ?? null;
+  } else if (hasPendingAssistant) {
+    // Model is currently emitting assistant text via SSE. Match the user's
+    // experience — they're watching text scroll in above the indicator.
+    mode = "static";
+    headline = `${agentDisplayName} is writing the response…`;
+    subtitle = pendingLastDoneTool
+      ? `Last step · ${formatToolName(pendingLastDoneTool.name)} ${pendingLastDoneTool.ok ? "✓" : "failed"}`
+      : null;
+  } else if (!lastEvent || lastEvent.kind === "user_message" || lastEvent.kind === "unknown") {
     // Pre-first-event window — typical kickoff wait. Use the gateway
     // lifecycle hint as the subtitle so power users see "calling the
     // model…" but the headline still gets the Beaming treatment.
