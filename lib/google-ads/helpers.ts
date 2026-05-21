@@ -377,6 +377,23 @@ export function rewriteRemovedResourceError(msg: string, entityHint?: string): s
 }
 
 /**
+ * Google Ads resource_count_limit_exceeded_error=10 is deterministic, not
+ * transient. For asset creation this almost always means the account/campaign
+ * has hit the allowed count for that asset family; tell agents to reuse/link
+ * existing assets instead of retrying create*Asset in a loop.
+ */
+export function rewriteAssetResourceLimitError(msg: string, fieldType?: string): string {
+  if (
+    /resource_count_limit_exceeded_error=10/i.test(msg) ||
+    /limit on the number of allowed resources of this type to be exceeded/i.test(msg)
+  ) {
+    const family = fieldType ? `${fieldType} ` : "";
+    return `${msg} — ${family}asset/resource limit reached. Do not retry create unchanged. List existing assets first (listCalloutAssets/listSitelinkAssets/listStructuredSnippetAssets/getAssetLinks), reuse an existing suitable asset with linkAsset, or unlink/remove obsolete links before creating more.`;
+  }
+  return msg;
+}
+
+/**
  * Build a `removeNegativeKeyword` next-tool hint. Five call sites (single
  * pauseKeyword precheck, pauseKeyword catch fallback, three bulk validators)
  * used to inline this object — one typo in `campaignId` and the agent
@@ -469,6 +486,20 @@ export function isValidFinalUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+const PHONE_LIKE_TEXT_RE = /(?:\+?1[\s.-]*)?(?:\([2-9]\d{2}\)|[2-9]\d{2})[\s.-]*\d{3}[\s.-]*\d{4}\b/;
+
+/**
+ * Google Ads rejects phone numbers embedded in ad/asset text with
+ * PHONE_NUMBER_IN_AD_TEXT. Keep this intentionally conservative: match clear
+ * North American phone formats, but do not block license numbers like
+ * "CSLB #1105249".
+ */
+export function validateNoPhoneNumberInAdText(texts: string[]): string | null {
+  const offending = texts.find((text) => PHONE_LIKE_TEXT_RE.test(text));
+  if (!offending) return null;
+  return `Google Ads policy preflight: phone numbers are not allowed in ad text/assets (PHONE_NUMBER_IN_AD_TEXT). Remove "${offending}" from headlines, descriptions, paths, callouts, sitelinks, or structured snippets; use a call asset/extension for phone numbers instead.`;
 }
 
 /** Returns null if valid, or an error message string. */

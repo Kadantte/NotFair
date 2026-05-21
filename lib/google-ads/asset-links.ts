@@ -23,7 +23,7 @@
 
 import { getCustomer } from "./client";
 import { isDemoAuth } from "@/lib/demo/constants";
-import { extractErrorMessage, normalizeCustomerId, safeEntityId } from "./helpers";
+import { extractErrorMessage, normalizeCustomerId, rewriteAssetResourceLimitError, safeEntityId } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -434,7 +434,7 @@ export async function linkAsset(
       entityId: params.assetId,
       beforeValue: "",
       afterValue: "",
-      error: extractErrorMessage(error),
+      error: rewriteAssetResourceLimitError(extractErrorMessage(error), config.fieldTypeName),
       fieldType: config.fieldTypeName,
       assetId: params.assetId,
       assetResourceName: assetResource,
@@ -555,7 +555,7 @@ export async function createAssetWithLinks(
       entityId: "",
       beforeValue: "",
       afterValue: params.afterValue,
-      error: extractErrorMessage(error),
+      error: rewriteAssetResourceLimitError(extractErrorMessage(error), config.fieldTypeName),
       label: params.label ?? null,
       fieldType: config.fieldTypeName,
       assetId: "",
@@ -903,7 +903,7 @@ export async function unlinkAssetByTarget(
       entityId: params.assetId,
       beforeValue: "",
       afterValue: "",
-      error: extractErrorMessage(error),
+      error: rewriteAssetResourceLimitError(extractErrorMessage(error), config.fieldTypeName),
       fieldType: config.fieldTypeName,
       assetId: params.assetId,
       assetResourceName: assetResource,

@@ -180,6 +180,37 @@ describe("createAd", () => {
     expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
 
+  it("blocks obvious phone numbers before Google Ads rejects PHONE_NUMBER_IN_AD_TEXT", async () => {
+    const result = await createAd(auth, "1234567890", {
+      ...validRsa,
+      descriptions: [
+        "Call (818) 900-7479 for a quote today.",
+        "Transparent pricing and quick scheduling for local service.",
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("PHONE_NUMBER_IN_AD_TEXT");
+    expect(result.error).toContain("call asset");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
+  it("does not mistake license numbers for phone numbers", async () => {
+    mockMutateResources.mockResolvedValueOnce({
+      mutate_operation_responses: [
+        { ad_group_ad_result: { resource_name: "customers/1234567890/adGroupAds/111~222" } },
+      ],
+    });
+
+    const result = await createAd(auth, "1234567890", {
+      ...validRsa,
+      headlines: ["CSLB #1105249", "Local HVAC Pros", "Same-Day Service"],
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockMutateResources).toHaveBeenCalledTimes(1);
+  });
+
   describe("path1/path2 (display URL paths)", () => {
     function successfulMutateResponse() {
       mockMutateResources.mockResolvedValueOnce({

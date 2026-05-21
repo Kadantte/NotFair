@@ -16,6 +16,7 @@ import {
   type AssetLinkMutationResult,
   type AssetLinkTarget,
 } from "./asset-links";
+import { validateNoPhoneNumberInAdText } from "./helpers";
 import type { AuthContext } from "./types";
 
 // ─── Reads ──────────────────────────────────────────────────────────
@@ -134,6 +135,20 @@ export async function createCalloutAsset(
       beforeValue: "",
       afterValue: text,
       error: "Callout text must be 25 characters or fewer",
+      fieldType: "CALLOUT",
+      assetId: "",
+      assetResourceName: "",
+    };
+  }
+  const phonePolicyError = validateNoPhoneNumberInAdText([text]);
+  if (phonePolicyError) {
+    return {
+      success: false,
+      action,
+      entityId: "",
+      beforeValue: "",
+      afterValue: text,
+      error: phonePolicyError,
       fieldType: "CALLOUT",
       assetId: "",
       assetResourceName: "",

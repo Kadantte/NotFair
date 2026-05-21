@@ -6,7 +6,7 @@ import {
   type AssetLinkMutationResult,
   type AssetLinkTarget,
 } from "./asset-links";
-import { isValidFinalUrl } from "./helpers";
+import { isValidFinalUrl, validateNoPhoneNumberInAdText } from "./helpers";
 import type { AuthContext } from "./types";
 
 export type SitelinkAsset = {
@@ -69,6 +69,8 @@ function normalizeSitelinkInput(
   }
   if (description1.length > 35) return { error: "Sitelink description1 must be 35 characters or fewer" };
   if (description2.length > 35) return { error: "Sitelink description2 must be 35 characters or fewer" };
+  const phonePolicyError = validateNoPhoneNumberInAdText([linkText, description1, description2]);
+  if (phonePolicyError) return { error: phonePolicyError };
 
   return { linkText, finalUrl, description1, description2 };
 }

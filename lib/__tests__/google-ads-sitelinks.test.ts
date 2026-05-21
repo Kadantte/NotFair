@@ -104,6 +104,19 @@ describe("sitelinks", () => {
     expect(mockMutateResources.mock.calls[0][0]).toHaveLength(1);
   });
 
+  it("rejects phone numbers in sitelink text before Google policy rejection", async () => {
+    const result = await createSitelinkAsset(auth, {
+      linkText: "Free Consultation",
+      finalUrl: "https://example.com/free-consultation",
+      description1: "On-site estimate fast",
+      description2: "Call (818) 900-7479",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("PHONE_NUMBER_IN_AD_TEXT");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
   it("createSitelinkAsset with campaign target produces atomic create+link", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [

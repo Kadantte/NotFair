@@ -1,5 +1,5 @@
 import { getCachedCustomer, getCustomer, AD_GROUP_TYPE, STATUS } from "./client";
-import { extractErrorMessage, extractPolicyRejection, getPolicyRetryBlock, isValidFinalUrl, normalizeCustomerId, recordPolicyFailure, rewriteConversionActionMutateError, rewriteRemovedResourceError, safeEntityId, toMicros, validateRsaAssets } from "./helpers";
+import { extractErrorMessage, extractPolicyRejection, getPolicyRetryBlock, isValidFinalUrl, normalizeCustomerId, recordPolicyFailure, rewriteConversionActionMutateError, rewriteRemovedResourceError, safeEntityId, toMicros, validateNoPhoneNumberInAdText, validateRsaAssets } from "./helpers";
 import type { AuthContext, WriteResult } from "./types";
 
 // ─── Create Shopping Campaign ────────────────────────────────────────
@@ -342,6 +342,15 @@ export async function createAd(
   }
   if (!isValidFinalUrl(params.finalUrl)) {
     return { success: false, action: "create_ad", entityId: "", beforeValue: "", afterValue: "", error: "Final URL must start with http:// or https://" };
+  }
+  const phonePolicyError = validateNoPhoneNumberInAdText([
+    ...params.headlines,
+    ...params.descriptions,
+    params.path1 ?? "",
+    params.path2 ?? "",
+  ]);
+  if (phonePolicyError) {
+    return { success: false, action: "create_ad", entityId: "", beforeValue: adGroupId, afterValue: params.finalUrl, error: phonePolicyError };
   }
   const retryBlock = getPolicyRetryBlock(auth, "createAd", policyTexts);
   if (retryBlock) {
@@ -1396,6 +1405,15 @@ export async function updateAdAssets(
   );
   if (rsaError) {
     return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: rsaError };
+  }
+  const phonePolicyError = validateNoPhoneNumberInAdText([
+    ...params.headlines.map((h) => h.text),
+    ...params.descriptions.map((d) => d.text),
+    params.path1 ?? "",
+    params.path2 ?? "",
+  ]);
+  if (phonePolicyError) {
+    return { success: false, action: "update_ad_assets", entityId, beforeValue: "", afterValue: "", error: phonePolicyError };
   }
 
   // Validate pin values

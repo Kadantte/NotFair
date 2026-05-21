@@ -6,6 +6,7 @@ import {
   type AssetLinkMutationResult,
   type AssetLinkTarget,
 } from "./asset-links";
+import { validateNoPhoneNumberInAdText } from "./helpers";
 import type { AuthContext } from "./types";
 
 export const STRUCTURED_SNIPPET_HEADERS = [
@@ -103,6 +104,10 @@ export function normalizeStructuredSnippetInput(
     return {
       error: `Structured snippet value "${tooLong}" is ${tooLong.length} characters. Each value must be 25 characters or fewer.`,
     };
+  }
+  const phonePolicyError = validateNoPhoneNumberInAdText(deduped);
+  if (phonePolicyError) {
+    return { error: phonePolicyError };
   }
 
   return { header, values: deduped };

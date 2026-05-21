@@ -67,6 +67,17 @@ describe("structured snippets", () => {
     expect(result.error).toMatch(/Services/);
   });
 
+  it("rejects phone numbers in structured snippet values before Google policy rejection", async () => {
+    const result = await createStructuredSnippetAsset(auth, {
+      header: "Services",
+      values: ["Plumbing", "Electrical", "(818) 900-7479"],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("PHONE_NUMBER_IN_AD_TEXT");
+    expect(mockMutateResources).not.toHaveBeenCalled();
+  });
+
   it("creates a structured snippet asset and links it to campaigns in one atomic mutate", async () => {
     mockMutateResources.mockResolvedValueOnce({
       mutate_operation_responses: [

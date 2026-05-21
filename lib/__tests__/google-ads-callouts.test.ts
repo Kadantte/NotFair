@@ -69,6 +69,13 @@ describe("callouts (RMF C.75)", () => {
       expect(mockMutateResources).not.toHaveBeenCalled();
     });
 
+    it("rejects phone numbers before Google policy rejection", async () => {
+      const result = await createCalloutAsset(auth, { text: "818-900-7479" });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("PHONE_NUMBER_IN_AD_TEXT");
+      expect(mockMutateResources).not.toHaveBeenCalled();
+    });
+
     it("surfaces API errors", async () => {
       mockMutateResources.mockRejectedValueOnce(new Error("INVALID_CALLOUT"));
       const result = await createCalloutAsset(auth, {
