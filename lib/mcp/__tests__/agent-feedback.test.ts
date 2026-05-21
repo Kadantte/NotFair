@@ -10,10 +10,13 @@ import { z } from "zod";
 
 const trackServerEvent = vi.fn();
 const postToSlack = vi.fn().mockResolvedValue(undefined);
+const dbInsertValues = vi.fn();
 
 // Stubbable DB query result. Tests can swap this to control what
 // `resolveUserEmail` sees without touching a real database.
 let dbEmailResult: { email: string | null }[] = [{ email: "user@example.com" }];
+let dbInsertedFeedbackId: number | null = 123;
+let dbInsertError: Error | null = null;
 
 vi.mock("@/lib/analytics-server", () => ({
   trackServerEvent: (...args: unknown[]) => trackServerEvent(...args),
@@ -28,17 +31,30 @@ vi.mock("@/lib/slack", () => ({
 // Stub both layers; tests configure dbEmailResult for the subscriptions branch
 // and getUserEmailMock for the auth.users branch.
 vi.mock("@/lib/db", () => {
-  const chainable = {
-    select: () => chainable,
-    from: () => chainable,
-    where: () => chainable,
+  const selectChain = {
+    select: () => selectChain,
+    from: () => selectChain,
+    where: () => selectChain,
     limit: () => Promise.resolve(dbEmailResult),
   };
+  const insertChain = {
+    values: (values: unknown) => {
+      dbInsertValues(values);
+      if (dbInsertError) throw dbInsertError;
+      return {
+        returning: () => Promise.resolve(dbInsertedFeedbackId == null ? [] : [{ id: dbInsertedFeedbackId }]),
+      };
+    },
+  };
   return {
-    db: () => chainable,
+    db: () => ({
+      ...selectChain,
+      insert: () => insertChain,
+    }),
     schema: {
       mcpSessions: { id: "id", googleEmail: "googleEmail" },
       subscriptions: { userId: "userId", email: "email" },
+      mcpToolFeedback: { id: "id" },
     },
   };
 });
@@ -113,7 +129,10 @@ const VALID_INPUT = {
 beforeEach(() => {
   trackServerEvent.mockClear();
   postToSlack.mockClear();
+  dbInsertValues.mockClear();
   dbEmailResult = [{ email: "user@example.com" }];
+  dbInsertedFeedbackId = 123;
+  dbInsertError = null;
   _resetSessionCountsForTest();
 });
 
@@ -126,6 +145,51 @@ describe("fileInternalNotFairToolFeedback tool", () => {
     expect(Object.keys(inputSchema)).toEqual(
       expect.arrayContaining(["category", "affected_tool", "observation", "suggestion", "user_goal"]),
     );
+  });
+
+
+
+  it("persists a durable feedback row and returns its feedback_id", async () => {
+    dbInsertedFeedbackId = 987;
+    const server = makeServer();
+    registerAgentFeedbackTools(server as never, () => VALID_AUTH);
+    const result = await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
+
+    expect(dbInsertValues).toHaveBeenCalledTimes(1);
+    expect(dbInsertValues).toHaveBeenCalledWith({
+      userId: "user-abc",
+      sessionId: 42,
+      category: "missing_capability",
+      affectedTool: "addNegativeKeyword",
+      observation: "Calling this tool 200x for a single batch felt redundant.",
+      suggestion: "Mention the bulk variant addKeywordToNegativeList in the description.",
+      userGoal: "Adding 12 negative keywords from a search-term audit.",
+      userEmail: "user@example.com",
+      clientName: "claude-code",
+      clientVersion: "1.2.3",
+      authMethod: "oauth",
+      status: "new",
+    });
+    expect(JSON.stringify(result)).toContain("987");
+
+    const [, , props] = trackServerEvent.mock.calls[0];
+    expect(props).toMatchObject({ feedback_id: 987 });
+  });
+
+  it("does not claim durable recording when the DB insert fails", async () => {
+    dbInsertError = new Error("database down");
+    const server = makeServer();
+    registerAgentFeedbackTools(server as never, () => VALID_AUTH);
+    const result = await server.call("fileInternalNotFairToolFeedback", VALID_INPUT);
+    await Promise.resolve();
+
+    expect(dbInsertValues).toHaveBeenCalledTimes(1);
+    expect(trackServerEvent).toHaveBeenCalledTimes(1);
+    expect(postToSlack).toHaveBeenCalledTimes(1);
+    const text = JSON.stringify(result);
+    expect(text).toContain("recorded");
+    expect(text).toContain("false");
+    expect(text).toContain("db_insert_failed");
   });
 
   it("fires PostHog event with full property set on a valid call", async () => {

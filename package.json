@@ -28,8 +28,10 @@
     "db:refresh-stale-account-snapshots": "tsx scripts/refresh-stale-account-snapshots.ts",
     "db:apply-0040-gohighlevel": "npx tsx scripts/apply-migration-0040-gohighlevel.ts",
     "db:apply-0041-gohighlevel-oauth": "npx tsx scripts/apply-migration-0041-gohighlevel-oauth.ts",
+    "db:apply-0045-mcp-tool-feedback": "tsx scripts/apply-migration-0045-mcp-tool-feedback.ts",
     "eval:mcp": "npx tsx scripts/eval-mcp/eval.ts",
-    "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts"
+    "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts",
+    "mcp-feedback:triage": "tsx scripts/triage-mcp-feedback.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",

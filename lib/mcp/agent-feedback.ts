@@ -2,6 +2,7 @@ import { z } from "zod";
 import { after } from "next/server";
 import { trackServerEvent } from "@/lib/analytics-server";
 import { postToSlack } from "@/lib/slack";
+import { db, schema } from "@/lib/db";
 import { typedResult } from "./types";
 import { escapeSlack, quoteBlock, resolveUserEmail, truncate } from "./slack-format";
 import type { ToolRegistrar } from "./types";
@@ -161,7 +162,36 @@ export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) =
 
       const userEmail = await resolveUserEmail(auth.sessionId, auth.userId);
 
+      let feedbackId: number | null = null;
+      let dbInsertFailed = false;
+      try {
+        const [row] = await db()
+          .insert(schema.mcpToolFeedback)
+          .values({
+            userId: auth.userId ?? null,
+            sessionId: auth.sessionId ?? null,
+            category,
+            affectedTool: affected_tool,
+            observation: truncatedObservation,
+            suggestion: truncatedSuggestion,
+            userGoal: truncatedGoal ?? null,
+            userEmail,
+            clientName: auth.clientName ?? null,
+            clientVersion: auth.clientVersion ?? null,
+            authMethod: auth.authMethod ?? null,
+            status: "new",
+          })
+          .returning({ id: schema.mcpToolFeedback.id });
+        feedbackId = row?.id ?? null;
+      } catch (err) {
+        dbInsertFailed = true;
+        console.error("[fileInternalNotFairToolFeedback] DB insert failed:", err);
+      }
+
       trackServerEvent(auth.userId, "mcp_improvement_suggested", {
+        feedback_id: feedbackId,
+        durable_recorded: feedbackId !== null,
+        db_insert_failed: dbInsertFailed,
         category,
         affected_tool,
         observation: truncatedObservation,
@@ -188,6 +218,7 @@ export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) =
       const slackText = [
         `:robot_face: *Agent feedback — \`${category}\`*`,
         `*Tool:* \`${escapeSlack(affected_tool)}\`  ·  *Client:* ${escapeSlack(clientLabel)}  ·  *Session:* ${auth.sessionId ?? "n/a"}`,
+        feedbackId !== null ? `*Feedback ID:* ${feedbackId}` : `*Feedback ID:* DB insert failed`,
         userEmail ? `*User:* ${escapeSlack(userEmail)}` : null,
         ``,
         `*Observation:*`,
@@ -215,9 +246,16 @@ export const registerAgentFeedbackTools: ToolRegistrar = (server, currentAuth) =
         }
       });
 
+      if (feedbackId === null) {
+        return typedResult(
+          { recorded: false, reason: "db_insert_failed", remaining_calls: remaining },
+          "Internal NotFair tool-feedback report recorded=false (reason: db_insert_failed). Continue the user task — no user-visible follow-up is needed.",
+        );
+      }
+
       return typedResult(
-        { recorded: true, remaining_calls: remaining },
-        "Internal NotFair tool-feedback report recorded. Continue the user task — no user-visible follow-up is needed unless the friction blocked completion.",
+        { recorded: true, feedback_id: feedbackId, remaining_calls: remaining },
+        `Internal NotFair tool-feedback report recorded (feedback_id: ${feedbackId}). Continue the user task — no user-visible follow-up is needed unless the friction blocked completion.`,
       );
     },
   );

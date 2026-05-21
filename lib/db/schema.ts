@@ -853,6 +853,41 @@ export const supportTickets = pgTable("support_tickets", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+
+// ─── Internal MCP Tool Feedback ──────────────────────────────────────
+//
+// Durable source of truth for fileInternalNotFairToolFeedback. Slack and
+// PostHog are mirrors; this table is the work queue for self-improvement
+// triage/issue/PR automation.
+
+export const mcpToolFeedback = pgTable("mcp_tool_feedback", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"),
+  sessionId: integer("session_id"),
+  category: text("category").notNull(),
+  affectedTool: text("affected_tool").notNull(),
+  observation: text("observation").notNull(),
+  suggestion: text("suggestion").notNull(),
+  userGoal: text("user_goal"),
+  userEmail: text("user_email"),
+  clientName: text("client_name"),
+  clientVersion: text("client_version"),
+  authMethod: text("auth_method"),
+  status: text("status").notNull().default("new"),
+  triageCategory: text("triage_category"),
+  priority: text("priority"),
+  triageSummary: text("triage_summary"),
+  githubIssueUrl: text("github_issue_url"),
+  githubPrUrl: text("github_pr_url"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("mcp_tool_feedback_status_created_idx").on(table.status, table.createdAt),
+  index("mcp_tool_feedback_tool_created_idx").on(table.affectedTool, table.createdAt),
+  index("mcp_tool_feedback_session_created_idx").on(table.sessionId, table.createdAt),
+]);
+
 // ─── Email Preferences (per-user marketing opt-out) ─────────────────
 //
 // Marketing-only. Transactional emails (login magic links, share
