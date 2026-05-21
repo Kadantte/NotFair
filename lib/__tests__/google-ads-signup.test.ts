@@ -29,7 +29,7 @@ describe("maybeFireGoogleAdsSignup", () => {
     _resetGoogleAdsSignupCacheForTests();
 
     process.env.KEYWORD_API_REFRESH_TOKEN = "system-refresh-token";
-    process.env.NOTFAIR_SIGNUP_CONVERSION_ACTION_ID = "7607072543";
+    process.env.NOTFAIR_SIGNUP_CONVERSION_ACTION_ID = "test-conv-action-id";
     // No NOTFAIR_OWN_GADS_CUSTOMER_ID — verifies the hardcoded default fires.
   });
 
@@ -48,7 +48,7 @@ describe("maybeFireGoogleAdsSignup", () => {
     const [auth, actionId, conversions] = uploadMock.mock.calls[0];
     expect(auth.customerId).toBe("3251706605");
     expect(auth.refreshToken).toBe("system-refresh-token");
-    expect(actionId).toBe("7607072543");
+    expect(actionId).toBe("test-conv-action-id");
     expect(conversions).toHaveLength(1);
     expect(conversions[0]).toMatchObject({
       gclid: "EAIaIQobChMI-test",

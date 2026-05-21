@@ -35,7 +35,7 @@ export function getNotFairSystemAuth(): AuthContext | null {
 }
 
 /**
- * The Google Ads conversion action id for NotFair's "Signup (server)"
+ * The Google Ads conversion action id for NotFair's "Signup (server) v2"
  * UPLOAD_CLICKS conversion — the source-of-truth signup signal uploaded
  * server-side via `uploadClickConversions`. Defaults to the action that
  * exists in account 3251706605 today; env overridable per-environment.
@@ -46,5 +46,5 @@ export function getNotFairSystemAuth(): AuthContext | null {
  * complete signal (gclid + hashed email, no ITP/ad-blocker loss).
  */
 export function getSignupConversionActionId(): string {
-  return getEnv("NOTFAIR_SIGNUP_CONVERSION_ACTION_ID") ?? "7607072543";
+  return getEnv("NOTFAIR_SIGNUP_CONVERSION_ACTION_ID") ?? "7616843039";
 }

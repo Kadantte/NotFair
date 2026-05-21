@@ -40,7 +40,7 @@ function sha256Hex(value: string): string {
  *   - KEYWORD_API_REFRESH_TOKEN (reused — same OAuth token, NotFair-scoped)
  *   - NOTFAIR_OWN_GADS_CUSTOMER_ID (optional override, default 3251706605)
  *   - NOTFAIR_OWN_GADS_LOGIN_CUSTOMER_ID (optional MCC routing)
- *   - NOTFAIR_SIGNUP_CONVERSION_ACTION_ID (optional, default 7607072543)
+ *   - NOTFAIR_SIGNUP_CONVERSION_ACTION_ID (optional, default 7616843039)
  *
  * When credentials aren't configured (dev, preview, CI) we no-op silently.
  */
