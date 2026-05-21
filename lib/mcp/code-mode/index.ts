@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { resolveToolAuth } from "../helpers";
-import { safeHandler, typedResult, accountIdParam, READ_ANNOTATIONS, type ToolRegistrar } from "../types";
+import { safeHandler, typedResult, accountIdParam, runScriptTimeoutMsParam, READ_ANNOTATIONS, type ToolRegistrar } from "../types";
 import { enforceRateLimit } from "../rate-limit";
 import { runScriptInSandbox, type RunScriptResult } from "./sandbox";
 import { buildAdsHost } from "./ads-client";
@@ -95,7 +95,7 @@ Note: \`change_event\` only supports the last 30 days regardless of how you expr
 - **Keyword quality fields are split by resource.** Query delivery metrics (\`metrics.clicks\`, \`metrics.cost_micros\`, conversions, etc.) from \`FROM keyword_view\`. Query quality-score fields from \`FROM ad_group_criterion\` without metrics: \`ad_group_criterion.quality_info.quality_score\`, \`creative_quality_score\`, \`post_click_quality_score\`, and \`search_predicted_ctr\`. There is no \`metrics.quality_info.quality_score\`, \`ad_group_criterion.quality_info.ad_relevance\`, or \`ad_group_criterion.quality_info.landing_page_experience\`.
 - **Known hallucinated fields:** there is no \`metrics.average_cpc_micros\`, \`metrics.cost_per_conversion_micros\`, \`metrics.impression_share\`, \`metrics.search_lost_is_rank\`, \`metrics.search_lost_is_budget\`, \`metrics.conversion_rate\`, \`metrics.quality_info.quality_score\`, \`asset.status\`, \`asset_group_asset.performance_label\`, \`asset.sitelink_asset.final_urls\`, \`campaign.url_expansion_opt_out\`, \`campaign.budget_micros\`, \`campaign.budget_amount_micros\`, \`campaign_criterion.proximity.address.city\`, \`campaign_criterion.audience.audience\`, \`change_event.campaign.name\`, \`change_event.resource_type\`, \`ad_group_criterion.quality_info.ad_relevance\`, \`ad_group_criterion.quality_info.landing_page_experience\`, \`campaign_experiment.*\`, \`conversion_action.default_value\`, \`conversion_action.last_conversion_date\`, \`conversion_action.most_recent_conversion_date\`, \`recommendation.impact.base_metrics.*\`, \`recommendation.keyword_match_type\`, \`billing_setup.payments_account_info.*\`, \`auction_insight.domain\`, or bare \`resource_name\`. Use \`metrics.average_cpc\`; use \`metrics.cost_per_conversion\`; for Search campaigns use \`metrics.search_impression_share\`, \`metrics.search_rank_lost_impression_share\`, and \`metrics.search_budget_lost_impression_share\`; calculate conversion rate from \`metrics.conversions / metrics.clicks\`; budget lives on \`campaign_budget.amount_micros\`; asset serving status lives on the link resource (\`campaign_asset.status\`, \`ad_group_asset.status\`, \`asset_group_asset.status\`, \`customer_asset.status\`); use \`campaign_criterion.proximity.address.city_name\`; use \`change_event.change_resource_type\`; use \`conversion_action.value_settings.default_value\`; use \`ads.queries.billingSetups\` for safe billing reads; replace \`resource_name\` with \`<resource>.resource_name\`; call \`getResourceMetadata(<resource>)\` for the rest.
 
-Rules: top-level await works; no fetch/require/process/fs; return value must be JSON-serializable; defaults are 30s timeout (max 45s), 500KB return cap, 100K log chars.
+Rules: top-level await works; no fetch/require/process/fs; return value must be JSON-serializable; defaults are 30000ms (30s) timeout, max 45000ms (45s), 500KB return cap, 100K log chars.
 
 ── CANONICAL AUDIT (one call, wide net, filter in-script) ──
 
@@ -135,13 +135,9 @@ export const registerCodeModeTools: ToolRegistrar = (server, currentAuth) => {
           .min(1)
           .max(50_000)
           .describe("JavaScript source. Top-level await allowed. See tool description for the API surface."),
-        timeoutMs: z
-          .number()
-          .int()
-          .min(100)
-          .max(45_000)
-          .default(30_000)
-          .describe("Wall-clock cap before the script is interrupted. Default 30s, max 45s. Raise to 45s when batching 15+ parallel queries."),
+        timeoutMs: runScriptTimeoutMsParam(
+          "Raise to 45000 when batching 15+ parallel queries via gaqlParallel.",
+        ),
       },
       annotations: READ_ANNOTATIONS,
     },

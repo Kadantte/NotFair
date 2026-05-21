@@ -47,6 +47,7 @@ export type ToolHarness = {
   callTool: (name: string, args?: Record<string, unknown>) => Promise<CallToolResult>;
   listToolNames: () => string[];
   getTool: (name: string) => CapturedTool;
+  getField: (toolName: string, fieldName: string) => z.ZodTypeAny;
 };
 
 /**
@@ -105,10 +106,25 @@ export function buildHarness(
     return t;
   };
 
+  const getField = (toolName: string, fieldName: string): z.ZodTypeAny => {
+    const tool = getTool(toolName);
+    const field = tool.inputSchema?.[fieldName];
+    if (!field) {
+      const known = Object.keys(tool.inputSchema ?? {}).join(", ") || "<none>";
+      throw new Error(`Tool "${toolName}" has no input field "${fieldName}". Known: ${known}`);
+    }
+    // ZodRawShape values are typed as the structural `$ZodType` in zod 4;
+    // tests need the rich `ZodTypeAny` surface (safeParse/description). Cast
+    // through unknown — every value placed into a Zod object schema is a
+    // full ZodType at runtime.
+    return field as unknown as z.ZodTypeAny;
+  };
+
   return {
     tools,
     resources,
     getTool,
+    getField,
     listToolNames: () => [...tools.keys()],
     async callTool(name, args = {}) {
       const tool = getTool(name);

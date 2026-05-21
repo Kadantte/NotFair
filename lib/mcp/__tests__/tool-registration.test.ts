@@ -51,6 +51,8 @@ vi.mock("@/lib/tools/execute", () => ({
 
 import { registerReadTools } from "../read-tools";
 import { registerWriteTools } from "../write-tools";
+import { registerCodeModeTools } from "../code-mode";
+import { registerMetaCodeModeTools } from "../code-mode-meta";
 import { clearCache, __resetActiveExperimentProbeCacheForTests } from "@/lib/google-ads";
 import { execWrite } from "@/lib/tools/execute";
 import { buildHarness, TEST_AUTH, expectOk, expectError } from "./harness";
@@ -116,6 +118,44 @@ describe("MCP read tools — registration", () => {
       ).toBeLessThanOrEqual(MAX_DESCRIPTION_CHARS);
     }
   });
+});
+
+describe("MCP runScript — description guardrails", () => {
+  // Regression guard for DocBot ticket 2026-05-21: an agent read
+  // "Default 30s, max 45s" next to a `timeoutMs` parameter and called
+  // `timeoutMs: 45`, which the schema rejected with a `min(100)` error.
+  // The fix spells MILLISECONDS into both the description and the
+  // .min/.max error messages so a future reader (LLM or human) can't
+  // make the same mistake. Both Google and Meta runScript tools share
+  // the `runScriptTimeoutMsParam` factory; the test asserts both.
+  const REQUIRED_DESCRIPTION_TOKENS = ["MILLISECONDS", "45000", "30000"];
+
+  for (const [platform, registrar] of [
+    ["google", registerCodeModeTools],
+    ["meta", registerMetaCodeModeTools],
+  ] as const) {
+    it(`${platform} runScript timeoutMs describe() spells out the unit and gives a 45000 example`, () => {
+      const harness = buildHarness([registrar], TEST_AUTH);
+      const description = harness.getField("runScript", "timeoutMs").description ?? "";
+      for (const token of REQUIRED_DESCRIPTION_TOKENS) {
+        expect(
+          description,
+          `${platform} runScript timeoutMs description missing "${token}". Current: ${description}`,
+        ).toContain(token);
+      }
+    });
+
+    it(`${platform} runScript timeoutMs rejects seconds-style values with a unit-aware error`, () => {
+      const harness = buildHarness([registrar], TEST_AUTH);
+      // Replicate what an agent would do: pass 45 thinking "45 seconds".
+      const parsed = harness.getField("runScript", "timeoutMs").safeParse(45);
+      expect(parsed.success).toBe(false);
+      const message = parsed.error?.issues[0]?.message ?? "";
+      // Error must tell the agent the right value to pass next time.
+      expect(message).toContain("MILLISECONDS");
+      expect(message).toContain("45000");
+    });
+  }
 });
 
 describe("MCP read tools — handler execution", () => {

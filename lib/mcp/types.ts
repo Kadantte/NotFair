@@ -91,6 +91,29 @@ export const accountIdParam = z
   .optional()
   .describe("Account ID (omit for primary)");
 
+/**
+ * Shared `runScript` timeout schema for the Google + Meta code-mode tools.
+ *
+ * Stays a factory (not a const) because each platform appends its own
+ * trailing guidance clause to the description — Google mentions
+ * `gaqlParallel`, Meta mentions `graphParallel`. The `min`/`max`/`default`
+ * envelope and the unit-spelled-out error messages are identical, so any
+ * drift would silently regress the DocBot 2026-05-21 fix on one platform.
+ *
+ * Regression-guarded by `MCP runScript — description guardrails` in
+ * `lib/mcp/__tests__/tool-registration.test.ts`.
+ */
+export function runScriptTimeoutMsParam(extraGuidance = "") {
+  const base = "Wall-clock cap in MILLISECONDS before the script is interrupted. Default 30000 (30s), max 45000 (45s). Examples: pass 45000 for a 45-second cap. Do NOT pass 45 — that's 45ms and will be rejected.";
+  return z
+    .number()
+    .int()
+    .min(100, "timeoutMs is in MILLISECONDS (min 100 = 0.1s). For a 45-second cap pass 45000, not 45.")
+    .max(45_000, "timeoutMs is in MILLISECONDS (max 45000 = 45s). For a 45-second cap pass 45000, not 45.")
+    .default(30_000)
+    .describe(extraGuidance ? `${base} ${extraGuidance}` : base);
+}
+
 /** Shared annotation presets to avoid repetition across tool registrations. */
 export const READ_ANNOTATIONS = {
   readOnlyHint: true,

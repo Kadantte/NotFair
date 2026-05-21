@@ -4,6 +4,7 @@ import {
   safeHandler,
   typedResult,
   accountIdParam,
+  runScriptTimeoutMsParam,
   READ_ANNOTATIONS,
   type ToolRegistrar,
 } from "@/lib/mcp/types";
@@ -77,7 +78,7 @@ return { worstCampaigns: worst, totals: { campaigns: r.campaigns.rowCount, adset
 
 ── RULES ──
 - Top-level await works. No fetch / require / process / fs reachable.
-- Return value must be JSON-serializable. Limits: 30s timeout (max 45s), 500KB return cap, 100K log chars.
+- Return value must be JSON-serializable. Limits: 30000ms (30s) timeout, max 45000ms (45s), 500KB return cap, 100K log chars.
 - Mutations (pause/enable/budget) go through dedicated tools (\`pauseCampaign\`, \`pauseAdSet\`, \`pauseAd\`, ...). Never write through runScript.
 
 ── ANTI-PATTERNS ──
@@ -99,15 +100,9 @@ export const registerMetaCodeModeTools: ToolRegistrar = (server, currentAuth) =>
           .describe(
             "JavaScript source. Top-level await allowed. See tool description for the API surface.",
           ),
-        timeoutMs: z
-          .number()
-          .int()
-          .min(100)
-          .max(45_000)
-          .default(30_000)
-          .describe(
-            "Wall-clock cap before the script is interrupted. Default 30s, max 45s.",
-          ),
+        timeoutMs: runScriptTimeoutMsParam(
+          "Raise to 45000 when batching 15+ parallel calls via graphParallel.",
+        ),
       },
       annotations: READ_ANNOTATIONS,
     },

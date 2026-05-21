@@ -116,6 +116,12 @@ When fixing a GAQL pattern or library quirk, sweep these surfaces. A single bug 
 
 ---
 
+## MCP tool authoring — unit-suffixed parameters
+
+- **State the unit explicitly in `describe()` and in `.min`/`.max` error messages.** When a parameter name carries a unit suffix (`timeoutMs`, `costMicros`, `bytesPerSecond`), the description prose must say it too — "Default 30s, max 45s" next to a `timeoutMs` parameter sends agents to call `timeoutMs: 45`, hitting the schema floor of 100 and erroring out. DocBot 2026-05-21 reported exactly this failure on `runScript`; the shared `runScriptTimeoutMsParam` factory in [lib/mcp/types.ts](../lib/mcp/types.ts) is the canonical pattern to copy. Spell out "MILLISECONDS" (or "MICROS", "BYTES", etc.) in the description, give a concrete numeric example (`pass 45000 for a 45-second cap`), and reinforce in `.min(100, "timeoutMs is in MILLISECONDS …")` / `.max(45_000, "…")` so the validation error itself tells the agent the correct value to retry with. Regression-guarded by the `runScript — description guardrails` block in [lib/mcp/__tests__/tool-registration.test.ts](../lib/mcp/__tests__/tool-registration.test.ts).
+
+---
+
 ## Adding to this file
 
 When you find a new landmine, append a one-liner. Include:
