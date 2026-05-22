@@ -16,6 +16,7 @@ import { ApprovalCard } from "@/components/approval-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LiveTranscript } from "@/components/live-transcript";
+import { Markdown } from "@/components/markdown";
 import { RunningDot } from "@/components/running-dot";
 import { StartAllTasksButton } from "@/components/start-all-tasks-button";
 import { cancelTaskAction } from "@/server/actions/tasks";
@@ -241,14 +242,14 @@ export function AgentTaskWorkspace({
                     <span className="transition-transform group-open:rotate-90">›</span>
                     Brief
                   </summary>
-                  <div className="mt-2 space-y-2 pl-3 text-sm whitespace-pre-wrap text-muted-foreground">
-                    {selected.task.brief}
+                  <div className="mt-2 max-h-[40vh] overflow-y-auto pl-3 text-sm text-muted-foreground">
+                    <Markdown>{selected.task.brief}</Markdown>
                     {selected.task.success_criteria && (
                       <div className="mt-2 border-l-2 border-muted pl-3 text-xs">
-                        <span className="font-medium text-foreground">
-                          Success criteria:
-                        </span>{" "}
-                        {selected.task.success_criteria}
+                        <div className="mb-1 font-medium text-foreground">
+                          Success criteria
+                        </div>
+                        <Markdown>{selected.task.success_criteria}</Markdown>
                       </div>
                     )}
                   </div>

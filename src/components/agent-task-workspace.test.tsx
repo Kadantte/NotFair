@@ -316,7 +316,7 @@ describe("AgentTaskWorkspace selected-task panel", () => {
       />,
     );
     expect(screen.getByText(/Brief body text/)).toBeInTheDocument();
-    expect(screen.getByText("Success criteria:")).toBeInTheDocument();
+    expect(screen.getByText("Success criteria")).toBeInTheDocument();
     expect(screen.getByText(/Success criteria text/)).toBeInTheDocument();
   });
 
