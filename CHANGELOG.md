@@ -2,6 +2,16 @@
 
 All notable changes to NotFair will be documented in this file.
 
+## [0.5.6.0] - 2026-05-21
+
+### Changed
+- **Adding NotFair-GoogleAds in Claude.ai now walks you through connecting Google Ads if you haven't yet.** Previously, connecting from Claude.ai before setting up Google Ads at notfair.co dumped a raw JSON 403 error in the browser with no path forward. Now you're bounced through Google sign-in with ads consent, then returned to Claude.ai to finish the OAuth dance in one continuous flow. Same fix for the "no active ad account selected" case for both Google and Meta — you're sent to the account picker, then back to Claude, instead of a dead-end JSON error.
+- **Claude.ai's "Connected ✓" indicator now tells the truth.** `tools/list` previously bypassed auth, so Claude's connector UI marked any token as "Connected" before validation actually ran — leaving users to discover the failure on their first tool call. `tools/list` now requires a valid bearer, so auth failures surface during connection setup instead of after the user thinks they're connected. Applies to NotFair-GoogleAds, NotFair-MetaAds, and NotFair-GoHighLevel.
+
+### Fixed
+- **`/oauth/token` no longer mints unusable tokens.** When the connection bound to an authorization code has no active ad account selected (cleared between `/authorize` and the token exchange), the endpoint now returns `invalid_grant` with an actionable message instead of issuing a token that the MCP auth resolver would 401 on every tool call — which Claude.ai then surfaces as a misleading "reconnect" prompt instead of the real "pick an account" action.
+- **GoHighLevel MCP route now uses the shared `isSchemaRequest` helper.** Replaces a stale local copy of the handshake-bypass logic to prevent drift the next time the allowlist changes.
+
 ## [0.5.5.14] - 2026-05-19
 
 ### Added

@@ -240,16 +240,15 @@ export async function GET(request: Request) {
         return NextResponse.redirect(metaStartUrl.toString());
       }
       if (!conn.activeAccountId) {
-        // Meta connection exists but no active ad account selected. The user
-        // probably has zero ad accounts on Meta, or the picker was bypassed.
-        return NextResponse.json(
-          {
-            error: "access_denied",
-            error_description:
-              "No active Meta ad account selected. Visit /connect to pick one and try again.",
-          },
-          { status: 403 },
+        // Connection exists but no active Meta ad account selected. Bounce
+        // through the in-app picker, then return here to finish the Claude
+        // OAuth dance — same pattern as the no-connection branch above.
+        const pickerUrl = new URL("/manage-ads-accounts/meta-ads", requestUrl);
+        pickerUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
         );
+        return NextResponse.redirect(pickerUrl.toString());
       }
       resolvedConnectionId = conn.id;
     } else {
@@ -265,19 +264,39 @@ export async function GET(request: Request) {
         )
         .limit(1);
 
-      if (googleConn?.activeAccountId) {
-        resolvedConnectionId = googleConn.id;
-      } else {
-        // No usable Google connection — bounce to setup.
-        return NextResponse.json(
-          {
-            error: "access_denied",
-            error_description:
-              "No Google Ads account connected. Visit notfair.co/connect to finish setup and try again.",
-          },
-          { status: 403 },
+      if (!googleConn) {
+        // No Google Ads connection yet — kick off Google OAuth with ads-scope
+        // consent, then bounce back here. Mirrors the Meta DCR branch's
+        // redirect through /api/oauth/meta/start. `prompt=select_account+consent`
+        // matches the rest of the app's connect-Google entry points
+        // (manage-ads-accounts/page.tsx) so the user picks which Google
+        // identity to attach Ads to, instead of getting the silent same-user
+        // re-auth.
+        const signinUrl = new URL("/api/auth/signin", requestUrl);
+        signinUrl.searchParams.set("prompt", "select_account+consent");
+        signinUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
         );
+        return NextResponse.redirect(signinUrl.toString());
       }
+      if (!googleConn.activeAccountId) {
+        // Google connection exists but no active customer selected — send
+        // through the account picker, then return here. The "no ads
+        // accounts" terminal case is handled downstream by /auth/callback
+        // (redirects to /manage-ads-accounts with reason=no_accounts and
+        // drops `next`), so we cannot loop back to /authorize indefinitely.
+        const pickerUrl = new URL(
+          "/manage-ads-accounts/google-ads/select",
+          requestUrl,
+        );
+        pickerUrl.searchParams.set(
+          "next",
+          `${requestUrl.pathname}${requestUrl.search}`,
+        );
+        return NextResponse.redirect(pickerUrl.toString());
+      }
+      resolvedConnectionId = googleConn.id;
     }
   }
 

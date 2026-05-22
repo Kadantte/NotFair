@@ -5,11 +5,16 @@
  * to their previous in-factory definitions.
  */
 
+// MCP handshake methods that the spec allows over an unauthenticated
+// connection. Deliberately narrow: `tools/list`, `resources/list`, and
+// `resources/read` are NOT here. Claude.ai's connector UI marks a connection
+// as "Connected" the moment `tools/list` returns 200 — so bypassing auth on
+// that method makes Claude show "Connected" even when the issued token
+// resolves to a dead connection, and the user only discovers it when the
+// first `tools/call` 401s and triggers a reconnect prompt. Gating
+// `tools/list` behind auth surfaces the failure during connection setup.
 const SCHEMA_METHODS = new Set([
   "initialize",
-  "tools/list",
-  "resources/list",
-  "resources/read",
   "notifications/initialized",
 ]);
 
@@ -74,10 +79,11 @@ export function mcpHandlerEndpointConfig(resourceUrlPath: string) {
 }
 
 /**
- * Detects MCP schema-introspection POSTs (initialize, tools/list,
- * notifications/initialized) so the factory can let them through without
- * auth. Returns `cloned` because reading `request.json()` consumes the body
- * and the caller still needs to forward the request to mcp-handler.
+ * Detects MCP handshake POSTs (`initialize`, `notifications/initialized`) so
+ * the factory can let them through without auth. Discovery methods like
+ * `tools/list` deliberately do NOT bypass auth — see `SCHEMA_METHODS` above
+ * for the rationale. Returns `cloned` because reading `request.json()`
+ * consumes the body and the caller still needs to forward it to mcp-handler.
  */
 export async function isSchemaRequest(
   request: Request,

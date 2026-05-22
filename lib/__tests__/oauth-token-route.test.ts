@@ -48,6 +48,7 @@ vi.mock("@/lib/db", () => ({
       id: "id",
       userId: "user_id",
       platform: "platform",
+      activeAccountId: "active_account_id",
       accessTokenExpiresAt: "access_token_expires_at",
     },
   },
@@ -383,6 +384,88 @@ describe("OAuth token route — POST", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toBe("invalid_grant");
+  });
+
+  // ─── connectionId-bound auth codes (Phase-2 Google DCR + Meta DCR) ──
+
+  it("issues a token for a connectionId-bound code when the connection has an activeAccountId", async () => {
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: null,
+        connectionId: 7,
+        gohighlevelConnectionId: null,
+        redirectUri: "http://localhost:3000/cb",
+        codeChallenge: null,
+        codeChallengeMethod: null,
+        resourceUrl: "/api/mcp/google_ads",
+      },
+    ]);
+    // ad_platform_connections lookup → row with an active account selected
+    mockSelectRows.mockResolvedValueOnce([
+      { activeAccountId: "1234567890", expiresAt: futureExpiry },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        client_secret: VALID_SECRET,
+        redirect_uri: "http://localhost:3000/cb",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.access_token).toMatch(/^oat_google_ads_[a-f0-9]{64}$/);
+    expect(mockInsertValues).toHaveBeenCalledTimes(1);
+    const insertArg = mockInsertValues.mock.calls[0][0];
+    expect(insertArg.connectionId).toBe(7);
+    expect(insertArg.sessionId).toBeNull();
+  });
+
+  it("rejects token issuance when the bound connection has no activeAccountId (closes the silent 'Connected → reconnect on first tool call' loop)", async () => {
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mockSelectRows.mockResolvedValueOnce([{ clientSecretHash: VALID_SECRET_HASH }]);
+    mockSelectRows.mockResolvedValueOnce([
+      {
+        code: "abc",
+        clientId: "test-client",
+        sessionId: null,
+        connectionId: 7,
+        gohighlevelConnectionId: null,
+        redirectUri: "http://localhost:3000/cb",
+        codeChallenge: null,
+        codeChallengeMethod: null,
+        resourceUrl: "/api/mcp/google_ads",
+      },
+    ]);
+    // ad_platform_connections lookup → row exists but activeAccountId was
+    // cleared between /authorize and this exchange.
+    mockSelectRows.mockResolvedValueOnce([
+      { activeAccountId: null, expiresAt: futureExpiry },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        grant_type: "authorization_code",
+        code: "abc",
+        client_id: "test-client",
+        client_secret: VALID_SECRET,
+        redirect_uri: "http://localhost:3000/cb",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("invalid_grant");
+    expect(body.error_description).toMatch(/active ad account/i);
+    // Critical: no dud token row inserted
+    expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
   it("does NOT translate when the session row has no userId (legacy ads-less rows)", async () => {

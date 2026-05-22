@@ -264,7 +264,10 @@ export async function POST(request: Request) {
     }
   } else if (authCode.connectionId !== null) {
     const [conn] = await db()
-      .select({ expiresAt: schema.adPlatformConnections.accessTokenExpiresAt })
+      .select({
+        activeAccountId: schema.adPlatformConnections.activeAccountId,
+        expiresAt: schema.adPlatformConnections.accessTokenExpiresAt,
+      })
       .from(schema.adPlatformConnections)
       .where(eq(schema.adPlatformConnections.id, authCode.connectionId))
       .limit(1);
@@ -274,6 +277,23 @@ export async function POST(request: Request) {
           error: "invalid_grant",
           error_description:
             "The platform connection bound to this authorization code no longer exists. Reconnect via /connect.",
+        },
+        { status: 400 },
+      );
+    }
+    // /authorize required activeAccountId to be set when minting this auth
+    // code (true for both Google and Meta DCR branches). If it's null here,
+    // the user disconnected or cleared their account selection between
+    // /authorize and this exchange. Without this guard we'd issue a token
+    // that the MCP auth resolver throws on at every `tools/call`, which
+    // Claude.ai surfaces as a misleading "reconnect" prompt instead of the
+    // real "pick an account" action.
+    if (!conn.activeAccountId) {
+      return NextResponse.json(
+        {
+          error: "invalid_grant",
+          error_description:
+            "No active ad account is selected for this connection. Visit /connect to pick one, then re-run the connection.",
         },
         { status: 400 },
       );

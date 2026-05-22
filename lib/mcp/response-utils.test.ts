@@ -10,16 +10,18 @@ function mcpRequest(method: string): Request {
 }
 
 describe("response-utils — schema request detection", () => {
-  it("allows unauthenticated MCP discovery requests, including public resources", async () => {
-    for (const method of ["initialize", "tools/list", "resources/list", "resources/read"]) {
+  it("allows the MCP handshake methods through unauthenticated", async () => {
+    for (const method of ["initialize", "notifications/initialized"]) {
       const { schemaOnly, cloned } = await isSchemaRequest(mcpRequest(method));
-      expect(schemaOnly, `${method} should bypass auth for discovery`).toBe(true);
+      expect(schemaOnly, `${method} should bypass auth for the handshake`).toBe(true);
       await expect(cloned.json()).resolves.toMatchObject({ method });
     }
   });
 
-  it("does not treat tool calls as schema-only discovery", async () => {
-    const { schemaOnly } = await isSchemaRequest(mcpRequest("tools/call"));
-    expect(schemaOnly).toBe(false);
+  it("requires auth for tools/list and resource discovery so Claude.ai's connector UI surfaces auth failures during setup, not on first tool call", async () => {
+    for (const method of ["tools/list", "resources/list", "resources/read", "tools/call"]) {
+      const { schemaOnly } = await isSchemaRequest(mcpRequest(method));
+      expect(schemaOnly, `${method} should require auth`).toBe(false);
+    }
   });
 });

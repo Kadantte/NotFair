@@ -31,12 +31,12 @@ import {
 import { GHL_PAT_PREFIX, hashPat, parseConnectionIdFromPat } from "@/lib/gohighlevel/pat";
 import { hasAllGoHighLevelScopes } from "@/lib/gohighlevel/scopes";
 import { findResource } from "@/lib/mcp/resources";
+import { isSchemaRequest } from "@/lib/mcp/response-utils";
 
 export const runtime = "nodejs";
 
 const RESOURCE_URL_PATH = "/api/mcp/gohighlevel";
 const OAT_PREFIX = findResource(RESOURCE_URL_PATH)?.tokenPrefix ?? "oat_gohighlevel_";
-const SCHEMA_METHODS = new Set(["initialize", "tools/list", "notifications/initialized"]);
 
 const authStore = new AsyncLocalStorage<GhlAuthContext>();
 
@@ -197,22 +197,6 @@ async function resolveAuth(request: Request): Promise<GhlAuthContext> {
   throw new Error(
     `Token prefix not recognized. Expected ${OAT_PREFIX}* (Claude OAuth) or ${GHL_PAT_PREFIX}* (PAT).`,
   );
-}
-
-async function isSchemaRequest(request: Request): Promise<{ schemaOnly: boolean; cloned: Request }> {
-  if (request.method !== "POST") return { schemaOnly: false, cloned: request };
-  // Clone first, parse the clone — leaves the original body stream untouched
-  // for downstream handlers. Reading `request.json()` here would consume the
-  // stream and break any subsequent middleware that also reads the body.
-  const cloned = request.clone();
-  const probe = request.clone();
-  try {
-    const body = await probe.json();
-    const method = body?.method;
-    return { schemaOnly: typeof method === "string" && SCHEMA_METHODS.has(method), cloned };
-  } catch {
-    return { schemaOnly: false, cloned };
-  }
 }
 
 async function handler(request: Request): Promise<Response> {
