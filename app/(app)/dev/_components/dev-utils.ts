@@ -1,7 +1,7 @@
 import type { Tab, Customer, CustomerAttribution } from './dev-types';
 
-export const VALID_TABS: ReadonlySet<Tab> = new Set(['customers', 'usage', 'outreach', 'influencers', 'developer', 'waitlist']);
-export const TAB_ORDER: readonly Tab[] = ['customers', 'usage', 'outreach', 'influencers', 'waitlist', 'developer'] as const;
+export const VALID_TABS: ReadonlySet<Tab> = new Set(['customers', 'usage', 'developer', 'waitlist']);
+export const TAB_ORDER: readonly Tab[] = ['customers', 'usage', 'waitlist', 'developer'] as const;
 export const DEFAULT_TAB: Tab = 'customers';
 
 export const DAYS_PER_YEAR = 365;

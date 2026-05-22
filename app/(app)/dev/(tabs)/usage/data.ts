@@ -11,6 +11,15 @@ import {
     operationRowCount,
     operationTypeRowCount,
 } from '@/lib/dev-ops-filter';
+import type {
+    DailyCountRow,
+    InteractionRow,
+    LowSuccessUser,
+    LowSuccessUsers,
+    PrevTotals,
+    TopTool,
+    UsageTilesData,
+} from '@/lib/dev-types';
 
 const PLATFORM_START = new Date('2026-03-25T00:00:00Z');
 
@@ -20,7 +29,9 @@ const PLATFORM_START = new Date('2026-03-25T00:00:00Z');
 const LOW_SUCCESS_WINDOW_DAYS = 3;
 const LOW_SUCCESS_MIN_INTERACTIONS = 3;
 
-export interface GetUsageDataOptions {
+const CACHE_TTL_SECONDS = 60;
+
+export interface UsageQueryOptions {
     days?: number;
     tz?: string;
     source?: string | null;
@@ -28,72 +39,91 @@ export interface GetUsageDataOptions {
     includeDev?: boolean;
 }
 
-async function fetchUsageData({
-    days: rawDays = 60,
-    tz = 'UTC',
-    source = null,
-    platform = null,
-    includeDev = false,
-}: GetUsageDataOptions = {}) {
-    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 120) : 60;
+type NormalizedOptions = {
+    days: number;
+    tz: string;
+    source: string | null;
+    platform: 'google_ads' | 'meta_ads' | null;
+    includeDev: boolean;
+};
 
+function normalize(opts: UsageQueryOptions): NormalizedOptions {
+    const rawDays = opts.days ?? 60;
+    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 120) : 60;
+    return {
+        days,
+        tz: opts.tz ?? 'UTC',
+        source: opts.source ?? null,
+        platform: opts.platform ?? null,
+        includeDev: !!opts.includeDev,
+    };
+}
+
+function cacheKey(prefix: string, opts: NormalizedOptions): string[] {
+    return [
+        prefix,
+        String(opts.days),
+        opts.tz,
+        opts.source ?? 'all',
+        opts.platform ?? 'all',
+        opts.includeDev ? 'dev' : 'prod',
+    ];
+}
+
+function timeWindows(days: number) {
     const now = new Date();
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const prevSince = new Date(now.getTime() - 2 * days * 24 * 60 * 60 * 1000);
+    return { now, since, prevSince };
+}
 
+function clientSourceFilter(source: string | null): SQL | null {
+    if (!source) return null;
+    if (source === 'chat' || source === 'adsagent-chat') {
+        return sql`${schema.operations.clientSource} IN ('chat', 'adsagent-chat')`;
+    }
+    if (source === 'unknown') {
+        return sql`${schema.operations.clientSource} IS NULL`;
+    }
+    return sql`${schema.operations.clientSource} = ${source}`;
+}
+
+function rawClientSourceFilter(source: string | null): SQL {
+    if (!source) return sql``;
+    if (source === 'chat' || source === 'adsagent-chat') {
+        return sql`AND o.client_source IN ('chat', 'adsagent-chat')`;
+    }
+    if (source === 'unknown') {
+        return sql`AND o.client_source IS NULL`;
+    }
+    return sql`AND o.client_source = ${source}`;
+}
+
+// ─── Tiles (totals + prev totals + new users) ────────────────────────────────
+
+async function fetchTiles(opts: NormalizedOptions): Promise<UsageTilesData> {
+    const { now, since, prevSince } = timeWindows(opts.days);
     const sinceIso = since.toISOString();
-    const nowIso = now.toISOString();
-    const interactionLookbackIso = new Date(since.getTime() - 30 * 60 * 1000).toISOString();
 
-    const lowSuccessSince = new Date(now.getTime() - LOW_SUCCESS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-    const lowSuccessSinceIso = lowSuccessSince.toISOString();
-    // 30-min buffer matches the interaction-stitching gap used elsewhere — without
-    // it, the first interaction of the window could be misclassified as "new".
-    const lowSuccessLookbackIso = new Date(lowSuccessSince.getTime() - 30 * 60 * 1000).toISOString();
-
-    const platformFilter = platform ? eq(schema.operations.platform, platform) : null;
-    const devExcludeForAlias = (alias: SQL) =>
-        includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(alias)}`;
+    const platformFilter = opts.platform ? eq(schema.operations.platform, opts.platform) : null;
 
     const whereRecent = and(
         gte(schema.operations.createdAt, since),
-        ...(includeDev ? [] : [excludeDevOpsFilter()]),
+        ...(opts.includeDev ? [] : [excludeDevOpsFilter()]),
         ...(platformFilter ? [platformFilter] : []),
     );
     const wherePrev = and(
         gte(schema.operations.createdAt, prevSince),
         lt(schema.operations.createdAt, since),
-        ...(includeDev ? [] : [excludeDevOpsFilter()]),
+        ...(opts.includeDev ? [] : [excludeDevOpsFilter()]),
         ...(platformFilter ? [platformFilter] : []),
     );
 
-    const tzLiteral = sql.raw(`'${tz}'`);
-    const localDate = sql`date((${schema.operations.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral})`;
+    const devExcludeRaw = opts.includeDev
+        ? sql``
+        : sql`AND ${excludeDevOpsFilterForAlias(sql`older.user_id`)}`;
 
-    const chatSourceFilter = sql`${schema.operations.clientSource} IN ('chat', 'adsagent-chat')`;
-    const dailySourceFilter =
-        source === 'chat' || source === 'adsagent-chat'
-            ? chatSourceFilter
-            : source === 'unknown'
-                ? sql`${schema.operations.clientSource} IS NULL`
-            : source
-                ? sql`${schema.operations.clientSource} = ${source}`
-                : null;
-
-    const whereDaily = dailySourceFilter
-        ? and(whereRecent, dailySourceFilter)
-        : whereRecent;
-
-    const interactionSourceFilter =
-        source === 'chat' || source === 'adsagent-chat'
-            ? sql`AND o.client_source IN ('chat', 'adsagent-chat')`
-            : source === 'unknown'
-                ? sql`AND o.client_source IS NULL`
-            : source
-                ? sql`AND o.client_source = ${source}`
-                : sql``;
-
-    const [totalsRow, prevTotalsRow, newUsersRow, dailyCounts, dailyInteractions, lowSuccessUsers, topTools] = await Promise.all([
+    const [totalsRow, prevTotalsRow, newUsersRow] = await Promise.all([
         db()
             .select({
                 calls: operationRowCount(),
@@ -125,26 +155,105 @@ async function fetchUsageData({
             select 1 from operations older
             where older.user_id = ${schema.operations.userId}
               and older.created_at < ${sinceIso}::timestamp
-              ${devExcludeForAlias(sql`older.user_id`)}
-              ${platform ? sql`and older.platform = ${platform}` : sql``}
+              ${devExcludeRaw}
+              ${opts.platform ? sql`and older.platform = ${opts.platform}` : sql``}
           )`,
                 ),
             ),
+    ]);
 
-        db()
-            .select({
-                day: sql<string>`to_char(${localDate}, 'YYYY-MM-DD')`,
-                reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
-                writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
-                errors: operationErrorRowCount(schema.operations),
-                dau: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
-            })
-            .from(schema.operations)
-            .where(whereDaily)
-            .groupBy(localDate)
-            .orderBy(localDate),
+    const totals = totalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
+    const prev = prevTotalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
+    const newUsers = newUsersRow[0]?.newUsers ?? 0;
 
-        db().execute(sql`
+    const priorWindowPredatesPlatform = prevSince < PLATFORM_START;
+    const prevTotals: PrevTotals = priorWindowPredatesPlatform
+        ? { calls: null, errors: null, activeUsers: null }
+        : { calls: prev.calls, errors: prev.errors, activeUsers: prev.activeUsers };
+
+    return {
+        days: opts.days,
+        range: { from: sinceIso, to: now.toISOString() },
+        totals: {
+            calls: totals.calls,
+            errors: totals.errors,
+            activeUsers: totals.activeUsers,
+            newUsers,
+        },
+        prevTotals,
+    };
+}
+
+export function getUsageTiles(opts: UsageQueryOptions = {}): Promise<UsageTilesData> {
+    const normalized = normalize(opts);
+    return unstable_cache(() => fetchTiles(normalized), cacheKey('dev-usage-tiles', normalized), {
+        revalidate: CACHE_TTL_SECONDS,
+        tags: ['dev-usage'],
+    })();
+}
+
+// ─── Daily counts (reads/writes/errors/dau per day) ──────────────────────────
+
+async function fetchDailyCounts(opts: NormalizedOptions): Promise<DailyCountRow[]> {
+    const { since } = timeWindows(opts.days);
+
+    const platformFilter = opts.platform ? eq(schema.operations.platform, opts.platform) : null;
+    const sourceFilter = clientSourceFilter(opts.source);
+
+    const whereDaily = and(
+        gte(schema.operations.createdAt, since),
+        ...(opts.includeDev ? [] : [excludeDevOpsFilter()]),
+        ...(platformFilter ? [platformFilter] : []),
+        ...(sourceFilter ? [sourceFilter] : []),
+    );
+
+    const tzLiteral = sql.raw(`'${opts.tz}'`);
+    const localDate = sql`date((${schema.operations.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral})`;
+
+    const rows = await db()
+        .select({
+            day: sql<string>`to_char(${localDate}, 'YYYY-MM-DD')`,
+            reads: operationTypeRowCount(schema.operations, OP_TYPE.READ),
+            writes: operationTypeRowCount(schema.operations, OP_TYPE.WRITE),
+            errors: operationErrorRowCount(schema.operations),
+            dau: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
+        })
+        .from(schema.operations)
+        .where(whereDaily)
+        .groupBy(localDate)
+        .orderBy(localDate);
+
+    return rows;
+}
+
+export function getUsageDaily(opts: UsageQueryOptions = {}): Promise<DailyCountRow[]> {
+    const normalized = normalize(opts);
+    return unstable_cache(
+        () => fetchDailyCounts(normalized),
+        cacheKey('dev-usage-daily', normalized),
+        { revalidate: CACHE_TTL_SECONDS, tags: ['dev-usage'] },
+    )();
+}
+
+// ─── Daily interactions (the slow LATERAL CTE) ───────────────────────────────
+
+async function fetchInteractions(opts: NormalizedOptions): Promise<InteractionRow[]> {
+    const { now, since } = timeWindows(opts.days);
+    const sinceIso = since.toISOString();
+    const nowIso = now.toISOString();
+    // 30-min lookback matches the interaction-stitching gap — without it, the
+    // first op of the window can be misclassified as the start of a new
+    // interaction when it's actually a continuation.
+    const lookbackIso = new Date(since.getTime() - 30 * 60 * 1000).toISOString();
+
+    const tzLiteral = sql.raw(`'${opts.tz}'`);
+    const devExclude = opts.includeDev
+        ? sql``
+        : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`;
+    const platformClause = opts.platform ? sql`AND o.platform = ${opts.platform}` : sql``;
+    const sourceClause = rawClientSourceFilter(opts.source);
+
+    const rows = await db().execute(sql`
       WITH filtered AS (
         SELECT
           o.id,
@@ -163,11 +272,11 @@ async function fetchUsageData({
           -- "interaction success rate". See lib/dev-ops-filter.ts for context.
           (o.success = 1 OR o.error_class = 'RATE_LIMIT')::int AS success
         FROM operations o
-        WHERE o.created_at >= ${interactionLookbackIso}::timestamp
+        WHERE o.created_at >= ${lookbackIso}::timestamp
           AND o.created_at < ${nowIso}::timestamp
-          ${includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`}
-          ${platform ? sql`AND o.platform = ${platform}` : sql``}
-          ${interactionSourceFilter}
+          ${devExclude}
+          ${platformClause}
+          ${sourceClause}
       ),
       ordered AS (
         SELECT
@@ -231,11 +340,52 @@ async function fetchUsageData({
       FROM interaction_days
       GROUP BY local_day
       ORDER BY local_day
-    `),
+    `);
 
-        // Fixed short window: long ranges let stale outages dominate and one-shot
-        // users dilute the rate. Stitches ops into interactions on a 30-min gap.
-        db().execute(sql`
+    return (
+        rows as unknown as Array<{
+            day: string;
+            interactions: number | string;
+            successful_interactions: number | string;
+        }>
+    ).map((r) => {
+        const interactions = Number(r.interactions ?? 0);
+        const successfulInteractions = Number(r.successful_interactions ?? 0);
+        return {
+            day: r.day,
+            interactions,
+            successfulInteractions,
+            interactionSuccessRate:
+                interactions > 0 ? (successfulInteractions / interactions) * 100 : 0,
+        };
+    });
+}
+
+export function getUsageInteractions(opts: UsageQueryOptions = {}): Promise<InteractionRow[]> {
+    const normalized = normalize(opts);
+    return unstable_cache(
+        () => fetchInteractions(normalized),
+        cacheKey('dev-usage-interactions', normalized),
+        { revalidate: CACHE_TTL_SECONDS, tags: ['dev-usage'] },
+    )();
+}
+
+// ─── Low-success users (fixed short window) ──────────────────────────────────
+
+async function fetchLowSuccess(opts: NormalizedOptions): Promise<LowSuccessUsers> {
+    const { now } = timeWindows(opts.days);
+    const lowSuccessSince = new Date(now.getTime() - LOW_SUCCESS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const lowSuccessSinceIso = lowSuccessSince.toISOString();
+    const lowSuccessLookbackIso = new Date(lowSuccessSince.getTime() - 30 * 60 * 1000).toISOString();
+    const nowIso = now.toISOString();
+
+    const devExclude = opts.includeDev
+        ? sql``
+        : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`;
+    const platformClause = opts.platform ? sql`AND o.platform = ${opts.platform}` : sql``;
+    const sourceClause = rawClientSourceFilter(opts.source);
+
+    const rows = await db().execute(sql`
       WITH filtered AS (
         SELECT
           o.id,
@@ -248,17 +398,15 @@ async function fetchUsageData({
           END AS client_source,
           o.platform,
           o.created_at,
-          -- Mirror the daily-interactions CTE above: RATE_LIMIT is our own
-          -- quota enforcement, not a real failure.
           (o.success = 1 OR o.error_class = 'RATE_LIMIT')::int AS success,
           o.error_class
         FROM operations o
         WHERE o.created_at >= ${lowSuccessLookbackIso}::timestamp
           AND o.created_at < ${nowIso}::timestamp
           AND o.user_id IS NOT NULL
-          ${includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`}
-          ${platform ? sql`AND o.platform = ${platform}` : sql``}
-          ${interactionSourceFilter}
+          ${devExclude}
+          ${platformClause}
+          ${sourceClause}
       ),
       ordered AS (
         SELECT
@@ -346,9 +494,59 @@ async function fetchUsageData({
         (pu.successful_interactions::float / NULLIF(pu.interactions, 0)) ASC,
         pu.interactions DESC
       LIMIT 10
-    `),
+    `);
 
-        db().execute(sql`
+    const users: LowSuccessUser[] = (
+        rows as unknown as Array<{
+            userId: string;
+            interactions: number | string;
+            successfulInteractions: number | string;
+            googleEmail: string | null;
+            primaryAccountId: string | null;
+            topErrorClasses: string[] | null;
+        }>
+    ).map((u) => {
+        const interactions = Number(u.interactions ?? 0);
+        const successfulInteractions = Number(u.successfulInteractions ?? 0);
+        return {
+            userId: u.userId,
+            googleEmail: u.googleEmail,
+            primaryAccountId: u.primaryAccountId,
+            interactions,
+            successfulInteractions,
+            successRate: interactions > 0 ? (successfulInteractions / interactions) * 100 : 0,
+            topErrorClasses: u.topErrorClasses ?? [],
+        };
+    });
+
+    return {
+        windowDays: LOW_SUCCESS_WINDOW_DAYS,
+        minInteractions: LOW_SUCCESS_MIN_INTERACTIONS,
+        users,
+    };
+}
+
+export function getUsageLowSuccess(opts: UsageQueryOptions = {}): Promise<LowSuccessUsers> {
+    const normalized = normalize(opts);
+    return unstable_cache(
+        () => fetchLowSuccess(normalized),
+        cacheKey('dev-usage-low-success', normalized),
+        { revalidate: CACHE_TTL_SECONDS, tags: ['dev-usage'] },
+    )();
+}
+
+// ─── Top tools ───────────────────────────────────────────────────────────────
+
+async function fetchTopTools(opts: NormalizedOptions): Promise<TopTool[]> {
+    const { since } = timeWindows(opts.days);
+    const sinceIso = since.toISOString();
+
+    const devExclude = opts.includeDev
+        ? sql``
+        : sql`AND ${excludeDevOpsFilterForAlias(sql`user_id`)}`;
+    const platformClause = opts.platform ? sql`AND platform = ${opts.platform}` : sql``;
+
+    const rows = await db().execute(sql`
       WITH per_op AS (
         SELECT
           tool_name,
@@ -362,8 +560,8 @@ async function fetchUsageData({
         FROM operations
         WHERE created_at >= ${sinceIso}::timestamp
           AND tool_name IS NOT NULL
-          ${includeDev ? sql`` : sql`AND ${excludeDevOpsFilterForAlias(sql`user_id`)}`}
-          ${platform ? sql`AND platform = ${platform}` : sql``}
+          ${devExclude}
+          ${platformClause}
       )
       SELECT
         tool_name AS "toolName",
@@ -375,121 +573,61 @@ async function fetchUsageData({
       GROUP BY tool_name
       ORDER BY calls DESC
       LIMIT 20
-    `),
-    ]);
+    `);
 
-    const lowSuccessRows = lowSuccessUsers as unknown as Array<{
-        userId: string;
-        interactions: number | string;
-        successfulInteractions: number | string;
-        googleEmail: string | null;
-        primaryAccountId: string | null;
-        topErrorClasses: string[] | null;
-    }>;
-
-    const totals = totalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
-    const prev = prevTotalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
-    const newUsers = newUsersRow[0]?.newUsers ?? 0;
-    const interactionsByDay = new Map(
-        (
-            dailyInteractions as unknown as Array<{
-                day: string;
-                interactions: number | string;
-                successful_interactions: number | string;
-            }>
-        ).map((row) => [
-            row.day,
-            {
-                interactions: Number(row.interactions ?? 0),
-                successfulInteractions: Number(row.successful_interactions ?? 0),
-            },
-        ]),
-    );
-
-    const priorWindowPredatesPlatform = prevSince < PLATFORM_START;
-
-    const prevTotals = priorWindowPredatesPlatform
-        ? { calls: null, errors: null, activeUsers: null }
-        : { calls: prev.calls, errors: prev.errors, activeUsers: prev.activeUsers };
-
-    return {
-        days,
-        range: { from: sinceIso, to: nowIso },
-        totals: {
-            calls: totals.calls,
-            errors: totals.errors,
-            activeUsers: totals.activeUsers,
-            newUsers,
-        },
-        prevTotals,
-        daily: dailyCounts.map((day) => {
-            const interaction = interactionsByDay.get(day.day) ?? {
-                interactions: 0,
-                successfulInteractions: 0,
-            };
-            return {
-                ...day,
-                interactions: interaction.interactions,
-                successfulInteractions: interaction.successfulInteractions,
-                interactionSuccessRate:
-                    interaction.interactions > 0
-                        ? (interaction.successfulInteractions / interaction.interactions) * 100
-                        : null,
-            };
-        }),
-        lowSuccessUsers: {
-            windowDays: LOW_SUCCESS_WINDOW_DAYS,
-            minInteractions: LOW_SUCCESS_MIN_INTERACTIONS,
-            users: lowSuccessRows.map((u) => {
-                const interactions = Number(u.interactions ?? 0);
-                const successfulInteractions = Number(u.successfulInteractions ?? 0);
-                return {
-                    userId: u.userId,
-                    googleEmail: u.googleEmail,
-                    primaryAccountId: u.primaryAccountId,
-                    interactions,
-                    successfulInteractions,
-                    successRate:
-                        interactions > 0
-                            ? (successfulInteractions / interactions) * 100
-                            : 0,
-                    topErrorClasses: u.topErrorClasses ?? [],
-                };
-            }),
-        },
-        topTools: (
-            topTools as unknown as Array<{
-                toolName: string | null;
-                calls: number | string;
-                errors: number | string;
-                p50: number | string;
-                p95: number | string;
-            }>
-        ).map((t) => ({
-            toolName: t.toolName,
-            calls: Number(t.calls),
-            errors: Number(t.errors),
-            p50: Number(t.p50),
-            p95: Number(t.p95),
-        })),
-    };
+    return (
+        rows as unknown as Array<{
+            toolName: string | null;
+            calls: number | string;
+            errors: number | string;
+            p50: number | string;
+            p95: number | string;
+        }>
+    ).map((t) => ({
+        toolName: t.toolName,
+        calls: Number(t.calls),
+        errors: Number(t.errors),
+        p50: Number(t.p50),
+        p95: Number(t.p95),
+    }));
 }
 
-export type UsageData = Awaited<ReturnType<typeof fetchUsageData>>;
-
-// Cache key includes every input that changes the result. Short revalidate
-// keeps repeat tab visits / refreshes near-instant without serving very stale
-// data; the API route can still pass `fresh` to bypass via a different code
-// path. Tag lets us invalidate from elsewhere if needed.
-export function getUsageData(opts: GetUsageDataOptions = {}): Promise<UsageData> {
-    const days = Number.isFinite(opts.days) ? Math.min(Math.max(opts.days as number, 1), 90) : 30;
-    const tz = opts.tz ?? 'UTC';
-    const source = opts.source ?? 'all';
-    const platform = opts.platform ?? 'all';
-    const includeDev = opts.includeDev ? '1' : '0';
+export function getUsageTopTools(opts: UsageQueryOptions = {}): Promise<TopTool[]> {
+    const normalized = normalize(opts);
     return unstable_cache(
-        () => fetchUsageData(opts),
-        ['dev-usage', String(days), tz, source, platform, includeDev],
-        { revalidate: 60, tags: ['dev-usage'] },
+        () => fetchTopTools(normalized),
+        cacheKey('dev-usage-top-tools', normalized),
+        { revalidate: CACHE_TTL_SECONDS, tags: ['dev-usage'] },
     )();
+}
+
+// ─── Section dispatch (used by the API route) ────────────────────────────────
+
+export type UsageSection = 'tiles' | 'daily' | 'interactions' | 'lowSuccess' | 'topTools';
+
+export const USAGE_SECTIONS: readonly UsageSection[] = [
+    'tiles',
+    'daily',
+    'interactions',
+    'lowSuccess',
+    'topTools',
+] as const;
+
+export function isUsageSection(value: string | null): value is UsageSection {
+    return value !== null && (USAGE_SECTIONS as readonly string[]).includes(value);
+}
+
+export function getUsageSection(section: UsageSection, opts: UsageQueryOptions) {
+    switch (section) {
+        case 'tiles':
+            return getUsageTiles(opts);
+        case 'daily':
+            return getUsageDaily(opts);
+        case 'interactions':
+            return getUsageInteractions(opts);
+        case 'lowSuccess':
+            return getUsageLowSuccess(opts);
+        case 'topTools':
+            return getUsageTopTools(opts);
+    }
 }

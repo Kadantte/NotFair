@@ -2,16 +2,25 @@
 // This file is type-only — no runtime imports.
 
 // ─── Usage route types (/api/dev/usage) ──────────────────────────────────────
+//
+// The Usage tab fetches each section independently so the fast queries can
+// paint while the slow per-interaction CTEs are still resolving. Keep these
+// shapes per-section — there is no "everything-in-one" response.
 
-export type DailyChartRow = {
+export type DailyCountRow = {
     day: string;
     reads: number;
     writes: number;
     errors: number;
     dau: number;
+};
+
+export type InteractionRow = {
+    day: string;
     interactions: number;
+    /** 0–100. Always finite — the SQL only groups days that had interactions. */
+    interactionSuccessRate: number;
     successfulInteractions: number;
-    interactionSuccessRate: number | null;
 };
 
 export type LowSuccessUser = {
@@ -52,14 +61,11 @@ export type PrevTotals = {
     activeUsers: number | null;
 };
 
-export type UsageStats = {
+export type UsageTilesData = {
     days: number;
     range: { from: string; to: string };
     totals: UsageTotals;
     prevTotals: PrevTotals;
-    daily: DailyChartRow[];
-    lowSuccessUsers: LowSuccessUsers;
-    topTools: TopTool[];
 };
 
 // ─── Activity route types (/api/dev/[accountId]/activity) ────────────────────

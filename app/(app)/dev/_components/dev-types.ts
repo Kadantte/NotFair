@@ -1,7 +1,3 @@
-import type { getContactsAction } from '@/app/(app)/outreach/actions';
-
-export type Contact = Awaited<ReturnType<typeof getContactsAction>>[number];
-
 export type CustomerAccount = {
     id: string;
     name: string;
@@ -69,5 +65,5 @@ export type ResetPreview = {
     stripeCustomers: { env: 'test' | 'live'; stripeCustomerId: string }[];
 };
 
-export type Tab = 'customers' | 'usage' | 'outreach' | 'influencers' | 'developer' | 'waitlist';
+export type Tab = 'customers' | 'usage' | 'developer' | 'waitlist';
 export type UsagePlatform = 'all' | 'google_ads' | 'meta_ads';

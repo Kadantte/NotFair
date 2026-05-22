@@ -1,49 +1,8 @@
-import { Suspense } from 'react';
 import { UsageView } from './usage-view';
-import { UsageSkeleton } from './usage-skeleton';
-import { getUsageData } from './data';
-import type { UsageData } from './data';
 
-type UsagePlatform = 'google_ads' | 'meta_ads' | null;
-
-export default async function DevUsagePage({
-    searchParams,
-}: {
-    searchParams: Promise<Record<string, string>>;
-}) {
-    const sp = await searchParams;
-    const rawDays = parseInt(sp.days ?? '60', 10);
-    const days = Number.isFinite(rawDays) ? Math.min(Math.max(rawDays, 1), 120) : 60;
-    const rawPlatform = sp.platform;
-    const platform: UsagePlatform =
-        rawPlatform === 'google_ads' || rawPlatform === 'meta_ads' ? rawPlatform : null;
-
-    // Stream the data section: the layout + skeleton flush immediately, the DB
-    // query keeps streaming on the same response. The user sees the page shell
-    // before getUsageData resolves.
-    return (
-        <Suspense fallback={<UsageSkeleton />}>
-            <UsageDataBoundary days={days} platform={platform} />
-        </Suspense>
-    );
-}
-
-async function UsageDataBoundary({
-    days,
-    platform,
-}: {
-    days: number;
-    platform: UsagePlatform;
-}) {
-    let initialData: UsageData | undefined;
-    // Best-guess tz for the team (PST). The client refetches on mount with the
-    // viewer's actual tz; this default just avoids a UTC flash for PST viewers,
-    // who are the common case for this internal dev dashboard.
-    const initialTz = 'America/Los_Angeles';
-    try {
-        initialData = await getUsageData({ days, platform, tz: initialTz });
-    } catch (err) {
-        console.error('[dev/usage] Server prefetch failed:', err);
-    }
-    return <UsageView initialData={initialData} initialTz={initialTz} />;
+// The page renders the shell immediately; each section fetches itself in
+// parallel via /api/dev/usage?section=…, so the fast queries paint while the
+// slow per-interaction CTEs are still resolving. See usage-view.tsx.
+export default function DevUsagePage() {
+    return <UsageView />;
 }

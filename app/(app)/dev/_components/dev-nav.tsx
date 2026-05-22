@@ -24,9 +24,7 @@ export function DevNav() {
                     >
                         {tab === 'developer'
                             ? <><span className="sm:hidden">Options</span><span className="hidden sm:inline">Developer Options</span></>
-                            : tab === 'influencers'
-                                ? <><span className="sm:hidden">Influencers</span><span className="hidden sm:inline">Influencer Reachout</span></>
-                                : tab}
+                            : tab}
                     </Link>
                 ))}
             </div>
