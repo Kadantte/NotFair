@@ -230,10 +230,6 @@
     "headline": "Bei {brand} anmelden",
     "subhead": "Google Ads mit KI verwalten",
     "signInWithGoogle": "Mit Google anmelden",
-    "or": "oder",
-    "sendMagicLink": "Magic Link senden",
-    "emailHelp": "Wir senden einen Anmeldelink an Ihre E-Mail-Adresse. Kein Passwort nötig.",
-    "emailSent": "Prüfen Sie Ihre E-Mail für den Anmeldelink.",
     "errors": {
       "consentDenied": "Sie haben die Anmeldung abgebrochen. Bitte erneut versuchen und auf „Zulassen“ klicken.",
       "scopeDenied": "Die Google Ads-Berechtigung wurde nicht erteilt. Bitte erneut versuchen und die „Google Ads“-Checkbox aktiviert lassen.",

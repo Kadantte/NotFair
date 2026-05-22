@@ -230,10 +230,6 @@
     "headline": "Iniciar sesión en {brand}",
     "subhead": "Gestiona Google Ads con IA",
     "signInWithGoogle": "Iniciar sesión con Google",
-    "or": "o",
-    "sendMagicLink": "Enviar enlace mágico",
-    "emailHelp": "Enviaremos un enlace de inicio de sesión a tu correo. Sin contraseña.",
-    "emailSent": "Revisa tu correo para abrir el enlace de inicio de sesión.",
     "errors": {
       "consentDenied": "Cancelaste el inicio de sesión. Inténtalo de nuevo y haz clic en \"Permitir\" para dar acceso.",
       "scopeDenied": "No se concedió el permiso de Google Ads. Inténtalo de nuevo y mantén marcada la casilla \"Google Ads\" en la pantalla de consentimiento.",

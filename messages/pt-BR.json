@@ -230,10 +230,6 @@
     "headline": "Entrar no {brand}",
     "subhead": "Gerencie seu Google Ads com IA",
     "signInWithGoogle": "Entrar com Google",
-    "or": "ou",
-    "sendMagicLink": "Enviar link mágico",
-    "emailHelp": "Enviaremos um link de acesso para seu e-mail. Sem senha.",
-    "emailSent": "Confira seu e-mail para acessar pelo link.",
     "errors": {
       "consentDenied": "Você cancelou o login. Tente novamente e clique em \"Permitir\" para conceder acesso.",
       "scopeDenied": "A permissão do Google Ads não foi concedida. Tente novamente e mantenha a caixa \"Google Ads\" marcada na tela de consentimento.",

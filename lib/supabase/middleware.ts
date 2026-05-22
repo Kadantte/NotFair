@@ -13,11 +13,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Authenticated when EITHER:
-  //   - legacy `adsagent_token` cookie is set (user came through Google
-  //     OAuth signin), OR
-  //   - any Supabase `sb-*` cookie is set (user came through magic link
-  //     / Supabase OAuth — they may not have connected a Google account
-  //     yet, so no adsagent_token exists).
+  //   - legacy `adsagent_token` cookie is set, OR
+  //   - any Supabase `sb-*` cookie is set.
+  // Google OAuth sign-in writes both; the legacy token survives from older
+  // sessions that pre-date the Supabase-anchored auth migration.
   //
   // This is a UX filter, not a security boundary — server actions and
   // layout-level session checks still do proper auth validation. A cheap

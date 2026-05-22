@@ -230,10 +230,6 @@
     "headline": "Sign in to {brand}",
     "subhead": "Manage your Google Ads with AI",
     "signInWithGoogle": "Sign in with Google",
-    "or": "or",
-    "sendMagicLink": "Send magic link",
-    "emailHelp": "We'll send a sign-in link to your email. No password needed.",
-    "emailSent": "Check your email for the login link!",
     "errors": {
       "consentDenied": "You cancelled the sign-in. Please try again and click \"Allow\" to grant access.",
       "scopeDenied": "Google Ads permission was not granted. Please try again and keep the \"Google Ads\" checkbox checked on the consent screen.",

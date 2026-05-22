@@ -230,10 +230,6 @@
     "headline": "Connexion à {brand}",
     "subhead": "Gérez Google Ads avec l’IA",
     "signInWithGoogle": "Se connecter avec Google",
-    "or": "ou",
-    "sendMagicLink": "Envoyer un lien magique",
-    "emailHelp": "Nous enverrons un lien de connexion à votre e-mail. Aucun mot de passe requis.",
-    "emailSent": "Vérifiez votre e-mail pour le lien de connexion.",
     "errors": {
       "consentDenied": "Vous avez annulé la connexion. Réessayez et cliquez sur « Autoriser » pour accorder l’accès.",
       "scopeDenied": "L’autorisation Google Ads n’a pas été accordée. Réessayez et gardez la case « Google Ads » cochée sur l’écran de consentement.",

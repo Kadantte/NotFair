@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { startGoogleConnect } from "@/lib/google-oauth";
 import { AUTH_ERROR_REASON } from "@/lib/auth-errors";
 import { BRAND_NAME } from "@/lib/brand";
@@ -33,10 +32,7 @@ function LoginForm() {
   const next = searchParams.get("next") ?? DEFAULT_ACTIVATION_PATH;
   const errorParam = searchParams.get("error");
 
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const reasonParam = searchParams.get("reason");
   const [error, setError] = useState(() => {
     if (errorParam !== "auth_failed") return "";
@@ -73,30 +69,6 @@ function LoginForm() {
     }
   }
 
-  async function signInWithEmail(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-
-    setLoading(true);
-    setError("");
-    setMessage("");
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/supabase/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
-
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      setMessage(t("emailSent"));
-    }
-  }
-
   return (
     <div className="w-full max-w-sm space-y-8">
       <div className="text-center space-y-2">
@@ -109,12 +81,6 @@ function LoginForm() {
       {error && (
         <div className="p-3 rounded border border-[#C45D4A]/40 bg-[#C45D4A]/10 text-[#C45D4A] text-sm text-center">
           {error}
-        </div>
-      )}
-
-      {message && (
-        <div className="p-3 rounded border border-[#5DBE82]/40 bg-[#5DBE82]/10 text-[#5DBE82] text-sm text-center">
-          {message}
         </div>
       )}
 
@@ -149,41 +115,6 @@ function LoginForm() {
           </>
         )}
       </Button>
-
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-[#3D3C36]" />
-        <span className="text-[#C4C0B6] text-xs uppercase">{t("or")}</span>
-        <div className="flex-1 h-px bg-[#3D3C36]" />
-      </div>
-
-      <form onSubmit={signInWithEmail} className="space-y-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          required
-          className="w-full h-12 px-4 rounded-md bg-[#24231F] border border-[#3D3C36] text-[#E8E4DD] placeholder:text-[#C4C0B6] focus:outline-none focus:border-[#4CAF6E] transition-colors"
-        />
-        <Button
-          type="submit"
-          disabled={loading || !email.trim()}
-          className="w-full h-12 bg-[#24231F] border border-[#3D3C36] text-[#E8E4DD] hover:bg-[#2E2D28] font-semibold rounded-md transition-colors"
-        >
-          {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              <Mail className="w-4 h-4 mr-2" />
-              {t("sendMagicLink")}
-            </>
-          )}
-        </Button>
-      </form>
-
-      <p className="text-[#C4C0B6] text-xs text-center">
-        {t("emailHelp")}
-      </p>
     </div>
   );
 }

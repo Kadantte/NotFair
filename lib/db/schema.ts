@@ -732,7 +732,8 @@ export const userAttribution = pgTable("user_attribution", {
   userId: text("user_id").primaryKey(),
   /** Email at signup/first capture time. Kept flat for admin/reconcile queries. */
   email: text("email"),
-  /** google_oauth, email_magic_link, or inferred/backfill values. */
+  /** google_oauth, backfill, or historical values (e.g. email_magic_link from
+   *  the removed magic-link sign-in path). New writes are always google_oauth. */
   signupMethod: text("signup_method"),
   /** Normalized first-touch source fields. `source` is utm_source or referrer domain fallback. */
   source: text("source"),
@@ -753,7 +754,8 @@ export const userAttribution = pgTable("user_attribution", {
   signupReferrerDomain: text("signup_referrer_domain"),
   /** Client-side first-touch capture timestamp, if available. */
   attributionCapturedAt: timestamp("attribution_captured_at"),
-  /** cookie, oauth_state, supabase_magic_link, backfill_auth_metadata, etc. */
+  /** cookie, oauth_state, backfill_auth_metadata, etc. (historical rows may
+   *  still carry supabase_magic_link_* values from the removed sign-in path.) */
   attributionSource: text("attribution_source").notNull().default("unknown"),
   attributionVersion: integer("attribution_version").notNull().default(1),
   /** Attribution-only raw payload; do not dump full auth.user metadata here. */
@@ -890,8 +892,8 @@ export const mcpToolFeedback = pgTable("mcp_tool_feedback", {
 
 // ─── Email Preferences (per-user marketing opt-out) ─────────────────
 //
-// Marketing-only. Transactional emails (login magic links, share
-// notifications) ignore this — they're operational, not promotional.
+// Marketing-only. Transactional emails (share notifications, etc.)
+// ignore this — they're operational, not promotional.
 
 export const emailPreferences = pgTable("email_preferences", {
   userId: text("user_id").primaryKey(),
