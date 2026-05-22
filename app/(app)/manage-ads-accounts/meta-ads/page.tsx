@@ -2,9 +2,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { hasJoinedWaitlist, isWaitlistApproved } from "@/lib/waitlist";
 import { AddMetaAdsAccountPage } from "@/components/add-meta-ads-account-page";
-import { MetaWaitlistWall } from "@/components/meta-waitlist";
 
 /**
  * Page for adding/managing Meta ad accounts. Open to any signed-in user —
@@ -78,15 +76,6 @@ export default async function AddMetaAdsAccountPagePath() {
           : null,
       };
     }
-  }
-
-  // Meta App Review is pending — block NEW connect flows behind a
-  // join-waitlist wall. Approved users (granted from /dev/waitlist) bypass
-  // the wall. Existing connected users must still reach manage/disconnect
-  // so they can revoke Meta tokens and invalidate issued MCP access.
-  if (!connection && !(await isWaitlistApproved("meta_ads"))) {
-    const joined = await hasJoinedWaitlist("meta_ads");
-    return <MetaWaitlistWall initialJoined={joined} source="meta_ads_page" />;
   }
 
   return <AddMetaAdsAccountPage initialConnection={connection} />;

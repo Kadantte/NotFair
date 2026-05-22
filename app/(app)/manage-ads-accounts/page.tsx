@@ -3,11 +3,9 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { getSession } from "@/lib/session";
-import { hasJoinedWaitlist, isWaitlistApproved } from "@/lib/waitlist";
 import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { BrandLockup } from "@/components/brand-lockup";
 import { OnboardingSignOut } from "@/components/onboarding-sign-out";
-import { MetaWaitlistCard } from "@/components/meta-waitlist";
 
 type CandidateAccount = {
   id: string;
@@ -97,19 +95,10 @@ export default async function ManageAdsAccountsPage({ searchParams }: Props) {
       iconSrc="/google-ads-icon.svg"
     />
   );
-  // Meta App Review is still pending — gate the entry behind a join-waitlist
-  // card. Approved users (granted from /dev/waitlist) bypass the wall and
-  // see the regular connect card. The gate also fires when the user has
-  // already joined, so the card shows "You're on the list" instead of CTA.
-  const metaWallEnabled = !(await isWaitlistApproved("meta_ads"));
-  const metaWaitlistJoined = metaWallEnabled ? await hasJoinedWaitlist("meta_ads") : false;
-
   const metaHref = hasMeta
     ? "/manage-ads-accounts/meta-ads"
     : `/api/oauth/meta/start?next=${encodeURIComponent(next ?? "/manage-ads-accounts/meta-ads")}`;
-  const metaCard = metaWallEnabled && !hasMeta ? (
-    <MetaWaitlistCard initialJoined={metaWaitlistJoined} source="hub" />
-  ) : (
+  const metaCard = (
     <PlatformCard
       href={metaHref}
       title={hasMeta ? t("manageMetaTitle") : t("addMetaTitle")}

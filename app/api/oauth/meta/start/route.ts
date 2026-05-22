@@ -16,12 +16,9 @@
 
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { db, schema } from "@/lib/db";
 import { storeOAuthNonce } from "@/lib/oauth-nonce";
 import { getAppOrigin } from "@/lib/app-url";
 import { buildMetaAuthorizeUrl } from "@/lib/meta-ads/oauth";
-import { isWaitlistApproved } from "@/lib/waitlist";
 import { identifyUser } from "@/lib/auth/identify-user";
 
 function getSafeNext(next: string | null): string {
@@ -46,25 +43,6 @@ export async function GET(request: Request) {
       `${requestUrl.pathname}${requestUrl.search}`,
     );
     return NextResponse.redirect(signinUrl.toString());
-  }
-
-  const [existingMetaConnection] = await db()
-    .select({ id: schema.adPlatformConnections.id })
-    .from(schema.adPlatformConnections)
-    .where(
-      and(
-        eq(schema.adPlatformConnections.userId, identity.userId),
-        eq(schema.adPlatformConnections.platform, "meta_ads"),
-      ),
-    )
-    .limit(1);
-
-  // The waitlist wall is UX only unless the OAuth start endpoint enforces the
-  // same policy. Existing connected users may still re-authorize; unconnected
-  // users need approval (granted from /dev/waitlist) before we create a Meta
-  // OAuth state.
-  if (!existingMetaConnection && !(await isWaitlistApproved("meta_ads"))) {
-    return NextResponse.redirect(new URL("/manage-ads-accounts/meta-ads", requestUrl));
   }
 
   const nonce = randomBytes(16).toString("hex");
