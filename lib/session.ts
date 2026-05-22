@@ -7,9 +7,7 @@ import { COOKIE_NAMES, type ActivePlatform } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 import { DEV_EMAILS } from "@/lib/dev-access";
 import { resolveActivePlatform } from "@/lib/active-platform";
-import { readGoogleFromConnections, readUserIdFromSupabase } from "@/lib/connections/feature-flags";
 import {
-  compareForShadowRead,
   loadGoogleConnection,
   type GoogleConnectionView,
 } from "@/lib/connections/google-read";
@@ -67,15 +65,11 @@ type LoadSessionResult = {
 };
 
 /**
- * Stage 1: identify the user and load device-level fields from `mcp_sessions`
- * (cookie binding, dev impersonation). Returns the legacy SessionRow shape so
- * stage-2 code can layer connection-row data on top without rewriting callers.
- *
- * Phase-2 note: this still reads Google connection state (refreshToken,
- * customerId, customerIds, loginCustomerId, googleEmail) from mcp_sessions for
- * back-compat with rows that haven't been dual-written yet. The
- * `mergeWithConnection` step below replaces those fields with values from
- * `ad_platform_connections` when `READ_GOOGLE_FROM_CONNECTIONS=true`.
+ * Legacy cookie-bound session loader. Used only for users still carrying an
+ * `adsagent_token` cookie from before the Supabase migration — new sign-ins
+ * never set this cookie and never create `mcp_sessions` rows. The result is
+ * always passed through `mergeWithConnection` so Google fields come from the
+ * authoritative `ad_platform_connections` row.
  */
 async function loadDeviceSession(): Promise<LoadSessionResult | null> {
   const cookieStore = await cookies();
@@ -150,24 +144,17 @@ async function loadDeviceSession(): Promise<LoadSessionResult | null> {
 }
 
 /**
- * Phase-4 step 1: Supabase-anchored session loader.
- *
- * Identifies the user via Supabase Auth cookies (refreshed per protected
- * request by `lib/supabase/middleware.ts` after the phase-2
- * `SUPABASE_SESSION_BRIDGE` flip), then loads connection state directly from
- * `ad_platform_connections`. Skips `mcp_sessions` for everything except:
- *   - The optional legacy `Session.token` (still surfaced on /connect for
- *     direct-bearer setup display; phase 3 retires this).
- *   - Dev impersonation, which still uses `mcp_sessions.id` cookie values
- *     (step 4 migrates the cookie to userId uuid).
+ * Supabase-anchored session loader. Identifies the user via Supabase Auth
+ * cookies (refreshed per protected request by `lib/supabase/middleware.ts`),
+ * then loads Google connection state directly from `ad_platform_connections`.
+ * Skips `mcp_sessions` for everything except:
+ *   - The optional legacy `Session.token` (surfaced on /connect for
+ *     direct-bearer setup display).
+ *   - Dev impersonation, which still uses `mcp_sessions.id` cookie values.
  *
  * Returns null when no Supabase user is present — caller falls through to
- * the legacy cookie path so users who haven't re-signed-in since the bridge
- * flipped keep working.
- *
- * Implication: post-step-1, callers should NOT run `mergeWithConnection`
- * over the result — the row is already connection-sourced. The dispatcher
- * (`loadSessionRow`) takes care of skipping it.
+ * the legacy cookie path so users who still carry `adsagent_token` from
+ * before the Supabase migration keep working.
  */
 async function loadSessionViaSupabase(): Promise<LoadSessionResult | null> {
   const supabase = await createSupabaseServerClient();
@@ -264,39 +251,17 @@ async function loadSessionViaSupabase(): Promise<LoadSessionResult | null> {
 }
 
 /**
- * Stage 2: layer Google `ad_platform_connections` fields on top of the
- * mcp_sessions row when `READ_GOOGLE_FROM_CONNECTIONS=true`. Always shadow-
- * reads (and emits `google_connection_mismatch` on diff) so we can validate
- * parity in both flag states.
- *
- * Returns the same `SessionRow` shape so all downstream getters
- * (getSession/getSessionAuth/getAuthContext) stay unchanged.
+ * Layer Google `ad_platform_connections` fields on top of the legacy
+ * mcp_sessions row so Google state always comes from the authoritative
+ * connection record. Returns the input unchanged when no connection row
+ * exists yet (rare — implies the user has a legacy `adsagent_token` cookie
+ * but no Google connection ever finished).
  */
-async function mergeWithConnection(args: {
-  result: LoadSessionResult;
-  source: string;
-}): Promise<LoadSessionResult> {
-  const { result, source } = args;
+async function mergeWithConnection(result: LoadSessionResult): Promise<LoadSessionResult> {
   const userId = result.row.userId;
   if (!userId) return result;
-
   const conn = await loadGoogleConnection(userId);
-
-  compareForShadowRead({
-    userId,
-    fromSession: {
-      refreshToken: result.row.refreshToken,
-      customerId: result.row.customerId,
-      customerIds: result.row.customerIds,
-      loginCustomerId: result.row.loginCustomerId,
-      googleEmail: result.row.googleEmail,
-    },
-    fromConnection: conn,
-    source,
-  });
-
-  if (!readGoogleFromConnections() || !conn) return result;
-
+  if (!conn) return result;
   return {
     ...result,
     row: projectConnectionOntoSessionRow(result.row, conn),
@@ -331,32 +296,28 @@ function stringifyCustomerIds(accounts: ConnectedAccount[]): string {
 }
 
 async function loadSessionRow(source: string): Promise<LoadSessionResult | null> {
-  // Phase-4 step 1: when on, prefer the Supabase-anchored loader. Its result
-  // is already connection-sourced — skip `mergeWithConnection`. Falls back to
-  // the legacy cookie path when no Supabase session is present.
-  if (readUserIdFromSupabase()) {
-    const supaResult = await loadSessionViaSupabase();
-    if (supaResult) {
-      trackResolutionPath(supaResult.row.userId, "supabase", source);
-      return supaResult;
-    }
+  // Supabase-anchored loader is primary; its result is already
+  // connection-sourced. The legacy `adsagent_token` path stays as a fallback
+  // for users who haven't re-signed-in since the Supabase migration.
+  const supaResult = await loadSessionViaSupabase();
+  if (supaResult) {
+    trackResolutionPath(supaResult.row.userId, "supabase", source);
+    return supaResult;
   }
 
   const result = await loadDeviceSession();
   if (!result) return null;
-  const merged = await mergeWithConnection({ result, source });
+  const merged = await mergeWithConnection(result);
   trackResolutionPath(merged.row.userId, "cookie_fallback", source);
   return merged;
 }
 
 /**
- * Phase-4 step 3 readiness signal: emit a PostHog event each time
- * loadSessionRow resolves a session, tagged with how it resolved. Drives
- * a dashboard that shows what % of authenticated traffic is on the
- * Supabase path vs still on the legacy `adsagent_token` cookie fallback.
- *
- * Drop the cookie path (step 3) only when `cookie_fallback` daily count
- * is at zero for ≥1 week.
+ * Emit a PostHog event each time loadSessionRow resolves a session, tagged
+ * with how it resolved. Drives a dashboard showing what % of authenticated
+ * traffic is on the Supabase path vs still on the legacy `adsagent_token`
+ * cookie fallback. Drop the cookie fallback only when `cookie_fallback`
+ * daily count is at zero for ≥1 week.
  */
 function trackResolutionPath(
   userId: string | null,

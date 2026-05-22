@@ -89,6 +89,21 @@ vi.mock("@/lib/auth-cookies", () => ({
   },
 }));
 
+// Supabase getUser returns null in these tests — every assertion exercises
+// the legacy adsagent_token cookie path. Mock the client so we don't need
+// real Supabase env vars at test time.
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+    },
+  })),
+}));
+
+vi.mock("@/lib/connections/google-read", () => ({
+  loadGoogleConnection: async () => null,
+}));
+
 // ─── Test data ──────────────────────────────────────────────────────
 
 const REAL_SESSION = {

@@ -48,6 +48,15 @@ vi.mock("@/lib/supabase/server", () => ({
       updateUser: vi.fn(async () => ({ data: { user: null }, error: null })),
     },
   })),
+  createRouteHandlerClient: vi.fn(async () => ({
+    client: {
+      auth: {
+        signInWithIdToken: mockSignInWithIdToken,
+        updateUser: vi.fn(async () => ({ data: { user: null }, error: null })),
+      },
+    },
+    applyPendingCookies: vi.fn(),
+  })),
 }));
 
 vi.mock("@/lib/google-ads", () => ({

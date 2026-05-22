@@ -9,7 +9,7 @@ import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { recordUserAttribution } from "@/lib/db/attribution";
 import { db, schema } from "@/lib/db";
 import { listConnectableAccounts, syncAccountSnapshots, type ConnectableAccount } from "@/lib/google-ads";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { getAppOrigin } from "@/lib/app-url";
 import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 import { REDDIT_SIGNUP_ID_COOKIE, sendRedditConversion } from "@/lib/reddit-capi";
@@ -741,7 +741,7 @@ export async function GET(request: Request) {
     return scopeResponse;
   }
 
-  const supabase = await createClient();
+  const { client: supabase, applyPendingCookies } = await createRouteHandlerClient();
   const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
     provider: "google",
     token: tokenData.id_token,
@@ -897,6 +897,13 @@ export async function GET(request: Request) {
       picture: meta?.avatar_url ?? meta?.picture ?? null,
     });
   }
+
+  // Apply the buffered sb-* cookies from signInWithIdToken onto the response
+  // we're returning. Without this, the redirect target sees no Supabase
+  // session and bounces the user back to /login (Next 16 doesn't merge
+  // cookies set via the cookies() store onto an explicitly returned
+  // NextResponse — see createRouteHandlerClient docs).
+  applyPendingCookies(response);
 
   return response;
 }

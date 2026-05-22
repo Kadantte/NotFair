@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSelectLimit, mockTrackServerEvent } = vi.hoisted(() => ({
+const { mockSelectLimit } = vi.hoisted(() => ({
   mockSelectLimit: vi.fn(),
-  mockTrackServerEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -27,13 +26,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-vi.mock("@/lib/analytics-server", () => ({
-  trackServerEvent: mockTrackServerEvent,
-}));
-
 import {
   activeLoginCustomerIdFor,
-  compareForShadowRead,
   loadGoogleConnection,
 } from "@/lib/connections/google-read";
 
@@ -162,145 +156,3 @@ describe("loadGoogleConnection", () => {
   });
 });
 
-describe("compareForShadowRead", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("emits missing_connection_row when no connection exists", () => {
-    compareForShadowRead({
-      userId: "user-1",
-      fromSession: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: '[{"id":"111","name":"A"}]',
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      fromConnection: null,
-      source: "test",
-    });
-
-    expect(mockTrackServerEvent).toHaveBeenCalledWith(
-      "user-1",
-      "google_connection_mismatch",
-      expect.objectContaining({ kind: "missing_connection_row", source: "test" }),
-    );
-  });
-
-  it("does not emit when session and connection agree", () => {
-    compareForShadowRead({
-      userId: "user-1",
-      fromSession: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: '[{"id":"111","name":"A","loginCustomerId":"999"}]',
-        loginCustomerId: "999",
-        googleEmail: "user@example.com",
-      },
-      fromConnection: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: [{ id: "111", name: "A", loginCustomerId: "999" }],
-        loginCustomerId: "999",
-        googleEmail: "user@example.com",
-      },
-      source: "test",
-    });
-
-    expect(mockTrackServerEvent).not.toHaveBeenCalled();
-  });
-
-  it("emits field_diff with the divergent fields when refreshToken differs", () => {
-    compareForShadowRead({
-      userId: "user-1",
-      fromSession: {
-        refreshToken: "session-rt",
-        customerId: "111",
-        customerIds: '[{"id":"111","name":"A"}]',
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      fromConnection: {
-        refreshToken: "connection-rt",
-        customerId: "111",
-        customerIds: [{ id: "111", name: "A" }],
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      source: "test",
-    });
-
-    expect(mockTrackServerEvent).toHaveBeenCalledWith(
-      "user-1",
-      "google_connection_mismatch",
-      expect.objectContaining({
-        kind: "field_diff",
-        fields: ["refreshToken"],
-      }),
-    );
-
-    // Token values are fingerprinted, not raw, so we don't leak them via PostHog.
-    const call = mockTrackServerEvent.mock.calls[0]!;
-    const props = call[2] as { diffs: { refreshToken: { session: string; connection: string } } };
-    expect(props.diffs.refreshToken.session).not.toBe("session-rt");
-    expect(props.diffs.refreshToken.connection).not.toBe("connection-rt");
-    expect(props.diffs.refreshToken.session).toMatch(/^[0-9a-f]{8}$/);
-  });
-
-  it("flags customerIds diff when accountIds differ", () => {
-    compareForShadowRead({
-      userId: "user-1",
-      fromSession: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: '[{"id":"111","name":"A"},{"id":"222","name":"B"}]',
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      fromConnection: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: [{ id: "111", name: "A" }], // missing the second
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      source: "test",
-    });
-
-    expect(mockTrackServerEvent).toHaveBeenCalledWith(
-      "user-1",
-      "google_connection_mismatch",
-      expect.objectContaining({
-        kind: "field_diff",
-        fields: ["customerIds"],
-      }),
-    );
-  });
-
-  it("treats absent loginCustomerId field as equivalent across sources", () => {
-    // Session-side stores customerIds as a JSON string with no loginCustomerId field.
-    // Connection-side returns a ConnectedAccount with no loginCustomerId field.
-    // The two should compare equal — neither has the field set.
-    compareForShadowRead({
-      userId: "user-1",
-      fromSession: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: '[{"id":"111","name":"A"}]',
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      fromConnection: {
-        refreshToken: "rt",
-        customerId: "111",
-        customerIds: [{ id: "111", name: "A" }],
-        loginCustomerId: null,
-        googleEmail: null,
-      },
-      source: "test",
-    });
-
-    expect(mockTrackServerEvent).not.toHaveBeenCalled();
-  });
-});

@@ -1,6 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAMES } from "@/lib/auth-cookies";
+
+// refreshSupabaseSession needs Supabase env vars to build a client; stub it
+// out so the middleware tests stay env-independent (they only care about the
+// route-protection branching).
+vi.mock("@/lib/supabase/refresh-session", () => ({
+  refreshSupabaseSession: vi.fn(async (request: NextRequest) =>
+    NextResponse.next({ request }),
+  ),
+}));
+
 import { updateSession } from "@/lib/supabase/middleware";
 
 type CookieKV = { name: string; value: string };
