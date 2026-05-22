@@ -23,6 +23,20 @@ vi.mock("@/server/openclaw/sessions", () => ({
     `agent:${agent}:${thread}`,
 }));
 
+// Shadow transcript writes to ~/.notfair-cmo by default — stub to keep
+// the unit test isolated from disk. Functional behavior is covered by
+// the e2e browser test.
+vi.mock("@/server/openclaw/shadow-transcript", () => ({
+  openShadowWriter: async () => ({
+    appendDelta: () => {},
+    flushAssistant: async () => {},
+    toolStart: async () => {},
+    toolResult: async () => {},
+    close: async () => {},
+  }),
+  shadowStreamEvent: async () => {},
+}));
+
 // generateTaskThreadId lives on task-kickoff now. Mock just that one symbol
 // while letting the real buildTaskKickoffMessage run — we want to catch
 // contract drift between run-task and the kickoff format.

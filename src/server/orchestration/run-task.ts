@@ -2,6 +2,10 @@ import {
   buildPendingSessionKey,
 } from "@/server/openclaw/sessions";
 import { streamChatViaGateway } from "@/server/openclaw/gateway-client";
+import {
+  openShadowWriter,
+  shadowStreamEvent,
+} from "@/server/openclaw/shadow-transcript";
 import { claimProposedTask, setTaskThreadIfMissing, updateTask } from "@/server/db/tasks";
 import type { Task } from "@/types";
 
@@ -57,6 +61,15 @@ export async function runTaskKickoffServerSide(task: Task): Promise<void> {
   const sessionKey = buildPendingSessionKey(finalTask.agent_id, finalTask.thread_id);
   const kickoffMessage = buildTaskKickoffMessage(finalTask);
 
+  // Tee gateway events to a shadow JSONL the browser can tail. OpenClaw's
+  // codex-app-server backend buffers session.jsonl until session-end and
+  // doesn't emit per-message broadcasts during the turn, so without the
+  // shadow there's no way for the UI to render tokens live for tasks
+  // kicked off server-side. The shadow uses the same OpenClaw-style
+  // schema as session.jsonl so transcript-tail can read both with the
+  // same parser.
+  const shadow = await openShadowWriter(finalTask.agent_id, finalTask.thread_id);
+
   // We drain the stream so the agent's turn fully runs, but we no longer
   // post-process the buffer for pseudo-XML blocks — any side effects
   // (task_status, comments, approvals) happen via the agent calling
@@ -67,11 +80,20 @@ export async function runTaskKickoffServerSide(task: Task): Promise<void> {
       sessionId: finalTask.thread_id,
       message: kickoffMessage,
     })) {
+      // Best-effort forward to the shadow; a shadow-write failure must
+      // not abort the actual gateway stream.
+      try {
+        await shadowStreamEvent(shadow, evt);
+      } catch (err) {
+        console.error("[run-task] shadow write failed:", err);
+      }
       if (evt.kind === "error") {
         throw new Error(evt.message);
       }
     }
+    await shadow.close();
   } catch (err) {
+    await shadow.close().catch(() => undefined);
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[run-task] kickoff failed for ${finalTask.id}:`, err);
     updateTask(finalTask.id, {

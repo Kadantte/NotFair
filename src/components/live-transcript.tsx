@@ -46,6 +46,32 @@ import { projectHref } from "@/lib/project-href";
 
 const POLL_INTERVAL_MS = 2_000;
 
+/**
+ * Content signature for cross-writer dedup. The id-based set in
+ * seenEventIdsRef catches in-channel dups (e.g. polling racing itself);
+ * this catches dups WHEN the same logical event arrives via different
+ * channels with different ids — e.g. the shadow transcript stream gave
+ * us an assistant turn during the run, and OpenClaw's eventual JSONL
+ * flush gives us the same turn with a fresh UUID at session-end.
+ *
+ * Signature keys are intentionally narrow: text body for messages
+ * (case-insensitive trim collapses whitespace differences from the
+ * shadow vs. final renders), tool_call_id for tool rows (those are
+ * unique per invocation regardless of the writer).
+ */
+function eventSignature(e: TranscriptEvent): string {
+  switch (e.kind) {
+    case "user_message":
+    case "assistant_text":
+      return `${e.kind}|${e.body.trim()}`;
+    case "tool_call":
+    case "tool_result":
+      return `${e.kind}|${e.tool_call_id}`;
+    default:
+      return `${e.kind}|${e.id}`;
+  }
+}
+
 type Props = {
   projectSlug: string;
   agentSlug: string;
@@ -194,6 +220,21 @@ export function LiveTranscript({
     new Set(initialEvents.map((e) => e.id)),
   );
 
+  /**
+   * Content signatures we've already rendered, for cross-writer dedup.
+   * The id-based set above can't catch the case where the SAME logical
+   * message arrives twice via different paths with different ids — the
+   * server-side-kickoff path writes a shadow transcript (ids like
+   * `shadow-<uuid>`), and OpenClaw later flushes its own copy of the
+   * session.jsonl at session-end with FRESH UUIDs. Without a content
+   * key, every assistant turn and tool call would render twice. Keyed by
+   * the semantic identity: text body for messages, tool_call_id for
+   * tool rows. Pure ref so React doesn't see it.
+   */
+  const seenSignaturesRef = useRef<Set<string>>(
+    new Set(initialEvents.map(eventSignature)),
+  );
+
   // ── Auto-scroll: only when the user is already near the bottom. ─────
   function onScroll() {
     const el = scrollRef.current;
@@ -222,13 +263,19 @@ export function LiveTranscript({
         byteOffset: number;
         file_size: number;
       };
-      // Dedupe against `seenEventIdsRef` synchronously. The ref tracks
-      // every id we've committed to state across the entire polling and
-      // SSE lifetimes; rationale lives on the ref's declaration.
-      const fresh = data.events.filter(
-        (e) => !seenEventIdsRef.current.has(e.id),
-      );
-      for (const e of fresh) seenEventIdsRef.current.add(e.id);
+      // Dedupe against both id (in-channel races) and content signature
+      // (cross-channel dups, e.g. shadow stream vs. OpenClaw's eventual
+      // JSONL flush). Rationale on the refs' declarations.
+      const fresh = data.events.filter((e) => {
+        if (seenEventIdsRef.current.has(e.id)) return false;
+        const sig = eventSignature(e);
+        if (seenSignaturesRef.current.has(sig)) return false;
+        return true;
+      });
+      for (const e of fresh) {
+        seenEventIdsRef.current.add(e.id);
+        seenSignaturesRef.current.add(eventSignature(e));
+      }
       if (fresh.length > 0) {
         setEvents((prev) => [...prev, ...fresh]);
         // Clear pending state: JSONL now has the canonical events so the
@@ -287,43 +334,74 @@ export function LiveTranscript({
   // Skipped during an active /api/chat send — that path already streams
   // its own deltas; layering re-attach on top would just duplicate work.
   useEffect(() => {
-    if (!composerDisabled) return;
-    if (sendingChat) return;
-    if (stopPolling) return;
-    // jsdom (vitest) doesn't ship EventSource. Skip the bridge there so
-    // component tests don't blow up; polling-path coverage stays intact.
-    if (typeof EventSource === "undefined") return;
+    // Comprehensive client-side trace for the SSE re-attach. Prefix
+    // [live-bridge] mirrors the server-side logs so a browser-console +
+    // dev-server pair shows the full path. Toggle off in prod later.
+    const log = (...args: unknown[]) =>
+      console.log("[live-bridge]", ...args);
+    if (!composerDisabled) {
+      log("skip: composerDisabled=false (task not in flight)", {
+        threadId,
+      });
+      return;
+    }
+    if (sendingChat) {
+      log("skip: sendingChat=true (/api/chat path owns streaming)", {
+        threadId,
+      });
+      return;
+    }
+    if (stopPolling) {
+      log("skip: stopPolling=true", { threadId });
+      return;
+    }
+    if (typeof EventSource === "undefined") {
+      log("skip: no EventSource in env (jsdom test)");
+      return;
+    }
     const url = `/api/agents/${agentSlug}/threads/${threadId}/live?project=${encodeURIComponent(projectSlug)}`;
+    log("opening", { url });
     const es = new EventSource(url);
+    es.addEventListener("open", () => log("opened"));
+    es.addEventListener("ready", (e: MessageEvent) => log("ready", e.data));
     es.addEventListener("transcript", (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as { events: TranscriptEvent[] };
-        if (!Array.isArray(data.events)) return;
-        const fresh = data.events.filter(
-          (ev) => !seenEventIdsRef.current.has(ev.id),
-        );
-        for (const ev of fresh) seenEventIdsRef.current.add(ev.id);
+        if (!Array.isArray(data.events)) {
+          log("transcript payload not an array", data);
+          return;
+        }
+        const fresh = data.events.filter((ev) => {
+          if (seenEventIdsRef.current.has(ev.id)) return false;
+          const sig = eventSignature(ev);
+          if (seenSignaturesRef.current.has(sig)) return false;
+          return true;
+        });
+        log("transcript", {
+          incoming: data.events.length,
+          fresh: fresh.length,
+        });
+        for (const ev of fresh) {
+          seenEventIdsRef.current.add(ev.id);
+          seenSignaturesRef.current.add(eventSignature(ev));
+        }
         if (fresh.length > 0) {
           setEvents((prev) => [...prev, ...fresh]);
-          // Live events arrived: clear any optimistic placeholders for
-          // active sends + reset the "I'm waiting" indicator state.
           setPendingUserMsg(null);
           setPendingAssistant("");
           setPendingTools([]);
           setPendingError(null);
           setPendingLifecycle(null);
         }
-      } catch {
-        // Malformed payload; skip silently.
+      } catch (err) {
+        log("transcript parse error", err);
       }
     });
-    es.addEventListener("error", () => {
-      // EventSource auto-reconnects on transient drops; nothing else
-      // needed here. If the server actually returned an error response
-      // (4xx/5xx), reconnect attempts will keep failing and the source
-      // closes itself — polling continues regardless.
+    es.addEventListener("error", (e) => {
+      log("error", { readyState: es.readyState, event: e });
     });
     return () => {
+      log("closing", { threadId });
       es.close();
     };
   }, [
