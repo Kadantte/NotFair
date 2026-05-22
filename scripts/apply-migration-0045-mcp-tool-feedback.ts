@@ -137,6 +137,17 @@ async function main() {
         );
       }
 
+      const [{ status_check: statusCheck }] = await tx<{ status_check: string | null }[]>`
+        SELECT pg_get_constraintdef(c.oid) AS status_check
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE t.relname = 'mcp_tool_feedback'
+          AND c.conname = 'mcp_tool_feedback_status_check'
+      `;
+      if (!statusCheck || !statusCheck.includes("'new'::text") || statusCheck.includes("'open'::text")) {
+        throw new Error(`[migrate] post-check failed: status check constraint is stale: ${statusCheck ?? "missing"}`);
+      }
+
       const requiredIndexes = [
         "mcp_tool_feedback_status_created_idx",
         "mcp_tool_feedback_tool_created_idx",

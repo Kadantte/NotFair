@@ -49,6 +49,32 @@ ALTER TABLE "mcp_tool_feedback" ADD COLUMN IF NOT EXISTS "metadata" jsonb NOT NU
 ALTER TABLE "mcp_tool_feedback" ADD COLUMN IF NOT EXISTS "created_at" timestamp NOT NULL DEFAULT now();
 ALTER TABLE "mcp_tool_feedback" ADD COLUMN IF NOT EXISTS "updated_at" timestamp NOT NULL DEFAULT now();
 
+-- Earlier manual rollout created a narrower status check using the first draft
+-- lifecycle (`open`, `in_progress`, `shipped`, ...). The app now writes
+-- `status = 'new'` for fresh agent feedback, and the triage automation expects
+-- the explicit queue lifecycle below. Recreate the check constraint so durable
+-- capture does not fail with SQLSTATE 23514.
+ALTER TABLE "mcp_tool_feedback" DROP CONSTRAINT IF EXISTS "mcp_tool_feedback_status_check";
+UPDATE "mcp_tool_feedback"
+SET "status" = CASE "status"
+  WHEN 'open' THEN 'new'
+  WHEN 'in_progress' THEN 'triaged'
+  WHEN 'shipped' THEN 'fixed'
+  ELSE "status"
+END
+WHERE "status" IN ('open', 'in_progress', 'shipped');
+ALTER TABLE "mcp_tool_feedback" ADD CONSTRAINT "mcp_tool_feedback_status_check"
+  CHECK ("status" IN (
+    'new',
+    'triaged',
+    'issue_opened',
+    'pr_opened',
+    'fixed',
+    'closed',
+    'wontfix',
+    'needs_info'
+  ));
+
 -- Internal queue only. Keep private even though it lives in public schema:
 -- observations/suggestions may contain accidental customer PII or sensitive
 -- account context. Server-side direct DB/service-role code writes this table;

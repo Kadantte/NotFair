@@ -364,6 +364,47 @@ describe("MCP write tools — smoke", () => {
     expect(mockMutateResources).toHaveBeenCalledTimes(1);
   });
 
+  it("enableAdGroup and pauseAdGroup are discoverable aliases for ad-group status updates", async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ ad_group: { name: "Dogs", status: "PAUSED" }, campaign: { bidding_strategy_type: "MANUAL_CPC" } }])
+      .mockResolvedValueOnce([{ ad_group: { name: "Dogs", status: "ENABLED" }, campaign: { bidding_strategy_type: "MANUAL_CPC" } }]);
+
+    const harness = buildHarness([registerWriteTools], TEST_AUTH);
+    const names = harness.listToolNames();
+    expect(names).toContain("enableAdGroup");
+    expect(names).toContain("pauseAdGroup");
+
+    const enabled = expectOk(await harness.callTool("enableAdGroup", {
+      campaignId: "100",
+      adGroupId: "111",
+    }));
+    expect(enabled).toMatchObject({
+      success: true,
+      action: "update_ad_group",
+      entityId: "111",
+      changeId: 1,
+    });
+    expect(mockMutateResources.mock.calls[0][0][0].resource).toMatchObject({
+      resource_name: "customers/1234567890/adGroups/111",
+      status: 2,
+    });
+
+    const paused = expectOk(await harness.callTool("pauseAdGroup", {
+      campaignId: "100",
+      adGroupId: "111",
+    }));
+    expect(paused).toMatchObject({
+      success: true,
+      action: "update_ad_group",
+      entityId: "111",
+      changeId: 1,
+    });
+    expect(mockMutateResources.mock.calls[1][0][0].resource).toMatchObject({
+      resource_name: "customers/1234567890/adGroups/111",
+      status: 3,
+    });
+  });
+
   it("linkAsset (image, ad_group level) flows through execWrite", async () => {
     mockQuery.mockResolvedValueOnce([{ asset: { source: "ADVERTISER" } }]);
     mockMutateResources.mockResolvedValueOnce({
@@ -945,7 +986,7 @@ describe("MCP write tools — smoke", () => {
       "pauseKeyword", "addKeyword", "updateBid",
       "addNegativeKeyword", "removeNegativeKeyword", "updateCampaignBudget",
       "pauseCampaign", "enableCampaign", "removeCampaign",
-      "createAdGroup", "updateAdGroup", "createAd", "pauseAd", "enableAd", "removeAd",
+      "createAdGroup", "updateAdGroup", "enableAdGroup", "pauseAdGroup", "createAd", "pauseAd", "enableAd", "removeAd",
       "updateAdFinalUrl", "updateAdAssets",
       "renameCampaign", "renameAdGroup",
       "updateCampaignBidding", "updateCampaignGoals",

@@ -44,6 +44,48 @@ export function registerAdGroupWriteTools(deps: WriteToolDeps) {
     writeToolCall({ accountId, campaignId }, (a) => renameAdGroup(a, campaignId, adGroupId, newName)),
   ));
 
+  // ─── Ad Group Status Aliases ───────────────────────────────────────
+
+  server.registerTool("enableAdGroup", {
+    description:
+      "Enable a paused standard Search ad group. Thin alias for updateAdGroup with status=ENABLED; " +
+      "use when account diagnosis says a paused ad group is blocking serving. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging and experiment-impact guardrails)"),
+      adGroupId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, adGroupId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const guardrails = await resolveGuardrails(targetId, campaignId);
+    return writeToolCall({ accountId, campaignId }, (a) =>
+      updateAdGroup(a, adGroupId, { status: "ENABLED" }, guardrails),
+    );
+  }));
+
+  server.registerTool("pauseAdGroup", {
+    description:
+      "Pause a standard Search ad group. Thin alias for updateAdGroup with status=PAUSED; " +
+      "use for surgical pausing within a campaign without pausing ads one-by-one. Returns changeId.",
+    inputSchema: {
+      accountId: accountIdParam,
+      campaignId: z.string().describe("Campaign ID (for logging and experiment-impact guardrails)"),
+      adGroupId: z.string(),
+      ...experimentImpactAcknowledgementSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, campaignId, adGroupId }) => {
+    const auth = currentAuth();
+    const targetId = resolveAccountId(auth, accountId);
+    const guardrails = await resolveGuardrails(targetId, campaignId);
+    return writeToolCall({ accountId, campaignId }, (a) =>
+      updateAdGroup(a, adGroupId, { status: "PAUSED" }, guardrails),
+    );
+  }));
+
   // ─── Update Ad Group Bid / Settings ────────────────────────────────
 
   server.registerTool("updateAdGroup", {

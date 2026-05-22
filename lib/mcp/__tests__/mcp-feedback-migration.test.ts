@@ -33,4 +33,27 @@ describe("MCP feedback migration and scripts", () => {
     expect(script).toContain(".orderBy(asc(schema.mcpToolFeedback.createdAt))");
     expect(script).not.toContain(".orderBy(desc(schema.mcpToolFeedback.createdAt))");
   });
+
+  it("accepts the current feedback queue lifecycle statuses", () => {
+    const sql = readRepoFile("drizzle/0045_add_mcp_tool_feedback.sql");
+    expect(sql).toMatch(/DROP CONSTRAINT IF EXISTS\s+"mcp_tool_feedback_status_check"/i);
+    expect(sql).toMatch(/UPDATE\s+"mcp_tool_feedback"\s+SET\s+"status"\s+=\s+CASE\s+"status"/i);
+    expect(sql).toContain("WHEN 'open' THEN 'new'");
+    expect(sql).toContain("WHEN 'in_progress' THEN 'triaged'");
+    expect(sql).toContain("WHEN 'shipped' THEN 'fixed'");
+    expect(sql.indexOf("UPDATE \"mcp_tool_feedback\"")).toBeLessThan(sql.indexOf("ADD CONSTRAINT \"mcp_tool_feedback_status_check\""));
+    expect(sql).toMatch(/ADD CONSTRAINT\s+"mcp_tool_feedback_status_check"/i);
+    for (const status of [
+      "new",
+      "triaged",
+      "issue_opened",
+      "pr_opened",
+      "fixed",
+      "closed",
+      "wontfix",
+      "needs_info",
+    ]) {
+      expect(sql).toContain(`'${status}'`);
+    }
+  });
 });
