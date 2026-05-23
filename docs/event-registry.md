@@ -1,6 +1,6 @@
 # Event Registry
 
-> Source of truth for all analytics events. Last updated: 2026-05-14.
+> Source of truth for all analytics events. Last updated: 2026-05-22.
 > Platforms: PostHog and X Ads Pixel. Check here before adding a new event.
 
 
@@ -29,6 +29,54 @@
 ```
 
 **Files:** `app/auth/callback/route.ts` (sets cookie, single-account paths), `app/api/auth/select-account/route.ts` (sets cookie, multi-account path), `components/posthog-provider.tsx` (reads cookie, fires event)
+
+---
+
+## account_disconnected
+
+**Phase:** 1
+**Category:** churn_signal
+**Platform:** PostHog (server)
+**Trigger:** Fires when a user successfully disconnects a connected ad platform. Google: `app/api/auth/disconnect-google/route.ts` (this also signs the user out, since Google is the identity grant). Meta: `app/api/auth/disconnect-meta/route.ts`. Idempotent no-op calls (already-disconnected) do NOT fire.
+**Hypothesis:** We believe tracking disconnects with `platform` and `account_count` tells us churn timing per platform and lets us test "users disconnect after failed writes" by joining to recent `ai_change_failed` events for the same `distinct_id`. Drives the quality bar for write tools and surfaces platform-specific churn drivers.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `platform` | string | `"meta_ads"` | Which platform was disconnected. Enum: `google_ads`, `meta_ads`. |
+| `account_count` | number | `3` | Number of ad accounts that were linked at the time of disconnect. For Google, falls back to the `mcp_sessions` row count for legacy connections that predate `ad_platform_connections.accountIds` backfill. |
+| `had_active_account` | boolean | `true` | Whether an active account was set on the connection. `false` indicates a "zombie" connection — user linked but never picked an active. Useful for separating "actively used then quit" from "never got going" churn. |
+
+```json
+{ "event": "account_disconnected", "properties": { "platform": "meta_ads", "account_count": 3, "had_active_account": true } }
+```
+
+**Files:** `app/api/auth/disconnect-meta/route.ts`, `app/api/auth/disconnect-google/route.ts`
+
+---
+
+## accounts_updated
+
+**Phase:** 1
+**Category:** funnel_entry
+**Platform:** PostHog (server)
+**Trigger:** Fires when a user changes the curated subset of linked ad accounts (which accounts NotFair is allowed to touch). Fires only on a real change — POSTs that leave the set unchanged do not fire. **First-time signup paths do NOT fire this event** — they're covered by `user_signed_up` instead, which would otherwise double-count the entire discovered account list as "added."
+**Hypothesis:** We believe tracking account-curation deltas tells us engagement direction post-onboarding: `added_count` over time signals expanding usage (a positive growth signal); `removed_count` signals dissatisfaction with specific accounts or a narrowing scope. `active_became_null` on Meta is a churn-risk precursor — connection still exists but the user has parked the integration.
+
+| Property | Type | Example | Description |
+|---|---|---|---|
+| `platform` | string | `"meta_ads"` | Which platform's selection was updated. Enum: `google_ads`, `meta_ads`. |
+| `selected_count` | number | `4` | Number of accounts linked after the update. |
+| `added_count` | number | `1` | Accounts added in this update (set difference: new \ previous). |
+| `removed_count` | number | `0` | Accounts removed in this update (set difference: previous \ new). |
+| `active_became_null` | boolean | `false` | True iff this update unlinked the previously active account and left the connection with no active default. Meta-only signal — Google's select-account route always sets a primary so this is always `false` there (property kept for cross-platform schema parity). |
+
+```json
+{ "event": "accounts_updated", "properties": { "platform": "meta_ads", "selected_count": 4, "added_count": 1, "removed_count": 0, "active_became_null": false } }
+```
+
+**Notes:** Distinct from `platform_switched` (which fires on *active*-account changes from the navbar). This event is for changes to the *linked subset*, which is a separate dimension. Account-switching analytics already live in `platform_switched` and should not also be added here.
+
+**Files:** `app/api/auth/update-meta-accounts/route.ts`, `app/api/auth/select-account/route.ts` (non-first-signup branch)
 
 ---
 

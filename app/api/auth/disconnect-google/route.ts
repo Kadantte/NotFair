@@ -24,13 +24,14 @@
  * browser. Both outcomes are surprises we never want.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { clearSessionCookies } from "@/lib/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
+import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 
 async function clearAllAuthCookies(response: NextResponse): Promise<void> {
   // App session cookies (token, customer, impersonate, profile, activePlatform).
@@ -94,6 +95,8 @@ export async function DELETE() {
     .select({
       id: schema.adPlatformConnections.id,
       refreshToken: schema.adPlatformConnections.refreshToken,
+      accountIds: schema.adPlatformConnections.accountIds,
+      activeAccountId: schema.adPlatformConnections.activeAccountId,
     })
     .from(schema.adPlatformConnections)
     .where(
@@ -145,6 +148,16 @@ export async function DELETE() {
       .delete(schema.mcpSessions)
       .where(inArray(schema.mcpSessions.id, sessionIds));
   }
+
+  trackServerEvent(userId, "account_disconnected", {
+    platform: "google_ads",
+    // Prefer the curated subset on the connection; fall back to mcp_sessions
+    // count for legacy users whose ad_platform_connections row hadn't been
+    // backfilled yet (rare, but a safer denominator than 0).
+    account_count: (conn?.accountIds ?? []).length || sessionRows.length,
+    had_active_account: conn?.activeAccountId != null,
+  });
+  after(flushServerEvents);
 
   const response = NextResponse.json({ ok: true });
   await clearAllAuthCookies(response);

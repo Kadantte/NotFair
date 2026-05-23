@@ -13,11 +13,12 @@
  * they re-OAuth via /api/oauth/meta/start.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getEnv } from "@/lib/env";
+import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 
 async function revokeUpstream(accessToken: string): Promise<void> {
   // DELETE /v{ver}/me/permissions revokes ALL granted permissions and
@@ -47,6 +48,8 @@ export async function DELETE() {
       id: schema.adPlatformConnections.id,
       accessToken: schema.adPlatformConnections.accessToken,
       refreshToken: schema.adPlatformConnections.refreshToken,
+      accountIds: schema.adPlatformConnections.accountIds,
+      activeAccountId: schema.adPlatformConnections.activeAccountId,
     })
     .from(schema.adPlatformConnections)
     .where(
@@ -82,6 +85,13 @@ export async function DELETE() {
   await db()
     .delete(schema.adPlatformConnections)
     .where(eq(schema.adPlatformConnections.id, conn.id));
+
+  trackServerEvent(userId, "account_disconnected", {
+    platform: "meta_ads",
+    account_count: (conn.accountIds ?? []).length,
+    had_active_account: conn.activeAccountId != null,
+  });
+  after(flushServerEvents);
 
   return NextResponse.json({ ok: true });
 }

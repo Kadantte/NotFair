@@ -246,6 +246,31 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[select-account] Failed to fire user_signed_up:", err);
     }
+  } else {
+    // Subsequent account-selection update (existing user revising their
+    // linked-accounts subset). First-time signups are covered by
+    // `user_signed_up` above and intentionally skip this event — that branch
+    // sees the full discovered set as "added" which would inflate engagement
+    // metrics. Fire only on a real change for parity with `accounts_updated`
+    // on the Meta side.
+    const previousIdSet = new Set(conn.customerIds.map((a) => a.id));
+    const newIdSet = new Set(validAccounts.map((a) => a.id));
+    let addedCount = 0;
+    for (const id of newIdSet) if (!previousIdSet.has(id)) addedCount++;
+    let removedCount = 0;
+    for (const id of previousIdSet) if (!newIdSet.has(id)) removedCount++;
+    if (addedCount > 0 || removedCount > 0) {
+      trackServerEvent(identity.userId, "accounts_updated", {
+        platform: "google_ads",
+        selected_count: validAccounts.length,
+        added_count: addedCount,
+        removed_count: removedCount,
+        // Google's select-account always sets a primary (never null), so
+        // unlike Meta this can't toggle true — but the property is kept for
+        // schema parity with the Meta event.
+        active_became_null: false,
+      });
+    }
   }
 
   // New signups land in auto mode by default so NotFair starts working

@@ -25,11 +25,12 @@
  *     accounts" state — tools 401 until the user picks at least one.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { setActivePlatformCookie } from "@/lib/auth-cookies";
+import { trackServerEvent, flushServerEvents } from "@/lib/analytics-server";
 
 type AccountEntry = {
   id: string;
@@ -135,6 +136,28 @@ export async function POST(request: Request) {
       updatedAt: sql`now()`,
     })
     .where(eq(schema.adPlatformConnections.id, conn.id));
+
+  // Fire telemetry only when the curated subset actually changed — same
+  // discipline as `platform_switched`. A no-op POST (selecting the same set)
+  // shouldn't inflate counts.
+  const previousIdSet = new Set((conn.accountIds ?? []).map((a) => a.id));
+  const newIdSet = new Set(selectedIds);
+  let addedCount = 0;
+  for (const id of newIdSet) if (!previousIdSet.has(id)) addedCount++;
+  let removedCount = 0;
+  for (const id of previousIdSet) if (!newIdSet.has(id)) removedCount++;
+  if (addedCount > 0 || removedCount > 0) {
+    trackServerEvent(userId, "accounts_updated", {
+      platform: "meta_ads",
+      selected_count: newAccountIds.length,
+      added_count: addedCount,
+      removed_count: removedCount,
+      // "Parked" state — connection still exists but nothing is selected.
+      // Distinct from disconnect, but a likely churn-risk precursor.
+      active_became_null: newActiveId === null && conn.activeAccountId != null,
+    });
+    after(flushServerEvents);
+  }
 
   const response = NextResponse.json({
     ok: true,
