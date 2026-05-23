@@ -8,16 +8,13 @@ import { Button } from '@/components/ui/button';
 import { errorRateColor, SOURCE_LABELS, DEV_RANGE_OPTIONS, RangePicker } from '@/lib/dev-format';
 import type {
     DailyCountRow,
-    InteractionRow,
     LowSuccessUsers,
     TopTool,
-    UsageTilesData,
 } from '@/lib/dev-types';
 import type { UsagePlatform } from '../../_components/dev-types';
 
 const Charts = {
     VolumeErrors: dynamic(() => import('./usage-charts').then((m) => m.VolumeErrorsChart), { ssr: false }),
-    InteractionSuccess: dynamic(() => import('./usage-charts').then((m) => m.InteractionSuccessChart), { ssr: false }),
     Dau: dynamic(() => import('./usage-charts').then((m) => m.DauChart), { ssr: false }),
 };
 
@@ -29,12 +26,10 @@ const USAGE_PLATFORM_LABELS: Record<UsagePlatform, string> = {
 
 // ─── Section plumbing ────────────────────────────────────────────────────────
 
-type Section = 'tiles' | 'daily' | 'interactions' | 'lowSuccess' | 'topTools';
+type Section = 'daily' | 'lowSuccess' | 'topTools';
 
 type SectionPayload = {
-    tiles: UsageTilesData;
     daily: DailyCountRow[];
-    interactions: InteractionRow[];
     lowSuccess: LowSuccessUsers;
     topTools: TopTool[];
 };
@@ -53,20 +48,18 @@ const DEFAULT_FILTERS: FilterState = {
     includeDev: false,
 };
 
-const SECTIONS: readonly Section[] = ['tiles', 'daily', 'interactions', 'lowSuccess', 'topTools'];
+const SECTIONS: readonly Section[] = ['daily', 'lowSuccess', 'topTools'];
 
 function filterKey(f: FilterState): string {
     return `${f.days}|${f.source}|${f.platform}|${f.includeDev ? 'dev' : 'prod'}`;
 }
 
 // One cache per section, module-level so it survives unmount/remount (tab
-// switching). The point of splitting is that a cached tiles response can paint
-// immediately while the slower interactions/low-success queries are still
-// resolving for the same filter combination.
+// switching). The point of splitting is that a cached daily response can paint
+// immediately while the slower low-success query is still resolving for the
+// same filter combination.
 const sectionCaches: { [K in Section]: Map<string, SectionPayload[K]> } = {
-    tiles: new Map(),
     daily: new Map(),
-    interactions: new Map(),
     lowSuccess: new Map(),
     topTools: new Map(),
 };
@@ -77,14 +70,8 @@ export function UsageView() {
     const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
     const initialKey = filterKey(DEFAULT_FILTERS);
-    const [tiles, setTiles] = useState<UsageTilesData | null>(
-        () => sectionCaches.tiles.get(initialKey) ?? null,
-    );
     const [daily, setDaily] = useState<DailyCountRow[] | null>(
         () => sectionCaches.daily.get(initialKey) ?? null,
-    );
-    const [interactions, setInteractions] = useState<InteractionRow[] | null>(
-        () => sectionCaches.interactions.get(initialKey) ?? null,
     );
     const [lowSuccess, setLowSuccess] = useState<LowSuccessUsers | null>(
         () => sectionCaches.lowSuccess.get(initialKey) ?? null,
@@ -93,14 +80,12 @@ export function UsageView() {
         () => sectionCaches.topTools.get(initialKey) ?? null,
     );
     const [loading, setLoading] = useState<Record<Section, boolean>>(() => ({
-        tiles: !sectionCaches.tiles.has(initialKey),
         daily: !sectionCaches.daily.has(initialKey),
-        interactions: !sectionCaches.interactions.has(initialKey),
         lowSuccess: !sectionCaches.lowSuccess.has(initialKey),
         topTools: !sectionCaches.topTools.has(initialKey),
     }));
     const [errors, setErrors] = useState<Record<Section, string | null>>({
-        tiles: null, daily: null, interactions: null, lowSuccess: null, topTools: null,
+        daily: null, lowSuccess: null, topTools: null,
     });
     const [accessDenied, setAccessDenied] = useState(false);
 
@@ -111,14 +96,12 @@ export function UsageView() {
     // case the response arrived between the previous fetch resolving and
     // applyData running.
     const abortControllersRef = useRef<Record<Section, AbortController | null>>({
-        tiles: null, daily: null, interactions: null, lowSuccess: null, topTools: null,
+        daily: null, lowSuccess: null, topTools: null,
     });
 
     const applyData = useCallback(<K extends Section>(section: K, value: SectionPayload[K] | null) => {
         switch (section) {
-            case 'tiles': setTiles(value as UsageTilesData | null); break;
             case 'daily': setDaily(value as DailyCountRow[] | null); break;
-            case 'interactions': setInteractions(value as InteractionRow[] | null); break;
             case 'lowSuccess': setLowSuccess(value as LowSuccessUsers | null); break;
             case 'topTools': setTopTools(value as TopTool[] | null); break;
         }
@@ -291,10 +274,7 @@ export function UsageView() {
                 />
             </div>
 
-            <TilesSection tiles={tiles} loading={loading.tiles} usageDays={filters.days} />
-
             <Charts.VolumeErrors daily={daily} loading={loading.daily} usageDays={filters.days} />
-            <Charts.InteractionSuccess interactions={interactions} loading={loading.interactions} />
             <Charts.Dau daily={daily} loading={loading.daily} />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -303,116 +283,6 @@ export function UsageView() {
             </div>
         </div>
     );
-}
-
-// ─── Tiles section ───────────────────────────────────────────────────────────
-
-function TilesSection({
-    tiles,
-    loading,
-    usageDays,
-}: {
-    tiles: UsageTilesData | null;
-    loading: boolean;
-    usageDays: number;
-}) {
-    if (loading || !tiles) {
-        return (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="border border-[#3D3C36] rounded-lg bg-[#24231F] px-4 py-3 animate-pulse">
-                        <div className="h-3 w-20 bg-[#3D3C36]/60 rounded mb-2" />
-                        <div className="h-7 w-24 bg-[#3D3C36]/80 rounded mb-1.5" />
-                        <div className="h-3 w-16 bg-[#3D3C36]/40 rounded" />
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    const currCallsRate =
-        tiles.totals.calls > 0 ? (tiles.totals.errors / tiles.totals.calls) * 100 : 0;
-    const prevCallsRate =
-        tiles.prevTotals.calls != null && tiles.prevTotals.errors != null && tiles.prevTotals.calls > 0
-            ? (tiles.prevTotals.errors / tiles.prevTotals.calls) * 100
-            : null;
-
-    type Tile = {
-        label: string;
-        display: string;
-        curr: number;
-        prev: number | null;
-        isErrorRate?: boolean;
-        noTrend?: boolean;
-        sub?: string;
-        absoluteDelta?: boolean;
-    };
-
-    const items: Tile[] = [
-        { label: 'Total Calls', display: tiles.totals.calls.toLocaleString(), curr: tiles.totals.calls, prev: tiles.prevTotals.calls },
-        { label: 'Error Rate', display: `${currCallsRate.toFixed(1)}%`, curr: currCallsRate, prev: prevCallsRate, isErrorRate: true },
-        { label: 'Active Users', display: tiles.totals.activeUsers.toLocaleString(), curr: tiles.totals.activeUsers, prev: tiles.prevTotals.activeUsers, absoluteDelta: true },
-        { label: 'New Users', display: tiles.totals.newUsers.toLocaleString(), curr: tiles.totals.newUsers, prev: null, noTrend: true, sub: 'this period' },
-    ];
-
-    return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            {items.map((tile) => (
-                <div key={tile.label} className="border border-[#3D3C36] rounded-lg bg-[#24231F] px-4 py-3">
-                    <div className="text-[10px] font-semibold text-[#C4C0B6] uppercase tracking-widest mb-1">{tile.label}</div>
-                    <div className="text-[22px] sm:text-[26px] font-semibold font-mono tabular-nums text-[#E8E4DD] leading-none">{tile.display}</div>
-                    <div className="mt-1">{renderTrendChip(tile, prevCallsRate, currCallsRate, usageDays)}</div>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-function renderTrendChip(
-    tile: {
-        curr: number;
-        prev: number | null;
-        isErrorRate?: boolean;
-        noTrend?: boolean;
-        sub?: string;
-        absoluteDelta?: boolean;
-    },
-    prevCallsRate: number | null,
-    currCallsRate: number,
-    usageDays: number,
-): React.ReactNode {
-    if (tile.noTrend) {
-        return tile.sub ? <span className="text-[11px] text-[#C4C0B6]">{tile.sub}</span> : null;
-    }
-
-    if (tile.isErrorRate) {
-        if (prevCallsRate == null) {
-            return <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
-        }
-        const delta = currCallsRate - prevCallsRate;
-        const absDelta = Math.abs(delta).toFixed(1);
-        if (delta > 0.05) return <span className="text-[11px] font-medium text-[#C45D4A]">▲ {absDelta}pp vs prev {usageDays}d</span>;
-        if (delta < -0.05) return <span className="text-[11px] font-medium text-[#4CAF6E]">▼ {absDelta}pp vs prev {usageDays}d</span>;
-        return <span className="text-[11px] text-[#C4C0B6]">≈ flat vs prev {usageDays}d</span>;
-    }
-
-    if (tile.absoluteDelta) {
-        if (tile.prev === null) {
-            return <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
-        }
-        const absDelta = tile.curr - tile.prev;
-        if (absDelta > 0) return <span className="text-[11px] font-medium text-[#4CAF6E]">▲ {absDelta} vs prev {usageDays}d</span>;
-        if (absDelta < 0) return <span className="text-[11px] text-[#C4C0B6]">▼ {Math.abs(absDelta)} vs prev {usageDays}d</span>;
-        return <span className="text-[11px] text-[#C4C0B6]">≈ flat vs prev {usageDays}d</span>;
-    }
-
-    if (tile.prev === null) return <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
-    if (tile.prev <= 0) return <span className="text-[11px] text-[#C4C0B6]/60">new</span>;
-    const pct = ((tile.curr - tile.prev) / tile.prev) * 100;
-    const absPct = Math.abs(pct).toFixed(0);
-    if (pct >= 1) return <span className="text-[11px] font-medium text-[#4CAF6E]">▲ {absPct}% vs prev {usageDays}d</span>;
-    if (pct <= -1) return <span className="text-[11px] text-[#C4C0B6]">▼ {absPct}% vs prev {usageDays}d</span>;
-    return <span className="text-[11px] text-[#C4C0B6]">≈ flat vs prev {usageDays}d</span>;
 }
 
 // ─── Low success users ───────────────────────────────────────────────────────

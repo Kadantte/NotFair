@@ -14,16 +14,6 @@ export function UsageSkeleton() {
                 ))}
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="border border-[#3D3C36] rounded-lg bg-[#24231F] px-4 py-3 animate-pulse">
-                        <div className="h-3 w-20 bg-[#3D3C36]/60 rounded mb-2" />
-                        <div className="h-7 w-24 bg-[#3D3C36]/80 rounded mb-1.5" />
-                        <div className="h-3 w-16 bg-[#3D3C36]/40 rounded" />
-                    </div>
-                ))}
-            </div>
-
             <div className="border border-[#3D3C36] rounded-xl bg-[#24231F]/40 h-72 animate-pulse" />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

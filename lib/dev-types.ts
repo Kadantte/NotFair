@@ -15,14 +15,6 @@ export type DailyCountRow = {
     dau: number;
 };
 
-export type InteractionRow = {
-    day: string;
-    interactions: number;
-    /** 0–100. Always finite — the SQL only groups days that had interactions. */
-    interactionSuccessRate: number;
-    successfulInteractions: number;
-};
-
 export type LowSuccessUser = {
     userId: string;
     googleEmail: string | null;
@@ -46,26 +38,6 @@ export type TopTool = {
     errors: number;
     p50: number;
     p95: number;
-};
-
-export type UsageTotals = {
-    calls: number;
-    errors: number;
-    activeUsers: number;
-    newUsers: number;
-};
-
-export type PrevTotals = {
-    calls: number | null;
-    errors: number | null;
-    activeUsers: number | null;
-};
-
-export type UsageTilesData = {
-    days: number;
-    range: { from: string; to: string };
-    totals: UsageTotals;
-    prevTotals: PrevTotals;
 };
 
 // ─── Activity route types (/api/dev/[accountId]/activity) ────────────────────

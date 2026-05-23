@@ -14,7 +14,7 @@ import {
     Area,
 } from 'recharts';
 import { ChartTooltipShell, DEV_RANGE_OPTIONS } from '@/lib/dev-format';
-import type { DailyCountRow, InteractionRow } from '@/lib/dev-types';
+import type { DailyCountRow } from '@/lib/dev-types';
 import { formatYTick, CHART_MARGIN, CHART_CURSOR, LEGEND_STYLE } from '../../_components/dev-utils';
 
 function rangeLabel(usageDays: number): string {
@@ -137,122 +137,6 @@ export function VolumeErrorsChart({
                             <Bar yAxisId="vol" dataKey="reads" name="Reads" stackId="a" fill="#4CAF6E" fillOpacity={0.75} />
                             <Bar yAxisId="vol" dataKey="writes" name="Writes" stackId="a" fill="#D4882A" fillOpacity={0.75} radius={[3, 3, 0, 0]} />
                             <Line yAxisId="err" type="monotone" dataKey="errorPct" name="Error %" dot={{ r: 3, fill: '#C45D4A', strokeWidth: 0 }} stroke="#C45D4A" strokeWidth={1.5} />
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
-            )}
-        </ChartCard>
-    );
-}
-
-// ─── Interaction success ─────────────────────────────────────────────────────
-
-export function InteractionSuccessChart({
-    interactions,
-    loading,
-}: {
-    interactions: InteractionRow[] | null;
-    loading: boolean;
-}) {
-    const subtitle = (() => {
-        if (loading || !interactions) {
-            return (
-                <p className="text-[11px] text-[#C4C0B6] mt-0.5 font-mono tabular-nums">
-                    30-minute interaction windows · loading…
-                </p>
-            );
-        }
-        if (interactions.length === 0) {
-            return (
-                <p className="text-[11px] text-[#C4C0B6] mt-0.5 font-mono tabular-nums">
-                    30-minute interaction windows · no interactions yet
-                </p>
-            );
-        }
-        const totalInteractions = interactions.reduce((s, d) => s + d.interactions, 0);
-        const totalSuccessful = interactions.reduce((s, d) => s + d.successfulInteractions, 0);
-        const avg = totalInteractions > 0 ? (totalSuccessful / totalInteractions) * 100 : null;
-        const latest = interactions[interactions.length - 1];
-        return (
-            <p className="text-[11px] text-[#C4C0B6] mt-0.5 font-mono tabular-nums">
-                {avg == null
-                    ? '30-minute interaction windows · no interactions yet'
-                    : `avg ${avg.toFixed(1)}% · latest ${latest?.interactionSuccessRate?.toFixed(1) ?? '0.0'}% · ${totalInteractions.toLocaleString()} interactions`}
-            </p>
-        );
-    })();
-
-    return (
-        <ChartCard title="Successful Interaction Rate" subtitle={subtitle}>
-            {loading || !interactions ? (
-                <ChartLoading height={220} />
-            ) : interactions.length === 0 ? (
-                <p className="text-sm text-[#C4C0B6] text-center py-8">No interactions in this range.</p>
-            ) : (
-                <div className="p-4">
-                    <ResponsiveContainer width="100%" height={220}>
-                        <ComposedChart
-                            data={interactions.map((d) => ({ ...d, date: d.day.slice(5) }))}
-                            margin={CHART_MARGIN}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#3D3C36" vertical={false} />
-                            <XAxis
-                                dataKey="date"
-                                stroke="#3D3C36"
-                                tick={{ fill: '#C4C0B6', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
-                                tickLine={false}
-                                angle={-45}
-                                textAnchor="end"
-                                interval="preserveStartEnd"
-                                minTickGap={20}
-                            />
-                            <YAxis
-                                domain={[0, 100]}
-                                stroke="#3D3C36"
-                                tick={{ fill: '#C4C0B6', fontSize: 11 }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                                width={40}
-                            />
-                            <Tooltip
-                                cursor={CHART_CURSOR}
-                                content={({ active, payload, label }) => {
-                                    if (!active || !payload?.length) return null;
-                                    const row = payload[0]?.payload as
-                                        | {
-                                              interactionSuccessRate?: number | null;
-                                              interactions?: number;
-                                              successfulInteractions?: number;
-                                          }
-                                        | undefined;
-                                    const successRate = row?.interactionSuccessRate ?? null;
-                                    const totalInter = row?.interactions ?? 0;
-                                    const successful = row?.successfulInteractions ?? 0;
-                                    return (
-                                        <ChartTooltipShell label={label}>
-                                            <div className="flex items-center gap-2 text-[#4CAF6E]">
-                                                <span className="w-2 h-2 rounded-full bg-[#4CAF6E] inline-block" />
-                                                {successRate == null ? 'n/a' : `${successRate.toFixed(1)}%`} successful
-                                            </div>
-                                            <div className="text-[#E8E4DD] mt-1 pt-1 border-t border-[#3D3C36]">
-                                                {successful.toLocaleString()} / {totalInter.toLocaleString()} interactions
-                                            </div>
-                                        </ChartTooltipShell>
-                                    );
-                                }}
-                            />
-                            <Legend wrapperStyle={LEGEND_STYLE} />
-                            <Line
-                                type="monotone"
-                                dataKey="interactionSuccessRate"
-                                name="Successful interactions"
-                                connectNulls
-                                dot={{ r: 3, fill: '#4CAF6E', strokeWidth: 0 }}
-                                activeDot={{ r: 4, fill: '#4CAF6E', strokeWidth: 0 }}
-                                stroke="#4CAF6E"
-                                strokeWidth={1.8}
-                            />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>

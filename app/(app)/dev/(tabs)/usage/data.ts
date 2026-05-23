@@ -2,26 +2,20 @@ import 'server-only';
 
 import { unstable_cache } from 'next/cache';
 import { db, schema } from '@/lib/db';
-import { sql, and, eq, gte, lt, isNotNull, type SQL } from 'drizzle-orm';
+import { sql, and, eq, gte, type SQL } from 'drizzle-orm';
 import { OP_TYPE } from '@/lib/db/tracking';
 import {
     excludeDevOpsFilter,
     excludeDevOpsFilterForAlias,
     operationErrorRowCount,
-    operationRowCount,
     operationTypeRowCount,
 } from '@/lib/dev-ops-filter';
 import type {
     DailyCountRow,
-    InteractionRow,
     LowSuccessUser,
     LowSuccessUsers,
-    PrevTotals,
     TopTool,
-    UsageTilesData,
 } from '@/lib/dev-types';
-
-const PLATFORM_START = new Date('2026-03-25T00:00:00Z');
 
 // "Top Users by Low Success Rate" surfaces fresh quality signal — a long
 // global window would let stale outages dominate. Pin to a short fixed window
@@ -99,99 +93,6 @@ function rawClientSourceFilter(source: string | null): SQL {
     return sql`AND o.client_source = ${source}`;
 }
 
-// ─── Tiles (totals + prev totals + new users) ────────────────────────────────
-
-async function fetchTiles(opts: NormalizedOptions): Promise<UsageTilesData> {
-    const { now, since, prevSince } = timeWindows(opts.days);
-    const sinceIso = since.toISOString();
-
-    const platformFilter = opts.platform ? eq(schema.operations.platform, opts.platform) : null;
-
-    const whereRecent = and(
-        gte(schema.operations.createdAt, since),
-        ...(opts.includeDev ? [] : [excludeDevOpsFilter()]),
-        ...(platformFilter ? [platformFilter] : []),
-    );
-    const wherePrev = and(
-        gte(schema.operations.createdAt, prevSince),
-        lt(schema.operations.createdAt, since),
-        ...(opts.includeDev ? [] : [excludeDevOpsFilter()]),
-        ...(platformFilter ? [platformFilter] : []),
-    );
-
-    const devExcludeRaw = opts.includeDev
-        ? sql``
-        : sql`AND ${excludeDevOpsFilterForAlias(sql`older.user_id`)}`;
-
-    const [totalsRow, prevTotalsRow, newUsersRow] = await Promise.all([
-        db()
-            .select({
-                calls: operationRowCount(),
-                errors: operationErrorRowCount(schema.operations),
-                activeUsers: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
-            })
-            .from(schema.operations)
-            .where(whereRecent),
-
-        db()
-            .select({
-                calls: operationRowCount(),
-                errors: operationErrorRowCount(schema.operations),
-                activeUsers: sql<number>`count(distinct ${schema.operations.userId}) filter (where ${schema.operations.userId} is not null)::int`,
-            })
-            .from(schema.operations)
-            .where(wherePrev),
-
-        db()
-            .select({
-                newUsers: sql<number>`count(distinct ${schema.operations.userId})::int`,
-            })
-            .from(schema.operations)
-            .where(
-                and(
-                    whereRecent,
-                    isNotNull(schema.operations.userId),
-                    sql`not exists (
-            select 1 from operations older
-            where older.user_id = ${schema.operations.userId}
-              and older.created_at < ${sinceIso}::timestamp
-              ${devExcludeRaw}
-              ${opts.platform ? sql`and older.platform = ${opts.platform}` : sql``}
-          )`,
-                ),
-            ),
-    ]);
-
-    const totals = totalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
-    const prev = prevTotalsRow[0] ?? { calls: 0, errors: 0, activeUsers: 0 };
-    const newUsers = newUsersRow[0]?.newUsers ?? 0;
-
-    const priorWindowPredatesPlatform = prevSince < PLATFORM_START;
-    const prevTotals: PrevTotals = priorWindowPredatesPlatform
-        ? { calls: null, errors: null, activeUsers: null }
-        : { calls: prev.calls, errors: prev.errors, activeUsers: prev.activeUsers };
-
-    return {
-        days: opts.days,
-        range: { from: sinceIso, to: now.toISOString() },
-        totals: {
-            calls: totals.calls,
-            errors: totals.errors,
-            activeUsers: totals.activeUsers,
-            newUsers,
-        },
-        prevTotals,
-    };
-}
-
-export function getUsageTiles(opts: UsageQueryOptions = {}): Promise<UsageTilesData> {
-    const normalized = normalize(opts);
-    return unstable_cache(() => fetchTiles(normalized), cacheKey('dev-usage-tiles', normalized), {
-        revalidate: CACHE_TTL_SECONDS,
-        tags: ['dev-usage'],
-    })();
-}
-
 // ─── Daily counts (reads/writes/errors/dau per day) ──────────────────────────
 
 async function fetchDailyCounts(opts: NormalizedOptions): Promise<DailyCountRow[]> {
@@ -231,141 +132,6 @@ export function getUsageDaily(opts: UsageQueryOptions = {}): Promise<DailyCountR
     return unstable_cache(
         () => fetchDailyCounts(normalized),
         cacheKey('dev-usage-daily', normalized),
-        { revalidate: CACHE_TTL_SECONDS, tags: ['dev-usage'] },
-    )();
-}
-
-// ─── Daily interactions (the slow LATERAL CTE) ───────────────────────────────
-
-async function fetchInteractions(opts: NormalizedOptions): Promise<InteractionRow[]> {
-    const { now, since } = timeWindows(opts.days);
-    const sinceIso = since.toISOString();
-    const nowIso = now.toISOString();
-    // 30-min lookback matches the interaction-stitching gap — without it, the
-    // first op of the window can be misclassified as the start of a new
-    // interaction when it's actually a continuation.
-    const lookbackIso = new Date(since.getTime() - 30 * 60 * 1000).toISOString();
-
-    const tzLiteral = sql.raw(`'${opts.tz}'`);
-    const devExclude = opts.includeDev
-        ? sql``
-        : sql`AND ${excludeDevOpsFilterForAlias(sql`o.user_id`)}`;
-    const platformClause = opts.platform ? sql`AND o.platform = ${opts.platform}` : sql``;
-    const sourceClause = rawClientSourceFilter(opts.source);
-
-    const rows = await db().execute(sql`
-      WITH filtered AS (
-        SELECT
-          o.id,
-          o.user_id,
-          o.session_id,
-          o.account_id,
-          CASE
-            WHEN o.client_source IN ('chat', 'adsagent-chat') THEN 'chat'
-            WHEN o.client_source IS NULL THEN 'unknown'
-            ELSE o.client_source
-          END AS client_source,
-          o.platform,
-          o.created_at,
-          -- RATE_LIMIT rejections originate from our own quota enforcement
-          -- (not a bug/upstream failure), so they should not drag down the
-          -- "interaction success rate". See lib/dev-ops-filter.ts for context.
-          (o.success = 1 OR o.error_class = 'RATE_LIMIT')::int AS success
-        FROM operations o
-        WHERE o.created_at >= ${lookbackIso}::timestamp
-          AND o.created_at < ${nowIso}::timestamp
-          ${devExclude}
-          ${platformClause}
-          ${sourceClause}
-      ),
-      ordered AS (
-        SELECT
-          *,
-          LAG(created_at) OVER (
-            PARTITION BY
-              COALESCE(user_id, 'session:' || COALESCE(session_id::text, 'none')),
-              account_id,
-              client_source,
-              platform
-            ORDER BY created_at, id
-          ) AS prev_created_at
-        FROM filtered
-      ),
-      marked AS (
-        SELECT
-          *,
-          CASE
-            WHEN prev_created_at IS NULL THEN 1
-            WHEN created_at - prev_created_at > interval '30 minutes' THEN 1
-            ELSE 0
-          END AS new_interaction
-        FROM ordered
-      ),
-      numbered AS (
-        SELECT
-          *,
-          SUM(new_interaction) OVER (
-            PARTITION BY
-              COALESCE(user_id, 'session:' || COALESCE(session_id::text, 'none')),
-              account_id,
-              client_source,
-              platform
-            ORDER BY created_at, id
-          ) AS interaction_seq
-        FROM marked
-      ),
-      interactions AS (
-        SELECT
-          COALESCE(user_id, 'session:' || COALESCE(session_id::text, 'none')) AS actor_key,
-          account_id,
-          client_source,
-          platform,
-          interaction_seq,
-          MIN(created_at) AS interaction_start,
-          (ARRAY_AGG(success ORDER BY created_at DESC, id DESC))[1] = 1 AS ended_successfully
-        FROM numbered
-        GROUP BY actor_key, account_id, client_source, platform, interaction_seq
-      ),
-      interaction_days AS (
-        SELECT
-          date((interaction_start AT TIME ZONE 'UTC') AT TIME ZONE ${tzLiteral}) AS local_day,
-          ended_successfully
-        FROM interactions
-        WHERE interaction_start >= ${sinceIso}::timestamp
-      )
-      SELECT
-        to_char(local_day, 'YYYY-MM-DD') AS day,
-        count(*)::int AS interactions,
-        count(*) FILTER (WHERE ended_successfully)::int AS successful_interactions
-      FROM interaction_days
-      GROUP BY local_day
-      ORDER BY local_day
-    `);
-
-    return (
-        rows as unknown as Array<{
-            day: string;
-            interactions: number | string;
-            successful_interactions: number | string;
-        }>
-    ).map((r) => {
-        const interactions = Number(r.interactions ?? 0);
-        const successfulInteractions = Number(r.successful_interactions ?? 0);
-        return {
-            day: r.day,
-            interactions,
-            successfulInteractions,
-            interactionSuccessRate:
-                interactions > 0 ? (successfulInteractions / interactions) * 100 : 0,
-        };
-    });
-}
-
-export function getUsageInteractions(opts: UsageQueryOptions = {}): Promise<InteractionRow[]> {
-    const normalized = normalize(opts);
-    return unstable_cache(
-        () => fetchInteractions(normalized),
-        cacheKey('dev-usage-interactions', normalized),
         { revalidate: CACHE_TTL_SECONDS, tags: ['dev-usage'] },
     )();
 }
@@ -603,12 +369,10 @@ export function getUsageTopTools(opts: UsageQueryOptions = {}): Promise<TopTool[
 
 // ─── Section dispatch (used by the API route) ────────────────────────────────
 
-export type UsageSection = 'tiles' | 'daily' | 'interactions' | 'lowSuccess' | 'topTools';
+export type UsageSection = 'daily' | 'lowSuccess' | 'topTools';
 
 export const USAGE_SECTIONS: readonly UsageSection[] = [
-    'tiles',
     'daily',
-    'interactions',
     'lowSuccess',
     'topTools',
 ] as const;
@@ -619,12 +383,8 @@ export function isUsageSection(value: string | null): value is UsageSection {
 
 export function getUsageSection(section: UsageSection, opts: UsageQueryOptions) {
     switch (section) {
-        case 'tiles':
-            return getUsageTiles(opts);
         case 'daily':
             return getUsageDaily(opts);
-        case 'interactions':
-            return getUsageInteractions(opts);
         case 'lowSuccess':
             return getUsageLowSuccess(opts);
         case 'topTools':
