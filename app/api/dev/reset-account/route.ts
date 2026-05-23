@@ -104,7 +104,7 @@ async function loadRealSession(): Promise<RealSession | null> {
   const store = await cookies();
   if (store.get(COOKIE_NAMES.impersonate)?.value) return null;
 
-  const identity = await identifyUser({ source: "dev-reset-account" });
+  const identity = await identifyUser();
   if (!identity) return null;
 
   const conn = await loadGoogleConnection(identity.userId);

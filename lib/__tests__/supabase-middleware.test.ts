@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIE_NAMES } from "@/lib/auth-cookies";
 
 // refreshSupabaseSession needs Supabase env vars to build a client; stub it
 // out so the middleware tests stay env-independent (they only care about the
@@ -23,10 +22,6 @@ function makeRequest(pathname: string, cookies: CookieKV[] = []): NextRequest {
   return new NextRequest(new URL(`http://localhost:3000${pathname}`), {
     headers,
   });
-}
-
-function withLegacyToken(token: string): CookieKV[] {
-  return [{ name: COOKIE_NAMES.token, value: token }];
 }
 
 function withSupabaseSession(): CookieKV[] {
@@ -69,12 +64,6 @@ describe("Supabase middleware — updateSession", () => {
       expect(response.headers.get("location")).toContain("/login");
     });
 
-    it("allows legacy-authenticated (adsagent_token) user through to /campaigns", async () => {
-      const response = await updateSession(makeRequest("/campaigns", withLegacyToken("test-token")));
-
-      expect(response.status).toBe(200);
-    });
-
     it("allows Supabase-authenticated (sb-* cookie) user through to /campaigns", async () => {
       const response = await updateSession(makeRequest("/campaigns", withSupabaseSession()));
 
@@ -87,8 +76,8 @@ describe("Supabase middleware — updateSession", () => {
       expect(response.status).toBe(200);
     });
 
-    it("allows authenticated user through to /chat", async () => {
-      const response = await updateSession(makeRequest("/chat", withLegacyToken("test-token")));
+    it("allows Supabase-authenticated user through to /chat", async () => {
+      const response = await updateSession(makeRequest("/chat", withSupabaseSession()));
 
       expect(response.status).toBe(200);
     });
@@ -116,7 +105,7 @@ describe("Supabase middleware — updateSession", () => {
 
   describe("redirect behavior", () => {
     it("does not redirect authenticated users away from /login", async () => {
-      const response = await updateSession(makeRequest("/login", withLegacyToken("test-token")));
+      const response = await updateSession(makeRequest("/login", withSupabaseSession()));
 
       expect(response.status).toBe(200);
     });

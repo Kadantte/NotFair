@@ -4,7 +4,7 @@ import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
 
 export async function GET() {
-  const identity = await identifyUser({ source: "gohighlevel-status" });
+  const identity = await identifyUser();
   if (!identity) return NextResponse.json({ connected: false, connections: [] });
 
   const rows = await db()

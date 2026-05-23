@@ -158,7 +158,7 @@ export async function GET(request: Request) {
     resolvedSessionId = session.id;
   } else {
     // 2 + 3. DCR flow — identify the user via Supabase.
-    const identity = await identifyUser({ source: "oauth-authorize" });
+    const identity = await identifyUser();
 
     if (!identity) {
       // No identity at all — send through Google sign-in, then back here.

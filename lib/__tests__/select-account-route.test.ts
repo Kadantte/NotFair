@@ -477,16 +477,13 @@ describe("Select account route — POST", () => {
     });
   });
 
-  // ─── Phase-4 step 2: Supabase-only identity (no legacy mcp_sessions) ──
+  // ─── Supabase-only identity path (only path post cookie-fallback removal) ──
 
   describe("Supabase-only identity path", () => {
     beforeEach(() => {
-      // No mcp_sessions row; identity comes purely from Supabase.
       mockIdentifyUser.mockResolvedValue({
         userId: "user-123",
         googleEmail: "supabase@example.com",
-        legacySessionId: null,
-        via: "supabase",
       });
       mockLoadGoogleConnection.mockResolvedValue({
         refreshToken: "refresh-token",
@@ -499,7 +496,7 @@ describe("Select account route — POST", () => {
       });
     });
 
-    it("succeeds without UPDATEing mcp_sessions when legacySessionId is null", async () => {
+    it("succeeds without touching mcp_sessions for the Supabase identity", async () => {
       const response = await POST(
         makeRequest({
           pendingToken: "pt",
@@ -518,7 +515,7 @@ describe("Select account route — POST", () => {
       expect(mockDeleteWhere).not.toHaveBeenCalled();
     });
 
-    it("does NOT re-set the adsagent_token cookie for Supabase-only users", async () => {
+    it("does NOT set the adsagent_token cookie", async () => {
       const response = await POST(
         makeRequest({
           pendingToken: "pt",

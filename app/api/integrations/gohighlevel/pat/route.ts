@@ -18,7 +18,7 @@ import { issuePat } from "@/lib/gohighlevel/pat";
 import { hasAllGoHighLevelScopes } from "@/lib/gohighlevel/scopes";
 
 export async function POST(request: Request) {
-  const identity = await identifyUser({ source: "gohighlevel-pat-mint" });
+  const identity = await identifyUser();
   if (!identity) {
     return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
   }

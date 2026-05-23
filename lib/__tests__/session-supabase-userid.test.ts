@@ -136,15 +136,6 @@ const CONNECTION_VIEW = {
 
 const LEGACY_TOKEN_ROW = { accessToken: "legacy-bearer-token" };
 
-const COOKIE_PATH_MCP_ROW = {
-  refreshToken: "rt-from-mcp",
-  customerId: "999",
-  customerIds: '[{"id":"999","name":"Cookie Acct"}]',
-  loginCustomerId: null,
-  userId: SUPABASE_USER.id,
-  googleEmail: SUPABASE_USER.email,
-};
-
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe("Supabase-anchored session loader", () => {
@@ -194,20 +185,7 @@ describe("Supabase-anchored session loader", () => {
     }
   });
 
-  it("no supabase user — falls through to legacy cookie path", async () => {
-    mockGetUser.mockReturnValue(null);
-    mockCookies._set("adsagent_token", "session-cookie-token");
-    mockSelectChain
-      .mockResolvedValueOnce([COOKIE_PATH_MCP_ROW])
-      .mockResolvedValueOnce([]);
-
-    const session = await getSession();
-
-    expect(session.connected).toBe(true);
-    expect(mockGetUser).toHaveBeenCalled();
-  });
-
-  it("no supabase user + no cookie — disconnected", async () => {
+  it("no supabase user — disconnected", async () => {
     mockGetUser.mockReturnValue(null);
 
     const session = await getSession();

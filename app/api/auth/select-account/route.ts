@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
   // Identity from Supabase; connection row is the source of truth for
   // refreshToken + candidate accounts.
-  const identity = await identifyUser({ source: "select-account" });
+  const identity = await identifyUser();
   if (!identity) {
     return NextResponse.json(
       { error: "No active session found" },

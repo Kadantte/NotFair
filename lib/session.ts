@@ -7,12 +7,8 @@ import { COOKIE_NAMES, type ActivePlatform } from "@/lib/auth-cookies";
 import { deriveCustomerName, parseCustomerIds, type AuthContext, type ConnectedAccount } from "@/lib/google-ads";
 import { DEV_EMAILS } from "@/lib/dev-access";
 import { resolveActivePlatform } from "@/lib/active-platform";
-import {
-  loadGoogleConnection,
-  type GoogleConnectionView,
-} from "@/lib/connections/google-read";
+import { loadGoogleConnection } from "@/lib/connections/google-read";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { trackServerEvent } from "@/lib/analytics-server";
 
 export type Session = {
   connected: true;
@@ -65,98 +61,17 @@ type LoadSessionResult = {
 };
 
 /**
- * Legacy cookie-bound session loader. Used only for users still carrying an
- * `adsagent_token` cookie from before the Supabase migration — new sign-ins
- * never set this cookie and never create `mcp_sessions` rows. The result is
- * always passed through `mergeWithConnection` so Google fields come from the
- * authoritative `ad_platform_connections` row.
- */
-async function loadDeviceSession(): Promise<LoadSessionResult | null> {
-  const cookieStore = await cookies();
-
-  const token = cookieStore.get(COOKIE_NAMES.token)?.value;
-
-  if (!token) return null;
-
-  const [realRow] = await db()
-    .select({
-      refreshToken: schema.mcpSessions.refreshToken,
-      customerId: schema.mcpSessions.customerId,
-      customerIds: schema.mcpSessions.customerIds,
-      loginCustomerId: schema.mcpSessions.loginCustomerId,
-      userId: schema.mcpSessions.userId,
-      googleEmail: schema.mcpSessions.googleEmail,
-    })
-    .from(schema.mcpSessions)
-    .where(
-      and(
-        eq(schema.mcpSessions.accessToken, token),
-        gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-      ),
-    )
-    .limit(1);
-
-  // Empty customerId is a valid "ads-less" session — user signed in via Google
-  // but has no Google Ads account to connect yet. Pending account-selection
-  // tokens also have customerId="", but those are passed via URL (?pending=…),
-  // never set as the cookie, so they don't leak through this lookup.
-  if (!realRow) return null;
-
-  const row: SessionRow = { ...realRow, userId: realRow.userId ?? null, loginCustomerId: realRow.loginCustomerId ?? null };
-
-  // Check for dev impersonation
-  const impersonateId = cookieStore.get(COOKIE_NAMES.impersonate)?.value;
-  if (impersonateId && row.googleEmail && DEV_EMAILS.includes(row.googleEmail)) {
-    if (!/^\d+$/.test(impersonateId)) return { token, row }; // malformed cookie → ignore, return real session
-    const sessionId = parseInt(impersonateId, 10);
-
-    const [targetRow] = await db()
-      .select({
-        refreshToken: schema.mcpSessions.refreshToken,
-        customerId: schema.mcpSessions.customerId,
-        customerIds: schema.mcpSessions.customerIds,
-        loginCustomerId: schema.mcpSessions.loginCustomerId,
-        userId: schema.mcpSessions.userId,
-        googleEmail: schema.mcpSessions.googleEmail,
-      })
-      .from(schema.mcpSessions)
-      .where(
-        and(
-          eq(schema.mcpSessions.id, sessionId),
-          gte(schema.mcpSessions.expiresAt, new Date().toISOString()),
-        ),
-      )
-      .limit(1);
-
-    // Impersonation requires a real, connected target session — never let a
-    // dev "impersonate" an ads-less placeholder, since the whole point of dev
-    // impersonation is to read another user's actual Google Ads data.
-    if (!targetRow || !targetRow.customerId) return null;
-
-    return {
-      token,
-      row: { ...targetRow, userId: targetRow.userId ?? null, loginCustomerId: targetRow.loginCustomerId ?? null },
-      impersonating: { sessionId, realEmail: row.googleEmail },
-    };
-  }
-
-  return { token, row };
-}
-
-/**
- * Supabase-anchored session loader. Identifies the user via Supabase Auth
- * cookies (refreshed per protected request by `lib/supabase/middleware.ts`),
- * then loads Google connection state directly from `ad_platform_connections`.
- * Skips `mcp_sessions` for everything except:
- *   - The optional legacy `Session.token` (surfaced on /connect for
- *     direct-bearer setup display).
- *   - Dev impersonation, which still uses `mcp_sessions.id` cookie values.
+ * Identify the user via Supabase Auth cookies (refreshed per protected
+ * request by `lib/supabase/middleware.ts`), then load Google connection
+ * state from `ad_platform_connections`.
  *
- * Returns null when no Supabase user is present — caller falls through to
- * the legacy cookie path so users who still carry `adsagent_token` from
- * before the Supabase migration keep working.
+ * Touches `mcp_sessions` only for:
+ *   - The optional `Session.token` (surfaced on /connect for direct-bearer
+ *     setup display, which is the frozen legacy cohort we keep serving).
+ *   - Dev impersonation, which still uses `mcp_sessions.id` cookie values
+ *     (slated to move to userId, see [phase-4-step-4 in migration doc]).
  */
-async function loadSessionViaSupabase(): Promise<LoadSessionResult | null> {
+async function loadSessionRow(): Promise<LoadSessionResult | null> {
   const supabase = await createSupabaseServerClient();
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
   if (!supabaseUser) return null;
@@ -204,14 +119,13 @@ async function loadSessionViaSupabase(): Promise<LoadSessionResult | null> {
     googleEmail = targetRow.googleEmail;
   }
 
-  // Connection is the source of truth for Google ads state. With
-  // READ_USERID_FROM_SUPABASE=true we skip `mergeWithConnection` entirely;
-  // the row is built here.
+  // Connection is the source of truth for Google ads state.
   const conn = await loadGoogleConnection(userId);
 
-  // Optional legacy lookup for `Session.token` — surfaced on /connect for
-  // direct-bearer Bearer-token setup. Phase 3 retires this consumer; until
-  // then a missing row degrades cleanly (UI hides the direct-bearer block).
+  // Optional `mcp_sessions` lookup for `Session.token` — surfaced on /connect
+  // for direct-bearer Bearer-token setup. The direct-bearer cohort is
+  // intentionally preserved (scope change 2026-05-07); a missing row degrades
+  // cleanly (UI hides the direct-bearer block).
   const [legacyTokenRow] = await db()
     .select({ accessToken: schema.mcpSessions.accessToken })
     .from(schema.mcpSessions)
@@ -250,41 +164,6 @@ async function loadSessionViaSupabase(): Promise<LoadSessionResult | null> {
   };
 }
 
-/**
- * Layer Google `ad_platform_connections` fields on top of the legacy
- * mcp_sessions row so Google state always comes from the authoritative
- * connection record. Returns the input unchanged when no connection row
- * exists yet (rare — implies the user has a legacy `adsagent_token` cookie
- * but no Google connection ever finished).
- */
-async function mergeWithConnection(result: LoadSessionResult): Promise<LoadSessionResult> {
-  const userId = result.row.userId;
-  if (!userId) return result;
-  const conn = await loadGoogleConnection(userId);
-  if (!conn) return result;
-  return {
-    ...result,
-    row: projectConnectionOntoSessionRow(result.row, conn),
-  };
-}
-
-function projectConnectionOntoSessionRow(
-  base: SessionRow,
-  conn: GoogleConnectionView,
-): SessionRow {
-  return {
-    ...base,
-    refreshToken: conn.refreshToken,
-    customerId: conn.customerId,
-    customerIds: stringifyCustomerIds(conn.customerIds),
-    loginCustomerId: conn.loginCustomerId,
-    // googleEmail keeps falling back to the session row when the connection
-    // row doesn't carry it — phase 4 finishes the move once Supabase Auth
-    // owns the identity record.
-    googleEmail: conn.googleEmail ?? base.googleEmail,
-  };
-}
-
 function stringifyCustomerIds(accounts: ConnectedAccount[]): string {
   return JSON.stringify(
     accounts.map((a) => ({
@@ -293,38 +172,6 @@ function stringifyCustomerIds(accounts: ConnectedAccount[]): string {
       ...("loginCustomerId" in a ? { loginCustomerId: a.loginCustomerId } : {}),
     })),
   );
-}
-
-async function loadSessionRow(source: string): Promise<LoadSessionResult | null> {
-  // Supabase-anchored loader is primary; its result is already
-  // connection-sourced. The legacy `adsagent_token` path stays as a fallback
-  // for users who haven't re-signed-in since the Supabase migration.
-  const supaResult = await loadSessionViaSupabase();
-  if (supaResult) {
-    trackResolutionPath(supaResult.row.userId, "supabase", source);
-    return supaResult;
-  }
-
-  const result = await loadDeviceSession();
-  if (!result) return null;
-  const merged = await mergeWithConnection(result);
-  trackResolutionPath(merged.row.userId, "cookie_fallback", source);
-  return merged;
-}
-
-/**
- * Emit a PostHog event each time loadSessionRow resolves a session, tagged
- * with how it resolved. Drives a dashboard showing what % of authenticated
- * traffic is on the Supabase path vs still on the legacy `adsagent_token`
- * cookie fallback. Drop the cookie fallback only when `cookie_fallback`
- * daily count is at zero for ≥1 week.
- */
-function trackResolutionPath(
-  userId: string | null,
-  via: "supabase" | "cookie_fallback",
-  source: string,
-): void {
-  trackServerEvent(userId ?? null, "web_session_resolved", { via, source });
 }
 
 /**
@@ -349,7 +196,7 @@ async function readProfileCookie(): Promise<{ displayName: string | null; pictur
 }
 
 export async function getSession(): Promise<Session> {
-  const result = await loadSessionRow("getSession");
+  const result = await loadSessionRow();
   if (!result) return { connected: false };
 
   // isDev is always based on the real user's email, not the impersonated one
@@ -436,12 +283,12 @@ export async function getSession(): Promise<Session> {
  * the picker. Returns null when there's no session at all.
  */
 export async function getCurrentRefreshToken(): Promise<string | null> {
-  const result = await loadSessionRow("getCurrentRefreshToken");
+  const result = await loadSessionRow();
   return result?.row.refreshToken ?? null;
 }
 
 export async function getSessionAuth(): Promise<SessionRow> {
-  const result = await loadSessionRow("getSessionAuth");
+  const result = await loadSessionRow();
   // Reject ads-less sessions: callers of getSessionAuth do Google Ads work
   // that requires a real customerId. The user-facing route handlers catch
   // this and bounce the user back to /connect, which is the right behavior
@@ -451,7 +298,7 @@ export async function getSessionAuth(): Promise<SessionRow> {
 }
 
 export async function getAuthContext(): Promise<{ auth: AuthContext; session: SessionRow }> {
-  const result = await loadSessionRow("getAuthContext");
+  const result = await loadSessionRow();
   if (!result || !result.row.customerId) throw new Error("Not authenticated");
   return {
     auth: {

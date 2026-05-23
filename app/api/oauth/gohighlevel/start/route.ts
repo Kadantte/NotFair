@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   // also gated on `mcp_sessions.customerId <> ''` (i.e. user must have a
   // Google connection); the connection-check moves to /connect UI surfaces
   // since GHL is platform-agnostic and doesn't strictly require Google Ads.
-  const identity = await identifyUser({ source: "gohighlevel-oauth-start" });
+  const identity = await identifyUser();
   if (!identity) {
     const signinUrl = new URL("/api/auth/signin", requestUrl);
     signinUrl.searchParams.set("next", `${requestUrl.pathname}${requestUrl.search}`);

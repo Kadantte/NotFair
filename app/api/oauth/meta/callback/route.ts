@@ -116,7 +116,7 @@ export async function GET(request: Request) {
   // identifyUser (Supabase first, cookie fallback) instead of looking up an
   // mcp_sessions row directly so post-step-2 Supabase-only users (who have
   // no mcp_sessions row) still pass.
-  const identity = await identifyUser({ source: "meta-oauth-callback" });
+  const identity = await identifyUser();
   if (!identity || identity.userId !== state.userId) {
     return redirectToConnect({ status: "error", reason: "no_session", next });
   }

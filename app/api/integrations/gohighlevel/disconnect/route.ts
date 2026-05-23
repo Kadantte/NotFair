@@ -21,7 +21,7 @@ import { db, schema } from "@/lib/db";
 import { identifyUser } from "@/lib/auth/identify-user";
 
 export async function DELETE(request: Request) {
-  const identity = await identifyUser({ source: "gohighlevel-disconnect" });
+  const identity = await identifyUser();
   if (!identity) {
     // 401 = needs login (no identity at all). 403 = identified but forbidden.
     // We're in the first case here; clients use the distinction to decide

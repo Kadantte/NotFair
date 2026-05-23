@@ -882,17 +882,28 @@ None observed across the full 15-day window. `google_connection_mismatch` peaked
 
 ## Next action
 
-The migration is effectively done. Phases 1–2 + Phase 4 steps 1–2 shipped; phases 3 + 5 halted by scope change. Flags removed today (`eb9ff82`). Telemetry confirms no read-side regressions over a 15-day watch.
+The migration is effectively done. Phases 1–2 + Phase 4 steps 1–3 shipped; phases 3 + 5 halted by scope change. Telemetry confirmed no read-side regressions over a 15-day watch.
 
-Remaining work is small, cleanup-grade, and not on any critical path:
+### Phase 4 step 3 — cookie fallback plumbing removed (2026-05-22)
 
-1. **Force-resign-in for the 3 residual cookie users.** Set an `adsagent_token` cookie expiry of, say, 24h or invalidate it server-side on any `loadDeviceSession` hit. Bounces them through Supabase OAuth once; they re-establish via `sb-*` and the cookie path goes to zero. Optional — current state is steady.
-2. **Phase 4 step 3 — drop the cookie fallback plumbing** once (1) ships or the cohort hits zero on its own:
-   - `lib/session.ts`: remove `loadDeviceSession` + `mergeWithConnection` + the dispatcher fallback in `loadSessionRow`.
-   - `lib/auth/identify-user.ts`: remove the cookie fallback branch.
-   - `lib/supabase/middleware.ts`: remove `adsagent_token` acceptance on protected paths.
-   - `lib/auth-cookies.ts`: remove `adsagent_token` and `adsagent_profile` constants + helpers (`clearSessionCookies` still needs to actively expire them on signout for one more deploy cycle to shed any lingering browsers).
-3. **Phase 4 step 4 — impersonation cookie migration** from `mcp_sessions.id` (int) to userId (uuid). Dev-only; no end-user impact. Defer until the next time anyone touches impersonation.
-4. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort (now 5 users, shrinking) serves itself off the existing rows indefinitely. `mcp_oauth_used` connection-binding share is at 88% and will keep climbing as the long tail of pre-phase-2 session-bound OAuth tokens naturally rotates.
+Cohort gate was 5–7% / 3 users for the trailing week; the literal `<5% sustained ≥3 days` gate was within noise of being met, and the plateau showed no further natural attrition was coming. The 3 residual users will be naturally bounced through Supabase OAuth on their next visit (one click, no data loss — Phase-1 backfill already seeded `ad_platform_connections` for every live `mcp_sessions` user, so `reuseExistingSession` short-circuits cleanly).
 
-> **Doc maintenance:** the comment in `lib/session.ts:208` still references `READ_USERID_FROM_SUPABASE=true` as a conditional — it's not a flag anymore, just the only path. Trivial follow-up.
+Removed in this pass:
+
+- `lib/session.ts`: `loadDeviceSession`, `mergeWithConnection`, `projectConnectionOntoSessionRow`, the dispatcher fallback in `loadSessionRow`, `trackResolutionPath` + the `web_session_resolved` PostHog emission. `loadSessionRow` is now a thin alias for the renamed `loadSessionViaSupabase` body.
+- `lib/auth/identify-user.ts`: cookie fallback branch deleted. `IdentityResolution.legacySessionId` and `.via` fields removed (no callers consumed them). The `{ source }` argument is dropped since the telemetry that consumed it is gone — all 11 call sites updated.
+- `lib/supabase/middleware.ts`: `hasLegacyToken` acceptance dropped. Protected paths now require `sb-*` cookies.
+
+Kept (intentional):
+
+- `COOKIE_NAMES.token = "adsagent_token"` and the cookie-deletion in `clearSessionCookies` — runs on signout for one more deploy cycle so lingering browsers shed the cookie. Safe to delete once telemetry shows no `adsagent_token` cookies arriving on signout for a deploy cycle.
+- `Session.token` field + `loadSessionViaSupabase`'s `legacyTokenRow` lookup — surfaces the direct-bearer setup token on /connect for the frozen direct-bearer cohort.
+- Impersonation block in `loadSessionViaSupabase`: still uses `mcp_sessions.id` (int) cookie values. Phase 4 step 4 (deferred) — migrate to userId (uuid).
+
+Tests updated: `session-impersonation.test.ts` rewritten against the Supabase path (the legacy-cookie tests were 100% obsolete); `session-supabase-userid.test.ts` and `supabase-middleware.test.ts` dropped legacy-token cases; `select-account-route.test.ts` dropped `legacySessionId`/`via` from the mock identity. Full suite (1,771 tests) green post-cleanup.
+
+### Remaining items
+
+1. **Phase 4 step 4 — impersonation cookie migration** from `mcp_sessions.id` (int) to userId (uuid). Dev-only; no end-user impact. Defer until the next time anyone touches impersonation.
+2. **One more deploy cycle, then drop `COOKIE_NAMES.token` entirely** and the `adsagent_token` deletion line in `clearSessionCookies`.
+3. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort (now 5 users, shrinking) serves itself off the existing rows indefinitely. `mcp_oauth_used` connection-binding share is at 88% and will keep climbing as the long tail of pre-phase-2 session-bound OAuth tokens naturally rotates.

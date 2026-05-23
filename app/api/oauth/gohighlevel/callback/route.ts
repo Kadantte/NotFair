@@ -86,7 +86,7 @@ export async function GET(request: Request) {
   const nonceOk = await verifyOAuthNonce(state.nonce);
   if (!nonceOk) return redirectToSurface({ status: "error", reason: "nonce_expired", next });
 
-  const identity = await identifyUser({ source: "gohighlevel-oauth-callback" });
+  const identity = await identifyUser();
   if (!identity || identity.userId !== state.userId) {
     return redirectToSurface({ status: "error", reason: "no_session", next });
   }

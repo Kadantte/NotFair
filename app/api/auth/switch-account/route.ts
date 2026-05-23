@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing customerId" }, { status: 400 });
   }
 
-  const identity = await identifyUser({ source: "switch-account" });
+  const identity = await identifyUser();
   if (!identity) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

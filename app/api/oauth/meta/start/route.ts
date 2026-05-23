@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   // user_id; ads-less Supabase users still need to start Meta OAuth (Meta is
   // one of the explicit "set up later" paths for users with no Google Ads
   // account).
-  const identity = await identifyUser({ source: "meta-oauth-start" });
+  const identity = await identifyUser();
   if (!identity) {
     // Send through Google sign-in, then bounce back here.
     const signinUrl = new URL("/api/auth/signin", requestUrl);
