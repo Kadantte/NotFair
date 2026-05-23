@@ -38,10 +38,10 @@
     "viewAudit": "Konto öffnen"
   },
   "Home": {
-    "githubBanner": "Google Ads aus Claude diagnostizieren und korrigieren - freigegebene Schreibzugriffe, live auf GitHub",
-    "eyebrow": "KI-Google-Ads-Stratege + Ausfuhrungsebene",
+    "githubBanner": "Google + Meta Ads aus Claude diagnostizieren und korrigieren - freigegebene Schreibzugriffe, live auf GitHub",
+    "eyebrow": "KI-Stratege fur Google + Meta Ads + Ausfuhrungsebene",
     "headline": "Finden, was falsch lauft. Direkt aus Claude korrigieren.",
-    "subhead": "NotFair gibt Claude Live-Zugriff auf Google Ads, um Probleme zu diagnostizieren, Korrekturen zu empfehlen und Kampagnenanderungen erst nach Ihrer Freigabe auszufuhren.",
+    "subhead": "NotFair gibt Claude Live-Zugriff auf Google Ads und Meta Ads, um Probleme zu diagnostizieren, Korrekturen zu empfehlen und Kampagnenanderungen erst nach Ihrer Freigabe auszufuhren.",
     "blogCta": "Blog lesen",
     "trustItems": [
       "Probleme diagnostizieren",
@@ -49,21 +49,47 @@
       "Jeden Schreibzugriff freigeben"
     ],
     "chat": {
-      "initialQuestion": "Warum sind Leads teurer geworden, und was soll ich korrigieren?",
-      "followUpQuestion": "Wende die freigegebenen Negatives und Keyword-Anderungen an.",
-      "intro": "Ich prufe Ausgaben, Suchbegriffe, Struktur und aktuelle Anderungen, bevor ich Korrekturen empfehle.",
-      "foundSummary": "3 Probleme gefunden und eine priorisierte Korrekturliste erstellt",
-      "findingsTitle": "{count} Probleme zu beheben:",
-      "finding1": "34 % der Ausgaben kommen aus zu weit gefassten Suchanfragen",
-      "finding2": "23 negative Keywords empfohlen, um unpassende Suchanfragen zu blockieren",
-      "finding3": "4 Anzeigengruppen sollten vor Budgeterhohungen getrennt werden",
+      "platformToggleLabel": "Ansehen auf",
+      "platformGoogle": "Google Ads",
+      "platformMeta": "Meta Ads",
       "permission1": "NotFair mochte ausfuhren",
-      "permission2": "um 23 Negatives und 80 Keyword-Edits anzuwenden",
       "approve": "Freigeben",
       "approveOnce": "Einmal freigeben",
       "deny": "Ablehnen",
       "placeholder": "Fragen Sie, was als Nachstes korrigiert werden soll",
-      "demo": "Demo"
+      "demo": "Demo",
+      "findingsTitle": "{count} Probleme zu beheben:",
+      "foundSummary": "3 Probleme gefunden und eine priorisierte Korrekturliste erstellt",
+      "google": {
+        "mcpBadge": "NotFair · Google Ads MCP",
+        "initialQuestion": "Warum sind Leads teurer geworden, und was soll ich korrigieren?",
+        "followUpQuestion": "Wende die freigegebenen Negatives und Keyword-Anderungen an.",
+        "intro": "Ich prufe Ausgaben, Suchbegriffe, Struktur und aktuelle Anderungen, bevor ich Korrekturen empfehle.",
+        "tool1Name": "getSearchTermReport",
+        "tool1Args": "letzte 30 T",
+        "tool2Name": "getKeywords",
+        "tool2Args": "Qualitat + Kosten",
+        "finding1": "34 % der Ausgaben kommen aus zu weit gefassten Suchanfragen",
+        "finding2": "23 negative Keywords empfohlen, um unpassende Suchanfragen zu blockieren",
+        "finding3": "4 Anzeigengruppen sollten vor Budgeterhohungen getrennt werden",
+        "permissionAction": "applyRecommendedFixes",
+        "permission2": "um 23 Negatives und 80 Keyword-Edits anzuwenden"
+      },
+      "meta": {
+        "mcpBadge": "NotFair · Meta Ads MCP",
+        "initialQuestion": "Warum steigt der CPA meiner Meta-Anzeigen, und was soll ich korrigieren?",
+        "followUpQuestion": "Wende die freigegebenen Pausen und Budget-Umschichtungen an.",
+        "intro": "Ich prufe Ausgaben, Zielgruppen-Uberschneidungen, Lernphase und Creative-Fatigue, bevor ich Korrekturen empfehle.",
+        "tool1Name": "getInsights",
+        "tool1Args": "letzte 30 T · Breakdowns",
+        "tool2Name": "listAdSets",
+        "tool2Args": "Status + ROAS",
+        "finding1": "2 Ad Sets stecken in der Lernphase und verbrauchen 28 % des Budgets",
+        "finding2": "3 Zielgruppen uberschneiden sich und bieten gegeneinander",
+        "finding3": "5 Creatives mit 4x+ Frequenz brauchen frische Varianten",
+        "permissionAction": "applyMetaFixes",
+        "permission2": "um 2 Ad Sets zu pausieren und 480 $/Tag auf Top-Performer umzuschichten"
+      }
     },
     "engineTitle": "Eine komplette Marketing-Engine in Ihrem Agenten",
     "engineBody": "Diagnosen, empfohlene Korrekturen, Schreibaktionen und Rückgängig-Funktion - alles über eine MCP-Verbindung pro Werbekonto.",
@@ -79,7 +105,7 @@
     "faq": [
       {
         "q": "Nimmt NotFair Anderungen ohne meine Freigabe vor?",
-        "a": "Nein. NotFair kann Ihr Konto frei lesen, aber jedes Schreibwerkzeug zeigt zuerst einen Diff. Sie bestatigen, bevor etwas in Google Ads landet - und jede Anderung ist mit einem einzelnen Tool-Aufruf reversibel."
+        "a": "Nein. NotFair kann Ihr Konto frei lesen, aber jedes Schreibwerkzeug zeigt zuerst einen Diff. Sie bestatigen, bevor etwas in Google Ads oder Meta Ads landet - und jede Anderung ist mit einem einzelnen Tool-Aufruf reversibel."
       },
       {
         "q": "Mit welchen KI-Clients funktioniert das?",
@@ -91,7 +117,7 @@
       },
       {
         "q": "Was kann der Agent tatsachlich andern?",
-        "a": "Keywords, Negatives, Gebote, Budgets, Anzeigen, Anzeigengruppen, Kampagneneinstellungen, Zielgruppen, Skripte und Reporting-Workflows - alles in Google Ads. Jeder Schreibzugriff ist freigabepflichtig und protokolliert."
+        "a": "In Google Ads: Keywords, Negatives, Gebote, Budgets, Anzeigen, Anzeigengruppen, Kampagneneinstellungen, Zielgruppen, Skripte und Reporting-Workflows. In Meta Ads: Kampagnen, Ad Sets, Anzeigen, Budgets, Planung und Creative-Status auf Facebook + Instagram. Jeder Schreibzugriff ist freigabepflichtig und protokolliert."
       },
       {
         "q": "Wie funktioniert die Authentifizierung?",
@@ -281,7 +307,7 @@
   "McpSetupHero": {
     "headlinePrefix": "Machen Sie",
     "headlineSuffix": "zu Ihrer Marketing-Engine",
-    "intro": "Verbinden Sie NotFair mit Claude, OpenClaw, Codex, Cursor oder Hermes und steuern Sie Google Ads aus dem Chat: diagnostizieren, Korrekturen entwerfen und jede Schreibaktion freigeben.",
+    "intro": "Verbinden Sie NotFair mit Claude, OpenClaw, Codex, Cursor oder Hermes und steuern Sie Google Ads oder Meta Ads aus dem Chat: diagnostizieren, Korrekturen entwerfen und jede Schreibaktion freigeben.",
     "tryPrompt": "Auditiere mein Google-Ads-Konto und ordne Korrekturen nach Wirkung.",
     "copyField": {
       "copy": "Kopieren",
@@ -509,7 +535,7 @@
           "7 Tage unbegrenzter Zugriff auf alle Funktionen",
           "Danach 300 MCP-Operationen/Monat, dauerhaft kostenlos",
           "Keine Kreditkarte erforderlich",
-          "Google Ads mit Claude, Cursor und jedem MCP-Client verbinden",
+          "Google Ads + Meta Ads mit Claude, Cursor und jedem MCP-Client verbinden",
           "Kontoprobleme diagnostizieren und Kampagnenänderungen entwerfen",
           "Gebote, Budgets, Keywords, Zielgruppen und Anzeigen vor Freigabe prüfen",
           "Community-Support"
@@ -530,8 +556,8 @@
         "scheduledCancel": "Geplante Kündigung",
         "renews": "Verlängert sich {interval} am {date}",
         "headlineFeatures": [
-          "Unbegrenzte Google-Ads-Operationen",
-          "Unbegrenzte Google-Ads-Konten",
+          "Unbegrenzte Google + Meta Ads-Operationen",
+          "Unbegrenzte Google + Meta Ads-Konten",
           "Bulk-Workflows: Keywords, Anzeigen, Budgets, Skripte",
           "Vollständige Änderungshistorie und Undo mit einem Aufruf",
           "Priorisierter E-Mail-Support"

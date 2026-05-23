@@ -38,10 +38,10 @@
     "viewAudit": "Abrir conta"
   },
   "Home": {
-    "githubBanner": "Diagnostique e corrija Google Ads pelo Claude - alteracoes com aprovacao, ao vivo no GitHub",
-    "eyebrow": "Estrategista de Google Ads com IA + camada de execucao",
+    "githubBanner": "Diagnostique e corrija Google + Meta Ads pelo Claude - alteracoes com aprovacao, ao vivo no GitHub",
+    "eyebrow": "Estrategista de Google + Meta Ads com IA + camada de execucao",
     "headline": "Encontre o que esta errado. Corrija pelo Claude.",
-    "subhead": "O NotFair da ao Claude acesso ao vivo ao Google Ads para diagnosticar problemas, recomendar correcoes e executar mudancas de campanha somente depois da sua aprovacao.",
+    "subhead": "O NotFair da ao Claude acesso ao vivo ao Google Ads e Meta Ads para diagnosticar problemas, recomendar correcoes e executar mudancas de campanha somente depois da sua aprovacao.",
     "blogCta": "Ler o blog",
     "trustItems": [
       "Diagnosticar problemas",
@@ -49,21 +49,47 @@
       "Aprovar cada alteracao"
     ],
     "chat": {
-      "initialQuestion": "Por que os leads ficaram mais caros, e o que devo corrigir?",
-      "followUpQuestion": "Aplique os negativos e as alteracoes de palavras-chave aprovadas.",
-      "intro": "Vou inspecionar gastos, termos de pesquisa, estrutura e mudancas recentes antes de recomendar correcoes.",
-      "foundSummary": "3 problemas encontrados e uma lista priorizada de correcoes preparada",
-      "findingsTitle": "{count} problemas para corrigir:",
-      "finding1": "34% do gasto vem de consultas com correspondencia ampla demais",
-      "finding2": "23 palavras-chave negativas recomendadas para bloquear buscas desalinhadas",
-      "finding3": "4 grupos de anuncios devem ser separados antes de aumentar o orcamento",
+      "platformToggleLabel": "Ver em",
+      "platformGoogle": "Google Ads",
+      "platformMeta": "Meta Ads",
       "permission1": "NotFair quer executar",
-      "permission2": "para aplicar 23 negativos e 80 edicoes de palavras-chave",
       "approve": "Aprovar",
       "approveOnce": "Aprovar uma vez",
       "deny": "Negar",
       "placeholder": "Pergunte o que corrigir agora",
-      "demo": "demo"
+      "demo": "demo",
+      "findingsTitle": "{count} problemas para corrigir:",
+      "foundSummary": "3 problemas encontrados e uma lista priorizada de correcoes preparada",
+      "google": {
+        "mcpBadge": "NotFair · Google Ads MCP",
+        "initialQuestion": "Por que os leads ficaram mais caros, e o que devo corrigir?",
+        "followUpQuestion": "Aplique os negativos e as alteracoes de palavras-chave aprovadas.",
+        "intro": "Vou inspecionar gastos, termos de pesquisa, estrutura e mudancas recentes antes de recomendar correcoes.",
+        "tool1Name": "getSearchTermReport",
+        "tool1Args": "ultimos 30d",
+        "tool2Name": "getKeywords",
+        "tool2Args": "qualidade + custo",
+        "finding1": "34% do gasto vem de consultas com correspondencia ampla demais",
+        "finding2": "23 palavras-chave negativas recomendadas para bloquear buscas desalinhadas",
+        "finding3": "4 grupos de anuncios devem ser separados antes de aumentar o orcamento",
+        "permissionAction": "applyRecommendedFixes",
+        "permission2": "para aplicar 23 negativos e 80 edicoes de palavras-chave"
+      },
+      "meta": {
+        "mcpBadge": "NotFair · Meta Ads MCP",
+        "initialQuestion": "Por que o CPA dos meus anuncios na Meta esta subindo, e o que devo corrigir?",
+        "followUpQuestion": "Aplique as pausas e os ajustes de orcamento aprovados.",
+        "intro": "Vou inspecionar gasto, sobreposicao de audiencia, fase de aprendizagem e fadiga de criativos antes de recomendar correcoes.",
+        "tool1Name": "getInsights",
+        "tool1Args": "ultimos 30d · breakdowns",
+        "tool2Name": "listAdSets",
+        "tool2Args": "status + ROAS",
+        "finding1": "2 ad sets presos em aprendizagem consomem 28% do gasto",
+        "finding2": "3 audiencias se sobrepoem e disputam lances entre si",
+        "finding3": "5 criativos com frequencia 4x+ precisam de variantes novas",
+        "permissionAction": "applyMetaFixes",
+        "permission2": "para pausar 2 ad sets e remanejar US$ 480/dia para os melhores"
+      }
     },
     "engineTitle": "Um motor de marketing completo dentro do seu agente",
     "engineBody": "Diagnósticos, correções recomendadas, alterações e desfazer — tudo por uma conexão MCP por conta de anúncios.",
@@ -79,7 +105,7 @@
     "faq": [
       {
         "q": "O NotFair faz mudancas sem minha aprovacao?",
-        "a": "Nao. O NotFair pode ler sua conta livremente, mas toda ferramenta de escrita mostra um diff primeiro. Voce confirma antes de qualquer coisa chegar ao Google Ads - e qualquer mudanca pode ser revertida com uma unica chamada de ferramenta."
+        "a": "Nao. O NotFair pode ler sua conta livremente, mas toda ferramenta de escrita mostra um diff primeiro. Voce confirma antes de qualquer coisa chegar ao Google Ads ou Meta Ads - e qualquer mudanca pode ser revertida com uma unica chamada de ferramenta."
       },
       {
         "q": "Com quais clientes de IA isso funciona?",
@@ -91,7 +117,7 @@
       },
       {
         "q": "O que o agente realmente consegue alterar?",
-        "a": "Palavras-chave, negativas, lances, orcamentos, anuncios, grupos de anuncios, configuracoes de campanha, audiencias, scripts e fluxos de relatorio - tudo no Google Ads. Toda escrita exige aprovacao e fica registrada."
+        "a": "No Google Ads: palavras-chave, negativas, lances, orcamentos, anuncios, grupos de anuncios, configuracoes de campanha, audiencias, scripts e fluxos de relatorio. No Meta Ads: campanhas, ad sets, anuncios, orcamentos, agendamentos e status criativos no Facebook + Instagram. Toda escrita exige aprovacao e fica registrada."
       },
       {
         "q": "Como funciona a autenticacao?",
@@ -281,7 +307,7 @@
   "McpSetupHero": {
     "headlinePrefix": "Transforme",
     "headlineSuffix": "no seu motor de marketing",
-    "intro": "Conecte o NotFair ao Claude, OpenClaw, Codex, Cursor ou Hermes e opere o Google Ads por chat: diagnostique, rascunhe correções e aprove cada escrita.",
+    "intro": "Conecte o NotFair ao Claude, OpenClaw, Codex, Cursor ou Hermes e opere o Google Ads ou Meta Ads por chat: diagnostique, rascunhe correções e aprove cada escrita.",
     "tryPrompt": "Audite minha conta do Google Ads e classifique as correções por impacto.",
     "copyField": {
       "copy": "Copiar",
@@ -509,7 +535,7 @@
           "7 dias de acesso ilimitado a todos os recursos",
           "Depois 300 operações MCP/mês, grátis para sempre",
           "Sem cartão de crédito",
-          "Conecte Google Ads ao Claude, Cursor e qualquer cliente MCP",
+          "Conecte Google Ads + Meta Ads ao Claude, Cursor e qualquer cliente MCP",
           "Diagnostique problemas da conta e rascunhe mudanças de campanha",
           "Pré-visualize mudanças de lances, orçamento, palavras-chave, públicos e anúncios antes de aprovar",
           "Suporte da comunidade"
@@ -530,8 +556,8 @@
         "scheduledCancel": "Cancelamento agendado",
         "renews": "Renova {interval} em {date}",
         "headlineFeatures": [
-          "Operações ilimitadas no Google Ads",
-          "Contas ilimitadas do Google Ads",
+          "Operações ilimitadas no Google + Meta Ads",
+          "Contas ilimitadas no Google + Meta Ads",
           "Fluxos em lote: palavras-chave, anúncios, orçamentos, scripts",
           "Histórico completo de mudanças e desfazer com uma chamada",
           "Suporte prioritário por e-mail"

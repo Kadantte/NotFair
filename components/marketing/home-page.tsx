@@ -157,12 +157,15 @@ function SmoothListItem({ children, delay = 0, className }: { children: ReactNod
   );
 }
 
-function HeroMockup() {
+type ChatPlatform = "google" | "meta";
+
+function HeroMockup({ platform }: { platform: ChatPlatform }) {
   const reached = useChatStep();
   const t = useTranslations("Home.chat");
+  const tp = useTranslations(`Home.chat.${platform}`);
   const has = (k: StepKey) => reached.has(k);
   const sent = has("user");
-  const inputText = !sent ? t("initialQuestion") : has("followUp") ? t("followUpQuestion") : "";
+  const inputText = !sent ? tp("initialQuestion") : has("followUp") ? tp("followUpQuestion") : "";
 
   return (
     <motion.div
@@ -193,7 +196,7 @@ function HeroMockup() {
             <ChatReveal show={has("user")}>
               <div className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-[#2E2D28] px-4 py-2.5 text-sm text-[#E8E4DD]">
-                  {t("initialQuestion")}
+                  {tp("initialQuestion")}
                 </div>
               </div>
             </ChatReveal>
@@ -201,7 +204,7 @@ function HeroMockup() {
             <ChatReveal show={has("intro")}>
               <p className="text-sm leading-relaxed text-[#E8E4DD]">
                 <SmoothLine>
-                  {t("intro")}
+                  {tp("intro")}
                 </SmoothLine>
               </p>
             </ChatReveal>
@@ -210,14 +213,14 @@ function HeroMockup() {
               <div className="rounded-xl border border-[#3D3C36] bg-[#1F1E1A] px-3 py-2.5">
                 <div className="space-y-1.5 font-mono-jb text-[11px] leading-5">
                   <ToolLine
-                    name="getSearchTermReport"
-                    args="last 30d"
+                    name={tp("tool1Name")}
+                    args={tp("tool1Args")}
                     done={has("tool1Done")}
                   />
                   <ChatReveal show={has("tool2")}>
                     <ToolLine
-                      name="getKeywords"
-                      args="quality + cost"
+                      name={tp("tool2Name")}
+                      args={tp("tool2Args")}
                       done={has("tool2Done")}
                     />
                   </ChatReveal>
@@ -241,15 +244,15 @@ function HeroMockup() {
                 <ul className="space-y-1.5 pl-1 text-sm leading-relaxed text-[#C4C0B6]">
                   <SmoothListItem delay={0.12} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span>{t("finding1")}</span>
+                    <span>{tp("finding1")}</span>
                   </SmoothListItem>
                   <SmoothListItem delay={0.24} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span>{t("finding2")}</span>
+                    <span>{tp("finding2")}</span>
                   </SmoothListItem>
                   <SmoothListItem delay={0.36} className="flex items-start gap-2">
                     <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#C4C0B6]" />
-                    <span>{t("finding3")}</span>
+                    <span>{tp("finding3")}</span>
                   </SmoothListItem>
                 </ul>
               </div>
@@ -260,10 +263,10 @@ function HeroMockup() {
                 <p className="text-xs leading-relaxed text-[#C4C0B6]">
                   <SmoothLine>
                     <span className="font-semibold text-[#E8E4DD]">{t("permission1")}</span>{" "}
-                    <span className="font-mono-jb text-[#E8B931]">applyRecommendedFixes</span>
+                    <span className="font-mono-jb text-[#E8B931]">{tp("permissionAction")}</span>
                   </SmoothLine>
                   <SmoothLine delay={0.12}>
-                    {t("permission2")}
+                    {tp("permission2")}
                   </SmoothLine>
                 </p>
                 <motion.div
@@ -310,7 +313,7 @@ function HeroMockup() {
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4CAF6E]/30 bg-[#4CAF6E]/10 px-2.5 py-1 text-[11px] font-medium text-[#4CAF6E]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#4CAF6E]" />
                   <span className="sm:hidden">NotFair MCP</span>
-                  <span className="hidden sm:inline">NotFair · Google Ads MCP</span>
+                  <span className="hidden sm:inline">{tp("mcpBadge")}</span>
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-[#C4C0B6] transition-colors hover:bg-[#2E2D28] hover:text-[#E8E4DD]">
@@ -359,9 +362,17 @@ export function HomePage({
   pricing: Omit<PricingSectionProps, "page">;
 }) {
   const t = useTranslations("Home");
+  const tChat = useTranslations("Home.chat");
   const tCta = useTranslations("CTA");
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
+  const [chatPlatform, setChatPlatform] = useState<ChatPlatform>("google");
+
+  function selectChatPlatform(next: ChatPlatform) {
+    if (next === chatPlatform) return;
+    setChatPlatform(next);
+    trackEvent("home_chat_platform_toggled", { platform: next });
+  }
 
   return (
     <>
@@ -432,7 +443,41 @@ export function HomePage({
               </div>
             </motion.div>
 
-            <HeroMockup />
+            <div className="flex flex-col items-center gap-3">
+              <div
+                role="tablist"
+                aria-label={tChat("platformToggleLabel")}
+                className="inline-flex rounded-full border border-[#3D3C36] bg-[#24231F] p-1"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chatPlatform === "google"}
+                  onClick={() => selectChatPlatform("google")}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                    chatPlatform === "google"
+                      ? "bg-[#E8E4DD] text-[#1A1917]"
+                      : "text-[#C4C0B6] hover:text-[#E8E4DD]"
+                  }`}
+                >
+                  {tChat("platformGoogle")}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chatPlatform === "meta"}
+                  onClick={() => selectChatPlatform("meta")}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                    chatPlatform === "meta"
+                      ? "bg-[#E8E4DD] text-[#1A1917]"
+                      : "text-[#C4C0B6] hover:text-[#E8E4DD]"
+                  }`}
+                >
+                  {tChat("platformMeta")}
+                </button>
+              </div>
+              <HeroMockup key={chatPlatform} platform={chatPlatform} />
+            </div>
           </div>
         </div>
       </section>

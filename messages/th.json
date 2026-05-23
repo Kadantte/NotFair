@@ -38,10 +38,10 @@
     "viewAudit": "เปิดบัญชี"
   },
   "Home": {
-    "githubBanner": "วิเคราะห์และแก้ Google Ads จาก Claude - ทุกการเขียนต้องอนุมัติ และเปิดบน GitHub",
-    "eyebrow": "นักวางกลยุทธ์ Google Ads ด้วย AI + ชั้นปฏิบัติการ",
+    "githubBanner": "วิเคราะห์และแก้ Google + Meta Ads จาก Claude - ทุกการเขียนต้องอนุมัติ และเปิดบน GitHub",
+    "eyebrow": "นักวางกลยุทธ์ Google + Meta Ads ด้วย AI + ชั้นปฏิบัติการ",
     "headline": "หาให้เจอว่าอะไรผิด แล้วแก้จาก Claude",
-    "subhead": "NotFair ให้ Claude เข้าถึง Google Ads แบบสดเพื่อวิเคราะห์ปัญหา แนะนำวิธีแก้ และแก้แคมเปญหลังจากคุณอนุมัติเท่านั้น",
+    "subhead": "NotFair ให้ Claude เข้าถึง Google Ads และ Meta Ads แบบสดเพื่อวิเคราะห์ปัญหา แนะนำวิธีแก้ และแก้แคมเปญหลังจากคุณอนุมัติเท่านั้น",
     "blogCta": "อ่านบล็อก",
     "trustItems": [
       "วิเคราะห์ปัญหา",
@@ -49,21 +49,47 @@
       "อนุมัติทุกการเขียน"
     ],
     "chat": {
-      "initialQuestion": "ทำไมต้นทุนลีดแพงขึ้น และควรแก้อะไร?",
-      "followUpQuestion": "ใช้ negative keywords และการแก้ไข keyword ที่อนุมัติแล้ว",
-      "intro": "ฉันจะตรวจ spend, search terms, โครงสร้าง และการเปลี่ยนแปลงล่าสุดก่อนแนะนำวิธีแก้",
-      "foundSummary": "พบ 3 ปัญหา และร่างรายการแก้ไขตามลำดับความสำคัญแล้ว",
-      "findingsTitle": "พบ {count} ปัญหาที่ควรแก้:",
-      "finding1": "34% ของ spend มาจากคำค้นหาที่ match กว้างเกินไป",
-      "finding2": "แนะนำ negative keywords 23 รายการเพื่อบล็อกการค้นหาที่ไม่เกี่ยวข้อง",
-      "finding3": "ควรแยก ad group 4 กลุ่มก่อนเพิ่มงบ",
+      "platformToggleLabel": "ดูตัวอย่างบน",
+      "platformGoogle": "Google Ads",
+      "platformMeta": "Meta Ads",
       "permission1": "NotFair ต้องการรัน",
-      "permission2": "เพื่อใช้ negatives 23 รายการ และแก้ keyword 80 รายการ",
       "approve": "อนุมัติ",
       "approveOnce": "อนุมัติครั้งเดียว",
       "deny": "ปฏิเสธ",
       "placeholder": "ถามว่าควรแก้อะไรต่อ",
-      "demo": "เดโม"
+      "demo": "เดโม",
+      "findingsTitle": "พบ {count} ปัญหาที่ควรแก้:",
+      "foundSummary": "พบ 3 ปัญหา และร่างรายการแก้ไขตามลำดับความสำคัญแล้ว",
+      "google": {
+        "mcpBadge": "NotFair · Google Ads MCP",
+        "initialQuestion": "ทำไมต้นทุนลีดแพงขึ้น และควรแก้อะไร?",
+        "followUpQuestion": "ใช้ negative keywords และการแก้ไข keyword ที่อนุมัติแล้ว",
+        "intro": "ฉันจะตรวจ spend, search terms, โครงสร้าง และการเปลี่ยนแปลงล่าสุดก่อนแนะนำวิธีแก้",
+        "tool1Name": "getSearchTermReport",
+        "tool1Args": "30 วันล่าสุด",
+        "tool2Name": "getKeywords",
+        "tool2Args": "คุณภาพ + ต้นทุน",
+        "finding1": "34% ของ spend มาจากคำค้นหาที่ match กว้างเกินไป",
+        "finding2": "แนะนำ negative keywords 23 รายการเพื่อบล็อกการค้นหาที่ไม่เกี่ยวข้อง",
+        "finding3": "ควรแยก ad group 4 กลุ่มก่อนเพิ่มงบ",
+        "permissionAction": "applyRecommendedFixes",
+        "permission2": "เพื่อใช้ negatives 23 รายการ และแก้ keyword 80 รายการ"
+      },
+      "meta": {
+        "mcpBadge": "NotFair · Meta Ads MCP",
+        "initialQuestion": "ทำไม CPA โฆษณา Meta ของฉันสูงขึ้น และควรแก้อะไร?",
+        "followUpQuestion": "ใช้การพักโฆษณาและการย้ายงบที่อนุมัติแล้ว",
+        "intro": "ฉันจะตรวจ spend, audience overlap, learning phase และ creative fatigue ก่อนแนะนำวิธีแก้",
+        "tool1Name": "getInsights",
+        "tool1Args": "30 วันล่าสุด · breakdowns",
+        "tool2Name": "listAdSets",
+        "tool2Args": "สถานะ + ROAS",
+        "finding1": "ad set 2 ชุดติด learning อยู่ ใช้งบไป 28% ของ spend",
+        "finding2": "audience 3 คู่ทับซ้อนกัน และประมูลแข่งกันเอง",
+        "finding3": "creative 5 ชิ้นที่ frequency 4x+ ต้องการตัวใหม่",
+        "permissionAction": "applyMetaFixes",
+        "permission2": "เพื่อพัก ad set 2 ชุด และย้ายงบ $480/วันไปยังตัวที่ทำงานดีที่สุด"
+      }
     },
     "engineTitle": "เครื่องมือการตลาดครบชุดอยู่ใน agent ของคุณ",
     "engineBody": "การวินิจฉัย คำแนะนำการแก้ไข การเขียน และการย้อนกลับ — ทั้งหมดผ่านการเชื่อมต่อ MCP หนึ่งรายการต่อบัญชีโฆษณา",
@@ -79,7 +105,7 @@
     "faq": [
       {
         "q": "NotFair จะเปลี่ยนบัญชีโดยไม่ขออนุมัติไหม?",
-        "a": "ไม่ NotFair อ่านบัญชีได้ แต่เครื่องมือที่เขียนข้อมูลจะแสดง diff ก่อนเสมอ คุณต้องยืนยันก่อนส่งไปยัง Google Ads และทุกการเปลี่ยนแปลงย้อนกลับได้ด้วย tool call เดียว"
+        "a": "ไม่ NotFair อ่านบัญชีได้ แต่เครื่องมือที่เขียนข้อมูลจะแสดง diff ก่อนเสมอ คุณต้องยืนยันก่อนส่งไปยัง Google Ads หรือ Meta Ads และทุกการเปลี่ยนแปลงย้อนกลับได้ด้วย tool call เดียว"
       },
       {
         "q": "ใช้กับ AI client อะไรได้บ้าง?",
@@ -91,7 +117,7 @@
       },
       {
         "q": "agent เปลี่ยนอะไรได้จริงบ้าง?",
-        "a": "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts และ reporting workflows บน Google Ads ทุกการเขียนต้องผ่านการอนุมัติและถูกบันทึกไว้"
+        "a": "บน Google Ads: keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts และ reporting workflows บน Meta Ads: campaigns, ad sets, ads, budgets, schedules และสถานะ creative ครอบคลุม Facebook + Instagram ทุกการเขียนต้องผ่านการอนุมัติและถูกบันทึกไว้"
       },
       {
         "q": "การยืนยันตัวตนทำงานอย่างไร?",
@@ -281,7 +307,7 @@
   "McpSetupHero": {
     "headlinePrefix": "เปลี่ยน",
     "headlineSuffix": "ให้เป็นเครื่องมือการตลาดของคุณ",
-    "intro": "เชื่อมต่อ NotFair กับ Claude, OpenClaw, Codex, Cursor หรือ Hermes แล้วจัดการ Google Ads จากแชต: วิเคราะห์ปัญหา ร่างวิธีแก้ และอนุมัติทุกการเขียนก่อนดำเนินการ",
+    "intro": "เชื่อมต่อ NotFair กับ Claude, OpenClaw, Codex, Cursor หรือ Hermes แล้วจัดการ Google Ads หรือ Meta Ads จากแชต: วิเคราะห์ปัญหา ร่างวิธีแก้ และอนุมัติทุกการเขียนก่อนดำเนินการ",
     "tryPrompt": "ตรวจสอบบัญชี Google Ads ของฉันและจัดอันดับวิธีแก้ตามผลกระทบ",
     "copyField": {
       "copy": "คัดลอก",
@@ -509,7 +535,7 @@
           "ใช้งานทุกฟีเจอร์ไม่จำกัด 7 วัน",
           "จากนั้น 300 MCP operations/เดือน ฟรีตลอดไป",
           "ไม่ต้องใช้บัตรเครดิต",
-          "เชื่อมต่อ Google Ads กับ Claude, Cursor และไคลเอนต์ MCP ใดก็ได้",
+          "เชื่อมต่อ Google Ads + Meta Ads กับ Claude, Cursor และไคลเอนต์ MCP ใดก็ได้",
           "วิเคราะห์ปัญหาบัญชีและร่างการเปลี่ยนแปลงแคมเปญ",
           "ดูการแก้ไข bid, budget, keyword, audience และ ad ก่อนอนุมัติ",
           "ซัพพอร์ตจากชุมชน"
@@ -530,8 +556,8 @@
         "scheduledCancel": "กำหนดยกเลิกแล้ว",
         "renews": "ต่ออายุ {interval} วันที่ {date}",
         "headlineFeatures": [
-          "Google Ads operations ไม่จำกัด",
-          "บัญชี Google Ads ไม่จำกัด",
+          "Google + Meta Ads operations ไม่จำกัด",
+          "บัญชี Google + Meta Ads ไม่จำกัด",
           "เวิร์กโฟลว์แบบกลุ่ม: คีย์เวิร์ด โฆษณา งบประมาณ สคริปต์",
           "ประวัติการเปลี่ยนแปลงครบถ้วนและ undo ด้วยคำสั่งเดียว",
           "ซัพพอร์ตอีเมลแบบสำคัญ"

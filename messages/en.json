@@ -38,10 +38,10 @@
     "viewAudit": "Open account"
   },
   "Home": {
-    "githubBanner": "Diagnose and fix Google Ads from Claude - approval-gated writes, live on GitHub",
-    "eyebrow": "AI Google Ads strategist + execution layer",
+    "githubBanner": "Diagnose and fix Google + Meta Ads from Claude - approval-gated writes, live on GitHub",
+    "eyebrow": "AI Google + Meta Ads strategist + execution layer",
     "headline": "Manage ads right from ChatGPT and Claude.",
-    "subhead": "NotFair gives Claude live Google Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.",
+    "subhead": "NotFair gives Claude live Google Ads and Meta Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.",
     "blogCta": "Read the blog",
     "trustItems": [
       "Diagnose issues",
@@ -49,21 +49,47 @@
       "Approve every write"
     ],
     "chat": {
-      "initialQuestion": "Why did leads get more expensive, and what should I fix?",
-      "followUpQuestion": "Apply the approved negative and keyword changes.",
-      "intro": "I'll inspect spend, search terms, structure, and recent changes before recommending fixes.",
-      "foundSummary": "Found 3 issues and drafted a prioritized fix list",
-      "findingsTitle": "Found {count} issues to fix:",
-      "finding1": "34% of spend is coming from loose-match queries",
-      "finding2": "23 negatives recommended to block mismatched searches",
-      "finding3": "4 ad groups should be split before budget increases",
+      "platformToggleLabel": "See it on",
+      "platformGoogle": "Google Ads",
+      "platformMeta": "Meta Ads",
       "permission1": "NotFair wants to run",
-      "permission2": "to apply 23 negatives and 80 keyword edits",
       "approve": "Approve",
       "approveOnce": "Approve once",
       "deny": "Deny",
       "placeholder": "Ask what to fix next",
-      "demo": "demo"
+      "demo": "demo",
+      "findingsTitle": "Found {count} issues to fix:",
+      "foundSummary": "Found 3 issues and drafted a prioritized fix list",
+      "google": {
+        "mcpBadge": "NotFair · Google Ads MCP",
+        "initialQuestion": "Why did leads get more expensive, and what should I fix?",
+        "followUpQuestion": "Apply the approved negative and keyword changes.",
+        "intro": "I'll inspect spend, search terms, structure, and recent changes before recommending fixes.",
+        "tool1Name": "getSearchTermReport",
+        "tool1Args": "last 30d",
+        "tool2Name": "getKeywords",
+        "tool2Args": "quality + cost",
+        "finding1": "34% of spend is coming from loose-match queries",
+        "finding2": "23 negatives recommended to block mismatched searches",
+        "finding3": "4 ad groups should be split before budget increases",
+        "permissionAction": "applyRecommendedFixes",
+        "permission2": "to apply 23 negatives and 80 keyword edits"
+      },
+      "meta": {
+        "mcpBadge": "NotFair · Meta Ads MCP",
+        "initialQuestion": "Why is CPA climbing on my Meta ads, and what should I fix?",
+        "followUpQuestion": "Apply the approved pauses and budget shifts.",
+        "intro": "I'll inspect spend, audience overlap, learning phase, and creative fatigue before recommending fixes.",
+        "tool1Name": "getInsights",
+        "tool1Args": "last 30d · breakdowns",
+        "tool2Name": "listAdSets",
+        "tool2Args": "status + ROAS",
+        "finding1": "2 ad sets stuck in learning are burning 28% of spend",
+        "finding2": "3 audiences overlap and bid against each other",
+        "finding3": "5 creatives at 4x+ frequency need fresh variants",
+        "permissionAction": "applyMetaFixes",
+        "permission2": "to pause 2 ad sets and shift $480/day to top performers"
+      }
     },
     "engineTitle": "A Complete Marketing Engine Inside Your Agent",
     "engineBody": "Diagnostics, recommended fixes, writes, and undo - all driven by one MCP connection per ad account.",
@@ -79,7 +105,7 @@
     "faq": [
       {
         "q": "Will NotFair make changes without my approval?",
-        "a": "No. NotFair can read your account freely, but every write tool surfaces a diff first. You confirm before anything hits Google Ads - and any change is reversible with a single tool call."
+        "a": "No. NotFair can read your account freely, but every write tool surfaces a diff first. You confirm before anything hits Google Ads or Meta Ads - and any change is reversible with a single tool call."
       },
       {
         "q": "Which AI clients does this work with?",
@@ -91,7 +117,7 @@
       },
       {
         "q": "What can the agent actually change?",
-        "a": "Keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts, and reporting workflows - all on Google Ads. Every write is approval-gated and logged."
+        "a": "On Google Ads: keywords, negatives, bids, budgets, ads, ad groups, campaign settings, audiences, scripts, and reporting workflows. On Meta Ads: campaigns, ad sets, ads, budgets, schedules, and creative status across Facebook + Instagram inventory. Every write is approval-gated and logged."
       },
       {
         "q": "How does authentication work?",
@@ -281,7 +307,7 @@
   "McpSetupHero": {
     "headlinePrefix": "Turn",
     "headlineSuffix": "Into Your Marketing Engine",
-    "intro": "Connect NotFair to Claude, OpenClaw, Codex, Cursor, or Hermes and operate Google Ads from a chat - diagnose, draft fixes, and approve every write.",
+    "intro": "Connect NotFair to Claude, OpenClaw, Codex, Cursor, or Hermes and operate Google Ads or Meta Ads from a chat - diagnose, draft fixes, and approve every write.",
     "tryPrompt": "Audit my Google Ads account and rank fixes by impact.",
     "copyField": {
       "copy": "Copy",
@@ -509,7 +535,7 @@
           "7 days of unlimited access - every feature, no caps",
           "Then 300 MCP operations/mo, free forever",
           "No credit card required",
-          "Connect Google Ads to Claude, Cursor, and any MCP client",
+          "Connect Google Ads + Meta Ads to Claude, Cursor, and any MCP client",
           "Diagnose account issues and draft campaign changes",
           "Preview bid, budget, keyword, audience, and ad edits before approval",
           "Community support"
@@ -530,8 +556,8 @@
         "scheduledCancel": "Scheduled cancel",
         "renews": "Renews {interval} on {date}",
         "headlineFeatures": [
-          "Unlimited Google Ads operations",
-          "Unlimited Google Ads accounts",
+          "Unlimited Google + Meta Ads operations",
+          "Unlimited Google + Meta Ads accounts",
           "Bulk workflows - keywords, ads, budgets, scripts",
           "Full change history & one-call undo",
           "Priority email support"
@@ -1085,29 +1111,29 @@
       "referenceSuffix": ".",
       "items": [
         {
-          "name": "listCampaigns",
+          "name": "runScript",
           "category": "read",
-          "description": "Pull live campaign performance, spend, and status"
+          "description": "Sandboxed JS with GAQL fan-out — every analytical read (campaigns, search terms, performance) goes through this one tool"
         },
         {
-          "name": "getKeywords",
+          "name": "listKeywords",
           "category": "read",
           "description": "Inspect keyword bids, Quality Scores, and impressions"
         },
         {
-          "name": "getSearchTermReport",
+          "name": "getChanges",
           "category": "read",
-          "description": "Find irrelevant queries, weak match types, and budget leaks"
+          "description": "NotFair's own change log — every Claude-applied write, undoable with one call"
         },
         {
-          "name": "getCampaignPerformance",
+          "name": "getRecommendations",
           "category": "read",
-          "description": "Deep-dive into campaign metrics over any date range"
+          "description": "Google's optimization suggestions with estimated impact"
         },
         {
-          "name": "updateBid",
+          "name": "bulkUpdateBids",
           "category": "write",
-          "description": "Adjust a keyword bid — reviewable before it applies"
+          "description": "Adjust keyword bids in bulk — reviewable before they apply"
         },
         {
           "name": "pauseCampaign",
@@ -1115,7 +1141,7 @@
           "description": "Pause an underperforming campaign through Claude"
         },
         {
-          "name": "addNegativeKeyword",
+          "name": "addKeywordToNegativeList",
           "category": "write",
           "description": "Block a wasted search term at the campaign or account level"
         },
