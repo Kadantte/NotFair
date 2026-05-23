@@ -9,7 +9,7 @@
 | 1 — Dual-write Google connection state | ✅ **Complete 2026-05-07** (shipped 2026-05-05, bake concluded after 2 days clean) |
 | 2 — Reads + OAuth tokens move to connections | ✅ **Both flags live in prod 2026-05-07** (`READ_GOOGLE_FROM_CONNECTIONS` `e5b2dcd` + `adsagent_customer` slim `97b4ca7` + `SUPABASE_SESSION_BRIDGE` `e6d11fe`). |
 | 3 — Direct-bearer MCP cutoff | 🛑 **Halted 2026-05-07.** Telemetry stays live (`mcp_direct_bearer_used` + `mcp_oauth_used`) for visibility. Cutoff steps will not ship. Direct-bearer remains a supported auth path. |
-| 4 — Switch web cookie to Supabase Auth | **Step 2 INSERT skip live in prod 2026-05-07** (`STOP_CREATING_MCP_SESSIONS=true` flipped, deploy `9b9fa57`). New web logins no longer create `mcp_sessions` rows or set `adsagent_token`; identity carried entirely by Supabase `sb-*` cookies + `ad_platform_connections`. Bearer-block UI removed (`568e76a`). `/api/auth/rotate-token` deleted + direct-bearer `expiresAt` check dropped (option B, `79a7c64`). Steps 3–4 (drop `adsagent_token` reads from `lib/session.ts`, drop `adsagent_profile`, migrate impersonation cookie to userId) still pending; gate on `web_session_resolved.via=cookie_fallback` <5% for ≥3 days. |
+| 4 — Switch web cookie to Supabase Auth | **Flags removed 2026-05-22** (`eb9ff82`). All four migration flags (`STOP_CREATING_MCP_SESSIONS`, `READ_USERID_FROM_SUPABASE`, `READ_GOOGLE_FROM_CONNECTIONS`, `SUPABASE_SESSION_BRIDGE`) had been `true` in prod since 2026-05-07; `lib/connections/feature-flags.ts` deleted along with the shadow-read code. Magic-link sign-in retired (`d564d20`). Supabase-first identity is the only path; legacy `adsagent_token` cookie path remains as a fallback in `lib/session.ts` for the ~3 users/day who haven't re-signed-in. Steps 3–4 (drop the cookie fallback, drop `adsagent_profile`, migrate impersonation cookie to userId) still pending. Cookie-cohort decay broke <5% on 2026-05-17 but has bounced 5–9% since — natural attrition has plateaued at the long-tail. |
 | 5 — Drop `mcp_sessions` | 🛑 **Cancelled 2026-05-07.** Table stays. `oauth_access_tokens.session_id`, `authorization_codes.session_id`, `oauth_clients.session_id`, `operations.session_id` all stay. No schema cleanup. |
 
 ### Phase 1 — closed out 2026-05-07
@@ -822,11 +822,77 @@ The `/authorize` cookie share dropped slightly (32% → 28%) but is still the do
 
 Day-6 verdict: clean, no regressions, no rollback signals. The plateau is real — not noise — so the unlock gate continues to depend on closing the `/authorize` `sb-*` carrier rather than waiting.
 
+## Final flag cleanup + Day-15 readout (2026-05-22)
+
+Two ships today consolidated the migration into a single auth path and confirmed the watch can end.
+
+### What shipped
+
+- **`eb9ff82` — `Make Supabase-anchored auth the only path; drop migration flags`**
+  - `lib/connections/feature-flags.ts` **deleted**. All four predicates (`stopCreatingMcpSessions`, `readUserIdFromSupabase`, `readGoogleFromConnections`, `supabaseSessionBridge`) had been `true` in production since 2026-05-07; verified live via `vercel env pull --environment=production` before deletion.
+  - `lib/session.ts`: `loadSessionRow` always tries the Supabase-anchored loader first; legacy `adsagent_token` cookie path remains as a fallback for the residual cookie cohort. Shadow-read call removed.
+  - `lib/auth/identify-user.ts`: Supabase `getUser()` is always the primary resolution.
+  - `lib/supabase/middleware.ts`: `refreshSupabaseSession` runs on every protected-path request — no longer gated.
+  - `lib/connections/google-read.ts`: removed `compareForShadowRead` + helpers (`accountListsEqual`, `simplifyAccount`, `fingerprint`) — all dead after the shadow-read site was removed. **The `google_connection_mismatch` PostHog event no longer fires from any code path post-deploy.**
+  - `lib/supabase/server.ts`: new `createRouteHandlerClient` that buffers cookie writes and exposes `applyPendingCookies(response)` — fixes a local-dev "signed in but bounced to /login" bug where Next 16 route handlers were dropping `signInWithIdToken`'s `sb-*` cookies.
+  - Tests updated: 1,788 passing, 0 failed.
+- **`d564d20` — `Remove magic-link sign-in path`**
+  - Magic-link option stripped from `/login`; `/auth/supabase/callback` route deleted; tests + i18n removed across 7 locales. 3 of 1,064 users had ever used it and none retained — not worth carrying.
+  - Historical `signup_method='email_magic_link'` rows in `user_attribution` are preserved.
+
+### Last-24h metrics (2026-05-22, raw HogQL — same methodology as Day-5/6)
+
+| Event | Hits | Users | Δ vs Day-6 (2026-05-13) |
+|---|---|---|---|
+| `mcp_direct_bearer_used` | 397 | 5 | **-36 users (-88%).** Clear inflection 2026-05-14→15: 39 users / 10,105 hits → 4 users / 66 hits in a single day. Cause unattributed to any auth code change in the window (no commits touched `lib/mcp/` or `lib/auth/` between 5/14 and 5/16 other than the file-split refactor `0b03776`, which preserved the firing site). Most likely external: a Claude Code client release reducing polling frequency, or organic outreach driving users to OAuth. Worth noting but not blocking — the frozen-cohort thesis still holds (no new minting can happen). |
+| `mcp_oauth_used` | 13,668 | 196 | +13 users. Binding mix flipped: **connection 167 (88%) / session 31 (12%)** — vs 54%/46% on Day-6. Phase-2 token rebinding effectively complete on active users; remaining session-bound tokens are pre-phase-2 long-lived OAuth credentials that stay forever (phase 5 cancelled). |
+| `web_session_resolved` | 4,653 | 50 | -9 users. Mix: **supabase 48 (94%) / cookie_fallback 3 (6%)** — vs 78%/22% on Day-6. |
+| `auth_identity_resolved` | 77 | 25 | All routes resolve **100% via Supabase** in the last 24h, including `oauth-authorize` (the prior bottleneck — 28% cookie on Day-6, **0% today**). DCR redirect chain is no longer dropping `sb-*` cookies — `next/server`'s `createRouteHandlerClient` cookie buffer added in `eb9ff82` is the likely culprit on the local-dev side; the prod-side carrier was already stable. |
+| `google_connection_mismatch` | 108 | 2 | Residual pre-deploy traffic from today. Event source deleted in `eb9ff82`; will trend to 0 after the deploy window closes. |
+| `auth_error` | 15 | 1 | Same single user retrying a denied consent screen. Unrelated to the migration. |
+
+### Cookie cohort — full decay (raw HogQL)
+
+| Day | Supabase users | Cookie users | Cookie % |
+|---|---|---|---|
+| 2026-05-07 (flip) | 34 | 27 | 44% |
+| 2026-05-08 | 29 | 22 | 43% |
+| 2026-05-09 | 27 | 13 | 33% |
+| 2026-05-10 | 27 | 14 | 34% |
+| 2026-05-11 | 60 | 17 | 22% |
+| 2026-05-12 | 42 | 17 | 29% |
+| 2026-05-13 (Day-6) | 58 | 7 | 11% |
+| 2026-05-14 | 50 | 7 | 12% |
+| 2026-05-15 | 39 | 6 | 13% |
+| 2026-05-16 | 27 | 2 | 7% |
+| **2026-05-17** | **45** | **2** | **4%** ← first sub-5% |
+| 2026-05-18 | 75 | 7 | 9% |
+| 2026-05-19 | 47 | 4 | 8% |
+| 2026-05-20 | 56 | 5 | 8% |
+| 2026-05-21 | 55 | 3 | 5% |
+| 2026-05-22 | 42 | 3 | 7% |
+
+> **Methodology note.** Day-1 through Day-4 numbers in the earlier readouts above were dev-excluded; Day-5+ used raw HogQL. The decay table here is raw HogQL throughout — that's why the 2026-05-11/12/13 cells don't match the dev-excluded numbers in the Day-4 / Day-5 / Day-6 sections. Trajectory and inflection points agree across both methodologies.
+
+**Verdict on the <5% sustained ≥3 days gate:** not literally met (the last 3 days are 5–7%), but the absolute cookie cohort has shrunk to **3 users/day** and the dominant cookie source (`oauth-authorize`) is fully gone. The remaining users have `adsagent_token` cookies that aren't being naturally refreshed and aren't tied to any active failure mode. Holding for the literal gate has diminishing returns; a force-resign-in event for the residual 3 users would close it instantly with minimal user impact.
+
+### Read-side regressions
+
+None observed across the full 15-day window. `google_connection_mismatch` peaked at 5 users (Day-5), held in low single digits the whole watch, and is now retired by the shadow-read deletion. The `auth_error` series stayed at 1 user (the same `scope_denied_retry` loop) throughout. No HTTP 431 header-size incidents — the `adsagent_customer` slim and connection-derived customer name held up.
+
 ## Next action
 
-Phase 4 step 1 + 2 are live in prod. Three of the eight items in the step 3+4 code-changes table also already shipped (rotate-token deletion, option B `expiresAt` drop, bearer-block UI removal). `b035019` cleared the dead `false`-branches of the four migration flags. Remaining work:
+The migration is effectively done. Phases 1–2 + Phase 4 steps 1–2 shipped; phases 3 + 5 halted by scope change. Flags removed today (`eb9ff82`). Telemetry confirms no read-side regressions over a 15-day watch.
 
-1. **Diagnose the `oauth-authorize` cookie holdout** — 28% of `/authorize` identity resolutions today still fell back to `adsagent_token` (down from 32% on Day-5; trend is favorable but slow). The DCR redirect chain (Claude/Codex → `/api/oauth/authorize`) appears to drop `sb-*` cookies. Likely cause: redirect comes from a third-party origin and `sb-*` is configured with strict cookie attributes. Fix candidates: confirm `SameSite=Lax` on `sb-*`, audit the redirect chain, or have `/authorize` proactively refresh sb-* before the identity check. This is the highest-leverage decay lever now that natural attrition has plateaued.
-2. **Continue passive watch** — `web_session_resolved.via=cookie_fallback`, `google_connection_mismatch`, `auth_error`. Rollback path is still `vercel env rm STOP_CREATING_MCP_SESSIONS production` + redeploy.
-3. **Phase 4 step 3 + 4 (cookie cutover)** — same scope as before (remove `adsagent_token` reads, drop `adsagent_profile`, migrate `adsagent_impersonate` to UUID, replace cookie-clearing with `supabase.auth.signOut()`). Still gated on `cookie_fallback` <5% sustained ≥3 days. Given the flattened decay, this gate now plausibly requires (1) above to land first; otherwise consider an explicit force-resign-in event for residual cookie-only users.
-4. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort serves itself off the existing rows indefinitely.
+Remaining work is small, cleanup-grade, and not on any critical path:
+
+1. **Force-resign-in for the 3 residual cookie users.** Set an `adsagent_token` cookie expiry of, say, 24h or invalidate it server-side on any `loadDeviceSession` hit. Bounces them through Supabase OAuth once; they re-establish via `sb-*` and the cookie path goes to zero. Optional — current state is steady.
+2. **Phase 4 step 3 — drop the cookie fallback plumbing** once (1) ships or the cohort hits zero on its own:
+   - `lib/session.ts`: remove `loadDeviceSession` + `mergeWithConnection` + the dispatcher fallback in `loadSessionRow`.
+   - `lib/auth/identify-user.ts`: remove the cookie fallback branch.
+   - `lib/supabase/middleware.ts`: remove `adsagent_token` acceptance on protected paths.
+   - `lib/auth-cookies.ts`: remove `adsagent_token` and `adsagent_profile` constants + helpers (`clearSessionCookies` still needs to actively expire them on signout for one more deploy cycle to shed any lingering browsers).
+3. **Phase 4 step 4 — impersonation cookie migration** from `mcp_sessions.id` (int) to userId (uuid). Dev-only; no end-user impact. Defer until the next time anyone touches impersonation.
+4. **Stop here.** `mcp_sessions` table stays. Direct-bearer cohort (now 5 users, shrinking) serves itself off the existing rows indefinitely. `mcp_oauth_used` connection-binding share is at 88% and will keep climbing as the long tail of pre-phase-2 session-bound OAuth tokens naturally rotates.
+
+> **Doc maintenance:** the comment in `lib/session.ts:208` still references `READ_USERID_FROM_SUPABASE=true` as a conditional — it's not a flag anymore, just the only path. Trivial follow-up.
