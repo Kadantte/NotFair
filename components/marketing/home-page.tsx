@@ -431,14 +431,9 @@ export function HomePage({
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-[#3D3C36] px-4 pb-20 pt-6 sm:pb-24 sm:pt-8">
+      <section className="relative overflow-hidden border-b border-[#3D3C36] px-4 pb-20 pt-3 sm:pb-24 sm:pt-4">
         <div className="container mx-auto max-w-6xl">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mb-6 flex justify-center sm:mb-8"
-          >
+          <div className="mb-3 flex justify-center sm:mb-4">
             <a
               href="https://github.com/nowork-studio/toprank"
               target="_blank"
@@ -463,7 +458,7 @@ export function HomePage({
               </span>
               <GitHubStarBadge stars={githubStars} />
             </a>
-          </motion.div>
+          </div>
 
           <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
             <div className="text-center lg:text-left">
