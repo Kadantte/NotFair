@@ -16,7 +16,7 @@ import { FREE_MONTHLY_OP_LIMIT } from "@/lib/free-quota";
  */
 
 const FROM = "NotFair <alert@updates.notfair.co>";
-const REPLY_TO = "hello@notfair.co";
+const REPLY_TO = "tong@notfair.co";
 const UPGRADE_URL = "https://notfair.co/pricing";
 
 export interface TrialEndEmailContent {
@@ -25,11 +25,24 @@ export interface TrialEndEmailContent {
   text: string;
 }
 
-export function buildTrialEndEmail(): TrialEndEmailContent {
+export interface BuildTrialEndEmailOptions {
+  /** Recipient's first name for personalized greeting. Null → generic "Hey there,". */
+  firstName?: string | null;
+}
+
+export function buildTrialEndEmail(opts: BuildTrialEndEmailOptions = {}): TrialEndEmailContent {
   const subject = "Your NotFair trial just ended";
 
+  // Greeting personalization: prefer first name if we have it, fall back
+  // to "Hey there," (avoid awkward "Hey ," empty-string artifacts).
+  const safeFirstName = opts.firstName?.trim();
+  const greeting = safeFirstName ? `Hey ${safeFirstName},` : "Hey there,";
+  const greetingHtml = safeFirstName
+    ? `Hey ${escapeHtml(safeFirstName)},`
+    : "Hey there,";
+
   const text = [
-    "Hey,",
+    greeting,
     "",
     "Your 7-day NotFair trial just ended. Your account stays active on the Free plan, which includes:",
     "",
@@ -61,7 +74,9 @@ export function buildTrialEndEmail(): TrialEndEmailContent {
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border:1px solid #E5E1D8;border-radius:6px;">
             <tr>
               <td style="padding:32px 32px 8px 32px;">
-                <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#6B6862;">NotFair</div>
+                <div style="font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#6B6862;line-height:1.5;">
+                  NotFair.co &mdash; Google Ads MCP &mdash; Meta Ads MCP
+                </div>
               </td>
             </tr>
             <tr>
@@ -70,7 +85,12 @@ export function buildTrialEndEmail(): TrialEndEmailContent {
               </td>
             </tr>
             <tr>
-              <td style="padding:16px 32px 0 32px;font-size:15px;line-height:1.55;color:#2E2D28;">
+              <td style="padding:8px 32px 0 32px;font-size:15px;line-height:1.55;color:#2E2D28;">
+                ${greetingHtml}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 0 32px;font-size:15px;line-height:1.55;color:#2E2D28;">
                 Your 7-day NotFair trial is up. Your account stays active on the <strong>Free plan</strong>, which gives you:
               </td>
             </tr>
@@ -111,15 +131,22 @@ export function buildTrialEndEmail(): TrialEndEmailContent {
   return { subject, html, text };
 }
 
+export interface SendTrialEndEmailOptions {
+  to: string;
+  /** Optional first name for personalized greeting; passed through to the
+   *  builder. Null/undefined → generic "Hey there," fallback. */
+  firstName?: string | null;
+}
+
 /**
  * POST one email to Resend. Throws on non-2xx; on success returns the
  * Resend message id (caller stamps `trial_end_email_sent_at` only after
  * this resolves, so a Resend outage doesn't permanently mark a user
  * "emailed").
  */
-export async function sendTrialEndEmail(to: string): Promise<string> {
+export async function sendTrialEndEmail(opts: SendTrialEndEmailOptions): Promise<string> {
   const apiKey = getRequiredEnv("RESEND_API_KEY");
-  const { subject, html, text } = buildTrialEndEmail();
+  const { subject, html, text } = buildTrialEndEmail({ firstName: opts.firstName ?? null });
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -129,7 +156,7 @@ export async function sendTrialEndEmail(to: string): Promise<string> {
     },
     body: JSON.stringify({
       from: FROM,
-      to,
+      to: opts.to,
       reply_to: REPLY_TO,
       subject,
       html,

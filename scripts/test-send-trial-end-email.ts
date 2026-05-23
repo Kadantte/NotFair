@@ -39,13 +39,13 @@ function loadEnvLocal() {
 }
 
 const FROM = "NotFair <alert@updates.notfair.co>";
-const REPLY_TO = "hello@notfair.co";
+const REPLY_TO = "tong@notfair.co";
 const UPGRADE_URL = "https://notfair.co/pricing";
 
 function buildEmail() {
   const subject = "Your NotFair trial just ended";
   const text = [
-    "Hey,",
+    "Hey there,",
     "",
     "Your 7-day NotFair trial just ended. Your account stays active on the Free plan, which includes:",
     "",
@@ -68,7 +68,9 @@ function buildEmail() {
       <tr><td align="center" style="padding:32px 16px;">
         <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border:1px solid #E5E1D8;border-radius:6px;">
           <tr><td style="padding:32px 32px 8px 32px;">
-            <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#6B6862;">NotFair · Test send</div>
+            <div style="font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#6B6862;line-height:1.5;">
+              NotFair.co &mdash; Google Ads MCP &mdash; Meta Ads MCP &middot; Test send
+            </div>
           </td></tr>
           <tr><td style="padding:8px 32px 0 32px;"><h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:700;color:#1A1917;">Your trial just ended</h1></td></tr>
           <tr><td style="padding:16px 32px 0 32px;font-size:15px;line-height:1.55;color:#2E2D28;">Your 7-day NotFair trial is up. Your account stays active on the <strong>Free plan</strong>, which gives you:</td></tr>
