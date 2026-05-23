@@ -183,7 +183,7 @@ function HeroMockup({
             <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
             <span className="h-3 w-3 rounded-full bg-[#28C840]" />
           </div>
-          <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5">
+          <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 whitespace-nowrap">
             <span className="flex items-center gap-1.5 text-xs font-medium text-[#C4C0B6]">
               <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
                 <Image
@@ -207,7 +207,7 @@ function HeroMockup({
               role="tab"
               aria-selected={platform === "google"}
               onClick={() => onSelectPlatform("google")}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
                 platform === "google"
                   ? "bg-[#E8E4DD] text-[#1A1917]"
                   : "text-[#C4C0B6] hover:text-[#E8E4DD]"
@@ -220,7 +220,7 @@ function HeroMockup({
               role="tab"
               aria-selected={platform === "meta"}
               onClick={() => onSelectPlatform("meta")}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
                 platform === "meta"
                   ? "bg-[#E8E4DD] text-[#1A1917]"
                   : "text-[#C4C0B6] hover:text-[#E8E4DD]"
@@ -229,6 +229,8 @@ function HeroMockup({
               {t("platformMeta")}
             </button>
             </div>
+            <span aria-hidden="true" className="text-[#5A5852]">·</span>
+            <span className="text-xs font-medium text-[#4CAF6E]">{t("demo")}</span>
           </div>
         </div>
 
