@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -82,10 +81,11 @@ const chatTimeline = [
 
 type StepKey = (typeof chatTimeline)[number]["key"];
 
-function useChatStep(): Set<StepKey> {
+function useChatStep(resetKey: unknown): Set<StepKey> {
   const [reached, setReached] = useState<Set<StepKey>>(new Set());
 
   useEffect(() => {
+    setReached(new Set());
     const timers = chatTimeline.map(({ key, at }) =>
       setTimeout(() => {
         setReached((prev) => {
@@ -97,7 +97,7 @@ function useChatStep(): Set<StepKey> {
       }, at),
     );
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [resetKey]);
 
   return reached;
 }
@@ -159,8 +159,14 @@ function SmoothListItem({ children, delay = 0, className }: { children: ReactNod
 
 type ChatPlatform = "google" | "meta";
 
-function HeroMockup({ platform }: { platform: ChatPlatform }) {
-  const reached = useChatStep();
+function HeroMockup({
+  platform,
+  onSelectPlatform,
+}: {
+  platform: ChatPlatform;
+  onSelectPlatform: (next: ChatPlatform) => void;
+}) {
+  const reached = useChatStep(platform);
   const t = useTranslations("Home.chat");
   const tp = useTranslations(`Home.chat.${platform}`);
   const has = (k: StepKey) => reached.has(k);
@@ -168,12 +174,7 @@ function HeroMockup({ platform }: { platform: ChatPlatform }) {
   const inputText = !sent ? tp("initialQuestion") : has("followUp") ? tp("followUpQuestion") : "";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
-      className="mx-auto w-full max-w-[480px]"
-    >
+    <div className="mx-auto w-full max-w-[480px]">
       <div className="flex h-[650px] flex-col overflow-hidden rounded-[28px] border border-[#3D3C36] bg-[#24231F] shadow-[0_24px_80px_-18px_rgba(0,0,0,0.72)]">
         <div className="relative flex shrink-0 items-center px-4 py-3">
           <div className="flex items-center gap-1.5">
@@ -181,13 +182,37 @@ function HeroMockup({ platform }: { platform: ChatPlatform }) {
             <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
             <span className="h-3 w-3 rounded-full bg-[#28C840]" />
           </div>
-          <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 text-xs font-medium text-[#C4C0B6]">
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
-              <Image src="/claude-icon.svg" alt="" width={10} height={10} className="h-2.5 w-2.5 brightness-0 invert" />
-            </span>
-            <span>Claude + NotFair</span>
-            <span className="text-[#5A5852]">·</span>
-            <span className="text-[#4CAF6E]">{t("demo")}</span>
+          <div
+            role="tablist"
+            aria-label={t("platformToggleLabel")}
+            className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#3D3C36] bg-[#1F1E1A] p-0.5"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={platform === "google"}
+              onClick={() => onSelectPlatform("google")}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                platform === "google"
+                  ? "bg-[#E8E4DD] text-[#1A1917]"
+                  : "text-[#C4C0B6] hover:text-[#E8E4DD]"
+              }`}
+            >
+              {t("platformGoogle")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={platform === "meta"}
+              onClick={() => onSelectPlatform("meta")}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                platform === "meta"
+                  ? "bg-[#E8E4DD] text-[#1A1917]"
+                  : "text-[#C4C0B6] hover:text-[#E8E4DD]"
+              }`}
+            >
+              {t("platformMeta")}
+            </button>
           </div>
         </div>
 
@@ -336,7 +361,7 @@ function HeroMockup({ platform }: { platform: ChatPlatform }) {
             </div>
           </div>
         </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -421,12 +446,7 @@ export function HomePage({
           </motion.div>
 
           <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-center lg:text-left"
-            >
+            <div className="text-center lg:text-left">
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-[#4CAF6E]">
                 {t("eyebrow")}
               </p>
@@ -485,43 +505,12 @@ export function HomePage({
                   ))}
                 </div>
               </div>
-            </motion.div>
-
-            <div className="flex flex-col items-center gap-3">
-              <div
-                role="tablist"
-                aria-label={tChat("platformToggleLabel")}
-                className="inline-flex rounded-full border border-[#3D3C36] bg-[#24231F] p-1"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={chatPlatform === "google"}
-                  onClick={() => selectChatPlatform("google")}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                    chatPlatform === "google"
-                      ? "bg-[#E8E4DD] text-[#1A1917]"
-                      : "text-[#C4C0B6] hover:text-[#E8E4DD]"
-                  }`}
-                >
-                  {tChat("platformGoogle")}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={chatPlatform === "meta"}
-                  onClick={() => selectChatPlatform("meta")}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                    chatPlatform === "meta"
-                      ? "bg-[#E8E4DD] text-[#1A1917]"
-                      : "text-[#C4C0B6] hover:text-[#E8E4DD]"
-                  }`}
-                >
-                  {tChat("platformMeta")}
-                </button>
-              </div>
-              <HeroMockup key={chatPlatform} platform={chatPlatform} />
             </div>
+
+            <HeroMockup
+              platform={chatPlatform}
+              onSelectPlatform={selectChatPlatform}
+            />
           </div>
         </div>
       </section>
