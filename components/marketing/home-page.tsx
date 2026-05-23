@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -182,11 +183,25 @@ function HeroMockup({
             <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
             <span className="h-3 w-3 rounded-full bg-[#28C840]" />
           </div>
-          <div
-            role="tablist"
-            aria-label={t("platformToggleLabel")}
-            className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#3D3C36] bg-[#1F1E1A] p-0.5"
-          >
+          <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-[#C4C0B6]">
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-[#D97757]">
+                <Image
+                  src="/claude-icon.svg"
+                  alt=""
+                  width={10}
+                  height={10}
+                  className="h-2.5 w-2.5 brightness-0 invert"
+                />
+              </span>
+              Claude
+            </span>
+            <span aria-hidden="true" className="text-[#5A5852]">·</span>
+            <div
+              role="tablist"
+              aria-label={t("platformToggleLabel")}
+              className="inline-flex rounded-full border border-[#3D3C36] bg-[#1F1E1A] p-0.5"
+            >
             <button
               type="button"
               role="tab"
@@ -213,6 +228,7 @@ function HeroMockup({
             >
               {t("platformMeta")}
             </button>
+            </div>
           </div>
         </div>
 
