@@ -458,7 +458,17 @@ export function HomePage({
                 <span className="block">{t("headlineSuffix")}</span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#C4C0B6] lg:mx-0">
-                {t("subhead")}
+                {t.rich("subhead", {
+                  google: (chunks) => (
+                    <span className="font-semibold text-[#4CAF6E]">{chunks}</span>
+                  ),
+                  meta: (chunks) => (
+                    <span className="font-semibold text-[#5B9DF8]">{chunks}</span>
+                  ),
+                  mcp: (chunks) => (
+                    <span className="font-semibold text-[#E8B931]">{chunks}</span>
+                  ),
+                })}
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
