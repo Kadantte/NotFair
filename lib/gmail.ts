@@ -2,14 +2,57 @@ import "server-only";
 import { google, gmail_v1 } from "googleapis";
 
 const USER_ID = "me";
+const GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.compose"];
+
+type ServiceAccountJson = {
+  client_email?: string;
+  private_key?: string;
+};
+
+function parseServiceAccount(): ServiceAccountJson | null {
+  const raw = process.env.GMAIL_SERVICE_ACCOUNT_JSON;
+  if (!raw) return null;
+  try {
+    const decoded = raw.trim().startsWith("{")
+      ? raw
+      : Buffer.from(raw, "base64").toString("utf8");
+    return JSON.parse(decoded) as ServiceAccountJson;
+  } catch (error) {
+    throw new Error(
+      `GMAIL_SERVICE_ACCOUNT_JSON must be raw JSON or base64-encoded JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function getImpersonatedUser(): string {
+  const subject = process.env.GMAIL_IMPERSONATE_USER?.trim();
+  if (!subject) {
+    throw new Error("GMAIL_IMPERSONATE_USER is required when using GMAIL_SERVICE_ACCOUNT_JSON");
+  }
+  return subject;
+}
 
 function getClient(): gmail_v1.Gmail {
+  const serviceAccount = parseServiceAccount();
+  if (serviceAccount) {
+    if (!serviceAccount.client_email || !serviceAccount.private_key) {
+      throw new Error("GMAIL_SERVICE_ACCOUNT_JSON is missing client_email or private_key");
+    }
+    const auth = new google.auth.JWT({
+      email: serviceAccount.client_email,
+      key: serviceAccount.private_key,
+      scopes: GMAIL_SCOPES,
+      subject: getImpersonatedUser(),
+    });
+    return google.gmail({ version: "v1", auth });
+  }
+
   const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
   if (!clientId || !clientSecret || !refreshToken) {
     throw new Error(
-      "Gmail not configured. Set GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN via `npx tsx scripts/gmail-auth.ts`.",
+      "Gmail not configured. Set GMAIL_SERVICE_ACCOUNT_JSON + GMAIL_IMPERSONATE_USER, or legacy GMAIL_OAUTH_CLIENT_ID/GMAIL_OAUTH_CLIENT_SECRET/GMAIL_REFRESH_TOKEN.",
     );
   }
   const auth = new google.auth.OAuth2(clientId, clientSecret);
@@ -18,7 +61,7 @@ function getClient(): gmail_v1.Gmail {
 }
 
 export function isGmailConfigured(): boolean {
-  return !!process.env.GMAIL_REFRESH_TOKEN;
+  return !!process.env.GMAIL_SERVICE_ACCOUNT_JSON || !!process.env.GMAIL_REFRESH_TOKEN;
 }
 
 export type GmailMessageSummary = {

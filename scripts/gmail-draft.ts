@@ -1,9 +1,9 @@
 /**
  * Gmail draft helper — list, create, update, delete, send.
  *
- * Uses the same GMAIL_REFRESH_TOKEN set up by scripts/gmail-auth.ts.
- * No gcloud CLI needed — the refresh token is long-lived and mints access
- * tokens on demand.
+ * Prefers GMAIL_SERVICE_ACCOUNT_JSON + GMAIL_IMPERSONATE_USER for Workspace
+ * domain-wide delegation. Falls back to the legacy GMAIL_REFRESH_TOKEN flow set
+ * up by scripts/gmail-auth.ts.
  *
  * Usage:
  *   bunx tsx scripts/gmail-draft.ts list [gmail-query]
@@ -24,17 +24,63 @@ import { loadEnvLocal } from "./_load-env";
 
 loadEnvLocal();
 
-const { GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = process.env;
+const {
+  GMAIL_OAUTH_CLIENT_ID,
+  GMAIL_OAUTH_CLIENT_SECRET,
+  GMAIL_REFRESH_TOKEN,
+  GMAIL_SERVICE_ACCOUNT_JSON,
+  GMAIL_IMPERSONATE_USER,
+} = process.env;
 
-if (!GMAIL_OAUTH_CLIENT_ID || !GMAIL_OAUTH_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
-  console.error("Missing GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET, or GMAIL_REFRESH_TOKEN in .env.local");
-  console.error("Run: bunx tsx scripts/gmail-auth.ts  to set one up.");
-  process.exit(1);
+function parseServiceAccount() {
+  if (!GMAIL_SERVICE_ACCOUNT_JSON) return null;
+  try {
+    const decoded = GMAIL_SERVICE_ACCOUNT_JSON.trim().startsWith("{")
+      ? GMAIL_SERVICE_ACCOUNT_JSON
+      : Buffer.from(GMAIL_SERVICE_ACCOUNT_JSON, "base64").toString("utf8");
+    return JSON.parse(decoded) as { client_email?: string; private_key?: string };
+  } catch (error) {
+    throw new Error(
+      `GMAIL_SERVICE_ACCOUNT_JSON must be raw JSON or base64-encoded JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
-const oauth2 = new google.auth.OAuth2(GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET);
-oauth2.setCredentials({ refresh_token: GMAIL_REFRESH_TOKEN });
-const gmail = google.gmail({ version: "v1", auth: oauth2 });
+function getImpersonatedUser(): string {
+  const subject = GMAIL_IMPERSONATE_USER?.trim();
+  if (!subject) {
+    throw new Error("GMAIL_IMPERSONATE_USER is required when using GMAIL_SERVICE_ACCOUNT_JSON");
+  }
+  return subject;
+}
+
+function gmailClient() {
+  const serviceAccount = parseServiceAccount();
+  if (serviceAccount) {
+    if (!serviceAccount.client_email || !serviceAccount.private_key) {
+      throw new Error("GMAIL_SERVICE_ACCOUNT_JSON is missing client_email or private_key");
+    }
+    const auth = new google.auth.JWT({
+      email: serviceAccount.client_email,
+      key: serviceAccount.private_key,
+      scopes: ["https://www.googleapis.com/auth/gmail.compose"],
+      subject: getImpersonatedUser(),
+    });
+    return google.gmail({ version: "v1", auth });
+  }
+
+  if (!GMAIL_OAUTH_CLIENT_ID || !GMAIL_OAUTH_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+    console.error("Missing Gmail auth. Set GMAIL_SERVICE_ACCOUNT_JSON + GMAIL_IMPERSONATE_USER, or legacy GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN in .env.local");
+    console.error("Legacy OAuth setup: bunx tsx scripts/gmail-auth.ts");
+    process.exit(1);
+  }
+
+  const oauth2 = new google.auth.OAuth2(GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET);
+  oauth2.setCredentials({ refresh_token: GMAIL_REFRESH_TOKEN });
+  return google.gmail({ version: "v1", auth: oauth2 });
+}
+
+const gmail = gmailClient();
 
 function parseFlags(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
