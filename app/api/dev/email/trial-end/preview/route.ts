@@ -18,15 +18,19 @@ export async function GET(request: Request) {
   const denied = await requireDevEmail();
   if (denied) return denied;
 
-  const userId = new URL(request.url).searchParams.get("userId")?.trim();
+  const params = new URL(request.url).searchParams;
+  const userId = params.get("userId")?.trim();
   if (!userId) {
     return Response.json({ error: "userId required" }, { status: 400 });
   }
 
-  // Dashboard is pinned to env=live; the per-row send uses stripeMode() to
-  // match what the cron itself sees. Use stripeMode() here too so preview
-  // and actual send agree.
-  const env = stripeMode();
+  // The dashboard is pinned to env=live and passes it explicitly. Fall back
+  // to stripeMode() only when no env is supplied, so callers without the
+  // override land where the running env's cron would land.
+  const envParam = params.get("env");
+  const env: "test" | "live" = envParam === "test" || envParam === "live"
+    ? envParam
+    : stripeMode();
   const [cand] = await loadTrialEndCandidates({ env, limit: 1, userId });
   if (!cand) {
     return Response.json(

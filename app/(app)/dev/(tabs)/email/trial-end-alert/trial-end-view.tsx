@@ -103,6 +103,7 @@ export function TrialEndView(props: Props) {
                     eligibleCapped={props.eligibleCapped}
                     queuedForLater={queuedForLater}
                     maxPerRun={props.maxPerRun}
+                    env={props.env}
                 />
                 <SentSection sends={props.sends} env={props.env} />
             </div>
@@ -209,11 +210,13 @@ function EligibleSection({
     eligibleCapped,
     queuedForLater,
     maxPerRun,
+    env,
 }: {
     eligible: DashboardEligibleRow[];
     eligibleCapped: boolean;
     queuedForLater: number;
     maxPerRun: number;
+    env: 'test' | 'live';
 }) {
     const router = useRouter();
     const [, startTransition] = useTransition();
@@ -244,9 +247,10 @@ function EligibleSection({
         setRowState((s) => ({ ...s, [userId]: { status: 'loading-preview' } }));
         setPreviewError(null);
         try {
-            const res = await fetch(`/api/dev/email/trial-end/preview?userId=${encodeURIComponent(userId)}`, {
-                credentials: 'include',
-            });
+            const res = await fetch(
+                `/api/dev/email/trial-end/preview?userId=${encodeURIComponent(userId)}&env=${env}`,
+                { credentials: 'include' },
+            );
             // API returns `recipient` (more email-domain natural) but PreviewState
             // uses `email` everywhere else in this component for consistency.
             const body = (await res.json().catch(() => ({}))) as {
@@ -292,7 +296,7 @@ function EligibleSection({
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId }),
+                body: JSON.stringify({ userId, env }),
             });
             const body = (await res.json().catch(() => ({}))) as
                 | { sent: true; email: string; resendId: string }
