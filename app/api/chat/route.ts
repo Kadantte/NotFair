@@ -1,4 +1,5 @@
 import { createAgentUIStream, createUIMessageStreamResponse } from "ai";
+import type { InferUITools, Tool, UIMessage } from "ai";
 import { and, eq } from "drizzle-orm";
 import { createGoogleAdsAgent } from "@/lib/agents/google-ads-agent";
 import { createMetaAdsAgent } from "@/lib/agents/meta-ads-agent";
@@ -6,10 +7,17 @@ import { getAuthContext, getSession } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { upsertThread, saveAllMessages } from "@/lib/db/chat";
 import { getToolPermissions } from "@/lib/tool-permissions";
+import { sanitizeNonEmptyPartMessages } from "@/lib/chat/messages";
+
+type AgentStreamMessage = UIMessage<unknown, never, InferUITools<Record<string, Tool>>>;
 
 export async function POST(request: Request) {
   const payload = await request.json();
-  const messages = payload.messages;
+  const messages = sanitizeNonEmptyPartMessages(payload.messages);
+
+  if (!messages.some((m) => m.role === "user")) {
+    return new Response("Message must contain at least one non-empty user message.", { status: 400 });
+  }
 
   // Use the non-strict getSession so Meta-only users (no Google customerId)
   // can still chat. The route then dispatches on session.activePlatform.
@@ -89,18 +97,20 @@ export async function POST(request: Request) {
   if (threadId) {
     const firstUserMsg = messages.find((m: { role: string }) => m.role === "user");
     const title = firstUserMsg?.parts
-      ?.filter((p: { type: string }) => p.type === "text")
-      ?.map((p: { text: string }) => p.text)
+      ?.filter((p) => p.type === "text")
+      ?.map((p) => p.text)
       ?.join(" ")
       ?.slice(0, 48) || "New chat";
 
     upsertThread({ id: threadId, userId, accountId: threadAccountId, title }).catch(() => {});
   }
 
+  const streamMessages = messages as AgentStreamMessage[];
+
   const stream = await createAgentUIStream({
     agent,
-    uiMessages: messages,
-    originalMessages: messages,
+    uiMessages: streamMessages,
+    originalMessages: streamMessages,
     abortSignal: request.signal,
     onFinish: async ({ messages: finalMessages }) => {
       if (!threadId) return;
