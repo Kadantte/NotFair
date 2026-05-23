@@ -232,17 +232,14 @@ export async function getCustomersData() {
     const customers = mergeCustomerSeeds(legacyCustomers, googleConnections);
 
     const allAccountIds = new Set<string>();
-    const customerEmails = new Set<string>();
     const parsed = customers.map((c) => {
         const accounts = parseCustomerIds(c.customerIds);
         for (const a of accounts) allAccountIds.add(a.id);
-        const emailKey = c.googleEmail?.toLowerCase() ?? null;
-        if (emailKey) customerEmails.add(emailKey);
-        return { ...c, accounts, emailKey };
+        return { ...c, accounts };
     });
     const userIds = [...new Set(parsed.map((c) => c.userId).filter((id): id is string => !!id))];
 
-    const [snapshots, opsCounts, errorCounts30d, contactsByEmail, attributionByUser, usdRates, subscriptionsByUser] = await Promise.all([
+    const [snapshots, opsCounts, errorCounts30d, attributionByUser, usdRates, subscriptionsByUser] = await Promise.all([
         (async () => {
             const map = new Map<string, { dailyBudget: number | null; activeCampaigns: number | null; currencyCode: string | null; lastSyncedAt: Date | null }>();
             if (allAccountIds.size > 0) {
@@ -303,30 +300,6 @@ export async function getCustomersData() {
                 for (const { accountId, calls, errorsCount } of rows) {
                     map.set(accountId, { calls: Number(calls), errorsCount: Number(errorsCount) });
                 }
-            }
-            return map;
-        })(),
-        (async () => {
-            const map = new Map<string, { status: string; hasDraft: boolean; lastContactedAt: string | null }>();
-            if (customerEmails.size === 0) return map;
-            // contacts.email is stored normalized via `normalizeEmail` at every
-            // insert site, so `inArray` on the lowercase set hits the unique
-            // index. Replaces a prior unfiltered `LIMIT 2000` scan.
-            const rows = await db()
-                .select({
-                    email: schema.contacts.email,
-                    status: schema.contacts.status,
-                    draftBody: schema.contacts.draftBody,
-                    lastContactedAt: schema.contacts.lastContactedAt,
-                })
-                .from(schema.contacts)
-                .where(inArray(schema.contacts.email, [...customerEmails]));
-            for (const r of rows) {
-                map.set(r.email, {
-                    status: r.status,
-                    hasDraft: !!r.draftBody,
-                    lastContactedAt: r.lastContactedAt ? r.lastContactedAt.toISOString() : null,
-                });
             }
             return map;
         })(),
@@ -437,11 +410,6 @@ export async function getCustomersData() {
 
         const lastActive = compareTimestamp(lastOp, c.lastSessionAt, 'max');
 
-        const contact = c.emailKey ? contactsByEmail.get(c.emailKey) : undefined;
-        let outreachStatus: 'contacted' | 'drafted' | 'none' = 'none';
-        if (contact?.status === 'contacted') outreachStatus = 'contacted';
-        else if (contact?.hasDraft) outreachStatus = 'drafted';
-
         const errorRate = totalCalls30d > 0 ? (totalErrors30d / totalCalls30d) * 100 : 0;
 
         return {
@@ -458,8 +426,6 @@ export async function getCustomersData() {
             totalOps: totalReads + totalWrites,
             dailyBudgetUsd: totalDailyBudgetUsd,
             attribution: c.userId ? attributionByUser.get(c.userId) ?? deriveAttribution(null) : deriveAttribution(null),
-            outreachStatus,
-            lastContactedAt: contact?.lastContactedAt ?? null,
             errorsCount: totalErrors30d,
             calls30d: totalCalls30d,
             errorRate,

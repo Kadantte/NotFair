@@ -34,8 +34,6 @@ export type Customer = {
     totalOps: number;
     dailyBudgetUsd: number | null;
     attribution: CustomerAttribution;
-    outreachStatus: 'contacted' | 'drafted' | 'none';
-    lastContactedAt: string | null;
     errorsCount: number;
     calls30d: number;
     errorRate: number;

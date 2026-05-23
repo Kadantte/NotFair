@@ -20,7 +20,6 @@ const APP_PATH_PREFIXES = [
   "/upgrade",
   "/usage",
   "/dev",
-  "/outreach",
 ] as const;
 
 const NOINDEX_HEADER_VALUE = "noindex, nofollow";

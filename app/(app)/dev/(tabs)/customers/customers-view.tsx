@@ -25,7 +25,6 @@ const CUSTOMER_PAGE_SIZE = 50;
 
 // Module-level stale-while-revalidate cache (CLAUDE.md pattern).
 let cachedCustomers: Customer[] | null = null;
-let cachedDraftEmails: Set<string> | null = null;
 
 function PlanBadge({ plan, inTrial }: { plan: 'free' | 'growth'; inTrial: boolean }) {
     if (inTrial) return (
@@ -55,33 +54,13 @@ export function CustomersView({ initialData }: Props) {
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
     const router = useRouter();
 
-    const applyDrafts = useCallback((list: Customer[], drafts: Set<string>): Customer[] => {
-        return list.map((c) => {
-            if (c.outreachStatus !== 'none') return c;
-            const key = c.googleEmail?.toLowerCase();
-            return key && drafts.has(key) ? { ...c, outreachStatus: 'drafted' as const } : c;
-        });
-    }, []);
-
-    const fetchDraftEmails = useCallback(async () => {
-        try {
-            const res = await fetch('/api/dev/customers/drafts', { credentials: 'include' });
-            if (!res.ok) return;
-            const { emails } = (await res.json()) as { emails: string[] };
-            const set = new Set(emails.map((e) => e.toLowerCase()));
-            cachedDraftEmails = set;
-            setCustomers((prev) => applyDrafts(prev, set));
-            cachedCustomers = applyDrafts(cachedCustomers ?? [], set);
-        } catch { /* best-effort */ }
-    }, [applyDrafts]);
-
     const fetchCustomers = useCallback(async (background = false, fresh = false) => {
         if (!background) setLoadingCustomers(true);
         try {
             const res = await fetch(`/api/dev/customers${fresh ? '?fresh=1' : ''}`, { credentials: 'include' });
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
-            const next: Customer[] = cachedDraftEmails ? applyDrafts(data.customers, cachedDraftEmails) : data.customers;
+            const next: Customer[] = data.customers;
             setCustomers(next);
             cachedCustomers = next;
         } catch {
@@ -89,12 +68,11 @@ export function CustomersView({ initialData }: Props) {
         } finally {
             setLoadingCustomers(false);
         }
-    }, [applyDrafts]);
+    }, []);
 
     useEffect(() => {
         fetchCustomers(!!cachedCustomers);
-        if (!cachedDraftEmails) fetchDraftEmails();
-    }, [fetchCustomers, fetchDraftEmails]);
+    }, [fetchCustomers]);
 
     const handleCopyEmail = useCallback((email: string, e: React.MouseEvent) => {
         e.preventDefault();

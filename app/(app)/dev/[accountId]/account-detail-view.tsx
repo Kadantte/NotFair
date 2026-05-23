@@ -6,7 +6,6 @@ import { RefreshCw, AlertCircle, ArrowLeft, RotateCcw, ExternalLink } from 'luci
 import { Button } from '@/components/ui/button';
 import { DeltaBadge } from '@/components/delta-badge';
 import { formatAction, formatValue, ENTITY_BADGE_COLORS } from '@/lib/operations-format';
-import { OutreachPanel } from './outreach-panel';
 import { LatestAuditCard, AuditRow } from './audit-card';
 import { ImpressionShareCard } from './impression-share-card';
 import { ActivityPanel, type ActivityPanelHandle } from './activity-panel';
@@ -141,30 +140,17 @@ export function AccountDetailView({
                     </div>
                 ) : data ? (
                     <>
-                        {/* Two-column command center: audit (left) + reach out (right) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
-                            {/* LEFT: audit (60%) */}
-                            <div className="lg:col-span-3 space-y-4">
-                                {data.auditHistory.length > 0 ? (
-                                    <LatestAuditCard audit={data.auditHistory[0]} />
-                                ) : (
-                                    <div className="rounded-xl border border-[#3D3C36] bg-[#24231F]/40 p-8 text-center text-sm text-[#C4C0B6]">
-                                        No audit yet for this account.
-                                    </div>
-                                )}
-                                {data.auditHistory[0]?.impressionShareDiagnosis && (
-                                    <ImpressionShareCard diagnosis={data.auditHistory[0].impressionShareDiagnosis} />
-                                )}
-                            </div>
-
-                            {/* RIGHT: reach out (40%, sticky on desktop) */}
-                            <div className="lg:col-span-2">
-                                {data.email && (
-                                    <div className="lg:sticky lg:top-0">
-                                        <OutreachPanel email={data.email} alwaysOpen />
-                                    </div>
-                                )}
-                            </div>
+                        <div className="space-y-4">
+                            {data.auditHistory.length > 0 ? (
+                                <LatestAuditCard audit={data.auditHistory[0]} />
+                            ) : (
+                                <div className="rounded-xl border border-[#3D3C36] bg-[#24231F]/40 p-8 text-center text-sm text-[#C4C0B6]">
+                                    No audit yet for this account.
+                                </div>
+                            )}
+                            {data.auditHistory[0]?.impressionShareDiagnosis && (
+                                <ImpressionShareCard diagnosis={data.auditHistory[0].impressionShareDiagnosis} />
+                            )}
                         </div>
 
                         {/* Past audits (collapsed by default for context) */}
