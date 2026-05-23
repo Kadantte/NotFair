@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Google Ads Claude MCP Server | NotFair",
   description:
-    "Connect Google Ads to Claude in 2 minutes. Claude gets live campaign context to diagnose issues, recommend fixes, and execute approved Google Ads changes.",
+    "NotFair is an independent Google Ads MCP server for Claude. Connect your own Google Ads account, diagnose issues, draft fixes, and approve every write.",
   path: "/google-ads-claude",
   keywords: [
     "google ads claude",
@@ -65,7 +65,7 @@ const jsonLd = [
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "Web",
     description:
-      "NotFair is a Google Ads MCP server for Claude. Connect your Google Ads account to Claude Desktop, Claude Code, or Claude Cowork so Claude can diagnose issues, recommend fixes, and manage approved campaign changes through natural conversation.",
+      "NotFair is an independent Google Ads MCP server for Claude. Connect your own Google Ads account to Claude Desktop, Claude Code, or Claude Cowork so Claude can diagnose issues, recommend fixes, and manage approved campaign changes through natural conversation.",
     offers: {
       "@type": "Offer",
       price: "0",

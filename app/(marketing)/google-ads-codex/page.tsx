@@ -4,7 +4,7 @@ import { buildMetadata, buildFaqJsonLd, SITE_URL } from "@/lib/seo";
 export const metadata = buildMetadata({
   title: "Codex Google Ads Agent — Manage Google Ads from OpenAI Codex | NotFair",
   description:
-    "Connect Codex to Google Ads through NotFair. Diagnose campaigns, review search terms, draft fixes, and approve every Google Ads change from your terminal.",
+    "NotFair independently connects OpenAI Codex to your own Google Ads account. Diagnose campaigns, review search terms, draft fixes, and approve every change from your terminal.",
   path: "/google-ads-codex",
   keywords: [
     "codex google ads",
@@ -59,7 +59,7 @@ const jsonLd = [
     applicationSubCategory: "Google Ads Management Software",
     operatingSystem: "macOS, Linux, Windows",
     description:
-      "NotFair is a Google Ads MCP server for OpenAI's Codex CLI. Connect your Google Ads account to Codex so it can diagnose campaigns, review search terms, draft fixes, and manage approved campaign changes from your terminal.",
+      "NotFair is an independent Google Ads MCP server for OpenAI's Codex CLI. Connect your own Google Ads account to Codex so it can diagnose campaigns, review search terms, draft fixes, and manage approved campaign changes from your terminal.",
     offers: {
       "@type": "Offer",
       price: "0",

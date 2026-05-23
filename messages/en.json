@@ -722,8 +722,8 @@
       "title": "Google Ads MCP Server for Claude, Codex, Hermes, and OpenClaw",
       "bodyBeforeLink": "NotFair is a hosted",
       "bodyBeforeCode": "server at",
-      "bodyAfterCode": ". Connect Claude, Codex, Hermes, OpenClaw, and other MCP clients to inspect campaigns, find issues, and prepare approved Google Ads changes through the Model Context Protocol.",
-      "note": "Free · OAuth 2.0 · No credit card",
+      "bodyAfterCode": ". NotFair connects your own Google Ads account to Claude, Codex, Hermes, OpenClaw, and other MCP clients so they can inspect campaigns, find issues, and prepare approved changes through the Model Context Protocol.",
+      "note": "Independent tool · OAuth 2.0 · Read live data, approve every write",
       "specPrefix": "New to MCP? Read the spec at",
       "specSuffix": "."
     },
@@ -1039,10 +1039,10 @@
         "line2": "Google Ads —",
         "highlight": "live data, 2-minute setup."
       },
-      "body": "NotFair is a Google Ads MCP server for Claude. Connect once and Claude gets live access to your campaigns, keywords, spend, and ad copy — then helps you diagnose, optimize, and manage through natural conversation.",
+      "body": "NotFair is an independent Google Ads MCP server for Claude. Connect your own Google Ads account once and Claude gets live campaign context — then helps you diagnose issues, draft fixes, and approve changes before anything mutates.",
       "disconnectedLabel": "Connect Google Ads to Claude",
       "connectedLabel": "Open Your Account",
-      "note": "No credit card required. Human approval on every write."
+      "note": "Not affiliated with Google or Anthropic. OAuth setup. Human approval on every write."
     },
     "configCard": {
       "step": "Step 1",
@@ -1226,10 +1226,10 @@
         "line2": "from OpenAI Codex —",
         "highlight": "review every change."
       },
-      "body": "NotFair connects Codex to live Google Ads data so you can diagnose campaigns, review search terms, draft fixes, and approve every account change from your terminal.",
+      "body": "NotFair is an independent MCP server that connects OpenAI Codex to your own Google Ads account. Diagnose campaigns, review search terms, draft fixes, and approve every account change from your terminal.",
       "disconnectedLabel": "Connect Google Ads to Codex",
       "connectedLabel": "Open Your Account",
-      "note": "No credit card required. Human approval on every write.",
+      "note": "Not affiliated with Google or OpenAI. OAuth setup. Human approval on every write.",
       "setupGuideLink": "View the 1-minute setup guide"
     },
     "capabilities": {

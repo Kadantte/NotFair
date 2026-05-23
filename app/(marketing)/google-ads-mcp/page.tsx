@@ -5,7 +5,7 @@ import { MCP_SERVER_URL } from "@/lib/brand";
 export const metadata = buildMetadata({
   title: "Google Ads MCP Server for Claude, Codex, Hermes & OpenClaw | NotFair",
   description:
-    "Hosted Google Ads MCP server for AI agents. Connect Claude, Codex, Hermes, OpenClaw, and other MCP clients to live Google Ads data and approved actions.",
+    "NotFair is an independent hosted Google Ads MCP server. Connect your own Google Ads account to Claude, Codex, Hermes, OpenClaw, and other MCP clients with approval-gated writes.",
   path: "/google-ads-mcp",
   keywords: [
     "google ads mcp",
@@ -63,7 +63,7 @@ const jsonLd = [
     applicationSubCategory: "Model Context Protocol Server",
     operatingSystem: "Web",
     description:
-      "Hosted Google Ads MCP server for Claude.ai, Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, Cursor, Cline, and any MCP-compatible AI client. Diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
+      "NotFair is an independent hosted Google Ads MCP server for Claude.ai, Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, Cursor, Cline, and any MCP-compatible AI client. Connect your own Google Ads account, diagnose issues, draft fixes, and approve writes. OAuth 2.0 + Bearer token auth.",
     offers: {
       "@type": "Offer",
       price: "0",
