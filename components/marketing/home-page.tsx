@@ -410,8 +410,20 @@ export function HomePage({
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
   const [chatPlatform, setChatPlatform] = useState<ChatPlatform>("google");
+  const [headlinePlatform, setHeadlinePlatform] = useState<ChatPlatform>("google");
+  const [headlineLocked, setHeadlineLocked] = useState(false);
+
+  useEffect(() => {
+    if (headlineLocked) return;
+    const id = setInterval(() => {
+      setHeadlinePlatform((p) => (p === "google" ? "meta" : "google"));
+    }, 2500);
+    return () => clearInterval(id);
+  }, [headlineLocked]);
 
   function selectChatPlatform(next: ChatPlatform) {
+    setHeadlineLocked(true);
+    setHeadlinePlatform(next);
     if (next === chatPlatform) return;
     setChatPlatform(next);
     trackEvent("home_chat_platform_toggled", { platform: next });
@@ -467,16 +479,16 @@ export function HomePage({
                     </span>
                     <AnimatePresence mode="wait" initial={false}>
                       <motion.span
-                        key={chatPlatform}
+                        key={headlinePlatform}
                         initial={{ opacity: 0, y: 14 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -14 }}
                         transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                         className={`absolute inset-0 whitespace-nowrap ${
-                          chatPlatform === "google" ? "text-[#4CAF6E]" : "text-[#5B9DF8]"
+                          headlinePlatform === "google" ? "text-[#4CAF6E]" : "text-[#5B9DF8]"
                         }`}
                       >
-                        {chatPlatform === "google"
+                        {headlinePlatform === "google"
                           ? tChat("platformGoogle")
                           : tChat("platformMeta")}
                       </motion.span>
