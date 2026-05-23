@@ -826,6 +826,7 @@ export async function updateConversionAction(
         conversion_action.counting_type,
         conversion_action.type,
         conversion_action.owner_customer,
+        conversion_action.primary_for_goal,
         conversion_action.value_settings.default_value,
         conversion_action.value_settings.always_use_default_value,
         conversion_action.value_settings.default_currency_code
@@ -855,6 +856,7 @@ export async function updateConversionAction(
       defaultValue: row.value_settings?.default_value,
       alwaysUseDefaultValue: row.value_settings?.always_use_default_value,
       currencyCode: row.value_settings?.default_currency_code,
+      primaryForGoal: row.primary_for_goal,
     });
   } catch (fetchError) {
     return {
@@ -994,6 +996,7 @@ export async function updateConversionAction(
     defaultValue: params.defaultValue,
     alwaysUseDefaultValue: params.alwaysUseDefaultValue,
     currencyCode: params.currencyCode,
+    primaryForGoal: params.primaryForGoal,
   });
 
   try {
@@ -1030,6 +1033,57 @@ export async function updateConversionAction(
           };
         }
         warnings.push(`Setting primary_for_goal failed: ${goalError}`);
+      } else {
+        try {
+          const readback = await customer.query(`
+            SELECT conversion_action.primary_for_goal
+            FROM conversion_action
+            WHERE conversion_action.id = ${safeEntityId(params.conversionActionId, "conversion action")}
+            LIMIT 1
+          `);
+          const rows = readback as Array<{ conversion_action?: { primary_for_goal?: unknown } }>;
+          const actual = rows[0]?.conversion_action?.primary_for_goal;
+          if (typeof actual === "boolean" && actual !== params.primaryForGoal) {
+            const mismatch = `primary_for_goal readback mismatch: expected ${params.primaryForGoal}, got ${actual}. Google Ads accepted the mutate call but did not reflect the requested serving-state change; verify whether this conversion action supports primary_for_goal updates.`;
+            if (!hasFieldChanges) {
+              return {
+                success: false,
+                action: "update_conversion_action",
+                entityId: params.conversionActionId,
+                beforeValue,
+                afterValue,
+                error: mismatch,
+              };
+            }
+            warnings.push(mismatch);
+          } else if (actual === undefined || actual === null) {
+            const missingReadback = "primary_for_goal readback did not return a value; mutation may be pending or unsupported.";
+            if (!hasFieldChanges) {
+              return {
+                success: false,
+                action: "update_conversion_action",
+                entityId: params.conversionActionId,
+                beforeValue,
+                afterValue,
+                error: missingReadback,
+              };
+            }
+            warnings.push(missingReadback);
+          }
+        } catch (readbackError) {
+          const message = `Could not verify primary_for_goal after mutate: ${extractErrorMessage(readbackError)}`;
+          if (!hasFieldChanges) {
+            return {
+              success: false,
+              action: "update_conversion_action",
+              entityId: params.conversionActionId,
+              beforeValue,
+              afterValue,
+              error: message,
+            };
+          }
+          warnings.push(message);
+        }
       }
     }
 

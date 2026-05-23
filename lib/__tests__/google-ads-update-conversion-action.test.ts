@@ -38,14 +38,27 @@ describe("updateConversionAction", () => {
   });
 
   it("skips the empty mutate when only primaryForGoal is set and only sends the primary_for_goal mutate", async () => {
-    setRow({
-      name: "Lead form",
-      status: 2,
-      category: 12,
-      counting_type: 2,
-      type: 7, // UPLOAD_CLICKS — mutable
-      owner_customer: "customers/1301265570",
-    });
+    mockQuery
+      .mockResolvedValueOnce([
+        {
+          conversion_action: {
+            name: "Lead form",
+            status: 2,
+            category: 12,
+            counting_type: 2,
+            type: 7, // UPLOAD_CLICKS — mutable
+            owner_customer: "customers/1301265570",
+            primary_for_goal: true,
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          conversion_action: {
+            primary_for_goal: false,
+          },
+        },
+      ]);
 
     const result = await updateConversionAction(auth, {
       conversionActionId: "9999",
@@ -66,6 +79,41 @@ describe("updateConversionAction", () => {
         },
       },
     ]);
+  });
+
+  it("fails primaryForGoal-only updates when readback still shows the old value", async () => {
+    mockQuery
+      .mockResolvedValueOnce([
+        {
+          conversion_action: {
+            name: "Lead form",
+            status: 2,
+            category: 12,
+            counting_type: 2,
+            type: 8, // WEBPAGE — mutable
+            owner_customer: "customers/1301265570",
+            primary_for_goal: true,
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          conversion_action: {
+            primary_for_goal: true,
+          },
+        },
+      ]);
+
+    const result = await updateConversionAction(auth, {
+      conversionActionId: "9999",
+      primaryForGoal: false,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/primary_for_goal readback mismatch/i);
+    expect(result.error).toMatch(/expected false/i);
+    expect(result.error).toMatch(/got true/i);
+    expect(JSON.parse(result.afterValue)).toMatchObject({ primaryForGoal: false });
   });
 
   it("refuses to mutate GA4-imported conversion actions with a clear error", async () => {
