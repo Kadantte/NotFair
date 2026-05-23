@@ -178,7 +178,7 @@ export function registerGoogleAdsTools(server: McpServer, currentAuth: () => Aut
 
   // ─── Session management tool ─────
   server.registerTool("listConnectedAccounts", {
-    description: "List Google Ads accounts connected to this session. Returns accountIds for use with all other tools.",
+    description: "List Google Ads accounts connected to this session. Returns accountIds and account names for use with all other tools. Call this FIRST when the user references a campaign or account by name but has not specified an accountId — match the returned account names to find the right accountId before calling summarizeAccountSetup, runScript, or any other account-scoped tool. When only one account is connected its ID becomes the default, but calling this once confirms the mapping and avoids a hard failure if the assumed default is wrong.",
     inputSchema: {},
     annotations: {
       readOnlyHint: true,

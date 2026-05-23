@@ -12,6 +12,10 @@ const RUN_SCRIPT_DESCRIPTION = `Run a JavaScript orchestration script in a sandb
 
 runScript is a READ-ONLY analytics sandbox. ads.gaql() and ads.gaqlParallel() only execute SELECT GAQL queries — they cannot pause, update, create, or delete anything. To mutate the account (pause keywords, update bids, create campaigns, add negatives, etc.), call the dedicated mutation tools (pauseKeyword, updateBid, bulkPauseKeywords, pauseCampaign, createCampaign, addNegativeKeyword, etc.) directly. Never try to perform mutations inside a runScript call.
 
+── ACCOUNT PREFLIGHT ──
+
+If the user references a campaign or account by name but has not provided an accountId, call listConnectedAccounts first to resolve the correct accountId. Passing a disconnected or wrong accountId causes an immediate hard failure; a single listConnectedAccounts call before runScript prevents this.
+
 ── WHEN TO USE THIS ──
 
 This is the DEFAULT tool for any open-ended analytical question about a Google Ads account. Reach for it first when you see:
