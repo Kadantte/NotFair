@@ -29,6 +29,8 @@
     "db:apply-0040-gohighlevel": "npx tsx scripts/apply-migration-0040-gohighlevel.ts",
     "db:apply-0041-gohighlevel-oauth": "npx tsx scripts/apply-migration-0041-gohighlevel-oauth.ts",
     "db:apply-0045-mcp-tool-feedback": "tsx scripts/apply-migration-0045-mcp-tool-feedback.ts",
+    "db:apply-0046-trial-end-email-sent-at": "tsx scripts/apply-migration-0046-trial-end-email-sent-at.ts",
+    "db:apply-0047-email-sends": "tsx scripts/apply-migration-0047-email-sends.ts",
     "eval:mcp": "npx tsx scripts/eval-mcp/eval.ts",
     "eval:mcp:compare": "npx tsx scripts/eval-mcp/compare.ts",
     "mcp-feedback:triage": "tsx scripts/triage-mcp-feedback.ts"

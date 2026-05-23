@@ -3,9 +3,10 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Terminal, Eye, Zap, MessageSquare } from "lucide-react";
-import { useSession } from "@/components/session-provider";
-import { AuditCTA, fadeInUp } from "@/components/marketing/audit-cta";
+import { ArrowRight, Terminal, Eye, Zap, MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
+import { fadeInUp } from "@/components/marketing/audit-cta";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { LandingLinksSection } from "@/components/marketing/landing-links-section";
 import { McpSetupHero } from "@/components/marketing/mcp-setup-hero";
@@ -33,15 +34,36 @@ type CapabilityCopy = {
 const capabilityIcons = [MessageSquare, Zap, Eye, Terminal];
 
 const RELATED_LINKS = [
-  { href: "/google-ads-mcp", key: "mcpServer" },
+  { href: "/meta-ads-mcp", key: "mcpServer" },
   { href: "/", key: "home" },
 ];
 
+const CONNECT_HREF = "/connect/meta-ads/any-mcp";
+
+function ConnectMetaButton({ label, page }: { label: string; page: string }) {
+  return (
+    <Link
+      href={CONNECT_HREF}
+      onClick={() =>
+        trackEvent("cta_clicked", {
+          page,
+          cta: "connect_meta_ads",
+          destination: CONNECT_HREF,
+        })
+      }
+    >
+      <Button className="h-14 rounded-full bg-[#4CAF6E] px-10 text-lg font-semibold text-[#1A1917] transition-all hover:scale-[1.02] hover:bg-[#3D9A5C]">
+        {label}
+        <ArrowRight className="ml-2 h-5 w-5" />
+      </Button>
+    </Link>
+  );
+}
+
 /* ─────────────────────────────────────────────────────── Page ──────────── */
 
-export function GoogleAdsClaudePage() {
-  const session = useSession();
-  const t = useTranslations("GoogleAdsClaudePage");
+export function MetaAdsClaudePage() {
+  const t = useTranslations("MetaAdsClaudePage");
   const tools = t.raw("tools.items") as ToolCopy[];
   const steps = t.raw("steps.items") as StepCopy[];
   const capabilities = (t.raw("capabilities.items") as CapabilityCopy[]).map((copy, index) => ({
@@ -79,16 +101,8 @@ export function GoogleAdsClaudePage() {
             </p>
 
             <div className="mt-8 flex flex-col items-center gap-3">
-              <AuditCTA
-                session={session}
-                page="google-ads-claude"
-                size="lg"
-                disconnectedLabel={t("hero.disconnectedLabel")}
-                connectedLabel={t("hero.connectedLabel")}
-              />
-              <p className="text-sm text-[#C4C0B6]">
-                {t("hero.note")}
-              </p>
+              <ConnectMetaButton label={t("hero.cta")} page="meta-ads-claude" />
+              <p className="text-sm text-[#C4C0B6]">{t("hero.note")}</p>
             </div>
           </motion.div>
         </div>
@@ -283,10 +297,10 @@ export function GoogleAdsClaudePage() {
           >
             {t("tools.referencePrefix")}{" "}
             <Link
-              href="/google-ads-mcp"
+              href="/meta-ads-mcp"
               className="text-[#4CAF6E] underline underline-offset-2 hover:text-[#3D9A5C]"
             >
-              /google-ads-mcp
+              /meta-ads-mcp
             </Link>
             {t("tools.referenceSuffix")}
           </motion.p>
@@ -326,13 +340,7 @@ export function GoogleAdsClaudePage() {
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">
-              <AuditCTA
-                session={session}
-                page="google-ads-claude"
-                size="lg"
-                disconnectedLabel={t("hero.disconnectedLabel")}
-                connectedLabel={t("hero.connectedLabel")}
-              />
+              <ConnectMetaButton label={t("hero.cta")} page="meta-ads-claude" />
               <p className="text-sm text-[#C4C0B6]">
                 {t("finalCta.note")}
               </p>

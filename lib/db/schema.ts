@@ -541,6 +541,10 @@ export const subscriptions = pgTable("subscriptions", {
   data: jsonb("data"),
   /** End of the per-user free trial. Set on row creation to created_at + 7d. */
   trialEndsAt: timestamp("trial_ends_at"),
+  /** When the trial-end notification email was successfully delivered to the
+   * customer. NULL = not yet emailed; pinned by the daily cron after Resend
+   * confirms send, which is what makes the job idempotent across runs. */
+  trialEndEmailSentAt: timestamp("trial_end_email_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -903,6 +907,62 @@ export const emailPreferences = pgTable("email_preferences", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ─── Email Sends (transactional / lifecycle / update tracking) ──────
+//
+// Generic per-send tracking for any single-recipient email NotFair
+// dispatches via Resend — trial-end alerts, product updates, quota
+// warnings, renewal reminders, weekly digests, etc. Each sender job
+// INSERTs a row after Resend accepts the message; `/api/webhooks/resend`
+// UPDATEs by `resendId` as delivery / open / click / bounce events arrive.
+//
+// Distinct from `broadcasts` + `broadcast_recipients` — those model
+// multi-recipient campaigns with a shared template. `email_sends` is for
+// sends that don't have a campaign abstraction above them.
+//
+// `kind` is the email-type discriminator (free-form text, no enum). Adding
+// a new send type is a one-liner: pick a slug, start writing rows with
+// that `kind`, and add the slug to EMAIL_SEND_KIND. Today's values:
+//   - 'trial_end' → /api/cron/trial-end-emails
+//
+// Per-sender idempotency lives on each sender's own latch (e.g.
+// `subscriptions.trialEndEmailSentAt`). This table is the audit + dashboard
+// surface — never the source of "should we send?".
+
+export const emailSends = pgTable("email_sends", {
+  id: serial("id").primaryKey(),
+  /** Email-type discriminator, e.g. 'trial_end', 'product_update'. New kinds
+   *  need no migration — just append to EMAIL_SEND_KIND below. */
+  kind: text("kind").notNull(),
+  userId: text("user_id").notNull(),
+  /** Stripe env at send time ("test" | "live") — scopes the dashboard. */
+  env: text("env").notNull(),
+  email: text("email").notNull(),
+  /** Resend message id from POST /emails. Unique — webhook UPSERTs match here. */
+  resendId: text("resend_id").notNull(),
+  /** sent | delivered | opened | clicked | bounced | failed */
+  status: text("status").notNull().default("sent"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  bouncedAt: timestamp("bounced_at"),
+  /** Bounce subtype (hard/soft/etc.) carried through from Resend. */
+  bounceType: text("bounce_type"),
+  errorMessage: text("error_message"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("email_sends_resend_id_uq").on(table.resendId),
+  index("email_sends_kind_sent_at_idx").on(table.kind, table.sentAt),
+  index("email_sends_user_idx").on(table.userId),
+]);
+
+/** Discriminator values written to `email_sends.kind`. Keep in sync with
+ *  the sender jobs and the dev dashboard filters. */
+export const EMAIL_SEND_KIND = {
+  TRIAL_END: "trial_end",
+} as const;
+export type EmailSendKind = (typeof EMAIL_SEND_KIND)[keyof typeof EMAIL_SEND_KIND];
 
 // ─── Design MCP Usage Quota ──────────────────────────────────────────
 //

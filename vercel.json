@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/impact-monitor",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/trial-end-emails",
+      "schedule": "0 16 * * *"
     }
   ]
 }
