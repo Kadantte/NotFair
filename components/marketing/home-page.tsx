@@ -367,8 +367,18 @@ export function HomePage({
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
   const [chatPlatform, setChatPlatform] = useState<ChatPlatform>("google");
+  const [chatPaused, setChatPaused] = useState(false);
+
+  useEffect(() => {
+    if (chatPaused) return;
+    const id = setInterval(() => {
+      setChatPlatform((p) => (p === "google" ? "meta" : "google"));
+    }, 5000);
+    return () => clearInterval(id);
+  }, [chatPaused]);
 
   function selectChatPlatform(next: ChatPlatform) {
+    setChatPaused(true);
     if (next === chatPlatform) return;
     setChatPlatform(next);
     trackEvent("home_chat_platform_toggled", { platform: next });
@@ -421,7 +431,31 @@ export function HomePage({
                 {t("eyebrow")}
               </p>
               <h1 className="font-display mx-auto mt-4 max-w-3xl text-5xl font-bold leading-[0.98] tracking-tight text-[#E8E4DD] sm:text-6xl lg:mx-0 lg:text-7xl">
-                {t("headline")}
+                <span className="block">
+                  {t("headlinePrefix")}{" "}
+                  <span className="relative inline-block align-baseline">
+                    <span aria-hidden="true" className="invisible whitespace-nowrap">
+                      {tChat("platformMeta")}
+                    </span>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span
+                        key={chatPlatform}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -14 }}
+                        transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                        className={`absolute inset-0 whitespace-nowrap ${
+                          chatPlatform === "google" ? "text-[#4CAF6E]" : "text-[#5B9DF8]"
+                        }`}
+                      >
+                        {chatPlatform === "google"
+                          ? tChat("platformGoogle")
+                          : tChat("platformMeta")}
+                      </motion.span>
+                    </AnimatePresence>
+                  </span>
+                </span>
+                <span className="block">{t("headlineSuffix")}</span>
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#C4C0B6] lg:mx-0">
                 {t("subhead")}

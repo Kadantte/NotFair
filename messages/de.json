@@ -40,7 +40,8 @@
   "Home": {
     "githubBanner": "Google + Meta Ads aus Claude diagnostizieren und korrigieren - freigegebene Schreibzugriffe, live auf GitHub",
     "eyebrow": "KI-Stratege fur Google + Meta Ads + Ausfuhrungsebene",
-    "headline": "Finden, was falsch lauft. Direkt aus Claude korrigieren.",
+    "headlinePrefix": "Verwalten Sie",
+    "headlineSuffix": "direkt aus ChatGPT und Claude.",
     "subhead": "NotFair gibt Claude Live-Zugriff auf Google Ads und Meta Ads, um Probleme zu diagnostizieren, Korrekturen zu empfehlen und Kampagnenanderungen erst nach Ihrer Freigabe auszufuhren.",
     "blogCta": "Blog lesen",
     "trustItems": [
@@ -1111,29 +1112,29 @@
       "referenceSuffix": ".",
       "items": [
         {
-          "name": "listCampaigns",
+          "name": "runScript",
           "category": "read",
-          "description": "Ruft Live-Kampagnenleistung, Ausgaben und Status ab"
+          "description": "Sandboxed JS mit GAQL-Fan-Out — jeder analytische Lesezugriff (Kampagnen, Suchbegriffe, Performance) läuft über dieses eine Tool"
         },
         {
-          "name": "getKeywords",
+          "name": "listKeywords",
           "category": "read",
           "description": "Prüft Keyword-Gebote, Quality Scores und Impressionen"
         },
         {
-          "name": "getSearchTermReport",
+          "name": "getChanges",
           "category": "read",
-          "description": "Findet irrelevante Suchanfragen, schwache Match Types und Budgetlecks"
+          "description": "NotFairs eigenes Änderungsprotokoll — jede von Claude angewendete Änderung, mit einem Aufruf rückgängig machbar"
         },
         {
-          "name": "getCampaignPerformance",
+          "name": "getRecommendations",
           "category": "read",
-          "description": "Analysiert Kampagnenmetriken über jeden Zeitraum im Detail"
+          "description": "Googles Optimierungsvorschläge mit geschätzter Wirkung"
         },
         {
-          "name": "updateBid",
+          "name": "bulkUpdateBids",
           "category": "write",
-          "description": "Passt ein Keyword-Gebot an, vor Anwendung prüfbar"
+          "description": "Passt Keyword-Gebote in großen Mengen an — vor der Anwendung prüfbar"
         },
         {
           "name": "pauseCampaign",
@@ -1141,7 +1142,7 @@
           "description": "Pausiert eine leistungsschwache Kampagne über Claude"
         },
         {
-          "name": "addNegativeKeyword",
+          "name": "addKeywordToNegativeList",
           "category": "write",
           "description": "Blockiert einen verschwendeten Suchbegriff auf Kampagnen- oder Kontoebene"
         },

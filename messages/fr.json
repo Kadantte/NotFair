@@ -40,7 +40,8 @@
   "Home": {
     "githubBanner": "Diagnostiquez et corrigez Google + Meta Ads depuis Claude - modifications avec approbation, disponibles sur GitHub",
     "eyebrow": "Strategie Google + Meta Ads par IA + couche d'execution",
-    "headline": "Trouvez ce qui ne va pas. Corrigez-le depuis Claude.",
+    "headlinePrefix": "Gérez",
+    "headlineSuffix": "directement depuis ChatGPT et Claude.",
     "subhead": "NotFair donne a Claude un acces direct a Google Ads et Meta Ads pour diagnostiquer les problemes, recommander des corrections et executer des changements de campagnes seulement apres votre approbation.",
     "blogCta": "Lire le blog",
     "trustItems": [
@@ -1111,29 +1112,29 @@
       "referenceSuffix": ".",
       "items": [
         {
-          "name": "listCampaigns",
+          "name": "runScript",
           "category": "read",
-          "description": "Récupère performance, dépense et statut des campagnes en direct"
+          "description": "JS isolé avec fan-out GAQL — toute lecture analytique (campagnes, termes de recherche, performance) passe par cet unique outil"
         },
         {
-          "name": "getKeywords",
+          "name": "listKeywords",
           "category": "read",
           "description": "Inspecte les enchères de mots-clés, Quality Scores et impressions"
         },
         {
-          "name": "getSearchTermReport",
+          "name": "getChanges",
           "category": "read",
-          "description": "Trouve les requêtes non pertinentes, les correspondances faibles et les fuites de budget"
+          "description": "Journal de changements NotFair — chaque écriture appliquée par Claude, annulable en un appel"
         },
         {
-          "name": "getCampaignPerformance",
+          "name": "getRecommendations",
           "category": "read",
-          "description": "Analyse en profondeur les métriques de campagne sur toute période"
+          "description": "Suggestions d’optimisation Google avec impact estimé"
         },
         {
-          "name": "updateBid",
+          "name": "bulkUpdateBids",
           "category": "write",
-          "description": "Ajuste une enchère de mot-clé, relisible avant application"
+          "description": "Ajuste les enchères de mots-clés en masse — relisibles avant application"
         },
         {
           "name": "pauseCampaign",
@@ -1141,7 +1142,7 @@
           "description": "Met en pause une campagne sous-performante via Claude"
         },
         {
-          "name": "addNegativeKeyword",
+          "name": "addKeywordToNegativeList",
           "category": "write",
           "description": "Bloque un terme de recherche gaspillé au niveau campagne ou compte"
         },

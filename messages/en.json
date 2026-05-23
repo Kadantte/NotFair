@@ -40,7 +40,8 @@
   "Home": {
     "githubBanner": "Diagnose and fix Google + Meta Ads from Claude - approval-gated writes, live on GitHub",
     "eyebrow": "AI Google + Meta Ads strategist + execution layer",
-    "headline": "Manage ads right from ChatGPT and Claude.",
+    "headlinePrefix": "Manage",
+    "headlineSuffix": "right from ChatGPT and Claude.",
     "subhead": "NotFair gives Claude live Google Ads and Meta Ads access to diagnose issues, recommend fixes, and execute campaign changes only after you approve.",
     "blogCta": "Read the blog",
     "trustItems": [
@@ -1214,6 +1215,174 @@
     },
     "finalCta": {
       "title": "Connect Google Ads to Claude — now.",
+      "body": "2-minute setup. Human in control of every change.",
+      "note": "Paste one config snippet. OAuth. Done."
+    }
+  },
+  "MetaAdsClaudePage": {
+    "hero": {
+      "eyebrow": "Meta Ads MCP Server",
+      "title": {
+        "line1": "Use Claude for",
+        "line2": "Meta Ads —",
+        "highlight": "live data, 2-minute setup."
+      },
+      "body": "NotFair is a Meta Ads MCP server for Claude. Connect once and Claude gets live access to your Facebook and Instagram campaigns, ad sets, creatives, and spend — then helps you diagnose fatigue, optimize budgets, and manage approved changes through natural conversation.",
+      "cta": "Connect Meta Ads to Claude",
+      "note": "No credit card required. Human approval on every write."
+    },
+    "steps": {
+      "eyebrow": "How it works",
+      "title": "Connect Meta Ads to Claude in 2 minutes.",
+      "items": [
+        {
+          "num": "1",
+          "title": "Add NotFair to your MCP config",
+          "desc": "Paste the config snippet into Claude Desktop, Claude Code, or Claude Cowork. One entry, no API keys needed at this step."
+        },
+        {
+          "num": "2",
+          "title": "Connect your Meta Ads account",
+          "desc": "OAuth in one click at notfair.co. Read permissions only until you approve a specific change — your Business Manager and ad accounts stay safe."
+        },
+        {
+          "num": "3",
+          "title": "Ask Claude anything about your campaigns",
+          "desc": "Try: \"Which ad sets are in frequency fatigue and what should I rotate?\" Claude pulls live Meta data and answers with specifics — no CSV exports, no copy-paste."
+        }
+      ]
+    },
+    "capabilities": {
+      "eyebrow": "What you get",
+      "title": "Claude AI for Meta Ads — what it actually does.",
+      "body": "Once connected, Claude has live access to your Facebook and Instagram ad accounts. No more exporting CSVs from Ads Manager, copying tables into chat, or working from screenshots. Ask a question, get a specific answer backed by real data.",
+      "items": [
+        {
+          "title": "Campaign diagnosis in natural language",
+          "body": "Ask Claude what is wrong. It checks campaign structure, ad-set delivery, audience overlap, frequency, creative fatigue, and budget pacing — then gives you a prioritized fix list."
+        },
+        {
+          "title": "Find the issues you did not know to ask for",
+          "body": "Mature accounts often have clear problems hiding in overlap, frequency, learning-phase status, and budget allocation. Asking \"what should I fix?\" surfaces them immediately."
+        },
+        {
+          "title": "Every change is reviewable",
+          "body": "NotFair never commits a change without your explicit approval. Claude shows you what it wants to do, you say yes or no. Human always in control."
+        },
+        {
+          "title": "Works where you already work",
+          "body": "Claude Desktop for solo marketers. Claude Code for developers managing campaigns. Claude Cowork for teams. One MCP config, all three clients."
+        }
+      ]
+    },
+    "tools": {
+      "eyebrow": "MCP tools exposed",
+      "title": "What Claude can read and change.",
+      "body": "NotFair exposes a focused set of MCP tools for Meta. Read tools give Claude live account context across Facebook and Instagram. Write tools let Claude propose changes — each requiring your explicit approval before execution.",
+      "columns": {
+        "tool": "Tool",
+        "type": "Type",
+        "description": "What it does"
+      },
+      "categories": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "referencePrefix": "Full tool reference at",
+      "referenceSuffix": ".",
+      "items": [
+        {
+          "name": "runScript",
+          "category": "read",
+          "description": "Sandboxed JS with Graph API fan-out — every analytical read across Facebook and Instagram goes through this one tool"
+        },
+        {
+          "name": "getInsights",
+          "category": "read",
+          "description": "Performance with breakdowns: spend, impressions, clicks, CTR, CPC, CPM, conversions, ROAS"
+        },
+        {
+          "name": "listCampaigns",
+          "category": "read",
+          "description": "List campaigns with status, objective, budget, bid strategy, and schedule"
+        },
+        {
+          "name": "listAdSets",
+          "category": "read",
+          "description": "Ad set details: optimization goal, billing event, daily/lifetime budget, targeting summary"
+        },
+        {
+          "name": "pauseCampaign",
+          "category": "write",
+          "description": "Pause a Meta campaign — reversible via enableCampaign"
+        },
+        {
+          "name": "pauseAdSet",
+          "category": "write",
+          "description": "Pause an ad set without touching its parent campaign"
+        },
+        {
+          "name": "updateCampaignBudget",
+          "category": "write",
+          "description": "Update daily or lifetime budget on a Meta campaign"
+        },
+        {
+          "name": "createCampaign",
+          "category": "write",
+          "description": "Launch a new Meta campaign with objective, budget, and schedule"
+        }
+      ]
+    },
+    "faq": {
+      "title": "FAQ — Meta Ads and Claude",
+      "intro": "Common questions from MCP builders and marketers setting up the Claude AI Meta Ads workflow.",
+      "items": [
+        {
+          "question": "How do I use Claude for Meta Ads with NotFair?",
+          "answer": "Add NotFair to your MCP config (one JSON snippet), connect your Meta Ads account via OAuth at notfair.co, and Claude immediately gains live access to your Facebook and Instagram campaigns. You can then ask Claude what is wrong, why performance changed, what to fix next, or to draft approved budget, audience, and creative changes — all in natural conversation."
+        },
+        {
+          "question": "Does NotFair work with Claude Desktop, Claude Code, and Claude Cowork?",
+          "answer": "Yes. NotFair is a standard MCP server, so it works with any MCP-compatible Claude client. Add the same config snippet to Claude Desktop settings, your Claude Code MCP config, or Claude Cowork — it works identically in all three."
+        },
+        {
+          "question": "What Meta Ads data can Claude see through NotFair?",
+          "answer": "Claude gets live access to campaign performance, ad set targeting and budgets, ad creative, spend, frequency, CPM, CTR, conversions, and audience overlap signals across Facebook and Instagram. It reads your actual ad account data in real time — no exports or manual uploads needed."
+        },
+        {
+          "question": "Can Claude make changes to my Meta Ads account?",
+          "answer": "Yes, but only with your explicit approval at each step. Claude can propose budget changes, pause campaigns or ad sets, update creative, and launch new campaigns — but every action is shown to you before it executes. You review and confirm. NotFair also logs every change so you can track impact."
+        },
+        {
+          "question": "Is this an official Meta or Anthropic integration?",
+          "answer": "NotFair is an independent product built on Anthropic's open Model Context Protocol (MCP) standard and the Meta Marketing API. It is not an official Meta product. MCP is the open standard Anthropic created for connecting AI to external tools — any developer can build MCP servers, and NotFair is one focused on ad platforms."
+        },
+        {
+          "question": "What does setup actually take?",
+          "answer": "Under 2 minutes. Paste one JSON snippet into your MCP config, open notfair.co, click Connect Meta Ads, complete the OAuth flow. That's it — Claude can now access your Meta ad accounts."
+        },
+        {
+          "question": "Do I need to know how to code to use this?",
+          "answer": "No coding required. Editing a JSON config file is the most technical step — it's copying and pasting one snippet. The rest is standard Meta OAuth and talking to Claude in plain English."
+        }
+      ]
+    },
+    "related": {
+      "title": "Related pages",
+      "intro": "Explore the full NotFair workflow for Meta Ads and Claude.",
+      "links": {
+        "mcpServer": {
+          "title": "Meta Ads MCP Server",
+          "description": "Learn how NotFair's MCP server exposes your Meta ad accounts and actions to any MCP-compatible AI client."
+        },
+        "home": {
+          "title": "NotFair Home",
+          "description": "The AI-powered ads agent — connect your ad accounts and let Claude diagnose issues, recommend fixes, and manage approved changes through conversation."
+        }
+      }
+    },
+    "finalCta": {
+      "title": "Connect Meta Ads to Claude — now.",
       "body": "2-minute setup. Human in control of every change.",
       "note": "Paste one config snippet. OAuth. Done."
     }

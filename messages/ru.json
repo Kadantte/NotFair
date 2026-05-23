@@ -40,7 +40,8 @@
   "Home": {
     "githubBanner": "Диагностика и исправление Google + Meta Ads из Claude — записи с одобрением, доступны на GitHub",
     "eyebrow": "AI стратег Google + Meta Ads + исполнительный уровень",
-    "headline": "Найдите, что не так. Исправьте это с Claude.",
+    "headlinePrefix": "Управляйте",
+    "headlineSuffix": "прямо из ChatGPT и Claude.",
     "subhead": "NotFair предоставляет Claude прямой доступ к Google Ads и Meta Ads для диагностики проблем, рекомендации исправлений и внесения изменений в кампанию только после вашего одобрения.",
     "blogCta": "Читать блог",
     "trustItems": [
@@ -1111,42 +1112,42 @@
       "referenceSuffix": ".",
       "items": [
         {
-          "name": "списокКампании",
+          "name": "runScript",
           "category": "read",
-          "description": "Извлекайте эффективность, расходы и статус кампании в реальном времени."
+          "description": "Изолированный JS с GAQL fan-out — каждое аналитическое чтение (кампании, поисковые запросы, эффективность) проходит через этот один инструмент."
         },
         {
-          "name": "получить ключевые слова",
+          "name": "listKeywords",
           "category": "read",
           "description": "Проверяйте ставки ключевых слов, показатели качества и показы."
         },
         {
-          "name": "getSearchTermReport",
+          "name": "getChanges",
           "category": "read",
-          "description": "Найдите нерелевантные запросы, слабые типы соответствия и утечки бюджета."
+          "description": "Журнал изменений NotFair — каждая запись, применённая Claude, отменяется одним вызовом."
         },
         {
-          "name": "getCampaignPerformance",
+          "name": "getRecommendations",
           "category": "read",
-          "description": "Подробное изучение показателей кампании за любой диапазон дат."
+          "description": "Рекомендации по оптимизации от Google с оценочным влиянием."
         },
         {
-          "name": "обновить ставку",
+          "name": "bulkUpdateBids",
           "category": "write",
-          "description": "Скорректируйте ставку для ключевого слова — можно проверить перед применением"
+          "description": "Массовая корректировка ставок ключевых слов — можно проверить перед применением."
         },
         {
-          "name": "паузаКампания",
+          "name": "pauseCampaign",
           "category": "write",
-          "description": "Приостановите неэффективную кампанию до Claude."
+          "description": "Приостановите неэффективную кампанию через Claude."
         },
         {
-          "name": "добавитьнегативеключевое слово",
+          "name": "addKeywordToNegativeList",
           "category": "write",
           "description": "Заблокируйте ненужный поисковый запрос на уровне кампании или аккаунта."
         },
         {
-          "name": "создатьобъявление",
+          "name": "createAd",
           "category": "write",
           "description": "Напишите и запустите новый текст объявления в ходе естественного разговора."
         }

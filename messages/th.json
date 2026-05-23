@@ -40,7 +40,8 @@
   "Home": {
     "githubBanner": "วิเคราะห์และแก้ Google + Meta Ads จาก Claude - ทุกการเขียนต้องอนุมัติ และเปิดบน GitHub",
     "eyebrow": "นักวางกลยุทธ์ Google + Meta Ads ด้วย AI + ชั้นปฏิบัติการ",
-    "headline": "หาให้เจอว่าอะไรผิด แล้วแก้จาก Claude",
+    "headlinePrefix": "จัดการ",
+    "headlineSuffix": "ได้เลยจาก ChatGPT และ Claude",
     "subhead": "NotFair ให้ Claude เข้าถึง Google Ads และ Meta Ads แบบสดเพื่อวิเคราะห์ปัญหา แนะนำวิธีแก้ และแก้แคมเปญหลังจากคุณอนุมัติเท่านั้น",
     "blogCta": "อ่านบล็อก",
     "trustItems": [
@@ -1111,29 +1112,29 @@
       "referenceSuffix": ".",
       "items": [
         {
-          "name": "listCampaigns",
+          "name": "runScript",
           "category": "read",
-          "description": "ดึงผลงาน ค่าใช้จ่าย และสถานะแคมเปญแบบสด"
+          "description": "JS แบบ sandbox พร้อม GAQL fan-out — ทุกการอ่านเชิงวิเคราะห์ (แคมเปญ, search terms, ผลงาน) ผ่านเครื่องมือเดียวนี้"
         },
         {
-          "name": "getKeywords",
+          "name": "listKeywords",
           "category": "read",
           "description": "ตรวจ bid คีย์เวิร์ด Quality Scores และ impressions"
         },
         {
-          "name": "getSearchTermReport",
+          "name": "getChanges",
           "category": "read",
-          "description": "ค้นหา query ที่ไม่เกี่ยวข้อง match type ที่อ่อน และงบที่รั่ว"
+          "description": "บันทึกการเปลี่ยนแปลงของ NotFair — ทุกการเขียนที่ Claude ทำ ย้อนกลับได้ด้วยการเรียกครั้งเดียว"
         },
         {
-          "name": "getCampaignPerformance",
+          "name": "getRecommendations",
           "category": "read",
-          "description": "เจาะลึก metrics ของแคมเปญในช่วงวันที่ใดก็ได้"
+          "description": "คำแนะนำการปรับแต่งจาก Google พร้อมผลกระทบโดยประมาณ"
         },
         {
-          "name": "updateBid",
+          "name": "bulkUpdateBids",
           "category": "write",
-          "description": "ปรับ bid คีย์เวิร์ด และตรวจสอบได้ก่อนใช้จริง"
+          "description": "ปรับ bid คีย์เวิร์ดเป็นกลุ่ม — ตรวจสอบได้ก่อนใช้จริง"
         },
         {
           "name": "pauseCampaign",
@@ -1141,7 +1142,7 @@
           "description": "หยุดแคมเปญผลงานต่ำผ่าน Claude"
         },
         {
-          "name": "addNegativeKeyword",
+          "name": "addKeywordToNegativeList",
           "category": "write",
           "description": "บล็อกคำค้นที่เปลืองงบในระดับแคมเปญหรือบัญชี"
         },
