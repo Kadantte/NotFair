@@ -64,6 +64,9 @@ async function main() {
   const rows = args.sample ? SAMPLE_ROWS.slice(0, args.limit) : await fetchFeedbackRows(args);
   const report = buildMcpFeedbackTriageReport(rows);
   console.log(JSON.stringify(report, null, 2));
+  // This script is a CLI. The shared DB singleton keeps the postgres client open,
+  // which can otherwise leave pnpm/tsx hanging after successful output.
+  process.exit(0);
 }
 
 main().catch((error) => {
