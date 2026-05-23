@@ -410,18 +410,8 @@ export function HomePage({
   const faqItems = t.raw("faq") as { q: string; a: string }[];
   const trustItems = t.raw("trustItems") as string[];
   const [chatPlatform, setChatPlatform] = useState<ChatPlatform>("google");
-  const [chatPaused, setChatPaused] = useState(false);
-
-  useEffect(() => {
-    if (chatPaused) return;
-    const id = setInterval(() => {
-      setChatPlatform((p) => (p === "google" ? "meta" : "google"));
-    }, 5000);
-    return () => clearInterval(id);
-  }, [chatPaused]);
 
   function selectChatPlatform(next: ChatPlatform) {
-    setChatPaused(true);
     if (next === chatPlatform) return;
     setChatPlatform(next);
     trackEvent("home_chat_platform_toggled", { platform: next });
