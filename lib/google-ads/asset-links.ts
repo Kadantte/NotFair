@@ -116,6 +116,13 @@ export const FIELD_TYPES = {
     assetTypeName: "IMAGE",
     supportedLevels: AD_IMAGE_LEVELS,
   },
+  PRICE: {
+    fieldTypeName: "PRICE",
+    // AssetFieldType.PRICE = 24 in google-ads-api v22 proto
+    fieldTypeInt: 24,
+    assetTypeName: "PRICE",
+    supportedLevels: EXTENSION_LEVELS,
+  },
 } as const satisfies Record<string, FieldTypeConfig>;
 
 export type FieldTypeName = keyof typeof FIELD_TYPES;

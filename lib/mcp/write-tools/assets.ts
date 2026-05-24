@@ -8,6 +8,10 @@ import {
   createImageAsset,
   fetchImageAssetFromUrl,
   IMAGE_FIELD_TYPE_NAMES,
+  createPriceAsset,
+  PRICE_EXTENSION_TYPES,
+  PRICE_EXTENSION_PRICE_UNITS,
+  PRICE_EXTENSION_PRICE_QUALIFIERS,
   linkAsset,
   unlinkAssetLinks,
   getAssetLinks,
@@ -18,6 +22,9 @@ import type {
   AssetLinkTarget,
   FieldTypeName,
   ImageAssetFieldType,
+  PriceExtensionType,
+  PriceExtensionPriceUnit,
+  PriceExtensionPriceQualifier,
 } from "@/lib/google-ads";
 import { execRead } from "@/lib/tools/execute";
 import {
@@ -182,6 +189,55 @@ export function registerAssetWriteTools(deps: WriteToolDeps) {
           targets: targets as AssetLinkTarget[] | undefined,
         }) as Promise<AssetLinkMutationResult>;
       },
+      acknowledgeExperimentImpact,
+    );
+    return typedResult(result);
+  }));
+
+  server.registerTool("createPriceAsset", {
+    description: `Create a price asset (3–8 offerings showing products/services with prices in search ads). Each offering has a header (≤25 chars), description (≤25 chars), price in micros (1 USD = 1,000,000), currency code, and final URL. Valid types: ${PRICE_EXTENSION_TYPES.join(", ")}. Optional priceQualifier: ${PRICE_EXTENSION_PRICE_QUALIFIERS.join(", ")}. Optional unit per offering: ${PRICE_EXTENSION_PRICE_UNITS.join(", ")}. Optionally link to customer/campaign/ad-group targets via \`targets\`. Returns changeId, assetId, and link resource names. To attach an existing price asset to more targets later, call \`linkAsset\` with fieldType PRICE.`,
+    inputSchema: {
+      accountId: accountIdParam,
+      type: z.enum([...PRICE_EXTENSION_TYPES] as [string, ...string[]]).describe(`Price asset type, e.g. "SERVICES" or "PRODUCT_CATEGORIES". Valid: ${PRICE_EXTENSION_TYPES.join(", ")}.`),
+      languageCode: z.string().min(1).describe("BCP-47 language code for the asset, e.g. 'en' or 'es'."),
+      priceOfferings: z.array(z.object({
+        header: z.string().min(1).max(25).describe("Offering header (≤25 chars), e.g. 'Basic Plan'"),
+        description: z.string().min(1).max(25).describe("Offering description (≤25 chars), e.g. 'Great for starters'"),
+        amountMicros: z.number().int().min(0).describe("Price in micros (1 USD = 1,000,000). E.g. $29.99 = 29,990,000."),
+        currencyCode: z.string().length(3).describe("ISO 4217 currency code, e.g. 'USD', 'EUR', 'GBP'."),
+        finalUrl: z.string().url().describe("Landing page URL for this offering."),
+        unit: z.enum([...PRICE_EXTENSION_PRICE_UNITS] as [string, ...string[]]).optional().describe(`Optional price unit. Valid: ${PRICE_EXTENSION_PRICE_UNITS.join(", ")}.`),
+      })).min(3).max(8).describe("3–8 price offerings shown in the asset."),
+      priceQualifier: z.enum([...PRICE_EXTENSION_PRICE_QUALIFIERS] as [string, ...string[]]).optional().describe(`Optional qualifier that modifies the displayed price (e.g. 'FROM' shows 'From $X'). Valid: ${PRICE_EXTENSION_PRICE_QUALIFIERS.join(", ")}.`),
+      targets: z.array(assetLinkTargetSchema).optional().describe(
+        `Optional serving targets. Omit or pass [] to create the asset only. ${ASSET_LINK_TARGETS_SHAPE_DOC}`,
+      ),
+      ...experimentImpactAcknowledgementSchema,
+    },
+    annotations: WRITE_ANNOTATIONS,
+  }, safeHandler(async ({ accountId, type, languageCode, priceOfferings, priceQualifier, targets, acknowledgeExperimentImpact }) => {
+    const { auth, targetId, targetAuth } = resolveToolAuth(currentAuth, accountId);
+    const result = await execAssetLinkWrite(
+      auth,
+      targetId,
+      campaignTargetIds(targets),
+      () => createPriceAsset(targetAuth, {
+        type: type as PriceExtensionType,
+        languageCode,
+        priceOfferings: (priceOfferings as Array<{
+          header: string;
+          description: string;
+          amountMicros: number;
+          currencyCode: string;
+          finalUrl: string;
+          unit?: string;
+        }>).map((o) => ({
+          ...o,
+          unit: o.unit as PriceExtensionPriceUnit | undefined,
+        })),
+        priceQualifier: priceQualifier as PriceExtensionPriceQualifier | undefined,
+        targets: targets as AssetLinkTarget[] | undefined,
+      }),
       acknowledgeExperimentImpact,
     );
     return typedResult(result);

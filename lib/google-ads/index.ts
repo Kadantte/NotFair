@@ -17,6 +17,7 @@ export * from "./call-assets";
 export * from "./structured-snippets";
 export * from "./sitelinks";
 export * from "./image-assets";
+export * from "./price-assets";
 export * from "./bidding-strategies";
 export * from "./negative-keyword-lists";
 export * from "./account-summary";
