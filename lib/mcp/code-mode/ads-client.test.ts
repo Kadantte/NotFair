@@ -78,7 +78,6 @@ describe("buildAdsHost bootstrap surface", () => {
           changeEventsQuery: pack.find(q => q.name === "changeEvents").query,
           conversionPerfQuery: pack.find(q => q.name === "conversionActionPerformance").query,
           recommendationsQuery: pack.find(q => q.name === "recommendations").query,
-          billingSetupsQuery: pack.find(q => q.name === "billingSetups").query,
         };
       `,
       host,
@@ -86,8 +85,11 @@ describe("buildAdsHost bootstrap surface", () => {
     });
 
     expect(r.ok).toBe(true);
-    const out = r.result as { count: number; names: string[]; searchTermsQuery: string; changeEventsQuery: string; conversionPerfQuery: string; recommendationsQuery: string; billingSetupsQuery: string };
-    expect(out.count).toBe(23);
+    const out = r.result as { count: number; names: string[]; searchTermsQuery: string; changeEventsQuery: string; conversionPerfQuery: string; recommendationsQuery: string };
+    // Must be ≤ gaqlParallel's MAX_PARALLEL_QUERIES (20) so the canonical
+    // audit example works without hitting the per-call limit.
+    expect(out.count).toBe(20);
+    expect(out.count).toBeLessThanOrEqual(20);
     expect(out.names).toEqual(expect.arrayContaining([
       "campaigns",
       "searchTerms",
@@ -95,18 +97,20 @@ describe("buildAdsHost bootstrap surface", () => {
       "conversionActions",
       "conversionActionPerformance",
       "recommendations",
-      "billingSetups",
       "campaignAssets",
       "sharedNegativeKeywordLists",
       "pausedCampaigns",
-      "customerManagerLinks",
       "changeEvents",
     ]));
+    // billingSetups, sharedNegativeKeywordMembers, customerManagerLinks were
+    // removed from the default pack to stay within the 20-query limit.
+    expect(out.names).not.toContain("billingSetups");
+    expect(out.names).not.toContain("sharedNegativeKeywordMembers");
+    expect(out.names).not.toContain("customerManagerLinks");
     expect(out.searchTermsQuery).toContain("FROM search_term_view");
     expect(out.changeEventsQuery).toContain("FROM change_event");
     expect(out.conversionPerfQuery).toContain("segments.conversion_action_name");
     expect(out.recommendationsQuery).toContain("FROM recommendation");
-    expect(out.billingSetupsQuery).toContain("FROM billing_setup");
   });
 
   it("exposes pure helpers that behave identically to the host versions", async () => {

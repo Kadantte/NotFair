@@ -333,6 +333,10 @@ function buildBootstrap(): string {
       // but the important surfaces are hard to forget. Usage:
       //   const { start, end } = ads.helpers.getDateRange(90);
       //   const r = await ads.gaqlParallel(ads.queries.auditPack(start, end));
+      // Returns exactly 20 queries — the gaqlParallel per-call limit.
+      // For billing setup, shared negative list members, or manager links,
+      // query ads.queries.billingSetups / sharedNegativeKeywordMembers /
+      // customerManagerLinks separately after the main audit.
       ads.queries.auditPack = (start, end) => [
         { name: "acct", query: ads.queries.accountInfo, limit: 1 },
         { name: "campaigns", query: ads.queries.campaigns(start, end), limit: 500 },
@@ -346,16 +350,13 @@ function buildBootstrap(): string {
         { name: "conversionActions", query: ads.queries.conversionActions, limit: 500 },
         { name: "conversionActionPerformance", query: ads.queries.conversionActionPerformance(start, end), limit: 500 },
         { name: "recommendations", query: ads.queries.recommendations, limit: 1000 },
-        { name: "billingSetups", query: ads.queries.billingSetups, limit: 100 },
         { name: "negativeKeywords", query: ads.queries.negativeKeywords, limit: 1000 },
         { name: "sharedNegativeKeywordLists", query: ads.queries.sharedNegativeKeywordLists, limit: 100 },
-        { name: "sharedNegativeKeywordMembers", query: ads.queries.sharedNegativeKeywordMembers, limit: 2000 },
         { name: "campaignAssets", query: ads.queries.campaignAssets, limit: 1000 },
         { name: "adGroupAssets", query: ads.queries.adGroupAssets, limit: 1000 },
         { name: "networkSegmentation", query: ads.queries.networkSegmentation(start, end), limit: 1000 },
         { name: "landingPages", query: ads.queries.landingPages(start, end), limit: 500 },
         { name: "pausedCampaigns", query: ads.queries.pausedCampaigns, limit: 500 },
-        { name: "customerManagerLinks", query: ads.queries.customerManagerLinks, limit: 100 },
         { name: "changeEvents", query: ads.queries.changeEvents(start, end), limit: 500 },
       ];
       Object.freeze(ads.queries);
