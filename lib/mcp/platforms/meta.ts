@@ -91,8 +91,21 @@ Conventions:
 - Ad account ids: pass the unprefixed numeric form (e.g. \`123456789\`); the
   tools add the \`act_\` prefix where Graph requires it.
 - Campaign / ad-set / ad ids are plain numeric strings.
-- Statuses: ACTIVE, PAUSED, ARCHIVED, DELETED. \`effective_status\` is a
-  superset that also includes IN_PROCESS, PENDING_REVIEW, etc.
+- Status axes: \`configured_status\` (a.k.a. \`status\`) is ACTIVE / PAUSED /
+  ARCHIVED. \`effective_status\` is the runtime state — superset that also
+  includes IN_PROCESS, PENDING_REVIEW, DISAPPROVED, etc. Filter
+  \`/campaigns\`, \`/adsets\`, \`/ads\` by \`effective_status\` using the
+  values ACTIVE, PAUSED, ARCHIVED. DELETED is NOT queryable on those
+  endpoints — Meta returns \`(#100) Invalid parameter\` with
+  \`error_subcode: 1815001\` ("Cannot Request for Deleted Objects").
+- Insights date_preset enum: today, yesterday, this_month, last_month,
+  this_quarter, maximum, data_maximum, last_3d, last_7d, last_14d,
+  last_28d, last_30d, last_90d, last_week_mon_sun, last_week_sun_sat,
+  last_quarter, last_year, this_week_mon_today, this_week_sun_today,
+  this_year. There is NO "lifetime" — use "maximum" for all-time.
+- \`object_story_spec\` lives on \`adcreative\`, not on \`ad\`. Reach it
+  via \`ad?fields=creative{object_story_spec}\` expansion, or query the
+  creative id directly.
 
 Handling write rejections:
 - A 400 with \`(#100) Invalid parameter\` typically means the entity id doesn't

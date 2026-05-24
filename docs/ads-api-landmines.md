@@ -1,6 +1,6 @@
-# Google Ads API Landmines
+# Ad-Platform API Landmines
 
-Empirical traps in the Google Ads API + the `google-ads-api` Node library. Each entry is something we either got bitten by or verified through code review. Append on every new bug found — the value compounds.
+Empirical traps in the Google Ads API + the `google-ads-api` Node library, and in the Meta Marketing (Graph) API. Each entry is something we either got bitten by or verified through code review. Append on every new bug found — the value compounds.
 
 Format: `[surface] one-line rule — Why it bites — How to verify`
 
@@ -113,6 +113,26 @@ When fixing a GAQL pattern or library quirk, sweep these surfaces. A single bug 
 - `lib/google-ads/audit/queries.test.ts` — snapshot tests for GAQL builders
 - `lib/__tests__/google-ads-gaql.test.ts` — GAQL validator/auto-rewrite logic
 - `lib/mcp/__tests__/tool-registration.test.ts` — tool schema registration + GAQL filter assertions
+
+### Meta surfaces
+- `lib/meta-ads/client.ts` — Graph client, error envelope, date_preset normalization
+- `lib/mcp/meta-tools/read-tools.ts` — read tool schemas (StatusFilterSchema, DatePresetSchema)
+- `lib/mcp/meta-tools/write-tools.ts` — write tool schemas + validate-only opt-in
+- `lib/mcp/code-mode-meta/meta-host.ts` — runScript sandbox bootstrap (ads.fields, ads.datePresets)
+- `lib/mcp/code-mode-meta/index.ts` — runScript system prompt (COMMON GOTCHAS)
+- `lib/mcp/platforms/meta.ts` — MCP server-level instructions
+- `__tests__/integration/meta-mcp-live.test.ts` — live regression cases (opt-in via META_MCP_TEST_BEARER_TOKEN)
+
+---
+
+## Meta Marketing API (Graph v21+) — empirical rules
+
+- **`effective_status` does not accept `DELETED` on `/campaigns`, `/adsets`, or `/ads`.** Meta returns HTTP 400 with `code 100`, `error_subcode 1815001`, `error_user_title: "Cannot Request for Deleted Objects"`, `error_user_msg: "Requesting for deleted objects is not supported in this endpoint."`. **`ARCHIVED` is accepted.** Pre-fix, our schema described `effective_status: ['ACTIVE','PAUSED','ARCHIVED','DELETED']` and the prompt at `lib/mcp/platforms/meta.ts` echoed all four — 9 production failures across 3 users before this was caught. The schema at `lib/mcp/meta-tools/read-tools.ts:StatusFilterSchema` now enforces `['ACTIVE','PAUSED','ARCHIVED']`; verified by the live regression case `listCampaigns(statuses: ['DELETED']) is rejected by the schema (subcode 1815001)` in `__tests__/integration/meta-mcp-live.test.ts`.
+- **`date_preset` rejects `"lifetime"` — the value Meta uses for all-time is `"maximum"`.** Production hit: 3 distinct users got `"lifetime is not a valid date_preset"`. The runScript host's `ads.datePresets` array used to ship `"lifetime"` (`lib/mcp/code-mode-meta/meta-host.ts`). The valid enum is captured in `META_DATE_PRESETS` at `lib/meta-ads/client.ts`; `normalizeDatePreset` auto-translates `lifetime`/`all_time`/`alltime` → `maximum` so the agent's first try still lands.
+- **Meta's error envelope carries `error_user_msg` and `error_user_title` alongside `message` — surface them or agents loop.** `message` alone is often just `"Invalid parameter"`; the actionable detail lives in `error_user_msg`. Pre-fix, one user's runScript ran an 11-iteration binary-search loop trying to figure out which adset field Meta rejected — the body had the answer the whole time. `buildMetaErrorMessage` at `lib/meta-ads/client.ts` prefers `error_user_msg`, appends both `code N` and `subcode N` so callers can branch on documented subcode tables (e.g. 1815001). Verified at `lib/meta-ads/client.test.ts` ("surfaces error_user_msg + subcode when Meta returns rich envelope").
+- **`object_story_spec` lives on `adcreative`, not on `ad`.** Asking for `object_story_spec` directly on `/{ad_id}` returns `(#100) Tried accessing nonexisting field`. Reach it via the `creative{object_story_spec}` sub-selection or query the creative id directly. The runScript host exposes `ads.fields.adWithCreativeSpec` with the correct expansion (`lib/mcp/code-mode-meta/meta-host.ts`). 5 production occurrences from one user's session.
+- **`/{ad_account}/insights` is a GET endpoint; `time_range` is a JSON-stringified object, not a `since=…&until=…` pair.** Already handled in `metaInsights`; flagged here so future expansions of /insights coverage don't reinvent it.
+- **Page Access Tokens are required for `/{page_post_id}/insights` even when the user has `pages_read_engagement` granted.** Fetch via `/me/accounts` and use the per-page `access_token` on the call. The mistake is reaching for the user token. See `getPagePostInsights` in `lib/mcp/meta-tools/read-tools.ts`.
 
 ---
 

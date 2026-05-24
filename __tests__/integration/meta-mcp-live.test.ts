@@ -239,6 +239,108 @@ describe.skipIf(!BEARER)("Meta MCP live", () => {
     expect(parsed.ads.length).toBeLessThanOrEqual(5);
   });
 
+  // ─── Regression cases for the 2026-05 error-fix bundle ────────────────
+  // These verify the four fixes empirically against Meta v21:
+  //   1. effective_status accepts ARCHIVED, not DELETED (subcode 1815001)
+  //   2. date_preset rejects "lifetime" at the schema before round-tripping
+  //   3. Meta's error_user_msg / error_user_title surface in MCP errors
+  //   4. ads.fields.adWithCreativeSpec resolves object_story_spec correctly
+  //
+  // See lib/meta-ads/client.test.ts for the unit-level coverage.
+
+  it("listCampaigns(statuses: [ACTIVE,PAUSED,ARCHIVED]) succeeds (ARCHIVED is queryable)", { timeout: 30_000 }, async () => {
+    const { isError, parsed } = await callTool("listCampaigns", {
+      statuses: ["ACTIVE", "PAUSED", "ARCHIVED"],
+      limit: 5,
+    });
+    expect(isError).toBe(false);
+    expect(Array.isArray(parsed.campaigns)).toBe(true);
+  });
+
+  it("listCampaigns(statuses: ['DELETED']) is rejected by the schema (subcode 1815001)", async () => {
+    // The Zod schema strips DELETED before we ever hit Meta. The MCP
+    // returns isError=true with a Zod validation message — agents don't
+    // burn a Meta round-trip on a known-unsupported value.
+    const { isError, text } = await callTool("listCampaigns", {
+      statuses: ["DELETED"],
+      limit: 1,
+    });
+    expect(isError).toBe(true);
+    expect(text.toLowerCase()).toMatch(/invalid|enum|deleted/);
+  });
+
+  it("getInsights(date_preset: 'lifetime') auto-translates to 'maximum' and succeeds", { timeout: 30_000 }, async () => {
+    // Pre-fix: Meta rejected with "lifetime is not a valid date_preset…".
+    // Post-fix: metaInsights translates lifetime → maximum and the call
+    // succeeds against the real /insights endpoint.
+    const { isError, parsed } = await callTool("getInsights", {
+      level: "account",
+      date_preset: "lifetime",
+      limit: 1,
+    });
+    expect(isError).toBe(false);
+    expect(Array.isArray(parsed.rows)).toBe(true);
+  });
+
+  it("getInsights(date_preset: 'yesterweek') is rejected by the schema (no Meta round-trip)", async () => {
+    const { isError, text } = await callTool("getInsights", {
+      level: "campaign",
+      date_preset: "yesterweek",
+      limit: 1,
+    });
+    expect(isError).toBe(true);
+    expect(text.toLowerCase()).toContain("date_preset");
+  });
+
+  it("Meta error envelope surfaces error_user_msg + subcode when forced via runScript", { timeout: 30_000 }, async () => {
+    // runScript bypasses the StatusFilterSchema, so we can force Meta to
+    // return the subcode 1815001 envelope. The agent-facing error message
+    // MUST carry "Cannot Request for Deleted Objects" so the agent
+    // self-corrects, not "Invalid parameter (code 100)" alone.
+    const { parsed } = await callTool("runScript", {
+      code: `
+        try {
+          await ads.graph("/{accountId}/campaigns", {
+            fields: "id,name",
+            effective_status: JSON.stringify(["DELETED"]),
+            limit: 1,
+          });
+          return { caughtError: false };
+        } catch (e) {
+          return { caughtError: true, message: String(e?.message ?? e) };
+        }
+      `,
+    });
+    expect(parsed.ok).toBe(true);
+    expect(parsed.result.caughtError).toBe(true);
+    const message: string = parsed.result.message;
+    expect(message).toContain("Cannot Request for Deleted Objects");
+    expect(message).toContain("subcode 1815001");
+  });
+
+  it("runScript: ads.fields.adWithCreativeSpec resolves object_story_spec via creative expansion", { timeout: 30_000 }, async () => {
+    // Pre-fix: agents asked for `object_story_spec` directly on /{ad_id}
+    // and got "(#100) Tried accessing nonexisting field". The new
+    // constant pulls it through the creative{...} sub-selection.
+    const { isError, parsed } = await callTool("runScript", {
+      code: `
+        const r = await ads.graph("/{accountId}/ads", {
+          fields: ads.fields.adWithCreativeSpec,
+          limit: 1,
+        });
+        const ad = r.data?.[0];
+        return {
+          hasResult: !!ad,
+          // Empty accounts return data: [] — that's a pass; we only fail
+          // if Meta rejects the field expansion itself.
+          hasCreative: ad ? typeof ad.creative === "object" : null,
+        };
+      `,
+    });
+    expect(isError).toBe(false);
+    expect(parsed.ok).toBe(true);
+  });
+
   it("runScript: ads.graph fetches /me Graph API user", async () => {
     const { isError, parsed } = await callTool("runScript", {
       code: `return await ads.graph("/me", { fields: "id,name" });`,

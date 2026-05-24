@@ -19,6 +19,8 @@ import {
   metaGraphAllPages,
   metaInsights,
   withActPrefix,
+  META_DATE_PRESETS,
+  normalizeDatePreset,
   type InsightsLevel,
 } from "@/lib/meta-ads/client";
 
@@ -26,8 +28,15 @@ const InsightsLevelSchema = z
   .enum(["account", "campaign", "adset", "ad"])
   .default("campaign");
 
+// Meta's `effective_status` filter rejects "DELETED" with HTTP 400 + subcode
+// 1815001 ("Cannot Request for Deleted Objects — Requesting for deleted
+// objects is not supported in this endpoint."). Empirically verified 2026-05
+// against /act_*/campaigns. ARCHIVED is accepted. Keep the enum tight so
+// agents can't ship the broken value — Meta's error envelope was sparse
+// enough that agents loop in runScript trial-and-error when they hit it
+// (16+ such loops in production logs across one user's session).
 const StatusFilterSchema = z
-  .array(z.enum(["ACTIVE", "PAUSED", "DELETED", "ARCHIVED"]))
+  .array(z.enum(["ACTIVE", "PAUSED", "ARCHIVED"]))
   .optional();
 
 export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
@@ -70,8 +79,13 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
         date_preset: z
           .string()
           .optional()
+          .refine((v) => v === undefined || normalizeDatePreset(v) !== null, {
+            message:
+              `Invalid date_preset. Use one of: ${META_DATE_PRESETS.join(", ")}. ` +
+              `For all-time data use "maximum" — Meta does not accept "lifetime".`,
+          })
           .describe(
-            "Predefined window (e.g. last_7d, last_30d, last_90d, this_month, lifetime). Mutually exclusive with time_range.",
+            `Predefined window. Accepted values: ${META_DATE_PRESETS.join(", ")}. For all-time use "maximum" (NOT "lifetime"). Mutually exclusive with time_range.`,
           ),
         time_range: z
           .object({
@@ -152,7 +166,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
       inputSchema: {
         accountId: accountIdParam,
         statuses: StatusFilterSchema.describe(
-          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only — pass `['ACTIVE','PAUSED','ARCHIVED','DELETED']` to include archived and deleted campaigns.",
+          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only — pass `['ACTIVE','PAUSED','ARCHIVED']` to include archived campaigns. Meta does NOT expose DELETED campaigns through this endpoint (subcode 1815001).",
         ),
         limit: z
           .number()
@@ -203,7 +217,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
             "Filter to ad sets under this campaign. Omit to list every ad set in the account.",
           ),
         statuses: StatusFilterSchema.describe(
-          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only.",
+          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only — pass `['ACTIVE','PAUSED','ARCHIVED']` to include archived ad sets. DELETED is not queryable through this endpoint (subcode 1815001).",
         ),
         limit: z
           .number()
@@ -256,7 +270,7 @@ export const registerMetaReadTools: ToolRegistrar = (server, currentAuth) => {
           .optional()
           .describe("Filter to ads under this ad set. Omit to list across the whole account."),
         statuses: StatusFilterSchema.describe(
-          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only.",
+          "Filter by effective_status. Default (unset): Meta returns ACTIVE + PAUSED only — pass `['ACTIVE','PAUSED','ARCHIVED']` to include archived ads. DELETED is not queryable through this endpoint (subcode 1815001).",
         ),
         limit: z
           .number()

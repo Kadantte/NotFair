@@ -14,6 +14,64 @@ import { getEnv } from "@/lib/env";
 
 const DEFAULT_API_VERSION = "v21.0";
 
+/**
+ * Valid `date_preset` values for /insights as of Meta Marketing API v21.
+ * Empirically verified: Meta rejects `"lifetime"` with a help URL
+ * pointing here, and accepts `"maximum"` for the same semantics.
+ */
+export const META_DATE_PRESETS = [
+  "today",
+  "yesterday",
+  "this_month",
+  "last_month",
+  "this_quarter",
+  "maximum",
+  "data_maximum",
+  "last_3d",
+  "last_7d",
+  "last_14d",
+  "last_28d",
+  "last_30d",
+  "last_90d",
+  "last_week_mon_sun",
+  "last_week_sun_sat",
+  "last_quarter",
+  "last_year",
+  "this_week_mon_today",
+  "this_week_sun_today",
+  "this_year",
+] as const;
+
+export type MetaDatePreset = (typeof META_DATE_PRESETS)[number];
+
+/**
+ * Map common LLM mistakes back to valid Meta presets. `lifetime` was the
+ * top recurring agent-side error in production (cluster of 3 distinct
+ * users hit it before this guard landed) — Meta uses `maximum` for the
+ * same "all data ever" semantics.
+ */
+const DATE_PRESET_ALIASES: Record<string, MetaDatePreset> = {
+  lifetime: "maximum",
+  all_time: "maximum",
+  alltime: "maximum",
+};
+
+/**
+ * Normalize an incoming `date_preset` value. Returns the valid Meta preset
+ * (possibly translated from a known alias) or `null` if the value is
+ * unrecognized. Callers should reject `null` rather than forwarding it —
+ * Meta's own error message helpfully lists valid values but the agent
+ * still wastes a round-trip when we let bad input through.
+ */
+export function normalizeDatePreset(value: string): MetaDatePreset | null {
+  const lower = value.toLowerCase().trim();
+  if (DATE_PRESET_ALIASES[lower]) return DATE_PRESET_ALIASES[lower];
+  if ((META_DATE_PRESETS as readonly string[]).includes(lower)) {
+    return lower as MetaDatePreset;
+  }
+  return null;
+}
+
 function apiVersion(): string {
   return getEnv("META_GRAPH_API_VERSION") ?? DEFAULT_API_VERSION;
 }
@@ -28,7 +86,51 @@ export type GraphErrorPayload = {
   code?: number;
   error_subcode?: number;
   fbtrace_id?: string;
+  // User-facing fields Meta returns alongside `message` on most validation
+  // errors. These carry the actionable detail — e.g. subcode 1815001 ships
+  // `error_user_title: "Cannot Request for Deleted Objects"` while `message`
+  // is just `"Invalid parameter"`. Empirically verified 2026-05 against the
+  // /campaigns edge with `effective_status` containing DELETED. Surfacing
+  // them keeps agents from binary-searching the request shape to figure
+  // out which parameter Meta rejected.
+  error_user_msg?: string;
+  error_user_title?: string;
+  /**
+   * Free-form structured detail Meta sometimes adds (insights param errors,
+   * targeting validation). Shape varies; we pass it through verbatim.
+   */
+  message_details?: unknown;
+  /** Per-field validation errors on creative / targeting mutations. */
+  error_data?: unknown;
 };
+
+/**
+ * Build the user-facing error string from Meta's response envelope.
+ *
+ * Priority: `error_user_msg` > `message`. Always appends `(code N)` /
+ * `(subcode N)` when present so callers can match on Meta's documented
+ * subcode table without parsing the message text. `error_user_title` is
+ * surfaced when it adds signal beyond `error_user_msg` (Meta sometimes
+ * sets the title and omits the msg, e.g. older endpoints).
+ */
+export function buildMetaErrorMessage(
+  envelope: GraphErrorPayload | null,
+  method: string,
+  path: string,
+): string {
+  const prefix = `Meta Graph ${method} ${path}`;
+  if (!envelope) return `${prefix}: HTTP error (no error envelope)`;
+  const headline = envelope.error_user_msg ?? envelope.message ?? "Unknown error";
+  const title =
+    envelope.error_user_title && envelope.error_user_title !== headline
+      ? ` [${envelope.error_user_title}]`
+      : "";
+  const codeTags: string[] = [];
+  if (envelope.code != null) codeTags.push(`code ${envelope.code}`);
+  if (envelope.error_subcode != null) codeTags.push(`subcode ${envelope.error_subcode}`);
+  const codes = codeTags.length > 0 ? ` (${codeTags.join(", ")})` : "";
+  return `${prefix}: ${headline}${title}${codes}`;
+}
 
 export class MetaApiError extends Error {
   readonly status: number;
@@ -147,9 +249,8 @@ export async function metaGraph<T = unknown>(
       : null;
 
   if (!res.ok || errorEnvelope) {
-    const message = errorEnvelope?.message
-      ? `Meta Graph ${method} ${path}: ${errorEnvelope.message}`
-        + (errorEnvelope.code ? ` (code ${errorEnvelope.code})` : "")
+    const message = errorEnvelope
+      ? buildMetaErrorMessage(errorEnvelope, method, path)
       : `Meta Graph ${method} ${path}: HTTP ${res.status}`;
     throw new MetaApiError({
       status: res.status,
@@ -220,9 +321,8 @@ export async function metaGraphAllPages<T = unknown>(
         status: res.status,
         path: req.path,
         graphError: errorEnvelope,
-        message: errorEnvelope?.message
-          ? `Meta Graph paging ${req.path}: ${errorEnvelope.message}`
-            + (errorEnvelope.code ? ` (code ${errorEnvelope.code})` : "")
+        message: errorEnvelope
+          ? buildMetaErrorMessage(errorEnvelope, "paging", req.path)
           : `Meta Graph paging ${req.path}: HTTP ${res.status}`,
       });
     }
@@ -333,6 +433,22 @@ export async function metaInsights<T = Record<string, unknown>>(
   if (options.date_preset && options.time_range) {
     throw new Error("metaInsights: pass `date_preset` OR `time_range`, not both.");
   }
+  // Defense in depth: even if the tool layer validated, callers from
+  // runScript can drop in any string. Translate aliases (`lifetime` →
+  // `maximum`) and reject unknown values with a list of valid presets so
+  // the agent doesn't burn a round-trip on Meta's rejection.
+  let resolvedPreset: MetaDatePreset | undefined;
+  if (options.date_preset) {
+    const normalized = normalizeDatePreset(options.date_preset);
+    if (!normalized) {
+      throw new Error(
+        `metaInsights: invalid date_preset "${options.date_preset}". ` +
+          `Valid values: ${META_DATE_PRESETS.join(", ")}. ` +
+          `Note: Meta does not accept "lifetime" — use "maximum" for all-time.`,
+      );
+    }
+    resolvedPreset = normalized;
+  }
   const totalCap = options.limit ?? 100;
   const params: Record<string, string | number> = {
     level: options.level ?? "campaign",
@@ -341,7 +457,7 @@ export async function metaInsights<T = Record<string, unknown>>(
     // 100 (Meta's effective max for /insights default fields).
     limit: Math.min(totalCap, 100),
   };
-  if (options.date_preset) params.date_preset = options.date_preset;
+  if (resolvedPreset) params.date_preset = resolvedPreset;
   if (options.time_range) params.time_range = JSON.stringify(options.time_range);
   if (options.time_increment !== undefined) params.time_increment = String(options.time_increment);
   if (options.breakdowns?.length) params.breakdowns = options.breakdowns.join(",");

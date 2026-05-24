@@ -227,6 +227,13 @@ function buildBootstrap(targetId: string): string {
       "id,name,status,effective_status,campaign_id,optimization_goal,billing_event,bid_amount,bid_strategy,daily_budget,lifetime_budget,start_time,end_time,targeting,promoted_object,created_time,updated_time",
     ad:
       "id,name,status,effective_status,adset_id,campaign_id,creative,configured_status,created_time,updated_time",
+    // Use this when you need the creative payload — `object_story_spec`
+    // lives on `adcreative`, NOT on `ad` directly. Querying
+    // `/{ad_id}?fields=object_story_spec` returns (#100) "Tried accessing
+    // nonexisting field". Reach it via the `creative{...}` expansion or
+    // query `/{creative_id}` instead.
+    adWithCreativeSpec:
+      "id,name,status,effective_status,adset_id,campaign_id,creative{id,name,object_story_spec,effective_object_story_id,thumbnail_url},configured_status,created_time,updated_time",
     adAccount:
       "id,account_id,name,currency,timezone_name,account_status,balance,amount_spent,spend_cap,disable_reason,business",
     insightsAudit:
@@ -235,21 +242,26 @@ function buildBootstrap(targetId: string): string {
       "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,reach,actions",
   };
 
-  // Common date presets accepted by /insights' `date_preset`. Surface as
-  // constants so scripts get autocomplete-style ergonomics.
+  // Date presets accepted by /insights' `date_preset`. Surface as constants
+  // so scripts get autocomplete-style ergonomics.
+  //
+  // IMPORTANT: do not add "lifetime" — Meta rejects it. Use "maximum" for
+  // all-time semantics (verified empirically against v21; Meta's own error
+  // message redirects "lifetime" callers to this list).
   const datePresets = [
     "today",
     "yesterday",
     "this_month",
     "last_month",
     "this_quarter",
+    "maximum",
+    "data_maximum",
     "last_3d",
     "last_7d",
     "last_14d",
     "last_28d",
     "last_30d",
     "last_90d",
-    "lifetime",
   ];
 
   return `

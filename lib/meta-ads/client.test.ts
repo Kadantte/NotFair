@@ -18,10 +18,13 @@ vi.mock("@/lib/env", () => ({
 }));
 
 import {
+  buildMetaErrorMessage,
+  META_DATE_PRESETS,
   metaGraph,
   metaGraphAllPages,
   metaInsights,
   MetaApiError,
+  normalizeDatePreset,
 } from "./client";
 
 type Init = RequestInit | undefined;
@@ -146,6 +149,146 @@ describe("metaGraph", () => {
       MetaApiError,
     );
   });
+
+  // Production regression: pre-fix, the error string was just
+  // `Meta Graph GET ...: Invalid parameter (code 100)` — the agent then
+  // burned 11 successive runScript iterations trying to figure out which
+  // field was bad. Meta's actual body carries `error_user_msg`
+  // ("Requesting for deleted objects is not supported in this endpoint.")
+  // and `error_user_title` ("Cannot Request for Deleted Objects") that we
+  // were dropping. Verified empirically against /act_*/campaigns with
+  // effective_status=["DELETED"] on 2026-05-23.
+  it("surfaces error_user_msg + subcode when Meta returns rich envelope (DELETED rejection)", async () => {
+    const { stub } = makeFetchStub([
+      {
+        status: 400,
+        body: {
+          error: {
+            message: "Invalid parameter",
+            type: "OAuthException",
+            code: 100,
+            error_subcode: 1815001,
+            error_user_title: "Cannot Request for Deleted Objects",
+            error_user_msg:
+              "Requesting for deleted objects is not supported in this endpoint.",
+            fbtrace_id: "A_s_ZuYouwJAs0tt3-_6DzA",
+          },
+        },
+      },
+    ]);
+    vi.stubGlobal("fetch", stub);
+
+    try {
+      await metaGraph("token", { path: "/act_123/campaigns" });
+      throw new Error("expected metaGraph to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(MetaApiError);
+      const e = err as MetaApiError;
+      // Agent-facing message must carry the actionable text, not just
+      // "Invalid parameter".
+      expect(e.message).toContain("Requesting for deleted objects");
+      expect(e.message).toContain("Cannot Request for Deleted Objects");
+      // Both the top-level code AND the subcode should be in the string —
+      // Meta documents many issues by subcode (e.g. 1815001).
+      expect(e.message).toContain("code 100");
+      expect(e.message).toContain("subcode 1815001");
+      // Raw envelope passes through so callers can branch on subcode.
+      expect(e.graphError?.error_subcode).toBe(1815001);
+      expect(e.graphError?.error_user_msg).toBeDefined();
+    }
+  });
+
+  it("falls back to `message` when error_user_msg is absent (older endpoints)", async () => {
+    const { stub } = makeFetchStub([
+      {
+        status: 400,
+        body: {
+          error: {
+            message: "Some legacy error",
+            type: "OAuthException",
+            code: 100,
+          },
+        },
+      },
+    ]);
+    vi.stubGlobal("fetch", stub);
+
+    try {
+      await metaGraph("token", { path: "/v1/legacy" });
+    } catch (err) {
+      expect((err as MetaApiError).message).toContain("Some legacy error");
+      expect((err as MetaApiError).message).toContain("code 100");
+    }
+  });
+});
+
+describe("buildMetaErrorMessage", () => {
+  it("prefers error_user_msg over message and tags both codes", () => {
+    const msg = buildMetaErrorMessage(
+      {
+        message: "Invalid parameter",
+        code: 100,
+        error_subcode: 1815001,
+        error_user_title: "Cannot Request for Deleted Objects",
+        error_user_msg: "Requesting for deleted objects is not supported in this endpoint.",
+      },
+      "GET",
+      "/act_1/campaigns",
+    );
+    expect(msg).toMatchInlineSnapshot(
+      `"Meta Graph GET /act_1/campaigns: Requesting for deleted objects is not supported in this endpoint. [Cannot Request for Deleted Objects] (code 100, subcode 1815001)"`,
+    );
+  });
+
+  it("omits the title when it duplicates the user msg", () => {
+    const msg = buildMetaErrorMessage(
+      {
+        error_user_msg: "Token expired",
+        error_user_title: "Token expired",
+        code: 190,
+      },
+      "GET",
+      "/me",
+    );
+    expect(msg).toContain("Token expired");
+    // No duplicate "[Token expired]" bracket — the title would just repeat.
+    expect((msg.match(/Token expired/g) ?? []).length).toBe(1);
+  });
+
+  it("handles null envelope as 'no error envelope'", () => {
+    const msg = buildMetaErrorMessage(null, "POST", "/act_1/adsets");
+    expect(msg).toBe("Meta Graph POST /act_1/adsets: HTTP error (no error envelope)");
+  });
+});
+
+describe("normalizeDatePreset", () => {
+  it("returns the preset unchanged when valid", () => {
+    expect(normalizeDatePreset("last_30d")).toBe("last_30d");
+    expect(normalizeDatePreset("maximum")).toBe("maximum");
+  });
+
+  it("translates the most-common LLM mistake (lifetime → maximum)", () => {
+    expect(normalizeDatePreset("lifetime")).toBe("maximum");
+    expect(normalizeDatePreset("Lifetime")).toBe("maximum");
+    expect(normalizeDatePreset("LIFETIME")).toBe("maximum");
+  });
+
+  it("translates other common aliases", () => {
+    expect(normalizeDatePreset("all_time")).toBe("maximum");
+    expect(normalizeDatePreset("alltime")).toBe("maximum");
+  });
+
+  it("returns null for unknown values (caller decides how to surface)", () => {
+    expect(normalizeDatePreset("last_60d")).toBeNull();
+    expect(normalizeDatePreset("forever")).toBeNull();
+    expect(normalizeDatePreset("")).toBeNull();
+  });
+
+  it("covers every preset listed in META_DATE_PRESETS", () => {
+    for (const preset of META_DATE_PRESETS) {
+      expect(normalizeDatePreset(preset)).toBe(preset);
+    }
+  });
 });
 
 describe("metaGraphAllPages", () => {
@@ -261,5 +404,20 @@ describe("metaInsights", () => {
         time_range: { since: "2026-01-01", until: "2026-01-07" },
       }),
     ).rejects.toThrow(/date_preset.*OR.*time_range/);
+  });
+
+  it("auto-translates lifetime → maximum and lets the call through (defense in depth)", async () => {
+    const { stub, calls } = makeFetchStub([{ body: { data: [] } }]);
+    vi.stubGlobal("fetch", stub);
+
+    await metaInsights("tok", "act_1", { date_preset: "lifetime" });
+    expect(calls[0].url).toContain("date_preset=maximum");
+    expect(calls[0].url).not.toContain("date_preset=lifetime");
+  });
+
+  it("rejects an unrecognized date_preset with a helpful message (runScript safety)", async () => {
+    await expect(
+      metaInsights("tok", "act_1", { date_preset: "yesterweek" }),
+    ).rejects.toThrow(/invalid date_preset.*"yesterweek"/);
   });
 });

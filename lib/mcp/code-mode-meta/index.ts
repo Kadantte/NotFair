@@ -45,8 +45,8 @@ Sync helpers:
 
 Constants:
 - ads.activeAccountId — the active ad-account numeric id (no act_ prefix).
-- ads.fields.* — comma-joined field-list strings: campaign, adset, ad, adAccount, insightsAudit, insightsLite. Drop into params.fields.
-- ads.datePresets — array of preset strings accepted by /insights date_preset.
+- ads.fields.* — comma-joined field-list strings: campaign, adset, ad, adWithCreativeSpec, adAccount, insightsAudit, insightsLite. Drop into params.fields. Use \`adWithCreativeSpec\` when you need creative payload — \`object_story_spec\` lives on adcreative, NOT on ad.
+- ads.datePresets — array of preset strings accepted by /insights date_preset. Meta does NOT accept "lifetime" — use "maximum" for all-time.
 
 Path templates:
 - "/{accountId}/campaigns"  →  "/act_<active-id>/campaigns"
@@ -80,6 +80,12 @@ return { worstCampaigns: worst, totals: { campaigns: r.campaigns.rowCount, adset
 - Top-level await works. No fetch / require / process / fs reachable.
 - Return value must be JSON-serializable. Limits: 30000ms (30s) timeout, max 45000ms (45s), 500KB return cap, 100K log chars.
 - Mutations (pause/enable/budget) go through dedicated tools (\`pauseCampaign\`, \`pauseAdSet\`, \`pauseAd\`, ...). Never write through runScript.
+
+── COMMON GOTCHAS ──
+- effective_status accepts ACTIVE, PAUSED, ARCHIVED. DELETED is NOT queryable on /campaigns, /adsets, /ads — Meta returns "Invalid parameter" with subcode 1815001.
+- date_preset: use "maximum" for all-time, not "lifetime" (Meta rejects "lifetime").
+- object_story_spec is on adcreative, not ad. Query \`/{ad_id}?fields=creative{object_story_spec}\` or use \`ads.fields.adWithCreativeSpec\`.
+- Money fields on /campaigns and /adsets (daily_budget, lifetime_budget, bid_amount) are MINOR units (cents for USD ad accounts). Read the ad account's currency via /{accountId}?fields=currency before reasoning about a value.
 
 ── ANTI-PATTERNS ──
 - Calling runScript 5+ times to fetch different surfaces — that's what graphParallel replaces.
