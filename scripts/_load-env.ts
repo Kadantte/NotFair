@@ -11,7 +11,11 @@ export function loadEnvLocal(): void {
       if (eqIdx === -1) continue;
       const key = trimmed.slice(0, eqIdx).trim();
       const value = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
-      if (!process.env[key]) process.env[key] = value;
+      // CLI scripts should prefer the repo-local environment. Hermes cron and
+      // other hosts may export their own DATABASE_URL/DIRECT_URL, which would
+      // otherwise shadow NotFair's Supabase URL and point feedback automation at
+      // the wrong database.
+      if (key) process.env[key] = value;
     }
   } catch {
     /* .env.local not found — rely on env vars */
