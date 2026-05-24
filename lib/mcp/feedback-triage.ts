@@ -62,6 +62,14 @@ export function classifyMcpFeedback(row: McpToolFeedbackRow): Pick<McpFeedbackTr
     return { triage_category: "missing_tool", priority: "medium", safe_autonomous_pr: false };
   }
 
+  // Route workflow_gap before text-pattern checks: workflow observations
+  // commonly contain words like "validation", "field", or "input" (e.g.
+  // "returned validation_error for the documented filter examples") that
+  // would otherwise trigger the input_schema_fix branch incorrectly.
+  if (row.category === "workflow_gap" || row.category === "ergonomic") {
+    return { triage_category: "workflow_ergonomics", priority: "medium", safe_autonomous_pr: false };
+  }
+
   if (/schema|parameter|param|field|zod|input|enum|required|validation/.test(text)) {
     return { triage_category: "input_schema_fix", priority: "medium", safe_autonomous_pr: true };
   }

@@ -48,6 +48,41 @@ describe("MCP feedback triage", () => {
     });
   });
 
+  it("routes workflow_gap category to workflow_ergonomics even when observation contains schema-pattern words", () => {
+    // Regression for feedback #8: the observation mentioned "validation_error"
+    // which matched the /validation/ text pattern and was mis-classified as
+    // input_schema_fix before the workflow category check was reached.
+    expect(
+      classifyMcpFeedback({
+        ...baseFeedback,
+        category: "workflow_gap",
+        affectedTool: "general",
+        observation:
+          "The suggestion-generation workflow depends on recent external signals, but `_notion_query_meeting_notes` returned `validation_error` for the documented minimal past-week filter examples.",
+        suggestion: "Fix example parity so documented relative-date filters work as-is.",
+      }),
+    ).toEqual({
+      triage_category: "workflow_ergonomics",
+      priority: "medium",
+      safe_autonomous_pr: false,
+    });
+  });
+
+  it("routes ergonomic category to workflow_ergonomics even when observation contains schema-pattern words", () => {
+    expect(
+      classifyMcpFeedback({
+        ...baseFeedback,
+        category: "ergonomic",
+        observation: "The required field list is long and the input schema could use sensible defaults.",
+        suggestion: "Add default values to reduce the number of required inputs.",
+      }),
+    ).toEqual({
+      triage_category: "workflow_ergonomics",
+      priority: "medium",
+      safe_autonomous_pr: false,
+    });
+  });
+
   it("does not misroute missing docs or schema details as a missing tool", () => {
     expect(
       classifyMcpFeedback({
