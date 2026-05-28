@@ -59,6 +59,40 @@ rmSync(STANDALONE, { recursive: true, force: true });
 renameSync(DEREF, STANDALONE);
 console.log(`Dereferenced symlinks under ${STANDALONE.replace(ROOT + "/", "")}`);
 
+// Hoist native-module loaders to a resolvable location. better-sqlite3 is a
+// serverExternalPackage, so Next leaves its `require('bindings')` as a runtime
+// resolve. pnpm nests `bindings` (and its dep `file-uri-to-path`) under
+// node_modules/.pnpm/<pkg>@<ver>/..., where Node's resolver — walking up from
+// better-sqlite3's own dir — never looks. Copying them to the top-level
+// node_modules/ makes them resolvable from every better-sqlite3 copy (both the
+// top-level one and Turbopack's hashed .next/node_modules alias). Without this,
+// the published tarball boots straight into `Cannot find module 'bindings'`.
+const STANDALONE_NM = join(STANDALONE, "node_modules");
+for (const pkg of ["bindings", "file-uri-to-path"]) {
+  const dest = join(STANDALONE_NM, pkg);
+  if (existsSync(dest)) continue;
+  const src = findInPnpm(pkg, STANDALONE_NM) ?? findInPnpm(pkg, join(ROOT, "node_modules"));
+  if (!src) {
+    console.warn(`Warning: could not locate '${pkg}' to hoist; standalone may fail to load better-sqlite3.`);
+    continue;
+  }
+  cpSync(src, dest, { recursive: true });
+  console.log(`Hoisted ${pkg} → ${dest.replace(ROOT + "/", "")}`);
+}
+
+// Locate a package's real directory inside a pnpm store
+// (<nm>/.pnpm/<pkg>@<ver>/node_modules/<pkg>). Returns the first match or null.
+function findInPnpm(pkg, nodeModules) {
+  const pnpmDir = join(nodeModules, ".pnpm");
+  if (!existsSync(pnpmDir)) return null;
+  for (const entry of readdirSync(pnpmDir)) {
+    if (!entry.startsWith(`${pkg}@`)) continue;
+    const candidate = join(pnpmDir, entry, "node_modules", pkg);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 // Sanity check: there should be no symlinks left in standalone after dereferencing.
 const remaining = countSymlinks(STANDALONE);
 if (remaining > 0) {

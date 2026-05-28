@@ -1,10 +1,10 @@
 {
   "name": "notfair-cmo",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0",
   "description": "Open-source AI marketing CMO portal. Run locally; orchestrates OpenClaw marketing agents (Google Ads, SEO, and more).",
   "license": "MIT",
   "bin": {
-    "notfair-cmo": "./bin/cli.mjs"
+    "notfair-cmo": "bin/cli.mjs"
   },
   "files": [
     "bin/",
@@ -87,5 +87,11 @@
       "unrs-resolver",
       "node-pty"
     ]
-  }
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ]
 }

@@ -11,6 +11,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.1] — 2026-05-24
+
+### Fixed
+
+- **`notfair-cmo` standalone build now boots.** The published tarball crashed on launch with `Cannot find module 'bindings'` — `better-sqlite3`'s native loader was present in the pnpm store but not at a path Node could resolve. `scripts/copy-standalone-assets.mjs` now hoists `bindings` and `file-uri-to-path` into the standalone's top-level `node_modules/`.
+- **`notfair-cmo` `package.json`** — corrected the `bin` path (`./bin/cli.mjs` → `bin/cli.mjs`, which npm 11 was stripping at publish), set first real release version `0.1.0`, and added an `os`/`cpu` guard (`darwin`/`arm64`) so unsupported platforms fail install cleanly instead of crashing at runtime.
+
+### Changed
+
+- **Portal default port moved `3000` → `3327`** (dev server stays on `3326`), avoiding the common `3000` collision and keeping dev/published ports adjacent. `/notfair:cmo` and the `notfair-cmo` CLI now use `3327`.
+- **`next.config.ts`** — added `allowedDevOrigins: ["127.0.0.1"]` so the dev server hydrates when opened on the loopback IP.
+
+---
+
 ## [0.25.0] — 2026-05-24
 
 ### Added

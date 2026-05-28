@@ -17,7 +17,7 @@ allowed-tools:
 
 Open the local NotFair CMO portal in the user's browser.
 
-The portal is a Node app (`notfair-cmo`) that runs on `http://127.0.0.1:3000` and lets the user chat with specialist marketing agents (CMO, Google Ads, SEO), schedule recurring work, and watch tool calls stream inline. Source: [`notfair-cmo/`](../notfair-cmo/). Distributed via `npx notfair-cmo@latest`.
+The portal is a Node app (`notfair-cmo`) that runs on `http://127.0.0.1:3327` and lets the user chat with specialist marketing agents (CMO, Google Ads, SEO), schedule recurring work, and watch tool calls stream inline. Source: [`notfair-cmo/`](../notfair-cmo/). Distributed via `npx notfair-cmo@latest`.
 
 This skill **does not implement the portal** — it only launches it. If you need to change portal behavior, edit `notfair-cmo/` and ship via its own npm release.
 
@@ -25,14 +25,14 @@ This skill **does not implement the portal** — it only launches it. If you nee
 
 ## Default port
 
-`3000` unless the user specifies otherwise (`--port`). If 3000 is busy, the portal's CLI auto-probes the next 5 ports.
+`3327` unless the user specifies otherwise (`--port`). If 3327 is busy, the portal's CLI auto-probes the next 5 ports. (The dev server uses `3326`; the published portal uses `3327`.)
 
 ---
 
 ## Step 1: Probe — is it already running?
 
 ```bash
-PORT=3000
+PORT=3327
 if curl -fsS --max-time 1 -o /dev/null "http://127.0.0.1:$PORT/" 2>/dev/null; then
   echo "RUNNING"
 else

@@ -32,7 +32,7 @@ program
 program
   .command("start", { isDefault: true })
   .description("Start the local server and open the UI in your browser.")
-  .option("-p, --port <port>", "Port to bind", "3000")
+  .option("-p, --port <port>", "Port to bind", "3327")
   .option("--no-open", "Do not auto-open the browser")
   .option("--data-dir <dir>", "Override data directory", DATA_DIR)
   .action(async (opts) => {
@@ -88,7 +88,7 @@ program
   .command("doctor")
   .description("Verify this machine is ready to run notfair-cmo.")
   .option("--data-dir <dir>", "Override data directory", DATA_DIR)
-  .option("-p, --port <port>", "Preferred port for the server", "3000")
+  .option("-p, --port <port>", "Preferred port for the server", "3327")
   .action(async (opts) => {
     const results = [];
 
