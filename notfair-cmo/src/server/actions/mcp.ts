@@ -4,9 +4,16 @@ import { randomBytes, createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getActiveProject } from "@/server/active-project";
-import { mcpSpecByKey } from "@/server/mcp-catalog";
+import { isPresetKey, mcpSpecByKey } from "@/server/mcp-catalog";
 import { setPending } from "@/server/mcp-pending";
 import { disconnectMcp as runDisconnect } from "@/server/mcp/state";
+import {
+  insertUserMcpServer,
+  findUserMcpServer,
+  deleteUserMcpServer,
+} from "@/server/db/user-mcp-servers";
+import { slugify } from "@/lib/slug";
+import { deriveDiscoveryUrl } from "@/server/mcp/discovery-url";
 
 export type StartMcpConnectResult =
   | { ok: true; authorize_url: string }
@@ -28,13 +35,13 @@ export async function startMcpConnect(input: {
    */
   return_to?: string;
 }): Promise<StartMcpConnectResult> {
-  const spec = mcpSpecByKey(input.mcp_key);
-  if (!spec) return { ok: false, error: `Unknown MCP key: ${input.mcp_key}` };
-
   const project = await getActiveProject();
   if (!project) {
     return { ok: false, error: "No active project. Pick one before connecting an MCP." };
   }
+
+  const spec = mcpSpecByKey(project.slug, input.mcp_key);
+  if (!spec) return { ok: false, error: `Unknown MCP key: ${input.mcp_key}` };
 
   let resolved: ResolvedAuthServer;
   try {
@@ -170,6 +177,161 @@ export async function listMcpToolsAction(input: {
   return { ok: true, tools };
 }
 
+export type ProbeMcpDiscoveryResult =
+  | {
+      ok: true;
+      discovery_url: string;
+      issuer: string;
+      registration_endpoint: string;
+    }
+  | { ok: false; error: string; kind: ProbeFailureKind };
+
+type ProbeFailureKind =
+  | "bad_url"
+  | "no_discovery_doc"
+  | "no_authorization_servers"
+  | "as_metadata_missing_endpoints"
+  | "dcr_unsupported";
+
+/**
+ * Validate that a candidate MCP resource URL is OAuth-2.0 connectable.
+ *
+ * Derives the RFC 9728 discovery URL from the resource URL, fetches it,
+ * follows the first `authorization_servers` issuer, fetches its RFC 8414
+ * metadata, and asserts the AS publishes a `registration_endpoint` (DCR).
+ *
+ * Returns the resolved discovery URL on success so the caller can stash
+ * it on the user_mcp_servers row — the connect flow reuses that URL
+ * verbatim, so we don't re-derive it later.
+ */
+export async function probeMcpDiscovery(input: {
+  resource_url: string;
+}): Promise<ProbeMcpDiscoveryResult> {
+  const discovery_url = deriveDiscoveryUrl(input.resource_url);
+  if (!discovery_url) {
+    return {
+      ok: false,
+      kind: "bad_url",
+      error: "Resource URL must be an https URL.",
+    };
+  }
+  try {
+    const resolved = await resolveAuthServer(discovery_url);
+    return {
+      ok: true,
+      discovery_url,
+      issuer: resolved.issuer,
+      registration_endpoint: resolved.registration_endpoint,
+    };
+  } catch (err) {
+    return classifyProbeError(err);
+  }
+}
+
+export type AddUserMcpServerResult =
+  | { ok: true; key: string }
+  | { ok: false; error: string; kind: AddFailureKind };
+
+type AddFailureKind = ProbeFailureKind | "no_project" | "name_unusable" | "key_in_use";
+
+/**
+ * Register a user-added MCP server for the active project.
+ *
+ * Slugs the display name into a stable `key` (also used as
+ * `mcp_tokens.server_name` post-connect), probes discovery to confirm the
+ * server is OAuth-2.0-with-DCR connectable, and writes a row to
+ * `user_mcp_servers`. The user then clicks Connect on the resulting card
+ * to drive the existing OAuth flow.
+ */
+export async function addUserMcpServerAction(input: {
+  display_name: string;
+  description?: string;
+  resource_url: string;
+}): Promise<AddUserMcpServerResult> {
+  const project = await getActiveProject();
+  if (!project) {
+    return {
+      ok: false,
+      kind: "no_project",
+      error: "No active project. Pick one before adding an MCP server.",
+    };
+  }
+  const slug = slugify(input.display_name);
+  if (!slug.ok) {
+    return {
+      ok: false,
+      kind: "name_unusable",
+      error: `Can't derive a key from this name: ${slug.reason}.`,
+    };
+  }
+  if (isPresetKey(slug.slug) || findUserMcpServer(project.slug, slug.slug)) {
+    return {
+      ok: false,
+      kind: "key_in_use",
+      error: `An MCP server named '${slug.slug}' already exists in this project.`,
+    };
+  }
+  const probe = await probeMcpDiscovery({ resource_url: input.resource_url });
+  if (!probe.ok) return probe;
+  insertUserMcpServer({
+    project_slug: project.slug,
+    key: slug.slug,
+    display_name: input.display_name.trim(),
+    description: input.description?.trim() ?? "",
+    resource_url: input.resource_url.trim(),
+    discovery_url: probe.discovery_url,
+  });
+  revalidatePath("/", "layout");
+  return { ok: true, key: slug.slug };
+}
+
+/**
+ * Remove a user-added MCP server from the active project. Drops the
+ * stored bearer (if any), unregisters from every agent's harness config,
+ * and deletes the catalog row.
+ *
+ * Presets cannot be removed this way — the action refuses unknown or
+ * preset keys.
+ */
+export async function removeUserMcpServerAction(input: {
+  mcp_key: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const project = await getActiveProject();
+  if (!project) {
+    return { ok: false, error: "No active project." };
+  }
+  if (isPresetKey(input.mcp_key)) {
+    return { ok: false, error: "Preset MCP servers can't be removed." };
+  }
+  const row = findUserMcpServer(project.slug, input.mcp_key);
+  if (!row) {
+    return { ok: false, error: `Unknown MCP key: ${input.mcp_key}.` };
+  }
+  try {
+    await runDisconnect(project.slug, input.mcp_key);
+    const { listProjectAgents } = await import("@/server/agent-meta");
+    const { getProject } = await import("@/server/db/projects");
+    const { requireAdapter } = await import("@/server/adapters/registry");
+    const proj = getProject(project.slug);
+    if (proj) {
+      const adapter = requireAdapter(proj.harness_adapter);
+      const agents = await listProjectAgents(project.slug);
+      for (const agent of agents) {
+        try {
+          await adapter.unregisterMcp(input.mcp_key, agent.agent_id);
+        } catch {
+          // best-effort
+        }
+      }
+    }
+    deleteUserMcpServer(project.slug, input.mcp_key);
+  } catch (err) {
+    return { ok: false, error: humanError(err) };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 // ─── helpers ────────────────────────────────────────────────────────
 
 type ResolvedAuthServer = {
@@ -179,36 +341,119 @@ type ResolvedAuthServer = {
   registration_endpoint: string;
 };
 
+class ProbeError extends Error {
+  kind: ProbeFailureKind;
+  constructor(kind: ProbeFailureKind, message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
+
 async function resolveAuthServer(
   resourceDiscoveryUrl: string,
 ): Promise<ResolvedAuthServer> {
   // RFC 9728: GET .well-known/oauth-protected-resource → carries the
   // `authorization_servers` array. We pick the first and then fetch its
   // RFC 8414 AS metadata to learn registration/token/authorize endpoints.
-  const r1 = await fetchJson(resourceDiscoveryUrl, 8000);
+  let r1: unknown;
+  try {
+    r1 = await fetchJson(resourceDiscoveryUrl, 8000);
+  } catch (err) {
+    throw new ProbeError(
+      "no_discovery_doc",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
   const servers = (r1 as { authorization_servers?: unknown }).authorization_servers;
   if (!Array.isArray(servers) || servers.length === 0) {
-    throw new Error("no authorization_servers in discovery doc");
+    throw new ProbeError(
+      "no_authorization_servers",
+      "no authorization_servers in discovery doc",
+    );
   }
   const issuer = String(servers[0]).replace(/\/$/, "");
-  // Standard AS metadata path; some notfair-style servers also accept a
-  // path-suffixed variant. Try the standard first — the path-suffixed
-  // variant is a hint for clients that skip RFC 9728, which we just
-  // didn't.
-  const asMetaUrl = `${issuer}/.well-known/oauth-authorization-server`;
-  const meta = (await fetchJson(asMetaUrl, 8000)) as Partial<ResolvedAuthServer>;
-  if (
-    !meta.authorization_endpoint
-    || !meta.token_endpoint
-    || !meta.registration_endpoint
-  ) {
-    throw new Error("AS metadata missing endpoints");
+  // RFC 8414 §3.1 says the well-known suffix is inserted between the
+  // issuer's host and path (the "inserted" form). The OIDC Discovery and
+  // some MCP servers also accept the issuer-suffix variant ("appended"
+  // form). Try each in order until one returns valid metadata.
+  const candidates = asMetadataCandidates(issuer);
+  const attempts: string[] = [];
+  let meta: Partial<ResolvedAuthServer> | null = null;
+  for (const url of candidates) {
+    attempts.push(url);
+    try {
+      meta = (await fetchJson(url, 8000)) as Partial<ResolvedAuthServer>;
+      break;
+    } catch {
+      // try the next candidate
+    }
+  }
+  if (!meta) {
+    throw new ProbeError(
+      "as_metadata_missing_endpoints",
+      `Couldn't fetch AS metadata. Tried: ${attempts.join(", ")}`,
+    );
+  }
+  if (!meta.authorization_endpoint || !meta.token_endpoint) {
+    throw new ProbeError(
+      "as_metadata_missing_endpoints",
+      "AS metadata missing authorize/token endpoints",
+    );
+  }
+  if (!meta.registration_endpoint) {
+    throw new ProbeError(
+      "dcr_unsupported",
+      "AS metadata is missing registration_endpoint — dynamic client registration is required.",
+    );
   }
   return {
     issuer,
     authorization_endpoint: meta.authorization_endpoint,
     token_endpoint: meta.token_endpoint,
     registration_endpoint: meta.registration_endpoint,
+  };
+}
+
+/**
+ * Build the AS-metadata URLs to probe, in priority order, for a given
+ * issuer. The "inserted" variants are spec-correct (RFC 8414 §3.1 / OIDC
+ * Discovery §4); the "appended" variants are a common deviation a number
+ * of real-world MCP servers still ship — including, ironically, the
+ * issuer URL Stripe advertises (`https://access.stripe.com/mcp`), which
+ * resolves only via the inserted form.
+ */
+function asMetadataCandidates(issuer: string): string[] {
+  const out: string[] = [];
+  let u: URL;
+  try {
+    u = new URL(issuer);
+  } catch {
+    return out;
+  }
+  const path = u.pathname === "/" ? "" : u.pathname.replace(/\/+$/, "");
+  const origin = u.origin;
+  // RFC 8414: inserted between host and path.
+  out.push(`${origin}/.well-known/oauth-authorization-server${path}`);
+  // OIDC Discovery: same insertion shape with a different suffix.
+  out.push(`${origin}/.well-known/openid-configuration${path}`);
+  // Appended-form fallbacks for servers that don't follow the insertion
+  // rule. Only worth trying when the issuer has a non-root path; for a
+  // root issuer the appended form equals the inserted form.
+  if (path) {
+    out.push(`${issuer.replace(/\/$/, "")}/.well-known/oauth-authorization-server`);
+    out.push(`${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`);
+  }
+  return out;
+}
+
+function classifyProbeError(err: unknown): ProbeMcpDiscoveryResult {
+  if (err instanceof ProbeError) {
+    return { ok: false, kind: err.kind, error: err.message };
+  }
+  return {
+    ok: false,
+    kind: "no_discovery_doc",
+    error: err instanceof Error ? err.message : String(err),
   };
 }
 

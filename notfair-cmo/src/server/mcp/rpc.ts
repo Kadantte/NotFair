@@ -42,7 +42,7 @@ export function readMcpConfigRow(
   project_slug: string,
   catalog_key: string,
 ): McpConfigRow | null {
-  const spec = mcpSpecByKey(catalog_key);
+  const spec = mcpSpecByKey(project_slug, catalog_key);
   if (!spec) return null;
   const token = findMcpToken(project_slug, catalog_key);
   if (!token) return { url: spec.resource_url };

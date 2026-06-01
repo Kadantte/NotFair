@@ -1,17 +1,23 @@
 /**
- * Static catalog of MCP servers the notfair-cmo UI knows how to connect.
+ * Project-scoped catalog of MCP servers the notfair-cmo UI knows about.
  *
- * "Known" means we have a stable URL + OAuth discovery doc the server-side
- * connect flow can drive end-to-end with zero LLM in the loop. Arbitrary
- * MCPs (user describes one in chat) still go through the agent — the
- * catalog is just the fast path for the ones we ship with.
+ * Two sources merge into one list:
  *
- * MCPs are managed at the project level (the Connections page). Tokens live
- * in the `mcp_tokens` SQLite table, scoped by (project_slug, server_name).
- * Per-agent visibility is enforced by the harness adapter's `registerMcp`
- * hook, which writes the chosen agent's MCP config to point at the right
- * token row.
+ *  - Static **presets** (this file): curated entries we ship with —
+ *    server URL + OAuth discovery doc are stable, so the connect flow
+ *    can drive end-to-end with zero LLM in the loop.
+ *  - **User-added** servers (`user_mcp_servers` SQLite table): anything
+ *    the user registers from the Connections page. Same `McpSpec` shape;
+ *    distinguished by `source: 'user'` so the UI can offer a "Remove"
+ *    action.
+ *
+ * Everything downstream of the catalog (OAuth callback, token storage in
+ * `mcp_tokens`, harness adapter `registerMcp`) is keyed off `spec.key`,
+ * which doubles as `mcp_tokens.server_name`. So both kinds of entries
+ * flow through the same code paths once registered.
  */
+
+import { listUserMcpServers } from "@/server/db/user-mcp-servers";
 
 export type McpSpec = {
   /** Stable catalog identifier (used by the UI + mcp_tokens.server_name). */
@@ -22,9 +28,11 @@ export type McpSpec = {
   resource_url: string;
   /** RFC 9728 protected-resource discovery endpoint. */
   discovery_url: string;
+  /** Where this entry came from — presets are immutable from the UI. */
+  source: "preset" | "user";
 };
 
-export const MCP_CATALOG: McpSpec[] = [
+export const MCP_CATALOG_PRESETS: McpSpec[] = [
   {
     key: "notfair-googleads",
     display_name: "NotFair Google Ads",
@@ -33,9 +41,43 @@ export const MCP_CATALOG: McpSpec[] = [
     resource_url: "https://notfair.co/api/mcp/google_ads",
     discovery_url:
       "https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads",
+    source: "preset",
   },
 ];
 
-export function mcpSpecByKey(key: string): McpSpec | undefined {
-  return MCP_CATALOG.find((m) => m.key === key);
+/** True if any preset reserves this key. Presets win over user rows. */
+export function isPresetKey(key: string): boolean {
+  return MCP_CATALOG_PRESETS.some((p) => p.key === key);
+}
+
+export function getMcpPresets(): McpSpec[] {
+  return MCP_CATALOG_PRESETS;
+}
+
+/**
+ * Return the merged catalog for a project: presets first, then user-added
+ * rows. A preset key shadows any colliding user row (which the add-server
+ * action prevents at insert time, but we double-check on read too).
+ */
+export function getMcpCatalog(project_slug: string): McpSpec[] {
+  const presets = MCP_CATALOG_PRESETS;
+  const presetKeys = new Set(presets.map((p) => p.key));
+  const userRows = listUserMcpServers(project_slug)
+    .filter((row) => !presetKeys.has(row.key))
+    .map<McpSpec>((row) => ({
+      key: row.key,
+      display_name: row.display_name,
+      description: row.description,
+      resource_url: row.resource_url,
+      discovery_url: row.discovery_url,
+      source: "user",
+    }));
+  return [...presets, ...userRows];
+}
+
+export function mcpSpecByKey(
+  project_slug: string,
+  key: string,
+): McpSpec | undefined {
+  return getMcpCatalog(project_slug).find((m) => m.key === key);
 }

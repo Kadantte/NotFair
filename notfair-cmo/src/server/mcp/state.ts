@@ -37,7 +37,7 @@ export async function getMcpStatus(
   project_slug: string,
   catalog_key: string,
 ): Promise<McpRuntimeStatus> {
-  const spec = mcpSpecByKey(catalog_key);
+  const spec = mcpSpecByKey(project_slug, catalog_key);
   if (!spec) return { state: "not_configured" };
   const token = findMcpToken(project_slug, catalog_key);
   if (!token) return { state: "not_configured" };

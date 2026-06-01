@@ -78,7 +78,7 @@ export async function registerCatalogMcpForAgent(
   catalog_key: string,
   agent_id: string,
 ): Promise<InstallResult> {
-  const spec = mcpSpecByKey(catalog_key);
+  const spec = mcpSpecByKey(project_slug, catalog_key);
   if (!spec) {
     return {
       ok: false,

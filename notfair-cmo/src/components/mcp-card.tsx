@@ -10,6 +10,7 @@ import {
   Unplug,
   XCircle,
   BookOpenText,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import {
   startMcpConnect,
   disconnectMcpAction,
   listMcpToolsAction,
+  removeUserMcpServerAction,
 } from "@/server/actions/mcp";
 import type { McpSpec } from "@/server/mcp-catalog";
 import type { McpRuntimeStatus } from "@/server/mcp/state";
@@ -31,7 +33,7 @@ type Props = {
 
 export function McpCard({ spec, status }: Props) {
   const [pending, startTransition] = useTransition();
-  const [busy, setBusy] = useState<"connect" | "disconnect" | null>(null);
+  const [busy, setBusy] = useState<"connect" | "disconnect" | "remove" | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const router = useRouter();
 
@@ -70,8 +72,23 @@ export function McpCard({ spec, status }: Props) {
     });
   }
 
+  function onRemove() {
+    setBusy("remove");
+    startTransition(async () => {
+      const result = await removeUserMcpServerAction({ mcp_key: spec.key });
+      if (!result.ok) {
+        toast.error(result.error);
+      } else {
+        toast.success(`${spec.display_name} removed`);
+        router.refresh();
+      }
+      setBusy(null);
+    });
+  }
+
   const isBusy = busy !== null || pending;
   const canViewTools = status.state === "connected";
+  const canRemove = spec.source === "user";
 
   return (
     <>
@@ -79,9 +96,7 @@ export function McpCard({ spec, status }: Props) {
         <CardContent className="space-y-4 p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
-                <Plug className="size-4" />
-              </div>
+              <McpIcon resourceUrl={spec.resource_url} alt={spec.display_name} />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-medium">{spec.display_name}</h3>
@@ -126,18 +141,37 @@ export function McpCard({ spec, status }: Props) {
 
           <div className="flex items-center justify-between gap-3">
             <StatusDetail status={status} />
-            {canViewTools && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setToolsOpen(true)}
-              >
-                <BookOpenText className="size-3.5" />
-                View tools
-              </Button>
-            )}
+            <div className="flex shrink-0 items-center gap-1">
+              {canViewTools && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setToolsOpen(true)}
+                >
+                  <BookOpenText className="size-3.5" />
+                  View tools
+                </Button>
+              )}
+              {canRemove && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  disabled={isBusy}
+                  onClick={onRemove}
+                >
+                  {busy === "remove" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
+                  Remove server
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -151,6 +185,58 @@ export function McpCard({ spec, status }: Props) {
       />
     </>
   );
+}
+
+/**
+ * Renders the MCP server's brand favicon via Google's `faviconV2` service.
+ *
+ * We strip subdomains down to the registrable domain (`mcp.stripe.com` →
+ * `stripe.com`) so the icon reflects the company's brand, not the API
+ * subdomain — Google rarely has a real favicon indexed for `mcp.*` or
+ * `api.*` hosts. Falls back to a Plug glyph on malformed URLs.
+ */
+function McpIcon({ resourceUrl, alt }: { resourceUrl: string; alt: string }) {
+  const [errored, setErrored] = useState(false);
+  let host: string | null = null;
+  try {
+    host = new URL(resourceUrl).hostname;
+  } catch {
+    host = null;
+  }
+  const brandHost = host ? brandDomain(host) : null;
+  const showImg = !!brandHost && !errored;
+  return (
+    <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${brandHost}&size=32`}
+          alt={alt}
+          width={20}
+          height={20}
+          className="size-5"
+          referrerPolicy="no-referrer"
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <Plug className="size-4" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Reduce a hostname to a "brand" host for favicon lookup. The Public
+ * Suffix List is the only fully correct answer here; the simple last-2-
+ * labels heuristic is wrong for some multipart TLDs (`example.co.uk`),
+ * but it's right for ~all consumer SaaS the connections page targets.
+ * Hosts that are already 2 labels or fewer (`notfair.co`, `localhost`)
+ * pass through unchanged.
+ */
+function brandDomain(host: string): string {
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length <= 2) return host;
+  return parts.slice(-2).join(".");
 }
 
 function StatusBadge({ status }: { status: McpRuntimeStatus }) {

@@ -43,6 +43,7 @@ const spec: McpSpec = {
   resource_url: "https://notfair.co/api/mcp/google_ads",
   discovery_url:
     "https://notfair.co/.well-known/oauth-protected-resource/api/mcp/google_ads",
+  source: "preset",
 };
 
 function connected(overrides: Partial<Extract<McpRuntimeStatus, { state: "connected" }>> = {}): McpRuntimeStatus {

@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { getProject } from "@/server/db/projects";
-import { MCP_CATALOG } from "@/server/mcp-catalog";
+import { getMcpCatalog } from "@/server/mcp-catalog";
 import { getMcpStatus } from "@/server/mcp/state";
 import { summarizeBuiltinTools } from "@/server/mcp-server/tool-summaries";
 import { McpCard } from "@/components/mcp-card";
 import { BuiltinMcpCard } from "@/components/builtin-mcp-card";
 import { McpFlashBanner } from "@/components/mcp-flash-banner";
+import { AddMcpServerCard } from "@/components/add-mcp-server-card";
 
 type Search = { mcp_connected?: string; mcp_error?: string };
 
@@ -22,10 +23,11 @@ export default async function ConnectionsPage({
   const { mcp_connected, mcp_error } = await searchParams;
   if (!project || project.archived_at) notFound();
 
+  const catalog = getMcpCatalog(project.slug);
   // Status probes happen in parallel — each has its own 2s timeout so a
   // flaky upstream doesn't gate the whole page.
   const statuses = await Promise.all(
-    MCP_CATALOG.map((s) => getMcpStatus(project.slug, s.key)),
+    catalog.map((s) => getMcpStatus(project.slug, s.key)),
   );
 
   // Built-in MCP: notfair-orchestration ships with the platform and serves
@@ -55,17 +57,19 @@ export default async function ConnectionsPage({
           tools={builtinTools}
         />
 
-        {MCP_CATALOG.length === 0 ? (
+        {catalog.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
               No external MCP servers in the catalog yet.
             </CardContent>
           </Card>
         ) : (
-          MCP_CATALOG.map((spec, i) => (
+          catalog.map((spec, i) => (
             <McpCard key={spec.key} spec={spec} status={statuses[i]} />
           ))
         )}
+
+        <AddMcpServerCard />
       </div>
     </div>
   );

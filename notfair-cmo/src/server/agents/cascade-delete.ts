@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import type { AgentTemplate } from "@/server/agent-templates";
 import { listProjectAgents } from "@/server/agent-meta";
-import { MCP_CATALOG } from "@/server/mcp-catalog";
+import { getMcpCatalog } from "@/server/mcp-catalog";
 import { listCronsForProject } from "@/server/scheduler/display";
 import { listProjectMcpTokens, deleteProjectMcpTokens } from "@/server/mcp/tokens";
 import { listAgentSessions } from "@/server/sessions";
@@ -72,12 +72,14 @@ export async function getProjectDeletionSummary(
   // pair.
   const tokens = listProjectMcpTokens(project_slug);
   const tokenServers = new Set(tokens.map((t) => t.server_name));
-  const mcps: ProjectDeletionMcpSummary[] = MCP_CATALOG.map((spec) => ({
-    catalog_key: spec.key,
-    display_name: spec.display_name,
-    stored_key: `${project_slug}-${spec.key}`,
-    configured: tokenServers.has(spec.key),
-  }));
+  const mcps: ProjectDeletionMcpSummary[] = getMcpCatalog(project_slug).map(
+    (spec) => ({
+      catalog_key: spec.key,
+      display_name: spec.display_name,
+      stored_key: `${project_slug}-${spec.key}`,
+      configured: tokenServers.has(spec.key),
+    }),
+  );
 
   return {
     project_slug,
@@ -107,8 +109,9 @@ export async function cascadeDeleteProjectArtifacts(project_slug: string): Promi
   // Unregister any MCP servers the adapter wrote into its config (so codex
   // global config doesn't leak agent-namespaced rows for deleted agents).
   if (adapter) {
+    const catalog = getMcpCatalog(project_slug);
     for (const agent of agents) {
-      for (const spec of MCP_CATALOG) {
+      for (const spec of catalog) {
         try {
           await adapter.unregisterMcp(spec.key, agent.agent_id);
         } catch {
@@ -139,4 +142,9 @@ export async function cascadeDeleteProjectArtifacts(project_slug: string): Promi
 
   // Drop MCP tokens.
   deleteProjectMcpTokens(project_slug);
+
+  // Drop user-added MCP catalog entries for the project.
+  getDb()
+    .prepare("DELETE FROM user_mcp_servers WHERE project_slug = ?")
+    .run(project_slug);
 }

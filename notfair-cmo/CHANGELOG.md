@@ -1,5 +1,15 @@
 # notfair-cmo
 
+## 0.3.1 — 2026-05-31
+
+User-configurable MCP catalog. The Connections page is no longer limited to the curated preset list — users can register any OAuth-2.0 MCP server (Stripe, Vercel, Supabase, or their own) by pasting a resource URL. The portal probes RFC 9728 protected-resource discovery + RFC 8414 AS metadata before persisting, so only servers that actually support dynamic client registration get past the form.
+
+- New `user_mcp_servers` SQLite table (migration `011`), project-scoped, joined with `MCP_CATALOG_PRESETS` by the new `getMcpCatalog(project_slug)` helper.
+- `mcpSpecByKey` is now project-scoped (`(project_slug, key)`); all call sites updated.
+- New server actions: `probeMcpDiscovery`, `addUserMcpServerAction`, `removeUserMcpServerAction`.
+- New "Add an MCP server" card on the Connections page; user-added cards get a "Remove server" affordance presets don't have.
+- `cascadeDeleteProjectArtifacts` cleans up `user_mcp_servers` rows on project deletion and unregisters the adapter rows for both presets and user-added entries.
+
 ## 0.3.0 — 2026-06-01
 
 End-to-end wiring + reliability pass on top of the 0.2.0 harness-agnostic rewrite. Every surface in the app is now driven by a real, persisted code path; no more half-finished stubs.
