@@ -82,6 +82,7 @@ async function dispatchJob(job: ScheduledJob): Promise<string | null> {
   let finalText: string | null = null;
   let deltaBuffer = "";
   const MAX_SUMMARY = 4000;
+  const errors: { message: string; transient: boolean }[] = [];
 
   for await (const evt of adapter.execute({
     projectSlug: project.slug,
@@ -101,10 +102,25 @@ async function dispatchJob(job: ScheduledJob): Promise<string | null> {
     } else if (evt.kind === "delta" && deltaBuffer.length < MAX_SUMMARY) {
       deltaBuffer += evt.text;
     } else if (evt.kind === "error") {
-      throw new Error(evt.message);
+      // Buffer rather than throw. Adapters (notably codex-local) can emit
+      // several error events during a single retry burst — the last one is
+      // usually the richest (exit code + stderr tail from execute.ts's
+      // close handler). Throwing on the first event surfaced opaque retry
+      // chatter like "Reconnecting... 2/5 (...)" and discarded the
+      // actionable post-exit message that arrived a few hundred ms later.
+      errors.push({ message: evt.message, transient: evt.transient ?? false });
     }
   }
   touchSession(session.id);
+
+  // No `final` and we have errors → the turn failed. Prefer the most recent
+  // non-transient error (the terminal exit-code message). Fall back to the
+  // last entry when everything was tagged transient (we ran out of richer
+  // signal; the retry chatter is all we have).
+  if (finalText === null && errors.length > 0) {
+    const terminal = [...errors].reverse().find((e) => !e.transient);
+    throw new Error((terminal ?? errors[errors.length - 1]!).message);
+  }
 
   const raw = (finalText ?? deltaBuffer).trim();
   if (!raw) return null;

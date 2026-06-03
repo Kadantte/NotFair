@@ -130,7 +130,14 @@ export async function* executeCodexLocal(
       for (const evt of out) events.push(evt);
       stdoutBuf = "";
     }
-    if (code !== 0 && !state.finalized) {
+    if (code !== 0) {
+      // Always push the exit-code+stderr-tail error on non-zero exit,
+      // even when state.finalized is set. `turn.failed` events from
+      // Codex's MCP reconnect loop are tagged transient by parse.ts and
+      // intentionally do NOT finalize the turn so we still get this
+      // richer post-exit message — but on a legitimately-finalized turn
+      // (turn.completed followed by a non-zero exit) the exit info is
+      // still the most actionable signal, so capture it unconditionally.
       const tail = stderrBuf.trim().split("\n").slice(-5).join("\n");
       events.push({
         kind: "error",

@@ -161,7 +161,46 @@ describe("parseCodexLine", () => {
       }),
       state,
     );
-    expect(out).toEqual([{ kind: "error", message: "rate limit hit" }]);
+    expect(out).toEqual([
+      { kind: "error", message: "rate limit hit", transient: false },
+    ]);
     expect(state.finalized).toBe(true);
+  });
+
+  it("tags Codex MCP reconnect chatter as transient and leaves the turn un-finalized", () => {
+    const state = makeCodexStreamState();
+    const out = parseCodexLine(
+      JSON.stringify({
+        type: "turn.failed",
+        error: {
+          message: "Reconnecting... 2/5 (timeout waiting for child process to exit)",
+        },
+      }),
+      state,
+    );
+    expect(out).toEqual([
+      {
+        kind: "error",
+        message: "Reconnecting... 2/5 (timeout waiting for child process to exit)",
+        transient: true,
+      },
+    ]);
+    // Critically: a transient error must NOT finalize the turn, otherwise
+    // execute.ts's close handler suppresses the richer post-exit error.
+    expect(state.finalized).toBe(false);
+  });
+
+  it("tags `type: error` lines that match the reconnect pattern as transient", () => {
+    const state = makeCodexStreamState();
+    const out = parseCodexLine(
+      JSON.stringify({
+        type: "error",
+        message: "Reconnecting... 1/5",
+      }),
+      state,
+    );
+    expect(out).toEqual([
+      { kind: "error", message: "Reconnecting... 1/5", transient: true },
+    ]);
   });
 });

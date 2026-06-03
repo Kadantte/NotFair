@@ -130,20 +130,48 @@ export function parseCodexLine(
   }
 
   if (event.type === "turn.failed") {
-    state.finalized = true;
-    events.push({
-      kind: "error",
-      message: event.error?.message ?? "codex turn failed",
-    });
+    const message = event.error?.message ?? "codex turn failed";
+    const transient = isTransientCodexError(message);
+    // Only flip `finalized` on a *terminal* failure. Transient retry
+    // chatter (Codex's MCP reconnect loop: "Reconnecting... N/5 ...")
+    // arrives on `turn.failed` too — if we marked the turn finalized
+    // there, the close handler in execute.ts would suppress the richer
+    // "codex exited with code N: <stderr tail>" error that lands after
+    // the process actually gives up.
+    if (!transient) state.finalized = true;
+    events.push({ kind: "error", message, transient });
     return events;
   }
 
   if (event.type === "error") {
-    events.push({ kind: "error", message: event.message ?? "codex error" });
+    const message = event.message ?? "codex error";
+    events.push({
+      kind: "error",
+      message,
+      transient: isTransientCodexError(message),
+    });
     return events;
   }
 
   return events;
+}
+
+/**
+ * Codex's MCP reconnect loop prints `Reconnecting... N/5 (...)` whenever
+ * a streamable-HTTP MCP server connection drops mid-turn. These are
+ * intermediate retry-state snapshots, not the terminal error — the real
+ * cause (network blip, expired token, etc.) is what eventually shows up
+ * on stderr when codex finally gives up. Surfacing the retry message as
+ * the run's error makes failures look opaque ("2/5 — why not 5/5?");
+ * tagging them lets the scheduler prefer the post-exit message instead.
+ */
+const TRANSIENT_CODEX_ERROR_PATTERNS: RegExp[] = [
+  /^Reconnecting\.\.\.\s+\d+\/\d+/,
+];
+
+export function isTransientCodexError(message: string): boolean {
+  const trimmed = message.trim();
+  return TRANSIENT_CODEX_ERROR_PATTERNS.some((re) => re.test(trimmed));
 }
 
 /**

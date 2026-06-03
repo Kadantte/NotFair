@@ -99,7 +99,17 @@ export type HarnessEvent =
     }
   | { kind: "lifecycle"; phase: string }
   | { kind: "final"; text: string }
-  | { kind: "error"; message: string }
+  | {
+      kind: "error";
+      message: string;
+      /**
+       * Set true when the message is mid-stream retry chatter (e.g. Codex's
+       * MCP reconnect loop printing "Reconnecting... 2/5"), not a terminal
+       * failure. Callers that need a single error to surface should prefer
+       * the most recent non-transient one.
+       */
+      transient?: boolean;
+    }
   /**
    * Adapter has learned the harness's own session id for this thread. The
    * caller should persist it on the `sessions.harness_session_id` column
