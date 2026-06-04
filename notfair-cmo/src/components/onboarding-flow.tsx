@@ -29,7 +29,8 @@ import {
   type GscProperty,
   type ConnectStepState,
 } from "@/server/onboarding/accounts";
-import { BrowseConnectorsDialog } from "@/components/browse-connectors-dialog";
+import { AddMcpServerMenu } from "@/components/add-mcp-server-card";
+import { McpIcon } from "@/components/mcp-icon";
 
 type Step =
   | "name"
@@ -61,15 +62,47 @@ function OnboardingFlowInner() {
       ? stepParam
       : "name";
 
+  // Step → progress-pip state mapping. The pickers (account, meta-account,
+  // gsc-property) all roll up under "Connect" because they're sub-flows
+  // launched from the connect step and return to it.
+  const phase: "name" | "connect" | "setup" =
+    step === "name" ? "name" : step === "setup" ? "setup" : "connect";
+
   return (
-    <div className="mx-auto w-full max-w-[720px] space-y-6 pt-8 pb-12">
+    <div className="ns-page">
       <a
         href="#onboarding-main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow"
       >
         Skip to content
       </a>
-      <main id="onboarding-main" className="space-y-6">
+
+      {/* Brand row + progress pips. The mark anchors the wizard so the user
+          always sees where they are; the pips show how far they've gone. */}
+      <div className="ns-topbar">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/notfair-mark.svg" alt="Notfair" />
+        <span className="ns-topbar-label">Notfair CMO</span>
+        <div className="ml-auto">
+          <div className="ns-progress">
+            <Pip n={1} label="Workspace" state={phase === "name" ? "active" : "done"} />
+            <span className="ns-pip-line" />
+            <Pip
+              n={2}
+              label="Connect"
+              state={phase === "name" ? "pending" : phase === "connect" ? "active" : "done"}
+            />
+            <span className="ns-pip-line" />
+            <Pip
+              n={3}
+              label="Setup"
+              state={phase === "setup" ? "active" : "pending"}
+            />
+          </div>
+        </div>
+      </div>
+
+      <main id="onboarding-main">
         {step === "name" && (
           <NameStep
             onCreated={(s) =>
@@ -89,6 +122,25 @@ function OnboardingFlowInner() {
           step === "setup") &&
           !slug && <MissingSlug />}
       </main>
+    </div>
+  );
+}
+
+function Pip({
+  n,
+  label,
+  state,
+}: {
+  n: number;
+  label: string;
+  state: "pending" | "active" | "done";
+}) {
+  return (
+    <div
+      className={`ns-pip ${state === "done" ? "is-done" : ""} ${state === "active" ? "is-active" : ""}`}
+    >
+      <span className="ns-pip-dot">{state === "done" ? "✓" : n}</span>
+      <span className="hidden sm:inline">{label}</span>
     </div>
   );
 }
@@ -176,84 +228,82 @@ function NameStep({ onCreated }: { onCreated: (slug: string) => void }) {
 
   return (
     <>
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-          Let&rsquo;s set up your CMO.
-        </h1>
-        <p className="text-sm text-muted-foreground">
+      <header>
+        <h1 className="ns-hero-title">Let&rsquo;s set up your workspace.</h1>
+        <p className="ns-hero-sub">
           Tell me what this workspace is so I can hit the ground running.
         </p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Workspace basics</CardTitle>
-          <CardDescription>
-            Name is required. Site and codebase are optional but help the
-            CMO write a more accurate first plan. Slug (used in agent
-            names) is derived from the name and immutable.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="display_name">Workspace name</Label>
-              <Input
-                id="display_name"
-                name="display_name"
-                required
-                autoFocus
-                placeholder="Notfair"
-                maxLength={80}
-                disabled={isPending}
-              />
-            </div>
+      <form action={formAction} className="mt-5 space-y-3.5">
+        <div className="space-y-1.5">
+          <Label htmlFor="display_name" className="text-[13px] font-medium">
+            Workspace name
+          </Label>
+          <Input
+            id="display_name"
+            name="display_name"
+            required
+            autoFocus
+            placeholder="Notfair"
+            maxLength={80}
+            disabled={isPending}
+            className="h-9 rounded-lg text-[14px]"
+          />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="website_url">
-                Website URL{" "}
-                <span className="text-xs font-normal text-muted-foreground">
-                  (optional)
-                </span>
-              </Label>
-              <Input
-                id="website_url"
-                name="website_url"
-                type="url"
-                placeholder="https://notfair.co"
-                maxLength={500}
-                disabled={isPending}
-              />
-              <p className="text-xs text-muted-foreground">
-                The CMO will skim a few pages to learn what you sell.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="codebase_path">
-                Local codebase folder{" "}
-                <span className="text-xs font-normal text-muted-foreground">
-                  (optional)
-                </span>
-              </Label>
-              <CodebasePathPicker disabled={isPending} />
-              <p className="text-xs text-muted-foreground">
-                Folder the CMO can read locally — README, package.json,
-                top-level files. Skim only, not a code review.
-              </p>
-            </div>
-            <HarnessPicker disabled={isPending} />
-            {errorMessage && (
-              <p role="alert" className="text-sm text-destructive">
-                {errorMessage}
-              </p>
-            )}
-            <Button type="submit" size="lg" disabled={isPending}>
-              {isPending ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : null}
-              Continue
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        <div className="space-y-1.5">
+          <Label htmlFor="website_url" className="text-[13px] font-medium">
+            Website URL{" "}
+            <span className="text-[12px] font-normal text-muted-foreground">
+              (optional)
+            </span>
+          </Label>
+          <Input
+            id="website_url"
+            name="website_url"
+            type="url"
+            placeholder="https://notfair.co"
+            maxLength={500}
+            disabled={isPending}
+            className="h-9 rounded-lg text-[14px]"
+          />
+          <p className="text-[11.5px] text-muted-foreground leading-tight">
+            The CMO will skim a few pages to learn what you sell.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="codebase_path" className="text-[13px] font-medium">
+            Local codebase folder{" "}
+            <span className="text-[12px] font-normal text-muted-foreground">
+              (optional)
+            </span>
+          </Label>
+          <CodebasePathPicker disabled={isPending} />
+          <p className="text-[11.5px] text-muted-foreground leading-tight">
+            Folder the CMO can read locally — README, package.json, top-level
+            files. Skim only.
+          </p>
+        </div>
+
+        <HarnessPicker disabled={isPending} />
+
+        {errorMessage && (
+          <p role="alert" className="text-[13px] text-destructive">
+            {errorMessage}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isPending}
+          className="ns-btn ns-btn-primary"
+        >
+          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Continue
+        </button>
+      </form>
     </>
   );
 }
@@ -342,9 +392,21 @@ function HarnessPicker({ disabled }: { disabled: boolean }) {
  */
 type RecommendedTile = {
   mcp_key: string;
-  display_name: string;
-  /** Short description shown under the title when the tile isn't connected. */
+  /** Primary row title — the MCP name, e.g. "Google Ads MCP". Doubles
+   *  as the tile's aria-label so existing tests that match by platform
+   *  prefix (`/^Google Ads/`) still resolve. */
+  mcp_display_name: string;
+  /** Short agent label rendered as a pill badge next to the title,
+   *  e.g. "Google Ads agent". The badge makes the MCP↔agent dependency
+   *  explicit so users understand connecting this MCP enables that agent. */
+  agent_badge: string;
+  /** What the user gets — phrased as the agent's capabilities (verbs),
+   *  not the MCP's data surfaces (nouns). Concrete benefit over abstract
+   *  feature listing. */
   description: string;
+  /** Resource URL the OAuth flow targets — also feeds <McpIcon>'s favicon
+   *  lookup so each tile shows the brand mark the connections page uses. */
+  resource_url: string;
   /** Sub-step the OAuth callback should land on so the user can pick an
    *  account/property when their token covers more than one. */
   account_step: "account" | "meta-account" | "gsc-property";
@@ -355,22 +417,33 @@ type RecommendedTile = {
 const RECOMMENDED_TILES: RecommendedTile[] = [
   {
     mcp_key: "notfair-googleads",
-    display_name: "Google Ads",
-    description: "Campaigns, bids, keywords, search terms, change history.",
+    mcp_display_name: "Google Ads MCP",
+    agent_badge: "Google Ads agent",
+    description:
+      "Audits campaigns, finds wasted spend, proposes bid changes.",
+    resource_url: "https://notfair.co/api/mcp/google_ads",
     account_step: "account",
     account_action_label: "Select Google Ads account",
   },
   {
     mcp_key: "notfair-metaads",
-    display_name: "Meta Ads",
-    description: "Facebook + Instagram campaigns, ad sets, creative, insights.",
+    mcp_display_name: "Meta Ads MCP",
+    agent_badge: "Meta Ads agent",
+    description:
+      "Audits ad sets, diagnoses creative fatigue, surfaces ROAS winners.",
+    resource_url: "https://notfair.co/api/mcp/meta_ads",
     account_step: "meta-account",
     account_action_label: "Select Meta ad account",
   },
   {
     mcp_key: "notfair-googlesearchconsole",
-    display_name: "Google Search Console",
-    description: "Organic search performance, queries, pages, indexing.",
+    mcp_display_name: "Google Search Console MCP",
+    // SEO agent owns Search Console — there's no dedicated GSC agent.
+    // See SPECIALIST_TEMPLATE_BY_MCP_KEY in agent-templates.ts.
+    agent_badge: "SEO agent",
+    description:
+      "Pulls organic performance, surfaces query and page movers, diagnoses indexing.",
+    resource_url: "https://notfair.co/api/mcp/google_search_console",
     account_step: "gsc-property",
     account_action_label: "Select GSC property",
   },
@@ -384,7 +457,6 @@ type ConnectStepStateView =
 function ConnectStep({ slug }: { slug: string }) {
   const router = useRouter();
   const [view, setView] = useState<ConnectStepStateView>({ phase: "loading" });
-  const [moreOpen, setMoreOpen] = useState(false);
   const [tileBusy, setTileBusy] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const connectionsHref = projectHref(slug, "/connections");
@@ -455,33 +527,27 @@ function ConnectStep({ slug }: { slug: string }) {
 
   if (view.phase === "loading") {
     return (
-      <Card>
-        <CardContent className="space-y-2 pt-6 pb-6">
-          <div className="flex items-center gap-3 text-sm">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
-            <span className="font-medium">Loading your connections&hellip;</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-3 text-sm text-muted-foreground py-8">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        <span>Loading your connections&hellip;</span>
+      </div>
     );
   }
 
   if (view.phase === "error") {
     return (
-      <Card role="alert">
-        <CardContent className="space-y-3 pt-6 pb-6">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 text-amber-600" aria-hidden />
-            <span className="font-medium text-sm">
-              Couldn&rsquo;t load connection state.
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground">{view.message}</p>
-          <Button asChild>
-            <Link href="/onboarding">Start over</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div role="alert" className="ns-list p-6 space-y-3">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="size-4 text-amber-600" aria-hidden />
+          <span className="font-medium text-sm">
+            Couldn&rsquo;t load connection state.
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">{view.message}</p>
+        <Link href="/onboarding" className="ns-btn ns-btn-primary">
+          Start over
+        </Link>
+      </div>
     );
   }
 
@@ -499,18 +565,15 @@ function ConnectStep({ slug }: { slug: string }) {
 
   return (
     <>
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-          Connect your tools.
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Each tool you connect lets one of your specialist agents come
-          online. Read-only at first &mdash; nothing changes until you
-          approve a write.
+      <header>
+        <h1 className="ns-hero-title">Connect MCPs to your agents.</h1>
+        <p className="ns-hero-sub">
+          Each MCP gives your <b>specialist agent</b> the data and APIs to
+          do real work.
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <ol className="ns-list">
         {RECOMMENDED_TILES.map((tile) => (
           <RecommendedConnectorTile
             key={tile.mcp_key}
@@ -522,50 +585,91 @@ function ConnectStep({ slug }: { slug: string }) {
             onPickAccount={() => onPickAccount(tile)}
           />
         ))}
-        <MoreConnectorsTile
-          extraConnectedCount={state.extra_connected_count}
-          onOpen={() => setMoreOpen(true)}
-        />
+        {/* Connected extras (Stripe, Supabase, …) added via the "More tools"
+            dialog land here, between the recommended trio and the More row,
+            so the list stays in the user's mental order: top tier first,
+            extras next, the door to add more last. */}
+        {state.extras.map((extra) => (
+          <ExtraConnectorTile key={extra.key} extra={extra} />
+        ))}
+        <li>
+          {/* Reuse the connections-page Add-MCP menu so onboarding gets the
+              same Browse + Custom paths. The trigger is a tile-shaped
+              button so it sits naturally as the last row of the grouped
+              list; the dropdown opens from there. */}
+          <AddMcpServerMenu
+            align="start"
+            // Hide the three recommended MCPs from Browse — they each have
+            // their own row above already, no point re-listing them.
+            hideKeys={RECOMMENDED_TILES.map((t) => t.mcp_key)}
+            // Filter already-connected entries from Browse. The dialog
+            // already filters via connectedKeys; the recommended trio is
+            // also in hideKeys above for belt-and-suspenders.
+            connectedKeys={[
+              ...(state.googleads.connected ? ["notfair-googleads"] : []),
+              ...(state.metaads.connected ? ["notfair-metaads"] : []),
+              ...(state.gsc.connected ? ["notfair-googlesearchconsole"] : []),
+              ...state.extras.map((e) => e.key),
+            ]}
+            trigger={
+              <button
+                type="button"
+                aria-label="More tools"
+                className="ns-tile w-full"
+              >
+                <span className="ns-tile-glyph" aria-hidden>
+                  +
+                </span>
+                <span className="ns-tile-body">
+                  <span className="ns-tile-name-row">
+                    <span className="ns-tile-name">More tools</span>
+                  </span>
+                  <span className="ns-tile-desc block">
+                    Browse Stripe, Supabase, PostHog, or paste a custom MCP URL.
+                  </span>
+                </span>
+                <span className="ns-tile-status">
+                  {state.extra_connected_count > 0 ? (
+                    <span>{state.extra_connected_count} connected</span>
+                  ) : (
+                    <span className="arrow" aria-hidden>
+                      ›
+                    </span>
+                  )}
+                </span>
+              </button>
+            }
+          />
+        </li>
+      </ol>
+
+      <div className="ns-foot">
+        <p className="ns-footnote">You can set up MCPs later in the app.</p>
+        {anyConnected ? (
+          <button
+            type="button"
+            onClick={onDone}
+            disabled={advancing}
+            className="ns-btn ns-btn-primary"
+          >
+            {advancing && <Loader2 className="size-4 animate-spin" />}
+            Next{" "}
+            <span aria-hidden style={{ fontWeight: 400 }}>
+              ›
+            </span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={advancing}
+            className="ns-btn ns-btn-ghost"
+          >
+            Skip
+          </button>
+        )}
       </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 pb-6">
-          <p className="text-xs text-muted-foreground">
-            You can connect, disconnect, or add custom MCPs anytime in{" "}
-            <Link href={connectionsHref} className="underline underline-offset-2">
-              Connections
-            </Link>
-            .
-          </p>
-          {anyConnected ? (
-            <Button onClick={onDone} disabled={advancing} size="lg">
-              {advancing && <Loader2 className="mr-1.5 size-4 animate-spin" />}
-              Done adding MCPs &mdash; next step
-            </Button>
-          ) : (
-            <Button
-              onClick={onSkip}
-              variant="ghost"
-              disabled={advancing}
-            >
-              Skip for now
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <BrowseConnectorsDialog
-        open={moreOpen}
-        onOpenChange={setMoreOpen}
-        // Hide the three recommended MCPs — they each have their own tile
-        // above, so showing them in the More dialog would be a duplicate.
-        hideKeys={RECOMMENDED_TILES.map((t) => t.mcp_key)}
-        connectedKeys={[
-          ...(state.googleads.connected ? ["notfair-googleads"] : []),
-          ...(state.metaads.connected ? ["notfair-metaads"] : []),
-          ...(state.gsc.connected ? ["notfair-googlesearchconsole"] : []),
-        ]}
-      />
     </>
   );
 }
@@ -585,83 +689,99 @@ function RecommendedConnectorTile({
   onConnect: () => void;
   onPickAccount: () => void;
 }) {
-  if (state.connected) {
-    return (
-      <div className="flex flex-col gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4">
-        <div className="flex items-start gap-2">
-          <div className="size-2 mt-1.5 rounded-full bg-emerald-500" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{tile.display_name}</p>
-            <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
-              Connected
-              {state.account_selected ? " · account selected" : null}
-            </p>
-          </div>
-        </div>
-        {state.account_selected ? null : (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onPickAccount}
-            disabled={disabled}
-            className="self-start"
-          >
-            {tile.account_action_label}
-          </Button>
-        )}
-      </div>
-    );
-  }
   return (
-    <button
-      type="button"
-      onClick={onConnect}
-      disabled={busy || disabled}
-      className="flex flex-col gap-2 rounded-md border border-border bg-card p-4 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{tile.display_name}</p>
-        {busy ? (
-          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
-        ) : (
-          <Plug className="size-3.5 text-muted-foreground" />
-        )}
-      </div>
-      <p className="text-xs text-muted-foreground line-clamp-2">
-        {tile.description}
-      </p>
-    </button>
+    <li>
+      <button
+        type="button"
+        onClick={state.connected ? undefined : onConnect}
+        disabled={busy || disabled}
+        aria-label={`${tile.mcp_display_name} — required for ${tile.agent_badge}`}
+        className={`ns-tile w-full ${state.connected ? "is-connected" : ""}`}
+        // When already connected, the row itself is non-actionable; the
+        // sub-action below handles "pick account" and the row would
+        // navigate nowhere otherwise. Keep it as a button so semantic
+        // tests (`getByRole('button', { name: /Google Ads/ })`) still
+        // resolve it, but don't trigger OAuth on click.
+        style={state.connected ? { cursor: "default" } : undefined}
+      >
+        <McpIcon resourceUrl={tile.resource_url} alt={tile.mcp_display_name} size="lg" />
+        <span className="ns-tile-body">
+          <span className="ns-tile-name-row">
+            <span className="ns-tile-name">{tile.mcp_display_name}</span>
+            <span className="ns-tile-badge">
+              Required for {tile.agent_badge}
+            </span>
+          </span>
+          <span className="ns-tile-desc block">{tile.description}</span>
+          {state.connected && !state.account_selected && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPickAccount();
+              }}
+              disabled={disabled}
+              className="ns-subaction"
+            >
+              {tile.account_action_label}
+            </button>
+          )}
+        </span>
+        <span className="ns-tile-status">
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : state.connected ? (
+            <span className="ns-status-connected">Connected</span>
+          ) : (
+            // Visual pill — the surrounding row IS the actual click target,
+            // so this is intentionally a span (not nested <button>) to keep
+            // HTML valid. The pill is the affordance saying "click this row
+            // to connect this MCP."
+            <span className="ns-btn ns-btn-primary ns-btn-sm">
+              Connect{" "}
+              <span className="arrow" aria-hidden style={{ fontWeight: 400 }}>
+                ›
+              </span>
+            </span>
+          )}
+        </span>
+      </button>
+    </li>
   );
 }
 
-function MoreConnectorsTile({
-  extraConnectedCount,
-  onOpen,
+function ExtraConnectorTile({
+  extra,
 }: {
-  extraConnectedCount: number;
-  onOpen: () => void;
+  extra: {
+    key: string;
+    display_name: string;
+    description?: string;
+    resource_url: string;
+  };
 }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex flex-col gap-2 rounded-md border border-dashed border-border bg-card p-4 text-left transition-colors hover:bg-muted/40"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">More tools</p>
-        {extraConnectedCount > 0 ? (
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
-            {extraConnectedCount} connected
-          </span>
-        ) : null}
+    <li>
+      <div
+        className="ns-tile is-connected"
+        style={{ cursor: "default", width: "100%" }}
+        aria-label={extra.display_name}
+      >
+        <McpIcon resourceUrl={extra.resource_url} alt={extra.display_name} size="lg" />
+        <span className="ns-tile-body">
+          <span className="ns-tile-name block">{extra.display_name}</span>
+          {extra.description && (
+            <span className="ns-tile-desc block">{extra.description}</span>
+          )}
+        </span>
+        <span className="ns-tile-status">
+          <span className="ns-status-connected">Connected</span>
+        </span>
       </div>
-      <p className="text-xs text-muted-foreground line-clamp-2">
-        Stripe, Supabase, PostHog, and any custom MCP you want to wire up.
-      </p>
-    </button>
+    </li>
   );
 }
+
 
 // ── Step 2.5: Setup (post-skip-or-connect provisioning watcher) ────
 
@@ -743,12 +863,10 @@ function SetupStep({ slug }: { slug: string }) {
 
   return (
     <>
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-          Setting up your agents.
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          One moment — provisioning your team in OpenClaw.
+      <header>
+        <h1 className="ns-hero-title">Setting up your agents.</h1>
+        <p className="ns-hero-sub">
+          One moment &mdash; bringing your team online.
         </p>
       </header>
 
@@ -1402,15 +1520,13 @@ function AccountPickerScaffold({
 
 function MissingSlug() {
   return (
-    <Card>
-      <CardContent className="space-y-3 pt-6 pb-6">
-        <p className="text-sm text-muted-foreground">
-          This step needs a workspace. Start from the beginning.
-        </p>
-        <Button asChild>
-          <Link href="/onboarding">Start over</Link>
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="mt-10 space-y-4">
+      <p className="text-[15px] text-muted-foreground">
+        This step needs a workspace. Start from the beginning.
+      </p>
+      <Link href="/onboarding" className="ns-btn ns-btn-primary">
+        Start over
+      </Link>
+    </div>
   );
 }

@@ -10,9 +10,9 @@ import {
 } from "./agent-templates";
 
 describe("AgentTemplate catalog", () => {
-  it("ships exactly five templates: cmo + 3 recommended specialists + seo", () => {
+  it("ships four templates: cmo + google_ads + meta_ads + seo (which owns GSC)", () => {
     const keys = TEMPLATES.map((t) => t.key).sort();
-    expect(keys).toEqual(["cmo", "google_ads", "gsc", "meta_ads", "seo"]);
+    expect(keys).toEqual(["cmo", "google_ads", "meta_ads", "seo"]);
   });
 
   it("only CMO is included in the default onboarding bundle", () => {
@@ -22,14 +22,14 @@ describe("AgentTemplate catalog", () => {
     );
   });
 
-  it("the three specialists declare their required MCP catalog key", () => {
+  it("the three specialists declare their required MCP catalog key — SEO owns GSC", () => {
     expect(templateForKey("google_ads")?.requires_mcp_key).toBe(
       "notfair-googleads",
     );
     expect(templateForKey("meta_ads")?.requires_mcp_key).toBe(
       "notfair-metaads",
     );
-    expect(templateForKey("gsc")?.requires_mcp_key).toBe(
+    expect(templateForKey("seo")?.requires_mcp_key).toBe(
       "notfair-googlesearchconsole",
     );
   });
@@ -38,25 +38,25 @@ describe("AgentTemplate catalog", () => {
     expect(templateForKey("cmo")?.requires_mcp_key).toBeUndefined();
   });
 
-  it("SPECIALIST_TEMPLATE_BY_MCP_KEY inverts requires_mcp_key for connect-time provisioning", () => {
+  it("SPECIALIST_TEMPLATE_BY_MCP_KEY inverts requires_mcp_key — GSC maps to seo", () => {
     expect(SPECIALIST_TEMPLATE_BY_MCP_KEY["notfair-googleads"]).toBe(
       "google_ads",
     );
     expect(SPECIALIST_TEMPLATE_BY_MCP_KEY["notfair-metaads"]).toBe("meta_ads");
     expect(SPECIALIST_TEMPLATE_BY_MCP_KEY["notfair-googlesearchconsole"]).toBe(
-      "gsc",
+      "seo",
     );
     expect(SPECIALIST_TEMPLATE_BY_MCP_KEY["stripe"]).toBeUndefined();
   });
 
-  it("templateForUrlSlug resolves the hyphenated URL form (gsc has no underscore so it round-trips trivially)", () => {
+  it("templateForUrlSlug resolves the hyphenated URL form", () => {
     expect(templateForUrlSlug("google-ads")?.key).toBe("google_ads");
     expect(templateForUrlSlug("meta-ads")?.key).toBe("meta_ads");
-    expect(templateForUrlSlug("gsc")?.key).toBe("gsc");
+    expect(templateForUrlSlug("seo")?.key).toBe("seo");
   });
 
   it("agentUrlSlug produces stable slugs for the new templates", () => {
     expect(agentUrlSlug("meta_ads", "Mia")).toBe("meta-ads-mia");
-    expect(agentUrlSlug("gsc", "Sasha")).toBe("gsc-sasha");
+    expect(agentUrlSlug("seo", "Sam")).toBe("seo-sam");
   });
 });

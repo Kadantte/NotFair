@@ -542,15 +542,14 @@ export async function setOnboardingMetaAdsAccountAction(
 // surface them as "properties" in the UI to match what users see in
 // Search Console.
 //
-// **Tool name is a best-guess.** The notfair-googlesearchconsole MCP
-// is freshly added; we expect a tool called `listSites` (mirroring the
-// Search Console API method). If the real tool name is different
-// (e.g. `listProperties`, `listConnectedSites`), change the constant
-// below — the failure mode is a clean RPC "method not found" error
-// surfaced through the existing rpcErrorMessage formatter.
+// The notfair-googlesearchconsole MCP exposes a `listProperties` tool
+// (verified against the live server) which returns a bare JSON array
+// of `{ siteUrl, permissionLevel }`. We also accept the spec-shaped
+// `{ siteEntry: [...] }` wrap and a defensive `{ sites: [...] }` so a
+// future server-side change doesn't break the picker.
 
 const GSC_MCP_KEY = "notfair-googlesearchconsole";
-const GSC_LIST_TOOL = "listSites";
+const GSC_LIST_TOOL = "listProperties";
 
 export type GscProperty = {
   /** Site URL exactly as Search Console uses it. */
@@ -599,14 +598,18 @@ export async function listGscProperties(
   return { ok: true, ...parsed };
 }
 
-type GscPropertiesPayload = {
-  // Search Console REST returns `siteEntry: [{ siteUrl, permissionLevel }]`.
-  // The MCP may pass that through unchanged, or normalize to a flatter
-  // shape. Accept both, plus a defensive `sites` array.
-  siteEntry?: Array<{ siteUrl?: unknown; permissionLevel?: unknown }>;
-  sites?: Array<{ id?: unknown; name?: unknown; siteUrl?: unknown }>;
-  defaultPropertyId?: unknown;
+type GscSiteRow = {
+  siteUrl?: unknown;
+  permissionLevel?: unknown;
+  id?: unknown;
+  name?: unknown;
 };
+
+type GscPropertiesPayload =
+  // The actual notfair-googlesearchconsole MCP returns a bare array.
+  | GscSiteRow[]
+  // Spec shape per the Search Console REST API.
+  | { siteEntry?: GscSiteRow[]; sites?: GscSiteRow[]; defaultPropertyId?: unknown };
 
 function parseGscPropertiesPayload(
   result: ListAccountsToolResult,
@@ -621,30 +624,35 @@ function parseGscPropertiesPayload(
   } catch {
     return null;
   }
-  const properties: GscProperty[] = [];
-  if (Array.isArray(body.siteEntry)) {
-    for (const s of body.siteEntry) {
-      const id = String(s?.siteUrl ?? "").trim();
-      if (!id) continue;
-      properties.push({
-        id,
-        name: prettyGscName(id),
-        permission:
-          typeof s?.permissionLevel === "string" ? s.permissionLevel : undefined,
-      });
-    }
-  } else if (Array.isArray(body.sites)) {
-    for (const s of body.sites) {
-      const id = String(s?.id ?? s?.siteUrl ?? "").trim();
-      if (!id) continue;
-      const name = String(s?.name ?? "").trim() || prettyGscName(id);
-      properties.push({ id, name });
-    }
-  } else {
+
+  // Normalize all three accepted shapes down to a single row list.
+  const rows: GscSiteRow[] = Array.isArray(body)
+    ? body
+    : Array.isArray(body?.siteEntry)
+      ? body.siteEntry
+      : Array.isArray(body?.sites)
+        ? body.sites
+        : [];
+  if (rows.length === 0 && !Array.isArray(body)) {
+    // Object with neither `siteEntry` nor `sites` — genuinely unexpected.
     return null;
   }
+
+  const properties: GscProperty[] = [];
+  for (const s of rows) {
+    if (!s || typeof s !== "object") continue;
+    const id = String(s.siteUrl ?? s.id ?? "").trim();
+    if (!id) continue;
+    const customName = typeof s.name === "string" ? s.name.trim() : "";
+    properties.push({
+      id,
+      name: customName || prettyGscName(id),
+      permission:
+        typeof s.permissionLevel === "string" ? s.permissionLevel : undefined,
+    });
+  }
   const default_property_id =
-    typeof body.defaultPropertyId === "string"
+    !Array.isArray(body) && typeof body.defaultPropertyId === "string"
       ? body.defaultPropertyId
       : null;
   return { properties, default_property_id };
@@ -718,13 +726,33 @@ export type ConnectedMcpState = {
   account_selected: boolean;
 };
 
+export type ConnectedExtraMcp = {
+  /** Catalog key (`stripe`, `supabase`, …) — what's stored on mcp_tokens. */
+  key: string;
+  /** Display label resolved from the catalog (`Stripe`, `Supabase`, …). */
+  display_name: string;
+  /** Short marketing line from the catalog. Optional. */
+  description?: string;
+  /** Resource URL — feeds the <McpIcon> favicon lookup so each extra row
+   *  shows its brand mark the same way the Connections page does. */
+  resource_url: string;
+};
+
 export type ConnectStepState = {
   googleads: ConnectedMcpState;
   metaads: ConnectedMcpState;
   gsc: ConnectedMcpState;
   /**
-   * Count of connected MCPs that aren't in the recommended trio
-   * (Stripe, Supabase, PostHog, …, plus any user-pasted custom servers).
+   * MCPs the user has connected via the "More tools" overflow dialog —
+   * anything outside the recommended trio (Stripe, Supabase, PostHog,
+   * plus any user-pasted custom servers). Rendered as additional rows in
+   * the connect-step list below the recommended tiles.
+   */
+  extras: ConnectedExtraMcp[];
+  /**
+   * Cached length of `extras`. Kept on the surface so existing test
+   * fixtures and any caller that only needs a badge count don't have
+   * to compute it themselves.
    */
   extra_connected_count: number;
   /**
@@ -749,6 +777,7 @@ export async function getConnectStepStateAction(
   const { findMcpToken, listProjectMcpTokens } = await import(
     "@/server/mcp/tokens"
   );
+  const { getMcpCatalog } = await import("@/server/mcp-catalog");
 
   const RECOMMENDED_KEYS = new Set([
     "notfair-googleads",
@@ -756,9 +785,25 @@ export async function getConnectStepStateAction(
     "notfair-googlesearchconsole",
   ]);
   const allTokens = listProjectMcpTokens(project_slug);
-  const extra_connected_count = allTokens.filter(
-    (t) => !RECOMMENDED_KEYS.has(t.server_name),
-  ).length;
+  const catalog = getMcpCatalog(project_slug);
+
+  // Build the extras list: for every connected non-recommended token,
+  // look up its display name + description in the catalog so the connect
+  // step can render real rows ("Stripe — Payments, …") instead of a bare
+  // catalog-key. Tokens whose catalog entry was removed (rare — manual
+  // db edit, or a preset we silently dropped) are skipped silently.
+  const extras: ConnectedExtraMcp[] = [];
+  for (const t of allTokens) {
+    if (RECOMMENDED_KEYS.has(t.server_name)) continue;
+    const entry = catalog.find((c) => c.key === t.server_name);
+    if (!entry) continue;
+    extras.push({
+      key: t.server_name,
+      display_name: entry.display_name,
+      description: entry.description,
+      resource_url: entry.resource_url,
+    });
+  }
 
   return {
     ok: true,
@@ -775,7 +820,8 @@ export async function getConnectStepStateAction(
         connected: !!findMcpToken(project_slug, "notfair-googlesearchconsole"),
         account_selected: !!project.gsc_property_id,
       },
-      extra_connected_count,
+      extras,
+      extra_connected_count: extras.length,
       website_url: project.website_url,
     },
   };

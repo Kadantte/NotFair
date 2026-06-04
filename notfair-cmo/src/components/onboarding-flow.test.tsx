@@ -129,6 +129,7 @@ beforeEach(() => {
       googleads: { connected: false, account_selected: false },
       metaads: { connected: false, account_selected: false },
       gsc: { connected: false, account_selected: false },
+      extras: [],
       extra_connected_count: 0,
       website_url: null,
     },
@@ -143,7 +144,7 @@ describe("OnboardingFlow — NameStep (default step)", () => {
   it("renders the project-name form when no step param is set", () => {
     render(<OnboardingFlow />);
     expect(
-      screen.getByRole("heading", { name: /Let.s set up your CMO/i }),
+      screen.getByRole("heading", { name: /Let.s set up your workspace/i }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/Name/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Continue/i })).toBeInTheDocument();
@@ -234,7 +235,7 @@ describe("OnboardingFlow — ConnectStep", () => {
     setStep("connect", "acme");
     render(<OnboardingFlow />);
     expect(
-      await screen.findByRole("heading", { name: /Connect your tools/i }),
+      await screen.findByRole("heading", { name: /Connect MCPs to your agents/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /^Google Ads/i }),
@@ -249,7 +250,7 @@ describe("OnboardingFlow — ConnectStep", () => {
       screen.getByRole("button", { name: /More tools/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Skip for now/i }),
+      screen.getByRole("button", { name: /^Skip/i }),
     ).toBeInTheDocument();
   });
 
@@ -298,34 +299,71 @@ describe("OnboardingFlow — ConnectStep", () => {
   it("hands off to the setup screen via Skip when zero MCPs are connected", async () => {
     setStep("connect", "acme");
     render(<OnboardingFlow />);
-    fireEvent.click(await screen.findByRole("button", { name: /Skip for now/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Skip/i }));
     expect(routerReplace).toHaveBeenCalledWith(
       "/onboarding?step=setup&slug=acme&from=skip",
     );
   });
 
-  it("flips Skip → 'Done adding MCPs — next step' once at least one MCP is connected", async () => {
+  it("flips Skip → 'Next' once at least one MCP is connected", async () => {
     getConnectStepStateAction.mockResolvedValue({
       ok: true,
       state: {
         googleads: { connected: true, account_selected: true },
         metaads: { connected: false, account_selected: false },
         gsc: { connected: false, account_selected: false },
+        extras: [],
         extra_connected_count: 0,
         website_url: null,
       },
     });
     setStep("connect", "acme");
     render(<OnboardingFlow />);
-    const done = await screen.findByRole("button", { name: /Done adding MCPs/i });
+    const done = await screen.findByRole("button", { name: /^Next/i });
     expect(done).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Skip for now/i }),
+      screen.queryByRole("button", { name: /^Skip/i }),
     ).not.toBeInTheDocument();
     fireEvent.click(done);
     expect(routerReplace).toHaveBeenCalledWith(
       "/onboarding?step=setup&slug=acme&from=connect",
     );
+  });
+
+  it("renders a row for each extra MCP connected via the More dialog", async () => {
+    getConnectStepStateAction.mockResolvedValue({
+      ok: true,
+      state: {
+        googleads: { connected: false, account_selected: false },
+        metaads: { connected: false, account_selected: false },
+        gsc: { connected: false, account_selected: false },
+        extras: [
+          {
+            key: "stripe",
+            display_name: "Stripe",
+            description: "Payments.",
+            resource_url: "https://mcp.stripe.com/",
+          },
+          {
+            key: "supabase",
+            display_name: "Supabase",
+            description: "Postgres.",
+            resource_url: "https://mcp.supabase.com/mcp",
+          },
+        ],
+        extra_connected_count: 2,
+        website_url: null,
+      },
+    });
+    setStep("connect", "acme");
+    render(<OnboardingFlow />);
+    // Both extras render as new rows in the grouped list, each with their
+    // display name visible.
+    expect(await screen.findByText("Stripe")).toBeInTheDocument();
+    expect(screen.getByText("Supabase")).toBeInTheDocument();
+    // The "More tools" tile still surfaces the count so the user can see
+    // at a glance how many extras are wired up.
+    expect(screen.getByText(/2 connected/)).toBeInTheDocument();
   });
 
   it("shows a 'Select Google Ads account' sub-action when the MCP is connected but no account is picked", async () => {
@@ -335,6 +373,7 @@ describe("OnboardingFlow — ConnectStep", () => {
         googleads: { connected: true, account_selected: false },
         metaads: { connected: false, account_selected: false },
         gsc: { connected: false, account_selected: false },
+        extras: [],
         extra_connected_count: 0,
         website_url: null,
       },

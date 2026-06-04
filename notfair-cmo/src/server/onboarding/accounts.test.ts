@@ -397,6 +397,26 @@ describe("listGscProperties", () => {
     });
   });
 
+  it("parses the bare-array shape the actual notfair MCP returns", async () => {
+    mcpRpcMock.mockResolvedValueOnce(
+      toolCallResult([
+        { siteUrl: "sc-domain:notfair.co", permissionLevel: "siteFullUser" },
+        { siteUrl: "https://example.com/", permissionLevel: "siteOwner" },
+      ]),
+    );
+    const r = await listGscProperties("acme");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.properties.map((p) => p.id)).toEqual([
+        "sc-domain:notfair.co",
+        "https://example.com/",
+      ]);
+      expect(r.properties[0]!.name).toBe("notfair.co");
+      expect(r.properties[1]!.name).toBe("example.com");
+      expect(r.properties[0]!.permission).toBe("siteFullUser");
+    }
+  });
+
   it("parses the Search Console `siteEntry` shape", async () => {
     mcpRpcMock.mockResolvedValueOnce(
       toolCallResult({

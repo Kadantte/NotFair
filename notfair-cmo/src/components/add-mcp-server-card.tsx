@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2, BookOpenText, MoreHorizontal } from "lucide-react";
 
@@ -42,14 +42,28 @@ import { BrowseConnectorsDialog } from "@/components/browse-connectors-dialog";
 export function AddMcpServerMenu({
   connectedKeys = [],
   connectedResourceUrls = [],
+  hideKeys = [],
+  trigger,
+  align = "end",
 }: {
   /** Catalog keys whose runtime status is `connected`. Browse tiles for
-   *  these render as non-clickable "connected" pills. */
+   *  these are filtered out of the grid entirely. */
   connectedKeys?: string[];
   /** Normalized resource URLs of connected entries — paired with
    *  `connectedKeys` so legacy rows (where the key was slugified
    *  differently than the trusted-connector id) still match by URL. */
   connectedResourceUrls?: string[];
+  /** Browse-dialog `hideKeys` passthrough — exclude specific catalog
+   *  entries from the grid (used by onboarding's connect step to hide
+   *  the recommended trio that already has first-class tiles). */
+  hideKeys?: string[];
+  /** Optional custom trigger. When omitted, renders the default pill
+   *  "Add server" button used by the Connections page header. Pass a
+   *  custom button-shaped node when slotting this into a list row,
+   *  grouped list, or other in-line surface. */
+  trigger?: ReactNode;
+  /** Radix `align` for the dropdown content. */
+  align?: "start" | "center" | "end";
 }) {
   const [browseOpen, setBrowseOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
@@ -58,16 +72,18 @@ export function AddMcpServerMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            size="sm"
-            className="h-9 gap-1.5 rounded-full px-4 shadow-sm"
-          >
-            <Plus className="size-3.5" />
-            Add server
-          </Button>
+          {trigger ?? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 gap-1.5 rounded-full px-4 shadow-sm"
+            >
+              <Plus className="size-3.5" />
+              Add server
+            </Button>
+          )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuContent align={align} className="w-60">
           <DropdownMenuItem
             onSelect={() => setBrowseOpen(true)}
             className="gap-2 py-2.5"
@@ -100,6 +116,7 @@ export function AddMcpServerMenu({
         onOpenChange={setBrowseOpen}
         connectedKeys={connectedKeys}
         connectedResourceUrls={connectedResourceUrls}
+        hideKeys={hideKeys}
       />
       <CustomConnectorDialog open={customOpen} onOpenChange={setCustomOpen} />
     </>

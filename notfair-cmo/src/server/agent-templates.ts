@@ -99,7 +99,7 @@ Style:
   starting the next.`;
 
 export type AgentTemplate = {
-  key: "cmo" | "google_ads" | "meta_ads" | "gsc" | "seo";
+  key: "cmo" | "google_ads" | "meta_ads" | "seo";
   /**
    * Label for the ROLE this template represents (e.g. "CMO", "Google
    * Ads"). Used in the sidebar role pill + anywhere the UI says
@@ -145,9 +145,11 @@ export type AgentTemplateKey = AgentTemplate["key"];
  * source of truth for "which agents does a freshly-created project get?".
  *
  * Only CMO ships by default now. The three specialists (Google Ads,
- * Meta Ads, Google Search Console) are gated on the user connecting the
- * matching MCP — the connect step in onboarding triggers provisioning
- * via provisionSpecialistForMcp as each token lands.
+ * Meta Ads, SEO) are gated on the user connecting the matching MCP —
+ * the connect step in onboarding triggers provisioning via
+ * provisionSpecialistForMcp as each token lands. Google Search Console
+ * isn't its own specialist — connecting GSC provisions the SEO agent,
+ * which uses GSC alongside on-page / technical SEO work.
  */
 export const DEFAULT_ONBOARDING_TEMPLATE_KEYS: AgentTemplateKey[] = ["cmo"];
 
@@ -156,11 +158,15 @@ export const DEFAULT_ONBOARDING_TEMPLATE_KEYS: AgentTemplateKey[] = ["cmo"];
  * onboarding connect step gates provisioning on. Inverse lookup
  * (MCP key → template key) used by provisionSpecialistForMcp when an
  * OAuth callback lands and we need to decide which specialist to mint.
+ *
+ * Notice GSC maps to `seo` — there's no dedicated GSC agent. The SEO
+ * specialist owns search-console work as part of its broader remit
+ * (technical SEO, content, ranking analysis).
  */
 export const SPECIALIST_TEMPLATE_BY_MCP_KEY: Record<string, AgentTemplateKey> = {
   "notfair-googleads": "google_ads",
   "notfair-metaads": "meta_ads",
-  "notfair-googlesearchconsole": "gsc",
+  "notfair-googlesearchconsole": "seo",
 };
 
 export function templateForKey(key: string): AgentTemplate | undefined {
@@ -270,73 +276,58 @@ for files in your workspace, and the orchestration MCP for coordination.`,
     requires_mcp_key: "notfair-metaads",
   },
   {
-    key: "gsc",
-    display_name: "Google Search Console",
-    default_name: "Sasha",
-    description: "Organic search performance — queries, pages, impressions, clicks, indexing.",
+    key: "seo",
+    display_name: "SEO",
+    default_name: "Sam",
+    description:
+      "Organic search — Search Console performance, technical SEO, content recommendations.",
     capabilities: [
-      "Pull search performance (queries, pages, devices, countries)",
-      "Surface query/page movers week-over-week",
+      "Pull Search Console performance (queries, pages, devices, countries)",
+      "Surface query and page movers week-over-week",
       "Identify pages losing impressions or rankings",
       "Diagnose indexing issues + coverage gaps",
-      "Schedule recurring ranking/click summaries",
+      "Audit on-page + technical SEO",
+      "Propose content ideas based on keyword movers",
+      "Schedule recurring ranking / click summaries",
       "Uses notfair-googlesearchconsole MCP when property connected",
     ],
     model: "openai-codex/gpt-5.5",
-    system_prompt: `You are a Google Search Console specialist agent on the notfair-cmo platform.
+    system_prompt: `You are the SEO specialist agent on the notfair-cmo platform.
 
 ${SPECIALIST_ROLE}
 
 ## Your domain tools
 
-When the notfair-googlesearchconsole MCP is connected to this project,
-use its tools to pull organic search performance (impressions, clicks,
-position) sliced by query, page, country, and device. The selected GSC
-property (e.g. \`sc-domain:example.com\` or \`https://example.com/\`)
-is persisted on the project — every call you make should target that
+Your primary data source is the **notfair-googlesearchconsole** MCP
+(connected during onboarding). The selected GSC property
+(e.g. \`sc-domain:example.com\` or \`https://example.com/\`) is
+persisted on the project; every call you make should target that
 property unless the brief explicitly asks for another.
+
+Use the MCP to pull organic search performance (impressions, clicks,
+average position) sliced by query, page, country, device, or date.
+Combine that with on-page audits, technical SEO checks, schema
+recommendations, and internal-link analysis when the brief asks for
+broader SEO work.
 
 Domain conventions you should respect:
 - Always quote impressions, clicks, CTR, and average position when
-  reporting findings. The user trusts numbers more than adjectives.
+  reporting Search Console findings. The user trusts numbers more than
+  adjectives.
 - Default to the last 28 days for performance reads unless the brief
-  asks for a different window. That window aligns with Search Console's
-  native default.
-- Movers analysis matters more than absolutes here — surface queries +
-  pages that moved week-over-week (impressions or position), not the
-  static top-10 lists the user has already seen.
+  asks otherwise. That window aligns with Search Console's native
+  default and survives one-off Sunday spikes.
+- Lead with **movers**, not absolutes — surface queries and pages that
+  moved week-over-week (impressions or position) rather than the static
+  top-10 lists the user has already seen.
+- Pages losing impressions + dropping in position are the high-signal
+  finding; pages with high impressions but low CTR are the high-leverage
+  one. Frame recommendations around which is which.
 
 You also have the platform's \`exec\` tool for shell, \`read/edit/write\`
 for files in your workspace, and the orchestration MCP for coordination.`,
     default_onboarding: false,
     requires_mcp_key: "notfair-googlesearchconsole",
-  },
-  {
-    key: "seo",
-    display_name: "SEO",
-    default_name: "Sam",
-    description: "SEO audits, content recommendations, ranking + click tracking, technical SEO.",
-    capabilities: [
-      "Audit on-page + technical SEO",
-      "Propose content ideas based on keyword movers",
-      "Track rankings + click data (when GSC connected)",
-      "Recommend schema + internal linking",
-      "Schedule recurring ranking checks",
-    ],
-    model: "openai-codex/gpt-5.5",
-    system_prompt: `You are an SEO specialist agent on the notfair-cmo platform.
-
-${SPECIALIST_ROLE}
-
-## Your domain tools
-
-You handle on-page + technical SEO, content recommendations, ranking
-checks, schema markup, and internal linking. When Google Search Console
-is connected, use it for ranking + click data.
-
-You also have the platform's \`exec\` tool for shell, \`read/edit/write\`
-for files in your workspace, and the orchestration MCP for coordination.`,
-    default_onboarding: false,
   },
 ];
 
