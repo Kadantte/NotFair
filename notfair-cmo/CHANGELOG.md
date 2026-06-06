@@ -1,5 +1,19 @@
 # notfair-cmo
 
+## 0.7.0 — 2026-06-06
+
+**Browser tools split into their own standalone MCP server.** The 11 `browser_*` tools moved out of `notfair-orchestration` into a new `notfair-browser` MCP at `/api/mcp/browser`. The orchestration surface drops from 32 tools to 21 (task / approval / project / cron only); each MCP server now has one clear job. Codex / Claude Code configs gain a second internal entry automatically on next project visit — no manual reconfig.
+
+**Tool descriptions sharpened to fight plugin collisions.** Real failure observed where a Codex-hosted CMO asked to "launch your browser" found OpenAI's bundled `browser-use` plugin first, then fell back to `open -a "Google Chrome"` (wrong profile, no shared cookies). Following Hermes' convention, every browser tool description now does explicit tool routing: `browser_open` claims the "launch the browser / open a page / go to <URL>" intent up front and names the wrong choices to ignore (browser-use plugin, `open -a`, AppleScript, xdg-open, `start chrome`). The orchestration skill loaded into every agent's IDENTITY/AGENTS.md gains a `CRITICAL: which "browser" tool to use` section enumerating the same anti-fallbacks.
+
+**Multi-agent safety: `browser_shutdown` removed from the agent surface.** With multiple agents sharing one workspace Chrome, any agent calling shutdown would kill the browser mid-task for the others. Browser lifecycle is now user-owned (Settings → Stop) and process-exit-owned only.
+
+**5-minute idle auto-shutdown.** A 30s background tick stops any workspace browser with no activity in the last 5 minutes (override via `NOTFAIR_BROWSER_IDLE_TIMEOUT_MS`). Settings card surfaces the countdown as `auto-stops in 258s if idle` alongside uptime.
+
+**Hidden Codex env-var bug fixed.** The Codex spawn loop only injected the orchestration bearer; for `notfair-browser` (and any future internal MCP), Codex saw the config entry but had no token, so tool discovery silently excluded the tools. Now both internal MCPs share the same machine secret via env injection.
+
+E2E verified: fresh Codex chat turn — Greg (CMO) asked to open https://example.org chose `notfair_notfairco__notfair_browser.browser_open` directly, no shell fallback, no plugin attempts.
+
 ## 0.6.0 — 2026-06-05
 
 **Workspace browser tool — agents can drive real Chrome.** One managed Chrome instance per workspace at `~/.notfair-cmo/projects/<slug>/browser/user-data/`, shared by every agent in that project via labeled tabs. The user signs into Google / Meta / Search Console once (Settings → Workspace browser → Launch + Open <service>), cookies persist in the workspace profile, and every agent inherits the session on subsequent runs.
