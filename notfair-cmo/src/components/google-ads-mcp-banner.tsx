@@ -54,7 +54,7 @@ export function GoogleAdsMcpBanner({ status, projectSlug }: Props) {
 
   return (
     <div
-      className="border-b border-border/60 bg-[hsl(38_92%_97%)] px-6 py-3"
+      className="bg-[hsl(var(--notfair-warn-soft))] px-6 py-3"
       role="status"
     >
       <div className="mx-auto flex w-full max-w-3xl items-start gap-3">

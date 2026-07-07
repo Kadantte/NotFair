@@ -42,7 +42,7 @@ export function AgentTabs({
 
   return (
     <nav
-      className="sticky top-0 z-20 flex items-center gap-1 border-b border-border/60 bg-[rgba(245,245,247,0.78)] px-4 backdrop-blur-md"
+      className="sticky top-0 z-20 flex items-center gap-1 bg-[hsl(var(--background)/0.82)] px-4 py-1.5 backdrop-blur-md"
       aria-label="Agent sections"
       style={{
         backdropFilter: "saturate(180%) blur(20px)",
@@ -58,20 +58,14 @@ export function AgentTabs({
             key={key}
             href={href}
             className={cn(
-              "relative flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium tracking-tight transition-colors",
+              "relative flex items-center gap-1.5 rounded-[7px] px-3 py-1.5 text-[13px] font-medium tracking-tight transition-colors",
               isActive
-                ? "text-foreground"
+                ? "bg-[hsl(var(--notfair-surface-2))] text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
             <Icon className="size-3.5" />
             {label}
-            {isActive && (
-              <span
-                aria-hidden
-                className="absolute inset-x-2.5 -bottom-px h-[1.5px] rounded-full bg-[hsl(var(--notfair-accent))]"
-              />
-            )}
           </Link>
         );
       })}

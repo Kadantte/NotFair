@@ -677,7 +677,7 @@ export function LiveTranscript({
         </div>
       </div>
 
-      <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="relative mx-auto w-full max-w-3xl px-6 py-3">
           {slashOpen && (
             <SlashCommandPopover
@@ -744,7 +744,7 @@ export function LiveTranscript({
                     : `Message ${agentDisplayName}…  (type / for commands)`
               }
               rows={1}
-              className="flex min-h-[40px] flex-1 resize-none rounded-xl border bg-background px-3.5 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-[40px] flex-1 resize-none rounded-xl bg-card px-3.5 py-2 text-sm shadow-[var(--notfair-shadow)] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
             {sendingChat ? (
               <Button
@@ -1034,7 +1034,7 @@ function RenderItem({
 function UserBubble({ body }: { body: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl bg-muted px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">
+      <div className="max-w-[85%] rounded-2xl rounded-br-[6px] bg-muted px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">
         {body}
       </div>
     </div>
@@ -1084,18 +1084,18 @@ function ToolGroup({
     ? "text-muted-foreground motion-safe:animate-spin"
     : hasError
       ? "text-destructive"
-      : "text-emerald-600";
+      : "text-[hsl(var(--notfair-accent))]";
 
   return (
     <details
       key={isLive ? "live" : "done"}
       open={isLive}
-      className="group rounded-md border bg-muted/20"
+      className="group rounded-[10px] bg-card shadow-[var(--notfair-shadow-sm)]"
     >
       <summary
         className={cn(
           "flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs",
-          "rounded-md hover:bg-muted/40 [&::-webkit-details-marker]:hidden",
+          "rounded-[10px] hover:bg-[hsl(var(--notfair-hover))] [&::-webkit-details-marker]:hidden",
         )}
       >
         <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
@@ -1108,15 +1108,15 @@ function ToolGroup({
         ) : (
           <HeadIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="text-[12px] font-medium text-foreground">
+        <span className="font-mono text-[12px] font-medium text-foreground">
           {intent.verb}
         </span>
         {intent.target && (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
             {intent.target}
           </span>
         )}
-        <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
+        <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
           {isLive ? (
             <span className="inline-flex items-center gap-1.5">
               <RunningDot size="sm" aria-label="" />
@@ -1131,7 +1131,7 @@ function ToolGroup({
           )}
         </span>
       </summary>
-      <div className="space-y-2 border-t bg-background/40 px-3 py-2">
+      <div className="space-y-2 bg-[hsl(var(--notfair-surface-2))/0.45] px-3 py-2">
         {tools.map((t) => (
           <ToolRow key={t.toolCallId} entry={t} mcpCatalog={mcpCatalog} />
         ))}
@@ -1157,7 +1157,7 @@ function ToolRow({
     : Loader2;
   const statusClass = entry.done
     ? entry.ok
-      ? "text-emerald-600"
+      ? "text-[hsl(var(--notfair-accent))]"
       : "text-destructive"
     : "text-muted-foreground motion-safe:animate-spin";
   // Show the raw command/label only when it actually adds information —
@@ -1180,11 +1180,11 @@ function ToolRow({
         ) : (
           <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="text-[12px] font-medium text-foreground">
+        <span className="font-mono text-[12px] font-medium text-foreground">
           {intent.verb}
         </span>
         {intent.target && (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
             {intent.target}
           </span>
         )}
@@ -1257,7 +1257,7 @@ function ToolBrandFavicon({
  */
 function BlockedStatus({ reason }: { reason: string }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-md border border-dashed border-amber-500/40 bg-amber-50/40 px-3 py-2 text-xs dark:bg-amber-950/20">
+    <div className="flex items-start gap-2.5 rounded-md bg-[hsl(var(--notfair-warn-soft))] px-3 py-2 text-xs">
       <span
         className="mt-1 inline-block size-2 shrink-0 rounded-full bg-amber-500"
         aria-hidden
@@ -1953,7 +1953,7 @@ function ErrorRow({
   body: string;
 }) {
   return (
-    <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
+    <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm">
       <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
       <div className="min-w-0 flex-1">
         <div className="font-medium text-destructive">

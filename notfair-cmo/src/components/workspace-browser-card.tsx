@@ -133,7 +133,7 @@ export function WorkspaceBrowserCard({ projectSlug }: { projectSlug: string }) {
             <span
               className={
                 "h-1.5 w-1.5 rounded-full " +
-                (status?.running ? "bg-emerald-500" : "bg-[hsl(var(--notfair-ink-5))]")
+                (status?.running ? "bg-[hsl(var(--notfair-accent))]" : "bg-[hsl(var(--notfair-ink-5))]")
               }
             />
             {loading

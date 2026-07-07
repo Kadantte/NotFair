@@ -155,8 +155,8 @@ export function AgentTaskWorkspace({
           workspace. The per-thread LiveTranscript polling still handles
           the open transcript. */}
       {/* ── Left pane: task list ─────────────────────────────────────── */}
-      <aside className="flex w-80 shrink-0 flex-col border-r bg-muted/20">
-        <div className="border-b px-4 py-3">
+      <aside className="flex w-80 shrink-0 flex-col bg-[hsl(var(--notfair-sidebar))]">
+        <div className="px-4 py-3">
           <p className="text-[11px] text-muted-foreground">
             {inFlightCount > 0 ? (
               <span className="inline-flex items-center gap-1.5">
@@ -227,7 +227,7 @@ export function AgentTaskWorkspace({
       <section className="flex min-w-0 flex-1 flex-col">
         {selected ? (
           <>
-            <header className="border-b bg-background/60 backdrop-blur">
+            <header className="bg-background/60 backdrop-blur">
               <div className="mx-auto w-full max-w-3xl px-6 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -567,7 +567,7 @@ function TaskRow({
 function StatusGlyph({ status }: { status: TaskStatus }) {
   switch (status) {
     case "done":
-      return <CheckCircle2 className="size-3.5 text-emerald-600" />;
+      return <CheckCircle2 className="size-3.5 text-[hsl(var(--notfair-accent))]" />;
     case "failed":
       return <XCircle className="size-3.5 text-destructive" />;
     case "cancelled":
@@ -577,7 +577,7 @@ function StatusGlyph({ status }: { status: TaskStatus }) {
     case "working":
       return <Loader2 className="size-3.5 animate-spin text-sky-600" />;
     case "blocked":
-      return <CircleDot className="size-3.5 text-amber-600" />;
+      return <CircleDot className="size-3.5 text-[hsl(var(--notfair-warn))]" />;
     case "proposed":
     default:
       return <Circle className="size-3.5 text-muted-foreground" />;
@@ -694,15 +694,15 @@ function AbandonedTaskCard({ taskDisplayId }: { taskDisplayId: string }) {
   const anyPending = resumePending || donePending || cancelPending;
 
   return (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-950/30">
+    <div className="rounded-lg bg-[hsl(var(--notfair-warn-soft))] p-4">
       <div className="flex items-start gap-3">
-        <StopCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <StopCircle className="mt-0.5 size-4 shrink-0 text-[hsl(var(--notfair-warn))]" />
         <div className="min-w-0 flex-1 space-y-2">
           <div>
-            <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+            <p className="text-sm font-medium text-foreground">
               Agent stopped without closing this task
             </p>
-            <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">
+            <p className="mt-0.5 text-xs text-[hsl(var(--notfair-ink-3))]">
               The last turn finished cleanly but the agent didn’t call
               <code className="mx-1 rounded bg-amber-500/15 px-1 py-0.5 font-mono text-[11px]">
                 submit_task_status

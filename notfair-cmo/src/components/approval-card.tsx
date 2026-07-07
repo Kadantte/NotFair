@@ -153,7 +153,7 @@ export function ApprovalCard({ approval }: ApprovalCardProps) {
           )}
 
           {approval.decision_note && !actionable && (
-            <div className="rounded-lg border border-dashed border-border bg-[hsl(var(--notfair-surface-2))]/60 p-3 text-[12px]">
+            <div className="rounded-lg bg-[hsl(var(--notfair-surface-2))]/60 p-3 text-[12px]">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--notfair-ink-4))]">
                 Decision note
               </div>
@@ -194,7 +194,7 @@ export function ApprovalCard({ approval }: ApprovalCardProps) {
               </div>
 
               {showPolicyForm && (
-                <div className="space-y-2 rounded-lg border border-border bg-[hsl(var(--notfair-surface-2))]/60 p-3 text-[12px]">
+                <div className="space-y-2 rounded-lg bg-[hsl(var(--notfair-surface-2))]/60 p-3 text-[12px]">
                   <p className="m-0 font-semibold text-[hsl(var(--notfair-ink))]">
                     Create auto-approval policy
                   </p>
@@ -277,7 +277,7 @@ export function ApprovalCard({ approval }: ApprovalCardProps) {
             onChange={(e) => setDenyNote(e.target.value)}
             placeholder="e.g. Wait until next week so we can review the landing page first."
             rows={4}
-            className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="w-full resize-y rounded-md border border-transparent bg-[hsl(var(--notfair-surface-2))] px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             disabled={pending}
             autoFocus
           />

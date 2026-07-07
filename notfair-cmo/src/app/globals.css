@@ -5,86 +5,120 @@
 @layer base {
   :root {
     /* ── notfair-cmo design system (see DESIGN.md) ───────────────────
-       Apple-flavored cool neutrals anchored on the Notfair brand
-       green #4CAF6E. Surfaces are pure white / Apple off-white; ink
-       is Apple's neutral scale; the accent does all chromatic work.
+       Codex-flavored monochrome chrome, dark-first with a light mode.
+       Depth comes from elevation (surface steps + soft shadows), not
+       border lines. Color is reserved for semantics: green = live/
+       connected, amber = attention, red = error. Primary actions are
+       inverted (black-on-light / white-on-dark).
 
        shadcn primitives are mapped onto these tokens so existing
        Card/Button/etc. components inherit the system automatically. */
 
     /* surfaces */
-    --background: 240 8% 96%;          /* #F5F5F7 */
-    --foreground: 240 3% 12%;          /* #1D1D1F */
+    --background: 240 7% 97%;          /* #F7F7F8 */
+    --foreground: 240 7% 8%;           /* #131316 */
     --card: 0 0% 100%;
-    --card-foreground: 240 3% 12%;
+    --card-foreground: 240 7% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 3% 12%;
+    --popover-foreground: 240 7% 8%;
 
-    /* primary CTA — brand green */
-    --primary: 138 39% 49%;            /* #4CAF6E */
+    /* primary CTA — inverted monochrome (Codex signature) */
+    --primary: 240 7% 8%;              /* #131316 */
     --primary-foreground: 0 0% 100%;
 
     /* secondary surface (used by Button variant=secondary, etc.) */
-    --secondary: 240 6% 94%;           /* #EFEFF1 */
-    --secondary-foreground: 240 3% 12%;
+    --secondary: 240 4% 94%;           /* #F0F0F1 */
+    --secondary-foreground: 240 7% 8%;
 
     /* muted text + surfaces */
-    --muted: 240 6% 94%;
-    --muted-foreground: 240 2% 44%;    /* #6E6E73 */
+    --muted: 240 4% 94%;
+    --muted-foreground: 240 3% 54%;    /* #85858C */
 
     /* shadcn "accent" surface (hover bg on dropdowns, etc.) — NOT the
        brand accent. Keep neutral so brand green stays uncrowded. */
-    --accent: 240 6% 94%;
-    --accent-foreground: 240 3% 12%;
+    --accent: 240 4% 94%;
+    --accent-foreground: 240 7% 8%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 83%;              /* #D2D2D7 */
-    --input: 240 6% 83%;
-    --ring: 138 39% 49%;               /* focus ring uses brand green */
+    --border: 240 5% 90%;
+    --input: 240 4% 94%;
+    --ring: 240 3% 54%;                /* neutral focus ring */
 
     --radius: 0.625rem;                /* 10px — between sm and md per DESIGN.md */
 
     /* ── DESIGN.md tokens (non-shadcn) ───────────────────────────────
        Use these directly in custom components when the shadcn mapping
        above isn't expressive enough. Comment names match DESIGN.md. */
-    --notfair-ink: 240 3% 12%;         /* #1D1D1F — primary text */
-    --notfair-ink-2: 240 2% 18%;       /* #2C2C2E — strong body */
-    --notfair-ink-3: 240 2% 26%;       /* #424245 — body text */
-    --notfair-ink-4: 240 2% 44%;       /* #6E6E73 — labels, support */
-    --notfair-surface-2: 240 6% 94%;   /* #EFEFF1 — inset / glyph bg */
-    --notfair-border-strong: 240 5% 73%; /* #B8B8BE */
-    --notfair-accent: 138 39% 49%;     /* #4CAF6E brand green */
-    --notfair-accent-soft: 138 31% 95%;/* #EDF7F0 */
-    --notfair-accent-border: 137 35% 75%; /* #A5D7B6 */
+    --notfair-ink: 240 7% 8%;          /* #131316 — primary text */
+    --notfair-ink-2: 240 4% 18%;       /* #2C2C30 — strong body */
+    --notfair-ink-3: 240 3% 35%;       /* #55555B — body text */
+    --notfair-ink-4: 240 3% 54%;       /* #85858C — labels, support */
+    --notfair-surface-2: 240 4% 94%;   /* #F0F0F1 — inset / glyph bg */
+    --notfair-sidebar: 240 3% 94%;     /* #EFEFF0 — sidebar rail */
+    --notfair-hover: 240 4% 96%;       /* row hover wash */
+    --notfair-border-strong: 240 4% 82%;
+    /* Inverted primary action (Codex CTA) */
+    --notfair-cta: 240 7% 8%;          /* #131316 */
+    --notfair-cta-text: 0 0% 100%;
+    /* NotFair green — semantic "live/connected" only, never chrome */
+    --notfair-accent: 138 43% 43%;     /* #3F9E60 (darker for light bg) */
+    --notfair-accent-soft: 138 31% 94%;
+    --notfair-accent-border: 137 35% 75%;
+    --notfair-warn: 39 76% 38%;        /* amber text */
+    --notfair-warn-soft: 39 70% 94%;   /* amber wash */
 
-    /* Apple-style diffuse shadows. No warm tints, no inner highlights. */
-    --notfair-shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 0 0 .5px rgba(0,0,0,.04);
-    --notfair-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -8px rgba(0,0,0,.10);
-    --notfair-shadow-lg: 0 2px 4px rgba(0,0,0,.06), 0 20px 50px -12px rgba(0,0,0,.18);
+    /* Elevation — layered soft shadows, no rings. */
+    --notfair-shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 2px 6px rgba(0,0,0,.04);
+    --notfair-shadow: 0 1px 2px rgba(0,0,0,.05), 0 3px 10px rgba(0,0,0,.06);
+    --notfair-shadow-lg: 0 2px 4px rgba(0,0,0,.06), 0 20px 50px -12px rgba(0,0,0,.16);
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    /* Codex dark: content #161618, sidebar darker, cards a step
+       lighter than content so elevation reads without borders. */
+    --background: 240 4% 9%;           /* #161618 */
+    --foreground: 240 6% 93%;          /* #ECECEE */
+    --card: 240 6% 13%;                /* #202024 */
+    --card-foreground: 240 6% 93%;
+    --popover: 240 6% 13%;
+    --popover-foreground: 240 6% 93%;
+    --primary: 0 0% 93%;               /* inverted: white CTA */
+    --primary-foreground: 240 6% 7%;
+    --secondary: 240 5% 16%;           /* #26262A */
+    --secondary-foreground: 240 6% 93%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 3% 48%;    /* #77777E */
+    --accent: 240 5% 16%;
+    --accent-foreground: 240 6% 93%;
+    --destructive: 0 62% 52%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 240 5% 18%;
+    --input: 240 5% 16%;
+    --ring: 240 4% 60%;
+
+    --notfair-ink: 240 6% 93%;         /* #ECECEE */
+    --notfair-ink-2: 240 4% 85%;       /* #D6D6DA */
+    --notfair-ink-3: 240 4% 67%;       /* #A6A6AD */
+    --notfair-ink-4: 240 3% 48%;       /* #77777E */
+    --notfair-surface-2: 240 5% 16%;   /* #26262A */
+    --notfair-sidebar: 240 3% 6%;      /* #0F0F10 */
+    --notfair-hover: 240 5% 15%;
+    --notfair-border-strong: 240 4% 30%;
+    --notfair-cta: 0 0% 93%;           /* #ECECEC */
+    --notfair-cta-text: 240 6% 7%;     /* #101012 */
+    --notfair-accent: 138 39% 49%;     /* #4CAF6E */
+    --notfair-accent-soft: 138 24% 14%; /* dark green-tinted well */
+    --notfair-accent-border: 138 30% 32%;
+    --notfair-warn: 39 65% 55%;        /* #D9A13F */
+    --notfair-warn-soft: 39 45% 14%;
+
+    /* Dark elevation: stronger shadows; the lighter card surface does
+       half the work. */
+    --notfair-shadow-sm: 0 1px 2px rgba(0,0,0,.40), 0 2px 6px rgba(0,0,0,.24);
+    --notfair-shadow: 0 1px 2px rgba(0,0,0,.45), 0 3px 10px rgba(0,0,0,.30);
+    --notfair-shadow-lg: 0 2px 4px rgba(0,0,0,.5), 0 20px 50px -12px rgba(0,0,0,.55);
   }
 }
 
@@ -133,7 +167,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    letter-spacing: -0.01em;
+    /* Codex: near-neutral tracking (Apple-tight was -0.01em) */
+    letter-spacing: -0.006em;
   }
 }
 
@@ -188,25 +223,14 @@
 }
 
 :root {
-  --sidebar: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
-}
-
-.dark {
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --sidebar: hsl(var(--notfair-sidebar));
+  --sidebar-foreground: hsl(var(--notfair-ink-3));
+  --sidebar-primary: hsl(var(--notfair-cta));
+  --sidebar-primary-foreground: hsl(var(--notfair-cta-text));
+  --sidebar-accent: hsl(var(--notfair-surface-2));
+  --sidebar-accent-foreground: hsl(var(--notfair-ink));
+  --sidebar-border: transparent;
+  --sidebar-ring: hsl(var(--ring));
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -228,7 +252,7 @@
      footer all fit in one viewport. Still confident, just less luxurious. */
   .ns-hero-title {
     @apply text-foreground;
-    font-size: 34px; line-height: 1.1; letter-spacing: -0.028em;
+    font-size: 30px; line-height: 1.1; letter-spacing: -0.022em;
     font-weight: 600; margin: 0 0 8px;
   }
   .ns-hero-sub {
@@ -252,24 +276,27 @@
     font-size: 12px; font-weight: 500; letter-spacing: -0.005em;
   }
 
-  /* Grouped list — single rounded container, hairline dividers.
-     Dividers live on the container's direct children, not on the tile
-     itself, so wrappers like `<li>` don't break the :last-child rule. */
+  /* Grouped list — separated elevated cards, no divider lines.
+     Each direct child (usually an `<li>`) becomes its own raised
+     surface; depth does the separating work borders used to do. */
   .ns-list {
-    @apply flex flex-col bg-card rounded-[14px] overflow-hidden;
+    @apply flex flex-col;
+    gap: 9px;
     margin-top: 20px;
+  }
+  .ns-list > * {
+    @apply bg-card overflow-hidden;
+    border-radius: 12px;
     box-shadow: var(--notfair-shadow);
   }
-  .ns-list > * + * {
-    border-top: 1px solid hsl(var(--border));
-  }
   .ns-tile {
-    @apply flex items-center gap-3 bg-card border-0 cursor-pointer transition-colors;
+    @apply flex items-center gap-3 border-0 cursor-pointer transition-colors;
+    background: transparent;
     padding: 12px 16px;
     text-align: left;
     width: 100%;
   }
-  .ns-tile:hover { background: #FAFAFC; }
+  .ns-tile:hover { background: hsl(var(--notfair-hover)); }
   .ns-tile:disabled { cursor: not-allowed; opacity: 0.6; }
   .ns-tile-glyph {
     @apply grid place-items-center flex-shrink-0 font-semibold uppercase;
@@ -290,14 +317,15 @@
     font-weight: 500; font-size: 14.5px; letter-spacing: -0.012em;
     line-height: 1.3;
   }
-  /* "Required for X agent" badge — quiet accent chip that makes the
-     MCP↔agent dependency visible at a glance. */
+  /* "Required for X agent" badge — quiet inset chip that makes the
+     MCP↔agent dependency visible at a glance. Monochrome; green is
+     reserved for live/connected status. */
   .ns-tile-badge {
     display: inline-flex; align-items: center;
     font-size: 10.5px; font-weight: 500; letter-spacing: 0;
-    line-height: 1; padding: 3px 8px; border-radius: 999px;
-    background: hsl(var(--notfair-accent-soft));
-    color: hsl(var(--notfair-accent));
+    line-height: 1; padding: 3.5px 9px; border-radius: 999px;
+    background: hsl(var(--notfair-surface-2));
+    color: hsl(var(--notfair-ink-4));
     white-space: nowrap;
   }
   .ns-tile-desc {
@@ -324,16 +352,17 @@
     border-radius: 50%; background: hsl(var(--notfair-accent));
   }
 
-  /* Connected tile — accent-tinted glyph. */
+  /* Connected tile — green-tinted glyph well (semantic accent). */
   .ns-tile.is-connected .ns-tile-glyph {
     background: hsl(var(--notfair-accent-soft));
     color: hsl(var(--notfair-accent));
   }
 
-  /* Sub-action — Apple text link with chevron. */
+  /* Sub-action — quiet text link with chevron. Ink, not green:
+     green is status-only in the Codex system. */
   .ns-subaction {
     @apply inline-flex items-center;
-    color: hsl(var(--notfair-accent));
+    color: hsl(var(--notfair-ink-2));
     font-weight: 500; font-size: 12.5px; letter-spacing: -0.005em;
     margin-top: 4px; gap: 4px;
     background: transparent; border: 0; cursor: pointer; padding: 0;
@@ -355,26 +384,29 @@
     font-size: 12px; line-height: 1.45; letter-spacing: -0.005em;
     max-width: 440px; margin: 0;
   }
-  .ns-footnote a { color: hsl(var(--notfair-accent)); text-decoration: none; }
-  .ns-footnote a:hover { text-decoration: underline; }
+  .ns-footnote a { color: hsl(var(--notfair-ink-2)); text-decoration: underline; }
+  .ns-footnote a:hover { color: hsl(var(--notfair-ink)); }
 
-  /* Pill buttons — Apple shape, solid fill / ghost. Compact for compact
-     wizard steps. */
+  /* Buttons — Codex shape: soft 8px radius, inverted primary fill,
+     borderless filled secondary. */
   .ns-btn {
     @apply inline-flex items-center gap-2 cursor-pointer;
-    font: inherit; font-size: 14px; font-weight: 500;
-    letter-spacing: -0.012em;
-    padding: 9px 18px; border-radius: 980px; border: 0;
+    font: inherit; font-size: 13.5px; font-weight: 500;
+    letter-spacing: -0.006em;
+    padding: 8px 15px; border-radius: 8px; border: 0;
     transition: 0.15s ease;
   }
-  .ns-btn-primary { background: hsl(var(--notfair-accent)); color: #fff; }
-  .ns-btn-primary:hover { filter: brightness(0.94); }
-  .ns-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-  .ns-btn-ghost {
-    background: transparent; color: hsl(var(--notfair-accent));
-    padding: 9px 14px;
+  .ns-btn-primary {
+    background: hsl(var(--notfair-cta));
+    color: hsl(var(--notfair-cta-text));
   }
-  .ns-btn-ghost:hover { background: hsl(var(--notfair-accent-soft)); }
+  .ns-btn-primary:hover { opacity: 0.9; }
+  .ns-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .ns-btn-ghost {
+    background: transparent; color: hsl(var(--notfair-ink-3));
+    padding: 8px 12px;
+  }
+  .ns-btn-ghost:hover { background: hsl(var(--notfair-surface-2)); }
   /* Compact pill used inside grouped-list rows as the right-side action.
      Not a button element — the whole row is the clickable target. */
   .ns-btn-sm {
@@ -392,23 +424,23 @@
   .ns-pip-dot {
     @apply grid place-items-center;
     width: 18px; height: 18px; border-radius: 50%;
-    background: hsl(var(--card));
-    border: 0.5px solid hsl(var(--border));
+    background: hsl(var(--notfair-surface-2));
     color: hsl(var(--notfair-ink-4));
     font-size: 10px; font-weight: 500;
   }
   .ns-pip.is-done .ns-pip-dot {
-    background: hsl(var(--notfair-ink));
-    color: #fff; border-color: hsl(var(--notfair-ink));
+    background: hsl(var(--notfair-accent-soft));
+    color: hsl(var(--notfair-accent));
   }
   .ns-pip.is-active .ns-pip-dot {
-    background: hsl(var(--notfair-accent));
-    color: #fff; border-color: hsl(var(--notfair-accent));
+    background: hsl(var(--notfair-cta));
+    color: hsl(var(--notfair-cta-text));
+    font-weight: 600;
   }
   .ns-pip.is-active { color: hsl(var(--notfair-ink)); }
   .ns-pip-line {
-    display: inline-block; width: 20px; height: 0.5px;
-    background: hsl(var(--notfair-border-strong)); opacity: 0.6;
+    display: inline-block; width: 20px; height: 1px;
+    background: hsl(var(--notfair-surface-2));
   }
 
   /* Top brand bar — Notfair mark + per-page label, no nav. */
@@ -421,8 +453,6 @@
   .ns-topbar-label {
     color: hsl(var(--notfair-ink-4));
     font-size: 12px; letter-spacing: -0.005em; font-weight: 400;
-    padding-left: 12px;
-    border-left: 0.5px solid hsl(var(--notfair-border-strong));
   }
 
   /* ── App-shell tokens (every authenticated page) ─────────────────
@@ -482,23 +512,22 @@
     font-size: 12px; font-weight: 400; letter-spacing: -0.005em;
   }
 
-  /* Apple-grouped list (app-scope variant of .ns-list — same shape,
-     no auto top-margin so it can sit directly under a section head).
-     Dividers are drawn between direct children rather than as a
-     row-level :last-child rule — `<article class="ns-row">` is often
-     wrapped in `<li>`, so :last-child on the article matches every
-     row and would suppress the divider on all of them. The
-     `> * + *` border-top is structural and works regardless of the
-     wrapping element. */
+  /* Grouped list (app-scope variant of .ns-list — same separated-
+     cards shape, no auto top-margin so it can sit directly under a
+     section head). Each direct child — `<article class="ns-row">` is
+     often wrapped in `<li>` — becomes its own elevated card; no
+     divider lines anywhere. */
   .ns-group {
-    @apply flex flex-col bg-card rounded-[14px] overflow-hidden;
+    @apply flex flex-col;
+    gap: 9px;
+  }
+  .ns-group > * {
+    @apply bg-card overflow-hidden;
+    border-radius: 12px;
     box-shadow: var(--notfair-shadow);
   }
-  .ns-group > * + * {
-    border-top: 1px solid hsl(var(--border));
-  }
   .ns-row {
-    @apply flex items-center gap-3 bg-card;
+    @apply flex items-center gap-3;
     padding: 14px 18px;
     text-align: left;
   }
@@ -509,7 +538,7 @@
     border: 0;
     background: transparent;
   }
-  .ns-row-button:hover { background: #FAFAFC; }
+  .ns-row-button:hover { background: hsl(var(--notfair-hover)); }
   .ns-row-button:disabled { cursor: not-allowed; opacity: 0.55; }
 
   /* Glyph tile next to a row's title — 38px iOS-app-icon shape. */
@@ -581,12 +610,16 @@
     color: hsl(var(--notfair-accent));
   }
   .ns-tag-amber {
-    background: hsl(38 92% 95%);
-    color: hsl(28 76% 38%);
+    background: hsl(var(--notfair-warn-soft));
+    color: hsl(var(--notfair-warn));
   }
   .ns-tag-red {
     background: hsl(0 92% 96%);
     color: hsl(0 72% 42%);
+  }
+  .dark .ns-tag-red {
+    background: hsl(0 45% 15%);
+    color: hsl(0 70% 65%);
   }
 
   /* Status dot — small filled circle in semantic color. Pair with a
@@ -613,36 +646,26 @@
     100% { box-shadow: 0 0 0 0 hsl(var(--notfair-accent) / 0); }
   }
 
-  /* Tabs — Apple "underline only" pattern. Quiet, lightweight; the
-     active tab gets a thin accent rule and ink-1 text. */
+  /* Tabs — Codex pill pattern: no underline rule, no border line;
+     the active tab is an inset filled pill. */
   .ns-tabs {
     @apply flex items-center gap-1;
-    border-bottom: 0.5px solid hsl(var(--border));
   }
   .ns-tab {
     @apply relative inline-flex items-center gap-1.5 cursor-pointer;
-    padding: 9px 14px;
+    padding: 6px 12px; border-radius: 7px;
     color: hsl(var(--notfair-ink-4));
     font-size: 13px; font-weight: 500; letter-spacing: -0.006em;
     background: transparent; border: 0;
-    transition: color 0.15s ease;
+    transition: color 0.15s ease, background-color 0.15s ease;
   }
   .ns-tab:hover { color: hsl(var(--notfair-ink-2)); }
   .ns-tab[data-active="true"],
   .ns-tab[aria-selected="true"] {
     color: hsl(var(--notfair-ink));
+    background: hsl(var(--notfair-surface-2));
   }
-  .ns-tab[data-active="true"]::after,
-  .ns-tab[aria-selected="true"]::after {
-    content: ""; position: absolute; left: 10px; right: 10px;
-    bottom: -0.5px; height: 1.5px; border-radius: 1px;
-    background: hsl(var(--notfair-ink));
-  }
-  /* Accent variant for the in-task surface: chat/transcript/etc. */
-  .ns-tab.is-accent[data-active="true"]::after,
-  .ns-tab.is-accent[aria-selected="true"]::after {
-    background: hsl(var(--notfair-accent));
-  }
+  /* Accent variant kept as an alias — pill style is identical. */
 
   /* KPI card — small surface with quiet label + large metric. */
   .ns-kpi {
@@ -650,7 +673,7 @@
     padding: 16px 18px;
     box-shadow: var(--notfair-shadow-sm);
   }
-  a.ns-kpi:hover, button.ns-kpi:hover { background: #FAFAFC; }
+  a.ns-kpi:hover, button.ns-kpi:hover { background: hsl(var(--notfair-hover)); }
   .ns-kpi-label {
     color: hsl(var(--notfair-ink-4));
     font-size: 12px; font-weight: 500; letter-spacing: -0.005em;
@@ -692,28 +715,30 @@
   }
   .ns-card-body { padding: 18px 22px; }
 
-  /* Inline action link — accent color, no chrome. Common in row metas. */
+  /* Inline action link — ink with underline, no chrome. Green stays
+     status-only. */
   .ns-link {
-    color: hsl(var(--notfair-accent));
+    color: hsl(var(--notfair-ink-2));
     font-weight: 500;
     text-decoration: none;
   }
   .ns-link:hover { text-decoration: underline; }
 
-  /* Secondary pill button — neutral surface, used alongside primary CTA. */
+  /* Secondary button — borderless inset fill (Codex gray button). */
   .ns-btn-secondary {
     background: hsl(var(--notfair-surface-2));
     color: hsl(var(--notfair-ink-2));
   }
-  .ns-btn-secondary:hover { background: hsl(240 6% 90%); }
+  .ns-btn-secondary:hover { filter: brightness(0.96); }
+  .dark .ns-btn-secondary:hover { filter: brightness(1.2); }
 
-  /* Outline pill — for low-emphasis actions next to a primary CTA. */
+  /* "Outline" kept as a name only — same borderless inset fill. */
   .ns-btn-outline {
-    background: hsl(var(--card));
+    background: hsl(var(--notfair-surface-2));
     color: hsl(var(--notfair-ink-2));
-    box-shadow: inset 0 0 0 0.5px hsl(var(--border));
   }
-  .ns-btn-outline:hover { background: hsl(var(--notfair-surface-2)); }
+  .ns-btn-outline:hover { filter: brightness(0.96); }
+  .dark .ns-btn-outline:hover { filter: brightness(1.2); }
 
   /* Destructive pill — used in danger-zone buttons. */
   .ns-btn-danger {
@@ -722,28 +747,33 @@
   .ns-btn-danger:hover { filter: brightness(0.94); }
   .ns-btn-danger:disabled { opacity: 0.55; cursor: not-allowed; }
 
-  /* ── Sidebar (Apple-flavored override of shadcn sidebar) ─────────
-     The sidebar primitive's defaults are too dense and lean cool-grey.
-     These overrides give it Apple Settings rail feel: roomy padding,
-     softer ink, accent-tinted active row, fine hairlines. */
+  /* ── Sidebar (Codex override of shadcn sidebar) ──────────────────
+     Darker-than-content rail, no border line against the content —
+     the surface step does the separation. Active row is a monochrome
+     inset pill; green stays reserved for live status. */
   [data-sidebar="sidebar"] {
-    background: hsl(0 0% 99%);
-    border-color: hsl(var(--border));
+    background: hsl(var(--notfair-sidebar));
+    border-color: transparent;
+    /* Edge elevation instead of a border-r line: a soft rightward
+       shadow lifts the content plane off the rail. */
+    box-shadow: 4px 0 16px -6px rgba(0, 0, 0, 0.10);
+  }
+  .dark [data-sidebar="sidebar"] {
+    box-shadow: 4px 0 16px -6px rgba(0, 0, 0, 0.45);
   }
   [data-sidebar="header"] {
     padding: 10px 8px;
-    border-bottom: 0.5px solid hsl(var(--border));
   }
   [data-sidebar="group-label"] {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+    font-size: 10.5px; font-weight: 500; letter-spacing: 0.07em;
     color: hsl(var(--notfair-ink-4));
-    text-transform: none;
+    text-transform: uppercase;
     padding-inline: 12px;
     margin-top: 4px;
   }
   [data-sidebar="menu-button"] {
     color: hsl(var(--notfair-ink-3));
-    font-weight: 500; font-size: 13px; letter-spacing: -0.008em;
+    font-weight: 500; font-size: 13px; letter-spacing: -0.006em;
     border-radius: 8px; height: 32px;
     transition: background-color 0.12s ease, color 0.12s ease;
   }
@@ -752,24 +782,24 @@
     color: hsl(var(--notfair-ink));
   }
   [data-sidebar="menu-button"][data-active="true"] {
-    background: hsl(var(--notfair-accent-soft));
-    color: hsl(var(--notfair-accent));
+    background: hsl(var(--notfair-surface-2));
+    color: hsl(var(--notfair-ink));
   }
   [data-sidebar="menu-button"][data-active="true"] svg {
-    color: hsl(var(--notfair-accent));
+    color: hsl(var(--notfair-ink));
   }
   [data-sidebar="menu-button"] svg {
     color: hsl(var(--notfair-ink-4));
   }
 
-  /* App topbar — for in-app surfaces (separate from the wizard topbar). */
+  /* App topbar — for in-app surfaces (separate from the wizard topbar).
+     Translucent wash of the page background; no border line. */
   .ns-app-topbar {
     @apply sticky top-0 z-30 flex items-center;
     height: 44px;
-    background: rgba(245,245,247,0.78);
+    background: hsl(var(--background) / 0.82);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 0.5px solid hsl(var(--border));
     padding: 0 16px;
     gap: 8px;
   }
@@ -782,8 +812,15 @@
     font-size: 12px; letter-spacing: -0.005em;
   }
   .ns-app-topbar-divider {
-    width: 0.5px; height: 18px;
-    background: hsl(var(--notfair-border-strong));
+    width: 1px; height: 18px;
+    background: hsl(var(--notfair-surface-2));
     margin: 0 4px;
+  }
+
+  /* Mono metadata — hosts, counts, ids, usage meters. The terminal-
+     adjacent detail that anchors the Codex feel. */
+  .ns-mono {
+    font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+    letter-spacing: 0;
   }
 }

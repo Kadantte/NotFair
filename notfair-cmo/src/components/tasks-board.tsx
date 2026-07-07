@@ -331,8 +331,7 @@ export function TasksBoard({ projectSlug, tasks, agents }: Props) {
         </DropdownMenu>
 
         <div
-          className="ml-auto inline-flex overflow-hidden rounded-full border border-border bg-card p-0.5"
-          style={{ boxShadow: "var(--notfair-shadow-sm)" }}
+          className="ml-auto inline-flex overflow-hidden rounded-full bg-[hsl(var(--notfair-surface-2))] p-0.5"
         >
           <button
             type="button"
@@ -342,7 +341,7 @@ export function TasksBoard({ projectSlug, tasks, agents }: Props) {
             className={cn(
               "flex h-7 w-9 items-center justify-center rounded-full transition-colors",
               prefs.view === "kanban"
-                ? "bg-[hsl(var(--notfair-ink))] text-white"
+                ? "bg-card text-foreground shadow-sm"
                 : "text-[hsl(var(--notfair-ink-4))] hover:text-[hsl(var(--notfair-ink))]",
             )}
           >
@@ -356,7 +355,7 @@ export function TasksBoard({ projectSlug, tasks, agents }: Props) {
             className={cn(
               "flex h-7 w-9 items-center justify-center rounded-full transition-colors",
               prefs.view === "list"
-                ? "bg-[hsl(var(--notfair-ink))] text-white"
+                ? "bg-card text-foreground shadow-sm"
                 : "text-[hsl(var(--notfair-ink-4))] hover:text-[hsl(var(--notfair-ink))]",
             )}
           >
@@ -376,7 +375,7 @@ export function TasksBoard({ projectSlug, tasks, agents }: Props) {
               key={id}
               type="button"
               onClick={() => toggleAgent(id)}
-              className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] hover:bg-muted"
+              className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--notfair-surface-2))] px-2 py-0.5 text-[11px] hover:bg-[hsl(var(--notfair-hover))]"
             >
               {agentLabel(agentById, id)}
               <X className="size-2.5 opacity-60" />
@@ -456,11 +455,10 @@ function KanbanView({
         return (
           <section
             key={status}
-            className="flex w-72 shrink-0 flex-col rounded-[14px] bg-[hsl(var(--notfair-surface-2))]/60"
-            style={{ boxShadow: "inset 0 0 0 0.5px hsl(var(--border))" }}
+            className="flex w-72 shrink-0 flex-col rounded-[14px] bg-[hsl(var(--notfair-ink)/0.035)]"
             aria-label={`${STATUS_LABEL[status]} column`}
           >
-            <header className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
+            <header className="flex items-center justify-between px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <span
                   aria-hidden
@@ -509,7 +507,7 @@ function TaskCard({
   return (
     <Link
       href={projectHref(projectSlug, `/tasks/${task.id}`)}
-      className="block rounded-[10px] bg-card p-3 transition-colors hover:bg-[hsl(0_0%_99%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--notfair-accent-border))]"
+      className="block rounded-[10px] bg-card p-3 shadow-[var(--notfair-shadow-sm)] transition-colors hover:bg-[hsl(var(--notfair-hover))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
       style={{ boxShadow: "var(--notfair-shadow-sm)" }}
     >
       <div className="flex items-center justify-between gap-2">
@@ -592,7 +590,7 @@ function ListView({
           <li key={t.id}>
             <Link
               href={projectHref(projectSlug, `/tasks/${t.id}`)}
-              className="grid grid-cols-[6rem_7rem_minmax(0,1fr)_9rem_6rem] items-center gap-3 px-4 py-2.5 text-[12.5px] transition-colors hover:bg-[hsl(0_0%_99%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--notfair-accent-border))]"
+              className="grid grid-cols-[6rem_7rem_minmax(0,1fr)_9rem_6rem] items-center gap-3 px-4 py-2.5 text-[12.5px] transition-colors hover:bg-[hsl(var(--notfair-hover))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
             >
               <span className="truncate font-mono text-[11px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
                 {t.display_id.toUpperCase()}
@@ -652,26 +650,6 @@ function countForAgent(
   // (potentially zero) count after the current filter is applied.
   void filtered;
   return all.filter((t) => t.agent_id === agentId).length;
-}
-
-function statusBorderTone(status: TaskStatus): string {
-  switch (status) {
-    case "working":
-      return "border-l-amber-500";
-    case "blocked":
-      return "border-l-rose-500";
-    case "done":
-      return "border-l-emerald-500";
-    case "approved":
-      return "border-l-sky-500";
-    case "failed":
-      return "border-l-red-700";
-    case "cancelled":
-      return "border-l-zinc-300";
-    case "proposed":
-    default:
-      return "border-l-zinc-400";
-  }
 }
 
 function relativeTime(iso: string): string {

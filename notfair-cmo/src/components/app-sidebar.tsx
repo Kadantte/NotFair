@@ -34,6 +34,7 @@ import { AgentNav } from "./agent-nav";
 import { ApprovalsLiveBadge } from "./live-badge";
 import { HarnessFooter } from "./harness-footer";
 import { SidebarVersion } from "./sidebar-version";
+import { ThemeToggle } from "./theme-toggle";
 
 type NavItem = {
   href: string;
@@ -131,14 +132,19 @@ export async function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border/60 px-3 py-2 group-data-[collapsible=icon]:hidden">
+      <SidebarFooter className="px-3 py-2 group-data-[collapsible=icon]:hidden">
         {active && harnessUsage && (
           <HarnessFooter
             adapter={active.harness_adapter}
             usage={harnessUsage}
           />
         )}
-        <SidebarVersion />
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <SidebarVersion />
+          </div>
+          <ThemeToggle />
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

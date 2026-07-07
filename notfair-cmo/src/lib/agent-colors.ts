@@ -6,7 +6,10 @@ import type { AgentTemplateKey } from "@/server/agent-templates";
  * well against the zinc neutral background.
  */
 export type AgentColor = {
-  /** Tailwind classes: chip background + text color. */
+  /** Tailwind classes: chip background + text color. Codex theme:
+   *  chips are neutral inset fills for every agent — hue lives in the
+   *  `dot` / `label` fields only, so ownership stays scannable without
+   *  colored blocks in the chrome. */
   chip: string;
   /** Solid dot/legend swatch. */
   dot: string;
@@ -16,22 +19,22 @@ export type AgentColor = {
 
 const PALETTE: Record<AgentTemplateKey, AgentColor> = {
   cmo: {
-    chip: "bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-100 border-blue-200/60 dark:border-blue-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-blue-500",
     label: "text-blue-700 dark:text-blue-300",
   },
   google_ads: {
-    chip: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100 border-amber-200/60 dark:border-amber-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-amber-500",
     label: "text-amber-700 dark:text-amber-300",
   },
   meta_ads: {
-    chip: "bg-pink-100 text-pink-900 dark:bg-pink-950 dark:text-pink-100 border-pink-200/60 dark:border-pink-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-pink-500",
     label: "text-pink-700 dark:text-pink-300",
   },
   seo: {
-    chip: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100 border-emerald-200/60 dark:border-emerald-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-emerald-500",
     label: "text-emerald-700 dark:text-emerald-300",
   },
@@ -45,42 +48,42 @@ const PALETTE: Record<AgentTemplateKey, AgentColor> = {
  */
 const EXTRA_PALETTE: AgentColor[] = [
   {
-    chip: "bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-100 border-violet-200/60 dark:border-violet-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-violet-500",
     label: "text-violet-700 dark:text-violet-300",
   },
   {
-    chip: "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-100 border-rose-200/60 dark:border-rose-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-rose-500",
     label: "text-rose-700 dark:text-rose-300",
   },
   {
-    chip: "bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-100 border-cyan-200/60 dark:border-cyan-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-cyan-500",
     label: "text-cyan-700 dark:text-cyan-300",
   },
   {
-    chip: "bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-950 dark:text-fuchsia-100 border-fuchsia-200/60 dark:border-fuchsia-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-fuchsia-500",
     label: "text-fuchsia-700 dark:text-fuchsia-300",
   },
   {
-    chip: "bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-100 border-teal-200/60 dark:border-teal-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-teal-500",
     label: "text-teal-700 dark:text-teal-300",
   },
   {
-    chip: "bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-100 border-orange-200/60 dark:border-orange-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-orange-500",
     label: "text-orange-700 dark:text-orange-300",
   },
   {
-    chip: "bg-indigo-100 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100 border-indigo-200/60 dark:border-indigo-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-indigo-500",
     label: "text-indigo-700 dark:text-indigo-300",
   },
   {
-    chip: "bg-lime-100 text-lime-900 dark:bg-lime-950 dark:text-lime-100 border-lime-200/60 dark:border-lime-900",
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
     dot: "bg-lime-500",
     label: "text-lime-700 dark:text-lime-300",
   },

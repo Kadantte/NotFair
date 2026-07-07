@@ -107,7 +107,7 @@ const COMPONENTS: Components = {
   pre: ({ className, ...props }) => (
     <pre
       className={cn(
-        "mb-3 max-w-full overflow-x-auto rounded-md border bg-muted/50 p-3 last:mb-0",
+        "mb-3 max-w-full overflow-x-auto rounded-md bg-muted/60 p-3 last:mb-0",
         className,
       )}
       {...props}

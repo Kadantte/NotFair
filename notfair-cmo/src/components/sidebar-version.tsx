@@ -108,7 +108,7 @@ export function SidebarVersion() {
       )}
 
       {upgraded && (
-        <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400">
+        <span className="text-[10.5px] text-[hsl(var(--notfair-accent))]">
           Restart to apply
         </span>
       )}

@@ -160,7 +160,7 @@ function TabLink({
         <span
           className={`ml-1 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums leading-none ${
             isActive
-              ? "bg-[hsl(var(--notfair-ink))] text-white"
+              ? "bg-card text-foreground shadow-sm"
               : "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))]"
           }`}
         >

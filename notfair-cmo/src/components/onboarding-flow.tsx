@@ -81,7 +81,9 @@ function OnboardingFlowInner() {
           always sees where they are; the pips show how far they've gone. */}
       <div className="ns-topbar">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/notfair-mark.svg" alt="Notfair" />
+        <img src="/notfair-mark.svg" alt="Notfair" className="dark:hidden" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/notfair-mark-dark.svg" alt="Notfair" className="hidden dark:block" />
         <span className="ns-topbar-label">Notfair CMO</span>
         <div className="ml-auto">
           <div className="ns-progress">
@@ -369,7 +371,7 @@ function HarnessPicker({ disabled }: { disabled: boolean }) {
             <div className="flex w-full items-center justify-between">
               <span className="text-sm font-medium text-foreground">{opt.label}</span>
               {opt.recommended && (
-                <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                <span className="rounded-full bg-[hsl(var(--notfair-accent-soft))] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[hsl(var(--notfair-accent))]">
                   Recommended
                 </span>
               )}
@@ -557,7 +559,7 @@ function ConnectStep({ slug }: { slug: string }) {
     return (
       <div role="alert" className="ns-list p-6 space-y-3">
         <div className="flex items-center gap-2">
-          <AlertCircle className="size-4 text-amber-600" aria-hidden />
+          <AlertCircle className="size-4 text-[hsl(var(--notfair-warn))]" aria-hidden />
           <span className="font-medium text-sm">
             Couldn&rsquo;t load connection state.
           </span>
@@ -922,7 +924,7 @@ function SetupStep({ slug }: { slug: string }) {
                   aria-hidden
                   className={
                     s.status === "done"
-                      ? "inline-flex size-4 items-center justify-center font-mono text-emerald-600"
+                      ? "inline-flex size-4 items-center justify-center font-mono text-[hsl(var(--notfair-accent))]"
                       : s.status === "failed"
                         ? "inline-flex size-4 items-center justify-center font-mono text-destructive"
                         : s.status === "in_progress"
@@ -1067,7 +1069,7 @@ function AccountStep({ slug }: { slug: string }) {
       <Card role="alert">
         <CardContent className="space-y-3 pt-6 pb-6">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 text-amber-600" aria-hidden />
+            <AlertCircle className="size-4 text-[hsl(var(--notfair-warn))]" aria-hidden />
             <span className="font-medium text-sm">
               Couldn&rsquo;t load your Google Ads accounts.
             </span>
@@ -1091,7 +1093,7 @@ function AccountStep({ slug }: { slug: string }) {
       <Card role="alert">
         <CardContent className="space-y-3 pt-6 pb-6">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 text-amber-600" aria-hidden />
+            <AlertCircle className="size-4 text-[hsl(var(--notfair-warn))]" aria-hidden />
             <span className="font-medium text-sm">
               No Google Ads accounts found on this connection.
             </span>
@@ -1445,7 +1447,7 @@ function AccountPickerScaffold({
       <Card role="alert">
         <CardContent className="space-y-3 pt-6 pb-6">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 text-amber-600" aria-hidden />
+            <AlertCircle className="size-4 text-[hsl(var(--notfair-warn))]" aria-hidden />
             <span className="font-medium text-sm">
               Couldn&rsquo;t load your {mcpDisplayName} accounts.
             </span>

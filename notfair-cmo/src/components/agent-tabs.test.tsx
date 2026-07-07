@@ -52,11 +52,19 @@ describe("AgentTabs", () => {
     expect(tasks.className).toContain("text-foreground");
   });
 
-  it("renders the underline indicator span only for the active tab", () => {
+  it("renders the inset pill fill only on the active tab", () => {
     pathnameRef.current = "/proj/agents/cmo/skills";
-    const { container } = render(<AgentTabs projectSlug="proj" agentSlug="cmo" />);
-    const indicators = container.querySelectorAll('span[aria-hidden="true"]');
-    expect(indicators.length).toBe(1);
+    render(<AgentTabs projectSlug="proj" agentSlug="cmo" />);
+    const skills = screen.getByRole("link", { name: /skills/i });
+    expect(skills.className).toContain("bg-[hsl(var(--notfair-surface-2))]");
+    const others = ["chat", "tasks", "files", "cron", "settings"].map((t) =>
+      screen.getByRole("link", { name: new RegExp(t, "i") }),
+    );
+    for (const link of others) {
+      expect(link.className).not.toContain(
+        "bg-[hsl(var(--notfair-surface-2))]",
+      );
+    }
   });
 
   it("treats no-match pathname as no active tab", () => {

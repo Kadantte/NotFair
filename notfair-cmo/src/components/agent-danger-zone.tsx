@@ -167,7 +167,7 @@ export function AgentDangerZone({ agentId, agentDisplayName }: Props) {
                 {!summary.exists_in_openclaw && (
                   <>
                     <dt className="text-muted-foreground">Workspace</dt>
-                    <dd className="text-amber-600 dark:text-amber-400">
+                    <dd className="text-[hsl(var(--notfair-warn))]">
                       already removed
                     </dd>
                   </>

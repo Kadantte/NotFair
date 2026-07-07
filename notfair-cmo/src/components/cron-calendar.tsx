@@ -194,10 +194,11 @@ export function CronCalendar({
           </div>
         </div>
 
-        {/* Day grid */}
-        <div className="overflow-hidden rounded-lg border bg-card">
+        {/* Day grid — borderless day wells separated by gaps; today is
+            an elevated card (Codex elevation instead of grid lines). */}
+        <div>
           <div
-            className="grid divide-x"
+            className="grid gap-1.5"
             style={{ gridTemplateColumns: `repeat(${visibleDays}, minmax(0, 1fr))` }}
           >
             {Array.from({ length: visibleDays }).map((_, i) => {
@@ -242,7 +243,7 @@ function FilterChips({
   ];
   return (
     <div
-      className="inline-flex items-center gap-0.5 rounded-md border bg-muted/40 p-0.5"
+      className="inline-flex items-center gap-0.5 rounded-md bg-[hsl(var(--notfair-surface-2))] p-0.5"
       role="tablist"
       aria-label="Filter crons"
     >
@@ -258,7 +259,7 @@ function FilterChips({
             className={cn(
               "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
               isActive
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -289,13 +290,15 @@ function DayColumn({
   const dateLabel = date.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
 
   return (
-    <div className="flex min-h-[280px] flex-col">
-      <div
-        className={cn(
-          "border-b px-2 py-1.5 text-center",
-          isToday && "bg-accent/30",
-        )}
-      >
+    <div
+      className={cn(
+        "flex min-h-[280px] flex-col rounded-[10px]",
+        isToday
+          ? "bg-card shadow-[var(--notfair-shadow)]"
+          : "bg-[hsl(var(--notfair-ink)/0.035)]",
+      )}
+    >
+      <div className="px-2 py-1.5 text-center">
         <div
           className={cn(
             "text-[10px] uppercase tracking-wide text-muted-foreground",
@@ -349,16 +352,25 @@ function OccurrenceChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "block w-full rounded-md border px-2 py-1 text-left text-[11px] leading-tight transition-colors hover:brightness-95",
-        color.chip,
-        occurrence.cron_disabled && "opacity-50 border-dashed",
+        "block w-full rounded-[7px] px-2 py-1 text-left text-[11px] leading-tight transition-colors",
+        "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] hover:bg-[hsl(var(--notfair-hover))]",
+        occurrence.cron_disabled && "opacity-50",
       )}
       title={`${occurrence.cron_name} · ${occurrence.schedule_text}${
         occurrence.cron_disabled ? " · disabled" : ""
       }${occurrence.run_status ? ` · ${occurrence.run_status}` : ""}`}
     >
-      <div className="flex items-center justify-between gap-1 tabular-nums font-medium">
-        <span className={cn(occurrence.cron_disabled && "line-through")}>
+      <div className="flex items-center justify-between gap-1 font-mono tabular-nums font-medium">
+        <span
+          className={cn(
+            "flex items-center gap-1.5",
+            occurrence.cron_disabled && "line-through",
+          )}
+        >
+          <span
+            aria-hidden
+            className={cn("inline-block size-1.5 shrink-0 rounded-full", color.dot)}
+          />
           {time}
         </span>
         {occurrence.cron_disabled ? (
@@ -367,7 +379,7 @@ function OccurrenceChip({
           <RunStatusGlyph status={occurrence.run_status} />
         )}
       </div>
-      <div className="truncate opacity-80">{occurrence.short_name}</div>
+      <div className="truncate font-mono opacity-80">{occurrence.short_name}</div>
     </button>
   );
 }
@@ -378,7 +390,7 @@ function RunStatusGlyph({ status }: { status: string | undefined }) {
   if (lower === "ok") {
     return (
       <span
-        className="inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+        className="inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--notfair-accent))] text-white"
         aria-label="success"
       >
         <Check className="size-2.5" strokeWidth={3} />
@@ -399,7 +411,7 @@ function RunStatusGlyph({ status }: { status: string | undefined }) {
   // neither ok nor error". Keeps the chip honest without picking a color.
   return (
     <span
-      className="inline-flex size-2 shrink-0 rounded-full bg-zinc-400"
+      className="inline-flex size-2 shrink-0 rounded-full bg-[hsl(var(--notfair-ink-4))]"
       aria-label={status}
     />
   );
@@ -768,11 +780,13 @@ function computeOccurrenceStatus(
 }
 
 function OccurrenceStatusBadge({ status }: { status: OccurrenceStatus }) {
+  // Monochrome chrome: only run outcomes carry color (green ok / red
+  // error). "scheduled" and "past" are neutral inset pills.
   if (status.kind === "scheduled") {
-    return <Pill cls="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30">scheduled</Pill>;
+    return <Pill cls="ns-tag-mono">scheduled</Pill>;
   }
   if (status.kind === "past") {
-    return <Pill cls="bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/30">past</Pill>;
+    return <Pill cls="ns-tag-mono opacity-70">past</Pill>;
   }
   // Past run with a known status — show OpenClaw's raw string, color by it.
   return <Pill cls={colorForRawStatus(status.raw)}>{status.raw}</Pill>;
@@ -781,19 +795,19 @@ function OccurrenceStatusBadge({ status }: { status: OccurrenceStatus }) {
 function colorForRawStatus(raw: string): string {
   const lower = raw.toLowerCase();
   if (lower === "ok") {
-    return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+    return "ns-tag-accent font-mono";
   }
   if (lower === "error") {
-    return "bg-destructive/10 text-destructive border-destructive/40";
+    return "ns-tag-red font-mono";
   }
-  return "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/30";
+  return "ns-tag-mono";
 }
 
 function Pill({ cls, children }: { cls: string; children: React.ReactNode }) {
   return (
     <span
       className={cn(
-        "inline-flex w-fit items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] font-medium",
+        "inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] font-medium",
         cls,
       )}
     >

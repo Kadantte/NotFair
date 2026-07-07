@@ -5,14 +5,16 @@ describe("colorForAgentSlug", () => {
   it("returns the reserved blue palette for cmo", () => {
     const c = colorForAgentSlug("cmo");
     expect(c.dot).toBe("bg-blue-500");
-    expect(c.chip).toContain("bg-blue-100");
+    // Codex theme: chip fills are neutral inset for every agent — hue
+    // survives only in dot/label.
+    expect(c.chip).toContain("bg-[hsl(var(--notfair-surface-2))]");
     expect(c.label).toContain("text-blue-700");
   });
 
   it("returns the amber palette for google-ads (hyphenated slug)", () => {
     const c = colorForAgentSlug("google-ads");
     expect(c.dot).toBe("bg-amber-500");
-    expect(c.chip).toContain("bg-amber-100");
+    expect(c.chip).toContain("bg-[hsl(var(--notfair-surface-2))]");
     expect(c.label).toContain("text-amber-700");
   });
 

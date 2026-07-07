@@ -93,14 +93,14 @@ export function PolicyList({
           </div>
 
           {showForm && (
-            <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+            <div className="space-y-3 rounded-md bg-muted/40 p-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1 text-xs">
                   <span className="block font-medium">Action type</span>
                   <select
                     value={actionType}
                     onChange={(e) => setActionType(e.target.value as ApprovalType)}
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="h-9 w-full rounded-md border border-transparent bg-[hsl(var(--notfair-surface-2))] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     disabled={pending}
                   >
                     {ACTION_TYPES.map((t) => (
@@ -115,7 +115,7 @@ export function PolicyList({
                   <select
                     value={autoDecision}
                     onChange={(e) => setAutoDecision(e.target.value as "approve" | "reject")}
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="h-9 w-full rounded-md border border-transparent bg-[hsl(var(--notfair-surface-2))] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     disabled={pending}
                   >
                     <option value="approve">Auto-approve</option>

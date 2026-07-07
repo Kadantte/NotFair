@@ -35,7 +35,13 @@ export function SidebarBrand({ homeHref }: Props) {
         <img
           src="/notfair-mark.svg"
           alt="Notfair"
-          className="h-[18px] w-auto transition-opacity group-hover/brand:opacity-0"
+          className="h-[18px] w-auto transition-opacity group-hover/brand:opacity-0 dark:hidden"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/notfair-mark-dark.svg"
+          alt="Notfair"
+          className="hidden h-[18px] w-auto transition-opacity group-hover/brand:opacity-0 dark:block"
         />
         <PanelLeft
           aria-hidden
@@ -52,7 +58,9 @@ export function SidebarBrand({ homeHref }: Props) {
       className="flex h-8 shrink-0 items-center px-2"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/notfair-mark.svg" alt="Notfair" className="h-[18px] w-auto" />
+      <img src="/notfair-mark.svg" alt="Notfair" className="h-[18px] w-auto dark:hidden" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/notfair-mark-dark.svg" alt="Notfair" className="hidden h-[18px] w-auto dark:block" />
     </Link>
   );
 }
