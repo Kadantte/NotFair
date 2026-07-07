@@ -102,7 +102,7 @@ Style:
   starting the next.`;
 
 export type AgentTemplate = {
-  key: "cmo" | "google_ads" | "meta_ads" | "seo";
+  key: "cmo" | "google_ads" | "meta_ads" | "seo" | "x_ads";
   /**
    * Label for the ROLE this template represents (e.g. "CMO", "Google
    * Ads"). Used in the sidebar role pill + anywhere the UI says
@@ -147,9 +147,9 @@ export type AgentTemplateKey = AgentTemplate["key"];
  * Subset of TEMPLATES included in the default onboarding bundle. Single
  * source of truth for "which agents does a freshly-created project get?".
  *
- * Only CMO ships by default now. The three specialists (Google Ads,
- * Meta Ads, SEO) are gated on the user connecting the matching MCP —
- * the connect step in onboarding triggers provisioning via
+ * Only CMO ships by default now. The four specialists (Google Ads,
+ * Meta Ads, SEO, X Ads) are gated on the user connecting the matching
+ * MCP — the connect step in onboarding triggers provisioning via
  * provisionSpecialistForMcp as each token lands. Google Search Console
  * isn't its own specialist — connecting GSC provisions the SEO agent,
  * which uses GSC alongside on-page / technical SEO work.
@@ -164,12 +164,15 @@ export const DEFAULT_ONBOARDING_TEMPLATE_KEYS: AgentTemplateKey[] = ["cmo"];
  *
  * Notice GSC maps to `seo` — there's no dedicated GSC agent. The SEO
  * specialist owns search-console work as part of its broader remit
- * (technical SEO, content, ranking analysis).
+ * (technical SEO, content, ranking analysis). Google Analytics is
+ * deliberately absent: its data serves the CMO + existing specialists,
+ * so connecting it provisions no agent.
  */
 export const SPECIALIST_TEMPLATE_BY_MCP_KEY: Record<string, AgentTemplateKey> = {
   "notfair-googleads": "google_ads",
   "notfair-metaads": "meta_ads",
   "notfair-googlesearchconsole": "seo",
+  "notfair-xads": "x_ads",
 };
 
 export function templateForKey(key: string): AgentTemplate | undefined {
@@ -196,7 +199,7 @@ export const TEMPLATES: AgentTemplate[] = [
     capabilities: [
       "Talk through marketing strategy and prioritization",
       "Propose experiments + 30-day plans",
-      "Delegate work to specialist agents (Google Ads, SEO)",
+      "Delegate work to specialist agents (Google Ads, Meta Ads, SEO, X Ads)",
       "Schedule recurring jobs via openclaw cron",
       "Coordinate signals across channels",
     ],
@@ -331,6 +334,53 @@ You also have the platform's \`exec\` tool for shell, \`read/edit/write\`
 for files in your workspace, and the orchestration MCP for coordination.`,
     default_onboarding: false,
     requires_mcp_key: "notfair-googlesearchconsole",
+  },
+  {
+    key: "x_ads",
+    display_name: "X Ads Specialist",
+    default_name: "Max",
+    description:
+      "Runs X (Twitter) Ads campaigns, line items, promoted posts, targeting, budgets.",
+    capabilities: [
+      "Audit campaign + line-item spend, CPM, engagement",
+      "Diagnose delivery + targeting issues",
+      "Surface creative fatigue + winners on promoted posts",
+      "Propose budget shifts + bid changes",
+      "Schedule recurring performance + pacing checks",
+      "Uses notfair-xads MCP when account connected",
+    ],
+    model: "openai-codex/gpt-5.5",
+    system_prompt: `You are an X Ads (Twitter) specialist agent on the notfair-cmo platform.
+
+${SPECIALIST_ROLE}
+
+## Your domain tools
+
+When the notfair-xads MCP is connected to this project, use its tools
+for everything on the ads account — campaigns, line items (X's ad
+groups), promoted posts, funding instruments, targeting, and analytics.
+Prefer the widest read the surface offers on a first pass (analytics
+across all campaigns / line items), then narrow — one broad read beats
+many small calls.
+
+Domain conventions you should respect:
+- Refer to spend in account currency, not abstract units. Always quote
+  numbers (spend, impressions, engagement rate, CPM, CTR) when
+  reporting findings.
+- Default to the last 30 days for performance reads unless the brief
+  asks for a different window.
+- X's structure is campaign → line item → promoted post. Bids,
+  targeting, and placements live on the LINE ITEM — most "why is this
+  campaign behaving oddly" questions resolve at line-item level.
+- Creative fatigue shows up fast on X: engagement rate decaying while
+  frequency climbs is the first thing to check in a "what's wrong"
+  pass; engagement rate + cost-per-engagement by promoted post is the
+  "what's working" pass.
+
+You also have the platform's \`exec\` tool for shell, \`read/edit/write\`
+for files in your workspace, and the orchestration MCP for coordination.`,
+    default_onboarding: false,
+    requires_mcp_key: "notfair-xads",
   },
 ];
 

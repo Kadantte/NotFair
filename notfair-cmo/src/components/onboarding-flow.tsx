@@ -388,10 +388,10 @@ function HarnessPicker({ disabled }: { disabled: boolean }) {
 
 /**
  * Spec for one of the recommended-MCP tiles in the connect step. The core
- * MCPs (Google Ads, Meta Ads, Google Search Console) each get their own
- * first-class tile because connecting them triggers the provisioning of a
- * matching specialist agent; Google Analytics and X Ads get tiles too but
- * provision no specialist (their data flows to the CMO + existing agents).
+ * MCPs (Google Ads, Meta Ads, Google Search Console, X Ads) each get their
+ * own first-class tile because connecting them triggers the provisioning of
+ * a matching specialist agent; Google Analytics gets a tile too but
+ * provisions no specialist (its data flows to the CMO + existing agents).
  */
 type RecommendedTile = {
   mcp_key: string;
@@ -462,6 +462,7 @@ const RECOMMENDED_TILES: RecommendedTile[] = [
   {
     mcp_key: "notfair-xads",
     mcp_display_name: "X Ads MCP",
+    agent_badge: "X Ads agent",
     description:
       "Audits X (Twitter) campaigns and line items, tracks spend and engagement.",
     resource_url: "https://notfair.co/api/mcp/x_ads",

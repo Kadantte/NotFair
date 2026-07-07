@@ -29,13 +29,20 @@ describe("colorForAgentSlug", () => {
     expect(c.label).toContain("text-emerald-700");
   });
 
+  it("returns the sky palette for x-ads (with or without a name suffix)", () => {
+    expect(colorForAgentSlug("x-ads").dot).toBe("bg-sky-500");
+    expect(colorForAgentSlug("x-ads-max").dot).toBe("bg-sky-500");
+  });
+
   it("returns a non-template color for custom slugs", () => {
     const c = colorForAgentSlug("growth-engineer");
     // Custom slugs must never land on a template dot color (they would clash
-    // with the reserved cmo/google_ads/seo legend swatches).
+    // with the reserved cmo/google_ads/meta_ads/seo/x_ads legend swatches).
     expect(c.dot).not.toBe("bg-blue-500");
     expect(c.dot).not.toBe("bg-amber-500");
+    expect(c.dot).not.toBe("bg-pink-500");
     expect(c.dot).not.toBe("bg-emerald-500");
+    expect(c.dot).not.toBe("bg-sky-500");
   });
 
   it("maps the same custom slug to the same color across calls", () => {

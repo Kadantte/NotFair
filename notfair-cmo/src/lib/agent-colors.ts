@@ -38,6 +38,13 @@ const PALETTE: Record<AgentTemplateKey, AgentColor> = {
     dot: "bg-emerald-500",
     label: "text-emerald-700 dark:text-emerald-300",
   },
+  // Sky, not cyan: cyan-500 lives in EXTRA_PALETTE and a reserved role
+  // hue must never collide with a hashed custom-agent swatch.
+  x_ads: {
+    chip: "bg-[hsl(var(--notfair-surface-2))] text-[hsl(var(--notfair-ink-3))] border-transparent",
+    dot: "bg-sky-500",
+    label: "text-sky-700 dark:text-sky-300",
+  },
 };
 
 /**

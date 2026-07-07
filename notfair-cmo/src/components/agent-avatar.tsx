@@ -7,8 +7,8 @@ import type { AgentTemplateKey } from "@/server/agent-templates";
  *
  *   - a role-tinted soft background circle, matching the colored chip
  *     used elsewhere in the system (CMO blue, Google Ads amber, Meta
- *     pink, SEO emerald)
- *   - a per-character palette (hair colour, accent) so the four faces
+ *     pink, SEO emerald, X Ads sky)
+ *   - a per-character palette (hair colour, accent) so the five faces
  *     are visually distinct at small sizes
  *   - one signature accessory (glasses, headset, hair clip, magnifying
  *     glass) so the role reads in one glance
@@ -182,11 +182,50 @@ const SEO: Avatar = {
   ],
 };
 
+/**
+ * Max — X Ads specialist. Jet-black hair and dark shades over a black
+ * tee (the platform's monochrome brand), on a sky wash so the chip
+ * still reads friendly next to the others.
+ */
+const X_ADS: Avatar = {
+  bg: "#D6ECF8",
+  palette: {
+    h: "#3F3F46", // near-black hair
+    H: "#18181B",
+    s: SKIN,
+    S: SKIN_SHADOW,
+    m: MOUTH,
+    c: CHEEK,
+    x: "#0A0A0B", // shades frame
+    w: "#52525B", // lens highlight
+    t: "#18181B", // black tee
+  },
+  grid: [
+    "................",
+    "................",
+    ".....HHHHHH.....",
+    "....HhhhhhhH....",
+    "...HhhhhhhhhH...",
+    "...Hhssssshhh...",
+    "...hsSssssShh...",
+    "...xxxxsxxxx....", // shades band
+    "...xwwxsxwwx....", // lenses + highlight
+    "....hssssssh....",
+    "....cssmsscs....",
+    ".....ssssss.....",
+    "....tssssst.....",
+    "...tttttttt.....", // black tee
+    "..tttttttttt....",
+    "..tttttttttt....",
+  ],
+};
+
 const AVATARS: Record<AgentTemplateKey, Avatar> = {
   cmo: CMO,
   google_ads: GOOGLE_ADS,
   meta_ads: META_ADS,
   seo: SEO,
+  x_ads: X_ADS,
 };
 
 /**

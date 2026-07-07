@@ -251,8 +251,12 @@ describe("OnboardingFlow — ConnectStep", () => {
     expect(
       screen.getByRole("button", { name: /^Google Analytics/i }),
     ).toBeInTheDocument();
+    // X Ads provisions a specialist like the trio — its tile must carry
+    // the agent badge in the accessible name.
     expect(
-      screen.getByRole("button", { name: /^X Ads/i }),
+      screen.getByRole("button", {
+        name: /^X Ads MCP — required for X Ads agent/i,
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /More tools/i }),
