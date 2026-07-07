@@ -6,9 +6,11 @@
 
 NotFair gives your AI agent direct access to Google Search Console, Google Ads, and Meta Ads (Facebook + Instagram). It analyzes your traffic, surfaces what's hurting your rankings, finds wasted ad spend, diagnoses creative fatigue and audience saturation, and tells you exactly what to fix. When you have access to the repo, it goes further: rewriting meta tags, fixing headings, adding structured data, and shipping the changes.
 
-### CLI + web — same engine
+### CLI + web + local portal — same engine
 
 The NotFair plugin is the CLI side — the skills that run inside Claude Code (and other AI agent hosts). [notfair.co](https://notfair.co) is the companion web app: sign in once, connect your Google Ads and Meta Ads accounts, and run audits through a browser UI. Both sides share the same engine, so an audit you run from the CLI uses the same tooling as the one on the web.
+
+There's also **[NotFair CMO](#notfair-cmo--a-local-marketing-team-in-your-browser)** — a local web portal that runs a team of specialist marketing agents (CMO, Google Ads, Meta Ads, SEO, X Ads) on top of your existing Claude Code or Codex login.
 
 > *"Am I wasting money on ads right now?"*
 > *"Why did my traffic drop and how do I fix it?"*
@@ -160,6 +162,29 @@ The plugin was renamed `toprank` → `notfair` in v0.24.0. If you previously ins
 
 Your data is preserved — the runtime state directory (`~/.toprank/`, holding portfolio state, change logs, business-context cache, audit history) is intentionally retained under its original name for this release. See `CHANGELOG.md` for details.
 
+---
+
+## NotFair CMO — a local marketing team in your browser
+
+[NotFair CMO](notfair-cmo/) is a local web portal that turns the skills above into an always-on marketing team. Instead of invoking skills one at a time from the CLI, you get named specialist agents per project — a **CMO** who owns strategy and delegates, plus **Google Ads**, **Meta Ads**, **SEO**, and **X Ads** specialists — each in its own isolated workspace, running on top of the Claude Code or Codex login you already have. Chat with them, watch tasks move across a kanban board, approve governed actions (spend, publishes, bid changes) from an approvals inbox, and let them schedule their own recurring jobs on a native cron scheduler.
+
+Open source, runs entirely on your machine, published to npm as [`notfair-cmo`](https://www.npmjs.com/package/notfair-cmo).
+
+### Get started
+
+**Prerequisites:** Node 20+ and at least one harness installed and authenticated — [Claude Code](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview) (recommended) or [Codex CLI](https://github.com/openai/codex).
+
+```bash
+npx notfair-cmo@latest doctor   # preflight: Node, harnesses, data dir, port
+npx notfair-cmo@latest          # launch the UI at http://127.0.0.1:3327
+```
+
+Or install globally with `npm install -g notfair-cmo`, then run `notfair-cmo`.
+
+Create a project, pick your harness, and connect platforms during onboarding — each MCP you connect (Google Ads, Meta Ads, Search Console, X Ads) provisions the matching specialist agent automatically. Already using the plugin? `/notfair:cmo` launches the portal straight from Claude Code.
+
+Full docs, CLI reference, and architecture notes: [`notfair-cmo/README.md`](notfair-cmo/README.md).
+
 ## Skills
 
 ### Google Ads
@@ -232,6 +257,7 @@ notfair/
 │   ├── geo-optimizer/           <- GEO for AI search engines
 │   └── setup-cms/               <- CMS connector
 ├── gemini/                      <- cross-model review via Gemini CLI
+├── notfair-cmo/                 <- local marketing portal (npm: notfair-cmo)
 ├── notfair-upgrade-skill/       <- self-updater
 ├── test/                        <- unit + LLM-judge eval tests
 └── VERSION

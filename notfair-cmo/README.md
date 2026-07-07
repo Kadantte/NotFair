@@ -7,7 +7,7 @@ Open source. Runs entirely on your machine. Bring your own LLM credentials (via 
 ## What it gives you
 
 - **Per-agent chat** scoped to each project — talk to a marketing-shaped agent that can launch campaigns, audit SEO, propose recurring jobs. Tool calls + MCP invocations stream inline as collapsible step rows.
-- **Specialist agents** (CMO + Google Ads + SEO) auto-provisioned per project, isolated in their own workspace dir. Clone or create more from the sidebar.
+- **Specialist agents** (CMO + Google Ads + Meta Ads + SEO + X Ads), each isolated in its own workspace dir. The CMO is provisioned on project create; each specialist appears when you connect the matching platform MCP. Clone or create more from the sidebar.
 - A **cron tab** (calendar + list) backed by a native SQLite scheduler. Agents create jobs via the `schedule_recurring_work` MCP tool; the tick loop in the Next.js process fires them on time.
 - **Project-scoped MCP connections** — one-click PKCE OAuth to bring third-party tools (Google Ads via NotFair's hosted MCP) into the agents' toolbox. Tokens stored in SQLite, never in env vars, and wired into the chosen harness automatically.
 - A **live audit log** of every autonomous decision and scheduled run, append-only.
@@ -65,10 +65,11 @@ Options on `doctor`: `--port <n>`, `--data-dir <path>`.
 ## What happens when you create a project
 
 1. SQLite row written at `~/.notfair-cmo/db.sqlite` with your harness choice (`projects.harness_adapter`).
-2. Default agents provisioned under the project's slug:
-   - `<slug>-cmo-<name>` — Chief Marketing Officer
-   - `<slug>-google-ads-<name>` — Google Ads specialist
-   - SEO is opt-in, provisioned on demand.
+2. Agents provisioned under the project's slug:
+   - `<slug>-cmo-<name>` — Chief Marketing Officer, created immediately.
+   - Specialists (`google-ads`, `meta-ads`, `seo`, `x-ads`) are gated on
+     connecting the matching platform MCP — each OAuth connect provisions
+     its agent (Search Console provisions the SEO specialist).
 
    Each gets its own workspace at `~/.notfair-cmo/agents/<id>/` with an `IDENTITY.md` system prompt scoped to its role + the chosen harness's native config (`.mcp.json` for Claude Code, sections in `~/.codex/config.toml` for Codex).
 3. The orchestration MCP server (`/api/mcp/orchestration`) is registered for every agent so they can call `create_task`, `submit_task_status`, `set_project_brief`, `schedule_recurring_work`, etc.
@@ -82,7 +83,7 @@ You can also schedule manually via the **+ New cron** button on the Crons tab.
 
 ## Connecting MCP servers (for live ad-platform data)
 
-The Connections page lists the MCP servers in our catalog (currently: NotFair Google Ads). Click **Connect** to start a one-click PKCE OAuth flow — no environment variables to set, no Google Cloud project of your own to register.
+The Connections page lists the MCP servers in our catalog (NotFair Google Ads, Meta Ads, Google Search Console, Google Analytics, X Ads — plus browseable extras like Stripe and Supabase, or any custom MCP URL). Click **Connect** to start a one-click PKCE OAuth flow — no environment variables to set, no Google Cloud project of your own to register.
 
 The token is persisted into `mcp_tokens` (SQLite) and the catalog MCP is automatically registered with every agent in the project via the chosen harness's config. New agents provisioned later get the same wiring.
 
