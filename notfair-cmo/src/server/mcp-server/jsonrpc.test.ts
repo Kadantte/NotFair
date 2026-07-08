@@ -285,7 +285,7 @@ describe("handleJsonRpc — tools/call submit_task_status", () => {
     expect(updateTaskMock).not.toHaveBeenCalled();
   });
 
-  it("is a no-op on terminal tasks (already succeeded/failed/cancelled)", async () => {
+  it("refuses updates to terminal tasks with an instructive error", async () => {
     getTaskMock.mockReturnValue({
       id: "t1",
       display_id: "x-1",
@@ -308,8 +308,17 @@ describe("handleJsonRpc — tools/call submit_task_status", () => {
       },
     });
     if (!r || "error" in r) throw new Error("expected ok envelope");
-    const result = r.result as { isError: boolean };
-    expect(result.isError).toBe(false);
+    const result = r.result as {
+      isError: boolean;
+      content: Array<{ text: string }>;
+    };
+    // Used to be a silent ok:true no-op — the agent would "restart" a
+    // cancelled task and narrate success the DB never recorded. Now the
+    // tool result is an error that names the terminal status and points
+    // the agent at create_task.
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toContain("done");
+    expect(result.content[0]!.text).toContain("create_task");
     // Terminal status is preserved — no DB write happens.
     expect(updateTaskMock).not.toHaveBeenCalled();
   });

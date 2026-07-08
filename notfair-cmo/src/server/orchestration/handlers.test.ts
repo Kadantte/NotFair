@@ -232,6 +232,35 @@ describe("handleTaskStatus — cannot-close-with-pending-approval invariant", ()
     );
     expect(r.ok && r.data.status).toBe("done");
   });
+
+  it("refuses updates to terminal tasks with an instructive error (no silent no-op)", async () => {
+    const { handleTaskStatus } = await import("./handlers");
+    for (const terminal of ["cancelled", "failed", "done"] as const) {
+      const t = createTask({
+        project_slug: "demo",
+        agent_id: "demo-google-ads",
+        brief: "x",
+      });
+      testDb.prepare("UPDATE tasks SET status=? WHERE id = ?").run(terminal, t.id);
+      const r = handleTaskStatus(
+        { task_id: t.id, status: "working" },
+        { project_slug: "demo", agent_id: "demo-google-ads" },
+      );
+      // The old behavior returned ok:true here — the agent "restarted" a
+      // cancelled task, saw success, and narrated progress the DB never
+      // recorded. The error must name the terminal status and point the
+      // agent at create_task instead.
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.error).toContain(terminal);
+        expect(r.error).toContain("create_task");
+      }
+      const after = testDb
+        .prepare("SELECT status FROM tasks WHERE id = ?")
+        .get(t.id) as { status: string };
+      expect(after.status).toBe(terminal);
+    }
+  });
 });
 
 describe("handleListMyTasks", () => {

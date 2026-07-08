@@ -182,7 +182,18 @@ export function handleTaskStatus(
     task.status === "failed" ||
     task.status === "done"
   ) {
-    return { ok: true, data: { task_id: task.id, status: task.status } };
+    // Terminal statuses never change. This used to return ok:true (a
+    // silent no-op so a late status flush after a mid-run user-cancel
+    // wouldn't error the turn) — but that lied to the agent: it would
+    // "restart" a cancelled task, get success back, and narrate progress
+    // the DB never recorded. Refuse loudly and say what to do instead.
+    return {
+      ok: false,
+      error:
+        `Task ${task.display_id} is '${task.status}' — a terminal status that cannot change. ` +
+        `Do NOT claim this task was restarted or updated. If the work should be redone, ` +
+        `create a NEW task via create_task and tell the user that's what you did.`,
+    };
   }
 
   // Closing a task that's gated on an unresolved approval is almost always
