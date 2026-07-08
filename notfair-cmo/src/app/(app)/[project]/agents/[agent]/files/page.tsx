@@ -77,7 +77,7 @@ export default async function AgentFilesPage({
   return (
     <div className="grid h-full grid-cols-[260px_minmax(0,1fr)] divide-x divide-border bg-background">
       {/* Left rail — file list */}
-      <aside className="flex min-h-0 flex-col bg-[hsl(0_0%_99%)]">
+      <aside className="flex min-h-0 flex-col bg-[hsl(var(--notfair-sidebar))]">
         <div className="border-b border-border/60 px-4 py-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--notfair-ink-4))]">
             Workspace files
