@@ -1,5 +1,17 @@
 # notfair-cmo
 
+## 0.8.0 — 2026-07-07
+
+**Slack-style "needs you" badges.** When an agent asks a question or requests an approval, a red badge with the count appears next to that agent in the sidebar — visible from every page — and on the blocked task's row in the task rail. Clicking the agent deep-links straight into the decision space (the blocked task with the question/approval card ready to answer) instead of Chat. Badges ride the existing 2–8 s liveness poll and clear the moment you answer. The green in-flight indicator on agent rows was removed — the red badge is the only signal, by design.
+
+**Task rail simplified.** One flat list (no more Working/Blocked/Done section headers), no "All quiet." status line, no per-row age counters. Each row is now two lines — task id on top, title below clamped to two lines with an ellipsis — with uniform row heights, sidebar-matching spacing (`gap-1`), and the same rounded selection treatment the agent sidebar uses.
+
+**Onboarding connect step reworked.** The "Required for <X> agent" pills are gone; each tile's description now reads "Gives the <X> agent the ability to …" so the MCP→agent dependency is plain language. Google Analytics moved out of the recommended tiles into the "More tools" browse dialog (it powers no specialist agent); a connected GA shows up as an extras row.
+
+**Agents can no longer "restart" terminal tasks into the void.** `submit_task_status` on a cancelled/done/failed task used to be a silent success no-op — an agent asked to "restart the task" would rerun the work, get success back, and narrate progress the DB never recorded. It now returns an instructive error naming the terminal status and pointing the agent at `create_task` for redos.
+
+**Fixes.** Files tab's file list now uses the theme sidebar token instead of a hardcoded near-white, so dark mode renders correctly. Removed the stray divider under the chat thread-selector header row.
+
 ## 0.7.1 — 2026-06-06
 
 **Sidebar shows the installed version + a one-click Upgrade button.** The sidebar footer now always displays `notfair-cmo v<x.y.z>`. When the npm registry has a newer release, an `v<x.y.z> available` button appears next to it — click runs `npm i -g notfair-cmo@latest` via a new `/api/upgrade` endpoint and surfaces "Restart to apply" on success. Latest-version lookup is cached 1 hour in-process so the sidebar polling doesn't pound `registry.npmjs.org`.
