@@ -25,6 +25,7 @@ const initial: LiveCounts = {
   project: "demo1",
   agents: { "demo1-cmo": 0, "demo1-google-ads": 1 },
   approvals: 0,
+  attention: {},
 };
 
 afterEach(() => {

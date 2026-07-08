@@ -4,6 +4,7 @@ import { ClientMountGate } from "@/components/client-mount-gate";
 import { LiveCountsProvider } from "@/components/live-counts-context";
 import { getActiveProject } from "@/server/active-project";
 import { actionableApprovalCount } from "@/server/db/approvals";
+import { attentionByAgent } from "@/server/db/attention";
 import { inFlightCountsByAgent } from "@/server/db/tasks";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
   const initialApprovals = active ? actionableApprovalCount(active.slug) : 0;
+  const initialAttention = active ? attentionByAgent(active.slug) : {};
 
   return (
     <ClientMountGate
@@ -32,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           project: active?.slug ?? null,
           agents: initialAgents,
           approvals: initialApprovals,
+          attention: initialAttention,
         }}
       >
         <SidebarProvider>

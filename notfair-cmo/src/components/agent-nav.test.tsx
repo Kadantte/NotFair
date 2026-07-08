@@ -94,26 +94,47 @@ describe("AgentNav", () => {
     expect(target?.getAttribute("data-active")).toBe("true");
   });
 
-  it("renders the in-flight count badge when count > 0", () => {
+  it("renders the red attention badge and deep-links to the blocked task", () => {
     render(
       <AgentNav
         projectSlug="proj"
         agents={agents}
-        inFlightCounts={{ "proj-cmo": 3 }}
+        attention={{ "proj-cmo": { count: 1, task_id: "demo1-1" } }}
       />,
     );
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByLabelText("3 running")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("1 waiting on your answer"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Greg/i })).toHaveAttribute(
+      "href",
+      "/proj/agents/cmo-greg/tasks?task=demo1-1",
+    );
+    // Other agents keep the default chat link.
+    expect(screen.getByRole("link", { name: /Ana/i })).toHaveAttribute(
+      "href",
+      "/proj/agents/google-ads-ana/chat",
+    );
   });
 
-  it("does not render a count when in-flight is 0", () => {
+  it("falls back to the Tasks tab when no waiting item is task-anchored", () => {
     render(
       <AgentNav
         projectSlug="proj"
         agents={agents}
-        inFlightCounts={{ "proj-cmo": 0 }}
+        attention={{ "proj-cmo": { count: 2, task_id: null } }}
       />,
     );
-    expect(screen.queryByLabelText(/running/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText("2 waiting on your answer"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Greg/i })).toHaveAttribute(
+      "href",
+      "/proj/agents/cmo-greg/tasks",
+    );
+  });
+
+  it("renders no indicator at all when nothing needs the user", () => {
+    render(<AgentNav projectSlug="proj" agents={agents} />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

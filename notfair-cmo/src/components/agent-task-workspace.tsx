@@ -40,21 +40,6 @@ const TASK_IN_FLIGHT: TaskStatus[] = ["proposed", "approved", "working", "blocke
 // composer is a parallel channel for free-form direction.
 const COMPOSER_LOCKED: TaskStatus[] = ["proposed", "approved", "working"];
 
-// `blocked` covers two distinct reasons: waiting on an approval, or
-// waiting on another task to finish. The section header stays generic
-// ("Blocked") and each row's subline spells out the actual reason —
-// avoids the previous "Waiting on approval" label being a lie when the
-// real blocker is an upstream task.
-const STATUS_GROUPS: Array<{ status: TaskStatus; label: string }> = [
-  { status: "working", label: "Working" },
-  { status: "blocked", label: "Blocked" },
-  { status: "proposed", label: "Proposed" },
-  { status: "approved", label: "Approved" },
-  { status: "done", label: "Done" },
-  { status: "failed", label: "Failed" },
-  { status: "cancelled", label: "Cancelled" },
-];
-
 const STATUS_VARIANT: Record<
   TaskStatus,
   "default" | "secondary" | "outline" | "destructive"
@@ -96,6 +81,9 @@ type Props = {
   tasks: Task[];
   selected: SelectedTaskBundle | null;
   proposedCount: number;
+  /** task_id → count of pending questions/approvals waiting on the user.
+   *  Rows in the rail show the Slack-style red badge when > 0. */
+  attentionByTask?: Record<string, number>;
   /** MCP catalog forwarded to the per-task LiveTranscript so tool calls
    *  that resolve to an MCP server render the server's brand favicon. */
   mcpCatalog?: McpCatalogEntryLite[];
@@ -109,21 +97,12 @@ export function AgentTaskWorkspace({
   tasks,
   selected,
   proposedCount,
+  attentionByTask = {},
   mcpCatalog,
 }: Props) {
   const router = useRouter();
   const search = useSearchParams();
   const selectedId = search.get("task");
-
-  const grouped = useMemo(() => {
-    const map = new Map<TaskStatus, Task[]>();
-    for (const t of tasks) {
-      const list = map.get(t.status) ?? [];
-      list.push(t);
-      map.set(t.status, list);
-    }
-    return map;
-  }, [tasks]);
 
   // Resolve blocker → blocker task. Used by TaskRow to show a
   //   "Waiting on <display_id>" subline on tasks blocked by an upstream
@@ -137,10 +116,6 @@ export function AgentTaskWorkspace({
   }, [tasks]);
 
   const totalCount = tasks.length;
-  const inFlightCount =
-    (grouped.get("working")?.length ?? 0) +
-    (grouped.get("proposed")?.length ?? 0) +
-    (grouped.get("approved")?.length ?? 0);
 
   function selectTask(displayId: string) {
     const params = new URLSearchParams(search?.toString() ?? "");
@@ -156,28 +131,14 @@ export function AgentTaskWorkspace({
           the open transcript. */}
       {/* ── Left pane: task list ─────────────────────────────────────── */}
       <aside className="flex w-80 shrink-0 flex-col bg-[hsl(var(--notfair-sidebar))]">
-        <div className="px-4 py-3">
-          <p className="text-[11px] text-muted-foreground">
-            {inFlightCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5">
-                <RunningDot size="sm" aria-label="" />
-                <span className="tabular-nums">{inFlightCount}</span> in flight
-              </span>
-            ) : totalCount === 0 ? (
-              "Nothing assigned yet."
-            ) : (
-              "All quiet."
-            )}
-          </p>
-          {proposedCount > 0 && (
-            <div className="mt-2">
-              <StartAllTasksButton
-                agentId={agentFullId}
-                proposedCount={proposedCount}
-              />
-            </div>
-          )}
-        </div>
+        {proposedCount > 0 && (
+          <div className="px-4 py-3">
+            <StartAllTasksButton
+              agentId={agentFullId}
+              proposedCount={proposedCount}
+            />
+          </div>
+        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto py-1">
           {totalCount === 0 ? (
@@ -185,40 +146,27 @@ export function AgentTaskWorkspace({
               The CMO will delegate tasks here.
             </div>
           ) : (
-            STATUS_GROUPS.map((group) => {
-              const items = grouped.get(group.status);
-              if (!items || items.length === 0) return null;
-              return (
-                <div key={group.status} className="py-1">
-                  <div className="flex items-center justify-between px-4 py-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      {group.label}
-                    </span>
-                    <span className="text-[10px] tabular-nums text-muted-foreground">
-                      {items.length}
-                    </span>
-                  </div>
-                  <ul>
-                    {items.map((t) => (
-                      <li key={t.id}>
-                        <TaskRow
-                          task={t}
-                          blocker={
-                            t.blocked_by_task_id
-                              ? taskById.get(t.blocked_by_task_id)
-                              : undefined
-                          }
-                          selected={
-                            t.display_id === selectedId || t.id === selectedId
-                          }
-                          onSelect={() => selectTask(t.display_id)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })
+            /* gap-1 matches SidebarMenu's item spacing so the task rail
+               reads like the agent list. */
+            <ul className="flex flex-col gap-1">
+              {tasks.map((t) => (
+                <li key={t.id}>
+                  <TaskRow
+                    task={t}
+                    blocker={
+                      t.blocked_by_task_id
+                        ? taskById.get(t.blocked_by_task_id)
+                        : undefined
+                    }
+                    attentionCount={attentionByTask[t.id] ?? 0}
+                    selected={
+                      t.display_id === selectedId || t.id === selectedId
+                    }
+                    onSelect={() => selectTask(t.display_id)}
+                  />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </aside>
@@ -490,6 +438,7 @@ function CancelTaskButton({ taskDisplayId }: { taskDisplayId: string }) {
 function TaskRow({
   task,
   blocker,
+  attentionCount = 0,
   selected,
   onSelect,
 }: {
@@ -497,6 +446,9 @@ function TaskRow({
   /** When this task is blocked by another task, the blocker (for the
    *  "Waiting on <id>" subline). Undefined for approval-blocked tasks. */
   blocker?: Task;
+  /** Pending questions/approvals on this task waiting on the user —
+   *  renders the Slack-style red badge when > 0. */
+  attentionCount?: number;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -511,11 +463,16 @@ function TaskRow({
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "group block w-full px-4 py-2.5 text-left transition-colors",
-        "hover:bg-accent/40 focus-visible:outline-none focus-visible:bg-accent/40",
-        selected && "bg-accent/80 hover:bg-accent/80",
+        // Mirror the sidebar's SidebarMenuButton look (rounded-md, inset,
+        // sidebar-accent fill on hover/selected) so picking a task reads
+        // the same as picking an agent.
+        "group mx-2 block w-[calc(100%-1rem)] rounded-md px-2.5 py-2 text-left transition-colors",
+        "hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent",
+        selected && "bg-sidebar-accent",
       )}
     >
+      {/* Line 1: glyph + task id (+ red badge). Line 2: title, clamped to
+          two rows with an ellipsis so long briefs never overflow the rail. */}
       <div className="flex items-center gap-2.5">
         <span className="flex size-3.5 shrink-0 items-center justify-center">
           {isRunning ? (
@@ -524,22 +481,29 @@ function TaskRow({
             <StatusGlyph status={task.status} />
           )}
         </span>
-        <span className="min-w-0 flex-1 truncate text-xs">
-          <span className="mr-1.5 font-mono text-[10px] text-muted-foreground tabular-nums">
-            {task.display_id.toUpperCase()}
-          </span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] font-medium text-muted-foreground tabular-nums">
+          {task.display_id.toUpperCase()}
+        </span>
+        {attentionCount > 0 && (
           <span
-            className={cn(
-              selected ? "font-medium text-foreground" : "text-foreground/90",
-              !isInFlight && task.status !== "working" && "text-muted-foreground",
-            )}
+            role="status"
+            aria-label={`${attentionCount} waiting on your answer`}
+            className="inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1 text-[10px] font-semibold tabular-nums leading-none text-white"
           >
-            {task.title ?? task.brief.slice(0, 80)}
+            {attentionCount}
           </span>
-        </span>
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-          {formatRelative(task.updated_at)}
-        </span>
+        )}
+      </div>
+      <div
+        className={cn(
+          // leading-4 (1rem) × 2 lines = min-h-8: one-line titles reserve
+          // the second line's space so every row is the same height.
+          "ml-6 mt-0.5 line-clamp-2 min-h-8 text-xs leading-4",
+          selected ? "font-medium text-foreground" : "text-foreground/90",
+          !isInFlight && task.status !== "working" && "text-muted-foreground",
+        )}
+      >
+        {task.title ?? task.brief.slice(0, 160)}
       </div>
       {task.status === "failed" && task.error_message && (
         <div className="ml-6 mt-1 line-clamp-1 text-[10px] text-destructive/80">
@@ -620,20 +584,6 @@ function parseOptionsJson(json: string): string[] {
     // fall through
   }
   return [];
-}
-
-function formatRelative(iso: string): string {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  const delta = Date.now() - t;
-  const sec = Math.round(delta / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.round(sec / 60);
-  if (min < 60) return `${min}m`;
-  const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr}h`;
-  const day = Math.round(hr / 24);
-  return `${day}d`;
 }
 
 /**

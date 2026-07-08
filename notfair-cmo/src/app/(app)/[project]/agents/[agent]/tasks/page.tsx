@@ -5,6 +5,7 @@ import { getProject } from "@/server/db/projects";
 import { getMcpCatalog } from "@/server/mcp-catalog";
 import { resolveAgentBySlug } from "@/server/agent-meta";
 import { listApprovalsForTask } from "@/server/db/approvals";
+import { attentionByTaskForAgent } from "@/server/db/attention";
 import { listQuestionsForTask } from "@/server/db/questions";
 import { getTask, listTasksByAgent, setTaskThreadIfMissing } from "@/server/db/tasks";
 import { buildPendingSessionKey, findSessionBySessionId } from "@/server/sessions/view";
@@ -81,6 +82,7 @@ export default async function AgentTasksPage({ params, searchParams }: Props) {
 
   const tasks = listTasksByAgent(agentFullId);
   const proposedCount = tasks.filter((t) => t.status === "proposed").length;
+  const attentionByTask = attentionByTaskForAgent(project.slug, agentFullId);
   // Brand-favicon lookup table for MCP tool calls in the transcript.
   const mcpCatalog = getMcpCatalog(project.slug).map((m) => ({
     key: m.key,
@@ -97,6 +99,7 @@ export default async function AgentTasksPage({ params, searchParams }: Props) {
       tasks={tasks}
       selected={selected}
       proposedCount={proposedCount}
+      attentionByTask={attentionByTask}
       mcpCatalog={mcpCatalog}
     />
   );

@@ -106,7 +106,7 @@ export default async function AgentChatThreadPage({
         <GoogleAdsMcpBanner status={googleAdsMcpStatus} projectSlug={projectSlug} />
       )}
 
-      <div className="flex items-center justify-between border-b bg-background/80 px-6 py-2 backdrop-blur">
+      <div className="flex items-center justify-between bg-background/80 px-6 py-2 backdrop-blur">
         <div className="text-xs text-muted-foreground">
           {sessionsForDropdown.length === 0
             ? "No threads yet"

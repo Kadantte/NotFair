@@ -20,6 +20,15 @@ import {
  * re-renders. When the response differs, only the badge nodes that
  * read the new value actually update.
  */
+export interface AgentAttentionEntry {
+  /** Pending questions + actionable approvals waiting on the user. */
+  count: number;
+  /** Oldest waiting item's task id — deep-link target so the badge
+   *  lands directly in the decision space. Null when none of the
+   *  waiting items is anchored to a task. */
+  task_id: string | null;
+}
+
 export interface LiveCounts {
   /** Project slug the counts belong to. null when no active project. */
   project: string | null;
@@ -27,12 +36,15 @@ export interface LiveCounts {
   agents: Record<string, number>;
   /** Project-level actionable approvals count. */
   approvals: number;
+  /** Map of agent_id → blocked-on-you signal (Slack-style red badge). */
+  attention: Record<string, AgentAttentionEntry>;
 }
 
 const LiveCountsContext = createContext<LiveCounts>({
   project: null,
   agents: {},
   approvals: 0,
+  attention: {},
 });
 
 export function useLiveCounts(): LiveCounts {
@@ -86,10 +98,13 @@ export function LiveCountsProvider({
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([k, v]) => [k, v]),
           v: body.approvals,
+          n: Object.entries(body.attention ?? {})
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, v]) => [k, v.count, v.task_id]),
         });
         if (sigRef.current === sig) return;
         sigRef.current = sig;
-        setCounts(body);
+        setCounts({ ...body, attention: body.attention ?? {} });
       } catch {
         // Network hiccup — skip this tick.
       }

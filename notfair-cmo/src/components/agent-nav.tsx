@@ -33,30 +33,43 @@ type Props = {
   projectSlug: string;
   agents: AgentNavEntry[];
   /**
-   * Optional server-side initial map (agent_id → in-flight count) used
+   * Optional server-side initial map (agent_id → attention entry) used
    * for the first paint only. After mount, live values come from
    * LiveCountsContext so we don't re-render the parent server component
    * just to flip a number.
    */
-  inFlightCounts?: Record<string, number>;
+  attention?: Record<string, { count: number; task_id: string | null }>;
 };
 
-export function AgentNav({ projectSlug, agents, inFlightCounts = {} }: Props) {
+export function AgentNav({ projectSlug, agents, attention = {} }: Props) {
   const pathname = usePathname();
   const live = useLiveCounts();
-  const counts: Record<string, number> = { ...inFlightCounts, ...live.agents };
+  const attentionByAgent = { ...attention, ...live.attention };
 
   return (
     <SidebarMenu>
       {agents.map((a) => {
+        // Slack model: when the agent is blocked on the user, the row IS
+        // the notification — red badge, and the click lands directly in
+        // the decision space (the blocked task's page) instead of Chat.
+        const agentAttention = attentionByAgent[a.key];
+        const needsYou = (agentAttention?.count ?? 0) > 0;
         // Every agent lands on Chat by default — users start by talking to
         // the agent. Tasks tab (the audit/history view of filed work) is one
         // click away.
-        const href = projectHref(projectSlug, `/agents/${a.slug}/chat`);
+        const href = needsYou
+          ? projectHref(
+              projectSlug,
+              `/agents/${a.slug}/tasks${
+                agentAttention?.task_id
+                  ? `?task=${encodeURIComponent(agentAttention.task_id)}`
+                  : ""
+              }`,
+            )
+          : projectHref(projectSlug, `/agents/${a.slug}/chat`);
         const agentBase = `/${projectSlug}/agents/${a.slug}`;
         const isActive =
           pathname === agentBase || pathname?.startsWith(`${agentBase}/`);
-        const liveCount = counts[a.key] ?? 0;
         const rolePalette = a.template_key ? colorForRole(a.template_key) : null;
         return (
           <SidebarMenuItem key={a.key}>
@@ -78,16 +91,13 @@ export function AgentNav({ projectSlug, agents, inFlightCounts = {} }: Props) {
                     {a.role_label}
                   </span>
                 )}
-                {liveCount > 0 && (
+                {needsYou && (
                   <span
-                    className="ml-auto inline-flex items-center gap-1.5"
                     role="status"
-                    aria-label={`${liveCount} running`}
+                    aria-label={`${agentAttention!.count} waiting on your answer`}
+                    className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1 text-[10px] font-semibold tabular-nums leading-none text-white"
                   >
-                    <span aria-hidden className="ns-dot ns-dot-live" />
-                    <span className="text-[10px] font-semibold tabular-nums text-[hsl(var(--notfair-accent))]">
-                      {liveCount}
-                    </span>
+                    {agentAttention!.count}
                   </span>
                 )}
               </Link>

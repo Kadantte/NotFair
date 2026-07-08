@@ -112,9 +112,8 @@ beforeEach(() => {
 });
 
 describe("AgentTaskWorkspace empty state", () => {
-  it("shows 'Nothing assigned yet.' subtitle and zero count when tasks is empty", () => {
+  it("shows the empty rail message when tasks is empty", () => {
     render(<AgentTaskWorkspace {...baseProps()} />);
-    expect(screen.getByText("Nothing assigned yet.")).toBeInTheDocument();
     expect(screen.getByText("The CMO will delegate tasks here.")).toBeInTheDocument();
     // Right pane empty state for hasTasks=false.
     expect(screen.getByText(/Google Ads has no tasks yet/)).toBeInTheDocument();
@@ -133,24 +132,19 @@ describe("AgentTaskWorkspace empty state", () => {
   });
 });
 
-describe("AgentTaskWorkspace in-flight summary + StartAllTasksButton", () => {
-  it("counts running + proposed + approved as 'in flight' and hides the start-all button when proposedCount=0", () => {
+describe("AgentTaskWorkspace StartAllTasksButton", () => {
+  it("hides the start-all button when proposedCount=0", () => {
     render(
       <AgentTaskWorkspace
         {...baseProps({
           tasks: [
             makeTask({ id: "a", display_id: "demo-1", status: "working" }),
-            makeTask({ id: "b", display_id: "demo-2", status: "approved" }),
             makeTask({ id: "c", display_id: "demo-3", status: "done" }),
           ],
           proposedCount: 0,
         })}
       />,
     );
-    expect(screen.getByText(/in flight/)).toBeInTheDocument();
-    // The summary "2 in flight" text is split across nodes; just look for "2".
-    const inFlightPara = screen.getByText(/in flight/).closest("p");
-    expect(inFlightPara?.textContent).toContain("2");
     expect(screen.queryByRole("button", { name: /Start all/ })).not.toBeInTheDocument();
   });
 
@@ -165,42 +159,51 @@ describe("AgentTaskWorkspace in-flight summary + StartAllTasksButton", () => {
     );
     expect(screen.getByRole("button", { name: /Start all 1 task/ })).toBeInTheDocument();
   });
-
-  it("falls back to 'All quiet.' when there are tasks but none in flight", () => {
-    render(
-      <AgentTaskWorkspace
-        {...baseProps({
-          tasks: [makeTask({ status: "done" })],
-        })}
-      />,
-    );
-    expect(screen.getByText("All quiet.")).toBeInTheDocument();
-  });
 });
 
-describe("AgentTaskWorkspace task list grouping", () => {
-  it("groups tasks by status and labels each group", () => {
+describe("AgentTaskWorkspace task list", () => {
+  it("renders one flat list — no status group headers", () => {
     render(
       <AgentTaskWorkspace
         {...baseProps({
           tasks: [
-            makeTask({ id: "1", display_id: "demo-1", status: "working" }),
-            makeTask({ id: "2", display_id: "demo-2", status: "proposed" }),
-            makeTask({ id: "3", display_id: "demo-3", status: "done" }),
-            makeTask({ id: "4", display_id: "demo-4", status: "failed", error_message: "boom" }),
+            makeTask({ id: "1", display_id: "demo-1", status: "working", title: "one" }),
+            makeTask({ id: "2", display_id: "demo-2", status: "proposed", title: "two" }),
+            makeTask({ id: "3", display_id: "demo-3", status: "done", title: "three" }),
+            makeTask({ id: "4", display_id: "demo-4", status: "failed", title: "four", error_message: "boom" }),
           ],
         })}
       />,
     );
-    expect(screen.getByText("Working")).toBeInTheDocument();
-    expect(screen.getByText("Proposed")).toBeInTheDocument();
-    expect(screen.getByText("Done")).toBeInTheDocument();
-    expect(screen.getByText("Failed")).toBeInTheDocument();
-    // Failed task surfaces the error message in the row.
+    // All four rows render in a single list without section labels.
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    for (const label of ["Working", "Proposed", "Done", "Failed"]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
+    // Failed task still surfaces the error message in the row.
     expect(screen.getByText("boom")).toBeInTheDocument();
   });
 
-  it("falls back to brief.slice(0,80) when task.title is null", () => {
+  it("shows the red attention badge on rows whose task waits on the user", () => {
+    render(
+      <AgentTaskWorkspace
+        {...baseProps({
+          tasks: [
+            makeTask({ id: "b1", display_id: "demo-1", status: "blocked", title: "needs me" }),
+            makeTask({ id: "ok", display_id: "demo-2", status: "working", title: "fine" }),
+          ],
+          attentionByTask: { b1: 2 },
+        })}
+      />,
+    );
+    expect(screen.getByLabelText("2 waiting on your answer")).toBeInTheDocument();
+    // The badge sits inside the row of the blocked task, not the other one.
+    expect(
+      screen.getByText("needs me").closest("button"),
+    ).toContainElement(screen.getByLabelText("2 waiting on your answer"));
+  });
+
+  it("falls back to a brief excerpt when task.title is null", () => {
     const brief = "This is a fallback brief shown when the task has no title field at all and we need text.";
     render(
       <AgentTaskWorkspace
@@ -209,7 +212,7 @@ describe("AgentTaskWorkspace task list grouping", () => {
         })}
       />,
     );
-    expect(screen.getByText(brief.slice(0, 80))).toBeInTheDocument();
+    expect(screen.getByText(brief.slice(0, 160))).toBeInTheDocument();
   });
 
   it("clicking a task row calls router.replace with the display_id as ?task=", () => {
