@@ -106,16 +106,37 @@ export async function cascadeDeleteProjectArtifacts(project_slug: string): Promi
   const adapter = project ? requireAdapter(project.harness_adapter) : null;
   const agents = await listProjectAgents(project_slug);
 
+  // Stop the project's workspace browser first — its Chrome profile lives
+  // under projects/<slug>/browser/, which the caller wipes; rm-ing a
+  // user-data-dir under a live Chrome leaves an orphaned process behind.
+  try {
+    const { stopBrowser } = await import("@/server/browser/session");
+    await stopBrowser(project_slug);
+  } catch (err) {
+    console.warn(`[delete] failed to stop workspace browser for ${project_slug}:`, err);
+  }
+
   // Unregister any MCP servers the adapter wrote into its config (so codex
   // global config doesn't leak rows for deleted projects, and claude-code
-  // workspaces don't reference dead bearers).
+  // workspaces don't reference dead bearers). This must cover the two
+  // INTERNAL servers (orchestration + browser) that provisioning registers
+  // for every agent, not just the external catalog — they used to be
+  // skipped here and leaked [mcp_servers.notfair_<slug>__…] entries into
+  // ~/.codex/config.toml for every deleted project.
   if (adapter) {
-    const catalog = getMcpCatalog(project_slug);
+    const { ORCHESTRATION_MCP_KEY, BROWSER_MCP_KEY } = await import(
+      "@/server/mcp-server/registration"
+    );
+    const serverNames = [
+      ...getMcpCatalog(project_slug).map((spec) => spec.key),
+      ORCHESTRATION_MCP_KEY,
+      BROWSER_MCP_KEY,
+    ];
     for (const agent of agents) {
-      for (const spec of catalog) {
+      for (const serverName of serverNames) {
         try {
           await adapter.unregisterMcp({
-            serverName: spec.key,
+            serverName,
             projectSlug: project_slug,
             agentId: agent.agent_id,
           });

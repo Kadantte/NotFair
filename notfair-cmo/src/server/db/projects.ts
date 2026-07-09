@@ -278,6 +278,11 @@ export function deleteProjectRow(slug: string): void {
     "sessions",
     "agent_actions",
     "sequence_runs",
+    // User-added MCP catalog entries (Browse connectors / custom URLs).
+    // cascadeDeleteProjectArtifacts also clears these, but this sweep must
+    // be complete on its own: with foreign_keys=ON, any leftover child row
+    // makes the final DELETE FROM projects fail and strands the project.
+    "user_mcp_servers",
   ];
   for (const table of childTables) {
     try {
