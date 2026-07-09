@@ -703,19 +703,33 @@ function RecommendedConnectorTile({
   onConnect: () => void;
   onPickAccount: () => void;
 }) {
+  // The row can't be a real <button>: the "Select account" sub-action
+  // below is a button too, and HTML forbids nested interactive elements
+  // (React 19 surfaces it as a hydration error). div[role=button] keeps
+  // the accessible name + role (so `getByRole('button', { name: /…/ })`
+  // still resolves) while making the nesting legal.
+  const inert = state.connected || busy || disabled;
+  const activate = () => {
+    if (!inert) onConnect();
+  };
   return (
     <li>
-      <button
-        type="button"
-        onClick={state.connected ? undefined : onConnect}
-        disabled={busy || disabled}
+      <div
+        role="button"
+        tabIndex={inert ? -1 : 0}
+        onClick={activate}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            activate();
+          }
+        }}
+        aria-disabled={busy || disabled ? true : undefined}
         aria-label={tile.mcp_display_name}
         className={`ns-tile w-full ${state.connected ? "is-connected" : ""}`}
         // When already connected, the row itself is non-actionable; the
         // sub-action below handles "pick account" and the row would
-        // navigate nowhere otherwise. Keep it as a button so semantic
-        // tests (`getByRole('button', { name: /Google Ads/ })`) still
-        // resolve it, but don't trigger OAuth on click.
+        // navigate nowhere otherwise.
         style={state.connected ? { cursor: "default" } : undefined}
       >
         <McpIcon resourceUrl={tile.resource_url} alt={tile.mcp_display_name} size="lg" />
@@ -756,7 +770,7 @@ function RecommendedConnectorTile({
             </span>
           )}
         </span>
-      </button>
+      </div>
     </li>
   );
 }
