@@ -64,7 +64,9 @@ export default async function AgentCronPage({
     const occs = expandSchedule(
       cron.id,
       cron.schedule_raw,
-      { from: startOfFirstDay, until },
+      // Never expand before the cron existed — avoids phantom occurrences on
+      // days earlier in the window than the cron's creation.
+      { from: Math.max(startOfFirstDay, cron.created_at_ms ?? startOfFirstDay), until },
       {
         name: cron.name,
         short_name: cron.short_name,

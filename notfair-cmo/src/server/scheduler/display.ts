@@ -38,6 +38,7 @@ export interface DisplayCron {
   last_status?: string;
   last_error?: string;
   next_run_at_ms?: number;
+  created_at_ms?: number;
 }
 
 export interface CronGroup {
@@ -114,6 +115,7 @@ function jobToDisplay(job: ScheduledJob, project_slug: string): DisplayCron {
     last_status: lastStatus ?? undefined,
     last_error: lastError,
     next_run_at_ms: nextRunMs,
+    created_at_ms: isoMs(job.created_at),
   };
 }
 

@@ -45,9 +45,11 @@ export default async function CronsPage({
   const allCrons = view.groups.flatMap((g) => g.crons);
   const agentSlugs = view.groups.map((g) => g.agent);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startOfFirstDay = today.getTime();
+  // Start the calendar on Monday of the current week, not on today.
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  const startOfFirstDay = start.getTime();
   const dayMs = 24 * 60 * 60 * 1000;
   const until = startOfFirstDay + NUM_DAYS * dayMs;
 
@@ -57,7 +59,9 @@ export default async function CronsPage({
     const occs = expandSchedule(
       cron.id,
       cron.schedule_raw,
-      { from: startOfFirstDay, until },
+      // Never expand before the cron existed — the calendar window can reach
+      // back to Monday, which would otherwise render phantom past occurrences.
+      { from: Math.max(startOfFirstDay, cron.created_at_ms ?? startOfFirstDay), until },
       {
         name: cron.name,
         short_name: cron.short_name,
