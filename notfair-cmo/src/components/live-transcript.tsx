@@ -1457,6 +1457,7 @@ function LiveWorkingIndicator({
     // entire history (e.g. a fresh "hi" lit up runScript / runScript /
     // listConnectedAccounts from prior audit turns).
     turnStartedAt,
+    now,
   });
 
   // Anchor elapsed to whichever is later: the turn-start wallclock the
@@ -1502,7 +1503,10 @@ type WorkingView = {
  *   4. A committed in-flight tool_call → mood "tool" (polling caught up
  *      before the SSE state did, e.g. on rejoin from another tab).
  *   5. Last committed event is a tool_result → mood "waiting".
- *   6. Last committed event is assistant_text → mood "wrapping".
+ *   6. Last committed event is assistant_text → mood "wrapping" while the
+ *      message is fresh; once it goes stale (WRAPPING_STALE_MS) the agent
+ *      is mid-work on its next step, not wrapping — mood "waiting" with
+ *      an honest "quiet for Xm" subtitle.
  *
  * Phases are derived from BOTH sources so the trajectory chips include
  * recent SSE tools the JSONL hasn't seen yet, then dedupe by tool name.
@@ -1520,8 +1524,10 @@ function deriveWorkingView(input: {
    * in "what is the agent doing right now?".
    */
   turnStartedAt: number | null;
+  /** Current wallclock (the caller's 1Hz tick) for staleness checks. */
+  now: number;
 }): WorkingView {
-  const { agentDisplayName, events, lifecyclePhase, pendingTools, hasPendingAssistant, turnStartedAt } = input;
+  const { agentDisplayName, events, lifecyclePhase, pendingTools, hasPendingAssistant, turnStartedAt, now } = input;
   // Only consider events from the current turn. Anything older is part
   // of the persistent transcript above this card, not the live status.
   const turnEvents =
@@ -1639,13 +1645,42 @@ function deriveWorkingView(input: {
       mood: "waiting",
     };
   }
-  // assistant_text
+  // assistant_text. "Wrapping up" is only true for the brief gap between
+  // the closing message and the turn's `final` event (sub-second on
+  // Codex, a few seconds on Claude Code). Codex delivers whole messages
+  // BETWEEN work phases and then goes silent — no deltas, no tool events
+  // — while it reasons toward its next tool call, so an intermediate
+  // narration message left "Wrapping up" spinning for many minutes and
+  // read as hung. Once the message goes stale, say what's actually
+  // happening: the agent is still mid-turn and has been quiet for a while.
+  if (now - lastEvent.ts > WRAPPING_STALE_MS) {
+    return {
+      headline: "Still working",
+      subtitle: `quiet for ${formatQuietFor(now - lastEvent.ts)} — progress updates from this harness can be sparse`,
+      phases,
+      mood: "waiting",
+    };
+  }
   return {
     headline: "Wrapping up",
     subtitle: subtitleForLastTool(pendingTools, events),
     phases,
     mood: "wrapping",
   };
+}
+
+/**
+ * How long the last assistant message may sit as the newest event before
+ * "Wrapping up" stops being a credible description of the turn. Past
+ * this, the agent is demonstrably NOT wrapping up — it's working silently
+ * toward its next step (Codex emits nothing while reasoning).
+ */
+const WRAPPING_STALE_MS = 30_000;
+
+function formatQuietFor(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 90) return `${sec}s`;
+  return `${Math.floor(sec / 60)}m`;
 }
 
 function subtitleForLastTool(

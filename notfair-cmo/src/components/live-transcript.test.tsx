@@ -104,6 +104,45 @@ describe("LiveTranscript empty state", () => {
   });
 });
 
+describe("LiveTranscript working indicator staleness", () => {
+  it("shows 'Wrapping up' while the last assistant message is fresh", () => {
+    const events: TranscriptEvent[] = [
+      { kind: "assistant_text", id: "a1", ts: Date.now() - 2_000, body: "Almost done." },
+    ];
+    render(
+      <LiveTranscript
+        {...defaultProps({
+          initialEvents: events,
+          composerDisabled: true,
+          threadId: "t-wrap-fresh",
+        })}
+      />,
+    );
+    expect(screen.getByText(/^Wrapping up$/)).toBeInTheDocument();
+  });
+
+  it("degrades to 'Still working' once the last assistant message goes stale", () => {
+    // Codex-style silent stretch: an intermediate narration message is the
+    // newest event for minutes while the agent reasons toward its next
+    // tool call. The indicator must not claim "Wrapping up" through that.
+    const events: TranscriptEvent[] = [
+      { kind: "assistant_text", id: "a1", ts: Date.now() - 5 * 60_000, body: "Setting this up now." },
+    ];
+    render(
+      <LiveTranscript
+        {...defaultProps({
+          initialEvents: events,
+          composerDisabled: true,
+          threadId: "t-wrap-stale",
+        })}
+      />,
+    );
+    expect(screen.getByText(/^Still working$/)).toBeInTheDocument();
+    expect(screen.getByText(/quiet for 5m/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Wrapping up$/)).not.toBeInTheDocument();
+  });
+});
+
 describe("LiveTranscript rendering events", () => {
   it("renders user, assistant text and tool group bubbles", () => {
     const events: TranscriptEvent[] = [
