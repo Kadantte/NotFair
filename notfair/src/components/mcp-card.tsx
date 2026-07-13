@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, BookOpenText, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  Loader2,
+  BookOpenText,
+  Trash2,
+  MoreHorizontal,
+  Unplug,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   startMcpConnect,
@@ -13,7 +19,12 @@ import {
 import type { McpSpec } from "@/server/mcp-catalog";
 import type { McpRuntimeStatus } from "@/server/mcp/state";
 import { McpToolsDialog } from "@/components/mcp-tools-dialog";
+import {
+  McpAccountPickerDialog,
+  type AccountPickerPrefetch,
+} from "@/components/mcp-account-picker-dialog";
 import { McpIcon } from "@/components/mcp-icon";
+import { accountPickerFor } from "@/lib/mcp-account-pickers";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,19 +35,65 @@ import {
 type Props = {
   spec: McpSpec;
   status: McpRuntimeStatus;
+  /** Needed by the account picker's list/set server actions. */
+  projectSlug: string;
+  /**
+   * Persisted account/property selection for pickable MCPs (Google Ads,
+   * Meta Ads, Search Console) — null when unset or not pickable.
+   */
+  selectedAccountId?: string | null;
+  /**
+   * Set when this card's MCP just finished OAuth (`?mcp_key=` matches) and
+   * the bearer offers a real account/property choice: the page prefetched
+   * the list server-side, and the card auto-opens the picker with it.
+   */
+  pickerPrefetch?: AccountPickerPrefetch | null;
+  /**
+   * Fired after any mutation (disconnect, remove, account picked), on top
+   * of the router.refresh() the card always does. Hosts whose data comes
+   * from a client-side action (onboarding's connect step) pass their
+   * reload here; server-rendered hosts (Connections page) omit it.
+   */
+  onMutated?: () => void;
 };
 
 /**
- * One row in the Connections list — Apple-style settings row with
- * brand glyph, name + status, and a primary connect/disconnect button.
+ * One row in the Connections list — Apple-style settings row with brand
+ * glyph, name + status, and a single primary action that tracks setup
+ * state: **Connect** when there's no token, **Choose account/property**
+ * when the token spans multiple accounts and none is picked yet, and a
+ * quiet **Switch account/property** once configured (the ⋯ menu holds
+ * Disconnect / Remove).
  */
-export function McpCard({ spec, status }: Props) {
+export function McpCard({
+  spec,
+  status,
+  projectSlug,
+  selectedAccountId = null,
+  pickerPrefetch = null,
+  onMutated,
+}: Props) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"connect" | "disconnect" | "remove" | null>(
     null,
   );
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const autoOpenedRef = useRef(false);
   const router = useRouter();
+
+  const picker = accountPickerFor(spec.key);
+  const isConnected = status.state === "connected";
+
+  // Post-OAuth landing: open the picker exactly once with the prefetched
+  // list. The flash banner strips ?mcp_key from the URL right after mount,
+  // so the intent is captured in state before the prop disappears.
+  useEffect(() => {
+    if (!pickerPrefetch || !picker || !isConnected) return;
+    if (autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    setPickerOpen(true);
+  }, [pickerPrefetch, picker, isConnected]);
 
   async function onConnect() {
     setBusy("connect");
@@ -64,6 +121,7 @@ export function McpCard({ spec, status }: Props) {
       } else {
         toast.success(`${spec.display_name} disconnected`);
         router.refresh();
+        onMutated?.();
       }
       setBusy(null);
     });
@@ -78,13 +136,13 @@ export function McpCard({ spec, status }: Props) {
       } else {
         toast.success(`${spec.display_name} removed`);
         router.refresh();
+        onMutated?.();
       }
       setBusy(null);
     });
   }
 
   const isBusy = busy !== null || pending;
-  const isConnected = status.state === "connected";
 
   return (
     <>
@@ -102,22 +160,18 @@ export function McpCard({ spec, status }: Props) {
           </div>
           <p className="ns-row-desc line-clamp-1">{spec.description}</p>
           <StatusLine status={status} resourceUrl={spec.resource_url} />
+          {picker && isConnected && selectedAccountId && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-[hsl(var(--notfair-ink-4))]">
+              <span>{picker.noun}:</span>
+              <span className="ns-tag-mono">{selectedAccountId}</span>
+            </p>
+          )}
         </div>
 
         <div className="ns-row-meta">
-          {isConnected ? (
-            <button
-              type="button"
-              className="ns-btn ns-btn-outline ns-btn-sm"
-              disabled={isBusy}
-              onClick={onDisconnect}
-            >
-              {busy === "disconnect" ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : null}
-              Disconnect
-            </button>
-          ) : (
+          {/* One primary action per setup state; a fully configured row
+              has none — its remaining actions live in the ⋯ menu. */}
+          {!isConnected ? (
             <button
               type="button"
               className="ns-btn ns-btn-primary ns-btn-sm"
@@ -129,7 +183,18 @@ export function McpCard({ spec, status }: Props) {
               ) : null}
               {status.state === "stale_token" ? "Reconnect" : "Connect"}
             </button>
-          )}
+          ) : picker ? (
+            // Unset gets the loud primary style (setup isn't done);
+            // switching an already-chosen account is a quiet outline.
+            <button
+              type="button"
+              className={`ns-btn ns-btn-sm ${selectedAccountId ? "ns-btn-outline" : "ns-btn-primary"}`}
+              disabled={isBusy}
+              onClick={() => setPickerOpen(true)}
+            >
+              {selectedAccountId ? "Switch" : "Choose"} {picker.short_noun}
+            </button>
+          ) : null}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -149,6 +214,20 @@ export function McpCard({ spec, status }: Props) {
                 >
                   <BookOpenText className="size-3.5 text-muted-foreground" />
                   View tools
+                </DropdownMenuItem>
+              )}
+              {isConnected && (
+                <DropdownMenuItem
+                  onSelect={onDisconnect}
+                  disabled={isBusy}
+                  className="gap-2 rounded-md px-2 py-1.5 text-[13px]"
+                >
+                  {busy === "disconnect" ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Unplug className="size-3.5 text-muted-foreground" />
+                  )}
+                  Disconnect
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
@@ -175,6 +254,21 @@ export function McpCard({ spec, status }: Props) {
         mcpDescription={spec.description}
         loadTools={() => listMcpToolsAction({ mcp_key: spec.key })}
       />
+
+      {picker && (
+        <McpAccountPickerDialog
+          projectSlug={projectSlug}
+          mcpKey={spec.key}
+          selectedId={selectedAccountId}
+          open={pickerOpen}
+          prefetch={pickerPrefetch}
+          onOpenChange={setPickerOpen}
+          onPicked={() => {
+            router.refresh();
+            onMutated?.();
+          }}
+        />
+      )}
     </>
   );
 }

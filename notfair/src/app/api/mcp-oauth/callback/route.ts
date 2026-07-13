@@ -186,6 +186,30 @@ export async function GET(request: Request) {
     console.error("[mcp-oauth] suggestion generation kickoff failed:", err);
   }
 
+  // Multi-account MCPs (Google Ads, Meta Ads, GSC): resolve the workspace's
+  // account/property selection now, server-side. A still-valid existing
+  // selection is kept, a bearer with exactly one account is persisted
+  // silently, and only a genuine choice appends `mcp_key` — which makes the
+  // Connections page open the picker dialog on the matching card.
+  try {
+    const { resolvePostConnectSelection } = await import(
+      "@/server/mcp/account-selection"
+    );
+    const selection = await resolvePostConnectSelection(
+      pending.project_slug,
+      pending.catalog_key,
+    );
+    if (selection.kind === "choice_required") {
+      back.searchParams.set("mcp_key", pending.catalog_key);
+    }
+  } catch (err) {
+    console.error("[mcp-oauth] post-connect account resolution threw:", err);
+    const { accountPickerFor } = await import("@/lib/mcp-account-pickers");
+    if (accountPickerFor(pending.catalog_key)) {
+      back.searchParams.set("mcp_key", pending.catalog_key);
+    }
+  }
+
   // Flash banner uses the catalog name (what the user recognizes), not the
   // project-prefixed server key.
   back.searchParams.set("mcp_connected", pending.display_name);

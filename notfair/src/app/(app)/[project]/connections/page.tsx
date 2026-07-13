@@ -9,8 +9,17 @@ import { McpFlashBanner } from "@/components/mcp-flash-banner";
 import { AddMcpServerMenu } from "@/components/add-mcp-server-card";
 import { normalizeResourceUrl } from "@/server/mcp/discovery-url";
 import { projectHref } from "@/lib/project-href";
+import { accountPickerFor } from "@/lib/mcp-account-pickers";
+import { prefetchAccountChoice } from "@/server/mcp/account-selection";
 
-type Search = { mcp_connected?: string; mcp_error?: string; mcp_analyzing?: string };
+type Search = {
+  mcp_connected?: string;
+  mcp_error?: string;
+  mcp_analyzing?: string;
+  /** Catalog key of the MCP that just finished OAuth — drives the
+   *  post-connect account/property picker on the matching card. */
+  mcp_key?: string;
+};
 
 export default async function ConnectionsPage({
   searchParams,
@@ -21,13 +30,22 @@ export default async function ConnectionsPage({
 }) {
   const { project: slug } = await params;
   const project = getProject(slug);
-  const { mcp_connected, mcp_error, mcp_analyzing } = await searchParams;
+  const { mcp_connected, mcp_error, mcp_analyzing, mcp_key } =
+    await searchParams;
   if (!project || project.archived_at) notFound();
 
   const catalog = getMcpCatalog(project.slug);
   const statuses = await Promise.all(
     catalog.map((s) => getMcpStatus(project.slug, s.key)),
   );
+
+  // Post-OAuth account/property picker: when the callback flagged a
+  // multi-account MCP (`?mcp_key=`), prefetch its list here on the server
+  // and hand it to the card, which auto-opens the picker dialog with it.
+  const pendingChoice = mcp_key
+    ? await prefetchAccountChoice(project, mcp_key)
+    : null;
+  const autoOpenPickerKey = pendingChoice ? mcp_key : null;
 
   const builtinTools = summarizeBuiltinTools();
   const connectedCount = statuses.filter((s) => s.state === "connected").length;
@@ -99,7 +117,19 @@ export default async function ConnectionsPage({
           <ol className="ns-group">
             {catalog.map((spec, i) => (
               <li key={spec.key}>
-                <McpCard spec={spec} status={statuses[i]} />
+                <McpCard
+                  spec={spec}
+                  status={statuses[i]}
+                  projectSlug={project.slug}
+                  selectedAccountId={
+                    accountPickerFor(spec.key)?.selectedId(project) ?? null
+                  }
+                  pickerPrefetch={
+                    spec.key === autoOpenPickerKey
+                      ? (pendingChoice?.prefetch ?? null)
+                      : null
+                  }
+                />
               </li>
             ))}
           </ol>

@@ -458,141 +458,64 @@ export async function setOnboardingGscPropertyAction(
   return { ok: true, project: updated };
 }
 
-// ── Onboarding connect-step state ──────────────────────────────────
+// ── Onboarding connect-step cards ──────────────────────────────────
 //
-// The multi-MCP onboarding step renders one tile per recommended MCP
-// (Google Ads, Meta Ads, GSC, X Ads — the ones that power a specialist
-// agent) plus a "More" tile. Google Analytics lives under "More": it
-// provisions no specialist, so a connected GA surfaces as an extras
-// row instead of a first-class tile. Each tile needs:
+// The connect step renders the exact `McpCard` rows the Connections page
+// uses — one shared component, one lifecycle (Connect → Choose → Switch),
+// zero drift between the two surfaces. This action assembles the card
+// inputs client-side onboarding can't compute itself: the catalog spec,
+// the live runtime status, and the persisted account/property selection.
 //
-//   - is the MCP connected? (token row exists)
-//   - is an account/property selected on the project row?
-//   - the display name to label the tile
-//
-// We also surface a count of additional non-recommended connectors the
-// user has wired up via the "More" tile so the tile can show that
-// number ("More · 2 connected").
+// The list is curated for the wizard: the recommended MCPs (the ones
+// goal agents most commonly measure) always show; anything else from the
+// catalog (Google Analytics, Stripe, user-pasted servers) appears only
+// once connected — until then it lives in the "More tools" browse menu.
 
-export type ConnectedMcpState = {
-  /** True when an mcp_tokens row exists for this catalog_key. */
-  connected: boolean;
-  /**
-   * True when the user has picked a specific account/property for this MCP
-   * (i.e. the project column is non-null). Always false when not connected.
-   */
-  account_selected: boolean;
+const RECOMMENDED_MCP_KEYS = new Set([
+  "notfair-googleads",
+  "notfair-metaads",
+  "notfair-googlesearchconsole",
+  "notfair-xads",
+]);
+
+export type ConnectCard = {
+  spec: import("@/server/mcp-catalog").McpSpec;
+  status: import("@/server/mcp/state").McpRuntimeStatus;
+  /** Persisted account/property selection — null when unset/not pickable. */
+  selected_id: string | null;
 };
 
-export type ConnectedExtraMcp = {
-  /** Catalog key (`stripe`, `supabase`, …) — what's stored on mcp_tokens. */
-  key: string;
-  /** Display label resolved from the catalog (`Stripe`, `Supabase`, …). */
-  display_name: string;
-  /** Short marketing line from the catalog. Optional. */
-  description?: string;
-  /** Resource URL — feeds the <McpIcon> favicon lookup so each extra row
-   *  shows its brand mark the same way the Connections page does. */
-  resource_url: string;
-};
-
-export type ConnectStepState = {
-  googleads: ConnectedMcpState;
-  metaads: ConnectedMcpState;
-  gsc: ConnectedMcpState;
-  /**
-   * X Ads has a first-class connect tile like the trio above, but no
-   * account/property picker sub-flow — `account_selected` simply
-   * mirrors `connected` so the tile shape stays uniform.
-   */
-  xads: ConnectedMcpState;
-  /**
-   * MCPs the user has connected via the "More tools" overflow dialog —
-   * anything outside the recommended trio (Stripe, Supabase, PostHog,
-   * plus any user-pasted custom servers). Rendered as additional rows in
-   * the connect-step list below the recommended tiles.
-   */
-  extras: ConnectedExtraMcp[];
-  /**
-   * Cached length of `extras`. Kept on the surface so existing test
-   * fixtures and any caller that only needs a badge count don't have
-   * to compute it themselves.
-   */
-  extra_connected_count: number;
-  /**
-   * Project's website_url — used by the connect step to pre-load context
-   * about what the user is connecting tools for. Optional in the schema;
-   * propagated here for the redirect-target builder.
-   */
-  website_url: string | null;
-};
-
-export type GetConnectStepStateResult =
-  | { ok: true; state: ConnectStepState }
+export type GetConnectCardsResult =
+  | { ok: true; cards: ConnectCard[]; any_connected: boolean }
   | { ok: false; error: string };
 
-export async function getConnectStepStateAction(
+export async function getOnboardingConnectCardsAction(
   project_slug: string,
-): Promise<GetConnectStepStateResult> {
+): Promise<GetConnectCardsResult> {
   if (!project_slug.trim()) return { ok: false, error: "Missing project slug." };
   const project = getProject(project_slug);
   if (!project) return { ok: false, error: "Project not found." };
 
-  const { findMcpToken, listProjectMcpTokens } = await import(
-    "@/server/mcp/tokens"
-  );
   const { getMcpCatalog } = await import("@/server/mcp-catalog");
+  const { getMcpStatus } = await import("@/server/mcp/state");
+  const { accountPickerFor } = await import("@/lib/mcp-account-pickers");
 
-  const RECOMMENDED_KEYS = new Set([
-    "notfair-googleads",
-    "notfair-metaads",
-    "notfair-googlesearchconsole",
-    "notfair-xads",
-  ]);
-  const allTokens = listProjectMcpTokens(project_slug);
   const catalog = getMcpCatalog(project_slug);
-
-  // Build the extras list: for every connected non-recommended token,
-  // look up its display name + description in the catalog so the connect
-  // step can render real rows ("Stripe — Payments, …") instead of a bare
-  // catalog-key. Tokens whose catalog entry was removed (rare — manual
-  // db edit, or a preset we silently dropped) are skipped silently.
-  const extras: ConnectedExtraMcp[] = [];
-  for (const t of allTokens) {
-    if (RECOMMENDED_KEYS.has(t.server_name)) continue;
-    const entry = catalog.find((c) => c.key === t.server_name);
-    if (!entry) continue;
-    extras.push({
-      key: t.server_name,
-      display_name: entry.display_name,
-      description: entry.description,
-      resource_url: entry.resource_url,
-    });
-  }
-
+  const statuses = await Promise.all(
+    catalog.map((s) => getMcpStatus(project_slug, s.key)),
+  );
+  const all = catalog.map((spec, i) => ({
+    spec,
+    status: statuses[i]!,
+    selected_id: accountPickerFor(spec.key)?.selectedId(project) ?? null,
+  }));
   return {
     ok: true,
-    state: {
-      googleads: {
-        connected: !!findMcpToken(project_slug, "notfair-googleads"),
-        account_selected: !!project.google_ads_account_id,
-      },
-      metaads: {
-        connected: !!findMcpToken(project_slug, "notfair-metaads"),
-        account_selected: !!project.meta_ads_account_id,
-      },
-      gsc: {
-        connected: !!findMcpToken(project_slug, "notfair-googlesearchconsole"),
-        account_selected: !!project.gsc_property_id,
-      },
-      xads: (() => {
-        const connected = !!findMcpToken(project_slug, "notfair-xads");
-        return { connected, account_selected: connected };
-      })(),
-      extras,
-      extra_connected_count: extras.length,
-      website_url: project.website_url,
-    },
+    cards: all.filter(
+      (c) =>
+        RECOMMENDED_MCP_KEYS.has(c.spec.key) || c.status.state === "connected",
+    ),
+    any_connected: all.some((c) => c.status.state === "connected"),
   };
 }
 

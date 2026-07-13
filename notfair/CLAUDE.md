@@ -11,14 +11,20 @@ heartbeat loop ("checks") measures the metric and lets the agent act — with
 observation windows, a spend envelope, and per-goal memory as the controls.
 No approvals, no tasks, no orchestration layer: goals are the only unit.
 
-## Verification (no test suite by design)
+## Verification
 
-This repo intentionally carries no unit tests, migrations, or legacy/compat
-code. Verification is:
+This repo carries no migrations or legacy/compat code. Verification is:
 
 1. `pnpm typecheck` — must be clean.
-2. `pnpm build` — must be clean.
-3. Live smoke: `pnpm dev` (port 3326), then walk the affected flow in the
+2. `pnpm test` — vitest; must be clean. Tests live next to the code they
+   cover (`src/lib/foo.ts` → `src/lib/foo.test.ts`). Default environment is
+   node; component tests opt into a DOM with a leading
+   `// @vitest-environment jsdom` pragma and use `@testing-library/react`.
+   Mock at the server-action / db-module boundary (`vi.mock`), not deeper.
+   Test pure logic and user-visible component behavior — don't unit-test
+   Next.js pages or route handlers; the live smoke covers those.
+3. `pnpm build` — must be clean.
+4. Live smoke: `pnpm dev` (port 3326), then walk the affected flow in the
    browser (goal index → goal page → chat / START / checks).
 
 Prompt-affecting changes (`src/server/goals/identity.ts`, tick briefs in

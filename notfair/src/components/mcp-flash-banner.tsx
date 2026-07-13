@@ -43,6 +43,7 @@ export function McpFlashBanner({
     url.searchParams.delete("mcp_connected");
     url.searchParams.delete("mcp_error");
     url.searchParams.delete("mcp_analyzing");
+    url.searchParams.delete("mcp_key");
     router.replace(url.pathname + (url.search ? url.search : ""));
   }, [connected, error, analyzing, goalsHref, router]);
 

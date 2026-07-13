@@ -1,5 +1,9 @@
 # NotFair
 
+## Unreleased
+
+**Pick which account each connection targets — right where you connect.** Multi-account MCPs (Google Ads, Meta Ads, Search Console) now resolve their workspace account/property on the Connections page, not just in onboarding. Finishing OAuth auto-keeps a still-valid selection, silently persists the only reachable account, and otherwise opens a picker dialog listing what the new token can reach. Each card carries one action tracking its setup state — **Connect** → **Choose account/property** → a quiet **Switch account/property** — with the persisted selection shown on the card (`Search Console property: sc-domain:example.com`) and Disconnect / Remove tucked into the ⋯ menu, so switching accounts never requires reconnecting. Selections persist on the workspace row and feed every goal agent's identity, keeping each workspace's agents on exactly one account per platform. Onboarding's connect step now renders the same `McpCard` rows and picker dialog as the Connections page — its bespoke connector tiles and three full-page picker steps are gone, so the Connect → Choose → Switch lifecycle is identical on both surfaces, and the picker's rows use the design system's elevated surfaces instead of borders. The account-selection layer is covered by the repo's first vitest suite (`pnpm test`).
+
 ## 0.9.0 — 2026-07-10
 
 **Renamed: notfair-cmo is now just NotFair — and the CMO is gone.** The product pivoted from "a CMO delegating to platform specialists" to **agent = goal**: you mint an agent per goal, define the goal by chatting with it, and it runs a disciplined improvement loop until the number says done. npm package `notfair-cmo` → `notfair` (bin: `notfair`), data dir `~/.notfair-cmo` → `~/.notfair` (auto-migrated on first start, merging safely with any plugin config already there), env vars `NOTFAIR_CMO_*` → `NOTFAIR_*`.
