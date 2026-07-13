@@ -1,0 +1,294 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import { ChevronRight, Layers, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  getGoalContextAction,
+  type ContextChunk,
+} from "@/server/actions/context";
+import { cn } from "@/lib/utils";
+import { Markdown } from "@/components/markdown";
+
+/**
+ * /context for a goal: what fills this agent's context window, measured
+ * against the SELECTED MODEL's real window size (read from the harness's
+ * own model metadata — never hardcoded here). Token counts are estimates
+ * (~4 chars/token); clicking a row reveals the chunk's exact content.
+ */
+
+export type ContextModelOption = {
+  value: string;
+  label: string;
+  context_window?: number;
+};
+
+const GROUP_META: Record<
+  ContextChunk["group"],
+  { label: string; swatch: string }
+> = {
+  instructions: { label: "Instructions", swatch: "bg-[hsl(var(--notfair-accent))]" },
+  tools: { label: "Tool definitions", swatch: "bg-[hsl(217_60%_55%)]" },
+  conversation: { label: "Conversation", swatch: "bg-[hsl(38_80%_55%)]" },
+};
+
+const FREE_SWATCH = "bg-[hsl(var(--notfair-ink-4)/0.18)]";
+
+/** 36_308 → "36.3k", 272_000 → "272k", 319 → "319". */
+function fmtK(n: number): string {
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  return `${k >= 100 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, "")}k`;
+}
+
+type LoadState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "error"; message: string }
+  | { phase: "ready"; chunks: ContextChunk[]; total: number };
+
+export function GoalContextDialog({
+  projectSlug,
+  agentId,
+  threadId,
+  models,
+}: {
+  projectSlug: string;
+  agentId: string;
+  threadId: string;
+  models: ContextModelOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<LoadState>({ phase: "idle" });
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [model, setModel] = useState(models[0]?.value ?? "");
+
+  const selected = useMemo(
+    () => models.find((m) => m.value === model) ?? models[0],
+    [models, model],
+  );
+  const window = selected?.context_window;
+
+  const load = useCallback(async () => {
+    setState({ phase: "loading" });
+    const r = await getGoalContextAction({
+      project_slug: projectSlug,
+      agent_id: agentId,
+      thread: threadId,
+    });
+    if (r.ok) setState({ phase: "ready", chunks: r.chunks, total: r.total_tokens });
+    else setState({ phase: "error", message: r.error });
+  }, [projectSlug, agentId, threadId]);
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (next && state.phase === "idle") void load();
+    if (!next) setExpanded(null);
+  }
+
+  // Denominator: the model's window when known, else the measured total.
+  const denom =
+    state.phase === "ready" ? (window && window > state.total ? window : state.total) : 0;
+  const pct = (tokens: number) => (denom > 0 ? (tokens / denom) * 100 : 0);
+
+  const groupTotals =
+    state.phase === "ready"
+      ? (Object.keys(GROUP_META) as ContextChunk["group"][]).map((g) => ({
+          group: g,
+          tokens: state.chunks
+            .filter((c) => c.group === g)
+            .reduce((a, c) => a + c.tokens, 0),
+        }))
+      : [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[hsl(var(--notfair-surface-2))] px-2.5 py-1 text-[12px] text-[hsl(var(--notfair-ink-3))] transition-colors hover:text-[hsl(var(--notfair-ink-1))]"
+          title="What fills this agent's context window"
+        >
+          <Layers className="size-3.5" aria-hidden />
+          Context
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[82vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-[15px]">
+            <Layers className="size-4" aria-hidden />
+            Context window
+          </DialogTitle>
+          <DialogDescription>
+            What this goal&rsquo;s agent works with each turn. Token counts are
+            estimates (~4 characters per token) — click any row for the exact
+            content.
+          </DialogDescription>
+        </DialogHeader>
+
+        {state.phase === "loading" && (
+          <div className="flex items-center gap-2 py-6 text-[13px] text-[hsl(var(--notfair-ink-4))]">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Measuring instruction files, tool schemas, and the conversation…
+          </div>
+        )}
+        {state.phase === "error" && (
+          <p className="py-4 text-[13px] text-[hsl(0_72%_51%)]">{state.message}</p>
+        )}
+
+        {state.phase === "ready" && (
+          <>
+            {/* Headline: used-of-window, with the model (and its window)
+                selectable — window sizes come from the harness's own model
+                metadata. */}
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="m-0 text-[20px] font-semibold tabular-nums">
+                ≈{fmtK(state.total)}
+                {window ? (
+                  <>
+                    <span className="text-[hsl(var(--notfair-ink-4))]"> of </span>
+                    {fmtK(window)}
+                    <span className="ml-2 text-[13px] font-normal text-[hsl(var(--notfair-ink-3))]">
+                      {pct(state.total).toFixed(1)}% used
+                    </span>
+                  </>
+                ) : (
+                  <span className="ml-1 text-[13px] font-normal text-[hsl(var(--notfair-ink-4))]">
+                    tokens (window size unknown for this model)
+                  </span>
+                )}
+              </p>
+              <label className="flex items-center gap-1.5 text-[11.5px] text-[hsl(var(--notfair-ink-4))]">
+                window of
+                <select
+                  value={selected?.value ?? ""}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="rounded-md bg-[hsl(var(--notfair-surface-2))] px-1.5 py-0.5 text-[12px] text-[hsl(var(--notfair-ink-2))]"
+                >
+                  {models.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                      {m.context_window ? ` · ${fmtK(m.context_window)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {/* Stacked bar of the WHOLE window; the muted tail is free space. */}
+            <div
+              className="flex h-4 w-full overflow-hidden rounded-md"
+              role="img"
+              aria-label={
+                window
+                  ? `Estimated ${fmtK(state.total)} of ${fmtK(window)} tokens used`
+                  : `Estimated ${fmtK(state.total)} tokens`
+              }
+            >
+              {state.chunks.map((c) => (
+                <span
+                  key={c.key}
+                  className={cn(
+                    GROUP_META[c.group].swatch,
+                    "border-r border-[hsl(var(--background))] last:border-r-0",
+                  )}
+                  style={{ width: `${Math.max(0.5, pct(c.tokens))}%` }}
+                  title={`${c.label} — ~${fmtK(c.tokens)} tokens`}
+                />
+              ))}
+              {window && window > state.total && (
+                <span
+                  className={cn(FREE_SWATCH, "flex-1")}
+                  title={`Free — ~${fmtK(window - state.total)} tokens`}
+                />
+              )}
+            </div>
+
+            {/* Group subtotals as the legend — text carries identity. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[hsl(var(--notfair-ink-3))]">
+              {groupTotals.map(({ group, tokens }) => (
+                <span key={group} className="inline-flex items-center gap-1.5 tabular-nums">
+                  <span className={cn("size-2 rounded-[2px]", GROUP_META[group].swatch)} aria-hidden />
+                  {GROUP_META[group].label} ~{fmtK(tokens)}
+                </span>
+              ))}
+              {window && window > state.total && (
+                <span className="inline-flex items-center gap-1.5 tabular-nums">
+                  <span className={cn("size-2 rounded-[2px]", FREE_SWATCH)} aria-hidden />
+                  Free ~{fmtK(window - state.total)}
+                </span>
+              )}
+            </div>
+
+            <ul className="m-0 flex list-none flex-col p-0">
+              {state.chunks.map((c) => {
+                const isOpen = expanded === c.key;
+                const share = pct(c.tokens);
+                return (
+                  <li key={c.key}>
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(isOpen ? null : c.key)}
+                      className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-2.5 text-left text-[13px] transition-colors hover:bg-[hsl(var(--notfair-surface-2))]"
+                      aria-expanded={isOpen}
+                    >
+                      <ChevronRight
+                        className={cn("size-3.5 shrink-0 text-[hsl(var(--notfair-ink-4))] transition-transform", isOpen && "rotate-90")}
+                        aria-hidden
+                      />
+                      <span className={cn("size-2 shrink-0 rounded-[2px]", GROUP_META[c.group].swatch)} aria-hidden />
+                      <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                      {/* per-row share of the window, as a quiet inline bar */}
+                      <span className="hidden h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[hsl(var(--notfair-ink-4)/0.12)] sm:block" aria-hidden>
+                        <span
+                          className={cn("block h-full", GROUP_META[c.group].swatch)}
+                          style={{ width: `${Math.min(100, Math.max(1.5, share))}%` }}
+                        />
+                      </span>
+                      <span className="w-16 shrink-0 text-right tabular-nums text-[12px] text-[hsl(var(--notfair-ink-3))]">
+                        ~{fmtK(c.tokens)}
+                      </span>
+                      <span className="w-12 shrink-0 text-right tabular-nums text-[11.5px] text-[hsl(var(--notfair-ink-4))]">
+                        {share < 0.1 ? "<0.1" : share.toFixed(1)}%
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="mb-3 ml-6">
+                        {c.note && (
+                          <p className="m-0 mb-1.5 text-[11.5px] text-[hsl(var(--notfair-ink-4))]">
+                            {c.note}
+                          </p>
+                        )}
+                        {c.format === "json" ? (
+                          <pre className="m-0 max-h-72 overflow-auto rounded-md bg-[hsl(var(--notfair-ink-1)/0.04)] p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-words text-[hsl(var(--notfair-ink-2))]">
+                            {c.content}
+                          </pre>
+                        ) : (
+                          <div className="max-h-72 overflow-auto rounded-md bg-[hsl(var(--notfair-ink-1)/0.04)] p-3">
+                            <Markdown className="text-[12px]">{c.content}</Markdown>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="m-0 text-[11px] leading-snug text-[hsl(var(--notfair-ink-4))]">
+              Not shown: the harness&rsquo;s own base prompt and its full
+              tool-output history — those live inside the runtime and
+              aren&rsquo;t visible to NotFair.
+            </p>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

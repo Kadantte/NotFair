@@ -10,7 +10,7 @@ NotFair gives your AI agent direct access to Google Search Console, Google Ads, 
 
 The NotFair plugin is the CLI side — the skills that run inside Claude Code (and other AI agent hosts). [notfair.co](https://notfair.co) is the companion web app: sign in once, connect your Google Ads and Meta Ads accounts, and run audits through a browser UI. Both sides share the same engine, so an audit you run from the CLI uses the same tooling as the one on the web.
 
-There's also **[NotFair CMO](#notfair-cmo--a-local-marketing-team-in-your-browser)** — a local web portal that runs a team of specialist marketing agents (CMO, Google Ads, Meta Ads, SEO, X Ads) on top of your existing Claude Code or Codex login.
+There's also the **[NotFair app](#the-notfair-app--goal-driven-marketing-agents-in-your-browser)** — a local web portal where a goal-driven agent runs a measured improvement loop against one ambition ("cut CAC to $30") on top of your existing Claude Code or Codex login.
 
 > *"Am I wasting money on ads right now?"*
 > *"Why did my traffic drop and how do I fix it?"*
@@ -164,26 +164,26 @@ Your data is preserved — the runtime state directory (`~/.toprank/`, holding p
 
 ---
 
-## NotFair CMO — a local marketing team in your browser
+## The NotFair app — goal-driven marketing agents in your browser
 
-[NotFair CMO](notfair-cmo/) is a local web portal that turns the skills above into an always-on marketing team. Instead of invoking skills one at a time from the CLI, you get named specialist agents per project — a **CMO** who owns strategy and delegates, plus **Google Ads**, **Meta Ads**, **SEO**, and **X Ads** specialists — each in its own isolated workspace, running on top of the Claude Code or Codex login you already have. Chat with them, watch tasks move across a kanban board, approve governed actions (spend, publishes, bid changes) from an approvals inbox, and let them schedule their own recurring jobs on a native cron scheduler.
+[NotFair](notfair/) is a local web portal built around one idea: state a goal, get a loop. A dedicated agent turns your ambition into a server-verified metric with a measured baseline, you confirm the target, and the agent runs a disciplined improvement cycle on your cadence — the platform measures the number mechanically each tick, the agent scores its past moves against their predictions, makes at most one new move, and every governed action (spend, publishes, bid changes) parks in an approvals inbox until you decide. The Goal page shows the whole loop: metric sparkline vs. target, tick diary, open actions with review dates, and the learnings the agent accumulates.
 
-Open source, runs entirely on your machine, published to npm as [`notfair-cmo`](https://www.npmjs.com/package/notfair-cmo).
+Open source, runs entirely on your machine, published to npm as [`notfair`](https://www.npmjs.com/package/notfair).
 
 ### Get started
 
 **Prerequisites:** Node 20+ and at least one harness installed and authenticated — [Claude Code](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview) (recommended) or [Codex CLI](https://github.com/openai/codex).
 
 ```bash
-npx notfair-cmo@latest doctor   # preflight: Node, harnesses, data dir, port
-npx notfair-cmo@latest          # launch the UI at http://127.0.0.1:3327
+npx notfair@latest doctor   # preflight: Node, harnesses, data dir, port
+npx notfair@latest          # launch the UI at http://127.0.0.1:3327
 ```
 
-Or install globally with `npm install -g notfair-cmo`, then run `notfair-cmo`.
+Or install globally with `npm install -g notfair`, then run `notfair`.
 
-Create a project, pick your harness, and connect platforms during onboarding — each MCP you connect (Google Ads, Meta Ads, Search Console, X Ads) provisions the matching specialist agent automatically. Already using the plugin? `/notfair:cmo` launches the portal straight from Claude Code.
+Create a project, pick your harness, connect platforms during onboarding, then open **Goal** and state an ambition — the agent works out how to measure it and shows you the baseline before anything runs. Already using the plugin? `/notfair:cmo` launches the portal straight from Claude Code.
 
-Full docs, CLI reference, and architecture notes: [`notfair-cmo/README.md`](notfair-cmo/README.md).
+Full docs, CLI reference, and architecture notes: [`notfair/README.md`](notfair/README.md).
 
 ## Skills
 
@@ -257,7 +257,7 @@ notfair/
 │   ├── geo-optimizer/           <- GEO for AI search engines
 │   └── setup-cms/               <- CMS connector
 ├── gemini/                      <- cross-model review via Gemini CLI
-├── notfair-cmo/                 <- local marketing portal (npm: notfair-cmo)
+├── notfair/                     <- local goal-loop agent app (npm: notfair)
 ├── notfair-upgrade-skill/       <- self-updater
 ├── test/                        <- unit + LLM-judge eval tests
 └── VERSION
