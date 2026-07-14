@@ -125,7 +125,7 @@ export default async function GoalPage({
         goal.status === "active") && <GoalAutoRefresh intervalMs={8000} />}
 
       {/* Header: the goal is the title. */}
-      <header className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2.5 sm:px-5 lg:flex-nowrap lg:gap-3">
+      <header className="flex min-w-0 flex-wrap items-center gap-2 py-2.5 pr-3 pl-16 sm:pr-5 md:pl-5 lg:flex-nowrap lg:gap-3">
         <span className="ns-tag-mono shrink-0">{STATUS_CHIP[goal.status]}</span>
         <h1 className="m-0 min-w-0 flex-1 truncate text-[14px] font-semibold">
           {goalLabel(goal)}
