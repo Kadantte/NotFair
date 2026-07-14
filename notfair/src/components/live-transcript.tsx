@@ -650,7 +650,7 @@ export function LiveTranscript({
         role="log"
         aria-live="polite"
       >
-        <div className="mx-auto w-full max-w-3xl px-6 py-6">
+        <div className="mx-auto w-full max-w-3xl px-5 py-6 sm:px-6">
           {leadingContent}
           {rendered.length === 0 &&
           !pendingUserMsg &&
@@ -659,7 +659,7 @@ export function LiveTranscript({
           !blockedReason ? (
             <TranscriptEmptyState agentDisplayName={agentDisplayName} />
           ) : (
-            <ol className="space-y-4">
+            <ol className="space-y-5">
               {rendered.map((item) => (
                 <li key={item.key}>
                   <RenderItem item={item} mcpCatalog={mcpCatalog} />
@@ -706,8 +706,8 @@ export function LiveTranscript({
         </div>
       </div>
 
-      <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="relative mx-auto w-full max-w-3xl px-6 py-3">
+      <div className="border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="relative mx-auto w-full max-w-3xl px-5 py-3 sm:px-6">
           {slashOpen && (
             <SlashCommandPopover
               commands={slashMatches}
@@ -720,7 +720,7 @@ export function LiveTranscript({
               textarea on top, a toolbar row below with only the circular
               send button. */}
           <form
-            className="rounded-2xl border border-border/60 bg-card shadow-[var(--notfair-shadow)] transition-shadow focus-within:ring-1 focus-within:ring-ring"
+            className="rounded-2xl border border-border/70 bg-card/90 shadow-[var(--notfair-shadow-sm)] transition-[border-color,box-shadow] focus-within:border-foreground/20 focus-within:shadow-[var(--notfair-shadow)]"
             onSubmit={(e) => {
               e.preventDefault();
               void send();
@@ -1113,7 +1113,7 @@ function RenderItem({
 function UserBubble({ body }: { body: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-br-[6px] bg-muted px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">
+      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[hsl(var(--notfair-surface-2))] px-3.5 py-2 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
         {body}
       </div>
     </div>
@@ -1125,7 +1125,7 @@ function AssistantText({ body }: { body: string }) {
   // pseudo-XML blocks. We render the assistant's prose as-is.
   if (body.trim() === "") return null;
   return (
-    <div className="text-sm leading-relaxed">
+    <div className="text-[14px] leading-7 text-foreground/90">
       <Markdown>{body}</Markdown>
     </div>
   );
@@ -1164,20 +1164,24 @@ function ToolGroup({
     : hasError
       ? "text-destructive"
       : "text-[hsl(var(--notfair-accent))]";
+  const callLabel = `${tools.length} ${tools.length === 1 ? "call" : "calls"}`;
 
   return (
     <details
       key={isLive ? "live" : "done"}
       open={isLive}
-      className="group rounded-[10px] bg-card shadow-[var(--notfair-shadow-sm)]"
+      data-activity-kind={headMcp ? "mcp" : "tool"}
+      className="group ml-1 border-l border-border/70 pl-4"
     >
       <summary
         className={cn(
-          "flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs",
-          "rounded-[10px] hover:bg-[hsl(var(--notfair-hover))] [&::-webkit-details-marker]:hidden",
+          "-ml-[25px] flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-md py-1 pr-2 pl-1 text-xs",
+          "hover:bg-[hsl(var(--notfair-hover))] [&::-webkit-details-marker]:hidden",
         )}
       >
-        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background shadow-sm">
+          <ChevronRight className="size-3 text-muted-foreground transition-transform group-open:rotate-90" />
+        </span>
         <StatusIcon className={cn("size-3.5 shrink-0", statusClass)} />
         {headMcp ? (
           <ToolBrandFavicon
@@ -1187,30 +1191,41 @@ function ToolGroup({
         ) : (
           <HeadIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="font-mono text-[12px] font-medium text-foreground">
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] uppercase",
+            headMcp
+              ? "bg-violet-500/10 text-violet-700 dark:text-violet-300"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          {headMcp ? "MCP" : "Tool"}
+        </span>
+        {headMcp && (
+          <span className="max-w-28 truncate text-[11px] font-medium text-muted-foreground">
+            {headMcp.display_name}
+          </span>
+        )}
+        <span className="font-medium text-foreground/90">
           {intent.verb}
         </span>
         {intent.target && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-muted-foreground">
             {intent.target}
           </span>
         )}
-        <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
+        <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
           {isLive ? (
             <span className="inline-flex items-center gap-1.5">
               <RunningDot size="sm" aria-label="" />
-              {tools.length === 1
-                ? "working"
-                : `${tools.length} steps · ${inFlightCount} live`}
+              {tools.length === 1 ? "running" : `${inFlightCount} running`}
             </span>
-          ) : tools.length === 1 ? (
-            <>1 step</>
           ) : (
-            <>{tools.length} steps</>
+            <>{callLabel}</>
           )}
         </span>
       </summary>
-      <div className="space-y-2 bg-[hsl(var(--notfair-surface-2))/0.45] px-3 py-2">
+      <div className="divide-y divide-border/50 pb-1 pl-1">
         {tools.map((t) => (
           <ToolRow key={t.toolCallId} entry={t} mcpCatalog={mcpCatalog} />
         ))}
@@ -1248,7 +1263,7 @@ function ToolRow({
     entry.label.trim() !== "" &&
     entry.label.trim() !== intent.target?.trim();
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5 py-2.5 first:pt-1.5">
       <div className="flex items-center gap-2 text-xs">
         <StatusIcon className={cn("size-3.5 shrink-0", statusClass)} />
         {mcp ? (
@@ -1259,28 +1274,43 @@ function ToolRow({
         ) : (
           <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="font-mono text-[12px] font-medium text-foreground">
+        <span
+          className={cn(
+            "rounded px-1 py-0.5 font-mono text-[8.5px] font-semibold tracking-[0.1em] uppercase",
+            mcp
+              ? "bg-violet-500/10 text-violet-700 dark:text-violet-300"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          {mcp ? "MCP" : "Tool"}
+        </span>
+        {mcp && (
+          <span className="max-w-28 truncate text-[10.5px] text-muted-foreground">
+            {mcp.display_name}
+          </span>
+        )}
+        <span className="font-medium text-foreground/90">
           {intent.verb}
         </span>
         {intent.target && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-muted-foreground">
             {intent.target}
           </span>
         )}
-        <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground/70">
+        <span className="ml-auto shrink-0 rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[9.5px] text-muted-foreground/80">
           {formatToolName(entry.name)}
         </span>
       </div>
       {showRawLabel && (
-        <pre className="ml-6 max-h-40 overflow-auto rounded bg-muted/60 px-2 py-1 font-mono text-[10.5px] leading-snug text-foreground/80 whitespace-pre-wrap break-all">
+        <pre className="ml-5 max-h-40 overflow-auto rounded-md border border-border/50 bg-muted/40 px-2.5 py-2 font-mono text-[10.5px] leading-relaxed text-foreground/80 whitespace-pre-wrap break-all">
           {entry.label}
         </pre>
       )}
       {entry.done && entry.result && (
-        <div className="ml-6 font-mono text-[11px] text-muted-foreground/90">
-          <span className="text-[10px] uppercase tracking-[0.18em]">
-            {entry.ok ? "→ result" : "→ error"}
-          </span>{" "}
+        <div className="ml-5 font-mono text-[10.5px] leading-relaxed text-muted-foreground/90">
+          <span className="mr-1.5 text-[9px] font-semibold uppercase tracking-[0.14em]">
+            {entry.ok ? "Result" : "Error"}
+          </span>
           <span className="break-words">{entry.result}</span>
         </div>
       )}
