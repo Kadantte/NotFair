@@ -125,30 +125,32 @@ export default async function GoalPage({
         goal.status === "active") && <GoalAutoRefresh intervalMs={8000} />}
 
       {/* Header: the goal is the title. */}
-      <header className="flex items-center gap-3 px-5 py-2.5">
+      <header className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2.5 sm:px-5 lg:flex-nowrap lg:gap-3">
         <span className="ns-tag-mono shrink-0">{STATUS_CHIP[goal.status]}</span>
-        <h1 className="m-0 min-w-0 truncate text-[14px] font-semibold">
+        <h1 className="m-0 min-w-0 flex-1 truncate text-[14px] font-semibold">
           {goalLabel(goal)}
         </h1>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <GoalContextDialog
-            projectSlug={slug}
-            agentId={resolved.agent_id}
-            threadId={threadId}
-            models={modelOptions.map((m) => ({
-              value: m.value,
-              label: m.label,
-              context_window: m.context_window,
-            }))}
-          />
-          <GoalMemoryDialog
-            entries={learnings.map((l) => ({
-              id: l.id,
-              body: l.body,
-              confidence: l.confidence,
-              created_at: l.created_at,
-            }))}
-          />
+        <div className="order-last flex w-full shrink-0 items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto">
+          <div className="hidden lg:contents">
+            <GoalContextDialog
+              projectSlug={slug}
+              agentId={resolved.agent_id}
+              threadId={threadId}
+              models={modelOptions.map((m) => ({
+                value: m.value,
+                label: m.label,
+                context_window: m.context_window,
+              }))}
+            />
+            <GoalMemoryDialog
+              entries={learnings.map((l) => ({
+                id: l.id,
+                body: l.body,
+                confidence: l.confidence,
+                created_at: l.created_at,
+              }))}
+            />
+          </div>
           {live && (
             <GoalControls
               goalId={goal.id}
@@ -158,7 +160,7 @@ export default async function GoalPage({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* Chat — the primary surface. */}
         <section className="flex min-w-0 flex-1 flex-col">
           <LiveTranscript
@@ -175,7 +177,7 @@ export default async function GoalPage({
         </section>
 
         {/* Status rail — the loop's state at a glance. */}
-        <aside className="w-[380px] shrink-0 overflow-y-auto bg-[hsl(var(--notfair-surface-2)/0.4)] px-4 py-4">
+        <aside className="hidden w-[380px] shrink-0 overflow-y-auto bg-[hsl(var(--notfair-surface-2)/0.4)] px-4 py-4 xl:block">
           <GoalRail slug={slug} agentSlug={agentSlug} goal={goal} />
         </aside>
       </div>
