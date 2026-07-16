@@ -192,6 +192,9 @@ CREATE TABLE IF NOT EXISTS goal_prs (
   id          TEXT PRIMARY KEY,
   goal_id     TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
   action_id   TEXT REFERENCES goal_actions(id) ON DELETE SET NULL,
+  -- The check (goal_ticks.tick_number) whose turn registered this PR, so
+  -- the Checks list can link a check to the PR it produced.
+  tick_number INTEGER,
   url         TEXT NOT NULL,
   title       TEXT NOT NULL,
   branch      TEXT,

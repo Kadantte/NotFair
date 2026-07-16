@@ -678,6 +678,8 @@ export async function handleRegisterPullRequest(
       title: input.title.trim(),
       branch: input.branch?.trim() || null,
       action_id: input.action_id ?? null,
+      // Same convention as log_goal_action: the current tick claims it.
+      tick_number: goal.tick_count || null,
     });
 
   // Pull the live state right away so the UI's review callout and the

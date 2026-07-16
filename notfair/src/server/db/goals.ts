@@ -726,27 +726,27 @@ export function createGoalTick(input: {
   goal_id: string;
   tick_number: number;
   trigger_kind: GoalTickTrigger;
-  metric_value?: number | null;
-  metric_error?: string | null;
 }): GoalTick {
   const db = getDb();
   const id = randomUUID();
   const ts = now();
   db.prepare(
     `INSERT INTO goal_ticks
-       (id, goal_id, tick_number, trigger_kind, metric_value, metric_error,
-        status, started_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'running', ?)`,
-  ).run(
-    id,
-    input.goal_id,
-    input.tick_number,
-    input.trigger_kind,
-    input.metric_value ?? null,
-    input.metric_error ?? null,
-    ts,
-  );
+       (id, goal_id, tick_number, trigger_kind, status, started_at)
+     VALUES (?, ?, ?, ?, 'running', ?)`,
+  ).run(id, input.goal_id, input.tick_number, input.trigger_kind, ts);
   return getGoalTick(id)!;
+}
+
+/** Backfill the measured metric onto a check created before measurement. */
+export function setGoalTickMetric(
+  id: string,
+  metric_value: number | null,
+  metric_error: string | null,
+): void {
+  getDb()
+    .prepare("UPDATE goal_ticks SET metric_value = ?, metric_error = ? WHERE id = ?")
+    .run(metric_value, metric_error, id);
 }
 
 export function getGoalTick(id: string): GoalTick | null {
@@ -770,7 +770,19 @@ export function finishGoalTick(
     .run(status, summary ?? null, now(), id);
 }
 
-export function listGoalTicks(goal_id: string, limit = 30): GoalTick[] {
+export function listGoalTicks(
+  goal_id: string,
+  limit = 30,
+  /** Cursor: only ticks strictly older than this tick_number (pagination). */
+  beforeTick?: number,
+): GoalTick[] {
+  if (beforeTick !== undefined) {
+    return getDb()
+      .prepare(
+        "SELECT * FROM goal_ticks WHERE goal_id = ? AND tick_number < ? ORDER BY tick_number DESC LIMIT ?",
+      )
+      .all(goal_id, beforeTick, limit) as GoalTick[];
+  }
   return getDb()
     .prepare(
       "SELECT * FROM goal_ticks WHERE goal_id = ? ORDER BY tick_number DESC LIMIT ?",

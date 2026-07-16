@@ -17,6 +17,7 @@ import {
 import { agentExistsOnDisk, listProjectAgents } from "@/server/agent-meta";
 import { runGoalIntake } from "@/server/goals/intake";
 import { runGoalTick } from "@/server/goals/tick";
+import { listCheckRows, type CheckRow } from "@/server/goals/checks";
 
 export type GoalActionResult = {
   ok: boolean;
@@ -155,7 +156,12 @@ export async function killGoalAction(
   return { ok: true };
 }
 
-/** Manual "Run tick now". Fire-and-forget; the diary shows the result. */
+/**
+ * Manual "Run tick now". Fire-and-forget for the turn itself, but the
+ * check row is claimed synchronously inside runGoalTick's pre-await
+ * prefix, so the Checks list shows the new (running, manual) check the
+ * moment this action returns.
+ */
 export async function runTickNowAction(goal_id: string): Promise<GoalActionResult> {
   const goal = getGoal(goal_id);
   if (!goal) return { ok: false, error: "Goal not found." };
@@ -172,4 +178,18 @@ export async function runTickNowAction(goal_id: string): Promise<GoalActionResul
 /** The live goal for an agent, if any (server helper for pages). */
 export async function getAgentGoalAction(agent_id: string) {
   return getGoalForAgent(agent_id);
+}
+
+/**
+ * Older diary page for the goal screen's Checks list — checks strictly
+ * older than `beforeTick`, newest first. Cursor pagination (not offset)
+ * so rows never shift under the reader when a new check lands mid-scroll.
+ */
+export async function loadMoreGoalChecksAction(
+  goal_id: string,
+  beforeTick: number,
+): Promise<{ rows: CheckRow[]; hasMore: boolean }> {
+  const goal = getGoal(goal_id);
+  if (!goal) return { rows: [], hasMore: false };
+  return listCheckRows(goal.id, { beforeTick });
 }

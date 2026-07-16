@@ -22,6 +22,8 @@ export type GoalPr = {
   id: string;
   goal_id: string;
   action_id: string | null;
+  /** The check whose turn registered this PR (null for pre-loop PRs). */
+  tick_number: number | null;
   url: string;
   title: string;
   branch: string | null;
@@ -56,17 +58,19 @@ export function createGoalPr(input: {
   title: string;
   branch?: string | null;
   action_id?: string | null;
+  tick_number?: number | null;
 }): GoalPr {
   const db = getDb();
   const now = new Date().toISOString();
   const id = randomUUID();
   db.prepare(
-    `INSERT OR IGNORE INTO goal_prs (id, goal_id, action_id, url, title, branch, next_sync_at, last_activity_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO goal_prs (id, goal_id, action_id, tick_number, url, title, branch, next_sync_at, last_activity_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.goal_id,
     input.action_id ?? null,
+    input.tick_number ?? null,
     input.url,
     input.title,
     input.branch ?? null,

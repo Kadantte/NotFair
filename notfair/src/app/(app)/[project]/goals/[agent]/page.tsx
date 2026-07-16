@@ -14,8 +14,8 @@ import {
   listMetricSnapshots,
   isTargetMet,
   type Goal,
-  type GoalTick,
 } from "@/server/db/goals";
+import { listCheckRows } from "@/server/goals/checks";
 import {
   listSessionsForAgent,
   pickLatestChatSession,
@@ -26,6 +26,7 @@ import { DEFAULT_HARNESS_ADAPTER, requireAdapter } from "@/server/adapters/regis
 import { projectHref } from "@/lib/project-href";
 import { goalLabel } from "@/lib/goal-label";
 import { formatMetric } from "@/lib/format-metric";
+import { timeAgo } from "@/lib/time-ago";
 import { GoalMemoryDialog } from "@/components/goal-memory-dialog";
 import { Markdown } from "@/components/markdown";
 import { GoalContextDialog } from "@/components/goal-context-dialog";
@@ -37,19 +38,13 @@ import { GoalStartButton } from "@/components/goal-start-button";
 import { GoalAutoRefresh } from "@/components/goal-auto-refresh";
 import { GoalProgressChart } from "@/components/goal-progress-chart";
 import { GoalChecksStrip } from "@/components/goal-checks-strip";
+import { GoalChecksList } from "@/components/goal-checks-list";
+import { RailSection } from "@/components/rail-section";
 import { listGoalPrs, type GoalPr } from "@/server/db/goal-prs";
 import { maybeSyncGoalPrs } from "@/server/goals/pr-sync";
 import { buildCheckSquares, currentStreak } from "@/lib/goal-streak";
 
 export const dynamic = "force-dynamic";
-
-function timeAgo(iso: string) {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${Math.floor(seconds)}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
 
 function fmtDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "—";
@@ -204,8 +199,13 @@ function GoalRail({
   // PRs the agent opened against the codebase. Kick a background GitHub
   // sync when rows look stale — the page's auto-refresh poll picks up the
   // fresh state a moment later without blocking this render.
-  const prs = listGoalPrs(goal.id, 10);
-  if (prs.some((pr) => pr.state === "open")) maybeSyncGoalPrs(goal.id);
+  // Merged/closed PRs leave the rail section; each stays reachable from
+  // the check that created it (CheckRow.prs).
+  const openPrs = listGoalPrs(goal.id, 100).filter((pr) => pr.state === "open");
+  if (openPrs.length > 0) maybeSyncGoalPrs(goal.id);
+  // First diary page for the lazy checks list; older pages stream in on
+  // scroll via loadMoreGoalChecksAction.
+  const { rows: checkRows, hasMore: checksHaveMore } = listCheckRows(goal.id);
 
   // Chart data — plain-JSON props for the client component.
   const chartPoints = snapshots.map((sn) => ({
@@ -356,8 +356,10 @@ function GoalRail({
           </RailCard>
 
           {(dueActions.length > 0 || gatedActions.length > 0) && (
-            <div>
-              <RailHeading>Open actions</RailHeading>
+            <RailSection
+              title="Open actions"
+              count={dueActions.length + gatedActions.length}
+            >
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
                 {dueActions.map((a) => (
                   <li key={a.id} className="text-[12px] leading-snug">
@@ -376,92 +378,38 @@ function GoalRail({
                   </li>
                 ))}
               </ul>
-            </div>
+            </RailSection>
           )}
 
-          {prs.length > 0 && (
-            <div>
-              <RailHeading>Pull requests</RailHeading>
+          {openPrs.length > 0 && (
+            <RailSection title="Open pull requests" count={openPrs.length}>
               <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-                {prs.map((pr) => (
+                {openPrs.map((pr) => (
                   <PrItem key={pr.id} pr={pr} />
                 ))}
               </ul>
-            </div>
+            </RailSection>
           )}
 
-          <div>
-            <RailHeading>Checks</RailHeading>
-            {ticks.length === 0 ? (
+          <RailSection title="Checks" count={goal.tick_count}>
+            {checkRows.length === 0 ? (
               <p className="m-0 text-[12px] text-[hsl(var(--notfair-ink-4))]">
                 None yet — the first runs at {fmtDate(goal.next_tick_at)}.
               </p>
             ) : (
-              <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-                {ticks.map((t) => (
-                  <TickItem key={t.id} slug={slug} agentSlug={agentSlug} goal={goal} tick={t} />
-                ))}
-              </ul>
+              <GoalChecksList
+                slug={slug}
+                agentSlug={agentSlug}
+                goalId={goal.id}
+                initialRows={checkRows}
+                initialHasMore={checksHaveMore}
+              />
             )}
-          </div>
+          </RailSection>
 
         </>
       )}
     </div>
-  );
-}
-
-function TickItem({
-  slug,
-  agentSlug,
-  goal,
-  tick,
-}: {
-  slug: string;
-  agentSlug: string;
-  goal: Goal;
-  tick: GoalTick;
-}) {
-  const threadLabel = tick.trigger_kind === "intake" ? "main" : `tick-${tick.tick_number}`;
-  return (
-    <li className="text-[12px] leading-snug">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-medium">
-          Check {tick.tick_number}
-          {tick.metric_value !== null && (
-            <span className={cn("ml-1.5 tabular-nums font-normal text-[hsl(var(--notfair-ink-3))]")}>
-              → {formatMetric(tick.metric_value)}
-            </span>
-          )}
-        </span>
-        <span className="shrink-0 text-[10.5px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
-          {timeAgo(tick.started_at)}
-        </span>
-      </div>
-      {tick.metric_error && (
-        <p className="m-0 text-[11.5px] text-[hsl(0_72%_51%)]">{tick.metric_error}</p>
-      )}
-      <div className="line-clamp-2 text-[11.5px] text-[hsl(var(--notfair-ink-4))]">
-        <Markdown className="text-[11.5px] text-[hsl(var(--notfair-ink-4))] [&_p]:m-0 [&_p]:inline [&_p+p]:before:content-['_']">
-          {tick.status === "running"
-            ? "running…"
-            : tick.status === "failed"
-              ? `failed: ${tick.summary ?? "(no detail)"}`
-              : tick.summary ?? "(no summary)"}
-        </Markdown>
-      </div>
-      {/* Running agent checks are watchable live: the session attaches at
-          turn start and the check page's transcript polls as it streams.
-          No-op checks never carry a session and stay unlinked. */}
-      {(tick.session_id || tick.status === "running") && (
-        <Link
-          href={projectHref(slug, `/goals/${agentSlug}/checks/${threadLabel}`)}
-          className="ns-link text-[10.5px]"
-        >
-          {tick.status === "running" ? "watch live ›" : "details ›"}
-        </Link>
-      )}
-    </li>
   );
 }
 
@@ -515,14 +463,6 @@ function PrItem({ pr }: { pr: GoalPr }) {
 
 function RailCard({ children }: { children: React.ReactNode }) {
   return <div className="ns-card p-3.5">{children}</div>;
-}
-
-function RailHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-2 mt-0 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--notfair-ink-4))]">
-      {children}
-    </p>
-  );
 }
 
 function RailStat({ k, v }: { k: string; v: string }) {

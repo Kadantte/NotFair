@@ -1,4 +1,5 @@
 import { getProject } from "@/server/db/projects";
+import type { Project } from "@/types";
 import { requireAdapter } from "@/server/adapters/registry";
 import { workspaceDirFor } from "@/server/agents/provisioning";
 import {
@@ -22,6 +23,7 @@ import {
   loggedSpendTotal,
   markGoalTicked,
   recordMetricSnapshot,
+  setGoalTickMetric,
   type Goal,
   type GoalAction,
   type GoalLearning,
@@ -344,22 +346,47 @@ async function runGoalTickInner(
   const tickNumber = markGoalTicked(goal.id);
   const nowIso = new Date().toISOString();
 
+  // Record the check row BEFORE the first await: everything up to here runs
+  // synchronously inside the caller's `void runGoalTick(...)`, so a manual
+  // "Run tick now" sees its check in the diary the moment the action
+  // returns. Measurement backfills the metric below.
+  const tick = createGoalTick({
+    goal_id: goal.id,
+    tick_number: tickNumber,
+    trigger_kind: trigger,
+  });
+
+  try {
+    await runClaimedTick(project, goal, tick, trigger, nowIso, opts);
+  } catch (err) {
+    // The row is already live in the diary — never strand it "running".
+    finishGoalTick(tick.id, "failed", err instanceof Error ? err.message : String(err));
+  }
+}
+
+async function runClaimedTick(
+  project: Project,
+  goal: Goal,
+  tick: GoalTick,
+  trigger: GoalTickTrigger,
+  nowIso: string,
+  opts: { extraContext?: string },
+): Promise<void> {
+  const tickNumber = tick.tick_number;
+
   // Ground truth first: the platform measures, not the agent — and PR
   // state comes from GitHub, not from what the agent remembers.
   const measurement = await measureGoalMetric(goal);
   if (measurement.ok) {
     recordMetricSnapshot(goal.id, measurement.value, "tick");
   }
+  setGoalTickMetric(
+    tick.id,
+    measurement.ok ? measurement.value : null,
+    measurement.ok ? null : measurement.error,
+  );
   await syncGoalPrs(goal.id);
   const freshGoal = getGoal(goal.id)!;
-
-  const tick = createGoalTick({
-    goal_id: goal.id,
-    tick_number: tickNumber,
-    trigger_kind: trigger,
-    metric_value: measurement.ok ? measurement.value : null,
-    metric_error: measurement.ok ? null : measurement.error,
-  });
 
   const actionsDueForReview = listActionsDueForReview(goal.id, nowIso);
   const gatedActions = listGatedActions(goal.id, nowIso);
