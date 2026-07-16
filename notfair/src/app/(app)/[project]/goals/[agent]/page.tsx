@@ -450,12 +450,15 @@ function TickItem({
               : tick.summary ?? "(no summary)"}
         </Markdown>
       </div>
-      {tick.session_id && tick.status !== "running" && (
+      {/* Running agent checks are watchable live: the session attaches at
+          turn start and the check page's transcript polls as it streams.
+          No-op checks never carry a session and stay unlinked. */}
+      {(tick.session_id || tick.status === "running") && (
         <Link
           href={projectHref(slug, `/goals/${agentSlug}/checks/${threadLabel}`)}
           className="ns-link text-[10.5px]"
         >
-          details ›
+          {tick.status === "running" ? "watch live ›" : "details ›"}
         </Link>
       )}
     </li>

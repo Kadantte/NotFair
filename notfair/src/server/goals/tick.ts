@@ -405,15 +405,18 @@ async function runGoalTickInner(
   });
 
   try {
-    const { sessionId, summary } = await streamAgentTurn({
+    const { summary } = await streamAgentTurn({
       projectSlug: project.slug,
       harnessAdapter: project.harness_adapter,
       agentId: goal.agent_id,
       sessionLabel: `tick-${tickNumber}`,
       message,
       source: "goal-tick",
+      // Attach as soon as the session exists — not after the turn — so a
+      // running check is clickable in the UI and a failed one keeps its
+      // partial transcript reachable.
+      onSession: (sessionId) => attachTickSession(tick.id, sessionId),
     });
-    attachTickSession(tick.id, sessionId);
     finishGoalTick(tick.id, "done", summary);
   } catch (err) {
     const messageText = err instanceof Error ? err.message : String(err);
@@ -445,6 +448,8 @@ export async function streamAgentTurn(input: {
   sessionLabel: string;
   message: string;
   source: string;
+  /** Fires with the session id before the turn streams (attach points). */
+  onSession?: (sessionId: string) => void;
 }): Promise<{ sessionId: string; summary: string | null }> {
   const adapter = requireAdapter(input.harnessAdapter);
   const session = getOrCreateSession({
@@ -453,6 +458,7 @@ export async function streamAgentTurn(input: {
     label: input.sessionLabel,
     harness_adapter: input.harnessAdapter,
   });
+  input.onSession?.(session.id);
   appendTranscriptEvent(session.id, "user", { text: input.message, source: input.source });
 
   let finalText: string | null = null;
