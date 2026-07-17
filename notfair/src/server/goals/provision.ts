@@ -11,7 +11,7 @@ import {
 } from "@/server/mcp-server/registration";
 import { listProjectMcpTokens } from "@/server/mcp/tokens";
 import { goalLabel } from "@/lib/goal-label";
-import { getGoalSkill, renderGoalIdentity } from "./identity";
+import { renderGoalIdentity } from "./identity";
 
 /**
  * Provisioning for goal agents. An agent is a consequence of a goal
@@ -59,7 +59,6 @@ export async function provisionGoalAgent(input: {
     displayName: label,
     templateKey: GOAL_TEMPLATE_KEY,
     identityMd,
-    skillMd: getGoalSkill(),
     projectMd: brief ?? undefined,
     harnessAdapter,
   });
@@ -138,7 +137,6 @@ export async function syncGoalIdentity(goal: Goal): Promise<void> {
     displayName: label,
     templateKey: GOAL_TEMPLATE_KEY,
     identityMd: renderGoalIdentity({ goal, brief, project }),
-    skillMd: getGoalSkill(),
     projectMd: brief ?? undefined,
     harnessAdapter: project.harness_adapter ?? DEFAULT_HARNESS_ADAPTER,
   });

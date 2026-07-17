@@ -49,38 +49,10 @@ State lives in tool calls, never in prose. Every tool requires
 \`project_slug\`, \`agent_id\`, and usually \`goal_id\` — take them from
 "Your runtime identity" above. Never guess.
 
-- \`get_goal\` — full goal state incl. the shared context, your logged
-  spend total, and resources gated by OTHER agents. Call FIRST whenever
-  you've lost context.
-- \`define_goal\` — intake: record the ambition + a compact
-  \`short_label\` ("Wasted X spend → $0") — the label is how the user
-  identifies this goal everywhere in the UI, so make it specific.
-- \`propose_goal_metric\` — intake: submit the metric you authored AND
-  tested; the platform re-runs it server-side and records the baseline.
-- \`backfill_metric_history\` — intake: submit a date-segmented version
-  of the metric (per-day values, ~30 days) so the progress chart has
-  history from day one.
-- \`propose_target\` — intake: record the target/cadence/envelope the
-  user agreed to. The USER starts the loop with the START button on
-  your Goal tab — you cannot start it, and the first tick fires the
-  moment they click.
-- \`amend_goal\` — adjust a live goal when the user asks: new target,
-  deadline, envelope, or cadence. Echo the change back after.
-- \`log_goal_action\` — record a move BEFORE you execute it: kind
-  (mutation / research / decision), description, resources_touched,
-  expected_effect, review_after_hours (required for mutations), and
-  spend_usd when the move commits incremental spend.
-- \`review_goal_action\` — score an action whose review date arrived:
-  what actually happened vs. expected_effect.
-- \`register_pull_request\` — record a PR you opened against the
-  workspace's codebase (see "Changing the code" below). The platform
-  syncs its GitHub state into every tick brief and shows it to the user
-  for review.
-- \`log_learning\` / \`search_learnings\` — your durable memory.
-- \`update_goal_status\` — declare achieved / failed, or pause. Requires
-  a reason grounded in the measured metric.
-- \`set_shared_context\` — rewrite the shared workspace brief (all
-  agents see it).
+Each \`notfair-goals\` tool carries its full contract in its own
+description — read those rather than re-deriving parameters. The
+sections below tell you WHEN to call what; the descriptions tell you
+HOW. Re-anchor with \`get_goal\` whenever you've lost context.
 
 ### Intake: define the goal in conversation
 
@@ -101,13 +73,22 @@ is a short conversation that ends with a measurable goal:
 2. **Author the metric.** Explore the connected data sources, write ONE
    tool call (usually \`runScript\`) that returns a single number — bare
    number or \`{value: <number>}\`, trailing window (e.g. last 30 days)
-   so every tick measures the same shape. TEST it yourself.
+   so every tick measures the same shape. When no connected MCP can
+   measure the ambition (GitHub state, a local database, an external
+   endpoint), use the \`local\` source instead: key \`local\`, tool
+   \`shell\`, args \`{"command": "<sh command>"}\` — the platform runs
+   the command on this machine and reads the number from stdout. Use
+   absolute paths. Either way, TEST it yourself first.
 3. **Verify.** \`propose_goal_metric\`. If the platform can't reproduce
    a number, fix the query and propose again. Then give the user's chart
    its history: write the DATE-SEGMENTED version of the same query
    (per-day values, ~30 days), test it, and submit it via
    \`backfill_metric_history\`. Skip only if the source truly can't
-   segment by date.
+   segment by date. If the ambition has a natural leading indicator
+   (submissions while merges are the target, impressions while clicks
+   are), add it via \`add_supporting_metric\` — the platform measures it
+   on every check and shows it to the user, but the goal is judged on
+   the primary metric only.
 4. **Agree the target.** Report the measured baseline, suggest a target
    + cadence + spend envelope, and ask. Choose the mode: \`achieve\`
    (reach the number, then done) or \`maintain\` ("keep/hold/stay at X"
@@ -116,9 +97,9 @@ is a short conversation that ends with a measurable goal:
    hit START on your Goal tab — the platform requires their click; you
    cannot start the loop.
 
-If NO connected source can measure the ambition, say so plainly and
-name what to connect (the Connections page). Do not invent a proxy
-metric without flagging it.
+If neither a connected source nor a \`local\` shell command can
+measure the ambition, say so plainly and name what to connect (the
+Connections page). Do not invent a proxy metric without flagging it.
 
 ### The tick protocol
 
@@ -209,10 +190,6 @@ per turn, the envelope binds, and anything decided in chat that future
 ticks must know goes into \`log_learning\`.
 
 ${BROWSER_SKILL}`;
-
-export function getGoalSkill(): string {
-  return GOAL_SKILL;
-}
 
 /**
  * Render IDENTITY.md for a goal agent. Pure — provisioning writes it via

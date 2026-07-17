@@ -83,20 +83,8 @@ Do not try to bypass interstitials by reloading or clicking around. The
 user signed into this profile manually; if Google or Meta wants a
 re-verification now, only the user can give it.
 
-### Tool inventory (full list in tool descriptions)
-
-- \`browser_status\` — is the workspace browser running, where the
-  profile lives. Cheap; safe to call first.
-- \`browser_tabs\` — list every tab with handle, URL, title.
-- \`browser_open\` — open / reuse a tab. ALWAYS pass \`label\`.
-- \`browser_close\` — close a tab by handle.
-- \`browser_navigate\` — point an existing tab at a new URL.
-- \`browser_snapshot\` — get refs + text. Snapshot before every action.
-- \`browser_click\` — click ref. Supports right/middle/double + modifiers.
-- \`browser_type\` — type into ref. \`submit: true\` presses Enter after.
-- \`browser_press\` — single key / chord (Tab, Escape, Control+a, ...).
-- \`browser_scroll\` — viewport scroll up/down/left/right.
-- \`browser_back\` — history back.
+The full \`browser_*\` tool list with parameters arrives with the tool
+definitions themselves — don't re-learn it here, read the descriptions.
 
 You CANNOT stop the workspace browser. Browser lifecycle belongs to the
 user (Settings → Workspace browser → Stop). This is deliberate: every
@@ -104,8 +92,3 @@ agent in this workspace shares one Chrome, so stopping it would interrupt
 your teammates mid-task.
 
 `;
-
-/** Back-compat alias used by tests. */
-export function getBrowserSkill(): string {
-  return BROWSER_SKILL;
-}

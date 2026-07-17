@@ -19,7 +19,6 @@ export interface ProvisionInput {
   displayName: string;
   templateKey: string;
   identityMd: string;
-  skillMd?: string;
   projectMd?: string;
   harnessAdapter: HarnessAdapterId;
 }
@@ -33,7 +32,6 @@ export async function provisionAgent(input: ProvisionInput): Promise<void> {
     templateKey: input.templateKey,
     workspaceDir: workspaceDirFor(input.agentId),
     identityMd: input.identityMd,
-    skillMd: input.skillMd,
     projectMd: input.projectMd,
   };
   await adapter.provisionAgent(spec);

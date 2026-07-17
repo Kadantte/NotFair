@@ -131,14 +131,6 @@ export async function getGoalContextAction(input: {
         );
       }
     }
-    const skill = await readWorkspaceFile(agent_id, "SKILL.md");
-    if (skill) {
-      chunks.push(
-        chunk("skill", "Goal-loop skill (SKILL.md)", "instructions", skill,
-          "Loaded on demand — enters context when the agent reads it during a session."),
-      );
-    }
-
     // ── MCP tool definitions ──────────────────────────────────────
     const goalTools = toolsChunk("notfair-goals", "Goal tools (notfair-goals)", await internalToolsList("goals"));
     if (goalTools) chunks.push(goalTools);

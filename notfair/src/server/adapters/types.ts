@@ -40,8 +40,6 @@ export interface AgentProvisionSpec {
   workspaceDir: string;
   /** The fully-rendered IDENTITY.md the agent should run with. */
   identityMd: string;
-  /** The shared SKILL.md (goals MCP usage etc.). Optional sidecar copy. */
-  skillMd?: string;
   /** PROJECT.md context, if a project brief exists yet. */
   projectMd?: string;
 }
