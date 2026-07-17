@@ -297,8 +297,8 @@ export async function deleteProjectAction(
 
 
   // Single shot — drops every artifact tied to this project: agent workspace
-  // dirs, scheduled_jobs + runs, sessions + transcripts, mcp_tokens. Adapter
-  // MCP entries get unregistered too.
+  // dirs, sessions + transcripts, mcp_tokens. Adapter MCP entries get
+  // unregistered too.
   try {
     await cascadeDeleteProjectArtifacts(slug);
   } catch (err) {
@@ -311,7 +311,7 @@ export async function deleteProjectAction(
 
   // 5) Canonical PROJECT.md directory at ~/.notfair/projects/<slug>/.
   //    The per-agent sidecar copies inside each workspace were already wiped
-  //    by cascadeDeleteAgent's `rm -rf` on the workspace dir; this is the
+  //    by the cascade's `rm -rf` on the workspace dirs; this is the
   //    last surface that holds the project brief on disk. Without this,
   //    recreating a project with the same slug later would silently inherit
   //    the prior tenant's PROJECT.md (writeIdentityFile inlines it if it

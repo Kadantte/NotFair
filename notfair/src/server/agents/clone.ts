@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { slugify } from "@/lib/slug";
 import { workspaceDirFor } from "@/server/agents/provisioning";
 import { writeAgentMeta } from "@/server/agent-meta";
-import { getDb } from "@/server/db/db";
 
 export interface CloneAgentInput {
   source_agent_id: string;
@@ -25,9 +24,9 @@ export interface CloneAgentResult {
 /**
  * Clone an existing agent within a project.
  *
- * Workspace dir copy via fs `cp -r`, scheduled jobs duplicated as new rows,
- * sessions / transcript_events left ON the source (we don't carry chat history
- * forward — the new agent starts with an empty thread list).
+ * Workspace dir copy via fs `cp -r`; sessions / transcript_events left ON
+ * the source (we don't carry chat history forward — the new agent starts
+ * with an empty thread list).
  */
 export async function cloneAgent(input: CloneAgentInput): Promise<CloneAgentResult> {
   let newSlug: string;
@@ -89,21 +88,6 @@ export function agentExistsInProject(project_slug: string, slug: string): boolea
   } catch {
     return true;
   }
-}
-
-/** Cascade-delete an agent's workspace + sessions + scheduled jobs. */
-export async function cascadeDeleteAgent(agent_id: string, project_slug: string): Promise<void> {
-  const dir = workspaceDirFor(agent_id);
-  const { rm } = await import("node:fs/promises");
-  if (existsSync(dir)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-  getDb()
-    .prepare("DELETE FROM scheduled_jobs WHERE project_slug = ? AND agent_id = ?")
-    .run(project_slug, agent_id);
-  getDb()
-    .prepare("DELETE FROM sessions WHERE project_slug = ? AND agent_id = ?")
-    .run(project_slug, agent_id);
 }
 
 void randomUUID; // imported for future use (sessions cloning if we re-enable)

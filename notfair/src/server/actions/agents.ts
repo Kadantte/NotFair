@@ -1,6 +1,7 @@
 "use server";
 
-import { cascadeDeleteAgent, cloneAgent } from "@/server/agents/clone";
+import { cloneAgent } from "@/server/agents/clone";
+import { cascadeDeleteAgentArtifacts } from "@/server/agents/cascade-delete";
 import { writeAgentMeta } from "@/server/agent-meta";
 
 // --- Relocate (used by project rename to move agents to the new slug) ---
@@ -42,7 +43,16 @@ export async function relocateAgent(
     created_at: input.preserve_created_at ?? new Date().toISOString(),
   });
 
-  await cascadeDeleteAgent(input.old_agent_id, input.source_project_slug).catch(() => {});
+  // Best-effort: the clone already succeeded, so a cleanup failure must not
+  // fail the relocation — but it must not be invisible either (a silent
+  // swallow here previously masked cleanup breaking entirely, stranding the
+  // old agent's sessions and MCP registrations).
+  await cascadeDeleteAgentArtifacts(
+    input.source_project_slug,
+    input.old_agent_id,
+  ).catch((err) =>
+    console.error(`[relocate] cleanup of old agent ${input.old_agent_id} failed:`, err),
+  );
 
   return {
     new_agent_id: cloneResult.new_agent_id,
