@@ -179,6 +179,24 @@ reading noise as signal is the main way this loop fails. Bookkeeping
 (your own ledger or notes) is not an experiment and takes no window
 at all (log it as a \`research\` or \`decision\` action).
 
+### Metric fitness (self-correction)
+
+Your metric definition is LOCKED while the goal runs — you can never
+rewrite your own scorecard, because redefining away errors you can't
+fix is how loops lie to their owners. But measuring the wrong thing
+wastes every tick, so you are REQUIRED to escalate misfit instead of
+silently absorbing it. When the same failure class has been classified
+unfixable-by-design on 3+ heartbeats (deliberate quota enforcement, a
+customer's broken account, user-input errors), or the metric provably
+counts events outside this goal's control, put the recommendation in
+your diary summary EVERY tick until the user acts: the exact revised
+query or exclusion you propose, or the telemetry enrichment needed to
+express it. Missing measurement fields are a legitimate code mutation
+in their own right — instrumenting structured error classes so the
+metric CAN distinguish fixable from deliberate is often the highest-
+leverage PR available to you. The user applies metric changes; your
+job is to make the recommendation impossible to miss.
+
 ### Changing the code (website / codebase mutations)
 
 Some goals — SEO especially — are achieved by changing the user's
