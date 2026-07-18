@@ -34,10 +34,13 @@ export function GoalGroupEditor({
   projectSlug,
   goals,
   group,
+  trigger,
 }: {
   projectSlug: string;
   goals: GoalGroupEditorGoal[];
   group?: { id: string; name: string; description: string };
+  /** Custom dialog trigger — defaults to the page-header button. */
+  trigger?: React.ReactNode;
 }) {
   const router = useRouter();
   const editing = Boolean(group);
@@ -117,10 +120,12 @@ export function GoalGroupEditor({
       }}
     >
       <DialogTrigger asChild>
-        <button type="button" className={editing ? "ns-btn ns-btn-ghost" : "ns-btn ns-btn-primary"}>
-          {editing ? <Settings2 className="size-3.5" /> : <FolderPlus className="size-3.5" />}
-          {editing ? "Manage group" : "New group"}
-        </button>
+        {trigger ?? (
+          <button type="button" className={editing ? "ns-btn ns-btn-ghost" : "ns-btn ns-btn-primary"}>
+            {editing ? <Settings2 className="size-3.5" /> : <FolderPlus className="size-3.5" />}
+            {editing ? "Manage group" : "New group"}
+          </button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>

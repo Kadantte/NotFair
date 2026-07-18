@@ -15,6 +15,7 @@ import {
   getGoalGroup,
   listGoalGroupMemberships,
   listGoalsInGroup,
+  renameGoalGroup,
   saveGoalGroup,
   setGoalGroupMembership,
 } from "./goal-groups";
@@ -86,6 +87,16 @@ describe("goal groups", () => {
     ).toThrow(/same project/);
     expect(getDb().prepare("SELECT COUNT(*) AS n FROM goal_groups WHERE name = 'Invalid'").get())
       .toEqual({ n: 0 });
+  });
+
+  it("renames a group in place without touching members", () => {
+    const goal = createGoal({ project_slug: PROJECT, agent_id: "renamed", statement: "Rename me" });
+    const group = createGoalGroup({ project_slug: PROJECT, name: "Rail before", goal_ids: [goal.id] });
+
+    const renamed = renameGoalGroup(group.id, "Rail after");
+    expect(renamed?.name).toBe("Rail after");
+    expect(listGoalsInGroup(group.id).map((g) => g.id)).toEqual([goal.id]);
+    expect(renameGoalGroup("missing-group", "Nope")).toBeNull();
   });
 
   it("deleting a group ungroups goals without deleting them", () => {

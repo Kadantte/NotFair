@@ -5,6 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+  Check,
+  FolderKanban,
+  FolderMinus,
+  FolderPlus,
   MoreVertical,
   Pause,
   Pencil,
@@ -22,7 +26,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -42,14 +50,20 @@ import {
   resumeGoalAction,
   setGoalPinnedAction,
 } from "@/server/actions/goals";
+import {
+  createGoalGroupAction,
+  moveGoalToGroupAction,
+} from "@/server/actions/goal-groups";
+import { GOAL_DRAG_TYPE } from "@/components/sidebar-goal-group";
 import { cn } from "@/lib/utils";
 
 type LiveStatus = "intake" | "proposed" | "active" | "paused";
 
 /**
  * One goal row in the sidebar rail: link to the goal screen plus a ⋮ menu
- * (pin, rename, pause/resume, delete). Server sidebar computes the display
- * bits (dot/label classes); this component owns the interactions.
+ * (pin, rename, move to group, pause/resume, delete). Rows are draggable onto
+ * group headers. Server sidebar computes the display bits (dot/label classes);
+ * this component owns the interactions.
  */
 export function SidebarGoalItem({
   href,
@@ -60,7 +74,9 @@ export function SidebarGoalItem({
   pinned,
   dotClass,
   labelClass,
-  nested = false,
+  projectSlug,
+  groups,
+  groupId,
 }: {
   href: string;
   /** Project home — where the user lands after deleting the open goal. */
@@ -71,14 +87,20 @@ export function SidebarGoalItem({
   pinned: boolean;
   dotClass: string;
   labelClass: string;
-  nested?: boolean;
+  projectSlug: string;
+  /** Every group in the project — targets for "Move to group". */
+  groups: { id: string; name: string }[];
+  /** The group this goal currently belongs to, if any. */
+  groupId: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [draft, setDraft] = useState(label);
+  const [groupDraft, setGroupDraft] = useState("");
 
   function run(
     fn: () => Promise<{ ok: boolean; error?: string }>,
@@ -114,8 +136,15 @@ export function SidebarGoalItem({
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild className={nested ? "pl-7" : undefined}>
-        <Link href={href}>
+      <SidebarMenuButton asChild>
+        <Link
+          href={href}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(GOAL_DRAG_TYPE, goalId);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+        >
           <span className={cn("ns-dot", dotClass)} aria-hidden />
           <span className={cn("truncate", labelClass)}>{label}</span>
           {pinned && (
@@ -156,6 +185,56 @@ export function SidebarGoalItem({
             <Pencil />
             Rename…
           </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger disabled={pending}>
+              <FolderKanban />
+              Move to group
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent className="min-w-44">
+                {groups.map((group) => (
+                  <DropdownMenuItem
+                    key={group.id}
+                    disabled={pending || group.id === groupId}
+                    onSelect={() =>
+                      run(
+                        () => moveGoalToGroupAction(goalId, group.id),
+                        `Moved to ${group.name}.`,
+                      )
+                    }
+                  >
+                    <span className="truncate">{group.name}</span>
+                    {group.id === groupId && <Check className="ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+                {groups.length > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuItem
+                  disabled={pending}
+                  onSelect={() => {
+                    setGroupDraft("");
+                    setNewGroupOpen(true);
+                  }}
+                >
+                  <FolderPlus />
+                  New group…
+                </DropdownMenuItem>
+                {groupId && (
+                  <DropdownMenuItem
+                    disabled={pending}
+                    onSelect={() =>
+                      run(
+                        () => moveGoalToGroupAction(goalId, null),
+                        "Removed from group.",
+                      )
+                    }
+                  >
+                    <FolderMinus />
+                    Remove from group
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
           {status === "active" && (
             <DropdownMenuItem
               disabled={pending}
@@ -253,6 +332,55 @@ export function SidebarGoalItem({
               Delete forever
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newGroupOpen} onOpenChange={setNewGroupOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New group with “{label}”</DialogTitle>
+            <DialogDescription>
+              A group is one dashboard for related goals. This goal becomes its
+              first member — add more from any goal’s menu or by dragging.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(
+                () =>
+                  createGoalGroupAction({
+                    project_slug: projectSlug,
+                    name: groupDraft,
+                    goal_ids: [goalId],
+                  }),
+                "Group created.",
+                () => setNewGroupOpen(false),
+              );
+            }}
+          >
+            <Input
+              value={groupDraft}
+              onChange={(e) => setGroupDraft(e.target.value)}
+              placeholder="Ads MCP reliability"
+              maxLength={80}
+              autoFocus
+              aria-label="Group name"
+            />
+            <DialogFooter className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNewGroupOpen(false)}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending || !groupDraft.trim()}>
+                Create group
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </SidebarMenuItem>

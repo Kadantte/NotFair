@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Fragment } from "react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -14,7 +14,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { SidebarBrand } from "@/components/sidebar-brand";
-import { BookOpen, FolderKanban, LayoutGrid, Plug, Plus, Settings, type LucideIcon } from "lucide-react";
+import { BookOpen, FolderPlus, LayoutGrid, Plug, Plus, Settings, type LucideIcon } from "lucide-react";
 import { listProjects } from "@/server/db/projects";
 import { getActiveProject } from "@/server/active-project";
 import { listProjectAgents } from "@/server/agent-meta";
@@ -26,6 +26,8 @@ import {
 } from "@/server/db/goals";
 import { colorForAgentSlug } from "@/lib/agent-colors";
 import { SidebarGoalItem } from "@/components/sidebar-goal-item";
+import { SidebarGoalGroup } from "@/components/sidebar-goal-group";
+import { GoalGroupEditor, type GoalGroupEditorGoal } from "@/components/goal-group-editor";
 import { readHarnessUsage } from "@/server/harness-usage";
 import { projectHref } from "@/lib/project-href";
 import { goalLabel } from "@/lib/goal-label";
@@ -69,12 +71,27 @@ export async function AppSidebar() {
     ...liveGoals.filter((g) => pinnedIds.has(g.id)),
     ...liveGoals.filter((g) => !pinnedIds.has(g.id)),
   ];
-  const totalGoals = active ? listGoals(active.slug).length : 0;
+  const allGoals = active ? listGoals(active.slug) : [];
+  const totalGoals = allGoals.length;
   const goalGroups = active ? listGoalGroups(active.slug) : [];
   const memberships = active ? listGoalGroupMemberships(active.slug) : [];
   const groupIdByGoal = new Map(memberships.map((membership) => [membership.goal_id, membership.group_id]));
   const ungroupedRailGoals = railGoals.filter((goal) => !groupIdByGoal.has(goal.id));
   const agentBySlug = new Map(agentEntries.map((a) => [a.agent_id, a]));
+  // Move-to-group menu targets on every goal row.
+  const groupTargets = goalGroups.map((group) => ({ id: group.id, name: group.name }));
+  // Full goal list for the create-group dialog behind the + header action.
+  const groupNameById = new Map(goalGroups.map((group) => [group.id, group.name]));
+  const editorGoals: GoalGroupEditorGoal[] = allGoals.map((goal) => {
+    const memberOf = groupIdByGoal.get(goal.id) ?? null;
+    return {
+      id: goal.id,
+      label: goalLabel(goal),
+      status: goal.status,
+      current_group_id: memberOf,
+      current_group_name: memberOf ? groupNameById.get(memberOf) ?? null : null,
+    };
+  });
   // Best-effort fetch of harness usage. For Codex this hits the
   // chatgpt.com wham/usage endpoint (cached 60s in-process); for
   // Claude Code it just reads the local stats-cache. Either failure
@@ -110,6 +127,16 @@ export async function AppSidebar() {
         {active && (
           <SidebarGroup>
             <SidebarGroupLabel>Goals</SidebarGroupLabel>
+            <GoalGroupEditor
+              projectSlug={active.slug}
+              goals={editorGoals}
+              trigger={
+                <SidebarGroupAction title="New group">
+                  <FolderPlus />
+                  <span className="sr-only">New group</span>
+                </SidebarGroupAction>
+              }
+            />
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -135,48 +162,22 @@ export async function AppSidebar() {
                       pinned={pinnedIds.has(goal.id)}
                       dotClass={GOAL_DOT[goal.status] ?? "ns-dot-mute"}
                       labelClass={color.label}
+                      projectSlug={active.slug}
+                      groups={groupTargets}
+                      groupId={null}
                     />
                   );
                 })}
-                {totalGoals > 0 && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link href={projectHref(active.slug, "/goals")}>
-                        <LayoutGrid />
-                        <span>All goals</span>
-                        <span className="ml-auto text-[11px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
-                          {totalGoals}
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {active && goalGroups.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Groups</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
                 {goalGroups.map((group) => {
                   const groupGoals = railGoals.filter((goal) => groupIdByGoal.get(goal.id) === group.id);
-                  const totalMembers = memberships.filter((membership) => membership.group_id === group.id).length;
                   return (
-                    <Fragment key={group.id}>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild>
-                          <Link href={projectHref(active.slug, `/groups/${group.id}`)}>
-                            <FolderKanban />
-                            <span className="truncate">{group.name}</span>
-                            <span className="ml-auto text-[11px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
-                              {totalMembers}
-                            </span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                    <SidebarGoalGroup
+                      key={group.id}
+                      groupId={group.id}
+                      name={group.name}
+                      href={projectHref(active.slug, `/groups/${group.id}`)}
+                      liveCount={groupGoals.length}
+                    >
                       {groupGoals.map((goal) => {
                         const agent = agentBySlug.get(goal.agent_id);
                         if (!agent) return null;
@@ -192,13 +193,28 @@ export async function AppSidebar() {
                             pinned={pinnedIds.has(goal.id)}
                             dotClass={GOAL_DOT[goal.status] ?? "ns-dot-mute"}
                             labelClass={color.label}
-                            nested
+                            projectSlug={active.slug}
+                            groups={groupTargets}
+                            groupId={group.id}
                           />
                         );
                       })}
-                    </Fragment>
+                    </SidebarGoalGroup>
                   );
                 })}
+                {totalGoals > 0 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href={projectHref(active.slug, "/goals")}>
+                        <LayoutGrid />
+                        <span>All goals</span>
+                        <span className="ml-auto text-[11px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
+                          {totalGoals}
+                        </span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

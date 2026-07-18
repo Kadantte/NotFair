@@ -5,8 +5,11 @@ import {
   createGoalGroup,
   deleteGoalGroup,
   getGoalGroup,
+  renameGoalGroup,
   saveGoalGroup,
+  setGoalGroupMembership,
 } from "@/server/db/goal-groups";
+import { getGoal } from "@/server/db/goals";
 import { getProject } from "@/server/db/projects";
 
 export type GoalGroupActionResult = {
@@ -75,6 +78,36 @@ export async function saveGoalGroupAction(input: {
     if (!group) return { ok: false, error: "Goal group not found." };
     revalidatePath("/", "layout");
     return { ok: true, group_id: group.id };
+  } catch (error) {
+    return { ok: false, error: messageForError(error) };
+  }
+}
+
+export async function renameGoalGroupAction(
+  groupId: string,
+  name: string,
+): Promise<GoalGroupActionResult> {
+  const fields = cleanFields(name);
+  if ("error" in fields) return { ok: false, error: fields.error };
+  try {
+    const group = renameGoalGroup(groupId, fields.name);
+    if (!group) return { ok: false, error: "Goal group not found." };
+    revalidatePath("/", "layout");
+    return { ok: true, group_id: group.id };
+  } catch (error) {
+    return { ok: false, error: messageForError(error) };
+  }
+}
+
+export async function moveGoalToGroupAction(
+  goalId: string,
+  groupId: string | null,
+): Promise<GoalGroupActionResult> {
+  if (!getGoal(goalId)) return { ok: false, error: "Goal not found." };
+  try {
+    setGoalGroupMembership(goalId, groupId);
+    revalidatePath("/", "layout");
+    return { ok: true, group_id: groupId ?? undefined };
   } catch (error) {
     return { ok: false, error: messageForError(error) };
   }

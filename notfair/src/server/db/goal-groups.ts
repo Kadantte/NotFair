@@ -126,6 +126,13 @@ export function listGoalsInGroup(groupId: string): Goal[] {
     .all(groupId) as Goal[];
 }
 
+export function renameGoalGroup(id: string, name: string): GoalGroup | null {
+  const changed = getDb()
+    .prepare("UPDATE goal_groups SET name = ?, updated_at = ? WHERE id = ?")
+    .run(name, now(), id).changes;
+  return changed > 0 ? getGoalGroup(id) : null;
+}
+
 export function saveGoalGroup(input: {
   id: string;
   name: string;
