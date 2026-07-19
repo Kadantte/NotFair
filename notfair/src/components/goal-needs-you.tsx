@@ -1,9 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Check, TriangleAlert } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { markUserActionHandledAction } from "@/server/actions/goals";
 import { timeAgo } from "@/lib/time-ago";
 
@@ -16,15 +24,17 @@ export type NeedsYouItem = {
 };
 
 /**
- * The escalation surface: open asks only the USER can resolve, pinned at
- * the top of the goal rail. Everything else in the loop is the agent's
- * job — this card is the one place that is explicitly yours. It renders
- * nothing when there is nothing to do; when it shows, the agent repeats
- * the same asks in every check summary until telemetry proves the fix
- * (or you mark one handled here, which the agent later verifies).
+ * The escalation surface: open asks only the USER can resolve, one amber
+ * button in the goal header. Everything else in the loop is the agent's
+ * job — this dialog is the one place that is explicitly yours. The
+ * trigger renders nothing when there is nothing to do; when it shows,
+ * the agent repeats the same asks in every check summary until telemetry
+ * proves the fix (or you mark one handled here, which the agent later
+ * verifies — and re-escalates if it is still broken).
  */
-export function GoalNeedsYou({ items }: { items: NeedsYouItem[] }) {
+export function GoalNeedsYouDialog({ items }: { items: NeedsYouItem[] }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (items.length === 0) return null;
@@ -37,50 +47,68 @@ export function GoalNeedsYou({ items }: { items: NeedsYouItem[] }) {
         return;
       }
       toast.success("Marked handled — the agent verifies it on a later check.");
+      if (items.length === 1) setOpen(false);
       router.refresh();
     });
   }
 
   return (
-    <section
-      aria-label={`Needs you: ${items.length} action${items.length === 1 ? "" : "s"}`}
-      className="ns-card bg-[hsl(var(--notfair-warn)/0.09)] p-3.5"
-    >
-      <div className="mb-2 flex items-center gap-1.5">
-        <TriangleAlert aria-hidden className="size-3.5 text-[hsl(var(--notfair-warn))]" />
-        <h2 className="m-0 text-[11px] font-semibold tracking-wide text-[hsl(var(--notfair-warn))] uppercase">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[hsl(var(--notfair-warn)/0.15)] px-2.5 py-1 text-[12px] font-medium text-[hsl(var(--notfair-warn))] transition-colors hover:bg-[hsl(var(--notfair-warn)/0.25)]"
+          title="Actions only you can take — the agent is blocked on these"
+        >
+          <TriangleAlert className="size-3.5" aria-hidden />
           Needs you
-        </h2>
-        <span className="text-[11px] tabular-nums text-[hsl(var(--notfair-warn))]">
-          {items.length}
-        </span>
-      </div>
-      <ul className="m-0 flex list-none flex-col gap-3 p-0">
-        {items.map((item) => (
-          <li key={item.action_id}>
-            <p className="m-0 text-[12.5px] leading-relaxed">{item.ask}</p>
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="text-[11px] text-[hsl(var(--notfair-ink-4))]">
-                raised {timeAgo(item.raised_at)}
-                {item.tick_number !== null && ` · check #${item.tick_number}`}
-              </span>
-              <button
-                type="button"
-                className="ns-btn ns-btn-ghost shrink-0 !px-2 !py-0.5 text-[11.5px]"
-                disabled={pending}
-                onClick={() => markHandled(item)}
-              >
-                <Check className="size-3" />
-                Mark handled
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-2.5 mb-0 text-[11px] leading-relaxed text-[hsl(var(--notfair-ink-4))]">
-        The agent repeats these in every check until telemetry proves the fix.
-        Marking one handled closes the ask — it re-escalates if still broken.
-      </p>
-    </section>
+          <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-[hsl(var(--notfair-warn))] px-1 text-[10.5px] font-semibold tabular-nums text-[hsl(var(--notfair-surface-1))]">
+            {items.length}
+          </span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[75vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-[15px]">
+            <TriangleAlert
+              className="size-4 text-[hsl(var(--notfair-warn))]"
+              aria-hidden
+            />
+            Needs you
+          </DialogTitle>
+          <DialogDescription>
+            The agent hit things only you can fix — credentials, app
+            permissions, account settings. It repeats each ask in every
+            check until telemetry proves the fix. Marking one handled
+            closes the ask; it re-escalates if still broken.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+          {items.map((item) => (
+            <li
+              key={item.action_id}
+              className="rounded-xl bg-[hsl(var(--notfair-warn)/0.09)] p-3"
+            >
+              <p className="m-0 text-[12.5px] leading-relaxed">{item.ask}</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-[hsl(var(--notfair-ink-4))]">
+                  raised {timeAgo(item.raised_at)}
+                  {item.tick_number !== null && ` · check #${item.tick_number}`}
+                </span>
+                <button
+                  type="button"
+                  className="ns-btn ns-btn-ghost shrink-0 !px-2 !py-0.5 text-[11.5px]"
+                  disabled={pending}
+                  onClick={() => markHandled(item)}
+                >
+                  <Check className="size-3" />
+                  Mark handled
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
   );
 }

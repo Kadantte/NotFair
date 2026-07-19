@@ -16,7 +16,7 @@ import {
   USER_ACTION_PREFIX,
   type Goal,
 } from "@/server/db/goals";
-import { GoalNeedsYou, type NeedsYouItem } from "@/components/goal-needs-you";
+import { GoalNeedsYouDialog, type NeedsYouItem } from "@/components/goal-needs-you";
 import { listCheckRows } from "@/server/goals/checks";
 import {
   listSessionsForAgent,
@@ -142,6 +142,15 @@ export default async function GoalPage({
     made_at: a.created_at,
     observe_until: a.review_after,
   }));
+  // Open escalations only the user can resolve — the amber header button.
+  const needsYou: NeedsYouItem[] = listUserActionRequests(goal.id).map((a) => ({
+    action_id: a.id,
+    ask: a.description
+      .slice(USER_ACTION_PREFIX.length)
+      .replace(/^[\s:—–-]+/, ""),
+    tick_number: a.tick_number,
+    raised_at: a.created_at,
+  }));
   const openPrs = listGoalPrs(goal.id, 100).filter((pr) => pr.state === "open");
   if (openPrs.length > 0) maybeSyncGoalPrs(goal.id);
   const prRows: PrRow[] = openPrs.map((pr) => ({
@@ -176,6 +185,9 @@ export default async function GoalPage({
           {goalLabel(goal)}
         </h1>
         <div className="order-last flex w-full shrink-0 items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto">
+          {/* Escalations stay visible at every width — they're the one
+              header item that is the user's job, not the agent's. */}
+          <GoalNeedsYouDialog items={needsYou} />
           <div className="hidden lg:contents">
             <GoalContextDialog
               projectSlug={slug}
@@ -245,15 +257,6 @@ function GoalRail({
 }) {
   const snapshots = listMetricSnapshots(goal.id, 400);
   const ticks = listGoalTicks(goal.id, 60);
-  // Open escalations only the user can resolve — pinned above everything.
-  const needsYou: NeedsYouItem[] = listUserActionRequests(goal.id).map((a) => ({
-    action_id: a.id,
-    ask: a.description
-      .slice(USER_ACTION_PREFIX.length)
-      .replace(/^[\s:—–-]+/, ""),
-    tick_number: a.tick_number,
-    raised_at: a.created_at,
-  }));
   const allActions = listGoalActions(goal.id, 100);
   const targetMet = isTargetMet(goal);
   const tickRunning = ticks.some((t) => t.status === "running");
@@ -305,8 +308,6 @@ function GoalRail({
 
   return (
     <div className="flex flex-col gap-5">
-      <GoalNeedsYou items={needsYou} />
-
       {/* Statement */}
       <p className="m-0 text-[12.5px] leading-relaxed text-[hsl(var(--notfair-ink-3))]">
         “{goal.statement}”

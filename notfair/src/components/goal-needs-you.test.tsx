@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GoalNeedsYou } from "@/components/goal-needs-you";
+import { GoalNeedsYouDialog } from "@/components/goal-needs-you";
 
 // Mock at the server-action boundary, per repo test conventions.
 const markHandled = vi.hoisted(() => vi.fn());
@@ -35,15 +35,16 @@ beforeEach(() => {
   refresh.mockReset();
 });
 
-describe("GoalNeedsYou", () => {
-  it("renders nothing when there are no open asks", () => {
-    const { container } = render(<GoalNeedsYou items={[]} />);
+describe("GoalNeedsYouDialog", () => {
+  it("renders no trigger when there are no open asks", () => {
+    const { container } = render(<GoalNeedsYouDialog items={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("lists every ask with its raised context", () => {
-    render(<GoalNeedsYou items={ITEMS} />);
-    expect(screen.getByRole("region", { name: /needs you: 2 actions/i })).toBeInTheDocument();
+  it("shows the badge count and lists every ask on open", () => {
+    render(<GoalNeedsYouDialog items={ITEMS} />);
+    const trigger = screen.getByRole("button", { name: /needs you\s*2/i });
+    fireEvent.click(trigger);
     expect(screen.getByText(/OPENAI_API_KEY/)).toBeInTheDocument();
     expect(screen.getByText(/raised 1h ago · check #43/)).toBeInTheDocument();
     expect(screen.getByText(/Meta app image-upload access/)).toBeInTheDocument();
@@ -51,7 +52,8 @@ describe("GoalNeedsYou", () => {
 
   it("marks an ask handled and refreshes", async () => {
     markHandled.mockResolvedValue({ ok: true });
-    render(<GoalNeedsYou items={ITEMS} />);
+    render(<GoalNeedsYouDialog items={ITEMS} />);
+    fireEvent.click(screen.getByRole("button", { name: /needs you\s*2/i }));
     fireEvent.click(screen.getAllByRole("button", { name: /mark handled/i })[0]!);
     await waitFor(() => expect(markHandled).toHaveBeenCalledWith("a1"));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
