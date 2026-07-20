@@ -122,11 +122,21 @@ describe("humanizeTool", () => {
     );
   });
 
-  it("prettifies namespaced MCP tool names", () => {
+  it("speaks MCP actions in natural language", () => {
     expect(
       humanizeTool("notfair_growth__notfair_googleads__listAdAccounts", null)
         .verb,
-    ).toBe("Called list ad accounts");
+    ).toBe("Listed ad accounts");
+    expect(humanizeTool("posthog.exec", "SELECT count() FROM events")).toEqual({
+      verb: "Ran a query",
+      target: "SELECT count() FROM events",
+    });
+    expect(humanizeTool("mcp__X__updateCampaignBudget", null).verb).toBe(
+      "Updated campaign budget",
+    );
+    expect(humanizeTool("mcp__X__frobnicateWidget", null).verb).toBe(
+      "Called frobnicate widget",
+    );
   });
 });
 

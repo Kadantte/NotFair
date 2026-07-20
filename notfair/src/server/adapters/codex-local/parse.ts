@@ -1,4 +1,5 @@
 import type { HarnessEvent } from "../types";
+import { labelFromArgs } from "../label-args";
 
 /**
  * Codex CLI emits one JSON event per line on stdout when invoked with
@@ -253,16 +254,8 @@ function labelForCodexInput(
     const firstLine = item.command.split("\n")[0];
     return firstLine.length > 160 ? `${firstLine.slice(0, 159)}…` : firstLine;
   }
-  if (!item.arguments) return undefined;
-  const tryKey = (k: string): string | null => {
-    const v = item.arguments?.[k];
-    return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
-  };
-  return (
-    tryKey("file_path") ??
-    tryKey("path") ??
-    tryKey("url") ??
-    tryKey("query") ??
-    undefined
-  );
+  // Broad extraction + compact k=v fallback — every MCP call should carry
+  // a human-scannable label (the SQL text, the URL, the id being acted
+  // on) into the transcript, not just the four keys we used to sample.
+  return labelFromArgs(item.arguments);
 }

@@ -1,4 +1,5 @@
 import type { HarnessEvent } from "../types";
+import { labelFromArgs } from "../label-args";
 
 /**
  * Claude Code emits one JSON object per line on stdout when invoked with
@@ -174,7 +175,10 @@ function labelForToolInput(name: string, input: unknown): string | undefined {
   // URLs
   const url = tryKey("url") ?? tryKey("uri");
   if (url) return url;
-  return undefined;
+  // Everything else (MCP calls especially): broad string-key extraction
+  // plus a compact k=v digest, so no call lands label-less while its
+  // arguments held something scannable.
+  return labelFromArgs(obj);
 }
 
 function shortenPath(p: string): string {

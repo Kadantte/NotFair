@@ -102,12 +102,80 @@ export function humanizeTool(name: string, label: string | null): ToolIntent {
     return { verb: "Fetched URL", target: label ?? undefined };
   if (n === "websearch" || n === "search" || n === "google")
     return { verb: "Searched the web", target: label ?? undefined };
-  // MCP / generic tool — strip namespace prefixes and pretty-print the action.
-  const action = formatToolName(name);
-  return {
-    verb: `Called ${prettifyToolAction(action)}`,
-    target: label ?? undefined,
-  };
+  // MCP / generic tool — strip namespace prefixes and speak the action
+  // in natural language ("Listed ad accounts", "Ran a query", …).
+  return mcpActionIntent(formatToolName(name), label);
+}
+
+/**
+ * Natural-language intent for an MCP/generic action name. The convention
+ * across the catalog is verb-first camelCase (`listAdAccounts`,
+ * `updateCampaignBudget`, `exec`), so the leading token picks the verb
+ * phrase and the rest names the object. Unknown verbs fall back to
+ * "Called <action>" — honest, never wrong.
+ */
+function mcpActionIntent(action: string, label: string | null): ToolIntent {
+  const pretty = prettifyToolAction(action); // e.g. "list ad accounts"
+  const [head = "", ...rest] = pretty.split(" ");
+  const obj = rest.join(" ");
+  const target = label ?? undefined;
+  // SQL-looking labels beat name heuristics: whatever the tool is called,
+  // the user is looking at a query.
+  const sqlish =
+    !!label && /^\s*(select|with|insert|delete\s+from|update\s+\w+\s+set)\b/i.test(label);
+  switch (head.toLowerCase()) {
+    case "exec":
+    case "execute":
+    case "query":
+    case "hogql":
+      return { verb: sqlish ? "Ran a query" : "Ran a command", target };
+    case "run":
+      return { verb: obj ? `Ran ${obj}` : sqlish ? "Ran a query" : "Ran a task", target };
+    case "list":
+      return { verb: obj ? `Listed ${obj}` : "Listed records", target };
+    case "get":
+    case "fetch":
+    case "read":
+      return { verb: obj ? `Fetched ${obj}` : "Fetched data", target };
+    case "search":
+      return { verb: obj ? `Searched ${obj}` : "Searched", target };
+    case "create":
+    case "add":
+      return { verb: obj ? `Created ${obj}` : "Created a record", target };
+    case "update":
+    case "set":
+    case "amend":
+      return { verb: obj ? `Updated ${obj}` : "Updated a record", target };
+    case "delete":
+    case "remove":
+      return { verb: obj ? `Removed ${obj}` : "Removed a record", target };
+    case "enable":
+      return { verb: `Enabled ${obj || "a resource"}`, target };
+    case "pause":
+      return { verb: `Paused ${obj || "a resource"}`, target };
+    case "resume":
+      return { verb: `Resumed ${obj || "a resource"}`, target };
+    case "rename":
+      return { verb: `Renamed ${obj || "a resource"}`, target };
+    case "propose":
+      return { verb: `Proposed ${obj || "a change"}`, target };
+    case "log":
+      return { verb: `Logged ${obj || "a record"}`, target };
+    case "review":
+      return { verb: `Reviewed ${obj || "a record"}`, target };
+    case "register":
+      return { verb: `Registered ${obj || "a record"}`, target };
+    case "backfill":
+      return { verb: `Backfilled ${obj || "history"}`, target };
+    case "verify":
+      return { verb: `Verified ${obj || "a definition"}`, target };
+    case "upload":
+      return { verb: `Uploaded ${obj || "data"}`, target };
+    case "send":
+      return { verb: `Sent ${obj || "a message"}`, target };
+    default:
+      return { verb: `Called ${pretty}`, target };
+  }
 }
 
 const SHELL_WRAPPER_RE =
