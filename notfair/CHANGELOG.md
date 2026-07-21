@@ -1,5 +1,9 @@
 # NotFair
 
+## 0.9.2 — 2026-07-20
+
+**New one-liner everywhere it counts.** npm description, CLI `--help`, and both READMEs now lead with what NotFair actually is: marketing agents that chase your goals 24/7, on your own machine. No code changes.
+
 ## 0.9.1 — 2026-07-20
 
 **Confirming the plan in chat starts the loop — the START button is gone.** Intake used to double-confirm: agree the plan in chat, then press START on the Goal tab. Now your confirmation in chat IS the consent moment — the moment the agent records the agreed target (`propose_target`), the goal goes active and the first check runs immediately.

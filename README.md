@@ -2,7 +2,7 @@
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gVJCRczpps)
 
-**Goal-driven, loop-powered marketing — running on your local machine.**
+**Marketing agents that chase your goals 24/7 — on your own machine.**
 
 Stop babysitting dashboards. State an ambition in plain language:
 
