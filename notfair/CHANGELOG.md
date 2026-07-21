@@ -1,5 +1,9 @@
 # NotFair
 
+## Unreleased
+
+**NotFair now runs in the background — and survives reboots.** `notfair` (or `notfair start`) detaches the server, waits for it to answer, and opens the UI; your terminal stays free and closing it no longer kills the loop. New lifecycle commands: `notfair status` (pid, port, uptime, health), `notfair stop` (finally implemented), and `notfair logs -f` (server log lives at `~/.notfair/logs/server.log`). `notfair autostart enable` installs a macOS LaunchAgent that starts NotFair at login and restarts it if it crashes — launchd becomes the single owner, so `start`/`stop` delegate to it instead of racing it for the port, the agent captures your shell's PATH so `claude`/`codex` stay reachable at login, and `start` self-heals the entry when an upgrade moves the package on disk. `--foreground` keeps the old attached behavior.
+
 ## 0.9.5 — 2026-07-21
 
 **The "Needs you" panel is now the single source of truth for repeated asks.** Agents were told to repeat user-action asks in every check summary, but nothing told them when an ask was closed — so asks you'd already handled kept echoing from summary to summary forever. Every tick brief now mirrors the panel's live list of open escalations: the agent repeats exactly those, and only those. A handled-but-still-broken problem comes back as a fresh escalation with new evidence, so the panel and the diary can never drift apart again.

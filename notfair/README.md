@@ -42,27 +42,41 @@ Run `notfair doctor` to check Node, both harness binaries, the data directory, a
 ```bash
 # One-shot, no install:
 npx notfair@latest doctor      # verify env
-npx notfair@latest             # launch UI on http://127.0.0.1:3327
+npx notfair@latest             # start in the background + open http://127.0.0.1:3327
 
 # Or install globally:
 npm install -g notfair
 notfair
 ```
 
-The UI opens in your browser. Sidebar is project-scoped; create one to start.
+The server runs as a background process (state in `~/.notfair/server.json`, log in `~/.notfair/logs/server.log`) and the UI opens in your browser — your terminal stays free, and closing it doesn't kill the loop. Sidebar is project-scoped; create one to start.
+
+To survive reboots, enable autostart (macOS):
+
+```bash
+notfair autostart enable    # launchd: starts at login, restarts on crash
+```
 
 ## CLI
 
 ```
-notfair                 Launch local server + open UI (default)
-notfair start           Same as above
-notfair doctor          Run preflight checks (see below)
+notfair                    Start in the background + open UI (default)
+notfair start              Same as above (--foreground to stay attached)
+notfair status             Running? pid, port, uptime, autostart state
+notfair stop               Stop the background server
+notfair logs [-n N] [-f]   Show / follow the server log
+notfair autostart enable   Start automatically at login (macOS launchd)
+notfair autostart disable  Remove the LaunchAgent + stop the server
+notfair autostart status   Is the LaunchAgent installed and loaded?
+notfair doctor             Run preflight checks (see below)
 notfair --version
 notfair --help
 ```
 
-Options on `start`: `--port <n>` (default 3327), `--no-open`, `--data-dir <path>`.
+Options on `start`: `--port <n>` (default 3327), `--no-open`, `--foreground`, `--data-dir <path>`.
 Options on `doctor`: `--port <n>`, `--data-dir <path>`.
+
+When autostart is enabled, launchd owns the server: `notfair start` delegates to it (never spawns a competing copy), `notfair stop` stops it until your next login, and `notfair autostart disable` removes it entirely. The LaunchAgent captures your shell's PATH so the `claude` / `codex` binaries stay reachable at login, and `notfair start` self-heals the entry if an upgrade moved the package on disk. Global install is recommended for autostart — the npx cache can be cleared at any time.
 
 `doctor` checks Node ≥ 20 (24 recommended), Claude Code on PATH, Codex on PATH, at least one harness ready, a writable data directory, and a free preferred port. It exits 0 if every check is passing and 1 otherwise, with a `Fix:` line under each failure naming the exact command to run.
 

@@ -80,8 +80,12 @@ notfair
 ```
 
 ```
-notfair                 Launch local server + open UI (default)
-notfair start           Same, with --port <n>, --no-open, --data-dir <path>
+notfair                 Start in the background + open UI (default)
+notfair start           Same, with --port <n>, --no-open, --foreground, --data-dir <path>
+notfair status          Running? pid, port, uptime, autostart state
+notfair stop            Stop the background server
+notfair logs            Show / follow the server log (-n N, -f)
+notfair autostart       enable | disable | status — start at login (macOS launchd)
 notfair doctor          Preflight checks with a Fix: line per failure
 ```
 
