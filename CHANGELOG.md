@@ -11,6 +11,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.9] — 2026-07-21
+
+### Fixed
+
+- **`--no-open` is honored on macOS and Windows in the content-calendar viewer.** An operator-precedence bug in the auto-open guard meant the two platforms where auto-open actually fires never consulted the flag; the guard is now an explicit helper with unit tests. Contributed by @Osamaali313 (#92).
+
+---
+
 ## [0.25.8] — 2026-07-21
 
 ### Added — ten new SEO skills (local, international, technical, commerce, off-page)
