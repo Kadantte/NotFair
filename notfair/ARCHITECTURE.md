@@ -74,7 +74,8 @@ USER'S MACHINE
    disposable; the DB is the loop's memory.
 4. One adapter turn runs on a `tick-<n>` session; every event persists to
    `transcript_events`; the result lands as a `goal_ticks` diary row the
-   dashboard renders (and links to the full transcript).
+   dashboard renders. Opening that row resumes the same chat session, so a
+   completed check remains available for follow-up turns in its original context.
 
 Chat turns hit the same agent through `/api/chat` — same identity, same
 rules; anything decided in chat that future ticks must know is written to
