@@ -77,13 +77,19 @@ export async function POST() {
         // is still the old one (we're still running) — but `latest` from
         // the registry should now match what we just installed.
         const latest = await getLatestVersion(true);
+        // launchd/daemon servers can restart themselves via /api/restart;
+        // foreground and dev runs belong to the user's terminal.
+        const managed = process.env.NOTFAIR_MANAGED ?? null;
+        const canRestart = managed === "launchd" || managed === "daemon";
         resolve(
           NextResponse.json({
             ok: true,
             installed_version: latest ?? null,
             running_version: getCurrentVersion(),
-            note:
-              "Upgraded. Restart NotFair to load the new version (`notfair` in your terminal).",
+            can_restart: canRestart,
+            note: canRestart
+              ? "Upgraded — restarting loads the new version."
+              : "Upgraded. Restart NotFair to load the new version (`notfair` in your terminal).",
             elapsed_ms,
             stdout_tail: stdout.slice(-1000),
           }),

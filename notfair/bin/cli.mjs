@@ -99,6 +99,11 @@ program
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
       NOTFAIR_DATA_DIR: opts.dataDir,
+      // Tells the server who supervises it, so /api/restart knows whether
+      // an in-app "Restart now" is safe (launchd flows through untouched).
+      NOTFAIR_MANAGED: opts.foreground
+        ? process.env.NOTFAIR_MANAGED ?? "foreground"
+        : "daemon",
     };
 
     if (opts.foreground) {
@@ -335,6 +340,78 @@ program
     process.exit(failed === 0 ? 0 : 1);
   });
 
+program
+  .command("update")
+  .description("Update NotFair to the latest npm version and restart the running server.")
+  .option("--data-dir <dir>", "Override data directory", (dir) => resolve(dir), DATA_DIR)
+  .action(async (opts) => {
+    const current = readPackageVersion();
+    const latest = await fetchLatestVersion();
+    if (!latest) {
+      console.error("Could not reach the npm registry — are you online?");
+      process.exit(1);
+    }
+    if (!isVersionNewer(latest, current)) {
+      console.log(`Already on the latest version (v${current}).`);
+      return;
+    }
+    console.log(`Update available: v${current} → v${latest}`);
+
+    // A source checkout can't be updated by npm — don't pave over it.
+    if (existsSync(join(PKG_ROOT, "src")) && existsSync(join(PKG_ROOT, "next.config.ts"))) {
+      console.log("You're running from source. Update with: git pull && pnpm install && pnpm build");
+      process.exit(1);
+    }
+
+    console.log(`Installing notfair@${latest} globally…`);
+    const installed = await runInherit("npm", ["install", "-g", `notfair@${latest}`]);
+    if (!installed) {
+      console.error("npm install failed. Try it directly: npm install -g notfair@latest");
+      process.exit(1);
+    }
+    const newCli = await globalCliPath();
+    if (PKG_ROOT.includes(`${sep}_npx${sep}`) && newCli) {
+      console.log("Installed globally — run future commands as plain `notfair`.");
+    }
+
+    // Restart whatever is running so the new version actually loads.
+    if (process.platform === "darwin" && existsSync(plistPath())) {
+      const cfg = readPlistConfig();
+      const port = cfg?.port ?? 3327;
+      if (newCli) {
+        writeFileSync(plistPath(), renderPlist(port, cfg?.dataDir ?? DATA_DIR, newCli));
+      }
+      await reloadLaunchAgent();
+      const url = `http://127.0.0.1:${port}`;
+      const healthy = await waitFor(() => isHealthy(url), 30_000, 500);
+      console.log(
+        healthy
+          ? `Updated to v${latest} — NotFair restarted on ${url}.`
+          : `Updated to v${latest}, but the restart hasn't answered yet — check \`notfair status\`.`,
+      );
+      return;
+    }
+
+    const state = getState(opts.dataDir);
+    if (state && isPidAlive(state.pid)) {
+      if (!newCli) {
+        console.log(`Updated to v${latest}. Restart to apply: notfair stop && notfair start`);
+        return;
+      }
+      console.log("Restarting the background server…");
+      try {
+        process.kill(state.pid, "SIGTERM");
+      } catch {}
+      await waitFor(() => !isPidAlive(state.pid), 10_000);
+      clearState(opts.dataDir);
+      const args = [newCli, "start", "--no-open", "--port", String(state.port), "--data-dir", state.data_dir ?? opts.dataDir];
+      const ok = await runInherit(process.execPath, args);
+      process.exit(ok ? 0 : 1);
+    }
+
+    console.log(`Updated to v${latest}. Start it with: notfair start`);
+  });
+
 const autostart = program
   .command("autostart")
   .description("Start NotFair automatically at login (macOS launchd).");
@@ -498,6 +575,55 @@ function formatUptime(startedAt) {
   return ` (up ${Math.floor(h / 24)}d)`;
 }
 
+// --- update helpers ---
+
+async function fetchLatestVersion() {
+  try {
+    const res = await fetch("https://registry.npmjs.org/notfair/latest", {
+      signal: AbortSignal.timeout(5_000),
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.version === "string" ? data.version : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when `a` is strictly newer than `b` by major.minor.patch. */
+function isVersionNewer(a, b) {
+  const parse = (v) => v.split(/[-+]/)[0].split(".").map((n) => Number(n) || 0);
+  const [amaj, amin, apat] = parse(a);
+  const [bmaj, bmin, bpat] = parse(b);
+  if (amaj !== bmaj) return amaj > bmaj;
+  if (amin !== bmin) return amin > bmin;
+  return apat > bpat;
+}
+
+/** The freshly-installed global CLI — stable across upgrades, unlike npx cache paths. */
+async function globalCliPath() {
+  const r = await runCheck("npm", ["root", "-g"], 15_000);
+  if (!r.ok) return null;
+  const cli = join(r.stdout.trim(), "notfair", "bin", "cli.mjs");
+  return existsSync(cli) ? cli : null;
+}
+
+/** Run a command with inherited stdio; true on exit 0. */
+function runInherit(cmd, args) {
+  return new Promise((resolvePromise) => {
+    let child;
+    try {
+      child = spawn(cmd, args, { stdio: "inherit" });
+    } catch {
+      resolvePromise(false);
+      return;
+    }
+    child.on("error", () => resolvePromise(false));
+    child.on("close", (code) => resolvePromise(code === 0));
+  });
+}
+
 // --- launchd helpers (macOS autostart) ---
 
 function requireDarwin() {
@@ -545,10 +671,10 @@ function xmlEscape(s) {
  * crash). PATH is captured from the enabling shell — launchd's default PATH
  * would hide the claude/codex binaries the agents need.
  */
-function renderPlist(port, dataDir) {
+function renderPlist(port, dataDir, cliPath = CLI_PATH) {
   const args = [
     process.execPath,
-    CLI_PATH,
+    cliPath,
     "start",
     "--foreground",
     "--no-open",

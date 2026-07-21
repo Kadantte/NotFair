@@ -1,5 +1,11 @@
 # NotFair
 
+## Unreleased
+
+**`notfair update` — one command from "there's a newer version" to running it.** Checks npm, installs globally, and restarts whatever is running: launchd-managed servers restart through the (freshly rewritten) LaunchAgent, background daemons are stopped and relaunched on the same port and data dir, and source checkouts are pointed at `git pull && pnpm build` instead of being paved over.
+
+**In-app updates actually work now — and finish with one click.** The sidebar's update check had been dead since the rebrand: it asked the npm registry for `NotFair`, but the registry is case-sensitive and the package is `notfair`, so the "update available" button never appeared. Fixed — and upgraded: after installing an update, background and launchd-managed servers now show **Restart now**, restart themselves, and reload the page on the new version. No more "go restart it in your terminal" (that note remains only for foreground/dev runs, which the app never kills).
+
 ## 0.9.6 — 2026-07-21
 
 **NotFair now runs in the background — and survives reboots.** `notfair` (or `notfair start`) detaches the server, waits for it to answer, and opens the UI; your terminal stays free and closing it no longer kills the loop. New lifecycle commands: `notfair status` (pid, port, uptime, health), `notfair stop` (finally implemented), and `notfair logs -f` (server log lives at `~/.notfair/logs/server.log`). `notfair autostart enable` installs a macOS LaunchAgent that starts NotFair at login and restarts it if it crashes — launchd becomes the single owner, so `start`/`stop` delegate to it instead of racing it for the port, the agent captures your shell's PATH so `claude`/`codex` stay reachable at login, and `start` self-heals the entry when an upgrade moves the package on disk. `--foreground` keeps the old attached behavior.

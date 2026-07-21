@@ -65,6 +65,7 @@ notfair start              Same as above (--foreground to stay attached)
 notfair status             Running? pid, port, uptime, autostart state
 notfair stop               Stop the background server
 notfair logs [-n N] [-f]   Show / follow the server log
+notfair update             Update to the latest npm version + restart the server
 notfair autostart enable   Start automatically at login (macOS launchd)
 notfair autostart disable  Remove the LaunchAgent + stop the server
 notfair autostart status   Is the LaunchAgent installed and loaded?
@@ -75,6 +76,8 @@ notfair --help
 
 Options on `start`: `--port <n>` (default 3327), `--no-open`, `--foreground`, `--data-dir <path>`.
 Options on `doctor`: `--port <n>`, `--data-dir <path>`.
+
+**Updating.** `notfair update` checks npm, installs the newer version globally, and restarts whatever is running — through launchd when autostart is enabled (rewriting the LaunchAgent to the fresh install), or by stopping and relaunching the background daemon. The app has the same flow built in: the sidebar footer shows the running version, an "✨ vX.Y.Z available" button appears when npm has a newer release, and clicking it installs the update and then offers **Restart now** — the server restarts itself (launchd- and daemon-managed runs) and the page reloads on the new version. Foreground/dev runs are never killed from the app; they get a "restart in your terminal" note instead.
 
 When autostart is enabled, launchd owns the server: `notfair start` delegates to it (never spawns a competing copy), `notfair stop` stops it until your next login, and `notfair autostart disable` removes it entirely. The LaunchAgent captures your shell's PATH so the `claude` / `codex` binaries stay reachable at login, and `notfair start` self-heals the entry if an upgrade moved the package on disk. Global install is recommended for autostart — the npx cache can be cleared at any time.
 

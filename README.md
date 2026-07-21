@@ -85,6 +85,7 @@ notfair start           Same, with --port <n>, --no-open, --foreground, --data-d
 notfair status          Running? pid, port, uptime, autostart state
 notfair stop            Stop the background server
 notfair logs            Show / follow the server log (-n N, -f)
+notfair update          Update to the latest npm version + restart the server
 notfair autostart       enable | disable | status — start at login (macOS launchd)
 notfair doctor          Preflight checks with a Fix: line per failure
 ```
