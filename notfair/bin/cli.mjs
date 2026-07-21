@@ -13,7 +13,7 @@ import {
   unlinkSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import { Command } from "commander";
@@ -21,12 +21,15 @@ import open from "open";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = dirname(__dirname);
-const DATA_DIR = process.env.NOTFAIR_DATA_DIR ?? join(homedir(), ".notfair");
+// Resolved to absolute: the value is forwarded as NOTFAIR_DATA_DIR to the
+// standalone server, whose cwd is the package dir — a relative path would
+// silently land the database inside the npm/npx cache.
+const DATA_DIR = resolve(process.env.NOTFAIR_DATA_DIR ?? join(homedir(), ".notfair"));
 
 const program = new Command();
 program
   .name("notfair")
-  .description("Local AI marketing CMO portal. Orchestrates OpenClaw marketing agents.")
+  .description("Goal-driven marketing agents on your machine, on top of Claude Code or Codex.")
   .version(readPackageVersion());
 
 program
@@ -34,7 +37,7 @@ program
   .description("Start the local server and open the UI in your browser.")
   .option("-p, --port <port>", "Port to bind", "3327")
   .option("--no-open", "Do not auto-open the browser")
-  .option("--data-dir <dir>", "Override data directory", DATA_DIR)
+  .option("--data-dir <dir>", "Override data directory", (dir) => resolve(dir), DATA_DIR)
   .action(async (opts) => {
     const desired = Number.parseInt(opts.port, 10);
     const port = await findFreePort(desired);
@@ -87,7 +90,7 @@ program
 program
   .command("doctor")
   .description("Verify this machine is ready to run NotFair.")
-  .option("--data-dir <dir>", "Override data directory", DATA_DIR)
+  .option("--data-dir <dir>", "Override data directory", (dir) => resolve(dir), DATA_DIR)
   .option("-p, --port <port>", "Preferred port for the server", "3327")
   .action(async (opts) => {
     const results = [];

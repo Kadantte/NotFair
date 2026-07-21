@@ -1,6 +1,6 @@
 {
   "name": "notfair",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Open-source AI marketing CMO portal. Run locally; orchestrates marketing agents (Google Ads, SEO, and more) on top of Claude Code, Codex, or other local AI coding agents.",
   "license": "MIT",
   "bin": {
@@ -16,7 +16,7 @@
     "dev": "next dev --turbopack -p 3326",
     "build": "next build && node scripts/copy-standalone-assets.mjs",
     "start": "next start",
-    "cli": "tsx bin/cli.ts",
+    "cli": "node bin/cli.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
