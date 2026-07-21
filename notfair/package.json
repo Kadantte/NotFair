@@ -19,7 +19,8 @@
     "cli": "node bin/cli.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@next/env": "16.2.6",
@@ -58,6 +59,7 @@
     "@types/react-dom": "^19.0.0",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "4.1.10",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.2.6",
     "jsdom": "^29.1.1",
