@@ -318,22 +318,24 @@ export type ProposeTargetInput = {
 };
 
 /**
- * Agent proposal: record the suggested target/cadence/envelope on a
- * `proposed` goal. Does NOT start the loop — that consent belongs to the
- * user, who clicks "Start the loop" (startGoalLoop) on the Goal tab.
+ * The user's confirmation, recorded from chat: target/cadence/envelope
+ * land on the `proposed` goal and the loop goes live in the same step —
+ * proposed → active with the first heartbeat scheduled. The caller fires
+ * an immediate first tick.
  */
 export function proposeTarget(id: string, input: ProposeTargetInput): Goal | null {
   const goal = getGoal(id);
   if (!goal || goal.status !== "proposed") return null;
   const cadence = input.cadence_cron ?? goal.cadence_cron;
-  if (!computeNextTick(cadence)) {
+  const nextTick = computeNextTick(cadence);
+  if (!nextTick) {
     throw new Error(`Invalid cadence cron expression: '${cadence}'`);
   }
   getDb()
     .prepare(
       `UPDATE goals
           SET target_value = ?, mode = ?, deadline = ?, spend_envelope_usd = ?,
-              cadence_cron = ?, updated_at = ?
+              cadence_cron = ?, status = 'active', next_tick_at = ?, updated_at = ?
         WHERE id = ? AND status = 'proposed'`,
     )
     .run(
@@ -342,27 +344,10 @@ export function proposeTarget(id: string, input: ProposeTargetInput): Goal | nul
       input.deadline ?? goal.deadline,
       input.spend_envelope_usd ?? goal.spend_envelope_usd,
       cadence,
+      nextTick,
       now(),
       id,
     );
-  return getGoal(id);
-}
-
-/**
- * The user's click: proposed (with a target on record) → active. Computes
- * the first heartbeat; the caller fires an immediate first tick.
- */
-export function startGoalLoop(id: string): Goal | null {
-  const goal = getGoal(id);
-  if (!goal || goal.status !== "proposed" || goal.target_value === null) return null;
-  const nextTick = computeNextTick(goal.cadence_cron);
-  if (!nextTick) throw new Error(`Invalid cadence cron expression: '${goal.cadence_cron}'`);
-  getDb()
-    .prepare(
-      `UPDATE goals SET status = 'active', next_tick_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'proposed'`,
-    )
-    .run(nextTick, now(), id);
   return getGoal(id);
 }
 

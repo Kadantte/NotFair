@@ -121,7 +121,7 @@ export function NewGoalForm({
       <div className="flex items-center justify-between gap-3">
         <p className="m-0 text-[12px] text-[hsl(var(--notfair-ink-4))]">
           An agent takes it from here: it turns this into a measured metric,
-          shows you the baseline, and nothing runs until you press START.
+          shows you the baseline, and nothing runs until you confirm the plan.
         </p>
         <Button onClick={submit} disabled={pending || !statement.trim()}>
           {pending ? "Creating…" : "Create goal"}

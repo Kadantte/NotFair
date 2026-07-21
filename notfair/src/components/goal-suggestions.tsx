@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 /**
  * Suggested-goal cards minted from a mechanical audit of a connected ads
  * account. Accepting one runs the normal statement-first flow: a goal
- * agent spins up, verifies the metric, and nothing spends until START.
+ * agent spins up, verifies the metric, and nothing spends until the user
+ * confirms the plan.
  */
 export function GoalSuggestionCard({
   suggestion,
@@ -75,7 +76,7 @@ export function GoalSuggestionCard({
       </p>
       <div className="mt-1 flex items-center justify-between gap-3">
         <p className="m-0 text-[11.5px] text-[hsl(var(--notfair-ink-4))]">
-          An agent verifies the numbers first — nothing runs until you press START.
+          An agent verifies the numbers first — nothing runs until you confirm the plan in chat.
         </p>
         <Button size="sm" onClick={accept} disabled={pending}>
           {pending ? "Creating…" : "Create this goal"}

@@ -42,7 +42,7 @@ type GroupKey = "setup" | "running" | "paused" | "achieved" | "failed" | "closed
 /**
  * Board columns. Intake and proposed share a column — both are "the goal
  * isn't running yet"; the card chip tells them apart (and flags the one
- * that's waiting on the user's START). The three terminal states each get
+ * waiting on the user's confirm in chat). The three terminal states each get
  * their own column so an achieved goal reads as a win, not just "gone".
  */
 const GROUPS: Array<{
@@ -192,7 +192,7 @@ function GoalCard({ goal }: { goal: BoardGoal }) {
       </div>
 
       {goal.status === "proposed" && (
-        <span className="ns-tag-accent mt-1.5 inline-block">ready to start</span>
+        <span className="ns-tag-accent mt-1.5 inline-block">confirm the plan in chat</span>
       )}
       {goal.status === "intake" && (
         <span className="ns-tag mt-1.5 inline-block">defining metric</span>

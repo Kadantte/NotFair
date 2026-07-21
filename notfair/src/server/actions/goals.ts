@@ -12,7 +12,6 @@ import {
   reviewGoalAction,
   setGoalPinned,
   setGoalStatus,
-  startGoalLoop,
   USER_ACTION_PREFIX,
 } from "@/server/db/goals";
 import { cascadeDeleteAgentArtifacts } from "@/server/agents/cascade-delete";
@@ -106,29 +105,6 @@ export async function createGoalAgentAction(input: {
     goal_id: goal.id,
     agent_slug: urlSlug,
   };
-}
-
-/**
- * The user's START click — the platform-enforced consent that begins the
- * loop. Fires the first tick immediately so the user watches it work
- * rather than waiting for tomorrow's heartbeat.
- */
-export async function startGoalLoopAction(goal_id: string): Promise<GoalActionResult> {
-  const goal = getGoal(goal_id);
-  if (!goal) return { ok: false, error: "Goal not found." };
-  if (goal.status !== "proposed" || goal.target_value === null) {
-    return {
-      ok: false,
-      error: "The goal isn't ready to start — agree a target with the agent in chat first.",
-    };
-  }
-  const started = startGoalLoop(goal_id);
-  if (!started) return { ok: false, error: "Could not start the loop." };
-  void runGoalTick(started, "manual").catch((err) =>
-    console.error("[goal-tick] first tick failed:", err),
-  );
-  revalidatePath("/", "layout");
-  return { ok: true, goal_id: started.id };
 }
 
 export async function pauseGoalAction(goal_id: string): Promise<GoalActionResult> {

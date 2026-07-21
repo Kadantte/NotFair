@@ -15,7 +15,7 @@ import { createGoalAgentAction, type GoalActionResult } from "@/server/actions/g
 /**
  * Accept a suggestion: mint the goal from its statement (the normal
  * statement-first flow — the agent still verifies the metric and the
- * user still presses START) and retire the card.
+ * user still confirms the plan in chat) and retire the card.
  */
 export async function acceptSuggestionAction(id: string): Promise<GoalActionResult> {
   const suggestion = getSuggestion(id);

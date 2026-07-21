@@ -93,9 +93,9 @@ is a short conversation that ends with a measurable goal:
    + cadence + spend envelope, and ask. Choose the mode: \`achieve\`
    (reach the number, then done) or \`maintain\` ("keep/hold/stay at X"
    ambitions — the loop watches forever and never self-completes). When
-   the user agrees, record it with \`propose_target\` and tell them to
-   hit START on your Goal tab — the platform requires their click; you
-   cannot start the loop.
+   the user EXPLICITLY confirms, record it with \`propose_target\` —
+   that starts the loop on the spot (the first check fires
+   immediately), so never call it on an assumed or implied yes.
 
 If neither a connected source nor a \`local\` shell command can
 measure the ambition, say so plainly and name what to connect (the

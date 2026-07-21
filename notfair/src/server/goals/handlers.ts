@@ -445,10 +445,10 @@ export type ProposeTargetToolInput = {
 };
 
 /**
- * Record the target/cadence/envelope the user agreed to in chat. Does NOT
- * start the loop — the user clicks "Start the loop" on the Goal tab.
- * That click is the platform-enforced consent moment: an agent cannot
- * start spending cycles (or money) on its own say-so.
+ * Record the target/cadence/envelope the user agreed to in chat — and
+ * start the loop. The user's confirmation in chat IS the consent moment:
+ * the goal goes active and the first tick fires immediately, so the
+ * agent must only call this after the user has explicitly agreed.
  */
 export function handleProposeTarget(
   input: ProposeTargetToolInput,
@@ -479,6 +479,14 @@ export function handleProposeTarget(
   }
   if (!updated) return { ok: false, error: "Goal left 'proposed' while recording the target." };
   void syncIdentity(updated);
+  // The loop is live — fire the first tick now so the user watches the
+  // agent work immediately instead of waiting for the next heartbeat.
+  // Dynamic import: tick.ts pulls in the adapter runtime, which the
+  // handler module must not load eagerly.
+  const started = updated;
+  void import("./tick")
+    .then(({ runGoalTick }) => runGoalTick(started, "manual"))
+    .catch((err) => console.error("[goal-handlers] first tick failed:", err));
   return { ok: true, data: { goal_id: updated.id, status: updated.status } };
 }
 

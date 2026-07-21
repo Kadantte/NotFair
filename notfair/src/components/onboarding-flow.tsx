@@ -625,7 +625,7 @@ function FirstGoalStep({
         <h1 className="ns-hero-title">Create your first goal.</h1>
         <p className="ns-hero-sub">
           Pick a focus, state the ambition. An agent measures it, shows you
-          the baseline, and waits for your START.
+          the baseline, and waits for your go-ahead.
         </p>
       </header>
 

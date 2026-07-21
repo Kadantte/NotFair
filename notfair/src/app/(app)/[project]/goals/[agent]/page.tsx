@@ -35,7 +35,6 @@ import { cadenceLabel } from "@/lib/goal-cadence";
 import { cn } from "@/lib/utils";
 import { LiveTranscript } from "@/components/live-transcript";
 import { GoalControls } from "@/components/goal-controls";
-import { GoalStartButton } from "@/components/goal-start-button";
 import { GoalAutoRefresh } from "@/components/goal-auto-refresh";
 import { GoalProgressChart } from "@/components/goal-progress-chart";
 import { GoalMetricCard, type MetricVariant } from "@/components/goal-metric-card";
@@ -78,7 +77,7 @@ function fmtClock(iso: string): string {
 
 const STATUS_CHIP: Record<Goal["status"], string> = {
   intake: "setting up",
-  proposed: "ready to start",
+  proposed: "confirm the plan",
   active: "running",
   paused: "paused",
   achieved: "achieved",
@@ -168,12 +167,11 @@ export default async function GoalPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Every pre-terminal state before START changes server-side via
-          agent tool calls: intake verifies the metric (→ proposed), and a
-          proposed goal's target lands via propose_target — which is what
-          makes the START button appear. Without polling `proposed`, the
-          user is told "press START" but the button never renders until a
-          manual reload. */}
+      {/* Every pre-terminal state changes server-side via agent tool
+          calls: intake verifies the metric (→ proposed), and the user's
+          confirmation in chat lands via propose_target (→ active, first
+          check running). Without polling, the rail keeps showing the
+          previous stage until a manual reload. */}
       {(goal.status === "intake" ||
         goal.status === "proposed" ||
         goal.status === "active") && <GoalAutoRefresh intervalMs={8000} />}
@@ -378,40 +376,20 @@ function GoalDashboard({
 
       {goal.status === "proposed" && (
         <RailCard>
-          {goal.target_value !== null ? (
-            <>
-              <p className="m-0 mb-3 text-[12.5px] leading-relaxed">
-                Baseline <b className="tabular-nums">{formatMetric(goal.baseline_value)}</b>,
-                verified against{" "}
-                <span className="font-mono text-[11px]">{goal.metric_source_key}</span>{" "}
-                <MetricMethodDialog
-                  name={goal.metric_name ?? "Metric"}
-                  sourceKey={goal.metric_source_key}
-                  sourceTool={goal.metric_source_tool}
-                  argsJson={goal.metric_source_args_json}
-                  direction={goal.metric_direction}
-                />
-                . The plan is agreed — the loop starts when you press START,
-                and the first check runs immediately.
-              </p>
-              <dl className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
-                <RailStat k="Target" v={`${formatMetric(goal.target_value)}${goal.mode === "maintain" ? " (hold)" : ""}`} />
-                <RailStat k="Heartbeat" v={cadenceLabel(goal.cadence_cron)} />
-                <RailStat k="Deadline" v={goal.deadline ? fmtDate(goal.deadline) : "none"} />
-                <RailStat
-                  k="Spend cap"
-                  v={goal.spend_envelope_usd !== null ? `$${goal.spend_envelope_usd}` : "none"}
-                />
-              </dl>
-              <GoalStartButton goalId={goal.id} />
-            </>
-          ) : (
-            <p className="m-0 text-[12.5px] leading-relaxed">
-              Metric verified — baseline{" "}
-              <b className="tabular-nums">{formatMetric(goal.baseline_value)}</b>. Agree the
-              target in chat and the START button appears here.
-            </p>
-          )}
+          <p className="m-0 text-[12.5px] leading-relaxed">
+            Baseline <b className="tabular-nums">{formatMetric(goal.baseline_value)}</b>,
+            verified against{" "}
+            <span className="font-mono text-[11px]">{goal.metric_source_key}</span>{" "}
+            <MetricMethodDialog
+              name={goal.metric_name ?? "Metric"}
+              sourceKey={goal.metric_source_key}
+              sourceTool={goal.metric_source_tool}
+              argsJson={goal.metric_source_args_json}
+              direction={goal.metric_direction}
+            />
+            . Agree the target in chat — the moment you confirm, the loop
+            starts and the first check runs.
+          </p>
         </RailCard>
       )}
 
@@ -560,15 +538,6 @@ function SupportMetricItem({ metric }: { metric: GoalSupportMetric }) {
           />
         </div>
       )}
-    </div>
-  );
-}
-
-function RailStat({ k, v }: { k: string; v: string }) {
-  return (
-    <div>
-      <dt className="text-[hsl(var(--notfair-ink-4))]">{k}</dt>
-      <dd className="m-0 font-medium tabular-nums">{v}</dd>
     </div>
   );
 }
