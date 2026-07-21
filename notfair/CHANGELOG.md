@@ -1,6 +1,6 @@
 # NotFair
 
-## Unreleased
+## 0.9.6 — 2026-07-21
 
 **NotFair now runs in the background — and survives reboots.** `notfair` (or `notfair start`) detaches the server, waits for it to answer, and opens the UI; your terminal stays free and closing it no longer kills the loop. New lifecycle commands: `notfair status` (pid, port, uptime, health), `notfair stop` (finally implemented), and `notfair logs -f` (server log lives at `~/.notfair/logs/server.log`). `notfair autostart enable` installs a macOS LaunchAgent that starts NotFair at login and restarts it if it crashes — launchd becomes the single owner, so `start`/`stop` delegate to it instead of racing it for the port, the agent captures your shell's PATH so `claude`/`codex` stay reachable at login, and `start` self-heals the entry when an upgrade moves the package on disk. `--foreground` keeps the old attached behavior.
 
