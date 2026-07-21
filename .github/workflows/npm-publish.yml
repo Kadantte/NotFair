@@ -24,9 +24,6 @@ jobs:
     defaults:
       run:
         working-directory: notfair
-    env:
-      # notfair/.npmrc reads ${NPM_TOKEN}; npm hard-errors if it's unset.
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -34,9 +31,13 @@ jobs:
         with:
           version: 10
 
+      # registry-url makes setup-node write an ~/.npmrc that reads
+      # NODE_AUTH_TOKEN — notfair/.npmrc is gitignored, so it cannot
+      # carry the auth wiring in CI.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
 
       - name: Skip if this version is already on npm
         id: version
@@ -68,3 +69,5 @@ jobs:
       - name: Publish ${{ steps.version.outputs.local }}
         if: steps.version.outputs.skip != 'true'
         run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
