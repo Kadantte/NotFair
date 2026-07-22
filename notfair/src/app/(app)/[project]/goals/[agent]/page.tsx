@@ -185,7 +185,11 @@ export default async function GoalPage({
         <div className="order-last flex w-full shrink-0 items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto">
           {/* Escalations stay visible at every width — they're the one
               header item that is the user's job, not the agent's. */}
-          <GoalNeedsYouDialog items={needsYou} />
+          <GoalNeedsYouDialog
+            items={needsYou}
+            projectSlug={slug}
+            agentSlug={agentSlug}
+          />
           <div className="hidden lg:contents">
             <GoalContextDialog
               projectSlug={slug}
@@ -435,13 +439,8 @@ function GoalDashboard({
                     key="cadence"
                     className="mt-1.5 mb-0 text-[11px] leading-relaxed text-[hsl(var(--notfair-ink-4))]"
                   >
-                    {cadenceLabel(goal.cadence_cron)} · next check{" "}
-                    {goal.status === "active" && goal.next_tick_at
-                      ? tickRunning
-                        ? "running now"
-                        : `${timeUntil(goal.next_tick_at)} (${fmtClock(goal.next_tick_at)})`
-                      : "—"}{" "}
-                    · {goal.tick_count} check{goal.tick_count === 1 ? "" : "s"} so far
+                    {cadenceLabel(goal.cadence_cron)} · {goal.tick_count} check
+                    {goal.tick_count === 1 ? "" : "s"} so far
                     {goal.spend_envelope_usd !== null &&
                       ` · spent $${loggedSpendTotal(goal.id)} of $${goal.spend_envelope_usd}`}
                   </p>
@@ -472,7 +471,23 @@ function GoalDashboard({
             </RailSection>
           )}
 
-          <RailSection title="Checks" count={goal.tick_count}>
+          <RailSection
+            title="Checks"
+            count={goal.tick_count}
+            meta={
+              goal.status === "active"
+                ? tickRunning
+                  ? "running now"
+                  : goal.next_tick_at
+                    ? (
+                        <span title={`Scheduled for ${fmtClock(goal.next_tick_at)}`}>
+                          next check {timeUntil(goal.next_tick_at)}
+                        </span>
+                      )
+                    : "next check —"
+                : undefined
+            }
+          >
             {checkRows.length === 0 ? (
               <p className="m-0 text-[12px] text-[hsl(var(--notfair-ink-4))]">
                 None yet — the first runs{" "}

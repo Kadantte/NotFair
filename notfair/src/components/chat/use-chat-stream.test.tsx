@@ -97,20 +97,21 @@ it("exposes initial events, derives remote-turn state, and clears the local view
   expect(result.current.openTurn).toBeNull();
 });
 
-it("polls, advances the cursor, and deduplicates by id and content signature", async () => {
+it("polls, advances the cursor, and only deduplicates durable event ids", async () => {
   vi.useFakeTimers();
   const original: TranscriptEvent = { kind: "assistant_text", id: "one", ts: 1, body: "same" };
+  const repeated: TranscriptEvent = { kind: "assistant_text", id: "two", ts: 2, body: "same" };
   const fresh: TranscriptEvent = { kind: "assistant_text", id: "three", ts: 3, body: "fresh" };
   vi.mocked(fetch).mockResolvedValue(
     pollResponse([
       original,
-      { ...original, id: "two", ts: 2 },
+      repeated,
       fresh,
     ], 3) as never,
   );
   const { result } = renderHook(() => useChatStream({ ...base, initialEvents: [original], initialCursor: 1 }));
   await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
-  expect(result.current.events).toEqual([original, fresh]);
+  expect(result.current.events).toEqual([original, repeated, fresh]);
   expect(fetch).toHaveBeenCalledWith(
     "/api/agents/goal-1/threads/main/transcript?offset=1&project=acme%20co",
     { cache: "no-store" },

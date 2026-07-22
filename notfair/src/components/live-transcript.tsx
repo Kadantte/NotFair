@@ -16,7 +16,7 @@ import {
 } from "@/components/chat/messages";
 import {
   collapseEvents,
-  toolGroupKey,
+  nextToolGroupKey,
 } from "@/components/chat/transcript-model";
 import { useChatStream } from "@/components/chat/use-chat-stream";
 import type { McpCatalogEntryLite } from "@/components/chat/tool-intent";
@@ -245,7 +245,7 @@ export function LiveTranscript({
                 </li>
               )}
               {pendingTools.length > 0 && (
-                <li key={toolGroupKey(pendingTools[0]!.toolCallId)}>
+                <li key={nextToolGroupKey(rendered, pendingTools[0]!.toolCallId)}>
                   <ToolGroup tools={pendingTools} mcpCatalog={mcpCatalog} />
                 </li>
               )}

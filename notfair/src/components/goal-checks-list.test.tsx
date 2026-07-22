@@ -67,7 +67,7 @@ async function tripSentinel() {
 }
 
 describe("GoalChecksList", () => {
-  it("renders the manual tag and PR pill on the right rows", () => {
+  it("renders compact trigger icons with full accessible labels and the PR pill", () => {
     render(
       <GoalChecksList
         {...baseProps}
@@ -87,7 +87,10 @@ describe("GoalChecksList", () => {
         initialHasMore={false}
       />,
     );
-    expect(screen.getByText("manually triggered")).toBeInTheDocument();
+    const manualIcon = screen.getByRole("img", { name: "Manually triggered" });
+    expect(manualIcon).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Heartbeat triggered" })).toBeInTheDocument();
+    expect(screen.queryByText("manually triggered")).not.toBeInTheDocument();
     const pill = screen.getByRole("link", { name: "PR #67 · merged" });
     expect(pill).toHaveAttribute("href", "https://github.com/acme/site/pull/67");
     // hasMore=false → no sentinel, no observer registered.

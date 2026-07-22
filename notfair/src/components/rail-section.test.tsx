@@ -7,7 +7,7 @@ import { RailSection } from "@/components/rail-section";
 describe("RailSection", () => {
   it("shows the body, title, and count by default", () => {
     render(
-      <RailSection title="Checks" count={12}>
+      <RailSection title="Checks" count={12} meta="next check in 42m">
         <p>diary rows</p>
       </RailSection>,
     );
@@ -16,6 +16,7 @@ describe("RailSection", () => {
       "true",
     );
     expect(screen.getByText("(12)")).toBeInTheDocument();
+    expect(screen.getByText("next check in 42m")).toBeInTheDocument();
     expect(screen.getByText("diary rows")).toBeVisible();
   });
 

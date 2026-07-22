@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { HeartPulse, Loader2, Zap } from "lucide-react";
 import { loadMoreGoalChecksAction } from "@/server/actions/goals";
 import type { CheckFilter, CheckPr, CheckRow, CheckWrite } from "@/server/goals/checks";
 import { projectHref } from "@/lib/project-href";
@@ -10,6 +10,12 @@ import { formatMetric } from "@/lib/format-metric";
 import { timeAgo } from "@/lib/time-ago";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * The goal rail's Checks diary. Server-renders the newest page; older
@@ -105,7 +111,7 @@ export function GoalChecksList({
   if (rows.length === 0) return null;
 
   return (
-    <>
+    <TooltipProvider delayDuration={250}>
       <div className="mb-2 flex items-center gap-1" role="group" aria-label="Filter checks">
         <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>
           All
@@ -132,7 +138,7 @@ export function GoalChecksList({
           )}
         </div>
       )}
-    </>
+    </TooltipProvider>
   );
 }
 
@@ -189,9 +195,7 @@ function CheckItem({
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-medium">
           Check {tick.tick_number}
-          {tick.trigger_kind === "manual" && (
-            <span className="ns-tag ml-1.5 align-middle">manually triggered</span>
-          )}
+          <CheckTriggerIcon triggerKind={tick.trigger_kind} />
           {tick.metric_value !== null && (
             <span className="ml-1.5 font-normal tabular-nums text-[hsl(var(--notfair-ink-3))]">
               → {formatMetric(tick.metric_value)}
@@ -239,6 +243,41 @@ function CheckItem({
         </div>
       )}
     </li>
+  );
+}
+
+/** Quiet trigger provenance: icon at rest, full wording on hover/focus. */
+function CheckTriggerIcon({
+  triggerKind,
+}: {
+  triggerKind: CheckRow["trigger_kind"];
+}) {
+  const manual = triggerKind === "manual";
+  if (!manual && triggerKind !== "heartbeat") return null;
+  const label = manual ? "Manually triggered" : "Heartbeat triggered";
+  const Icon = manual ? Zap : HeartPulse;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          tabIndex={0}
+          aria-label={label}
+          className={cn(
+            "ml-1 inline-flex size-4 translate-y-[2px] items-center justify-center rounded-sm align-baseline outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            manual
+              ? "text-[hsl(var(--notfair-warn))]"
+              : "text-[hsl(var(--notfair-ink-4))]",
+          )}
+        >
+          <Icon className={cn("size-3", manual && "fill-current")} aria-hidden />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={4}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

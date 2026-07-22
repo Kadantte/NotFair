@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { TranscriptEvent } from "@/server/sessions/transcript-tail";
 import {
   collapseEvents,
-  eventSignature,
   handleSseEvent,
   upsertToolEntry,
   type SseToolEvent,
@@ -192,30 +191,5 @@ describe("collapseEvents (top-up)", () => {
       ok: true,
       result: "3 files",
     });
-  });
-});
-
-describe("eventSignature (top-up)", () => {
-  it("keys lifecycle/unknown events by kind and id", () => {
-    expect(
-      eventSignature({ kind: "lifecycle", id: "l1", ts: t, phase: "start" }),
-    ).toBe("lifecycle|l1");
-    expect(
-      eventSignature({ kind: "unknown", id: "u9", ts: t, raw_type: "x" }),
-    ).toBe("unknown|u9");
-  });
-
-  it("keys tool_results by call id so shadow and DB copies collide", () => {
-    expect(
-      eventSignature({
-        kind: "tool_result",
-        id: "shadow-1",
-        ts: t,
-        tool_call_id: "t1",
-        name: "shell",
-        summary: null,
-        ok: true,
-      }),
-    ).toBe("tool_result|t1");
   });
 });

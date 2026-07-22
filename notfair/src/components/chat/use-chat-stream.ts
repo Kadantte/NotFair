@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findOpenTurn, isOpenTurnLive } from "@/lib/turn-state";
 import type { TranscriptEvent } from "@/server/sessions/transcript-tail";
 import {
-  eventSignature,
   handleSseEvent,
   upsertToolEntry,
   type ToolEntry,
@@ -16,7 +15,7 @@ const POLL_INTERVAL_MS = 2_000;
 /**
  * The chat's streaming state machine, extracted whole from the original
  * LiveTranscript. Owns: the committed event log (poll + SSE-bridge fed,
- * dedup'd across writers), the optimistic pending state for an active
+ * deduped by durable event id), the optimistic pending state for an active
  * send, the send/stop calls, and the remote-turn detection that keeps
  * the UI honest about turns this tab didn't start.
  *
@@ -100,29 +99,13 @@ export function useChatStream({
     new Set(initialEvents.map((e) => e.id)),
   );
 
-  /**
-   * Content signatures we've already rendered, for cross-writer dedup.
-   * The id-based set above can't catch the case where the SAME logical
-   * message arrives twice via different paths with different ids — the
-   * server-side-kickoff path writes a shadow transcript (ids like
-   * `shadow-<uuid>`), and the poll later returns the DB copy of the
-   * session.jsonl at session-end with FRESH UUIDs. Without a content
-   * key, every assistant turn and tool call would render twice.
-   */
-  const seenSignaturesRef = useRef<Set<string>>(
-    new Set(initialEvents.map(eventSignature)),
-  );
-
   const commitFresh = useCallback((incoming: TranscriptEvent[]) => {
     const fresh = incoming.filter((e) => {
       if (seenEventIdsRef.current.has(e.id)) return false;
-      const sig = eventSignature(e);
-      if (seenSignaturesRef.current.has(sig)) return false;
       return true;
     });
     for (const e of fresh) {
       seenEventIdsRef.current.add(e.id);
-      seenSignaturesRef.current.add(eventSignature(e));
     }
     if (fresh.length > 0) {
       setEvents((prev) => [...prev, ...fresh]);
@@ -181,17 +164,15 @@ export function useChatStream({
     };
   }, [pollIntervalMs, pollOnce, sendingChat]);
 
-  // ── Live re-attach: SSE bridge to the shadow-transcript stream. ─────
+  // ── Live re-attach: SSE bridge to committed transcript events. ──────
   // The DB poll can lag a fast-streaming turn, so polling sees nothing
-  // mid-turn. Both server-side task kickoffs and /api/chat tee their
-  // gateway events to a live stream — this bridge tails that file so a
-  // tab switching back to a thread mid-run picks up the stream instead
-  // of staring at a frozen transcript until the turn flushes.
+  // mid-turn. Transcript inserts also emit the same durable row through
+  // an in-process live stream, so a tab switching back to a thread sees
+  // progress immediately instead of waiting for its next poll.
   //
-  // The bridge runs on every thread mount, not just tasks. The shadow
-  // file may not exist (idle thread) or exist-but-be-idle (run already
-  // finished); both cases are no-ops on the server. Same dedup set as
-  // polling, so events that later land in the DB don't double-render.
+  // The bridge runs on every thread mount, not just tasks. An idle thread
+  // simply emits nothing. Polling and the live bridge carry the same row
+  // id, so the synchronous id set prevents double-rendering.
   //
   // Skipped during an active /api/chat send — that path already streams
   // its own deltas; layering re-attach on top would just duplicate work.

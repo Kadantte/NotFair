@@ -184,8 +184,12 @@ export function ToolGroup({
         <StatusIcon className={cn("ml-auto size-3.5 shrink-0", statusClass)} />
       </summary>
       <div className="mt-1.5 divide-y divide-border/30 rounded-xl bg-[hsl(var(--notfair-surface-2)/0.5)] px-3.5 py-1">
-        {tools.map((t) => (
-          <ToolRow key={t.toolCallId} entry={t} mcpCatalog={mcpCatalog} />
+        {tools.map((t, index) => (
+          <ToolRow
+            key={`${t.toolCallId}:${index}`}
+            entry={t}
+            mcpCatalog={mcpCatalog}
+          />
         ))}
       </div>
     </details>

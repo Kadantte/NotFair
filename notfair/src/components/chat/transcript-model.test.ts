@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TranscriptEvent } from "@/server/sessions/transcript-tail";
 import {
   collapseEvents,
-  eventSignature,
+  nextToolGroupKey,
   upsertToolEntry,
 } from "./transcript-model";
 import { humanizeTool, matchMcpServerKey } from "./tool-intent";
@@ -76,6 +76,22 @@ describe("collapseEvents", () => {
     ]);
   });
 
+  it("keeps groups unique when a harness reuses tool ids across turns", () => {
+    const items = collapseEvents([
+      call("c1", "item_1"),
+      text("a1", "first turn"),
+      call("c2", "item_1"),
+      text("a2", "second turn"),
+    ]);
+    const groups = items.filter((item) => item.kind === "tool_group");
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "tg:item_1",
+      "tg:item_1:1",
+    ]);
+    expect(nextToolGroupKey(items, "item_1")).toBe("tg:item_1:2");
+  });
+
   it("keeps an orphan tool_result as its own done entry", () => {
     const items = collapseEvents([result("r9", "t9", false)]);
     expect(items).toHaveLength(1);
@@ -84,13 +100,6 @@ describe("collapseEvents", () => {
       { kind: "tool_group" }
     >;
     expect(group.tools[0]).toMatchObject({ toolCallId: "t9", done: true, ok: false });
-  });
-});
-
-describe("eventSignature", () => {
-  it("keys messages by trimmed body and tools by call id", () => {
-    expect(eventSignature(text("a", " same "))).toBe(eventSignature(text("b", "same")));
-    expect(eventSignature(call("x", "t1"))).toBe("tool_call|t1");
   });
 });
 

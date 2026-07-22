@@ -21,34 +21,28 @@ export type RenderedItem =
   | { kind: "tool_group"; key: string; tools: ToolEntry[] }
   | { kind: "system_unknown"; key: string; raw_type: string };
 
-/** Stable across the optimistic SSE row and its committed transcript copy. */
-export function toolGroupKey(toolCallId: string): string {
-  return `tg:${toolCallId}`;
+/**
+ * Stable across the optimistic SSE row and its committed transcript copy.
+ * Harnesses may restart tool ids (for example `item_1`) on every turn, so
+ * later occurrences need a suffix to remain unique within a long chat.
+ */
+export function toolGroupKey(toolCallId: string, occurrence = 0): string {
+  return occurrence === 0
+    ? `tg:${toolCallId}`
+    : `tg:${toolCallId}:${occurrence}`;
 }
 
-/**
- * Content signature for cross-writer dedup. The id-based set in the
- * stream hook catches in-channel dups (e.g. polling racing itself);
- * this catches dups when the same logical event arrives via different
- * channels with different ids — e.g. the shadow transcript stream gave
- * us an assistant turn during the run, and the eventual transcript
- * flush gives us the same turn with a fresh UUID at session-end.
- *
- * Signature keys are intentionally narrow: text body for messages
- * (case preserved, whitespace trimmed), tool_call_id for tool rows
- * (unique per invocation regardless of the writer).
- */
-export function eventSignature(e: TranscriptEvent): string {
-  switch (e.kind) {
-    case "user_message":
-    case "assistant_text":
-      return `${e.kind}|${e.body.trim()}`;
-    case "tool_call":
-    case "tool_result":
-      return `${e.kind}|${e.tool_call_id}`;
-    default:
-      return `${e.kind}|${e.id}`;
-  }
+/** Match the pending tool card to the key its committed group will receive. */
+export function nextToolGroupKey(
+  rendered: RenderedItem[],
+  toolCallId: string,
+): string {
+  const occurrence = rendered.filter(
+    (item) =>
+      item.kind === "tool_group" &&
+      item.tools[0]?.toolCallId === toolCallId,
+  ).length;
+  return toolGroupKey(toolCallId, occurrence);
 }
 
 /**
@@ -132,13 +126,17 @@ export function collapseEvents(events: TranscriptEvent[]): RenderedItem[] {
   }
   const out: RenderedItem[] = [];
   let buffer: ToolEntry[] = [];
+  const groupOccurrences = new Map<string, number>();
   const flush = () => {
     if (buffer.length === 0) return;
+    const firstToolCallId = buffer[0]!.toolCallId;
+    const occurrence = groupOccurrences.get(firstToolCallId) ?? 0;
     out.push({
       kind: "tool_group",
-      key: toolGroupKey(buffer[0]!.toolCallId),
+      key: toolGroupKey(firstToolCallId, occurrence),
       tools: buffer,
     });
+    groupOccurrences.set(firstToolCallId, occurrence + 1);
     buffer = [];
   };
   for (const step of steps) {
