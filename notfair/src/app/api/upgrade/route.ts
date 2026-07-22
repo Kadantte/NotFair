@@ -1,55 +1,270 @@
 import { spawn } from "node:child_process";
-import { copyFile, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { NextResponse } from "next/server";
 
-import { _resetLatestCache, getCurrentVersion, getLatestVersion } from "@/server/version";
+import {
+  _resetLatestCache,
+  getCurrentVersion,
+  getLatestVersion,
+  isSemverGreater,
+} from "@/server/version";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UPGRADE_TIMEOUT_MS = 5 * 60 * 1000;
 const TAIL_BYTES = 4_000;
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+type UpgradeAction = "prepare" | "apply";
+
+type PendingUpdate = {
+  version: string;
+  tarball: string;
+  downloaded_at: string;
+};
+
+type CommandResult = {
+  code: number | null;
+  elapsed_ms: number;
+  stdout: string;
+  stderr: string;
+  spawn_error?: string;
+};
 
 /**
  * POST /api/upgrade
  *
- * Runs `npm i -g notfair@latest` from the user's shell environment.
- * The currently-running NotFair process keeps the old code loaded in
- * memory (Node module cache), so the user must restart `notfair` to
- * pick up the upgraded binary. The response message says so.
+ * `prepare` is intentionally download-only: it asks npm to pack the exact
+ * registry version into NotFair's data directory and records the staged
+ * tarball. It never changes the running installation.
  *
- * If npm isn't on PATH (e.g. the user runs NotFair from a node_modules
- * shim that doesn't expose npm globally), we surface the spawn error so
- * the client can show the copyable command instead.
+ * `apply` is only sent after the user clicks Update. It installs that exact
+ * staged tarball globally. The client immediately follows a successful apply
+ * with /api/restart when NotFair owns its background process.
  */
-export async function POST() {
-  // A running standalone bundle can be replaced by a source rebuild or by
-  // the upgrade itself. Never let npm inherit that now-missing directory:
-  // Node aborts in process.cwd() with ENOENT (`npm` exit code 7) before the
-  // install even starts. The user's home directory is stable across both.
-  return new Promise<Response>((resolve) => {
-    const startedAt = Date.now();
-    const child = spawn("npm", ["i", "-g", "notfair@latest"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
-      cwd: homedir(),
-    });
+export async function POST(request?: Request) {
+  const action = await requestedAction(request);
+  if (!action) {
+    return NextResponse.json(
+      { ok: false, error: "Unknown upgrade action." },
+      { status: 400 },
+    );
+  }
+  return action === "apply" ? applyUpdate() : prepareUpdate();
+}
 
+async function requestedAction(request?: Request): Promise<UpgradeAction | null> {
+  if (!request) return "prepare";
+  try {
+    const body = (await request.json()) as { action?: unknown };
+    if (body.action === undefined || body.action === "prepare") return "prepare";
+    if (body.action === "apply") return "apply";
+    return null;
+  } catch {
+    return "prepare";
+  }
+}
+
+async function prepareUpdate(): Promise<Response> {
+  const latest = await getLatestVersion(true);
+  const current = getCurrentVersion();
+  if (!latest) {
+    return NextResponse.json(
+      { ok: false, error: "Could not reach the npm registry." },
+      { status: 503 },
+    );
+  }
+  if (!VERSION_PATTERN.test(latest)) {
+    return NextResponse.json(
+      { ok: false, error: "The npm registry returned an invalid version." },
+      { status: 502 },
+    );
+  }
+  if (!isSemverGreater(latest, current)) {
+    return NextResponse.json({
+      ok: true,
+      downloaded_version: latest,
+      running_version: current,
+      already_current: true,
+    });
+  }
+
+  const tarball = stagedTarballPath(latest);
+  const existing = await isFile(tarball);
+  if (!existing) {
+    await mkdir(dirname(tarball), { recursive: true });
+    const result = await runNpm([
+      "pack",
+      `notfair@${latest}`,
+      "--pack-destination",
+      dirname(tarball),
+      "--silent",
+    ]);
+    if (result.spawn_error) {
+      return npmUnavailableResponse(result.spawn_error, "download");
+    }
+    if (result.code !== 0 || !(await isFile(tarball))) {
+      return npmFailureResponse(result, "download", latest);
+    }
+  }
+
+  await writePendingUpdate({
+    version: latest,
+    tarball,
+    downloaded_at: new Date().toISOString(),
+  });
+
+  return NextResponse.json({
+    ok: true,
+    downloaded_version: latest,
+    running_version: current,
+    note: `v${latest} downloaded and ready to install.`,
+  });
+}
+
+async function applyUpdate(): Promise<Response> {
+  const pending = await readPendingUpdate();
+  if (!pending || !(await isFile(pending.tarball))) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "The downloaded update is missing. Download it again before applying.",
+      },
+      { status: 409 },
+    );
+  }
+
+  const result = await runNpm(["i", "-g", pending.tarball]);
+  if (result.spawn_error) {
+    return npmUnavailableResponse(result.spawn_error, "install", pending.version);
+  }
+  if (result.code !== 0) {
+    return npmFailureResponse(result, "install", pending.version);
+  }
+
+  try {
+    await syncGlobalNativeBindings();
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "NotFair was installed, but its native database module could not be prepared for this Node.js version.",
+        hint: error instanceof Error ? error.message : String(error),
+        command: `npm i -g notfair@${pending.version}`,
+      },
+      { status: 500 },
+    );
+  }
+
+  _resetLatestCache();
+  const managed = process.env.NOTFAIR_MANAGED ?? null;
+  const canRestart = managed === "launchd" || managed === "daemon";
+  return NextResponse.json({
+    ok: true,
+    installed_version: pending.version,
+    running_version: getCurrentVersion(),
+    can_restart: canRestart,
+    note: canRestart
+      ? "Installed — restarting loads the new version."
+      : "Installed. Restart NotFair to load the new version (`notfair` in your terminal).",
+    elapsed_ms: result.elapsed_ms,
+    stdout_tail: result.stdout.slice(-1000),
+  });
+}
+
+function updateRoot(): string {
+  const dataDir = process.env.NOTFAIR_DATA_DIR ?? join(homedir(), ".notfair");
+  return resolve(dataDir, "updates");
+}
+
+function stagedTarballPath(version: string): string {
+  return join(updateRoot(), version, `notfair-${version}.tgz`);
+}
+
+function pendingUpdatePath(): string {
+  return join(updateRoot(), "pending.json");
+}
+
+async function writePendingUpdate(update: PendingUpdate): Promise<void> {
+  const target = pendingUpdatePath();
+  const temporary = `${target}.${process.pid}.tmp`;
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(temporary, `${JSON.stringify(update)}\n`, { mode: 0o600 });
+  await rename(temporary, target);
+}
+
+async function readPendingUpdate(): Promise<PendingUpdate | null> {
+  try {
+    const parsed = JSON.parse(await readFile(pendingUpdatePath(), "utf8")) as Partial<PendingUpdate>;
+    if (
+      typeof parsed.version !== "string" ||
+      !VERSION_PATTERN.test(parsed.version) ||
+      typeof parsed.tarball !== "string" ||
+      typeof parsed.downloaded_at !== "string"
+    ) {
+      return null;
+    }
+    const expected = stagedTarballPath(parsed.version);
+    if (resolve(parsed.tarball) !== resolve(expected)) return null;
+    return parsed as PendingUpdate;
+  } catch {
+    return null;
+  }
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function runNpm(args: string[]): Promise<CommandResult> {
+  // A running standalone bundle can be replaced by a source rebuild or an
+  // explicit install. Never inherit a now-missing server working directory:
+  // npm aborts in process.cwd() with ENOENT (exit code 7) before doing work.
+  return new Promise((resolveCommand) => {
+    const startedAt = Date.now();
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    let child;
+    try {
+      child = spawn("npm", args, {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: process.env,
+        cwd: homedir(),
+      });
+    } catch (error) {
+      resolveCommand({
+        code: null,
+        elapsed_ms: Date.now() - startedAt,
+        stdout,
+        stderr,
+        spawn_error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
     const append = (target: "out" | "err") => (chunk: Buffer) => {
       const text = chunk.toString("utf8");
-      if (target === "out") {
-        stdout = (stdout + text).slice(-TAIL_BYTES);
-      } else {
-        stderr = (stderr + text).slice(-TAIL_BYTES);
-      }
+      if (target === "out") stdout = (stdout + text).slice(-TAIL_BYTES);
+      else stderr = (stderr + text).slice(-TAIL_BYTES);
     };
     child.stdout?.on("data", append("out"));
     child.stderr?.on("data", append("err"));
 
+    const finish = (result: CommandResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(killTimer);
+      resolveCommand(result);
+    };
     const killTimer = setTimeout(() => {
       try {
         child.kill("SIGTERM");
@@ -58,81 +273,50 @@ export async function POST() {
       }
     }, UPGRADE_TIMEOUT_MS);
 
-    child.on("error", (err) => {
-      clearTimeout(killTimer);
-      resolve(
-        NextResponse.json(
-          {
-            ok: false,
-            error: err.message,
-            hint:
-              "Could not run `npm` from the NotFair process. Run `npm i -g notfair@latest` in your terminal instead.",
-            command: "npm i -g notfair@latest",
-          },
-          { status: 500 },
-        ),
-      );
+    child.on("error", (error) => {
+      finish({
+        code: null,
+        elapsed_ms: Date.now() - startedAt,
+        stdout,
+        stderr,
+        spawn_error: error.message,
+      });
     });
-
-    child.on("exit", async (code) => {
-      clearTimeout(killTimer);
-      const elapsed_ms = Date.now() - startedAt;
-      if (code === 0) {
-        try {
-          await syncGlobalNativeBindings();
-        } catch (error) {
-          resolve(
-            NextResponse.json(
-              {
-                ok: false,
-                error: "NotFair was installed, but its native database module could not be prepared for this Node.js version.",
-                hint: error instanceof Error ? error.message : String(error),
-                command: "npm i -g notfair@latest",
-              },
-              { status: 500 },
-            ),
-          );
-          return;
-        }
-        _resetLatestCache();
-        // Confirm by refreshing the version snapshot. The current version
-        // is still the old one (we're still running) — but `latest` from
-        // the registry should now match what we just installed.
-        const latest = await getLatestVersion(true);
-        // launchd/daemon servers can restart themselves via /api/restart;
-        // foreground and dev runs belong to the user's terminal.
-        const managed = process.env.NOTFAIR_MANAGED ?? null;
-        const canRestart = managed === "launchd" || managed === "daemon";
-        resolve(
-          NextResponse.json({
-            ok: true,
-            installed_version: latest ?? null,
-            running_version: getCurrentVersion(),
-            can_restart: canRestart,
-            note: canRestart
-              ? "Upgraded — restarting loads the new version."
-              : "Upgraded. Restart NotFair to load the new version (`notfair` in your terminal).",
-            elapsed_ms,
-            stdout_tail: stdout.slice(-1000),
-          }),
-        );
-      } else {
-        resolve(
-          NextResponse.json(
-            {
-              ok: false,
-              error: `npm exited with code ${code}`,
-              elapsed_ms,
-              stdout_tail: stdout.slice(-1000),
-              stderr_tail: stderr.slice(-1000),
-              command: "npm i -g notfair@latest",
-            },
-            { status: 500 },
-          ),
-        );
-      }
+    child.on("exit", (code) => {
+      finish({ code, elapsed_ms: Date.now() - startedAt, stdout, stderr });
     });
   });
+}
+
+function npmUnavailableResponse(error: string, operation: "download" | "install", version?: string) {
+  const command = version ? `npm i -g notfair@${version}` : "npm i -g notfair@latest";
+  return NextResponse.json(
+    {
+      ok: false,
+      error,
+      hint: `Could not run npm to ${operation} the update. Run \`${command}\` in your terminal instead.`,
+      command,
+    },
+    { status: 500 },
+  );
+}
+
+function npmFailureResponse(
+  result: CommandResult,
+  operation: "download" | "install",
+  version: string,
+) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: `npm ${operation} exited with code ${result.code}`,
+      elapsed_ms: result.elapsed_ms,
+      stdout_tail: result.stdout.slice(-1000),
+      stderr_tail: result.stderr.slice(-1000),
+      command: `npm i -g notfair@${version}`,
+    },
+    { status: 500 },
+  );
 }
 
 async function syncGlobalNativeBindings() {
@@ -141,26 +325,10 @@ async function syncGlobalNativeBindings() {
 }
 
 async function npmGlobalRoot(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let stdout = "";
-    const child = spawn("npm", ["root", "-g"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
-      cwd: homedir(),
-    });
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
-    });
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      const root = stdout.trim();
-      if (code === 0 && root) {
-        resolve(root);
-      } else {
-        reject(new Error(`Could not locate npm's global package directory (exit ${code}).`));
-      }
-    });
-  });
+  const result = await runNpm(["root", "-g"]);
+  const root = result.stdout.trim();
+  if (result.code === 0 && root) return root;
+  throw new Error(`Could not locate npm's global package directory (exit ${result.code}).`);
 }
 
 /**

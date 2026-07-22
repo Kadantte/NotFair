@@ -1,5 +1,9 @@
 # NotFair
 
+## 0.9.15 — 2026-07-21
+
+**Background updates no longer modify a running installation.** NotFair now downloads the exact npm release into its local update cache without installing it; only clicking **Update to v…** performs the global install, immediately restarts a managed server, and reloads the app. This removes the live-file replacement window that could leave Chrome requesting chunks from two different builds.
+
 ## 0.9.14 — 2026-07-21
 
 **Goal chat now reflects Codex’s real model defaults and reasoning controls.** The model menu no longer duplicates the configured default, and each provider-supported reasoning effort can be selected per goal and carried safely through the chat API to the Codex CLI.

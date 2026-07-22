@@ -26,7 +26,7 @@ describe("SidebarVersion", () => {
     vi.unstubAllGlobals();
   });
 
-  it("automatically installs an available update before asking to apply it", async () => {
+  it("only downloads an available update before asking the user to apply it", async () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({ current: "0.9.13", latest: "0.9.14", has_update: true }),
@@ -36,23 +36,29 @@ describe("SidebarVersion", () => {
     render(<SidebarVersion />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/upgrade", { method: "POST" });
+      expect(fetchMock).toHaveBeenCalledWith("/api/upgrade", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "prepare" }),
+      });
     });
     expect(
       await screen.findByRole("button", { name: /update to v0\.9\.14/i }),
     ).toBeEnabled();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(toastSuccess).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /restart now/i })).toBeNull();
   });
 
-  it("restarts immediately when the user applies the installed update", async () => {
+  it("installs and restarts only after the user clicks Update", async () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({ current: "0.9.13", latest: "0.9.14", has_update: true }),
       )
+      .mockResolvedValueOnce(jsonResponse({ ok: true }))
       .mockResolvedValueOnce(jsonResponse({ ok: true, can_restart: true }))
       // Keep the restart request pending so the component remains in its
-      // visible restarting state without beginning the version poll.
+      // visible updating state without beginning the version poll.
       .mockReturnValueOnce(new Promise<Response>(() => {}));
 
     render(<SidebarVersion />);
@@ -61,11 +67,16 @@ describe("SidebarVersion", () => {
     );
 
     await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/upgrade", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "apply" }),
+      });
       expect(fetchMock).toHaveBeenCalledWith("/api/restart", { method: "POST" });
     });
     expect(screen.queryByRole("button", { name: /restart now/i })).toBeNull();
     expect(
-      screen.getByRole("button", { name: /restarting/i }),
+      screen.getByRole("button", { name: /updating/i }),
     ).toBeDisabled();
   });
 
@@ -73,6 +84,9 @@ describe("SidebarVersion", () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({ current: "0.9.13", latest: "0.9.14", has_update: true }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ ok: true }),
       )
       .mockResolvedValueOnce(
         jsonResponse({
@@ -84,8 +98,11 @@ describe("SidebarVersion", () => {
 
     render(<SidebarVersion />);
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: /update to v0\.9\.14/i }),
+    );
     expect(await screen.findByText("Restart to apply")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(toastSuccess).toHaveBeenCalledWith(
       "Restart NotFair from your terminal.",
       { duration: 15_000 },
@@ -100,7 +117,7 @@ describe("SidebarVersion", () => {
       .mockResolvedValueOnce(
         jsonResponse({ ok: false, error: "registry unavailable" }, false),
       )
-      .mockResolvedValueOnce(jsonResponse({ ok: true, can_restart: true }));
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     render(<SidebarVersion />);
     const retry = await screen.findByRole("button", { name: /retry update/i });

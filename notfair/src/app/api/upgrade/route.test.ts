@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
@@ -13,6 +13,7 @@ vi.mock("@/server/version", () => ({
   _resetLatestCache: vi.fn(),
   getCurrentVersion: vi.fn(() => "0.9.7"),
   getLatestVersion: vi.fn(async () => "0.9.8"),
+  isSemverGreater: vi.fn(() => true),
 }));
 
 import { POST, syncInstalledNativeBindings } from "./route";
@@ -30,28 +31,96 @@ function fakeChild() {
 }
 
 describe("POST /api/upgrade", () => {
+  let dataDir: string;
+  const originalDataDir = process.env.NOTFAIR_DATA_DIR;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    return mkdtemp(join(tmpdir(), "notfair-update-data-")).then((dir) => {
+      dataDir = dir;
+      process.env.NOTFAIR_DATA_DIR = dir;
+    });
   });
 
-  it("starts npm from the stable home directory instead of the server cwd", async () => {
+  afterEach(async () => {
+    if (originalDataDir === undefined) delete process.env.NOTFAIR_DATA_DIR;
+    else process.env.NOTFAIR_DATA_DIR = originalDataDir;
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  it("downloads the package without modifying the installed version", async () => {
     const child = fakeChild();
     mocks.spawn.mockReturnValue(child);
 
     const responsePromise = POST();
 
-    expect(mocks.spawn).toHaveBeenCalledWith(
+    await vi.waitFor(() => {
+      expect(mocks.spawn).toHaveBeenCalledWith(
+        "npm",
+        [
+          "pack",
+          "notfair@0.9.8",
+          "--pack-destination",
+          join(dataDir, "updates", "0.9.8"),
+          "--silent",
+        ],
+        expect.objectContaining({ cwd: homedir() }),
+      );
+    });
+    expect(mocks.spawn).not.toHaveBeenCalledWith(
       "npm",
-      ["i", "-g", "notfair@latest"],
-      expect.objectContaining({ cwd: homedir() }),
+      expect.arrayContaining(["-g"]),
+      expect.anything(),
     );
 
+    await mkdir(join(dataDir, "updates", "0.9.8"), { recursive: true });
+    await writeFile(join(dataDir, "updates", "0.9.8", "notfair-0.9.8.tgz"), "package");
+    child.emit("exit", 0);
+    const response = await responsePromise;
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      downloaded_version: "0.9.8",
+    });
+  });
+
+  it("runs npm install only for an explicit apply action", async () => {
+    const updateDir = join(dataDir, "updates", "0.9.8");
+    const tarball = join(updateDir, "notfair-0.9.8.tgz");
+    await mkdir(updateDir, { recursive: true });
+    await writeFile(tarball, "package");
+    await writeFile(
+      join(dataDir, "updates", "pending.json"),
+      JSON.stringify({
+        version: "0.9.8",
+        tarball,
+        downloaded_at: new Date().toISOString(),
+      }),
+    );
+    const child = fakeChild();
+    mocks.spawn.mockReturnValue(child);
+
+    const responsePromise = POST(
+      new Request("http://localhost/api/upgrade", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "apply" }),
+      }),
+    );
+
+    await vi.waitFor(() => {
+      expect(mocks.spawn).toHaveBeenCalledWith(
+        "npm",
+        ["i", "-g", tarball],
+        expect.objectContaining({ cwd: homedir() }),
+      );
+    });
     child.emit("exit", 7);
     const response = await responsePromise;
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({
       ok: false,
-      error: "npm exited with code 7",
+      error: "npm install exited with code 7",
     });
   });
 

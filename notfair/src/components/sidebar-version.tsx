@@ -16,16 +16,16 @@ type Phase =
   | "idle"
   | "downloading"
   | "ready"
-  | "restarting"
+  | "updating"
   | "manual"
   | "failed";
 
 /**
- * Sidebar footer: current version + the update flow. When npm reports a
- * newer version, it installs automatically through /api/upgrade. Once ready,
- * the Update button restarts background/launchd servers through /api/restart
- * and reloads on the new version. Foreground/dev runs are told to restart
- * from the terminal because the app does not own those processes.
+ * Sidebar footer: current version + a two-phase update flow. A newer package
+ * is downloaded in the background without touching the running install. The
+ * Update button explicitly installs it, restarts an owned background server,
+ * and reloads on the new version. Foreground/dev runs are told to restart from
+ * the terminal after the explicit install because the app does not own them.
  */
 export function SidebarVersion() {
   const [info, setInfo] = useState<VersionInfo | null>(null);
@@ -58,9 +58,13 @@ export function SidebarVersion() {
     if (!version.has_update) return;
     setPhase("downloading");
     try {
-      const res = await fetch("/api/upgrade", { method: "POST" });
+      const res = await fetch("/api/upgrade", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "prepare" }),
+      });
       const body = (await res.json()) as
-        | { ok: true; note?: string; can_restart?: boolean }
+        | { ok: true; note?: string }
         | { ok: false; error?: string; command?: string; hint?: string };
       if (!res.ok || !body.ok) {
         const msg = !body.ok
@@ -75,32 +79,51 @@ export function SidebarVersion() {
         setPhase("failed");
         return;
       }
-      if (body.can_restart) {
-        setPhase("ready");
-        toast.success(`v${version.latest} installed — click Update to apply.`, {
-          duration: 10_000,
-        });
-      } else {
-        setPhase("manual");
-        toast.success(
-          body.note ?? "Upgraded. Restart NotFair in your terminal to apply.",
-          { duration: 15_000 },
-        );
-      }
+      setPhase("ready");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
       setPhase("failed");
     }
   }
 
-  async function restart() {
+  async function applyAndRestart() {
     if (phase !== "ready") return;
-    setPhase("restarting");
+    setPhase("updating");
     try {
-      const res = await fetch("/api/restart", { method: "POST" });
-      const body = (await res.json()) as { ok: boolean; hint?: string };
-      if (!res.ok || !body.ok) {
-        toast.error(body.hint ?? "Could not restart from here — use your terminal.", {
+      const applyResponse = await fetch("/api/upgrade", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "apply" }),
+      });
+      const applyBody = (await applyResponse.json()) as
+        | { ok: true; can_restart: boolean; note?: string }
+        | { ok: false; error?: string; hint?: string; command?: string };
+      if (!applyResponse.ok || !applyBody.ok) {
+        const message = !applyBody.ok
+          ? applyBody.hint ?? applyBody.error ?? "Could not install the update."
+          : "Could not install the update.";
+        if (!applyBody.ok && applyBody.command) {
+          await navigator.clipboard.writeText(applyBody.command).catch(() => {});
+          toast.error(`${message}\nCommand copied to clipboard.`, { duration: 10_000 });
+        } else {
+          toast.error(message, { duration: 10_000 });
+        }
+        setPhase("ready");
+        return;
+      }
+      if (!applyBody.can_restart) {
+        toast.success(
+          applyBody.note ?? "Installed. Restart NotFair from your terminal to apply.",
+          { duration: 15_000 },
+        );
+        setPhase("manual");
+        return;
+      }
+
+      const restartResponse = await fetch("/api/restart", { method: "POST" });
+      const restartBody = (await restartResponse.json()) as { ok: boolean; hint?: string };
+      if (!restartResponse.ok || !restartBody.ok) {
+        toast.error(restartBody.hint ?? "Could not restart from here — use your terminal.", {
           duration: 10_000,
         });
         setPhase("manual");
@@ -177,19 +200,19 @@ export function SidebarVersion() {
         </Button>
       )}
 
-      {(phase === "ready" || phase === "restarting") && (
+      {(phase === "ready" || phase === "updating") && (
         <Button
           size="sm"
           variant="outline"
-          disabled={phase === "restarting"}
-          onClick={restart}
-          title={`Restart and update to v${info.latest}`}
+          disabled={phase === "updating"}
+          onClick={applyAndRestart}
+          title={`Install v${info.latest} and restart now`}
           className="h-6 gap-1 px-2 text-[10.5px] font-medium"
         >
-          {phase === "restarting" ? (
+          {phase === "updating" ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" />
-              Restarting…
+              Updating…
             </>
           ) : (
             <>
