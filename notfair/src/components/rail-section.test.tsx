@@ -7,7 +7,7 @@ import { RailSection } from "@/components/rail-section";
 describe("RailSection", () => {
   it("shows the body, title, and count by default", () => {
     render(
-      <RailSection title="Checks" count={12}>
+      <RailSection title="Checks" count={12} meta="next check in 42m">
         <p>diary rows</p>
       </RailSection>,
     );
@@ -16,6 +16,7 @@ describe("RailSection", () => {
       "true",
     );
     expect(screen.getByText("(12)")).toBeInTheDocument();
+    expect(screen.getByText("next check in 42m")).toBeInTheDocument();
     expect(screen.getByText("diary rows")).toBeVisible();
   });
 
@@ -32,5 +33,26 @@ describe("RailSection", () => {
     expect(screen.getByText("action rows")).not.toBeVisible();
     fireEvent.click(toggle);
     expect(screen.getByText("action rows")).toBeVisible();
+  });
+
+  it("collapses independently from neighboring sections", () => {
+    render(
+      <>
+        <RailSection title="Goal">
+          <p>Increase qualified traffic</p>
+        </RailSection>
+        <RailSection title="Main metric">
+          <p>Organic sessions</p>
+        </RailSection>
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Goal" }));
+
+    expect(screen.getByText("Increase qualified traffic")).not.toBeVisible();
+    expect(screen.getByText("Organic sessions")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Main metric" }),
+    ).toHaveAttribute("aria-expanded", "true");
   });
 });

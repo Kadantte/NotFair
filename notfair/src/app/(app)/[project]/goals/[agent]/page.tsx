@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { getProject } from "@/server/db/projects";
 import { resolveAgentBySlug } from "@/server/agent-meta";
 import {
   getGoalForAgent,
   getLatestGoalForAgent,
+  isGoalArchived,
   listGoalActions,
   listOpenGoalActions,
   listUserActionRequests,
@@ -35,7 +37,6 @@ import { cadenceLabel } from "@/lib/goal-cadence";
 import { cn } from "@/lib/utils";
 import { LiveTranscript } from "@/components/live-transcript";
 import { GoalControls } from "@/components/goal-controls";
-import { GoalStartButton } from "@/components/goal-start-button";
 import { GoalAutoRefresh } from "@/components/goal-auto-refresh";
 import { GoalProgressChart } from "@/components/goal-progress-chart";
 import { GoalMetricCard, type MetricVariant } from "@/components/goal-metric-card";
@@ -55,6 +56,7 @@ import { type MoveRow } from "@/components/goal-moves";
 import { GoalPrsDialog, type PrRow } from "@/components/goal-prs-dialog";
 import { maybeSyncGoalPrs } from "@/server/goals/pr-sync";
 import { buildCheckSquares, currentStreak } from "@/lib/goal-streak";
+import { GoalCompletionDialog } from "@/components/goal-completion-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +80,7 @@ function fmtClock(iso: string): string {
 
 const STATUS_CHIP: Record<Goal["status"], string> = {
   intake: "setting up",
-  proposed: "ready to start",
+  proposed: "confirm the plan",
   active: "running",
   paused: "paused",
   achieved: "achieved",
@@ -129,6 +131,8 @@ export default async function GoalPage({
   }));
 
   const live = goal.status === "intake" || goal.status === "proposed" || goal.status === "active" || goal.status === "paused";
+  const achievementArchived =
+    goal.status === "achieved" ? isGoalArchived(goal.id) : false;
   const learnings = listGoalLearnings(goal.id, 100);
 
   // Header dialogs: the moves journal (every open action, whatever its
@@ -168,12 +172,11 @@ export default async function GoalPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Every pre-terminal state before START changes server-side via
-          agent tool calls: intake verifies the metric (→ proposed), and a
-          proposed goal's target lands via propose_target — which is what
-          makes the START button appear. Without polling `proposed`, the
-          user is told "press START" but the button never renders until a
-          manual reload. */}
+      {/* Every pre-terminal state changes server-side via agent tool
+          calls: intake verifies the metric (→ proposed), and the user's
+          confirmation in chat lands via propose_target (→ active, first
+          check running). Without polling, the rail keeps showing the
+          previous stage until a manual reload. */}
       {(goal.status === "intake" ||
         goal.status === "proposed" ||
         goal.status === "active") && <GoalAutoRefresh intervalMs={8000} />}
@@ -187,7 +190,11 @@ export default async function GoalPage({
         <div className="order-last flex w-full shrink-0 items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto">
           {/* Escalations stay visible at every width — they're the one
               header item that is the user's job, not the agent's. */}
-          <GoalNeedsYouDialog items={needsYou} />
+          <GoalNeedsYouDialog
+            items={needsYou}
+            projectSlug={slug}
+            agentSlug={agentSlug}
+          />
           <div className="hidden lg:contents">
             <GoalContextDialog
               projectSlug={slug}
@@ -216,6 +223,28 @@ export default async function GoalPage({
             <GoalControls
               goalId={goal.id}
               status={goal.status as "intake" | "proposed" | "active" | "paused"}
+            />
+          )}
+          {goal.status === "achieved" && !achievementArchived && (
+            <GoalCompletionDialog
+              goalId={goal.id}
+              label={goalLabel(goal)}
+              metricName={goal.metric_name}
+              currentValue={goal.current_value}
+              targetValue={goal.target_value}
+              metricDirection={goal.metric_direction}
+              completionReason={goal.status_reason}
+              completedAt={goal.updated_at}
+              trigger={
+                <button
+                  type="button"
+                  className="ns-chip ns-completed-badge bg-[hsl(var(--notfair-accent-soft))] font-medium text-[hsl(var(--notfair-accent))] shadow-[inset_0_0_0_1px_hsl(var(--notfair-accent-border))] hover:text-[hsl(var(--notfair-accent))]"
+                  aria-label="Celebrate this completed goal"
+                >
+                  <Sparkles aria-hidden />
+                  Celebrate
+                </button>
+              }
             />
           )}
         </div>
@@ -360,59 +389,44 @@ function GoalDashboard({
 
   return (
     <>
-      {/* Statement */}
-      <p className="m-0 text-[12.5px] leading-relaxed text-[hsl(var(--notfair-ink-3))]">
-        “{goal.statement}”
-      </p>
+      <RailSection title="Goal">
+        <p className="m-0 text-[12.5px] leading-relaxed text-[hsl(var(--notfair-ink-3))]">
+          “{goal.statement}”
+        </p>
+      </RailSection>
 
       {/* Lifecycle-specific card */}
       {goal.status === "intake" && (
-        <RailCard>
-          <p className="m-0 text-[12.5px] leading-relaxed">
-            The agent is working out how to <b>measure</b> this — watch the
-            chat. It will verify a metric, show you the baseline, and propose
-            a plan. Nothing touches your account yet.
-          </p>
-        </RailCard>
+        <RailSection title="Main metric">
+          <RailCard>
+            <p className="m-0 text-[12.5px] leading-relaxed">
+              The agent is working out how to <b>measure</b> this — watch the
+              chat. It will verify a metric, show you the baseline, and propose
+              a plan. Nothing touches your account yet.
+            </p>
+          </RailCard>
+        </RailSection>
       )}
 
       {goal.status === "proposed" && (
-        <RailCard>
-          {goal.target_value !== null ? (
-            <>
-              <p className="m-0 mb-3 text-[12.5px] leading-relaxed">
-                Baseline <b className="tabular-nums">{formatMetric(goal.baseline_value)}</b>,
-                verified against{" "}
-                <span className="font-mono text-[11px]">{goal.metric_source_key}</span>{" "}
-                <MetricMethodDialog
-                  name={goal.metric_name ?? "Metric"}
-                  sourceKey={goal.metric_source_key}
-                  sourceTool={goal.metric_source_tool}
-                  argsJson={goal.metric_source_args_json}
-                  direction={goal.metric_direction}
-                />
-                . The plan is agreed — the loop starts when you press START,
-                and the first check runs immediately.
-              </p>
-              <dl className="mb-3 grid grid-cols-2 gap-2 text-[12px]">
-                <RailStat k="Target" v={`${formatMetric(goal.target_value)}${goal.mode === "maintain" ? " (hold)" : ""}`} />
-                <RailStat k="Heartbeat" v={cadenceLabel(goal.cadence_cron)} />
-                <RailStat k="Deadline" v={goal.deadline ? fmtDate(goal.deadline) : "none"} />
-                <RailStat
-                  k="Spend cap"
-                  v={goal.spend_envelope_usd !== null ? `$${goal.spend_envelope_usd}` : "none"}
-                />
-              </dl>
-              <GoalStartButton goalId={goal.id} />
-            </>
-          ) : (
+        <RailSection title="Main metric">
+          <RailCard>
             <p className="m-0 text-[12.5px] leading-relaxed">
-              Metric verified — baseline{" "}
-              <b className="tabular-nums">{formatMetric(goal.baseline_value)}</b>. Agree the
-              target in chat and the START button appears here.
+              Baseline <b className="tabular-nums">{formatMetric(goal.baseline_value)}</b>,
+              verified against{" "}
+              <span className="font-mono text-[11px]">{goal.metric_source_key}</span>{" "}
+              <MetricMethodDialog
+                name={goal.metric_name ?? "Metric"}
+                sourceKey={goal.metric_source_key}
+                sourceTool={goal.metric_source_tool}
+                argsJson={goal.metric_source_args_json}
+                direction={goal.metric_direction}
+              />
+              . Agree the target in chat — the moment you confirm, the loop
+              starts and the first check runs.
             </p>
-          )}
-        </RailCard>
+          </RailCard>
+        </RailSection>
       )}
 
       {(goal.status === "active" ||
@@ -421,61 +435,58 @@ function GoalDashboard({
         goal.status === "failed" ||
         goal.status === "killed") && (
         <>
-          <GoalMetricCard
-            variants={metricVariants}
-            mode={goal.mode}
-            badges={
-              <>
-                {targetMet && (
-                  <span key="state" className="ns-tag">
-                    {goal.mode === "maintain" ? "holding" : "target met"}
-                  </span>
-                )}
-                {tickRunning && (
-                  <span key="checking" className="ns-tag">
-                    checking…
-                  </span>
-                )}
-              </>
-            }
-            strip={
-              goal.mode === "maintain" ? (
-                <div key="strip" className="mt-3">
-                  <GoalChecksStrip squares={squares} streak={streak} />
-                </div>
-              ) : undefined
-            }
-            footer={
-              <>
-                <p
-                  key="cadence"
-                  className="mt-1.5 mb-0 text-[11px] leading-relaxed text-[hsl(var(--notfair-ink-4))]"
-                >
-                  {cadenceLabel(goal.cadence_cron)} · next check{" "}
-                  {goal.status === "active" && goal.next_tick_at
-                    ? tickRunning
-                      ? "running now"
-                      : `${timeUntil(goal.next_tick_at)} (${fmtClock(goal.next_tick_at)})`
-                    : "—"}{" "}
-                  · {goal.tick_count} check{goal.tick_count === 1 ? "" : "s"} so far
-                  {goal.spend_envelope_usd !== null &&
-                    ` · spent $${loggedSpendTotal(goal.id)} of $${goal.spend_envelope_usd}`}
-                </p>
-                {goal.status_reason &&
-                  (goal.status === "achieved" || goal.status === "failed" || goal.status === "killed") && (
-                    <Markdown
-                      key="reason"
-                      className="mt-2 text-[12px] leading-relaxed text-[hsl(var(--notfair-ink-3))] [&_p]:m-0"
-                    >
-                      {goal.status_reason}
-                    </Markdown>
+          <RailSection title="Main metric">
+            <GoalMetricCard
+              variants={metricVariants}
+              mode={goal.mode}
+              badges={
+                <>
+                  {targetMet && (
+                    <span key="state" className="ns-tag">
+                      {goal.mode === "maintain" ? "holding" : "target met"}
+                    </span>
                   )}
-              </>
-            }
-            actions={chartActions}
-            failures={chartFailures}
-            deadline={goal.deadline ? Date.parse(goal.deadline) : null}
-          />
+                  {tickRunning && (
+                    <span key="checking" className="ns-tag">
+                      checking…
+                    </span>
+                  )}
+                </>
+              }
+              strip={
+                goal.mode === "maintain" ? (
+                  <div key="strip" className="mt-3">
+                    <GoalChecksStrip squares={squares} streak={streak} />
+                  </div>
+                ) : undefined
+              }
+              footer={
+                <>
+                  <p
+                    key="cadence"
+                    className="mt-1.5 mb-0 text-[11px] leading-relaxed text-[hsl(var(--notfair-ink-4))]"
+                  >
+                    {cadenceLabel(goal.cadence_cron)} · {goal.tick_count} check
+                    {goal.tick_count === 1 ? "" : "s"} so far
+                    {goal.spend_envelope_usd !== null &&
+                      ` · spent $${loggedSpendTotal(goal.id)} of $${goal.spend_envelope_usd}`}
+                  </p>
+                  {goal.status_reason &&
+                    (goal.status === "achieved" || goal.status === "failed" || goal.status === "killed") && (
+                      <Markdown
+                        key="reason"
+                        className="mt-2 text-[12px] leading-relaxed text-[hsl(var(--notfair-ink-3))] [&_p]:m-0"
+                      >
+                        {goal.status_reason}
+                      </Markdown>
+                    )}
+                </>
+              }
+              actions={chartActions}
+              failures={chartFailures}
+              deadline={goal.deadline ? Date.parse(goal.deadline) : null}
+            />
+          </RailSection>
 
           {extraSupports.length > 0 && (
             <RailSection title="Supporting metrics" count={extraSupports.length}>
@@ -487,7 +498,23 @@ function GoalDashboard({
             </RailSection>
           )}
 
-          <RailSection title="Checks" count={goal.tick_count}>
+          <RailSection
+            title="Checks"
+            count={goal.tick_count}
+            meta={
+              goal.status === "active"
+                ? tickRunning
+                  ? "running now"
+                  : goal.next_tick_at
+                    ? (
+                        <span title={`Scheduled for ${fmtClock(goal.next_tick_at)}`}>
+                          next check {timeUntil(goal.next_tick_at)}
+                        </span>
+                      )
+                    : "next check —"
+                : undefined
+            }
+          >
             {checkRows.length === 0 ? (
               <p className="m-0 text-[12px] text-[hsl(var(--notfair-ink-4))]">
                 None yet — the first runs{" "}
@@ -560,15 +587,6 @@ function SupportMetricItem({ metric }: { metric: GoalSupportMetric }) {
           />
         </div>
       )}
-    </div>
-  );
-}
-
-function RailStat({ k, v }: { k: string; v: string }) {
-  return (
-    <div>
-      <dt className="text-[hsl(var(--notfair-ink-4))]">{k}</dt>
-      <dd className="m-0 font-medium tabular-nums">{v}</dd>
     </div>
   );
 }

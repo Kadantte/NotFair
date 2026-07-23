@@ -95,7 +95,7 @@ export default async function ProjectGoalsPage({
         <div className="ns-page-head-stack">
           <h1 className="ns-page-title">{project.display_name}</h1>
           <p className="ns-page-sub">
-            State a goal. It gets measured, you press START, the loop runs.
+            State a goal. It gets measured, you confirm the plan, the loop runs.
           </p>
         </div>
       </header>

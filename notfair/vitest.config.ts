@@ -18,5 +18,24 @@ export default defineConfig({
     // per-file via `// @vitest-environment jsdom` (vitest 4 removed the
     // environmentMatchGlobs shorthand).
     environment: "node",
+    coverage: {
+      provider: "v8",
+      // The denominator is everything we unit-test by convention. Excluded
+      // per CLAUDE.md: Next.js pages/layouts/route handlers (live smoke
+      // covers those), vendored shadcn primitives, and the boot hook.
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/app/**",
+        "src/components/ui/**",
+        "src/instrumentation.ts",
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.d.ts",
+        "src/types.ts",
+      ],
+      thresholds: {
+        statements: 80,
+        lines: 80,
+      },
+    },
   },
 });

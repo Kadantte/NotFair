@@ -8,7 +8,9 @@
  */
 import pkg from "../../package.json";
 
-const PACKAGE_NAME = "NotFair";
+// npm package names are lowercase and the registry is case-sensitive —
+// "NotFair" 404s and silently kills the update check.
+const PACKAGE_NAME = "notfair";
 const NPM_REGISTRY_LATEST = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
 const NPM_FETCH_TIMEOUT_MS = 5_000;
 const LATEST_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour

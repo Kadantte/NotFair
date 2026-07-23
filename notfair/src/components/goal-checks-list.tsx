@@ -2,14 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { HeartPulse, Loader2, Zap } from "lucide-react";
 import { loadMoreGoalChecksAction } from "@/server/actions/goals";
-import type { CheckFilter, CheckPr, CheckRow } from "@/server/goals/checks";
+import type { CheckFilter, CheckPr, CheckRow, CheckWrite } from "@/server/goals/checks";
 import { projectHref } from "@/lib/project-href";
 import { formatMetric } from "@/lib/format-metric";
 import { timeAgo } from "@/lib/time-ago";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * The goal rail's Checks diary. Server-renders the newest page; older
@@ -17,8 +23,8 @@ import { Markdown } from "@/components/markdown";
  * tick_number). The page's 5s auto-refresh re-sends the first page, which
  * is merged in by id so freshly loaded history is never dropped.
  *
- * The "Action taken" filter hides observe-only checks (no action recorded,
- * no PR). Rows are kept in one merged store and filtered at render time,
+ * The "Action taken" filter hides read-only checks (nothing modified, no
+ * PR). Rows are kept in one merged store and filtered at render time,
  * so the auto-refresh merge stays filter-agnostic; pagination re-queries
  * the server with the filter so skipped checks don't count against pages.
  */
@@ -105,7 +111,7 @@ export function GoalChecksList({
   if (rows.length === 0) return null;
 
   return (
-    <>
+    <TooltipProvider delayDuration={250}>
       <div className="mb-2 flex items-center gap-1" role="group" aria-label="Filter checks">
         <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>
           All
@@ -132,13 +138,13 @@ export function GoalChecksList({
           )}
         </div>
       )}
-    </>
+    </TooltipProvider>
   );
 }
 
-/** A check "took action" when it recorded an action or registered a PR. */
+/** A check "took action" when it modified something or registered a PR. */
 function tookAction(row: CheckRow): boolean {
-  return row.actions_count > 0 || row.prs.length > 0;
+  return row.writes.length > 0 || row.prs.length > 0;
 }
 
 function FilterButton({
@@ -189,9 +195,7 @@ function CheckItem({
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-medium">
           Check {tick.tick_number}
-          {tick.trigger_kind === "manual" && (
-            <span className="ns-tag ml-1.5 align-middle">manually triggered</span>
-          )}
+          <CheckTriggerIcon triggerKind={tick.trigger_kind} />
           {tick.metric_value !== null && (
             <span className="ml-1.5 font-normal tabular-nums text-[hsl(var(--notfair-ink-3))]">
               → {formatMetric(tick.metric_value)}
@@ -217,7 +221,10 @@ function CheckItem({
       {/* Running agent checks are watchable live: the session attaches at
           turn start and the check page's transcript polls as it streams.
           No-op checks never carry a session and stay unlinked. */}
-      {(tick.session_id || tick.status === "running" || tick.prs.length > 0) && (
+      {(tick.session_id ||
+        tick.status === "running" ||
+        tick.prs.length > 0 ||
+        tick.writes.length > 0) && (
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           {(tick.session_id || tick.status === "running") && (
             <Link
@@ -227,12 +234,61 @@ function CheckItem({
               {tick.status === "running" ? "watch live ›" : "details ›"}
             </Link>
           )}
+          {tick.writes.map((write) => (
+            <CheckWriteBadge key={write.label} write={write} />
+          ))}
           {tick.prs.map((pr) => (
             <CheckPrButton key={pr.id} pr={pr} />
           ))}
         </div>
       )}
     </li>
+  );
+}
+
+/** Quiet trigger provenance: icon at rest, full wording on hover/focus. */
+function CheckTriggerIcon({
+  triggerKind,
+}: {
+  triggerKind: CheckRow["trigger_kind"];
+}) {
+  const manual = triggerKind === "manual";
+  if (!manual && triggerKind !== "heartbeat") return null;
+  const label = manual ? "Manually triggered" : "Heartbeat triggered";
+  const Icon = manual ? Zap : HeartPulse;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          tabIndex={0}
+          aria-label={label}
+          className={cn(
+            "ml-1 inline-flex size-4 translate-y-[2px] items-center justify-center rounded-sm align-baseline outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            manual
+              ? "text-[hsl(var(--notfair-warn))]"
+              : "text-[hsl(var(--notfair-ink-4))]",
+          )}
+        >
+          <Icon className={cn("size-3", manual && "fill-current")} aria-hidden />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={4}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Compact accent pill naming one kind of modification the check made
+ *  ("Campaign budget updated", "Keyword paused ×3"). */
+function CheckWriteBadge({ write }: { write: CheckWrite }) {
+  return (
+    <span className="ns-tag-accent inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium">
+      {write.label}
+      {write.count > 1 && ` ×${write.count}`}
+    </span>
   );
 }
 

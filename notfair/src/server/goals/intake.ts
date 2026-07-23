@@ -36,8 +36,8 @@ greet: acknowledge the ambition in one sentence, ask only what's truly
 blocking (if anything), then explore the data, author + TEST the metric
 query, verify it via propose_goal_metric, and report the measured
 baseline with a suggested target, cadence, and spend envelope. End by
-asking the user to confirm (they'll press START on your Goal tab after
-you record their agreement via propose_target).`;
+asking the user to confirm — the moment they do, record it via
+propose_target, which starts the loop and fires the first check.`;
 }
 
 /** Fire-and-forget from goal creation. The goal screen's embedded chat

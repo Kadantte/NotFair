@@ -1,14 +1,118 @@
 # NotFair
 
-## Unreleased
+## 0.9.18 — 2026-07-22
+
+**Streaming replies now stay visually quiet.** While the agent writes, chat shows only the animated **Writing the response** label—without a spinner, goal name, timer, tool subtitle, or activity history—so the status no longer competes with the response itself.
+
+## 0.9.17 — 2026-07-22
+
+**Completed goals now get the celebration they deserve.** Achievements stay visible in the sidebar with a sparkling **Completed** badge until you open the congratulations experience, where you can set a more ambitious next milestone or archive the goal without losing its chat, checks, metrics, or evidence.
+
+**Background NotFair servers can reliably launch Codex.** Codex discovery no longer depends entirely on an interactive shell’s `PATH`; chat execution, health checks, login, and usage status now find standard installations and the executable bundled with the ChatGPT desktop app while still honoring `NOTFAIR_CODEX_BIN`.
+
+## 0.9.16 — 2026-07-22
+
+**NotFair now starts with the Node.js runtime that matches its installed native database module.** Global installs no longer land on a server-error page when the shell and npm installation use different Node.js versions.
+
+**Interrupted checks recover safely after a restart.** Finished turns are reconciled from their stored transcript, genuinely interrupted work is marked failed instead of running forever, and checks owned by another live NotFair process are left untouched.
+
+**Finished tool activity no longer keeps shimmering.** Missing tool-result events are closed at terminal turn boundaries and retain the correct success or failure state.
+
+## 0.9.15 — 2026-07-21
+
+**Background updates no longer modify a running installation.** NotFair now downloads the exact npm release into its local update cache without installing it; only clicking **Update to v…** performs the global install, immediately restarts a managed server, and reloads the app. This removes the live-file replacement window that could leave Chrome requesting chunks from two different builds.
+
+## 0.9.14 — 2026-07-21
+
+**Goal chat now reflects Codex’s real model defaults and reasoning controls.** The model menu no longer duplicates the configured default, and each provider-supported reasoning effort can be selected per goal and carried safely through the chat API to the Codex CLI.
+
+**Every check exposes the prompt that started it.** The trigger appears as a normal user-style message, expands into fully rendered Markdown, and stays contained within the transcript so long activity labels cannot make the whole workspace scroll.
+
+**Updates download before you ask to apply them.** When a release is available, NotFair downloads it automatically; the visible update button then restarts the managed server and applies the release immediately instead of presenting a second restart step.
+
+## 0.9.13 — 2026-07-21
+
+**Adding a server now opens the connector catalog immediately.** The Connections page and onboarding’s **More tools** tile skip the extra menu and go straight to **Browse connectors**, where **Add custom connector** is always the final option—even when every trusted connector is already connected.
+
+**The goal sidebar is quieter and easier to control.** Goal rows no longer carry redundant status dots, group rows match the same visual style with an inline disclosure chevron instead of a count, nested action menus align with their parent, and hovering one goal reveals only that goal’s actions.
+
+## 0.9.12 — 2026-07-21
+
+**All goals now opens as a grouped metrics dashboard.** Every goal card leads with its live value, target or hold threshold, health, recent history, and check freshness; groups structure the page, pinned and live goals stay prominent, and every card opens the selected goal's full dashboard and chat. The layout works from mobile through wide desktop and refreshes active goal data automatically.
+
+**Expanded tool activity is calmer and easier to scan.** Tool groups summarize work in plain language, keep their disclosure control stable through streaming updates, and expand into a compact, scrollable activity list without nested result boxes or layout jumps.
+
+**Metric history renders at the requested size.** Goal sparklines now honor their height in both measured and empty states, keeping dashboard cards aligned while readings arrive.
+
+## 0.9.11 — 2026-07-21
+
+**Needs You requests now open the conversation that raised them.** Every escalation includes a **Details** link to its originating check, where completed checks remain fully conversational so you can ask follow-up questions or give the agent more work in the right context.
+
+**The Checks rail now owns its schedule and trigger context.** The next-check countdown (or running state) lives in the section heading, while manual and heartbeat checks use compact, accessible icons with full labels on hover or keyboard focus.
+
+**Long chats keep repeated messages and tool activity stable.** Transcript merging now deduplicates only by durable event IDs, and reused harness tool IDs receive occurrence-aware UI keys, preventing dropped repeated turns, key collisions, and tool-list flicker.
+
+## 0.9.10 — 2026-07-21
+
+**Fresh installs now start cleanly on every supported Node.js version.** The CLI refreshes Next.js's bundled `better-sqlite3` copies from npm's locally built dependency before each server start, so installing a release built with Node 24 no longer produces a database-module error when the user's active runtime is Node 20, 22, 25, or 26.
+
+## 0.9.9 — 2026-07-21
+
+**Sidebar upgrades no longer fail with `npm exited with code 7`.** NotFair now launches npm and its restart helper from the user's stable home directory, so rebuilding or replacing the standalone app cannot strand the updater inside a directory that no longer exists.
+
+**Restarting after an upgrade uses the correct native database binary.** Before offering **Restart now**, the updater synchronizes Next.js's traced `better-sqlite3` copies with the dependency npm built for the user's active Node.js version. This prevents the upgraded app from landing on a server-error screen when the release builder and local Node versions use different native ABIs.
+
+## 0.9.8 — 2026-07-21
+
+**Completed checks stay fully conversational.** Opening a finished check from the goal rail now keeps its composer and model picker active, so you can ask follow-up questions or give the agent more work in that check's original context instead of being sent back to the main goal chat.
+
+**The goal rail is easier to scan and control.** The goal statement and primary metric now have explicit **Goal** and **Main metric** headings, and every right-rail section can be collapsed independently without losing its internal state.
+
+**Tool activity no longer flashes open and shut.** Live tool groups stay quietly collapsed by default, keep a stable identity while streaming results settle into the transcript, and preserve the user's manual expanded state through completion.
+
+## 0.9.7 — 2026-07-21
+
+**`notfair update` — one command from "there's a newer version" to running it.** Checks npm, installs globally, and restarts whatever is running: launchd-managed servers restart through the (freshly rewritten) LaunchAgent, background daemons are stopped and relaunched on the same port and data dir, and source checkouts are pointed at `git pull && pnpm build` instead of being paved over.
+
+**In-app updates actually work now — and finish with one click.** The sidebar's update check had been dead since the rebrand: it asked the npm registry for `NotFair`, but the registry is case-sensitive and the package is `notfair`, so the "update available" button never appeared. Fixed — and upgraded: after installing an update, background and launchd-managed servers now show **Restart now**, restart themselves, and reload the page on the new version. No more "go restart it in your terminal" (that note remains only for foreground/dev runs, which the app never kills).
+
+**Search Console setup now handles accounts with no reachable properties.** Empty `sites` and `siteEntry` responses are valid and render as an empty property list instead of being rejected as malformed. The test suite now covers 80%+ of executable statements and lines, with enforced coverage thresholds to prevent regression.
+
+## 0.9.6 — 2026-07-21
+
+**NotFair now runs in the background — and survives reboots.** `notfair` (or `notfair start`) detaches the server, waits for it to answer, and opens the UI; your terminal stays free and closing it no longer kills the loop. New lifecycle commands: `notfair status` (pid, port, uptime, health), `notfair stop` (finally implemented), and `notfair logs -f` (server log lives at `~/.notfair/logs/server.log`). `notfair autostart enable` installs a macOS LaunchAgent that starts NotFair at login and restarts it if it crashes — launchd becomes the single owner, so `start`/`stop` delegate to it instead of racing it for the port, the agent captures your shell's PATH so `claude`/`codex` stay reachable at login, and `start` self-heals the entry when an upgrade moves the package on disk. `--foreground` keeps the old attached behavior.
+
+## 0.9.5 — 2026-07-21
+
+**The "Needs you" panel is now the single source of truth for repeated asks.** Agents were told to repeat user-action asks in every check summary, but nothing told them when an ask was closed — so asks you'd already handled kept echoing from summary to summary forever. Every tick brief now mirrors the panel's live list of open escalations: the agent repeats exactly those, and only those. A handled-but-still-broken problem comes back as a fresh escalation with new evidence, so the panel and the diary can never drift apart again.
+
+## 0.9.4 — 2026-07-20
+
+**The working indicator's status text is visible again.** The shimmer gradient referenced a CSS token that doesn't exist, which invalidated the whole background — and with `background-clip: text` in play, the headline ("Calling the model", "Thinking", "Using N tools") rendered fully transparent, leaving a blank gap next to the spinner. The same undefined-token sweep restores the metric card's active-segment fill, the context dialog's content wells, chip hover colors, and the "Needs you" badge count.
+
+**Linux gets a native folder picker.** The Browse button now works on Linux desktops via zenity (GTK) with a kdialog (KDE/Plasma) fallback, and reports a clear error when neither is installed. Contributed by @RohithVangalla1 (#77), ported to the renamed app tree.
+
+## 0.9.3 — 2026-07-20
+
+**Tagline refined.** "Goal-driven, loop-powered marketing agents that crush your business goals 24/7" — the identity and the hustle in one line, across npm, CLI `--help`, and the READMEs. First release published by the new auto-publish GitHub Action.
+
+## 0.9.2 — 2026-07-20
+
+**New one-liner everywhere it counts.** npm description, CLI `--help`, and both READMEs now lead with what NotFair actually is: marketing agents that chase your goals 24/7, on your own machine. No code changes.
+
+## 0.9.1 — 2026-07-20
+
+**Confirming the plan in chat starts the loop — the START button is gone.** Intake used to double-confirm: agree the plan in chat, then press START on the Goal tab. Now your confirmation in chat IS the consent moment — the moment the agent records the agreed target (`propose_target`), the goal goes active and the first check runs immediately.
+
+**Check diary rows show what changed.** Each check on the Checks rail now carries write badges — MCP writes classified from the check's own tool calls ("Campaign budget updated"), plus agent-labeled action badges for logged mutations. The "Action taken" filter keys off real writes, so read-only checks stay out of the way.
+
+**CLI: relative `--data-dir` no longer strands your database in the npm cache.** The path is resolved to absolute before it reaches the server; previously `--data-dir ./data` validated one directory and wrote `db.sqlite` into another (inside the npx cache, for `npx notfair` runs). The `pnpm cli` script now points at the real CLI entry, and the `--help` text no longer references a long-dead runtime.
 
 **Codex account and model state now match the local CLI.** The sidebar reads authentication independently from usage availability, shows the correct ChatGPT Pro label, keeps authenticated users signed in when a rate-limit window is absent, and offers a working manual sign-in button when Codex is actually logged out. The chat model selector now names the configured Codex model instead of showing an opaque “Default” label.
 
 **Completed checks stop looking active.** A harness final event now renders as a static “Turn complete” state with no spinner, heartbeat, shimmer, or increasing timer. Read-only check logs also explain that follow-up belongs in the goal chat instead of implying the agent is still working forever.
 
 **Code changes go through pull requests — and the loop tracks them natively.** Goals whose levers live in your website's code (SEO above all) now have a sanctioned, governed channel: the agent may change code only inside the workspace's **Codebase folder** (new Settings card, validated + editable any time), only on a `notfair/…` branch, and only via a PR it registers with the new `register_pull_request` tool — never a direct push, never merging its own PR. You review and merge on GitHub, exactly like any teammate's PR. PR state syncs through your authenticated `gh` CLI via a centralized freshness sweep on the 30-second scheduler: every open PR carries its own adaptive `next_sync_at` (checks every 2 minutes right after activity, decaying to hourly for long-quiet PRs, resetting on any observed change; merged/closed PRs leave the schedule forever), with tick-time and goal-page-view syncs kept as correctness/UX guarantees and a single-flight guard so triggers coalesce. Each tick brief therefore carries the live truth: changes requested → the agent addresses your review comments that tick; awaiting review → your Goal tab and the goals index show a "PR needs your review" badge; merged → the observation window measures from there; closed unmerged → the agent scores the action as rejected and learns. Open PRs also pin the heartbeat to its normal cadence (no smart-sleep past a pending review). Without a codebase folder set, code stays off-limits and agents log recommendations instead.
-
-**Fix: the START button now appears without a manual reload.** The goal page only auto-refreshed during `intake` and `active`, so once the metric verified (→ `proposed`) the page went static — the agent would say "press START" but the button never rendered until you reloaded. `proposed` goals now poll too, so the target recording and the START card surface live.
 
 **Goal creation gets a platform focus — dynamic per workspace.** The goal form (goals index and a new onboarding step 3, "First goal") shows one focus chip per connected platform — Google Ads, Meta Ads, SEO (Search Console), X Ads, Analytics — plus "Other". Picking a focus swaps in platform-appropriate placeholder text and tap-to-fill example statements, and the choice rides along to the agent's intake kickoff so it explores the right platform even when the statement is ambiguous. Connect Search Console and SEO goals are one tap away — without auto-flooding the index with machine-proposed goals (the audited X Ads suggestions remain the only auto-generated ones). Onboarding now ends by minting that first goal instead of dropping you on an empty index; skippable, and the workspace form is identical.
 

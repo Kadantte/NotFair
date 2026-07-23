@@ -8,7 +8,6 @@ import {
   getLatestGoalForAgent,
   listGoalLearnings,
 } from "@/server/db/goals";
-import { listSessionsForAgent } from "@/server/sessions/view";
 import { readTranscriptTail } from "@/server/sessions/transcript-tail";
 import { getMcpCatalog } from "@/server/mcp-catalog";
 import { DEFAULT_HARNESS_ADAPTER, requireAdapter } from "@/server/adapters/registry";
@@ -21,9 +20,9 @@ import { GoalMemoryDialog } from "@/components/goal-memory-dialog";
 export const dynamic = "force-dynamic";
 
 /**
- * Read-only transcript of one loop check (tick). Reached from the goal
- * screen's Checks list; the composer is disabled — steering happens in
- * the goal's own conversation, not inside a check's log.
+ * Conversation for one loop check (tick). Reached from the goal screen's
+ * Checks list; follow-up turns resume the same harness session so the agent
+ * keeps the check's exact context, tools, and transcript.
  */
 export default async function CheckTranscriptPage({
   params,
@@ -38,8 +37,6 @@ export default async function CheckTranscriptPage({
   const goal =
     getGoalForAgent(resolved.agent_id) ?? getLatestGoalForAgent(resolved.agent_id);
 
-  const sessions = listSessionsForAgent(slug, resolved.agent_id);
-  const existing = sessions.find((s) => s.sessionId === threadId);
   const { events: initialEvents, cursor: initialCursor } = readTranscriptTail(
     slug,
     resolved.agent_id,
@@ -69,7 +66,7 @@ export default async function CheckTranscriptPage({
           Back to goal
         </Link>
         <h1 className="m-0 min-w-0 truncate text-[14px] font-semibold">
-          {goal ? goalLabel(goal) : resolved.name} — check log
+          {goal ? goalLabel(goal) : resolved.name} — check chat
         </h1>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <GoalContextDialog
@@ -103,10 +100,9 @@ export default async function CheckTranscriptPage({
           threadId={threadId}
           initialEvents={initialEvents}
           initialCursor={initialCursor}
-          composerDisabled
-          disabledComposerPlaceholder="This check log is read-only — follow up from the goal chat"
           showCompletedStatus
           mcpCatalog={mcpCatalog}
+          modelOptions={modelOptions}
         />
       </div>
     </div>

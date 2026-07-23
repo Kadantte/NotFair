@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition, type DragEvent } from "react";
 import { toast } from "sonner";
 import {
   ChevronRight,
+  CircleCheck,
   LayoutDashboard,
   MoreVertical,
   Pencil,
@@ -45,22 +46,23 @@ import { cn } from "@/lib/utils";
 export const GOAL_DRAG_TYPE = "application/x-notfair-goal";
 
 /**
- * One goal group in the sidebar rail: a collapsible header (chevron + name +
- * live-goal count) with its member goals nested beneath, a ⋮ menu (dashboard,
- * rename, delete), and a drop target for goal rows dragged from the rail.
+ * One goal group in the sidebar rail: a goal-style collapsible row with its
+ * member goals nested beneath, a ⋮ menu (dashboard, rename, delete), and a
+ * drop target for goal rows dragged from the rail.
  */
 export function SidebarGoalGroup({
   groupId,
   name,
   href,
-  liveCount,
+  completedCount = 0,
   children,
 }: {
   groupId: string;
   name: string;
   /** Group dashboard route. */
   href: string;
-  liveCount: number;
+  /** Unarchived achievements inside a collapsed group remain discoverable. */
+  completedCount?: number;
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -134,17 +136,24 @@ export function SidebarGoalGroup({
           dragOver && "bg-sidebar-accent ring-2 ring-sidebar-ring",
         )}
       >
+        <span className="truncate">{name}</span>
+        {completedCount > 0 && (
+          <span
+            aria-label={`${completedCount} completed goal${completedCount === 1 ? "" : "s"}`}
+            className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-[hsl(var(--notfair-accent-soft))] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-[hsl(var(--notfair-accent))]"
+          >
+            <CircleCheck className="!size-3" />
+            {completedCount}
+          </span>
+        )}
         <ChevronRight
+          data-group-chevron
           aria-hidden
           className={cn(
             "!size-3.5 shrink-0 text-[hsl(var(--notfair-ink-4))] transition-transform",
             !collapsed && "rotate-90",
           )}
         />
-        <span className="truncate font-medium">{name}</span>
-        <span className="ml-auto text-[11px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
-          {liveCount}
-        </span>
       </SidebarMenuButton>
 
       <DropdownMenu>
@@ -183,7 +192,9 @@ export function SidebarGoalGroup({
       </DropdownMenu>
 
       {/* Members stay mounted while collapsed so their dialog state survives. */}
-      <SidebarMenuSub hidden={collapsed}>{children}</SidebarMenuSub>
+      <SidebarMenuSub className="mr-0 pr-0" hidden={collapsed}>
+        {children}
+      </SidebarMenuSub>
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="max-w-sm">

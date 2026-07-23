@@ -37,22 +37,36 @@ beforeEach(() => {
 
 describe("GoalNeedsYouDialog", () => {
   it("renders no trigger when there are no open asks", () => {
-    const { container } = render(<GoalNeedsYouDialog items={[]} />);
+    const { container } = render(
+      <GoalNeedsYouDialog items={[]} projectSlug="acme" agentSlug="meta-errors" />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the badge count and lists every ask on open", () => {
-    render(<GoalNeedsYouDialog items={ITEMS} />);
+    render(
+      <GoalNeedsYouDialog items={ITEMS} projectSlug="acme" agentSlug="meta-errors" />,
+    );
     const trigger = screen.getByRole("button", { name: /needs you\s*2/i });
     fireEvent.click(trigger);
     expect(screen.getByText(/OPENAI_API_KEY/)).toBeInTheDocument();
     expect(screen.getByText(/raised 1h ago · check #43/)).toBeInTheDocument();
     expect(screen.getByText(/Meta app image-upload access/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Details for check #43" })).toHaveAttribute(
+      "href",
+      "/acme/goals/meta-errors/checks/tick-43",
+    );
+    expect(screen.getByRole("link", { name: "Details in goal chat" })).toHaveAttribute(
+      "href",
+      "/acme/goals/meta-errors",
+    );
   });
 
   it("marks an ask handled and refreshes", async () => {
     markHandled.mockResolvedValue({ ok: true });
-    render(<GoalNeedsYouDialog items={ITEMS} />);
+    render(
+      <GoalNeedsYouDialog items={ITEMS} projectSlug="acme" agentSlug="meta-errors" />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /needs you\s*2/i }));
     fireEvent.click(screen.getAllByRole("button", { name: /mark handled/i })[0]!);
     await waitFor(() => expect(markHandled).toHaveBeenCalledWith("a1"));

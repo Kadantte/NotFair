@@ -14,7 +14,10 @@ import {
   TranscriptEmptyState,
   UserBubble,
 } from "@/components/chat/messages";
-import { collapseEvents } from "@/components/chat/transcript-model";
+import {
+  collapseEvents,
+  nextToolGroupKey,
+} from "@/components/chat/transcript-model";
 import { useChatStream } from "@/components/chat/use-chat-stream";
 import type { McpCatalogEntryLite } from "@/components/chat/tool-intent";
 import {
@@ -35,17 +38,7 @@ type Props = {
   initialEvents: TranscriptEvent[];
   /** Byte offset *after* `initialEvents` — polls start from here. */
   initialCursor: number;
-  /**
-   * When true, disables the composer. This does not imply that a turn is
-   * still running; read-only transcript views also disable the composer.
-   */
-  composerDisabled?: boolean;
-  /**
-   * Optional explanation shown inside a disabled composer. Read-only
-   * transcript views use this instead of claiming the agent is working.
-   */
-  disabledComposerPlaceholder?: string;
-  /** Keep a static terminal status visible in read-only transcript views. */
+  /** Keep a static terminal status visible after a completed turn. */
   showCompletedStatus?: boolean;
   /**
    * Set when the agent's task is parked in `blocked` (e.g., waiting on a
@@ -86,8 +79,6 @@ export function LiveTranscript({
   threadId,
   initialEvents,
   initialCursor,
-  composerDisabled = false,
-  disabledComposerPlaceholder,
   showCompletedStatus = false,
   blockedReason,
   mcpCatalog,
@@ -98,20 +89,47 @@ export function LiveTranscript({
   // per project+agent in localStorage; loaded after mount so SSR and the
   // first client render agree (no hydration mismatch).
   const modelStorageKey = `NotFair:model:${projectSlug}:${agentSlug}`;
+  const effortStorageKey = `NotFair:effort:${projectSlug}:${agentSlug}`;
   const [model, setModel] = useState("");
+  const [reasoningEffort, setReasoningEffort] = useState("");
   useEffect(() => {
     const stored = window.localStorage.getItem(modelStorageKey);
-    if (stored && modelOptions.some((m) => m.value === stored)) {
-      setModel(stored);
+    const storedOption = modelOptions.find((m) => m.value === stored);
+    if (storedOption && !storedOption.is_default) {
+      setModel(storedOption.value);
+    } else if (storedOption?.is_default) {
+      window.localStorage.removeItem(modelStorageKey);
     }
     // modelOptions is a fresh array per render from the server page —
     // key its identity by content to avoid effect churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelStorageKey, JSON.stringify(modelOptions)]);
+  const defaultModel = modelOptions.find((option) => option.is_default);
+  const selectedModel =
+    modelOptions.find((option) => option.value === model) ?? defaultModel;
+  useEffect(() => {
+    const stored = window.localStorage.getItem(effortStorageKey);
+    const supported = selectedModel?.reasoning_efforts ?? [];
+    if (
+      stored &&
+      stored !== selectedModel?.default_reasoning_effort &&
+      supported.some((option) => option.value === stored)
+    ) {
+      setReasoningEffort(stored);
+    } else {
+      setReasoningEffort("");
+      if (stored) window.localStorage.removeItem(effortStorageKey);
+    }
+  }, [effortStorageKey, selectedModel]);
   function onPickModel(value: string) {
     setModel(value);
     if (value) window.localStorage.setItem(modelStorageKey, value);
     else window.localStorage.removeItem(modelStorageKey);
+  }
+  function onPickReasoningEffort(value: string) {
+    setReasoningEffort(value);
+    if (value) window.localStorage.setItem(effortStorageKey, value);
+    else window.localStorage.removeItem(effortStorageKey);
   }
   const defaultModelLabel =
     modelOptions.find((option) => option.is_default)?.label ?? "Default";
@@ -126,6 +144,7 @@ export function LiveTranscript({
     initialEvents,
     initialCursor,
     model,
+    reasoningEffort,
   });
   const {
     events,
@@ -160,7 +179,7 @@ export function LiveTranscript({
           case "set-model": {
             const wanted = action.value.toLowerCase();
             const names = [
-              `${defaultModelLabel} (default)`,
+              ...(defaultModel ? [] : ["Default"]),
               ...modelOptions.map((m) => m.label),
             ].join(", ");
             if (!wanted) {
@@ -218,8 +237,7 @@ export function LiveTranscript({
     (e) => e.kind === "lifecycle" && e.phase === "done",
   );
   // Keep the indicator at the bottom of the transcript throughout a live
-  // turn. Read-only logs can opt into a static completed status, but merely
-  // disabling the composer must never manufacture a forever-running state.
+  // turn. Completed check conversations retain a static terminal status.
   const showThinking =
     sendingChat ||
     remoteTurnActive ||
@@ -240,7 +258,6 @@ export function LiveTranscript({
           {rendered.length === 0 &&
           !pendingUserMsg &&
           !sendingChat &&
-          !composerDisabled &&
           !blockedReason ? (
             <TranscriptEmptyState agentDisplayName={agentDisplayName} />
           ) : (
@@ -256,13 +273,13 @@ export function LiveTranscript({
                 </li>
               )}
               {pendingTools.length > 0 && (
-                <li>
+                <li key={nextToolGroupKey(rendered, pendingTools[0]!.toolCallId)}>
                   <ToolGroup tools={pendingTools} mcpCatalog={mcpCatalog} />
                 </li>
               )}
               {pendingAssistant && (
                 <li>
-                  <AssistantText body={pendingAssistant} streaming />
+                  <AssistantText body={pendingAssistant} />
                 </li>
               )}
               {pendingError && (
@@ -274,7 +291,10 @@ export function LiveTranscript({
                 </li>
               )}
               {showThinking && (
-                <li>
+                <li
+                  data-live-working-status
+                  className={pendingAssistant ? "!mt-2" : undefined}
+                >
                   {blockedReason ? (
                     <BlockedStatus reason={blockedReason} />
                   ) : (
@@ -297,20 +317,18 @@ export function LiveTranscript({
       <div className="bg-gradient-to-t from-background via-background/95 to-transparent pt-2">
         <div className="mx-auto w-full max-w-3xl px-5 pb-3 sm:px-6">
           <ChatComposer
-            disabled={composerDisabled}
             busy={composerBusy}
             sendingChat={sendingChat}
             placeholder={
-              composerDisabled
-                ? disabledComposerPlaceholder ??
-                  "The agent is working — the transcript updates live"
-                : blockedReason
-                  ? "Reply — the agent will see your message"
-                  : "Message this goal's agent…  (type / for commands)"
+              blockedReason
+                ? "Reply — the agent will see your message"
+                : "Message this goal's agent…  (type / for commands)"
             }
             modelOptions={modelOptions}
             model={model}
+            reasoningEffort={reasoningEffort}
             onPickModel={onPickModel}
+            onPickReasoningEffort={onPickReasoningEffort}
             onSubmit={(text) => void onSubmit(text)}
             onStop={stream.stopTurn}
           />

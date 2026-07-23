@@ -12,11 +12,14 @@ import { cn } from "@/lib/utils";
 export function RailSection({
   title,
   count,
+  meta,
   defaultOpen = true,
   children,
 }: {
   title: string;
   count?: number;
+  /** Compact status shown in the section heading, before the chevron. */
+  meta?: React.ReactNode;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
@@ -35,12 +38,19 @@ export function RailSection({
             <span className="ml-1 font-normal tabular-nums">({count})</span>
           )}
         </span>
-        <ChevronDown
-          className={cn(
-            "size-3.5 shrink-0 text-[hsl(var(--notfair-ink-4))] transition-transform",
-            !open && "-rotate-90",
+        <span className="flex shrink-0 items-center gap-1.5">
+          {meta && (
+            <span className="text-[10.5px] font-normal tracking-normal text-[hsl(var(--notfair-ink-4))] normal-case">
+              {meta}
+            </span>
           )}
-        />
+          <ChevronDown
+            className={cn(
+              "size-3.5 shrink-0 text-[hsl(var(--notfair-ink-4))] transition-transform",
+              !open && "-rotate-90",
+            )}
+          />
+        </span>
       </button>
       <div hidden={!open}>{children}</div>
     </section>

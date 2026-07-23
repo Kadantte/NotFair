@@ -110,7 +110,7 @@ export function NewGoalForm({
               type="button"
               disabled={pending}
               onClick={() => setStatement(example)}
-              className="rounded-lg bg-[hsl(var(--notfair-surface-2)/0.6)] px-2.5 py-1 text-[12px] text-[hsl(var(--notfair-ink-3))] shadow-[var(--notfair-shadow-sm)] transition-colors hover:bg-[hsl(var(--notfair-surface-2))] hover:text-[hsl(var(--notfair-ink-1))]"
+              className="rounded-lg bg-[hsl(var(--notfair-surface-2)/0.6)] px-2.5 py-1 text-[12px] text-[hsl(var(--notfair-ink-3))] shadow-[var(--notfair-shadow-sm)] transition-colors hover:bg-[hsl(var(--notfair-surface-2))] hover:text-[hsl(var(--notfair-ink))]"
             >
               {example}
             </button>
@@ -121,7 +121,7 @@ export function NewGoalForm({
       <div className="flex items-center justify-between gap-3">
         <p className="m-0 text-[12px] text-[hsl(var(--notfair-ink-4))]">
           An agent takes it from here: it turns this into a measured metric,
-          shows you the baseline, and nothing runs until you press START.
+          shows you the baseline, and nothing runs until you confirm the plan.
         </p>
         <Button onClick={submit} disabled={pending || !statement.trim()}>
           {pending ? "Creating…" : "Create goal"}

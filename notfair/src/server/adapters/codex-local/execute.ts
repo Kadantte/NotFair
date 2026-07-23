@@ -4,10 +4,9 @@ import { join } from "node:path";
 import type { HarnessEvent, HarnessExecuteContext } from "../types";
 import { makeCodexStreamState, parseCodexLine } from "./parse";
 import { bearerEnvVarForServer } from "./mcp";
+import { resolveCodexBinary } from "./binary";
 import { getOrCreateMcpServerSecret } from "@/server/mcp-server/secret";
 import { listProjectMcpTokens } from "@/server/mcp/tokens";
-
-const CODEX_BIN = process.env.NOTFAIR_CODEX_BIN?.trim() || "codex";
 
 /**
  * Stream one chat turn through the Codex CLI.
@@ -44,6 +43,12 @@ export async function* executeCodexLocal(
   if (ctx.model) {
     args.push("-m", ctx.model);
   }
+  if (ctx.reasoningEffort) {
+    args.push(
+      "-c",
+      `model_reasoning_effort=${JSON.stringify(ctx.reasoningEffort)}`,
+    );
+  }
 
   // Resume only when we have a real codex thread id from a prior turn.
   // NotFair's session UUID is not a codex thread id — passing it would
@@ -73,7 +78,7 @@ export async function* executeCodexLocal(
   for (const token of listProjectMcpTokens(ctx.projectSlug)) {
     mcpEnv[bearerEnvVarForServer(token.server_name)] = token.access_token_enc;
   }
-  const child = spawn(CODEX_BIN, args, {
+  const child = spawn(resolveCodexBinary(), args, {
     cwd: ctx.workspaceDir,
     env: {
       ...process.env,

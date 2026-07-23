@@ -13,6 +13,8 @@ import { getDb } from "./db";
  *                              │
  *                              ▼
  *                 achieved | failed | killed   (terminal)
+ *                    │
+ *                    └── user sets next milestone ──▶ active
  *
  * intake   — goal agent is authoring + testing the metric query
  * proposed — metric verified server-side, baseline measured; awaiting the
@@ -121,6 +123,7 @@ export type GoalTick = {
   goal_id: string;
   tick_number: number;
   trigger_kind: GoalTickTrigger;
+  owner_pid: number | null;
   session_id: string | null;
   metric_value: number | null;
   metric_error: string | null;
@@ -231,6 +234,114 @@ export function listLiveGoals(project_slug: string): Goal[] {
 }
 
 /**
+ * Goals shown in daily navigation. Achievements remain visible until the user
+ * explicitly archives them, which prevents the completion moment from
+ * silently disappearing between sidebar refreshes.
+ */
+export function listSidebarGoals(project_slug: string): Goal[] {
+  return getDb()
+    .prepare(
+      `SELECT g.* FROM goals g
+        LEFT JOIN goal_archives a ON a.goal_id = g.id
+        WHERE g.project_slug = ?
+          AND (
+            g.status IN ('intake','proposed','active','paused')
+            OR (g.status = 'achieved' AND a.goal_id IS NULL)
+          )
+        ORDER BY
+          CASE WHEN g.status = 'achieved' THEN 0 ELSE 1 END,
+          CASE WHEN g.status = 'achieved' THEN g.updated_at END DESC,
+          g.created_at ASC`,
+    )
+    .all(project_slug) as Goal[];
+}
+
+/** Whether an achieved goal has been dismissed from daily navigation. */
+export function isGoalArchived(id: string): boolean {
+  return Boolean(
+    getDb().prepare("SELECT 1 FROM goal_archives WHERE goal_id = ?").get(id),
+  );
+}
+
+/**
+ * Archive an achievement without changing its historical status. Idempotent
+ * so a double click cannot corrupt or rewrite the completion record.
+ */
+export function archiveAchievedGoal(id: string): Goal | null {
+  const goal = getGoal(id);
+  if (!goal || goal.status !== "achieved") return null;
+  getDb()
+    .prepare(
+      "INSERT OR IGNORE INTO goal_archives (goal_id, archived_at) VALUES (?, ?)",
+    )
+    .run(id, now());
+  return goal;
+}
+
+/**
+ * Turn a completed achievement into the next measurable milestone. This is
+ * the one intentional terminal → live transition: it keeps the same metric,
+ * evidence, chat, and agent, but requires a target beyond the freshly
+ * completed value.
+ */
+export function continueAchievedGoal(
+  id: string,
+  input: {
+    target_value: number;
+    deadline: string | null;
+    short_label?: string | null;
+  },
+): Goal | null {
+  const goal = getGoal(id);
+  if (!goal || goal.status !== "achieved") return null;
+  if (goal.current_value === null || goal.metric_direction === null) {
+    throw new Error("This goal has no current measured value to continue from.");
+  }
+  if (!Number.isFinite(input.target_value)) {
+    throw new Error("Enter a valid target.");
+  }
+  const movesForward =
+    goal.metric_direction === "increase"
+      ? input.target_value > goal.current_value
+      : input.target_value < goal.current_value;
+  if (!movesForward) {
+    const direction = goal.metric_direction === "increase" ? "above" : "below";
+    throw new Error(
+      `Set the next target ${direction} the completed value (${goal.current_value}).`,
+    );
+  }
+  const nextTick = computeNextTick(goal.cadence_cron);
+  if (!nextTick) {
+    throw new Error(`Invalid cadence cron expression: '${goal.cadence_cron}'`);
+  }
+
+  const db = getDb();
+  const update = db.transaction(() => {
+    const result = db
+      .prepare(
+        `UPDATE goals
+            SET target_value = ?, deadline = ?,
+                short_label = COALESCE(?, short_label), status = 'active',
+                status_reason = NULL, next_tick_at = ?, updated_at = ?
+          WHERE id = ? AND status = 'achieved'`,
+      )
+      .run(
+        input.target_value,
+        input.deadline,
+        input.short_label?.trim() || null,
+        nextTick,
+        now(),
+        id,
+      );
+    if (result.changes === 0) return false;
+    db.prepare("DELETE FROM goal_archives WHERE goal_id = ?").run(id);
+    return true;
+  });
+  if (!update()) return null;
+  return getGoal(id);
+}
+
+/**
  * Chat-intake step 1: record what the user wants (statement) plus any
  * constraints they stated. Only while the goal is still in intake.
  */
@@ -318,22 +429,24 @@ export type ProposeTargetInput = {
 };
 
 /**
- * Agent proposal: record the suggested target/cadence/envelope on a
- * `proposed` goal. Does NOT start the loop — that consent belongs to the
- * user, who clicks "Start the loop" (startGoalLoop) on the Goal tab.
+ * The user's confirmation, recorded from chat: target/cadence/envelope
+ * land on the `proposed` goal and the loop goes live in the same step —
+ * proposed → active with the first heartbeat scheduled. The caller fires
+ * an immediate first tick.
  */
 export function proposeTarget(id: string, input: ProposeTargetInput): Goal | null {
   const goal = getGoal(id);
   if (!goal || goal.status !== "proposed") return null;
   const cadence = input.cadence_cron ?? goal.cadence_cron;
-  if (!computeNextTick(cadence)) {
+  const nextTick = computeNextTick(cadence);
+  if (!nextTick) {
     throw new Error(`Invalid cadence cron expression: '${cadence}'`);
   }
   getDb()
     .prepare(
       `UPDATE goals
           SET target_value = ?, mode = ?, deadline = ?, spend_envelope_usd = ?,
-              cadence_cron = ?, updated_at = ?
+              cadence_cron = ?, status = 'active', next_tick_at = ?, updated_at = ?
         WHERE id = ? AND status = 'proposed'`,
     )
     .run(
@@ -342,27 +455,10 @@ export function proposeTarget(id: string, input: ProposeTargetInput): Goal | nul
       input.deadline ?? goal.deadline,
       input.spend_envelope_usd ?? goal.spend_envelope_usd,
       cadence,
+      nextTick,
       now(),
       id,
     );
-  return getGoal(id);
-}
-
-/**
- * The user's click: proposed (with a target on record) → active. Computes
- * the first heartbeat; the caller fires an immediate first tick.
- */
-export function startGoalLoop(id: string): Goal | null {
-  const goal = getGoal(id);
-  if (!goal || goal.status !== "proposed" || goal.target_value === null) return null;
-  const nextTick = computeNextTick(goal.cadence_cron);
-  if (!nextTick) throw new Error(`Invalid cadence cron expression: '${goal.cadence_cron}'`);
-  getDb()
-    .prepare(
-      `UPDATE goals SET status = 'active', next_tick_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'proposed'`,
-    )
-    .run(nextTick, now(), id);
   return getGoal(id);
 }
 
@@ -496,8 +592,9 @@ export function listGatedActionsForOtherAgents(
 
 /**
  * Status transitions outside the intake→proposed→active happy path:
- * pause/resume and the three terminal states. Terminal states are
- * one-way — a closed goal is history, not a resumable draft.
+ * pause/resume and the three terminal states. This generic transition stays
+ * one-way; the explicit achieved → active continuation is isolated in
+ * continueAchievedGoal so a failed or closed goal can never be revived.
  */
 export function setGoalStatus(
   id: string,
@@ -620,6 +717,8 @@ export type CreateGoalActionInput = {
   expected_effect: string;
   review_after?: string | null;
   spend_usd?: number | null;
+  /** Agent-written check-diary badge, e.g. "Budget updated". */
+  badge?: string | null;
 };
 
 export function createGoalAction(input: CreateGoalActionInput): GoalAction {
@@ -643,7 +742,28 @@ export function createGoalAction(input: CreateGoalActionInput): GoalAction {
     input.spend_usd ?? null,
     ts,
   );
+  const badge = input.badge?.trim().slice(0, 60);
+  if (badge) {
+    db.prepare(
+      "INSERT INTO goal_action_badges (action_id, badge, created_at) VALUES (?, ?, ?)",
+    ).run(id, badge, ts);
+  }
   return getGoalAction(id)!;
+}
+
+/** Agent-written badges across a goal's actions, oldest first per tick. */
+export function listGoalActionBadges(
+  goal_id: string,
+): Array<{ tick_number: number | null; badge: string }> {
+  return getDb()
+    .prepare(
+      `SELECT a.tick_number AS tick_number, b.badge AS badge
+         FROM goal_action_badges b
+         JOIN goal_actions a ON a.id = b.action_id
+        WHERE a.goal_id = ?
+        ORDER BY a.created_at ASC, a.rowid ASC`,
+    )
+    .all(goal_id) as Array<{ tick_number: number | null; badge: string }>;
 }
 
 export function getGoalAction(id: string): GoalAction | null {
@@ -823,9 +943,9 @@ export function createGoalTick(input: {
   const ts = now();
   db.prepare(
     `INSERT INTO goal_ticks
-       (id, goal_id, tick_number, trigger_kind, status, started_at)
-     VALUES (?, ?, ?, ?, 'running', ?)`,
-  ).run(id, input.goal_id, input.tick_number, input.trigger_kind, ts);
+       (id, goal_id, tick_number, trigger_kind, owner_pid, status, started_at)
+     VALUES (?, ?, ?, ?, ?, 'running', ?)`,
+  ).run(id, input.goal_id, input.tick_number, input.trigger_kind, process.pid, ts);
   return getGoalTick(id)!;
 }
 
@@ -861,6 +981,22 @@ export function finishGoalTick(
     .run(status, summary ?? null, now(), id);
 }
 
+/** Terminal transition used by crash recovery; never overwrite live progress. */
+export function finishRunningGoalTick(
+  id: string,
+  status: Extract<GoalTickStatus, "done" | "failed">,
+  summary?: string | null,
+): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE goal_ticks
+          SET status = ?, summary = ?, finished_at = ?
+        WHERE id = ? AND status = 'running'`,
+    )
+    .run(status, summary ?? null, now(), id);
+  return result.changes === 1;
+}
+
 export function listGoalTicks(
   goal_id: string,
   limit = 30,
@@ -879,6 +1015,24 @@ export function listGoalTicks(
       "SELECT * FROM goal_ticks WHERE goal_id = ? ORDER BY tick_number DESC LIMIT ?",
     )
     .all(goal_id, limit) as GoalTick[];
+}
+
+/** Every MCP/tool call started across a goal's tick sessions, in event
+ *  order — the checks list classifies these into write badges. */
+export function listTickToolCalls(
+  goal_id: string,
+): Array<{ tick_number: number; name: string }> {
+  return getDb()
+    .prepare(
+      `SELECT t.tick_number AS tick_number,
+              json_extract(e.payload_json, '$.name') AS name
+         FROM goal_ticks t
+         JOIN transcript_events e ON e.session_id = t.session_id
+        WHERE t.goal_id = ? AND e.kind = 'tool'
+          AND json_extract(e.payload_json, '$.phase') = 'start'
+        ORDER BY t.tick_number ASC, e.seq ASC`,
+    )
+    .all(goal_id) as Array<{ tick_number: number; name: string }>;
 }
 
 /** Specific ticks by number, newest first — backs the filtered checks list. */

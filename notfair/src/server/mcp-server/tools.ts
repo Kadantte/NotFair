@@ -26,7 +26,8 @@ import {
  * its IDENTITY.md — we never derive identity from the bearer.
  *
  * The surface is deliberately small: the goal lifecycle
- * (define → propose metric → propose target → user clicks START), the loop's bookkeeping
+ * (define → propose metric → propose target on the user's confirm, which
+ * starts the loop), the loop's bookkeeping
  * (actions, reviews, learnings, status), the shared workspace context,
  * and auxiliary scheduling. There is no task board, no approvals, no
  * delegation — one agent, one goal, one loop.
@@ -156,7 +157,7 @@ async function handleProposeGoalMetricTool(input: unknown): Promise<ToolResult> 
   const r = await handleProposeGoalMetric(rest, { project_slug, agent_id });
   if (!r.ok) return { ok: false, error: r.error };
   return txt(
-    `Metric verified server-side. Baseline measured: ${r.data.baseline_value}. Report this to the user, suggest a target + cadence + spend envelope, and record it with propose_target once they agree. They start the loop with the START button on your Goal tab.`,
+    `Metric verified server-side. Baseline measured: ${r.data.baseline_value}. Report this to the user, suggest a target + cadence + spend envelope, and record it with propose_target once they agree — recording it starts the loop immediately.`,
   );
 }
 
@@ -280,7 +281,7 @@ async function handleProposeTargetTool(input: unknown): Promise<ToolResult> {
   const r = handleProposeTarget(rest, { project_slug, agent_id });
   if (!r.ok) return { ok: false, error: r.error };
   return txt(
-    "Target recorded. Tell the user everything is set and point them at the START button on your Goal tab — the loop begins the moment they click it (the first tick runs immediately). You cannot start it yourself.",
+    "Target recorded — the loop is LIVE and the first check is running now. Tell the user the plan is locked in and they can watch the first check on their Goal tab.",
   );
 }
 
@@ -345,6 +346,13 @@ const logGoalActionInput = z.object({
     .optional()
     .describe(
       "Estimated INCREMENTAL spend this action commits (e.g. a budget raise's expected extra cost until review). The platform sums these against the envelope and shows the total in every tick brief. Omit for spend-neutral actions.",
+    ),
+  action_badge: z
+    .string()
+    .max(60)
+    .optional()
+    .describe(
+      "2–4 word past-tense badge naming what changed, shown on this check's diary row (e.g. 'Budget updated', 'Keywords paused', 'Ad label updated'). REQUIRED for mutations, except pull-request changes — the PR badge is automatic, omit it there. Omit for research/decision actions.",
     ),
 });
 
@@ -571,7 +579,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "propose_target",
     description:
-      "Intake step 3: record the target/cadence/spend envelope the user agreed to in chat. This does NOT start the loop — the user clicks START on your Goal tab (platform-enforced consent), which also fires the first tick immediately. Rejects targets on the wrong side of the baseline.",
+      "Intake step 3: record the target/cadence/spend envelope the user agreed to in chat. Recording it STARTS the loop — the goal goes active and the first check fires immediately, so call this ONLY after the user has explicitly confirmed the plan. Rejects targets on the wrong side of the baseline.",
     inputSchema: proposeTargetInput,
     handler: handleProposeTargetTool,
   },

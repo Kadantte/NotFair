@@ -15,6 +15,7 @@ import {
   Pin,
   PinOff,
   Play,
+  Sparkles,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -56,15 +57,25 @@ import {
   moveGoalToGroupAction,
 } from "@/server/actions/goal-groups";
 import { GOAL_DRAG_TYPE } from "@/components/sidebar-goal-group";
+import { GoalCompletionDialog } from "@/components/goal-completion-dialog";
 import { cn } from "@/lib/utils";
 
-type LiveStatus = "intake" | "proposed" | "active" | "paused";
+type SidebarStatus = "intake" | "proposed" | "active" | "paused" | "achieved";
+
+type CompletionSummary = {
+  metricName: string | null;
+  currentValue: number | null;
+  targetValue: number | null;
+  metricDirection: "increase" | "decrease" | null;
+  completionReason: string | null;
+  completedAt: string;
+};
 
 /**
  * One goal row in the sidebar rail: link to the goal screen plus a ⋮ menu
  * (pin, rename, move to group, pause/resume, delete). Rows are draggable onto
- * group headers. Server sidebar computes the display bits (dot/label classes);
- * this component owns the interactions.
+ * group headers. Server sidebar computes the label color; this component owns
+ * the interactions.
  */
 export function SidebarGoalItem({
   href,
@@ -73,21 +84,20 @@ export function SidebarGoalItem({
   label,
   status,
   pinned,
-  dotClass,
   labelClass,
   projectSlug,
   groups,
   groupId,
   needsAttention = false,
+  completion,
 }: {
   href: string;
   /** Project home — where the user lands after deleting the open goal. */
   homeHref: string;
   goalId: string;
   label: string;
-  status: LiveStatus;
+  status: SidebarStatus;
   pinned: boolean;
-  dotClass: string;
   labelClass: string;
   projectSlug: string;
   /** Every group in the project — targets for "Move to group". */
@@ -96,6 +106,8 @@ export function SidebarGoalItem({
   groupId: string | null;
   /** Open "Needs you" escalations — renders the amber attention mark. */
   needsAttention?: boolean;
+  /** Achievement evidence for the celebration handoff. */
+  completion?: CompletionSummary;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -143,13 +155,13 @@ export function SidebarGoalItem({
       <SidebarMenuButton asChild>
         <Link
           href={href}
+          className={cn(status === "achieved" && "pr-[7.4rem]!")}
           draggable
           onDragStart={(e) => {
             e.dataTransfer.setData(GOAL_DRAG_TYPE, goalId);
             e.dataTransfer.effectAllowed = "move";
           }}
         >
-          <span className={cn("ns-dot", dotClass)} aria-hidden />
           <span className={cn("truncate", labelClass)}>{label}</span>
           {needsAttention && (
             <TriangleAlert
@@ -165,6 +177,30 @@ export function SidebarGoalItem({
           )}
         </Link>
       </SidebarMenuButton>
+
+      {status === "achieved" && completion && (
+        <GoalCompletionDialog
+          goalId={goalId}
+          label={label}
+          metricName={completion.metricName}
+          currentValue={completion.currentValue}
+          targetValue={completion.targetValue}
+          metricDirection={completion.metricDirection}
+          completionReason={completion.completionReason}
+          completedAt={completion.completedAt}
+          goalHref={href}
+          trigger={
+            <SidebarMenuAction
+              data-completion-badge
+              className="ns-completed-badge right-7 top-1 !h-6 !w-auto gap-1 rounded-full bg-[hsl(var(--notfair-accent-soft))] px-2 text-[10px] font-semibold text-[hsl(var(--notfair-accent))] shadow-[inset_0_0_0_1px_hsl(var(--notfair-accent-border))] hover:bg-[hsl(var(--notfair-accent-soft))] hover:text-[hsl(var(--notfair-accent))]"
+              aria-label={`Celebrate completed goal: ${label}`}
+            >
+              <Sparkles className="!size-3" />
+              <span>Completed</span>
+            </SidebarMenuAction>
+          }
+        />
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

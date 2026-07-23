@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Check, TriangleAlert } from "lucide-react";
+import { Check, MessageSquareText, TriangleAlert } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { markUserActionHandledAction } from "@/server/actions/goals";
+import { projectHref } from "@/lib/project-href";
 import { timeAgo } from "@/lib/time-ago";
 
 export type NeedsYouItem = {
@@ -32,7 +34,15 @@ export type NeedsYouItem = {
  * proves the fix (or you mark one handled here, which the agent later
  * verifies — and re-escalates if it is still broken).
  */
-export function GoalNeedsYouDialog({ items }: { items: NeedsYouItem[] }) {
+export function GoalNeedsYouDialog({
+  items,
+  projectSlug,
+  agentSlug,
+}: {
+  items: NeedsYouItem[];
+  projectSlug: string;
+  agentSlug: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -62,7 +72,7 @@ export function GoalNeedsYouDialog({ items }: { items: NeedsYouItem[] }) {
         >
           <TriangleAlert className="size-3.5" aria-hidden />
           Needs you
-          <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-[hsl(var(--notfair-warn))] px-1 text-[10.5px] font-semibold tabular-nums text-[hsl(var(--notfair-surface-1))]">
+          <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-[hsl(var(--notfair-warn))] px-1 text-[10.5px] font-semibold tabular-nums text-[hsl(var(--card))]">
             {items.length}
           </span>
         </button>
@@ -80,7 +90,8 @@ export function GoalNeedsYouDialog({ items }: { items: NeedsYouItem[] }) {
             The agent hit things only you can fix — credentials, app
             permissions, account settings. It repeats each ask in every
             check until telemetry proves the fix. Marking one handled
-            closes the ask; it re-escalates if still broken.
+            closes the ask; it re-escalates if still broken. Open Details
+            to ask the agent about it in the conversation that raised it.
           </DialogDescription>
         </DialogHeader>
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -95,15 +106,34 @@ export function GoalNeedsYouDialog({ items }: { items: NeedsYouItem[] }) {
                   raised {timeAgo(item.raised_at)}
                   {item.tick_number !== null && ` · check #${item.tick_number}`}
                 </span>
-                <button
-                  type="button"
-                  className="ns-btn ns-btn-ghost shrink-0 !px-2 !py-0.5 text-[11.5px]"
-                  disabled={pending}
-                  onClick={() => markHandled(item)}
-                >
-                  <Check className="size-3" />
-                  Mark handled
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Link
+                    href={projectHref(
+                      projectSlug,
+                      item.tick_number === null
+                        ? `/goals/${agentSlug}`
+                        : `/goals/${agentSlug}/checks/tick-${item.tick_number}`,
+                    )}
+                    className="ns-btn ns-btn-ghost !px-2 !py-0.5 text-[11.5px]"
+                    aria-label={
+                      item.tick_number === null
+                        ? "Details in goal chat"
+                        : `Details for check #${item.tick_number}`
+                    }
+                  >
+                    <MessageSquareText className="size-3" />
+                    Details
+                  </Link>
+                  <button
+                    type="button"
+                    className="ns-btn ns-btn-ghost !px-2 !py-0.5 text-[11.5px]"
+                    disabled={pending}
+                    onClick={() => markHandled(item)}
+                  >
+                    <Check className="size-3" />
+                    Mark handled
+                  </button>
+                </div>
               </div>
             </li>
           ))}

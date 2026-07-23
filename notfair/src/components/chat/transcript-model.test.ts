@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TranscriptEvent } from "@/server/sessions/transcript-tail";
 import {
   collapseEvents,
-  eventSignature,
+  nextToolGroupKey,
   upsertToolEntry,
 } from "./transcript-model";
 import { humanizeTool, matchMcpServerKey } from "./tool-intent";
@@ -38,6 +38,17 @@ const result = (id: string, tcid: string, ok = true): TranscriptEvent => ({
   summary: null,
   ok,
 });
+const lifecycle = (
+  id: string,
+  phase: string,
+  ok?: boolean,
+): TranscriptEvent => ({
+  kind: "lifecycle",
+  id,
+  ts: t,
+  phase,
+  ok,
+});
 
 describe("collapseEvents", () => {
   it("pairs calls with results and groups contiguous tools", () => {
@@ -57,6 +68,7 @@ describe("collapseEvents", () => {
       ReturnType<typeof collapseEvents>[number],
       { kind: "tool_group" }
     >;
+    expect(group.key).toBe("tg:t1");
     expect(group.tools).toHaveLength(2);
     expect(group.tools[0]).toMatchObject({ toolCallId: "t1", done: true });
     expect(group.tools[1]).toMatchObject({ toolCallId: "t2", done: false });
@@ -75,6 +87,22 @@ describe("collapseEvents", () => {
     ]);
   });
 
+  it("keeps groups unique when a harness reuses tool ids across turns", () => {
+    const items = collapseEvents([
+      call("c1", "item_1"),
+      text("a1", "first turn"),
+      call("c2", "item_1"),
+      text("a2", "second turn"),
+    ]);
+    const groups = items.filter((item) => item.kind === "tool_group");
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "tg:item_1",
+      "tg:item_1:1",
+    ]);
+    expect(nextToolGroupKey(items, "item_1")).toBe("tg:item_1:2");
+  });
+
   it("keeps an orphan tool_result as its own done entry", () => {
     const items = collapseEvents([result("r9", "t9", false)]);
     expect(items).toHaveLength(1);
@@ -84,12 +112,77 @@ describe("collapseEvents", () => {
     >;
     expect(group.tools[0]).toMatchObject({ toolCallId: "t9", done: true, ok: false });
   });
-});
 
-describe("eventSignature", () => {
-  it("keys messages by trimmed body and tools by call id", () => {
-    expect(eventSignature(text("a", " same "))).toBe(eventSignature(text("b", "same")));
-    expect(eventSignature(call("x", "t1"))).toBe("tool_call|t1");
+  it("closes an unmatched tool call when the turn reaches a terminal boundary", () => {
+    const items = collapseEvents([
+      call("c1", "t1"),
+      text("a1", "finished"),
+      lifecycle("done-1", "done"),
+    ]);
+    const group = items[0] as Extract<
+      ReturnType<typeof collapseEvents>[number],
+      { kind: "tool_group" }
+    >;
+    expect(group.tools[0]).toMatchObject({ toolCallId: "t1", done: true });
+  });
+
+  it("marks an unmatched tool failed when the terminal boundary is an error", () => {
+    const items = collapseEvents([
+      call("c1", "t1"),
+      text("err-1", "⚠ harness crashed"),
+      lifecycle("done-1", "done", false),
+    ]);
+    const group = items[0] as Extract<
+      ReturnType<typeof collapseEvents>[number],
+      { kind: "tool_group" }
+    >;
+    expect(group.tools[0]).toMatchObject({
+      toolCallId: "t1",
+      done: true,
+      ok: false,
+    });
+  });
+
+  it("closes abandoned tools before a later turn reuses their id", () => {
+    const items = collapseEvents([
+      call("c1", "item_1"),
+      user("u2", "try again"),
+      lifecycle("start-2", "start"),
+      call("c2", "item_1"),
+    ]);
+    const groups = items.filter((item) => item.kind === "tool_group");
+    expect(groups).toHaveLength(2);
+    expect(groups[0]!.tools[0]).toMatchObject({
+      toolCallId: "item_1",
+      done: true,
+      ok: false,
+    });
+    expect(groups[1]!.tools[0]).toMatchObject({
+      toolCallId: "item_1",
+      done: false,
+    });
+  });
+
+  it("closes an unmatched tool when a fresh lifecycle starts without a user row", () => {
+    const items = collapseEvents([
+      call("c1", "item_1"),
+      lifecycle("start-2", "start"),
+      call("c2", "item_1"),
+    ]);
+    const group = items[0] as Extract<
+      ReturnType<typeof collapseEvents>[number],
+      { kind: "tool_group" }
+    >;
+    expect(group.tools).toHaveLength(2);
+    expect(group.tools[0]).toMatchObject({
+      toolCallId: "item_1",
+      done: true,
+      ok: false,
+    });
+    expect(group.tools[1]).toMatchObject({
+      toolCallId: "item_1",
+      done: false,
+    });
   });
 });
 
