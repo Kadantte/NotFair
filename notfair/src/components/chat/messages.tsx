@@ -123,21 +123,13 @@ export function UserBubble({ body }: { body: string }) {
 
 export function AssistantText({
   body,
-  streaming = false,
 }: {
   body: string;
-  streaming?: boolean;
 }) {
   if (body.trim() === "") return null;
   return (
     <div className="text-[15px] leading-[1.75] text-foreground/95">
       <Markdown>{body}</Markdown>
-      {streaming && (
-        <span
-          aria-hidden
-          className="ml-1 inline-block h-[15px] w-[3px] translate-y-[2px] animate-pulse rounded-full bg-foreground/60"
-        />
-      )}
     </div>
   );
 }

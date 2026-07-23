@@ -279,7 +279,7 @@ export function LiveTranscript({
               )}
               {pendingAssistant && (
                 <li>
-                  <AssistantText body={pendingAssistant} streaming />
+                  <AssistantText body={pendingAssistant} />
                 </li>
               )}
               {pendingError && (
@@ -291,7 +291,10 @@ export function LiveTranscript({
                 </li>
               )}
               {showThinking && (
-                <li>
+                <li
+                  data-live-working-status
+                  className={pendingAssistant ? "!mt-2" : undefined}
+                >
                   {blockedReason ? (
                     <BlockedStatus reason={blockedReason} />
                   ) : (

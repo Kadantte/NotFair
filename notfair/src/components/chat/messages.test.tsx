@@ -2,7 +2,7 @@
 import { fireEvent, render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { RenderItem, ToolGroup } from "./messages";
+import { AssistantText, RenderItem, ToolGroup } from "./messages";
 import type { RenderedItem, ToolEntry } from "./transcript-model";
 
 const runningTool: ToolEntry = {
@@ -13,6 +13,18 @@ const runningTool: ToolEntry = {
   ok: true,
   done: false,
 };
+
+describe("AssistantText", () => {
+  it("does not add a standalone streaming cursor below the message", () => {
+    const { container } = render(
+      <AssistantText body="The answer is still streaming." />,
+    );
+
+    expect(container).toHaveTextContent("The answer is still streaming.");
+    expect(container.querySelector(".animate-pulse")).toBeNull();
+    expect(container.querySelector('span[aria-hidden="true"]')).toBeNull();
+  });
+});
 
 describe("ToolGroup", () => {
   it("stays collapsed by default and preserves a user's expansion when the tool finishes", () => {
